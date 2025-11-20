@@ -51,6 +51,10 @@ export function useSwingActivities() {
           hasSwingTag: activity.comment?.toLowerCase().includes("swing") || false,
         }));
 
+        console.log('[SwingActivities] Fetched activities:', swingActivities.length);
+        console.log('[SwingActivities] Activity types:', swingActivities.map(a => a.activityType));
+        console.log('[SwingActivities] Symbols:', [...new Set(swingActivities.map(a => a.assetSymbol))]);
+
         return swingActivities;
       } catch (error) {
         console.error("Failed to fetch swing activities:", error);

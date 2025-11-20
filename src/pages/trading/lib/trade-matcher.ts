@@ -73,11 +73,65 @@ export class TradeMatcher {
       unmatchedSells.push(...result.unmatchedSells);
     }
 
+    // Convert standalone dividends (from symbols with no trades) into closed trades
+    if (this.includeDividends) {
+      for (const [symbol, symbolDividends] of Object.entries(dividendsBySymbol)) {
+        // Only process dividends for symbols that have no trading activity
+        if (!bySymbol[symbol]) {
+          for (const dividend of symbolDividends) {
+            closedTrades.push(this.createDividendClosedTrade(dividend, symbol));
+          }
+        }
+      }
+    }
+
+    // Also create dividend closed trades for dividends attached to open positions
+    if (this.includeDividends) {
+      for (const position of openPositions) {
+        if (position.totalDividends && position.totalDividends > 0) {
+          // Find all dividends for this position
+          const positionDividends = dividendsBySymbol[position.symbol] || [];
+          for (const dividend of positionDividends) {
+            closedTrades.push(this.createDividendClosedTrade(dividend, position.symbol));
+          }
+        }
+      }
+    }
+
     return {
       closedTrades,
       openPositions,
       unmatchedBuys,
       unmatchedSells,
+    };
+  }
+
+  /**
+   * Create a closed trade from a dividend activity (treats dividend as realized income)
+   */
+  private createDividendClosedTrade(dividend: ActivityDetails, symbol: string): ClosedTrade {
+    const dividendDate = new Date(dividend.date);
+    const dividendAmount = dividend.amount || 0;
+
+    return {
+      id: `dividend-${dividend.id}`,
+      symbol,
+      assetName: dividend.assetName || undefined,
+      entryDate: dividendDate,
+      exitDate: dividendDate,
+      quantity: 0, // Dividends don't have quantity
+      entryPrice: 0,
+      exitPrice: 0,
+      totalFees: 0,
+      totalDividends: dividendAmount,
+      realizedPL: dividendAmount, // Dividend is pure profit
+      returnPercent: 0, // No cost basis for dividends
+      holdingPeriodDays: 0,
+      currency: dividend.currency,
+      accountId: dividend.accountId,
+      accountName: dividend.accountName || "",
+      buyActivityId: dividend.id,
+      sellActivityId: dividend.id,
     };
   }
 

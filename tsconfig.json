@@ -2,7 +2,7 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     // Main app specific settings
-    "types": ["@tauri-apps/api", "vitest/globals"],
+    "types": ["@tauri-apps/api", "vitest/globals", "@testing-library/jest-dom", "node"],
     "noEmit": true,
     "composite": false, // Main app doesn't need to be composite
 
@@ -16,6 +16,7 @@
     }
   },
   "include": ["src"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts", "src/test"],
   "references": [
     { "path": "./tsconfig.node.json" },
     { "path": "./packages/ui" },

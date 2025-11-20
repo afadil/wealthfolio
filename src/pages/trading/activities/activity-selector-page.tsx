@@ -24,6 +24,7 @@ import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useDateFormatter } from "@/hooks/use-date-formatter";
+import { ActivityTypeBadge } from "@/pages/activity/components/activity-type-badge";
 
 export default function ActivitySelectorPage() {
   const { t } = useTranslation("trading");
@@ -218,6 +219,8 @@ export default function ActivitySelectorPage() {
                     </SelectItem>
                     <SelectItem value="BUY">{t("activitySelector.types.buy")}</SelectItem>
                     <SelectItem value="SELL">{t("activitySelector.types.sell")}</SelectItem>
+                    <SelectItem value="ADD_HOLDING">Add Holding</SelectItem>
+                    <SelectItem value="DIVIDEND">Dividend</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -274,11 +277,7 @@ export default function ActivitySelectorPage() {
                           {formatActivityDate(new Date(activity.date))}
                         </td>
                         <td className="p-3">
-                          <Badge
-                            variant={activity.activityType === "BUY" ? "default" : "secondary"}
-                          >
-                            {activity.activityType}
-                          </Badge>
+                          <ActivityTypeBadge type={activity.activityType as any} />
                         </td>
                         <td className="p-3 font-medium">
                           {activity.assetSymbol}

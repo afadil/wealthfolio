@@ -221,8 +221,6 @@ export async function loadInstalledAddons(): Promise<void> {
   logger.info(
     `🎉 Successfully loaded ${loadedCount} out of ${enabledAddonFiles.length} enabled addons`,
   );
-
-  // Debug: Show current navigation state
 }
 
 /**

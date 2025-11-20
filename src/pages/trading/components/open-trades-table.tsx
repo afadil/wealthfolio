@@ -106,6 +106,11 @@ export function OpenTradesTable({ positions }: OpenTradesTableProps) {
         accessorKey: "accountName",
         header: t("components.openTrades.table.account"),
         cell: ({ row }) => row.original.accountName,
+        filterFn: (row, _columnId, filterValue: Set<string>) => {
+          // filterValue is the set of selected account IDs
+          if (!filterValue || filterValue.size === 0) return true;
+          return filterValue.has(row.original.accountId);
+        },
       },
       {
         accessorKey: "quantity",
@@ -203,16 +208,12 @@ export function OpenTradesTable({ positions }: OpenTradesTableProps) {
 
   // Apply account filter
   useEffect(() => {
-    if (selectedAccounts.size > 0) {
-      table
-        .getColumn("accountName")
-        ?.setFilterValue((value: string) =>
-          selectedAccounts.has(positions.find((p) => p.accountName === value)?.accountId || ""),
-        );
-    } else {
-      table.getColumn("accountName")?.setFilterValue(undefined);
+    const accountColumn = table.getColumn("accountName");
+    if (accountColumn) {
+      // Pass the Set of selected account IDs as the filter value
+      accountColumn.setFilterValue(selectedAccounts.size > 0 ? selectedAccounts : undefined);
     }
-  }, [selectedAccounts, table, positions]);
+  }, [selectedAccounts, table]);
 
   const hasFilters = globalFilter || selectedAccounts.size > 0;
 

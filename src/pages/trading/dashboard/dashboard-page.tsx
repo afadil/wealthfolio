@@ -35,6 +35,10 @@ export default function DashboardPage() {
   const { data: dashboardData, isLoading, error, refetch } = useSwingDashboard(selectedPeriod);
   const { preferences } = useSwingPreferences();
 
+  console.log('[DashboardPage] Dashboard data:', dashboardData);
+  console.log('[DashboardPage] Preferences:', preferences);
+  console.log('[DashboardPage] Selected activity IDs:', preferences.selectedActivityIds);
+
   const handleNavigateToActivities = () => {
     navigate("/trading/activities");
   };

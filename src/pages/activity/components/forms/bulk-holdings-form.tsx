@@ -304,11 +304,11 @@ export const BulkHoldingsForm = ({
       if (fields.length > 1) {
         remove(index);
         // Focus previous row if removing current selection
-        if (index > 0) {
-          requestAnimationFrame(() => {
-            setFocus(`holdings.${index - 1}.ticker`);
-          });
-        }
+      }
+      if (index > 0) {
+        requestAnimationFrame(() => {
+          setFocus(`holdings.${index - 1}.ticker`);
+        });
       }
     },
     [remove, fields.length, setFocus],

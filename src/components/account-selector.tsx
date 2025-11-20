@@ -131,7 +131,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
 
     if (includePortfolio) {
       const baseCurrency = settings?.baseCurrency ?? "USD"; // Default to USD if settings not loaded
-      const portfolioAccount = createPortfolioAccount(baseCurrency, t);
+      const portfolioAccount = createPortfolioAccount(baseCurrency, t as any);
       // Check if portfolio account already exists to avoid duplication
       const portfolioExists = accounts.some((account) => account.id === PORTFOLIO_ACCOUNT_ID);
 
