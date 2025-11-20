@@ -15,11 +15,6 @@ use crate::events::{
     PORTFOLIO_UPDATE_ERROR, PORTFOLIO_UPDATE_START, RESOURCE_CHANGED,
 };
 
-#[cfg(feature = "wealthfolio-pro")]
-use crate::SyncHandles;
-#[cfg(feature = "wealthfolio-pro")]
-use wealthfolio_core::sync::peer_store;
-
 /// Sets up the global event listeners for the application.
 pub fn setup_event_listeners(handle: AppHandle) {
     // Listener for consolidated portfolio update requests
@@ -147,9 +142,6 @@ fn handle_resource_change(handle: AppHandle, payload_str: &str) {
 
     match serde_json::from_str::<ResourceEventPayload>(payload_str) {
         Ok(event) => {
-            #[cfg(feature = "wealthfolio-pro")]
-            schedule_peer_sync(handle.clone());
-
             match event.resource_type.as_str() {
                 "account" => handle_account_resource_change(handle.clone(), &event),
                 "activity" => handle_activity_resource_change(handle.clone(), &event),
@@ -322,42 +314,6 @@ fn collect_activity_symbols(
         }
     }
 }
-
-#[cfg(feature = "wealthfolio-pro")]
-fn schedule_peer_sync(handle: AppHandle) {
-    if let Some(sync_handles) = handle.try_state::<SyncHandles>() {
-        let engine = sync_handles.engine.clone();
-        spawn(async move {
-            let pool = engine.db_pool();
-            let peers = match pool.get() {
-                Ok(mut conn) => match peer_store::load_peers(&mut conn) {
-                    Ok(peers) => peers,
-                    Err(err) => {
-                        warn!("Failed to load peers for realtime sync: {}", err);
-                        return;
-                    }
-                },
-                Err(err) => {
-                    warn!(
-                        "Failed to get database connection for realtime sync: {}",
-                        err
-                    );
-                    return;
-                }
-            };
-
-            for peer in peers.into_iter() {
-                let engine = engine.clone();
-                spawn(async move {
-                    if let Err(err) = engine.sync_now(peer.id).await {
-                        warn!("Realtime sync with peer {} failed: {}", peer.id, err);
-                    }
-                });
-            }
-        });
-    }
-}
-
 // Removed unused routable checks; engine will handle connectivity fallbacks
 
 // This function handles the portfolio snapshot and history calculation logic

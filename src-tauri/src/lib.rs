@@ -6,8 +6,6 @@ mod context;
 mod events;
 mod listeners;
 mod secret_store;
-#[cfg(feature = "wealthfolio-pro")]
-mod sync_identity;
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod menu;
@@ -22,42 +20,24 @@ use updater::check_for_update;
 use dotenvy::dotenv;
 use std::env;
 use std::sync::Arc;
-#[cfg(feature = "wealthfolio-pro")]
-use uuid;
 
 use tauri::AppHandle;
 use tauri::Manager;
 
 use context::ServiceContext;
-#[cfg(feature = "wealthfolio-pro")]
-use events::emit_portfolio_trigger_recalculate;
 use events::{emit_app_ready, emit_portfolio_trigger_update, PortfolioRequestPayload};
-#[cfg(feature = "wealthfolio-pro")]
-use sync_identity::get_or_create_sync_identity;
-#[cfg(feature = "wealthfolio-pro")]
-use wealthfolio_core::sync::{engine::SyncEngine, transport};
 
-#[cfg(feature = "wealthfolio-pro")]
-#[derive(Clone)]
-pub struct SyncHandles {
-    pub engine: SyncEngine,
-}
-
-#[cfg(not(feature = "wealthfolio-pro"))]
-#[derive(Clone)]
-pub struct SyncHandles;
-
-/// Spawns background tasks such as menu setup, update checks, and initial portfolio sync.
+/// Spawns background tasks such as menu setup, update checks, and initial portfolio update.
 fn spawn_background_tasks(
     handle: AppHandle,
-    _context: Arc<ServiceContext>,
-    _instance_id: Arc<String>,
+    context: Arc<ServiceContext>,
+    instance_id: Arc<String>,
 ) {
     // Set up menu and updater (desktop only)
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
         let menu_handle = handle.clone();
-        let instance_id_menu = _instance_id.clone();
+        let instance_id_menu = instance_id.clone();
         tauri::async_runtime::spawn(async move {
             match menu::create_menu(&menu_handle) {
                 Ok(menu) => {
@@ -77,8 +57,8 @@ fn spawn_background_tasks(
 
         // Check for updates on startup (if enabled)
         let update_handle = handle.clone();
-        let instance_id_update = _instance_id.clone();
-        let update_context = _context.clone();
+        let instance_id_update = instance_id.clone();
+        let update_context = context.clone();
         tauri::async_runtime::spawn(async move {
             if let Ok(is_enabled) = update_context
                 .settings_service()
@@ -97,83 +77,6 @@ fn spawn_background_tasks(
         .refetch_all_market_data(false)
         .build();
     emit_portfolio_trigger_update(&handle, initial_payload);
-
-    #[cfg(feature = "wealthfolio-pro")]
-    {
-        let handle_clone = handle.clone();
-        let ctx_for_sync = _context.clone();
-        tauri::async_runtime::spawn(async move {
-            // Check if sync is enabled
-            let is_sync_enabled = ctx_for_sync
-                .settings_service()
-                .is_sync_enabled()
-                .unwrap_or(false);
-
-            // 1) Get DB pool
-            let pool = ctx_for_sync.db_pool();
-
-            // 2) Stable device_id and QUIC identity from OS keyring on all platforms
-            let (device_id, identity) = match get_or_create_sync_identity() {
-                Ok(value) => value,
-                Err(err) => {
-                    log::warn!("failed to load sync identity from keyring: {err}");
-                    let fallback_id = uuid::Uuid::new_v4();
-                    let identity = transport::Identity::generate_for_device(fallback_id)
-                        .expect("generate fallback sync identity");
-                    (fallback_id, Arc::new(identity))
-                }
-            };
-            let device_id_str = device_id.to_string();
-
-            // Mirror device_id into DB for triggers
-            {
-                use diesel::prelude::*;
-                let mut conn = pool.get().expect("db conn");
-                let _ = diesel::sql_query("PRAGMA foreign_keys = ON;").execute(&mut conn);
-                let _ = diesel::sql_query("INSERT OR REPLACE INTO sync_device(id) VALUES (?1)")
-                    .bind::<diesel::sql_types::Text, _>(&device_id_str)
-                    .execute(&mut conn);
-            }
-
-            // 3) Create the engine and make it available to commands immediately
-            let listen_addr = "0.0.0.0:33445".to_string();
-            let listen_endpoints = vec![format!("quic://{listen_addr}")];
-            let mut engine = SyncEngine::with_identity(
-                pool.clone(),
-                device_id,
-                listen_addr,
-                listen_endpoints,
-                Arc::clone(&identity),
-            );
-            // Keep engine reachable from commands as early as possible
-            handle_clone.manage(SyncHandles {
-                engine: engine.clone(),
-            });
-
-            if is_sync_enabled {
-                // Notify app when a sync Pull actually applies local data: trigger recalc
-                let handle_for_cb = handle_clone.clone();
-                engine.set_on_apply_sync(Arc::new(move || {
-                    emit_portfolio_trigger_recalculate(
-                        &handle_for_cb,
-                        PortfolioRequestPayload::builder()
-                            .refetch_all_market_data(true)
-                            .build(),
-                    );
-                }));
-
-                if let Err(_e) = engine.start().await {
-                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
-                    log::error!("sync start error: {_e}");
-                    return;
-                }
-
-                log::info!("sync engine started successfully");
-            } else {
-                log::debug!("sync is disabled in settings; engine registered but not started");
-            }
-        });
-    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -366,27 +269,6 @@ pub fn run() {
             commands::addon::install_addon_from_staging,
             commands::addon::clear_addon_staging,
             commands::addon::submit_addon_rating,
-            // Device Sync commands in pro version only
-            #[cfg(feature = "wealthfolio-pro")]
-            commands::sync::get_sync_status,
-            #[cfg(feature = "wealthfolio-pro")]
-            commands::sync::get_device_name,
-            #[cfg(feature = "wealthfolio-pro")]
-            commands::sync::generate_pairing_payload,
-            #[cfg(feature = "wealthfolio-pro")]
-            commands::sync::enable_sync_now,
-            #[cfg(feature = "wealthfolio-pro")]
-            commands::sync::disable_sync_now,
-            #[cfg(feature = "wealthfolio-pro")]
-            commands::sync::pair_and_sync,
-            #[cfg(feature = "wealthfolio-pro")]
-            commands::sync::force_full_sync_with_peer,
-            #[cfg(feature = "wealthfolio-pro")]
-            commands::sync::sync_now,
-            #[cfg(feature = "wealthfolio-pro")]
-            commands::sync::probe_local_network_access,
-            #[cfg(feature = "wealthfolio-pro")]
-            commands::sync::initialize_sync_for_existing_data,
         ])
         .build(tauri::generate_context!())
         .expect("error while running wealthfolio application");
