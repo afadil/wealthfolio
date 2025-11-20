@@ -1,5 +1,6 @@
 import { useAccounts } from "@/hooks/use-accounts";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { useRecalculatePortfolioMutation, useUpdatePortfolioMutation } from "@/hooks/use-calculate-portfolio";
 import { useHoldings } from "@/hooks/use-holdings";
 import { AccountType, HoldingType, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { useSettingsContext } from "@/lib/settings-provider";
@@ -27,6 +28,14 @@ interface LauncherAccountItem {
   name: string;
   accountType: Account["accountType"];
 }
+interface LauncherActionItem {
+  title: string;
+  href: string;
+  icon?: React.ReactNode;
+  keywords?: string[];
+  label?: string;
+  disabled?: boolean;
+}
 
 const accountTypeIcons: Record<AccountType | typeof PORTFOLIO_ACCOUNT_ID, Icon> = {
   [AccountType.SECURITIES]: Icons.Briefcase,
@@ -45,6 +54,14 @@ export function AppLauncher() {
   const { holdings, isLoading: isHoldingsLoading } = useHoldings(PORTFOLIO_ACCOUNT_ID);
   const { isBalanceHidden, toggleBalanceVisibility } = useBalancePrivacy();
   const { updateSettings } = useSettingsContext();
+  const {
+    mutate: updatePortfolio,
+    isPending: isUpdatingPortfolio,
+  } = useUpdatePortfolioMutation();
+  const {
+    mutate: recalculatePortfolio,
+    isPending: isRecalculatingPortfolio,
+  } = useRecalculatePortfolioMutation();
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -86,7 +103,7 @@ export function AppLauncher() {
   }, [location.pathname]);
 
   // Combine navigation items with additional quick actions
-  const actionItems = useMemo(() => {
+  const actionItems = useMemo<LauncherActionItem[]>(() => {
     // Build smart URL with context awareness and optional activity type
     const buildTransactionUrl = (activityType?: string) => {
       const path = location.pathname;
@@ -123,7 +140,7 @@ export function AppLauncher() {
     };
 
     // Additional quick actions not in main navigation
-    const quickActions = [
+    const quickActions: LauncherActionItem[] = [
       {
         title: isBalanceHidden ? "Show Balance" : "Hide Balance",
         href: "#toggle-privacy",
@@ -155,6 +172,30 @@ export function AppLauncher() {
         icon: <Icons.Monitor className="size-6" />,
         keywords: ["theme", "system", "appearance", "mode", "auto"],
         label: "Theme → System",
+      },
+      {
+        title: "Update Market Data",
+        href: "#update-portfolio",
+        icon: isUpdatingPortfolio ? (
+          <Icons.Spinner className="size-6 animate-spin" />
+        ) : (
+          <Icons.Refresh className="size-6" />
+        ),
+        keywords: ["update", "portfolio", "market data", "quotes", "refresh"],
+        label: isUpdatingPortfolio ? "Updating market data..." : "Update market data",
+        disabled: isUpdatingPortfolio,
+      },
+      {
+        title: "Recalculate Portfolio",
+        href: "#recalculate-portfolio",
+        icon: isRecalculatingPortfolio ? (
+          <Icons.Spinner className="size-6 animate-spin" />
+        ) : (
+          <Icons.Clock className="size-6" />
+        ),
+        keywords: ["recalculate", "portfolio", "reprice", "history", "refresh"],
+        label: isRecalculatingPortfolio ? "Recalculating portfolio..." : "Recalculate portfolio",
+        disabled: isRecalculatingPortfolio,
       },
       {
         title: "Record Buy",
@@ -225,10 +266,16 @@ export function AppLauncher() {
       ...(navigation.primary ?? []),
       ...(navigation.secondary ?? []),
       ...(navigation.addons ?? []),
-    ];
+    ] as LauncherActionItem[];
 
     return [...quickActions, ...navItems];
-  }, [navigation, location.pathname, isBalanceHidden]);
+  }, [
+    isBalanceHidden,
+    isRecalculatingPortfolio,
+    isUpdatingPortfolio,
+    location.pathname,
+    navigation,
+  ]);
 
   const holdingOptions = useMemo<LauncherHoldingItem[]>(() => {
     if (!holdings?.length) {
@@ -315,6 +362,26 @@ export function AppLauncher() {
       return;
     }
 
+    if (path === "#update-portfolio") {
+      if (isUpdatingPortfolio) {
+        return;
+      }
+      updatePortfolio();
+      setSearch("");
+      setOpen(false);
+      return;
+    }
+
+    if (path === "#recalculate-portfolio") {
+      if (isRecalculatingPortfolio) {
+        return;
+      }
+      recalculatePortfolio();
+      setSearch("");
+      setOpen(false);
+      return;
+    }
+
     setSearch("");
     setOpen(false);
     navigate(path);
@@ -359,7 +426,12 @@ export function AppLauncher() {
               const iconElement = action.icon;
               const resizedIcon = iconElement
                 ? React.cloneElement(iconElement as React.ReactElement<{ className?: string }>, {
-                    className: "text-muted-foreground mr-2 h-4 w-4",
+                    className: [
+                      "text-muted-foreground mr-2 h-4 w-4",
+                      (iconElement as React.ReactElement<{ className?: string }>).props.className,
+                    ]
+                      .filter(Boolean)
+                      .join(" "),
                   })
                 : null;
 
@@ -371,6 +443,7 @@ export function AppLauncher() {
                   key={action.href ?? index}
                   value={displayText}
                   keywords={action.keywords ?? []}
+                  disabled={action.disabled}
                   onSelect={() => handleSelectAction(action.href)}
                 >
                   {resizedIcon}
