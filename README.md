@@ -46,7 +46,7 @@ Data Storage. No Subscriptions, No Cloud.
 
 Visit the app website at [Wealthfolio App](https://wealthfolio.app/).
 
-![Screenshot](public/screenshot.png)
+![Screenshot](public/screenshot.webp)
 
 ### ✨ Key Features
 
@@ -78,8 +78,7 @@ functionality:
   data
 - **🔐 Secrets Management** - Secure storage for API keys and sensitive data
 
-**Get started building addons:**
-[Addon Developer Guide](docs/addons/addon-developer-guide.md)
+**Get started building addons:** See the [Addon Documentation Hub](docs/addons/index.md)
 
 Documentation for all Activity types, including the required form fields, is
 available in
@@ -101,21 +100,15 @@ See [ROADMAP.md](./ROADMAP.md).
 
 - **[Addon Documentation Hub](docs/addons/index.md)** - Main entry point for
   addon development
-- **[Developer Guide](docs/addons/addon-developer-guide.md)** - Comprehensive
-  guide from setup to advanced patterns
+- **[Getting Started](docs/addons/addon-getting-started.md)** - Guide to get
+  started with addon development
 - **[API Reference](docs/addons/addon-api-reference.md)** - Complete API
   documentation with examples
-- **[Permission System](docs/addons/addon-permissions.md)** - Security and
-  permission system guide
-- **[Examples & Tutorials](docs/addons/addon-examples.md)** - Practical examples
-  and step-by-step tutorials
+- **[Architecture](docs/addons/addon-architecture.md)** - Design patterns and
+  architecture guide
 
 ### Quick Links
 
-- 🚀
-  **[Get Started with Addons](docs/addons/addon-developer-guide.md#quick-start)**
-- 🔒
-  **[Security Best Practices](docs/addons/addon-permissions.md#security-best-practices)**
 - 💡 **[Example Addons](addons/)** - Browse sample addons in the repository
 - 🛠️ **[Development Tools](packages/addon-dev-tools/)** - CLI tools for addon
   development
@@ -303,8 +296,8 @@ The latest server build is published to Docker Hub.
 docker pull afadil/wealthfolio:latest
 ```
 
-After pulling, use `afadil/wealthfolio:latest` in the run commands below. If
-you build the image locally, swap the image name back to `wealthfolio`.
+After pulling, use `afadil/wealthfolio:latest` in the run commands below. If you
+build the image locally, swap the image name back to `wealthfolio`.
 
 ### Building the Image
 
@@ -528,18 +521,16 @@ Your addon will be automatically discovered and loaded with hot reload support!
 Check out the [addons/](addons/) directory for sample addons including:
 
 - **Goal Progress Tracker**: Visual goal tracking with calendar like interface
-- More examples in the [documentation](docs/addons/addon-examples.md)
+- **Investment Fees Tracker**: Track and analyze investment fees
 
 ### Resources
 
-- **[Complete Developer Guide](docs/addons/addon-developer-guide.md)** -
-  Everything you need to know
+- **[Getting Started Guide](docs/addons/addon-getting-started.md)** -
+  Everything you need to know to start building addons
 - **[API Reference](docs/addons/addon-api-reference.md)** - Full API
   documentation
-- **[Permission System](docs/addons/addon-permissions.md)** - Security and
-  permissions guide
-- **[Examples & Tutorials](docs/addons/addon-examples.md)** - Step-by-step
-  tutorials
+- **[Architecture Guide](docs/addons/addon-architecture.md)** - Design patterns
+  and best practices
 
 ## Technologies Used
 
