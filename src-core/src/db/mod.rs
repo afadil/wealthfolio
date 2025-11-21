@@ -88,19 +88,19 @@ pub fn get_db_path(input: &str) -> String {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
         // Desktop/server behavior:
-        // 1) Prefer DATABASE_URL if provided (preserve legacy semantics, including relative paths)
+        // Prefer DATABASE_URL if provided and non-empty; otherwise, always
+        // treat `input` as the app data directory and append `app.db`.
         if let Ok(url) = std::env::var("DATABASE_URL") {
-            return url;
+            if !url.trim().is_empty() {
+                return url;
+            }
         }
 
-        // 2) If input looks like a file (has an extension), use it directly
-        let p = Path::new(input);
-        if p.extension().is_some() {
-            return p.to_str().unwrap().to_string();
-        }
-
-        // 3) Otherwise, treat it as a directory and append default filename
-        return p.join("app.db").to_str().unwrap().to_string();
+        return Path::new(input)
+            .join("app.db")
+            .to_str()
+            .unwrap()
+            .to_string();
     }
 }
 
