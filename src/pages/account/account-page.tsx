@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/sheet";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useValuationHistory } from "@/hooks/use-valuation-history";
+import { usePortfolioDividends } from "@/hooks/use-portfolio-dividends";
 import { AccountType } from "@/lib/constants";
 import { Account, AccountValuation, DateRange, TimePeriod, TrackedItem } from "@/lib/types";
 import { calculatePerformanceMetrics, cn } from "@/lib/utils";
@@ -117,6 +118,9 @@ const AccountPage = () => {
     id,
   );
 
+  const { data: dividendData } = usePortfolioDividends();
+  const accountDividends = dividendData?.dividendsByAccount.get(id) || 0;
+
   // Calculate gainLossAmount and simpleReturn from valuationHistory
   const { gainLossAmount: frontendGainLossAmount, simpleReturn: frontendSimpleReturn } =
     useMemo(() => {
@@ -134,6 +138,15 @@ const AccountPage = () => {
   }, [valuationHistory]);
 
   const currentValuation = valuationHistory?.[valuationHistory.length - 1];
+
+  const adjustedValuation = useMemo(() => {
+    if (!currentValuation) return currentValuation;
+    // Adjust cost basis by subtracting dividends to show "Net Capital at Risk"
+    return {
+      ...currentValuation,
+      costBasis: Math.max(0, currentValuation.costBasis - accountDividends),
+    };
+  }, [currentValuation, accountDividends]);
 
   const isLoading = isAccountsLoading || isValuationHistoryLoading;
   const isDetailsLoading = isLoading || isPerformanceHistoryLoading;
@@ -343,7 +356,7 @@ const AccountPage = () => {
 
           <div className="flex flex-col space-y-4">
             <AccountMetrics
-              valuation={currentValuation}
+              valuation={adjustedValuation}
               performance={accountPerformance}
               className="grow"
               isLoading={isDetailsLoading || isPerformanceHistoryLoading}

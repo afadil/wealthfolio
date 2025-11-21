@@ -1,7 +1,7 @@
 import { AdaptiveCalendarView } from "../components/adaptive-calendar-view";
 import { DistributionCharts } from "../components/distribution-charts";
 import { EquityCurveChart } from "../components/equity-curve-chart";
-import { OpenTradesTable } from "../components/open-trades-table";
+import { OpenTradesTable } from "@/components/open-trades-table";
 import { PeriodSelector, getChartPeriodDisplay } from "../components/period-selector";
 import { SettingsSheet } from "../components/settings-sheet";
 import { useSwingDashboard } from "../hooks/use-swing-dashboard";

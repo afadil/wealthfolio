@@ -24,6 +24,9 @@ import AssetLotsTable from "./asset-lots-table";
 import QuoteHistoryTable from "./quote-history-table";
 import { useAssetProfileMutations } from "./use-asset-profile-mutations";
 import { useQuoteMutations } from "./use-quote-mutations";
+import { AssetOpenPositions } from "./components/asset-open-positions";
+import { AssetActivitiesTable } from "./components/asset-activities-table";
+import { useAssetPerformance } from "./hooks/use-asset-performance";
 
 interface AssetProfileFormData {
   name: string;
@@ -56,10 +59,10 @@ interface AssetDetailData {
   } | null;
 }
 
-type AssetTab = "overview" | "lots" | "history";
+type AssetTab = "overview" | "lots" | "history" | "activities";
 
 export const AssetProfilePage = () => {
-  const { t } = useTranslation(["assets"]);
+  const { t } = useTranslation(["assets", "activity"]);
   const { symbol: encodedSymbol = "" } = useParams<{ symbol: string }>();
   const symbol = decodeURIComponent(encodedSymbol);
   const location = useLocation();
@@ -109,6 +112,9 @@ export const AssetProfilePage = () => {
     symbol,
     enabled: !!symbol,
   });
+
+  // Use the new hook to get dividend-adjusted performance data
+  const { openPositions, totalDividends, isLoading: isPerformanceLoading } = useAssetPerformance(symbol);
 
   const quote = useMemo(() => {
     return quoteHistory?.at(-1) ?? null;
@@ -165,10 +171,28 @@ export const AssetProfilePage = () => {
   const symbolHolding = useMemo((): AssetDetailData | null => {
     if (!holding) return null;
 
+    // Adjust metrics to include dividends as return of capital/total return
+    // Adjusted Cost Basis = Original Cost Basis - Total Dividends
+    // Adjusted Total Return = (Market Value - Adjusted Cost Basis)
+    //                       = Market Value - (Original Cost Basis - Total Dividends)
+    //                       = (Market Value - Original Cost Basis) + Total Dividends
+    
+    const originalCostBasis = holding.costBasis?.local ?? 0;
+    const adjustedCostBasis = Math.max(0, originalCostBasis - totalDividends);
+    
     const averageCostPrice =
-      holding.costBasis?.local && holding.quantity !== 0
-        ? holding.costBasis.local / holding.quantity
+      adjustedCostBasis && holding.quantity !== 0
+        ? adjustedCostBasis / holding.quantity
         : 0;
+
+    const originalTotalReturn = holding.totalGain?.local ?? 0;
+    const adjustedTotalReturn = originalTotalReturn + totalDividends;
+    
+    // Recalculate return percent based on adjusted cost basis
+    // If cost basis is reduced to 0, return is infinite (or handled gracefully)
+    const adjustedTotalReturnPercent = adjustedCostBasis > 0 
+      ? adjustedTotalReturn / adjustedCostBasis 
+      : 0;
 
     const quoteData = quote
       ? {
@@ -188,17 +212,17 @@ export const AssetProfilePage = () => {
     return {
       numShares: Number(holding.quantity),
       marketValue: Number(holding.marketValue.local ?? 0),
-      costBasis: Number(holding.costBasis?.local ?? 0),
-      averagePrice: Number(averageCostPrice),
+      costBasis: Number(adjustedCostBasis), // Use adjusted cost basis
+      averagePrice: Number(averageCostPrice), // Use adjusted average price
       portfolioPercent: Number(holding.weight ?? 0),
       todaysReturn: quoteData?.todaysReturn ?? null,
       todaysReturnPercent: quoteData?.todaysReturnPercent ?? null,
-      totalReturn: Number(holding.totalGain?.local ?? 0),
-      totalReturnPercent: Number(holding.totalGainPct ?? 0),
+      totalReturn: Number(adjustedTotalReturn), // Use adjusted total return
+      totalReturnPercent: Number(adjustedTotalReturnPercent), // Use adjusted total return percent
       currency: holding.localCurrency ?? holding.instrument?.currency ?? "USD",
       quote: quoteData?.quote ?? null,
     };
-  }, [holding, quote]);
+  }, [holding, quote, totalDividends]);
 
   const handleSave = useCallback(() => {
     if (!holding) return;
@@ -252,6 +276,7 @@ export const AssetProfilePage = () => {
       items.push({ value: "lots", label: t("assets:profile.tabs.lots") });
     }
 
+    items.push({ value: "activities", label: t("activity:page.title", { defaultValue: "Activities" }) });
     items.push({ value: "history", label: t("assets:profile.tabs.quotes") });
 
     return items;
@@ -444,6 +469,13 @@ export const AssetProfilePage = () => {
             marketPrice={profile.marketPrice}
           />
         ),
+      });
+    }
+
+    if (profile) {
+      tabs.push({
+        name: t("activity:page.title", { defaultValue: "Activities" }),
+        content: <AssetActivitiesTable symbol={symbol} />,
       });
     }
 
@@ -867,6 +899,8 @@ export const AssetProfilePage = () => {
                   )}
                 </div>
               </div>
+
+              <AssetOpenPositions openPositions={openPositions} isLoading={isPerformanceLoading} />
             </TabsContent>
           )}
 
@@ -880,6 +914,11 @@ export const AssetProfilePage = () => {
               />
             </TabsContent>
           )}
+
+          {/* Activities Content */}
+          <TabsContent value="activities" className="pt-6">
+            <AssetActivitiesTable symbol={symbol} />
+          </TabsContent>
 
           {/* History/Quotes Content: Requires quoteHistory */}
           <TabsContent value="history" className="space-y-16 pt-6">

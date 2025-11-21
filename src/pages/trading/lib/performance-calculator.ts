@@ -33,8 +33,10 @@ export class PerformanceCalculator {
     );
 
     // Calculate unrealized P/L from open positions
+    // Note: We must exclude dividends from here if they are already counted in realized P/L
+    // to avoid double counting. OpenPosition.unrealizedPL includes dividends.
     const totalUnrealizedPL = openPositions.reduce(
-      (sum, pos) => sum + convert(pos.unrealizedPL, pos.currency),
+      (sum, pos) => sum + convert(pos.unrealizedPL - (pos.totalDividends || 0), pos.currency),
       0,
     );
 

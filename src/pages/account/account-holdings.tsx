@@ -1,5 +1,6 @@
 import { getHoldings } from "@/commands/portfolio";
 import { useAccounts } from "@/hooks/use-accounts";
+import { useDividendAdjustedHoldings } from "@/hooks/use-dividend-adjusted-holdings";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { QueryKeys } from "@/lib/query-keys";
 import { Account, Holding, HoldingType } from "@/lib/types";
@@ -19,6 +20,8 @@ const AccountHoldings = ({ accountId }: { accountId: string }) => {
     queryFn: () => getHoldings(accountId),
   });
 
+  const { adjustedHoldings } = useDividendAdjustedHoldings(holdings ?? undefined);
+
   const { accounts } = useAccounts();
 
   const selectedAccount = useMemo(() => {
@@ -29,11 +32,11 @@ const AccountHoldings = ({ accountId }: { accountId: string }) => {
     return selectedAccount ? [selectedAccount] : [];
   }, [selectedAccount]);
 
-  if (!isLoading && !holdings?.length) {
+  if (!isLoading && !adjustedHoldings?.length) {
     return null;
   }
 
-  const filteredHoldings = holdings?.filter((holding) => holding.holdingType !== HoldingType.CASH);
+  const filteredHoldings = adjustedHoldings?.filter((holding) => holding.holdingType !== HoldingType.CASH);
 
   if (!isLoading && !filteredHoldings?.length) {
     return null;

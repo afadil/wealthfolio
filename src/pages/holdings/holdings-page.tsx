@@ -21,6 +21,7 @@ import { useAccounts } from "@/hooks/use-accounts";
 import { useHapticFeedback } from "@/hooks/use-haptic-feedback";
 import { useHoldings } from "@/hooks/use-holdings";
 import { usePlatform } from "@/hooks/use-platform";
+import { useDividendAdjustedHoldings } from "@/hooks/use-dividend-adjusted-holdings";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { Account, Holding, HoldingType, Instrument } from "@/lib/types";
@@ -55,6 +56,7 @@ export const HoldingsPage = () => {
   const { settings } = useSettingsContext();
 
   const { holdings, isLoading } = useHoldings(selectedAccount?.id ?? PORTFOLIO_ACCOUNT_ID);
+  const { adjustedHoldings } = useDividendAdjustedHoldings(holdings ?? undefined);
   const { accounts } = useAccounts();
   const { isMobile: isMobilePlatform } = usePlatform();
   const triggerHaptic = useHapticFeedback();
@@ -90,7 +92,7 @@ export const HoldingsPage = () => {
   };
 
   const holdingsForSheet = useMemo(() => {
-    if (!sheetFilterType || !holdings) {
+    if (!sheetFilterType || !adjustedHoldings) {
       return [];
     }
 
@@ -98,30 +100,30 @@ export const HoldingsPage = () => {
 
     switch (sheetFilterType) {
       case "class":
-        filteredHoldings = holdings.filter((h) => {
+        filteredHoldings = adjustedHoldings.filter((h) => {
           const isCash = h.holdingType === HoldingType.CASH;
           const assetSubClass = isCash ? t("page.cash") : (h.instrument?.assetSubclass ?? "Other");
           return assetSubClass === sheetFilterName;
         });
         break;
       case "sector":
-        filteredHoldings = holdings.filter((h) =>
+        filteredHoldings = adjustedHoldings.filter((h) =>
           h.instrument?.sectors?.some((s) => s.name === sheetFilterName),
         );
         break;
       case "country":
-        filteredHoldings = holdings.filter((h) =>
+        filteredHoldings = adjustedHoldings.filter((h) =>
           h.instrument?.countries?.some((c) => c.name === sheetFilterName),
         );
         break;
       case "currency":
-        filteredHoldings = holdings.filter((h) => h.localCurrency === sheetFilterName);
+        filteredHoldings = adjustedHoldings.filter((h) => h.localCurrency === sheetFilterName);
         break;
       case "composition":
         if (sheetCompositionFilter) {
-          filteredHoldings = holdings.filter((h) => h.instrument?.id === sheetCompositionFilter);
+          filteredHoldings = adjustedHoldings.filter((h) => h.instrument?.id === sheetCompositionFilter);
         } else if (sheetFilterName) {
-          filteredHoldings = holdings.filter(
+          filteredHoldings = adjustedHoldings.filter(
             (h) =>
               h.instrument?.assetSubclass === sheetFilterName ||
               h.instrument?.assetClass === sheetFilterName,
@@ -137,17 +139,18 @@ export const HoldingsPage = () => {
       const aBase = a.marketValue?.base ?? 0;
       return Number(bBase) - Number(aBase);
     });
-  }, [holdings, sheetFilterType, sheetFilterName, sheetCompositionFilter]);
+  }, [adjustedHoldings, sheetFilterType, sheetFilterName, sheetCompositionFilter]);
 
   const handleAccountSelect = (account: Account) => {
     setSelectedAccount(account);
   };
 
   const { cashHoldings, nonCashHoldings, filteredNonCashHoldings } = useMemo(() => {
+    const currentHoldings = adjustedHoldings || [];
     const cash =
-      holdings?.filter((holding) => holding.holdingType?.toLowerCase() === HoldingType.CASH) ?? [];
+      currentHoldings.filter((holding) => holding.holdingType?.toLowerCase() === HoldingType.CASH) ?? [];
     const nonCash =
-      holdings?.filter((holding) => holding.holdingType?.toLowerCase() !== HoldingType.CASH) ?? [];
+      currentHoldings.filter((holding) => holding.holdingType?.toLowerCase() !== HoldingType.CASH) ?? [];
 
     // Apply asset type filter
     const filtered =
@@ -160,7 +163,7 @@ export const HoldingsPage = () => {
         : nonCash;
 
     return { cashHoldings: cash, nonCashHoldings: nonCash, filteredNonCashHoldings: filtered };
-  }, [holdings, selectedTypes]);
+  }, [adjustedHoldings, selectedTypes]);
 
   const hasActiveFilters = useMemo(() => {
     const hasAccountFilter = selectedAccount?.id !== PORTFOLIO_ACCOUNT_ID;
