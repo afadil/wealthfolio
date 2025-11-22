@@ -72,6 +72,7 @@ const COMMANDS: CommandMap = {
   get_quote_history: { method: "GET", path: "/market-data/quotes/history" },
   update_quote: { method: "PUT", path: "/market-data/quotes" },
   delete_quote: { method: "DELETE", path: "/market-data/quotes/id" },
+  import_quotes_csv: { method: "POST", path: "/market-data/quotes/import" },
   synch_quotes: { method: "POST", path: "/market-data/sync/history" },
   sync_market_data: { method: "POST", path: "/market-data/sync" },
   // Secrets
@@ -371,6 +372,14 @@ export const invokeWeb = async <T>(
     case "delete_quote": {
       const { id } = payload as { id: string };
       url += `/${encodeURIComponent(id)}`;
+      break;
+    }
+    case "import_quotes_csv": {
+      const { quotes, overwriteExisting } = payload as {
+        quotes: unknown;
+        overwriteExisting: boolean;
+      };
+      body = JSON.stringify({ quotes, overwriteExisting });
       break;
     }
     case "sync_market_data": {
