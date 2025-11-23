@@ -6,7 +6,7 @@ import { AmountDisplay } from "@wealthfolio/ui";
 import { useState } from "react";
 import { Area, AreaChart, Tooltip, YAxis } from "recharts";
 
-interface HistoryChartData {
+export interface HistoryChartData {
   date: string;
   totalValue: number;
   netContribution: number;
@@ -38,40 +38,34 @@ const CustomTooltip = ({
     return null;
   }
 
-  const totalValueData = payload.find(
-    (item): item is TooltipEntry & { dataKey: "totalValue"; payload: HistoryChartData } =>
-      item?.dataKey === "totalValue" && item.payload !== undefined,
-  );
-  const netContributionData = payload.find(
-    (item): item is TooltipEntry & { dataKey: "netContribution"; payload: HistoryChartData } =>
-      item?.dataKey === "netContribution" && item.payload !== undefined,
-  );
-
-  const tvPayload = totalValueData?.payload;
-  const ncPayload = netContributionData?.payload;
-
-  if (!tvPayload) {
+  const firstPayload = payload[0]?.payload;
+  if (!firstPayload) {
     return null;
   }
 
+  const totalValue = firstPayload.totalValue;
+  const netContribution = firstPayload.netContribution;
+  const currency = firstPayload.currency;
+
   return (
     <div className="bg-popover grid grid-cols-1 gap-1.5 rounded-md border p-2 shadow-md">
-      <p className="text-muted-foreground text-xs">{formatDate(tvPayload.date)}</p>
+      <p className="text-muted-foreground text-xs">{formatDate(firstPayload.date)}</p>
 
       <div className="flex items-center justify-between space-x-2">
         <div className="flex items-center space-x-1.5">
           <span className="block h-0.5 w-3" style={{ backgroundColor: "var(--success)" }} />
-          <span className="text-muted-foreground text-xs">Total Value:</span>
+          <span className="text-muted-foreground text-xs font-semibold">Total Value:</span>
         </div>
         <AmountDisplay
-          value={tvPayload.totalValue}
-          currency={tvPayload.currency}
+          value={totalValue}
+          currency={currency}
           isHidden={isBalanceHidden}
           className="text-xs font-semibold"
         />
       </div>
-      {isChartHovered && ncPayload && (
-        <div className="flex items-center justify-between space-x-2">
+
+      {isChartHovered && netContribution !== undefined && (
+        <div className="flex items-center justify-between space-x-2 border-t pt-1 mt-1">
           <div className="flex items-center space-x-1.5">
             <span
               className="block h-0 w-3 border-b-2 border-dashed"
@@ -80,10 +74,10 @@ const CustomTooltip = ({
             <span className="text-muted-foreground text-xs">Net Deposit:</span>
           </div>
           <AmountDisplay
-            value={ncPayload.netContribution}
-            currency={ncPayload.currency}
+            value={netContribution}
+            currency={currency}
             isHidden={isBalanceHidden}
-            className="text-xs font-semibold"
+            className="text-xs"
           />
         </div>
       )}
@@ -136,6 +130,7 @@ export function HistoryChart({
         </defs>
         <Tooltip
           position={{ y: -20 }}
+          cursor={false}
           content={(props) => (
             <CustomTooltip
               {...(props as TooltipBaseProps)}
@@ -144,7 +139,22 @@ export function HistoryChart({
             />
           )}
         />
-        <YAxis hide type="number" domain={["auto", "auto"]} />
+        <YAxis
+          type="number"
+          domain={["auto", "auto"]}
+          mirror={true}
+          tickFormatter={(value) => {
+            if (isBalanceHidden) return "****";
+            if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+            if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
+            return value.toFixed(0);
+          }}
+          tick={{ fontSize: 12 }}
+          tickLine={false}
+          axisLine={false}
+          width={55}
+        />
+
         <Area
           isAnimationActive={true}
           animationDuration={300}
@@ -156,6 +166,8 @@ export function HistoryChart({
           fillOpacity={1}
           fill="url(#colorUv)"
         />
+
+        {/* Net contribution line (always shown on hover) */}
         <Area
           isAnimationActive={true}
           animationDuration={300}

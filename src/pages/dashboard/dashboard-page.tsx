@@ -2,7 +2,9 @@ import { HistoryChart } from "@/components/history-chart";
 import { PrivacyToggle } from "@/components/privacy-toggle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useHoldings } from "@/hooks/use-holdings";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 import { useValuationHistory } from "@/hooks/use-valuation-history";
+
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { DateRange, TimePeriod } from "@/lib/types";
@@ -39,7 +41,10 @@ const getInitialDateRange = (): DateRange => ({
 const INITIAL_INTERVAL_CODE: TimePeriod = "3M";
 
 export default function DashboardPage() {
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
+  const [dateRange, setDateRange] = usePersistentState<DateRange | undefined>(
+    "global:dateRange",
+    getInitialDateRange(),
+  );
   const [selectedIntervalDescription, setSelectedIntervalDescription] =
     useState<string>("Last 3 months");
   const [isAllTime, setIsAllTime] = useState<boolean>(false);
@@ -97,16 +102,16 @@ export default function DashboardPage() {
       <div data-ptr-content className="flex min-h-screen flex-col">
         <div className="px-4 pt-22 pb-6 md:px-6 md:pt-10 md:pb-8 lg:px-8 lg:pt-12">
           <PortfolioUpdateTrigger lastCalculatedAt={currentValuation?.calculatedAt}>
-            <div className="flex items-start gap-2">
+            <div className="flex items-start gap-2 pt-3">
+              <PrivacyToggle />
               <div>
-                <div className="flex items-center gap-3">
+                <div className="min-h-[3rem] flex items-center">
                   <Balance
                     isLoading={isHoldingsLoading}
                     targetValue={totalValue}
                     currency={baseCurrency}
                     displayCurrency={true}
                   />
-                  <PrivacyToggle />
                 </div>
                 <div className="text-md flex space-x-3">
                   <GainAmount
@@ -114,13 +119,13 @@ export default function DashboardPage() {
                     value={gainLossAmount}
                     currency={baseCurrency}
                     displayCurrency={false}
-                  ></GainAmount>
+                  />
                   <div className="border-secondary my-1 border-r pr-2" />
                   <GainPercent
                     className="lg:text-md text-sm font-light"
                     value={simpleReturn}
                     animated={true}
-                  ></GainPercent>
+                  />
                   {selectedIntervalDescription && (
                     <span className="lg:text-md text-muted-foreground ml-1 text-sm font-light">
                       {selectedIntervalDescription}
@@ -135,7 +140,10 @@ export default function DashboardPage() {
         <div className="h-[300px]">
           {valuationHistory && chartData.length > 0 ? (
             <>
-              <HistoryChart data={chartData} />
+              <HistoryChart
+                data={chartData}
+                isLoading={isValuationHistoryLoading}
+              />
               <div className="flex w-full justify-center">
                 <IntervalSelector
                   className="pointer-events-auto relative z-20 w-full max-w-screen-sm sm:max-w-screen-md md:max-w-2xl lg:max-w-3xl"

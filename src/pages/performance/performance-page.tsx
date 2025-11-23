@@ -218,7 +218,7 @@ export default function PerformancePage() {
     null,
   );
   const [dateRange, setDateRange] = usePersistentState<DateRange | undefined>(
-    "performance:dateRange",
+    "global:dateRange",
     {
       from: subMonths(new Date(), 12),
       to: new Date(),

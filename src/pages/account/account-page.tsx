@@ -14,6 +14,7 @@ import {
   PrivacyAmount,
 } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 
 import { PrivacyToggle } from "@/components/privacy-toggle";
 import { Button } from "@/components/ui/button";
@@ -58,13 +59,6 @@ import { AccountContributionLimit } from "./account-contribution-limit";
 import AccountHoldings from "./account-holdings";
 import AccountMetrics from "./account-metrics";
 
-interface HistoryChartData {
-  date: string;
-  totalValue: number;
-  netContribution: number;
-  currency: string;
-}
-
 // Map account types to icons for visual distinction
 const accountTypeIcons: Record<AccountType, Icon> = {
   SECURITIES: Icons.Briefcase,
@@ -84,7 +78,10 @@ const INITIAL_INTERVAL_CODE: TimePeriod = "3M";
 const AccountPage = () => {
   const { id = "" } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
+  const [dateRange, setDateRange] = usePersistentState<DateRange | undefined>(
+    "global:dateRange",
+    getInitialDateRange(),
+  );
   const [selectedIntervalCode, setSelectedIntervalCode] =
     useState<TimePeriod>(INITIAL_INTERVAL_CODE);
   const [desktopSelectorOpen, setDesktopSelectorOpen] = useState(false);
@@ -143,7 +140,7 @@ const AccountPage = () => {
       return calculatePerformanceMetrics(valuationHistory, false);
     }, [valuationHistory, id]);
 
-  const chartData: HistoryChartData[] = useMemo(() => {
+  const chartData = useMemo(() => {
     if (!valuationHistory) return [];
     return valuationHistory.map((valuation: AccountValuation) => ({
       date: valuation.valuationDate,
