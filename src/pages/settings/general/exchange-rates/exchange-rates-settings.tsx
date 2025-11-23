@@ -135,7 +135,7 @@ export function ExchangeRatesSettings() {
                 Add rate
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
               <AddExchangeRateForm
                 onSubmit={(newRate) => {
                   addExchangeRate(newRate);
