@@ -5,6 +5,7 @@ pub const DATA_SOURCE_MARKET_DATA_APP: &str = "MARKETDATA_APP";
 pub const DATA_SOURCE_CALCULATED: &str = "CALCULATED";
 pub const DATA_SOURCE_ALPHA_VANTAGE: &str = "ALPHA_VANTAGE";
 pub const DATA_SOURCE_METAL_PRICE_API: &str = "METAL_PRICE_API";
+pub const DATA_SOURCE_OPENFIGI: &str = "OPENFIGI";
 
 /// Default values
 pub const DEFAULT_QUOTE_BATCH_SIZE: usize = 1000;
