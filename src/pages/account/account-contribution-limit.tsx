@@ -38,7 +38,7 @@ export function AccountContributionLimit({ accountId }: AccountContributionLimit
 
   if (!limitForAccount) {
     return (
-      <Card className="dark:border-primary/20 dark:bg-primary/20 border-none bg-blue-100 p-6 shadow-sm">
+      <Card className="border-muted bg-muted/70 border-none p-6 shadow-none">
         <div className="flex items-center justify-between text-sm">
           <span>
             You&apos;ve contributed{" "}
