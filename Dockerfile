@@ -1,9 +1,9 @@
 # Global build args
-ARG RUST_IMAGE=rust:1.86-alpine
+ARG RUST_IMAGE=docker.io/rust:1.86-alpine
 
 # Stage 1: build frontend
 # Use --platform=$BUILDPLATFORM to run on the native runner (fast)
-FROM --platform=$BUILDPLATFORM node:20-alpine AS frontend
+FROM --platform=$BUILDPLATFORM docker.io/node:20-alpine AS frontend
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY . .
@@ -13,7 +13,7 @@ RUN npm install -g pnpm@9.9.0 && pnpm install --frozen-lockfile
 RUN pnpm tsc && pnpm vite build && mv dist /web-dist
 
 # Stage 2: build server with cross-compilation
-FROM --platform=$BUILDPLATFORM tonistiigi/xx AS xx
+FROM --platform=$BUILDPLATFORM docker.io/tonistiigi/xx AS xx
 
 FROM --platform=$BUILDPLATFORM ${RUST_IMAGE} AS backend
 # Copy xx scripts to handle cross-compilation
@@ -52,7 +52,7 @@ RUN xx-cargo build --release --manifest-path src-server/Cargo.toml && \
     cp src-server/target/$(xx-cargo --print-target-triple)/release/wealthfolio-server /wealthfolio-server
 
 # Final stage
-FROM alpine:3.19
+FROM docker.io/alpine:3.19
 WORKDIR /app
 # Copy from backend (which is now build platform, but binary is target platform)
 COPY --from=backend /wealthfolio-server /usr/local/bin/wealthfolio-server
