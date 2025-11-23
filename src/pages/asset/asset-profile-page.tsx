@@ -352,7 +352,7 @@ export const AssetProfilePage = () => {
                       <Badge
                         variant="secondary"
                         key={sector.name}
-                        className="dark:text-primary-foreground m-1 cursor-help bg-indigo-100 uppercase"
+                        className="dark:text-primary-foreground m-1 cursor-help bg-blue-100 uppercase"
                         title={`${sector.name}: ${sector.weight <= 1 ? (sector.weight * 100).toFixed(2) : sector.weight}%`}
                       >
                         {sector.name}
