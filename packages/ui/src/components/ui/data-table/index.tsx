@@ -16,6 +16,7 @@ import * as React from "react";
 
 import { Icons } from "@/components/ui/icons";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 
 import type { DataTableFacetedFilterProps } from "./data-table-faceted-filter";
 import { DataTableToolbar } from "./data-table-toolbar";
@@ -26,6 +27,7 @@ interface DataTableProps<TData, TValue> {
   filters?: DataTableFacetedFilterProps<TData, TValue>[];
   defaultColumnVisibility?: VisibilityState;
   defaultSorting?: SortingState;
+  storageKey?: string;
   data: TData[];
   manualPagination?: boolean;
   scrollable?: boolean;
@@ -41,12 +43,15 @@ export function DataTable<TData, TValue>({
   manualPagination = false,
   defaultColumnVisibility,
   defaultSorting,
+  storageKey,
   scrollable = false,
   showColumnToggle = false,
   toolbarActions,
 }: DataTableProps<TData, TValue>) {
   const [rowSelection, setRowSelection] = React.useState({});
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(defaultColumnVisibility || {});
+  const [columnVisibility, setColumnVisibility] = storageKey
+    ? usePersistentState<VisibilityState>(`${storageKey}:column-visibility`, defaultColumnVisibility || {})
+    : React.useState<VisibilityState>(defaultColumnVisibility || {});
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [sorting, setSorting] = React.useState<SortingState>(defaultSorting || []);
 

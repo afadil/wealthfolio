@@ -10,7 +10,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { AmountDisplay, AnimatedToggleGroup } from "@wealthfolio/ui";
+import { AmountDisplay, AnimatedToggleGroup, EmptyPlaceholder } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
 
 import { AccountSelector } from "@/components/account-selector";
@@ -24,6 +24,7 @@ import { usePlatform } from "@/hooks/use-platform";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { Account, Holding, HoldingType, Instrument } from "@/lib/types";
+import { useNavigate } from "react-router-dom";
 import { AccountAllocationChart } from "./components/account-allocation-chart";
 import { CashHoldingsWidget } from "./components/cash-holdings-widget";
 import { ClassesChart } from "./components/classes-chart";
@@ -39,6 +40,7 @@ import { SectorsChart } from "./components/sectors-chart";
 type SheetFilterType = "class" | "sector" | "country" | "currency" | "account" | "composition";
 
 export const HoldingsPage = () => {
+  const navigate = useNavigate();
   const [selectedAccount, setSelectedAccount] = useState<Account | null>({
     id: PORTFOLIO_ACCOUNT_ID,
     name: "All Portfolio",
@@ -175,88 +177,127 @@ export const HoldingsPage = () => {
     return hasAccountFilter || hasTypeFilter;
   }, [selectedAccount, selectedTypes]);
 
-  const renderHoldingsView = () => (
-    <div className="space-y-4 p-2 lg:p-4">
-      <div className="hidden md:block">
-        <HoldingsTable
-          holdings={filteredNonCashHoldings ?? []}
-          isLoading={isLoading}
-          showTotalReturn={showTotalReturn}
-          setShowTotalReturn={setShowTotalReturn}
-        />
-      </div>
-      <div className="block md:hidden">
-        <HoldingsTableMobile
-          holdings={nonCashHoldings ?? []}
-          isLoading={isLoading}
-          selectedTypes={selectedTypes}
-          setSelectedTypes={setSelectedTypes}
-          selectedAccount={selectedAccount}
-          accounts={accounts ?? []}
-          onAccountChange={handleAccountSelect}
-          showSearch={true}
-          showFilterButton={false}
-          sortBy={sortBy}
-          showTotalReturn={showTotalReturn}
-        />
-      </div>
+  // Check if there are no holdings at all (excluding cash holdings)
+  const hasNoHoldings = !isLoading && (!nonCashHoldings || nonCashHoldings.length === 0);
+
+  // For insights tab, check if there are no holdings at all (including cash)
+  const hasNoHoldingsAtAll = !isLoading && (!holdings || holdings.length === 0);
+
+  const renderEmptyState = () => (
+    <div className="flex items-center justify-center py-16">
+      <EmptyPlaceholder
+        icon={<Icons.TrendingUp className="text-muted-foreground h-10 w-10" />}
+        title="No holdings yet"
+        description="Get started by adding your first transaction or quickly import your existing holdings from a CSV file."
+      >
+        <div className="flex flex-col items-center gap-3 sm:flex-row">
+          <Button size="default" onClick={() => navigate("/activities/manage")}>
+            <Icons.Plus className="mr-2 h-4 w-4" />
+            Add Transaction
+          </Button>
+          <Button size="default" variant="outline" onClick={() => navigate("/import")}>
+            <Icons.Import className="mr-2 h-4 w-4" />
+            Import from CSV
+          </Button>
+        </div>
+      </EmptyPlaceholder>
     </div>
   );
 
-  const renderAnalyticsView = () => (
-    <div className="space-y-4 p-2 lg:p-4">
-      {/* Cash Holdings Widget */}
-      <CashHoldingsWidget cashHoldings={cashHoldings ?? []} isLoading={isLoading} />
+  const renderHoldingsView = () => {
+    if (hasNoHoldings) {
+      return renderEmptyState();
+    }
 
-      {/* Top row: Summary widgets */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <HoldingCurrencyChart
-          holdings={[...cashHoldings, ...filteredNonCashHoldings]}
-          baseCurrency={settings?.baseCurrency ?? "USD"}
-          isLoading={isLoading}
-          onCurrencySectionClick={(currencyName) =>
-            handleChartSectionClick("currency", currencyName, `Holdings in ${currencyName}`)
-          }
-        />
-
-        <AccountAllocationChart isLoading={isLoading} />
-
-        <ClassesChart
-          holdings={[...cashHoldings, ...filteredNonCashHoldings]}
-          isLoading={isLoading}
-          onClassSectionClick={(className) =>
-            handleChartSectionClick("class", className, `Asset Class: ${className}`)
-          }
-        />
-
-        <CountryChart
-          holdings={filteredNonCashHoldings}
-          isLoading={isLoading}
-          onCountrySectionClick={(countryName) =>
-            handleChartSectionClick("country", countryName, `Holdings in ${countryName}`)
-          }
-        />
-      </div>
-
-      {/* Second row: Composition and Sector */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
-        <div className="col-span-1 lg:col-span-3">
-          <PortfolioComposition holdings={filteredNonCashHoldings ?? []} isLoading={isLoading} />
-        </div>
-
-        {/* Sectors Chart - Now self-contained */}
-        <div className="col-span-1">
-          <SectorsChart
-            holdings={filteredNonCashHoldings}
+    return (
+      <div className="space-y-4 p-2 lg:p-4">
+        <div className="hidden md:block">
+          <HoldingsTable
+            holdings={filteredNonCashHoldings ?? []}
             isLoading={isLoading}
-            onSectorSectionClick={(sectorName) =>
-              handleChartSectionClick("sector", sectorName, `Holdings in Sector: ${sectorName}`)
-            }
+            showTotalReturn={showTotalReturn}
+            setShowTotalReturn={setShowTotalReturn}
+          />
+        </div>
+        <div className="block md:hidden">
+          <HoldingsTableMobile
+            holdings={nonCashHoldings ?? []}
+            isLoading={isLoading}
+            selectedTypes={selectedTypes}
+            setSelectedTypes={setSelectedTypes}
+            selectedAccount={selectedAccount}
+            accounts={accounts ?? []}
+            onAccountChange={handleAccountSelect}
+            showSearch={true}
+            showFilterButton={false}
+            sortBy={sortBy}
+            showTotalReturn={showTotalReturn}
           />
         </div>
       </div>
-    </div>
-  );
+    );
+  };
+
+  const renderAnalyticsView = () => {
+    if (hasNoHoldingsAtAll) {
+      return renderEmptyState();
+    }
+
+    return (
+      <div className="space-y-4 p-2 lg:p-4">
+        {/* Cash Holdings Widget */}
+        <CashHoldingsWidget cashHoldings={cashHoldings ?? []} isLoading={isLoading} />
+
+        {/* Top row: Summary widgets */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <HoldingCurrencyChart
+            holdings={[...cashHoldings, ...filteredNonCashHoldings]}
+            baseCurrency={settings?.baseCurrency ?? "USD"}
+            isLoading={isLoading}
+            onCurrencySectionClick={(currencyName) =>
+              handleChartSectionClick("currency", currencyName, `Holdings in ${currencyName}`)
+            }
+          />
+
+          <AccountAllocationChart isLoading={isLoading} />
+
+          <ClassesChart
+            holdings={[...cashHoldings, ...filteredNonCashHoldings]}
+            isLoading={isLoading}
+            onClassSectionClick={(className) =>
+              handleChartSectionClick("class", className, `Asset Class: ${className}`)
+            }
+          />
+
+          <CountryChart
+            holdings={filteredNonCashHoldings}
+            isLoading={isLoading}
+            onCountrySectionClick={(countryName) =>
+              handleChartSectionClick("country", countryName, `Holdings in ${countryName}`)
+            }
+          />
+        </div>
+
+        {/* Second row: Composition and Sector */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+          <div className="col-span-1 lg:col-span-3">
+            <PortfolioComposition holdings={filteredNonCashHoldings ?? []} isLoading={isLoading} />
+          </div>
+
+          {/* Sectors Chart - Now self-contained */}
+          <div className="col-span-1">
+            <SectorsChart
+              holdings={filteredNonCashHoldings}
+              isLoading={isLoading}
+              onSectorSectionClick={(sectorName) =>
+                handleChartSectionClick("sector", sectorName, `Holdings in Sector: ${sectorName}`)
+              }
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const views: SwipablePageView[] = [
     { value: "holdings", label: "Holdings", content: renderHoldingsView() },
