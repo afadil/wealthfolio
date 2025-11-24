@@ -10,6 +10,7 @@ import { TickerAvatar } from "@/components/ticker-avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { useSettingsContext } from "@/lib/settings-provider";
 import { Holding } from "@/lib/types";
 import { AmountDisplay, QuantityDisplay } from "@wealthfolio/ui";
 import { useState } from "react";
@@ -53,7 +54,17 @@ export const HoldingsTable = ({
   setShowTotalReturn?: (value: boolean) => void;
 }) => {
   const { isBalanceHidden } = useBalancePrivacy();
+  const { settings } = useSettingsContext();
   const [showConvertedValues, setShowConvertedValues] = useState(false);
+
+  const baseCurrency = settings?.baseCurrency ?? holdings[0]?.baseCurrency;
+  const hasMultipleCurrencies = holdings.some((holding) => {
+    if (!baseCurrency || !holding.localCurrency) {
+      return false;
+    }
+
+    return holding.localCurrency.toUpperCase() !== baseCurrency.toUpperCase();
+  });
 
   if (isLoading) {
     return (
@@ -95,6 +106,7 @@ export const HoldingsTable = ({
         searchBy="symbol"
         filters={filters}
         showColumnToggle={true}
+        storageKey="holdings-table"
         defaultColumnVisibility={{
           currency: false,
           symbolName: false,
@@ -117,25 +129,27 @@ export const HoldingsTable = ({
                 rounded="md"
               />
             )}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setShowConvertedValues(!showConvertedValues)}
-                  className="h-8 w-8 rounded-lg"
-                >
-                  {showConvertedValues ? (
-                    <Icons.Globe className="h-4 w-4" />
-                  ) : (
-                    <Icons.DollarSign className="h-4 w-4" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Show values in {showConvertedValues ? "Asset Currency" : "Base Currency"}</p>
-              </TooltipContent>
-            </Tooltip>
+            {hasMultipleCurrencies && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setShowConvertedValues(!showConvertedValues)}
+                    className="h-8 w-8 rounded-lg"
+                  >
+                    {showConvertedValues ? (
+                      <Icons.Globe className="h-4 w-4" />
+                    ) : (
+                      <Icons.DollarSign className="h-4 w-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Show values in {showConvertedValues ? "Asset Currency" : "Base Currency"}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
           </div>
         }
       />
