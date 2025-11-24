@@ -5,9 +5,9 @@ import { AppLayout } from "@/pages/layouts/app-layout";
 import { OnboardingLayout } from "@/pages/layouts/onboarding-layout";
 import SettingsLayout from "@/pages/settings/settings-layout";
 
+import ActivityManagerPage from "@/pages/activity/activity-manager-page";
 import ActivityPage from "@/pages/activity/activity-page";
 import ActivityImportPage from "@/pages/activity/import/activity-import-page";
-import ActivityManagerPage from "@/pages/activity/activity-manager-page";
 import DashboardPage from "@/pages/dashboard/dashboard-page";
 import HoldingsPage from "@/pages/holdings/holdings-page";
 import IncomePage from "@/pages/income/income-page";
@@ -27,6 +27,7 @@ import MarketDataSettingsPage from "./pages/settings/market-data/market-data-set
 import useGlobalEventListener from "./use-global-event-listener";
 // import QRScannerPage from './pages/qr-scanner/qr-scanner-page'; // File not found
 import { getDynamicRoutes, subscribeToNavigationUpdates } from "@/addons/addons-runtime-context";
+import NotFoundPage from "@/pages/not-found";
 import AboutSettingsPage from "./pages/settings/about/about-page";
 
 export function AppRoutes() {
@@ -102,7 +103,7 @@ export function AppRoutes() {
             <Route path="market-data/import" element={<MarketDataImportPage />} />
             <Route path="addons" element={<AddonSettingsPage />} />
           </Route>
-          <Route path="*" element={<h1>Not Found</h1>} />
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
