@@ -11,7 +11,9 @@ use axum::{
     routing::{delete, get, post, put},
     Json, Router,
 };
-use wealthfolio_core::market_data::{MarketDataProviderInfo, MarketDataProviderSetting, Quote};
+use wealthfolio_core::market_data::{
+    MarketDataProviderInfo, MarketDataProviderSetting, Quote, QuoteImport,
+};
 
 async fn get_market_data_providers(
     State(state): State<Arc<AppState>>,
@@ -127,6 +129,35 @@ async fn sync_history_quotes(State(state): State<Arc<AppState>>) -> ApiResult<St
 }
 
 #[derive(serde::Deserialize)]
+struct ImportQuotesBody {
+    quotes: Vec<QuoteImport>,
+    #[serde(rename = "overwriteExisting")]
+    overwrite_existing: bool,
+}
+
+async fn import_quotes_csv(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<ImportQuotesBody>,
+) -> ApiResult<Json<Vec<QuoteImport>>> {
+    let result = state
+        .market_data_service
+        .import_quotes_from_csv(body.quotes, body.overwrite_existing)
+        .await?;
+
+    enqueue_portfolio_job(
+        state,
+        PortfolioJobConfig {
+            account_ids: None,
+            symbols: None,
+            refetch_all_market_data: false,
+            force_full_recalculation: false,
+        },
+    );
+
+    Ok(Json(result))
+}
+
+#[derive(serde::Deserialize)]
 struct SyncBody {
     symbols: Option<Vec<String>>,
     #[serde(rename = "refetchAll")]
@@ -160,6 +191,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/market-data/quotes/history", get(get_quote_history))
         .route("/market-data/quotes/{symbol}", put(update_quote))
         .route("/market-data/quotes/id/{id}", delete(delete_quote))
+        .route("/market-data/quotes/import", post(import_quotes_csv))
         .route("/market-data/sync/history", post(sync_history_quotes))
         .route("/market-data/sync", post(sync_market_data))
 }

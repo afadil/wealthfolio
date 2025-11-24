@@ -1,41 +1,42 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { format } from "date-fns";
 import { Quote } from "@/lib/types";
+import { format } from "date-fns";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
+import { formatQuantity } from "@/lib/utils";
+import {
+  createColumnHelper,
+  flexRender,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  SortingState,
+  useReactTable,
+} from "@tanstack/react-table";
 import {
   Button,
-  Input,
-  Icons,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   DatePickerInput,
+  formatAmount,
+  Icons,
+  Input,
+  Label,
+  MoneyInput,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
   Switch,
-  Label,
-  MoneyInput,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  formatAmount,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@wealthfolio/ui";
-import { formatQuantity } from "@/lib/utils";
-import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  getPaginationRowModel,
-  createColumnHelper,
-  flexRender,
-  SortingState,
-} from "@tanstack/react-table";
 
 interface QuoteHistoryTableProps {
   data: Quote[];
@@ -408,15 +409,23 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
               </PopoverContent>
             </Popover>
             {isManualDataSource && (
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => setIsAddingQuote(true)}
-                disabled={isAddingQuote}
-              >
-                <Icons.PlusCircle className="mr-2 h-4 w-4" />
-                Add Quote
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => setIsAddingQuote(true)}
+                  disabled={isAddingQuote}
+                >
+                  <Icons.PlusCircle className="mr-2 h-4 w-4" />
+                  Add Quote
+                </Button>
+                <Button asChild variant="outline" size="sm">
+                  <Link to="/settings/market-data/import" className="flex items-center gap-2">
+                    <Icons.Import className="h-4 w-4" />
+                    Import Quotes
+                  </Link>
+                </Button>
+              </div>
             )}
           </div>
         </div>

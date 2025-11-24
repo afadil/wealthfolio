@@ -221,16 +221,14 @@ export const updateMarketDataProviderSettings = async (payload: {
   }
 };
 
-export const importManualQuotes = async (
-  quotes: QuoteImport[],
-  overwriteExisting: boolean,
-): Promise<QuoteImport[]> => {
+export const importManualQuotes = async (quotes: QuoteImport[]): Promise<QuoteImport[]> => {
   try {
+    const overwriteExisting = true;
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri("import_quotes_csv", { quotes, overwriteExisting });
       case RUN_ENV.WEB:
-        throw new Error("Manual quote import is only available on desktop.");
+        return invokeWeb("import_quotes_csv", { quotes, overwriteExisting });
       default:
         throw new Error("Manual quote import is not supported in this environment.");
     }

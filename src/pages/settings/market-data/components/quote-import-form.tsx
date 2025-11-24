@@ -7,10 +7,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@wealthfolio/ui/components/ui/card";
-import { Checkbox } from "@wealthfolio/ui/components/ui/checkbox";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Input } from "@wealthfolio/ui/components/ui/input";
-import { Label } from "@wealthfolio/ui/components/ui/label";
 import { AnimatePresence, motion } from "motion/react";
 import React, { useRef, useState } from "react";
 
@@ -18,20 +16,16 @@ interface QuoteImportFormProps {
   file: File | null;
   isValidating: boolean;
   error: string | null;
-  overwriteExisting: boolean;
   onFileSelect: (file: File | null) => void;
   onValidate: () => void;
-  onOverwriteChange: (overwrite: boolean) => void;
 }
 
 export function QuoteImportForm({
   file,
   isValidating,
   error,
-  overwriteExisting,
   onFileSelect,
   onValidate,
-  onOverwriteChange,
 }: QuoteImportFormProps) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -306,20 +300,12 @@ export function QuoteImportForm({
           </Alert>
         )}
 
-        {/* Import Options */}
-        <div className="space-y-3">
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="overwrite"
-              checked={overwriteExisting}
-              onCheckedChange={onOverwriteChange}
-              className="h-6 w-6"
-            />
-            <Label htmlFor="overwrite" className="text-sm">
-              Overwrite existing quotes with the same symbol and date
-            </Label>
-          </div>
-        </div>
+        <Alert>
+          <Icons.Info className="h-4 w-4" />
+          <AlertDescription className="text-xs sm:text-sm">
+            Quotes with the same symbol and date in your CSV will overwrite existing data during import.
+          </AlertDescription>
+        </Alert>
 
         {/* Validate Button */}
         <Button onClick={onValidate} disabled={!file || isValidating} className="w-full">

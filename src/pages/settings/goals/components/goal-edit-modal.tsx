@@ -19,7 +19,7 @@ export function GoalEditModal({ goal, open, onClose }: GoalEditModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[625px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[625px]">
         <GoalForm defaultValues={defaultValues} onSuccess={onClose} />
       </DialogContent>
     </Dialog>

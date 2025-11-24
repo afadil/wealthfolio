@@ -52,7 +52,6 @@ export function useQuoteImport(): QuoteImportState & QuoteImportActions {
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [overwriteExisting, setOverwriteExisting] = useState(false);
 
   const validateFile = useCallback(async () => {
     if (!file) {
@@ -149,7 +148,7 @@ export function useQuoteImport(): QuoteImportState & QuoteImportActions {
         });
       }, 200);
 
-      const result = await importManualQuotes(prepareQuotesForImport(allQuotes), overwriteExisting);
+      const result = await importManualQuotes(prepareQuotesForImport(allQuotes));
       const normalizedResult = result.map(normalizeQuoteImport);
 
       clearInterval(progressInterval);
@@ -174,7 +173,7 @@ export function useQuoteImport(): QuoteImportState & QuoteImportActions {
       setIsImporting(false);
       setImportProgress(0);
     }
-  }, [file, overwriteExisting]);
+  }, [file]);
 
   const reset = useCallback(() => {
     setFile(null);
@@ -183,7 +182,6 @@ export function useQuoteImport(): QuoteImportState & QuoteImportActions {
     setIsImporting(false);
     setImportProgress(0);
     setError(null);
-    setOverwriteExisting(false);
   }, []);
 
   return {
@@ -194,13 +192,11 @@ export function useQuoteImport(): QuoteImportState & QuoteImportActions {
     isImporting,
     importProgress,
     error,
-    overwriteExisting,
 
     // Actions
     setFile,
     validateFile,
     importQuotes,
-    setOverwriteExisting,
     reset,
   };
 }

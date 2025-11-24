@@ -6365,7 +6365,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-app"
-version = "2.0.0"
+version = "2.0.1"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -6396,7 +6396,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio_core"
-version = "2.0.0"
+version = "2.0.1"
 dependencies = [
  "anyhow",
  "async-trait",

@@ -1,11 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
 import { calculateDepositsForLimit, getContributionLimit } from "@/commands/contribution-limits";
-import { QueryKeys } from "@/lib/query-keys";
-import { ContributionLimit, DepositsCalculation } from "@/lib/types";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PrivacyAmount } from "@wealthfolio/ui";
+import { QueryKeys } from "@/lib/query-keys";
+import { ContributionLimit, DepositsCalculation } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { Icons, PrivacyAmount } from "@wealthfolio/ui";
+import { Link } from "react-router-dom";
 
 interface AccountContributionLimitProps {
   accountId: string;
@@ -37,7 +38,7 @@ export function AccountContributionLimit({ accountId }: AccountContributionLimit
 
   if (!limitForAccount) {
     return (
-      <Card className="dark:border-primary/20 dark:bg-primary/20 border-none bg-indigo-100 p-6 shadow-sm">
+      <Card className="border-muted bg-muted/70 border-none p-6 shadow-none">
         <div className="flex items-center justify-between text-sm">
           <span>
             You&apos;ve contributed{" "}
@@ -47,7 +48,14 @@ export function AccountContributionLimit({ accountId }: AccountContributionLimit
                 currency={deposits?.baseCurrency ?? "USD"}
               />
             </span>{" "}
-            so far in {currentYear}. There&apos;s no contribution limit set for this account.
+            so far in {currentYear}. There&apos;s no contribution limit set for this account.{" "}
+            <Link
+              to="/settings/contribution-limits"
+              className="text-primary inline-flex items-center gap-1 font-semibold"
+            >
+              Set limit
+              <Icons.ArrowRight className="h-3.5 w-3.5" />
+            </Link>
           </span>
         </div>
       </Card>
