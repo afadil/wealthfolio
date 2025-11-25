@@ -41,6 +41,12 @@ const sidebarNavItems = [
     subtitle: "Providers and data update",
     icon: <Icons.BarChart className="h-5 w-5" />,
   },
+  {
+    title: "Securities",
+    href: "securities",
+    subtitle: "Manage security definitions",
+    icon: <Icons.BadgeDollarSign className="h-5 w-5" />,
+  },
 
   {
     title: "Add-ons",

@@ -180,6 +180,21 @@ async fn sync_market_data(
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[derive(serde::Deserialize)]
+struct LatestQuotesBody {
+    symbols: Vec<String>,
+}
+
+async fn get_latest_quotes(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<LatestQuotesBody>,
+) -> ApiResult<Json<std::collections::HashMap<String, Quote>>> {
+    let quotes = state
+        .market_data_service
+        .get_latest_quotes_for_symbols(&body.symbols)?;
+    Ok(Json(quotes))
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/providers", get(get_market_data_providers))
@@ -189,6 +204,7 @@ pub fn router() -> Router<Arc<AppState>> {
         )
         .route("/market-data/search", get(search_symbol))
         .route("/market-data/quotes/history", get(get_quote_history))
+        .route("/market-data/quotes/latest", post(get_latest_quotes))
         .route("/market-data/quotes/{symbol}", put(update_quote))
         .route("/market-data/quotes/id/{id}", delete(delete_quote))
         .route("/market-data/quotes/import", post(import_quotes_csv))

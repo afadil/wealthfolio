@@ -117,49 +117,87 @@ export const AssetProfilePage = () => {
   const syncMarketDataMutation = useSyncMarketDataMutation();
 
   useEffect(() => {
+    const instrument = holding?.instrument;
+    const asset = assetProfile;
+
+    // Helper to safely parse JSON or return array
+    const parseSectors = (data: string | Sector[] | null | undefined): Sector[] => {
+      if (!data) return [];
+      if (typeof data === "string") {
+        try {
+          return JSON.parse(data) as Sector[];
+        } catch {
+          return [];
+        }
+      }
+      return data;
+    };
+
+    const parseCountries = (data: string | Country[] | null | undefined): Country[] => {
+      if (!data) return [];
+      if (typeof data === "string") {
+        try {
+          return JSON.parse(data) as Country[];
+        } catch {
+          return [];
+        }
+      }
+      return data;
+    };
+
     setFormData({
-      name: holding?.instrument?.name ?? "",
-      sectors: holding?.instrument?.sectors ?? [],
-      countries: holding?.instrument?.countries ?? [],
-      assetSubClass: holding?.instrument?.assetSubclass ?? "",
-      assetClass: holding?.instrument?.assetClass ?? "",
-      notes: holding?.instrument?.notes ?? "",
-      dataSource: (holding?.instrument?.dataSource as DataSource) ?? DataSource.YAHOO,
+      name: instrument?.name ?? asset?.name ?? "",
+      sectors: parseSectors(instrument?.sectors ?? asset?.sectors),
+      countries: parseCountries(instrument?.countries ?? asset?.countries),
+      assetSubClass: instrument?.assetSubclass ?? asset?.assetSubClass ?? "",
+      assetClass: instrument?.assetClass ?? asset?.assetClass ?? "",
+      notes: instrument?.notes ?? asset?.notes ?? "",
+      dataSource: (instrument?.dataSource ?? asset?.dataSource ?? DataSource.YAHOO) as DataSource,
     });
-  }, [holding]);
+  }, [holding, assetProfile]);
 
   const profile = useMemo(() => {
-    if (!holding?.instrument) return null;
+    const instrument = holding?.instrument;
+    const asset = assetProfile;
+
+    if (!instrument && !asset) return null;
+
     const totalGainAmount = holding?.totalGain?.local ?? 0;
     const totalGainPercent = holding?.totalGainPct ?? 0;
     const calculatedAt = holding?.asOfDate;
 
     return {
-      id: holding.instrument.id,
-      symbol: holding.instrument.symbol,
-      name: holding.instrument.name ?? "-",
+      id: instrument?.id ?? asset?.id ?? "",
+      symbol: instrument?.symbol ?? asset?.symbol ?? symbol,
+      name: instrument?.name ?? asset?.name ?? "-",
       isin: null,
       assetType: null,
       symbolMapping: null,
-      assetClass: holding.instrument.assetClass ?? "",
-      assetSubClass: holding.instrument.assetSubclass ?? "",
-      notes: holding.instrument.notes ?? null,
-      countries: JSON.stringify(holding.instrument.countries ?? []),
+      assetClass: instrument?.assetClass ?? asset?.assetClass ?? "",
+      assetSubClass: instrument?.assetSubclass ?? asset?.assetSubClass ?? "",
+      notes: instrument?.notes ?? asset?.notes ?? null,
+      countries:
+        typeof instrument?.countries === "string"
+          ? instrument.countries
+          : JSON.stringify(instrument?.countries ?? asset?.countries ?? []),
       categories: null,
       classes: null,
       attributes: null,
-      createdAt: holding.openDate ? new Date(holding.openDate) : new Date(),
+      createdAt: holding?.openDate ? new Date(holding.openDate) : new Date(),
       updatedAt: new Date(),
-      currency: holding.instrument.currency ?? "USD",
-      dataSource: (holding.instrument.dataSource as DataSource) ?? DataSource.YAHOO,
-      sectors: JSON.stringify(holding.instrument.sectors ?? []),
+      currency: instrument?.currency ?? asset?.currency ?? "USD",
+      dataSource: (instrument?.dataSource ?? asset?.dataSource ?? DataSource.YAHOO) as DataSource,
+      sectors:
+        typeof instrument?.sectors === "string"
+          ? instrument.sectors
+          : JSON.stringify(instrument?.sectors ?? asset?.sectors ?? []),
       url: null,
       marketPrice: quote?.close ?? 0,
       totalGainAmount,
       totalGainPercent,
       calculatedAt,
     };
-  }, [holding, quote]);
+  }, [holding, assetProfile, quote, symbol]);
 
   const symbolHolding = useMemo((): AssetDetailData | null => {
     if (!holding) return null;
@@ -200,7 +238,7 @@ export const AssetProfilePage = () => {
   }, [holding, quote]);
 
   const handleSave = useCallback(() => {
-    if (!holding) return;
+    if (!profile) return;
     updateAssetProfileMutation.mutate({
       symbol,
       name: formData.name,
@@ -211,10 +249,10 @@ export const AssetProfilePage = () => {
       assetClass: formData.assetClass,
     });
     setIsEditing(false);
-  }, [holding, symbol, formData, updateAssetProfileMutation]);
+  }, [profile, symbol, formData, updateAssetProfileMutation]);
 
   const handleSaveTitle = useCallback(() => {
-    if (!holding) return;
+    if (!profile) return;
     updateAssetProfileMutation.mutate({
       symbol,
       name: formData.name,
@@ -224,20 +262,48 @@ export const AssetProfilePage = () => {
       assetSubClass: formData.assetSubClass,
       assetClass: formData.assetClass,
     });
-  }, [holding, symbol, formData, updateAssetProfileMutation]);
+  }, [profile, symbol, formData, updateAssetProfileMutation]);
 
   const handleCancel = useCallback(() => {
     setIsEditing(false);
+    const instrument = holding?.instrument;
+    const asset = assetProfile;
+
+    // Helper to safely parse JSON or return array
+    const parseSectors = (data: string | Sector[] | null | undefined): Sector[] => {
+      if (!data) return [];
+      if (typeof data === "string") {
+        try {
+          return JSON.parse(data) as Sector[];
+        } catch {
+          return [];
+        }
+      }
+      return data;
+    };
+
+    const parseCountries = (data: string | Country[] | null | undefined): Country[] => {
+      if (!data) return [];
+      if (typeof data === "string") {
+        try {
+          return JSON.parse(data) as Country[];
+        } catch {
+          return [];
+        }
+      }
+      return data;
+    };
+
     setFormData({
-      name: holding?.instrument?.name ?? "",
-      sectors: holding?.instrument?.sectors ?? [],
-      countries: holding?.instrument?.countries ?? [],
-      assetSubClass: holding?.instrument?.assetSubclass ?? "",
-      assetClass: holding?.instrument?.assetClass ?? "",
-      notes: holding?.instrument?.notes ?? "",
-      dataSource: (holding?.instrument?.dataSource as DataSource) ?? DataSource.YAHOO,
+      name: instrument?.name ?? asset?.name ?? "",
+      sectors: parseSectors(instrument?.sectors ?? asset?.sectors),
+      countries: parseCountries(instrument?.countries ?? asset?.countries),
+      assetSubClass: instrument?.assetSubclass ?? asset?.assetSubClass ?? "",
+      assetClass: instrument?.assetClass ?? asset?.assetClass ?? "",
+      notes: instrument?.notes ?? asset?.notes ?? "",
+      dataSource: (instrument?.dataSource ?? asset?.dataSource ?? DataSource.YAHOO) as DataSource,
     });
-  }, [holding]);
+  }, [holding, assetProfile]);
 
   // Build toggle items dynamically based on available data
   const toggleItems = useMemo(() => {
@@ -579,8 +645,8 @@ export const AssetProfilePage = () => {
     );
   }
 
-  // Handle case where loading finished but we have neither profile/holding nor quote data
-  if (!profile && !holding && (!quoteHistory || quoteHistory.length === 0)) {
+  // Handle case where loading finished but we have no asset data at all
+  if (!profile && (!quoteHistory || quoteHistory.length === 0)) {
     return (
       <Page>
         <PageHeader
@@ -602,7 +668,6 @@ export const AssetProfilePage = () => {
       </Page>
     );
   }
-
   return (
     <Page>
       <PageHeader>
@@ -636,7 +701,7 @@ export const AssetProfilePage = () => {
                     setIsEditingTitle(false);
                     setFormData((prev) => ({
                       ...prev,
-                      name: holding?.instrument?.name ?? "",
+                      name: holding?.instrument?.name ?? assetProfile?.name ?? "",
                     }));
                   }
                 }}

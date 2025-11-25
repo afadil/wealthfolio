@@ -8,6 +8,7 @@ import SettingsLayout from "@/pages/settings/settings-layout";
 import ActivityManagerPage from "@/pages/activity/activity-manager-page";
 import ActivityPage from "@/pages/activity/activity-page";
 import ActivityImportPage from "@/pages/activity/import/activity-import-page";
+import AssetsPage from "@/pages/asset/assets-page";
 import DashboardPage from "@/pages/dashboard/dashboard-page";
 import HoldingsPage from "@/pages/holdings/holdings-page";
 import IncomePage from "@/pages/income/income-page";
@@ -101,6 +102,7 @@ export function AppRoutes() {
             <Route path="contribution-limits" element={<ContributionLimitPage />} />
             <Route path="market-data" element={<MarketDataSettingsPage />} />
             <Route path="market-data/import" element={<MarketDataImportPage />} />
+            <Route path="securities" element={<AssetsPage />} />
             <Route path="addons" element={<AddonSettingsPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />

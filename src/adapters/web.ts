@@ -64,12 +64,15 @@ const COMMANDS: CommandMap = {
   delete_contribution_limit: { method: "DELETE", path: "/limits" },
   calculate_deposits_for_contribution_limit: { method: "GET", path: "/limits" },
   // Asset profile
+  get_assets: { method: "GET", path: "/assets" },
+  delete_asset: { method: "DELETE", path: "/assets" },
   get_asset_profile: { method: "GET", path: "/assets/profile" },
   update_asset_profile: { method: "PUT", path: "/assets/profile" },
   update_asset_data_source: { method: "PUT", path: "/assets/data-source" },
   // Market data
   search_symbol: { method: "GET", path: "/market-data/search" },
   get_quote_history: { method: "GET", path: "/market-data/quotes/history" },
+  get_latest_quotes: { method: "POST", path: "/market-data/quotes/latest" },
   update_quote: { method: "PUT", path: "/market-data/quotes" },
   delete_quote: { method: "DELETE", path: "/market-data/quotes/id" },
   import_quotes_csv: { method: "POST", path: "/market-data/quotes/import" },
@@ -322,6 +325,11 @@ export const invokeWeb = async <T>(
       url += `/${encodeURIComponent(id)}`;
       break;
     }
+    case "delete_asset": {
+      const { id } = payload as { id: string };
+      url += `/${encodeURIComponent(id)}`;
+      break;
+    }
     case "calculate_deposits_for_contribution_limit": {
       const { limitId } = payload as { limitId: string };
       url += `/${encodeURIComponent(limitId)}/deposits`;
@@ -361,6 +369,11 @@ export const invokeWeb = async <T>(
       const params = new URLSearchParams();
       params.set("symbol", symbol);
       url += `?${params.toString()}`;
+      break;
+    }
+    case "get_latest_quotes": {
+      const { symbols } = payload as { symbols: string[] };
+      body = JSON.stringify({ symbols });
       break;
     }
     case "update_quote": {

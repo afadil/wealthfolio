@@ -19,6 +19,9 @@ pub enum Error {
     #[error("Asset operation failed: {0}")]
     Asset(String),
 
+    #[error("Constraint violation: {0}")]
+    ConstraintViolation(String),
+
     #[error("Failed to convert between currencies: {0}")]
     CurrencyConversionFailed(String),
     #[error("Currency '{0}' is not supported")]

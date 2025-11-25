@@ -6,8 +6,8 @@ use log::debug;
 use std::sync::Arc;
 
 use crate::db::{get_connection, WriteHandle};
-use crate::errors::Result;
-use crate::schema::assets;
+use crate::errors::{Error, Result};
+use crate::schema::{activities, assets, quotes};
 
 use super::assets_model::{Asset, AssetDB, NewAsset, UpdateAssetProfile};
 use super::assets_traits::AssetRepositoryTrait;
@@ -150,5 +150,40 @@ impl AssetRepositoryTrait for AssetRepository {
     /// Lists assets by their symbols
     fn list_by_symbols(&self, symbols: &Vec<String>) -> Result<Vec<Asset>> {
         self.list_by_symbols_impl(symbols)
+    }
+
+    async fn delete(&self, asset_id: &str) -> Result<()> {
+        let asset_id_owned = asset_id.to_string();
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                // Check for activities constraint
+                let activity_count: i64 = activities::table
+                    .filter(activities::asset_id.eq(&asset_id_owned))
+                    .count()
+                    .get_result(conn)?;
+
+                if activity_count > 0 {
+                    return Err(Error::ConstraintViolation(
+                        "Cannot delete asset: it has existing activities. Please delete all associated activities first.".to_string()
+                    ));
+                }
+
+                // Get the asset symbol for deleting quotes
+                let asset_symbol: String = assets::table
+                    .filter(assets::id.eq(&asset_id_owned))
+                    .select(assets::symbol)
+                    .first(conn)?;
+
+                // Delete all quotes for this asset (by symbol)
+                diesel::delete(quotes::table.filter(quotes::symbol.eq(&asset_symbol)))
+                    .execute(conn)?;
+
+                // Delete the asset
+                diesel::delete(assets::table.filter(assets::id.eq(&asset_id_owned)))
+                    .execute(conn)?;
+
+                Ok(())
+            })
+            .await
     }
 }

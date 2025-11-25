@@ -72,6 +72,38 @@ export const getAssetProfile = async (assetId: string): Promise<Asset> => {
   }
 };
 
+export const getAssets = async (): Promise<Asset[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri("get_assets");
+      case RUN_ENV.WEB:
+        return invokeWeb("get_assets");
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error("Error loading assets.");
+    throw error;
+  }
+};
+
+export const getLatestQuotes = async (symbols: string[]): Promise<Record<string, Quote>> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri("get_latest_quotes", { symbols });
+      case RUN_ENV.WEB:
+        return invokeWeb("get_latest_quotes", { symbols });
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error("Error loading latest quotes.");
+    throw error;
+  }
+};
+
 export const updateAssetProfile = async (payload: UpdateAssetProfile): Promise<Asset> => {
   try {
     switch (getRunEnv()) {
@@ -84,6 +116,24 @@ export const updateAssetProfile = async (payload: UpdateAssetProfile): Promise<A
     }
   } catch (error) {
     logger.error("Error updating asset profile.");
+    throw error;
+  }
+};
+
+export const deleteAsset = async (id: string): Promise<void> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        await invokeTauri("delete_asset", { id });
+        return;
+      case RUN_ENV.WEB:
+        await invokeWeb("delete_asset", { id });
+        return;
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error("Error deleting asset.");
     throw error;
   }
 };

@@ -7,7 +7,8 @@ use crate::{
 };
 use axum::{
     extract::{Path, Query, State},
-    routing::{get, put},
+    http::StatusCode,
+    routing::{delete, get, put},
     Json, Router,
 };
 use wealthfolio_core::assets::{Asset as CoreAsset, UpdateAssetProfile};
@@ -24,6 +25,11 @@ async fn get_asset_profile(
 ) -> ApiResult<Json<CoreAsset>> {
     let asset = state.asset_service.get_asset_by_id(&q.asset_id)?;
     Ok(Json(asset))
+}
+
+async fn list_assets(State(state): State<Arc<AppState>>) -> ApiResult<Json<Vec<CoreAsset>>> {
+    let assets = state.asset_service.get_assets()?;
+    Ok(Json(assets))
 }
 
 async fn update_asset_profile(
@@ -65,8 +71,15 @@ async fn update_asset_data_source(
     Ok(Json(asset))
 }
 
+async fn delete_asset(State(state): State<Arc<AppState>>, Path(id): Path<String>) -> ApiResult<StatusCode> {
+    state.asset_service.delete_asset(&id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
+        .route("/assets", get(list_assets))
+        .route("/assets/{id}", delete(delete_asset))
         .route("/assets/profile", get(get_asset_profile))
         .route("/assets/profile/{id}", put(update_asset_profile))
         .route("/assets/data-source/{id}", put(update_asset_data_source))

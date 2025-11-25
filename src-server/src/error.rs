@@ -30,7 +30,11 @@ struct ErrorBody {
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let (status, msg) = match &self {
-            ApiError::Core(e) => (StatusCode::BAD_REQUEST, e.to_string()),
+            ApiError::Core(e) => match e {
+                CoreError::ConstraintViolation(_) => (StatusCode::CONFLICT, e.to_string()),
+                CoreError::Validation(_) => (StatusCode::BAD_REQUEST, e.to_string()),
+                _ => (StatusCode::BAD_REQUEST, e.to_string()),
+            },
             ApiError::NotFound => (StatusCode::NOT_FOUND, self.to_string()),
             ApiError::NotImplemented(reason) => (StatusCode::NOT_IMPLEMENTED, reason.clone()),
             ApiError::Anyhow(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),

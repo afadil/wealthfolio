@@ -2,12 +2,12 @@ import { useMutation } from "@tanstack/react-query";
 import { syncMarketData } from "@/commands/market-data";
 import { useToast } from "@/components/ui/use-toast";
 
-export function useSyncMarketDataMutation() {
+export function useSyncMarketDataMutation(refetchAll = true) {
   const { toast } = useToast();
 
   return useMutation({
     mutationFn: async (symbols: string[]) => {
-      await syncMarketData(symbols, true);
+      await syncMarketData(symbols, refetchAll);
     },
     onError: (error: Error) => {
       toast({
