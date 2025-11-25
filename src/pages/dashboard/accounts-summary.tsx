@@ -92,7 +92,7 @@ const AccountSummaryComponent = React.memo(
         ? `${item.accountCurrency} • ${item.accountCount} ${item.accountCount === 1 ? "account" : "accounts"}`
         : `${item.accountCount} ${item.accountCount === 1 ? "account" : "accounts"}`
       : useAccountCurrency
-        ? item.accountCurrency
+        ? (item.accountCurrency ?? item.baseCurrency)
         : item.baseCurrency;
 
     const totalValue = useAccountCurrency
