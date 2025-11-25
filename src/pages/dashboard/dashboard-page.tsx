@@ -14,6 +14,7 @@ import { useMemo, useState } from "react";
 import { AccountsSummary } from "./accounts-summary";
 import Balance from "./balance";
 import SavingGoals from "./goals";
+import TopHoldings from "./top-holdings";
 
 function DashboardSkeleton() {
   return (
@@ -153,7 +154,12 @@ export default function DashboardPage() {
             <div className="md:col-span-2">
               <AccountsSummary />
             </div>
-            <div className="sm:col-span-1">
+            <div className="space-y-6 sm:col-span-1">
+              <TopHoldings
+                holdings={holdings}
+                isLoading={isHoldingsLoading}
+                baseCurrency={baseCurrency}
+              />
               <SavingGoals />
             </div>
           </div>

@@ -135,6 +135,7 @@ export function SavingGoals() {
           {goals && goals.length > 0 ? (
             [...goals]
               .sort((a, b) => a.targetAmount - b.targetAmount)
+              .slice(0, 5)
               .map((goal) => {
                 const progressData = goalsProgress.find((p) => p.name === goal.title);
 
