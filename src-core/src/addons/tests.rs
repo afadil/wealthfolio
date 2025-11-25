@@ -105,8 +105,8 @@ fn test_detect_addon_permissions() {
                 ctx.sidebar.addItem({ id: 'test' });
                 ctx.router.add({ path: '/test' });
                 ctx.onDisable(() => { console.log('disabled'); });
-                api.getHoldings();
-                data.getPortfolio();
+                ctx.api.portfolio.getHoldings();
+                ctx.api.portfolio.getHolding();
             "#
             .to_string(),
             is_main: true,
@@ -115,7 +115,7 @@ fn test_detect_addon_permissions() {
             name: "helper.js".to_string(),
             content: r#"
                 function helper() {
-                    return getMarketData('AAPL');
+                    return ctx.api.market.searchTicker('AAPL');
                 }
             "#
             .to_string(),
@@ -170,8 +170,8 @@ fn test_detect_addon_permissions() {
         "getHoldings should be detected"
     );
     assert!(
-        portfolio_functions.contains(&"getPortfolio"),
-        "getPortfolio should be detected"
+        portfolio_functions.contains(&"getHolding"),
+        "getHolding should be detected"
     );
 
     // Should detect market-data functions
@@ -190,8 +190,8 @@ fn test_detect_addon_permissions() {
         .map(|f| f.name.as_str())
         .collect();
     assert!(
-        market_functions.contains(&"getMarketData"),
-        "getMarketData should be detected"
+        market_functions.contains(&"searchTicker"),
+        "searchTicker should be detected"
     );
 }
 

@@ -204,13 +204,17 @@ impl ValuationServiceTrait for ValuationService {
                 required_asset_ids.insert(asset_id.clone());
                 let position_currency = normalize_currency_code(&position.currency);
                 if position_currency != account_curr {
-                    required_fx_pairs.insert((position_currency.to_string(), account_curr.to_string()));
+                    required_fx_pairs
+                        .insert((position_currency.to_string(), account_curr.to_string()));
                 }
             }
             for (cash_curr, _amount) in &snapshot.cash_balances {
                 let normalized_cash_currency = normalize_currency_code(cash_curr);
                 if normalized_cash_currency != account_curr {
-                    required_fx_pairs.insert((normalized_cash_currency.to_string(), account_curr.to_string()));
+                    required_fx_pairs.insert((
+                        normalized_cash_currency.to_string(),
+                        account_curr.to_string(),
+                    ));
                 }
             }
         }
@@ -228,7 +232,8 @@ impl ValuationServiceTrait for ValuationService {
         for quote in &quotes_vec {
             let normalized_quote_currency = normalize_currency_code(&quote.currency);
             if normalized_quote_currency != account_curr.as_str() {
-                required_fx_pairs.insert((normalized_quote_currency.to_string(), account_curr.clone()));
+                required_fx_pairs
+                    .insert((normalized_quote_currency.to_string(), account_curr.clone()));
             }
         }
 
