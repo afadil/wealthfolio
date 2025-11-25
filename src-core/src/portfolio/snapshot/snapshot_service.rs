@@ -6,7 +6,7 @@ use crate::assets::AssetRepositoryTrait;
 use crate::constants::{DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
 use crate::errors::{CalculatorError, Error, Result};
 use crate::fx::fx_traits::FxServiceTrait;
-use crate::portfolio::snapshot::{AccountStateSnapshot, Position};
+use crate::portfolio::snapshot::{AccountStateSnapshot, Lot, Position};
 use crate::utils::time_utils::get_days_between;
 
 use async_trait::async_trait;
@@ -57,7 +57,10 @@ pub trait SnapshotServiceTrait: Send + Sync {
 
     /// Retrieves the most recent calculated **holdings** snapshot for a specific account.
     /// Returns `Ok(None)` when no snapshot exists yet. Valuation fields will be zero or default.
-    fn get_latest_holdings_snapshot(&self, account_id: &str) -> Result<Option<AccountStateSnapshot>>;
+    fn get_latest_holdings_snapshot(
+        &self,
+        account_id: &str,
+    ) -> Result<Option<AccountStateSnapshot>>;
 
     /// Calculates and stores aggregated "TOTAL" portfolio snapshots based on individual account holdings.
     /// This should typically be run after `calculate_holdings_snapshots` has processed individual accounts.
@@ -656,7 +659,7 @@ impl SnapshotService {
                         average_cost: Decimal::ZERO,
                         total_cost_basis: Decimal::ZERO, // This will be in asset's currency (pos.currency)
                         currency: pos.currency.clone(),
-                        lots: VecDeque::new(), // Lots are generally not merged for TOTAL view
+                        lots: VecDeque::new(),
                         inception_date: pos.inception_date,
                         created_at: Utc::now(),
                         last_updated: Utc::now(),
@@ -664,6 +667,22 @@ impl SnapshotService {
 
                 agg_pos.quantity += pos.quantity;
                 agg_pos.total_cost_basis += pos.total_cost_basis; // Summing in asset's currency
+                if pos.inception_date < agg_pos.inception_date {
+                    agg_pos.inception_date = pos.inception_date;
+                }
+
+                if !pos.lots.is_empty() {
+                    let agg_position_id = agg_pos.id.clone();
+                    agg_pos.lots.extend(
+                        pos.lots
+                            .iter()
+                            .cloned()
+                            .map(|mut lot: Lot| {
+                                lot.position_id = agg_position_id.clone();
+                                lot
+                            }),
+                    );
+                }
 
                 // Convert this specific position's total_cost_basis (in asset currency) to base_portfolio_currency
                 // and add to the portfolio's overall cost_basis.
@@ -698,6 +717,12 @@ impl SnapshotService {
 
         // Finalize average costs for aggregated positions
         for agg_pos in aggregated_positions.values_mut() {
+            if agg_pos.lots.len() > 1 {
+                let mut sorted_lots: Vec<_> = agg_pos.lots.drain(..).collect();
+                sorted_lots.sort_by_key(|lot| lot.acquisition_date);
+                agg_pos.lots = sorted_lots.into();
+            }
+
             if !agg_pos.quantity.is_zero() {
                 agg_pos.average_cost =
                     (agg_pos.total_cost_basis / agg_pos.quantity).round_dp(DECIMAL_PRECISION);
@@ -1088,7 +1113,10 @@ impl SnapshotServiceTrait for SnapshotService {
         Ok(reconstructed_snapshots)
     }
 
-    fn get_latest_holdings_snapshot(&self, account_id: &str) -> Result<Option<AccountStateSnapshot>> {
+    fn get_latest_holdings_snapshot(
+        &self,
+        account_id: &str,
+    ) -> Result<Option<AccountStateSnapshot>> {
         let today = Utc::now().naive_utc().date();
         // The date passed to get_latest_snapshot_before_date is exclusive, so use tomorrow to include today.
         let tomorrow = today.succ_opt().unwrap_or(today);

@@ -59,7 +59,7 @@ impl FxRepository {
 
         let query = "
             WITH LatestQuotes AS (
-                SELECT q.* 
+                SELECT q.*
                 FROM quotes q
                 INNER JOIN assets a ON q.symbol = a.id
                 WHERE a.asset_type = 'FOREX'
@@ -332,8 +332,14 @@ impl FxRepository {
         let rate_id_owned = rate_id.to_string();
         self.writer
             .exec(move |conn| {
-                diesel::delete(quotes::table.filter(quotes::symbol.eq(rate_id_owned)))
+                // Delete all quotes for this exchange rate
+                diesel::delete(quotes::table.filter(quotes::symbol.eq(&rate_id_owned)))
                     .execute(conn)?;
+
+                // Delete the asset
+                diesel::delete(assets::table.filter(assets::id.eq(&rate_id_owned)))
+                    .execute(conn)?;
+
                 Ok(())
             })
             .await

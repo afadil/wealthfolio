@@ -1,4 +1,5 @@
 use crate::errors::{CalculatorError, Error as CoreError, Result as CoreResult};
+use crate::fx::currency::normalize_currency_code;
 use crate::fx::fx_traits::FxServiceTrait;
 use crate::market_data::MarketDataServiceTrait;
 use crate::portfolio::snapshot::SnapshotServiceTrait;
@@ -185,25 +186,36 @@ impl ValuationServiceTrait for ValuationService {
 
         let mut required_asset_ids = HashSet::new();
         let mut required_fx_pairs = HashSet::new();
-        let base_curr = self.base_currency.read().unwrap().clone();
+        let base_curr = {
+            let base_guard = self.base_currency.read().unwrap();
+            normalize_currency_code(&base_guard).to_string()
+        };
+        let mut normalized_account_currency: Option<String> = None;
 
         for snapshot in &snapshots_to_process {
-            let account_curr = &snapshot.currency;
-            if account_curr != &base_curr {
-                required_fx_pairs.insert((account_curr.clone(), base_curr.clone()));
+            let account_curr = normalize_currency_code(&snapshot.currency);
+            if normalized_account_currency.is_none() {
+                normalized_account_currency = Some(account_curr.to_string());
+            }
+            if account_curr != base_curr {
+                required_fx_pairs.insert((account_curr.to_string(), base_curr.clone()));
             }
             for (asset_id, position) in &snapshot.positions {
                 required_asset_ids.insert(asset_id.clone());
-                if &position.currency != account_curr {
-                    required_fx_pairs.insert((position.currency.clone(), account_curr.clone()));
+                let position_currency = normalize_currency_code(&position.currency);
+                if position_currency != account_curr {
+                    required_fx_pairs.insert((position_currency.to_string(), account_curr.to_string()));
                 }
             }
             for (cash_curr, _amount) in &snapshot.cash_balances {
-                if cash_curr != account_curr {
-                    required_fx_pairs.insert((cash_curr.clone(), account_curr.clone()));
+                let normalized_cash_currency = normalize_currency_code(cash_curr);
+                if normalized_cash_currency != account_curr {
+                    required_fx_pairs.insert((normalized_cash_currency.to_string(), account_curr.to_string()));
                 }
             }
         }
+
+        let account_curr = normalized_account_currency.unwrap_or_else(|| base_curr.clone());
 
         let quotes_vec = self
             .market_data_service
@@ -212,6 +224,13 @@ impl ValuationServiceTrait for ValuationService {
                 actual_calculation_start_date,
                 calculation_end_date,
             )?;
+
+        for quote in &quotes_vec {
+            let normalized_quote_currency = normalize_currency_code(&quote.currency);
+            if normalized_quote_currency != account_curr.as_str() {
+                required_fx_pairs.insert((normalized_quote_currency.to_string(), account_curr.clone()));
+            }
+        }
 
         let fx_rates_by_date = self
             .fetch_fx_rates_for_range(
@@ -236,7 +255,7 @@ impl ValuationServiceTrait for ValuationService {
             .filter_map(|holdings_snapshot| {
                 let current_date = holdings_snapshot.snapshot_date;
                 let account_id_clone = account_id.to_string();
-                let base_curr_clone = self.base_currency.read().unwrap().clone();
+                let base_curr_clone = base_curr.clone();
 
                 let quotes_for_current_date =
                     quotes_by_date.get(&current_date).cloned().unwrap_or_default();

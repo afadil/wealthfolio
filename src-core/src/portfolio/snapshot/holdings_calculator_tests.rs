@@ -77,6 +77,10 @@ mod tests {
             unimplemented!("Not needed for tests")
         }
 
+        async fn delete(&self, _asset_id: &str) -> Result<()> {
+            Ok(())
+        }
+
         fn get_by_id(&self, asset_id: &str) -> Result<Asset> {
             self.assets
                 .get(asset_id)
