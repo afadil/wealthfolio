@@ -133,7 +133,7 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
         fee: 0,
         isDraft: false,
         isValid: true,
-        comment: data.comment || `Bulk import - ${validHoldings.length} holdings`,
+        comment: data.comment || "",
       }));
 
       confirmImportMutation.mutate({ activities: activitiesToImport });

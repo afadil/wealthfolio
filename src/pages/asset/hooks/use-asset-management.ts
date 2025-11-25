@@ -33,7 +33,7 @@ export const useAssetManagement = () => {
     onSuccess: (asset) => {
       invalidateCaches(asset.id);
       toast({
-        title: "Asset updated",
+        title: "Security updated",
         description: "Changes saved successfully.",
         variant: "success",
       });
@@ -42,7 +42,7 @@ export const useAssetManagement = () => {
       logger.error(`Error updating asset: ${error}`);
       toast({
         title: "Update failed",
-        description: "There was a problem saving the asset.",
+        description: "There was a problem saving the security.",
         variant: "destructive",
       });
     },
@@ -53,8 +53,8 @@ export const useAssetManagement = () => {
     onSuccess: (_, assetId) => {
       invalidateCaches(assetId);
       toast({
-        title: "Asset deleted",
-        description: "The asset has been removed.",
+        title: "Security deleted",
+        description: "The security has been removed.",
         variant: "success",
       });
     },
@@ -68,10 +68,10 @@ export const useAssetManagement = () => {
       const isActivitiesError = errorMessage.toLowerCase().includes("existing activities");
 
       toast({
-        title: "Unable to delete asset",
+        title: "Unable to delete security",
         description: isActivitiesError
-          ? "This asset cannot be deleted because it has existing activities. Please delete all associated activities first."
-          : errorMessage || "The asset could not be removed right now.",
+          ? "This security cannot be deleted because it has existing activities. Please delete all associated activities first."
+          : errorMessage || "The security could not be removed right now.",
         variant: "destructive",
       });
     },
