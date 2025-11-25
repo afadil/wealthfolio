@@ -52,9 +52,9 @@ const Balance: React.FC<BalanceProps> = ({
   return (
     <h1 className="font-heading text-3xl font-bold tracking-tight" data-testid="portfolio-balance">
       {isBalanceHidden ? (
-        <span>
+        <span className="text-4x">
           {displayCurrency ? currencySymbol : ""}
-          ••••••
+          •••••••
         </span>
       ) : (
         <>
