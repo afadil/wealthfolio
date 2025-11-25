@@ -1,6 +1,7 @@
 use crate::assets::AssetServiceTrait;
 use crate::assets_model::{Asset, Country as AssetCountry, Sector as AssetSector};
 use crate::errors::{CalculatorError, Error as CoreError, Result};
+use crate::fx::currency::{get_normalization_rule, normalize_currency_code};
 use crate::portfolio::holdings::holdings_model::{
     Country, Holding, HoldingType, Instrument, MonetaryValue, Sector,
 };
@@ -46,6 +47,211 @@ impl HoldingsService {
             asset_service,
             snapshot_service,
             valuation_service,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::snapshot::Lot;
+
+    use super::*;
+    use chrono::Utc;
+    use rust_decimal::Decimal;
+    use rust_decimal_macros::dec;
+    use std::collections::VecDeque;
+
+    #[test]
+    fn normalize_holding_currency_converts_minor_security_units() {
+        let as_of = Utc::now().date_naive();
+        let mut holding = Holding {
+            id: "SEC-TEST-GBp".to_string(),
+            account_id: "TEST".to_string(),
+            holding_type: HoldingType::Security,
+            instrument: Some(Instrument {
+                id: "TEST".to_string(),
+                symbol: "TEST".to_string(),
+                name: Some("Test".to_string()),
+                currency: "GBp".to_string(),
+                notes: None,
+                data_source: None,
+                asset_class: None,
+                asset_subclass: None,
+                countries: None,
+                sectors: None,
+            }),
+            quantity: dec!(1),
+            open_date: None,
+            lots: Some(VecDeque::from(vec![Lot {
+                id: "LOT1".to_string(),
+                position_id: "POS-TEST".to_string(),
+                acquisition_date: Utc::now(),
+                quantity: dec!(1),
+                cost_basis: dec!(3000),
+                acquisition_price: dec!(3000),
+                acquisition_fees: dec!(0),
+            }])),
+            local_currency: "GBp".to_string(),
+            base_currency: "GBP".to_string(),
+            fx_rate: Some(dec!(0.01)),
+            market_value: MonetaryValue {
+                local: dec!(3090),
+                base: dec!(30.9),
+            },
+            cost_basis: Some(MonetaryValue {
+                local: dec!(3000),
+                base: dec!(30),
+            }),
+            price: Some(dec!(3090)),
+            unrealized_gain: Some(MonetaryValue {
+                local: dec!(90),
+                base: dec!(0.9),
+            }),
+            unrealized_gain_pct: Some(dec!(0.03)),
+            realized_gain: None,
+            realized_gain_pct: None,
+            total_gain: Some(MonetaryValue {
+                local: dec!(90),
+                base: dec!(0.9),
+            }),
+            total_gain_pct: Some(dec!(0.03)),
+            day_change: Some(MonetaryValue {
+                local: dec!(-44),
+                base: dec!(-0.44),
+            }),
+            day_change_pct: Some(dec!(-0.014)),
+            prev_close_value: Some(MonetaryValue {
+                local: dec!(3134),
+                base: dec!(31.34),
+            }),
+            weight: dec!(0.1),
+            as_of_date: as_of,
+        };
+
+        normalize_holding_currency(&mut holding);
+
+        assert_eq!(holding.local_currency, "GBP");
+        assert_eq!(holding.instrument.as_ref().unwrap().currency, "GBP");
+        assert_eq!(holding.fx_rate, Some(dec!(1)));
+        assert_eq!(holding.price, Some(dec!(30.9)));
+        assert_eq!(holding.market_value.local, dec!(30.9));
+        assert_eq!(holding.market_value.base, dec!(30.9));
+        assert_eq!(holding.cost_basis.as_ref().unwrap().local, dec!(30));
+        assert_eq!(holding.cost_basis.as_ref().unwrap().base, dec!(30));
+        assert_eq!(holding.unrealized_gain.as_ref().unwrap().local, dec!(0.9));
+        assert_eq!(holding.unrealized_gain.as_ref().unwrap().base, dec!(0.9));
+        assert_eq!(holding.day_change.as_ref().unwrap().local, dec!(-0.44));
+        assert_eq!(holding.day_change.as_ref().unwrap().base, dec!(-0.44));
+        assert_eq!(
+            holding.prev_close_value.as_ref().unwrap().local,
+            dec!(31.34)
+        );
+        assert_eq!(holding.prev_close_value.as_ref().unwrap().base, dec!(31.34));
+        let lot = holding.lots.as_ref().unwrap().front().unwrap();
+        assert_eq!(lot.cost_basis, dec!(30));
+        assert_eq!(lot.acquisition_price, dec!(30));
+    }
+
+    #[test]
+    fn normalize_holding_currency_keeps_cash_price_at_one() {
+        let mut holding = Holding {
+            id: "CASH-TEST-GBp".to_string(),
+            account_id: "TEST".to_string(),
+            holding_type: HoldingType::Cash,
+            instrument: None,
+            quantity: dec!(1000),
+            open_date: None,
+            lots: None,
+            local_currency: "GBp".to_string(),
+            base_currency: "GBP".to_string(),
+            fx_rate: Some(dec!(0.01)),
+            market_value: MonetaryValue {
+                local: dec!(1000),
+                base: dec!(10),
+            },
+            cost_basis: Some(MonetaryValue {
+                local: dec!(1000),
+                base: dec!(10),
+            }),
+            price: Some(dec!(1)),
+            unrealized_gain: Some(MonetaryValue::zero()),
+            unrealized_gain_pct: Some(Decimal::ZERO),
+            realized_gain: Some(MonetaryValue::zero()),
+            realized_gain_pct: Some(Decimal::ZERO),
+            total_gain: Some(MonetaryValue::zero()),
+            total_gain_pct: Some(Decimal::ZERO),
+            day_change: Some(MonetaryValue {
+                local: dec!(0),
+                base: dec!(0),
+            }),
+            day_change_pct: Some(Decimal::ZERO),
+            prev_close_value: Some(MonetaryValue {
+                local: dec!(1000),
+                base: dec!(10),
+            }),
+            weight: dec!(1),
+            as_of_date: Utc::now().date_naive(),
+        };
+
+        normalize_holding_currency(&mut holding);
+
+        assert_eq!(holding.local_currency, "GBP");
+        assert_eq!(holding.fx_rate, Some(dec!(1)));
+        assert_eq!(holding.market_value.local, dec!(10));
+        assert_eq!(holding.market_value.base, dec!(10));
+        assert_eq!(holding.cost_basis.as_ref().unwrap().local, dec!(10));
+        assert_eq!(holding.price, Some(Decimal::ONE));
+        assert_eq!(holding.prev_close_value.as_ref().unwrap().local, dec!(10));
+        assert_eq!(holding.prev_close_value.as_ref().unwrap().base, dec!(10));
+    }
+}
+
+fn apply_factor_to_monetary_value(value: &mut MonetaryValue, factor: Decimal) {
+    value.local *= factor;
+}
+
+fn apply_factor_to_optional_monetary_value(value: &mut Option<MonetaryValue>, factor: Decimal) {
+    if let Some(v) = value {
+        apply_factor_to_monetary_value(v, factor);
+    }
+}
+
+fn normalize_holding_currency(holding: &mut Holding) {
+    if let Some(instrument) = holding.instrument.as_mut() {
+        let normalized_currency = normalize_currency_code(&instrument.currency);
+        instrument.currency = normalized_currency.to_string();
+    }
+
+    if let Some(rule) = get_normalization_rule(&holding.local_currency) {
+        let factor = rule.factor;
+        holding.local_currency = rule.major_code.to_string();
+
+        if let Some(rate) = holding.fx_rate {
+            holding.fx_rate = Some(rate / factor);
+        }
+
+        if holding.holding_type == HoldingType::Security {
+            if let Some(price) = holding.price {
+                holding.price = Some(price * factor);
+            }
+        } else if holding.holding_type == HoldingType::Cash {
+            holding.price = Some(Decimal::ONE);
+        }
+
+        apply_factor_to_monetary_value(&mut holding.market_value, factor);
+        apply_factor_to_optional_monetary_value(&mut holding.cost_basis, factor);
+        apply_factor_to_optional_monetary_value(&mut holding.unrealized_gain, factor);
+        apply_factor_to_optional_monetary_value(&mut holding.realized_gain, factor);
+        apply_factor_to_optional_monetary_value(&mut holding.total_gain, factor);
+        apply_factor_to_optional_monetary_value(&mut holding.day_change, factor);
+        apply_factor_to_optional_monetary_value(&mut holding.prev_close_value, factor);
+
+        if let Some(lots) = holding.lots.as_mut() {
+            for lot in lots {
+                lot.cost_basis *= factor;
+                lot.acquisition_price *= factor;
+                lot.acquisition_fees *= factor;
+            }
         }
     }
 }
@@ -290,6 +496,10 @@ impl HoldingsServiceTrait for HoldingsService {
             }
         }
 
+        for holding_view in &mut holdings {
+            normalize_holding_currency(holding_view);
+        }
+
         Ok(holdings)
     }
 
@@ -446,6 +656,8 @@ impl HoldingsServiceTrait for HoldingsService {
         {
             Ok(_) => {
                 if let Some(valued_holding) = single_holding_vec.into_iter().next() {
+                    let mut valued_holding = valued_holding;
+                    normalize_holding_currency(&mut valued_holding);
                     Ok(Some(valued_holding))
                 } else {
                     error!("Valuation service returned Ok but the holding vector was empty for asset {} in account {}.", asset_id, account_id);

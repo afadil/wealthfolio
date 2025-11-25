@@ -3,6 +3,7 @@ use super::fx_errors::FxError;
 use super::fx_model::{ExchangeRate, NewExchangeRate};
 use super::fx_traits::{FxRepositoryTrait, FxServiceTrait};
 use crate::errors::Result;
+use crate::fx::currency::{denormalization_multiplier, normalize_currency_code};
 use crate::market_data::market_data_model::DataSource;
 use async_trait::async_trait;
 use chrono::{NaiveDate, Utc};
@@ -95,6 +96,80 @@ impl FxService {
             }
         }
     }
+
+    fn normalize_currency_pair<'a>(
+        from_currency: &'a str,
+        to_currency: &'a str,
+    ) -> (&'a str, &'a str, Decimal, Decimal) {
+        let normalized_from = normalize_currency_code(from_currency);
+        let normalized_to = normalize_currency_code(to_currency);
+
+        let source_multiplier = if normalized_from == from_currency {
+            Decimal::ONE
+        } else {
+            // We converted from a minor to a major unit
+            Decimal::ONE / denormalization_multiplier(from_currency)
+        };
+
+        let target_multiplier = denormalization_multiplier(to_currency);
+
+        (
+            normalized_from,
+            normalized_to,
+            source_multiplier,
+            target_multiplier,
+        )
+    }
+
+    fn get_latest_rate_between_normalized(&self, from: &str, to: &str) -> Result<Decimal> {
+        if from == to {
+            return Ok(Decimal::ONE);
+        }
+
+        if let Ok(converter_lock) = self.converter.read() {
+            if let Some(converter) = &*converter_lock {
+                let today = Utc::now().naive_utc().date();
+                if let Ok(rate) = converter.get_rate_nearest(from, to, today) {
+                    return Ok(rate);
+                }
+            }
+        }
+
+        let rate = self.load_latest_exchange_rate(from, to)?;
+        Ok(rate.rate)
+    }
+
+    fn get_rate_for_date_between_normalized(
+        &self,
+        from: &str,
+        to: &str,
+        date: NaiveDate,
+    ) -> Result<Decimal> {
+        if from == to {
+            return Ok(Decimal::ONE);
+        }
+
+        if let Ok(converter_lock) = self.converter.read() {
+            if let Some(converter) = &*converter_lock {
+                if let Ok(rate) = converter.get_rate_nearest(from, to, date) {
+                    return Ok(rate);
+                }
+            }
+        }
+
+        let latest_rate = self.load_latest_exchange_rate(from, to)?;
+        let fallback_date = latest_rate.timestamp.date_naive();
+
+        log::warn!(
+            "No exchange rate found for {}/{} on {}. Using fallback rate from {}",
+            from,
+            to,
+            date,
+            fallback_date
+        );
+
+        Ok(latest_rate.rate)
+    }
 }
 
 #[async_trait]
@@ -123,7 +198,10 @@ impl FxServiceTrait for FxService {
     }
 
     fn get_historical_rates(&self, from: &str, to: &str, days: i64) -> Result<Vec<ExchangeRate>> {
-        let symbol = ExchangeRate::make_fx_symbol(from, to);
+        let normalized_from = normalize_currency_code(from);
+        let normalized_to = normalize_currency_code(to);
+
+        let symbol = ExchangeRate::make_fx_symbol(&normalized_from, &normalized_to);
         let end = Utc::now();
         let start = end - chrono::Duration::days(days);
 
@@ -158,36 +236,27 @@ impl FxServiceTrait for FxService {
     }
 
     fn get_latest_exchange_rate(&self, from_currency: &str, to_currency: &str) -> Result<Decimal> {
-        if from_currency == to_currency {
-            return Ok(Decimal::ONE);
+        let (normalized_from, normalized_to, source_multiplier, target_multiplier) =
+            Self::normalize_currency_pair(from_currency, to_currency);
+
+        if normalized_from == normalized_to {
+            return Ok(source_multiplier * target_multiplier);
         }
 
-        // Try to get the converter
-        if let Ok(converter_lock) = self.converter.read() {
-            if let Some(converter) = &*converter_lock {
-                // Use the converter to get the latest rate
-                let today = Utc::now().naive_utc().date();
-                match converter.get_rate_nearest(from_currency, to_currency, today) {
-                    Ok(rate) => return Ok(rate),
-                    Err(_) => {
-                        // Fall through to direct repository access (no log here to avoid duplication)
-                    }
+        let base_rate =
+            match self.get_latest_rate_between_normalized(normalized_from, normalized_to) {
+                Ok(rate) => rate,
+                Err(e) => {
+                    log::error!(
+                        "Exchange rate not available for {}/{}",
+                        normalized_from,
+                        normalized_to
+                    );
+                    return Err(e);
                 }
-            }
-        }
+            };
 
-        // Fallback to direct repository access
-        match self.load_latest_exchange_rate(from_currency, to_currency) {
-            Ok(rate) => Ok(rate.rate),
-            Err(e) => {
-                log::error!(
-                    "Exchange rate not available for {}/{}",
-                    from_currency,
-                    to_currency
-                );
-                Err(e)
-            }
-        }
+        Ok(source_multiplier * base_rate * target_multiplier)
     }
 
     fn get_exchange_rate_for_date(
@@ -213,36 +282,17 @@ impl FxServiceTrait for FxService {
             .into());
         }
 
-        if from_currency == to_currency {
-            return Ok(Decimal::ONE);
+        let (normalized_from, normalized_to, source_multiplier, target_multiplier) =
+            Self::normalize_currency_pair(from_currency, to_currency);
+
+        if normalized_from == normalized_to {
+            return Ok(source_multiplier * target_multiplier);
         }
 
-        // Try to get the converter
-        if let Ok(converter_lock) = self.converter.read() {
-            if let Some(converter) = &*converter_lock {
-                // Use the converter to get the rate for the specific date
-                match converter.get_rate_nearest(from_currency, to_currency, date) {
-                    Ok(rate) => return Ok(rate),
-                    Err(_) => {
-                        // Fall through to fallback
-                    }
-                }
-            }
-        }
+        let base_rate =
+            self.get_rate_for_date_between_normalized(normalized_from, normalized_to, date)?;
 
-        // Fallback to latest rate if converter not available or failed
-        let latest_rate = self.load_latest_exchange_rate(from_currency, to_currency)?;
-        let fallback_date = latest_rate.timestamp.date_naive();
-
-        log::warn!(
-            "No exchange rate found for {}/{} on {}. Using fallback rate from {}",
-            from_currency,
-            to_currency,
-            date,
-            fallback_date
-        );
-
-        Ok(latest_rate.rate)
+        Ok(source_multiplier * base_rate * target_multiplier)
     }
 
     fn convert_currency(
@@ -255,21 +305,6 @@ impl FxServiceTrait for FxService {
             return Ok(amount);
         }
 
-        // Try to get the converter
-        if let Ok(converter_lock) = self.converter.read() {
-            if let Some(converter) = &*converter_lock {
-                // Use the converter to convert the amount
-                let today = Utc::now().naive_utc().date();
-                match converter.convert_amount(amount, from_currency, to_currency, today) {
-                    Ok(converted) => return Ok(converted),
-                    Err(_) => {
-                        // Fall through to fallback
-                    }
-                }
-            }
-        }
-
-        // Fallback to direct rate lookup
         let rate = self.get_latest_exchange_rate(from_currency, to_currency)?;
         Ok(amount * rate)
     }
@@ -285,20 +320,6 @@ impl FxServiceTrait for FxService {
             return Ok(amount);
         }
 
-        // Try to get the converter
-        if let Ok(converter_lock) = self.converter.read() {
-            if let Some(converter) = &*converter_lock {
-                // Use the converter to convert the amount for the specific date
-                match converter.convert_amount_nearest(amount, from_currency, to_currency, date) {
-                    Ok(converted) => return Ok(converted),
-                    Err(_) => {
-                        // Fall through to fallback
-                    }
-                }
-            }
-        }
-
-        // Fallback to direct rate lookup - logging happens in get_exchange_rate_for_date
         let rate = self.get_exchange_rate_for_date(from_currency, to_currency, date)?;
         Ok(amount * rate)
     }
@@ -323,13 +344,18 @@ impl FxServiceTrait for FxService {
             return Ok(());
         }
 
+        let normalized_from = normalize_currency_code(from);
+        let normalized_to = normalize_currency_code(to);
+
         // Try to get existing rate first
-        let existing_rate = self.load_latest_exchange_rate(from, to).ok();
+        let existing_rate = self
+            .load_latest_exchange_rate(&normalized_from, &normalized_to)
+            .ok();
 
         // Create FX asset and add default rate if no rate exists
         if existing_rate.is_none() {
             self.repository
-                .create_fx_asset(from, to, DataSource::Yahoo.as_str())
+                .create_fx_asset(&normalized_from, &normalized_to, DataSource::Yahoo.as_str())
                 .await?;
         }
 
@@ -341,13 +367,22 @@ impl FxServiceTrait for FxService {
         if from == to {
             return Ok(());
         }
+        let normalized_from = normalize_currency_code(from);
+        let normalized_to = normalize_currency_code(to);
+
         // Try to get existing rate first
-        let existing_rate = self.load_latest_exchange_rate(from, to).ok();
+        let existing_rate = self
+            .load_latest_exchange_rate(&normalized_from, &normalized_to)
+            .ok();
 
         // Create FX asset and add default rate if no rate exists
         if existing_rate.is_none() {
             self.repository
-                .create_fx_asset(from, to, DataSource::Manual.as_str())
+                .create_fx_asset(
+                    &normalized_from,
+                    &normalized_to,
+                    DataSource::Manual.as_str(),
+                )
                 .await?;
         }
 

@@ -98,7 +98,7 @@ export default function DashboardPage() {
         <div className="px-4 pt-22 pb-6 md:px-6 md:pt-10 md:pb-8 lg:px-8 lg:pt-12">
           <PortfolioUpdateTrigger lastCalculatedAt={currentValuation?.calculatedAt}>
             <div className="flex items-start gap-2">
-              <div>
+              <div className="min-h-[4.5rem]">
                 <div className="flex items-center gap-3">
                   <Balance
                     isLoading={isHoldingsLoading}

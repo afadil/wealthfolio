@@ -1,6 +1,9 @@
 import { useAccounts } from "@/hooks/use-accounts";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
-import { useRecalculatePortfolioMutation, useUpdatePortfolioMutation } from "@/hooks/use-calculate-portfolio";
+import {
+  useRecalculatePortfolioMutation,
+  useUpdatePortfolioMutation,
+} from "@/hooks/use-calculate-portfolio";
 import { useHoldings } from "@/hooks/use-holdings";
 import { AccountType, HoldingType, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { useSettingsContext } from "@/lib/settings-provider";
@@ -54,14 +57,9 @@ export function AppLauncher() {
   const { holdings, isLoading: isHoldingsLoading } = useHoldings(PORTFOLIO_ACCOUNT_ID);
   const { isBalanceHidden, toggleBalanceVisibility } = useBalancePrivacy();
   const { updateSettings } = useSettingsContext();
-  const {
-    mutate: updatePortfolio,
-    isPending: isUpdatingPortfolio,
-  } = useUpdatePortfolioMutation();
-  const {
-    mutate: recalculatePortfolio,
-    isPending: isRecalculatingPortfolio,
-  } = useRecalculatePortfolioMutation();
+  const { mutate: updatePortfolio, isPending: isUpdatingPortfolio } = useUpdatePortfolioMutation();
+  const { mutate: recalculatePortfolio, isPending: isRecalculatingPortfolio } =
+    useRecalculatePortfolioMutation();
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -259,6 +257,13 @@ export function AppLauncher() {
         icon: <Icons.Import className="size-6" />,
         keywords: ["import", "csv", "upload", "file", "bulk"],
         label: "Import Activities",
+      },
+      {
+        title: "Manage Securities",
+        href: "/settings/securities",
+        icon: <Icons.Settings className="size-6" />,
+        keywords: ["securities", "assets", "stocks", "manage", "edit", "settings"],
+        label: "Manage Securities",
       },
     ];
 
@@ -492,11 +497,9 @@ export function AppLauncher() {
                   <CommandItem
                     key={account.id}
                     value={account.name}
-                    keywords={[
-                      account.name,
-                      account.accountType,
-                      "account",
-                    ].filter((keyword): keyword is string => Boolean(keyword))}
+                    keywords={[account.name, account.accountType, "account"].filter(
+                      (keyword): keyword is string => Boolean(keyword),
+                    )}
                     onSelect={() => handleSelectAccount(account.id)}
                   >
                     <IconComponent className="text-muted-foreground mr-2 h-4 w-4" />

@@ -1,4 +1,5 @@
 use crate::errors::{Error, Result};
+use crate::fx::currency::{normalize_amount, normalize_currency_code};
 use crate::fx::FxError;
 use crate::market_data::market_data_model::Quote;
 use crate::portfolio::snapshot::AccountStateSnapshot;
@@ -33,6 +34,8 @@ pub fn calculate_valuation(
     base_currency: &str, // Pass base currency directly
 ) -> Result<DailyAccountValuation> {
     let account_currency = &holdings_snapshot.currency;
+    let normalized_account_currency = normalize_currency_code(account_currency);
+    let normalized_base_currency = normalize_currency_code(base_currency);
 
     // --- 1. Calculate Market Values (Account Currency) ---
     let total_investment_market_value_acct_ccy = calculate_investment_market_value_acct(
@@ -40,14 +43,14 @@ pub fn calculate_valuation(
         quotes_today,
         fx_rates_today,
         target_date,
-        account_currency,
+        normalized_account_currency,
     )?;
 
     let total_cash_value_acct_ccy = calculate_cash_value_acct(
         holdings_snapshot,
         fx_rates_today,
         target_date,
-        account_currency,
+        normalized_account_currency,
     )?;
 
     // Total market value in account currency (investments + cash)
@@ -59,8 +62,8 @@ pub fn calculate_valuation(
     // --- 2. Get Base Currency FX Rate ---
     let fx_rate_to_base = match get_rate_from_map(
         fx_rates_today,
-        account_currency,
-        base_currency, // Use the passed base_currency
+        normalized_account_currency,
+        normalized_base_currency,
         target_date,
     ) {
         Ok(rate) => rate,
@@ -112,19 +115,21 @@ fn calculate_investment_market_value_acct(
     let mut total_position_market_value = Decimal::ZERO;
     for (asset_id, position) in &holdings_snapshot.positions {
         if let Some(quote) = quotes_today.get(asset_id) {
-            let quote_currency = &quote.currency;
-            let quote_fx_rate = if quote_currency == account_currency {
+            let (normalized_price, normalized_quote_currency) =
+                normalize_amount(quote.close, &quote.currency);
+
+            let quote_fx_rate = if normalized_quote_currency == account_currency {
                 Decimal::ONE
             } else {
                 get_rate_from_map(
                     fx_rates_today,
-                    quote_currency,
+                    &normalized_quote_currency,
                     account_currency,
                     target_date,
                 )? // Propagate error if FX rate is missing
             };
 
-            let market_value = position.quantity * quote.close * quote_fx_rate;
+            let market_value = position.quantity * normalized_price * quote_fx_rate;
             total_position_market_value += market_value;
         } else {
             debug!(
@@ -145,13 +150,21 @@ fn calculate_cash_value_acct(
 ) -> Result<Decimal> {
     let mut total_cash_value = Decimal::ZERO;
     for (cash_currency, amount) in &holdings_snapshot.cash_balances {
-        let cash_fx_rate = if cash_currency == account_currency {
+        let (normalized_amount, normalized_cash_currency) =
+            normalize_amount(*amount, cash_currency);
+
+        let cash_fx_rate = if normalized_cash_currency == account_currency {
             Decimal::ONE
         } else {
-            get_rate_from_map(fx_rates_today, cash_currency, account_currency, target_date)?
+            get_rate_from_map(
+                fx_rates_today,
+                &normalized_cash_currency,
+                account_currency,
+                target_date,
+            )?
             // Propagate error if FX rate is missing
         };
-        total_cash_value += *amount * cash_fx_rate;
+        total_cash_value += normalized_amount * cash_fx_rate;
     }
     Ok(total_cash_value)
 }

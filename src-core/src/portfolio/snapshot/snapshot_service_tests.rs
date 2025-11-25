@@ -4,7 +4,7 @@ mod tests {
     use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
     use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
-    use std::collections::HashMap;
+    use std::collections::{HashMap, VecDeque};
     use std::sync::{Arc, RwLock};
 
     use crate::accounts::{Account, AccountRepositoryTrait, AccountUpdate, NewAccount};
@@ -19,7 +19,7 @@ mod tests {
     use crate::fx::fx_model::{ExchangeRate, NewExchangeRate};
     use crate::fx::fx_traits::FxServiceTrait;
     use crate::portfolio::snapshot::{
-        snapshot_repository::SnapshotRepositoryTrait, AccountStateSnapshot, Position,
+        snapshot_repository::SnapshotRepositoryTrait, AccountStateSnapshot, Lot, Position,
         SnapshotService, SnapshotServiceTrait,
     };
 
@@ -225,6 +225,10 @@ mod tests {
             _data_source: String,
         ) -> AppResult<Asset> {
             unimplemented!("update_data_source not implemented for MockAssetRepository")
+        }
+
+        async fn delete(&self, _asset_id: &str) -> AppResult<()> {
+            Ok(())
         }
 
         fn get_by_id(&self, asset_id: &str) -> AppResult<Asset> {
@@ -969,6 +973,128 @@ mod tests {
             total_snapshot_date2.cost_basis.round_dp(DECIMAL_PRECISION),
             expected_cost_basis_date2.round_dp(DECIMAL_PRECISION)
         );
+    }
+
+    #[tokio::test]
+    async fn total_portfolio_snapshot_merges_lots() {
+        let base_portfolio_currency = "USD";
+        let target_date_str = "2023-02-01";
+        let target_date = NaiveDate::parse_from_str(target_date_str, "%Y-%m-%d").unwrap();
+
+        let mut mock_account_repo_instance = MockAccountRepository::new();
+        let acc1 = create_test_account("acc1", "USD", "USD Account 1");
+        let acc2 = create_test_account("acc2", "USD", "USD Account 2");
+        mock_account_repo_instance.add_account(acc1.clone());
+        mock_account_repo_instance.add_account(acc2.clone());
+        let mock_account_repo_arc = Arc::new(mock_account_repo_instance);
+
+        let mock_activity_repo_arc = Arc::new(MockActivityRepository::new());
+        let mock_fx_service_arc = Arc::new(MockFxService::new());
+        let mock_snapshot_repo = MockSnapshotRepository::new();
+
+        let lot1 = Lot {
+            id: "LOT1".to_string(),
+            position_id: format!("pos_AAPL_{}", acc1.id),
+            acquisition_date: DateTime::<Utc>::from_naive_utc_and_offset(
+                target_date.and_hms_opt(0, 0, 0).unwrap(),
+                Utc,
+            ),
+            quantity: dec!(3),
+            cost_basis: dec!(300),
+            acquisition_price: dec!(100),
+            acquisition_fees: dec!(0),
+        };
+
+        let lot2 = Lot {
+            id: "LOT2".to_string(),
+            position_id: format!("pos_AAPL_{}", acc2.id),
+            acquisition_date: DateTime::<Utc>::from_naive_utc_and_offset(
+                target_date.succ_opt().unwrap().and_hms_opt(0, 0, 0).unwrap(),
+                Utc,
+            ),
+            quantity: dec!(2),
+            cost_basis: dec!(220),
+            acquisition_price: dec!(110),
+            acquisition_fees: dec!(0),
+        };
+
+        let mut snap1 = create_blank_snapshot(&acc1.id, &acc1.currency, target_date_str);
+        snap1.positions.insert(
+            "AAPL".to_string(),
+            Position {
+                id: format!("pos_AAPL_{}", acc1.id),
+                account_id: acc1.id.clone(),
+                asset_id: "AAPL".to_string(),
+                currency: "USD".to_string(),
+                quantity: dec!(3),
+                average_cost: dec!(100),
+                total_cost_basis: dec!(300),
+                lots: VecDeque::from(vec![lot1.clone()]),
+                inception_date: lot1.acquisition_date,
+                created_at: Utc::now(),
+                last_updated: Utc::now(),
+            },
+        );
+
+        let mut snap2 = create_blank_snapshot(&acc2.id, &acc2.currency, target_date_str);
+        snap2.positions.insert(
+            "AAPL".to_string(),
+            Position {
+                id: format!("pos_AAPL_{}", acc2.id),
+                account_id: acc2.id.clone(),
+                asset_id: "AAPL".to_string(),
+                currency: "USD".to_string(),
+                quantity: dec!(2),
+                average_cost: dec!(110),
+                total_cost_basis: dec!(220),
+                lots: VecDeque::from(vec![lot2.clone()]),
+                inception_date: lot2.acquisition_date,
+                created_at: Utc::now(),
+                last_updated: Utc::now(),
+            },
+        );
+
+        mock_snapshot_repo.add_snapshots(vec![snap1, snap2]);
+        let mock_snapshot_repo_arc = Arc::new(mock_snapshot_repo);
+        let base_currency_arc = Arc::new(RwLock::new(base_portfolio_currency.to_string()));
+
+        let mock_asset_repo = Arc::new(MockAssetRepository::new());
+        let snapshot_service = SnapshotService::new(
+            base_currency_arc.clone(),
+            mock_account_repo_arc.clone(),
+            mock_activity_repo_arc,
+            mock_snapshot_repo_arc.clone(),
+            mock_asset_repo,
+            mock_fx_service_arc.clone(),
+        );
+
+        let result = snapshot_service.calculate_total_portfolio_snapshots().await;
+        assert!(result.is_ok());
+
+        let saved_snapshots = mock_snapshot_repo_arc.get_saved_snapshots();
+        assert_eq!(saved_snapshots.len(), 1);
+
+        let total_snapshot = &saved_snapshots[0];
+        let total_pos = total_snapshot.positions.get("AAPL").unwrap();
+        assert_eq!(total_pos.quantity, dec!(5));
+        assert_eq!(total_pos.total_cost_basis, dec!(520));
+        assert_eq!(total_pos.lots.len(), 2);
+        assert_eq!(
+            total_pos.inception_date,
+            DateTime::<Utc>::from_naive_utc_and_offset(
+                target_date.and_hms_opt(0, 0, 0).unwrap(),
+                Utc
+            )
+        );
+
+        let expected_position_id = format!("AAPL_{}", PORTFOLIO_TOTAL_ACCOUNT_ID);
+        assert!(total_pos
+            .lots
+            .iter()
+            .all(|lot| lot.position_id == expected_position_id));
+        assert!(total_pos.lots.iter().any(|lot| lot.id == lot1.id));
+        assert!(total_pos.lots.iter().any(|lot| lot.id == lot2.id));
+        assert_eq!(total_pos.average_cost, dec!(104));
     }
 
     #[tokio::test]

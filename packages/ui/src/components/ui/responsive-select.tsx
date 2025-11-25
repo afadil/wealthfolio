@@ -76,7 +76,7 @@ export function ResponsiveSelect({
         </Button>
 
         <Sheet open={open} onOpenChange={setOpen}>
-          <SheetContent side={mobileSide} className="h-[80vh] rounded-t-2xl p-0">
+          <SheetContent side={mobileSide} className="mx-1 h-[80vh] rounded-t-4xl p-0">
             <SheetHeader className="border-border border-b px-6 pt-6 pb-4">
               <SheetTitle>{sheetTitle}</SheetTitle>
               {sheetDescription ? <SheetDescription>{sheetDescription}</SheetDescription> : null}

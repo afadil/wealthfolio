@@ -199,7 +199,7 @@ pub fn detect_addon_permissions(addon_files: &[AddonFile]) -> Vec<AddonPermissio
         ),
         (
             "ui",
-            vec!["sidebar.addItem", "router.add"],
+            vec!["sidebar.addItem", "router.add", "onDisable"],
             "User interface and navigation",
         ),
     ];

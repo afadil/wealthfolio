@@ -153,28 +153,43 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
         &self,
         input_symbols: &[String],
     ) -> Result<HashMap<String, Quote>> {
+        if input_symbols.is_empty() {
+            return Ok(HashMap::new());
+        }
+
         let mut conn = get_connection(&self.pool)?;
 
-        let filtered_quotes = quotes
-            .filter(symbol.eq_any(input_symbols))
+        let placeholders = input_symbols
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let sql = format!(
+            "WITH RankedQuotes AS ( \
+                SELECT \
+                    q.*, \
+                    ROW_NUMBER() OVER (PARTITION BY q.symbol ORDER BY q.timestamp DESC) as rn \
+                FROM quotes q WHERE q.symbol IN ({}) \
+            ) \
+            SELECT * FROM RankedQuotes WHERE rn = 1 \
+            ORDER BY symbol",
+            placeholders
+        );
+
+        let mut query_builder = Box::new(sql_query(sql)).into_boxed::<Sqlite>();
+
+        for symbol_val in input_symbols {
+            query_builder = query_builder.bind::<Text, _>(symbol_val);
+        }
+
+        let ranked_quotes_db: Vec<QuoteDb> = query_builder
             .load::<QuoteDb>(&mut conn)
             .map_err(MarketDataError::DatabaseError)?;
 
-        let mut latest_quotes_map: HashMap<String, QuoteDb> = HashMap::new();
-        for q in filtered_quotes {
-            latest_quotes_map
-                .entry(q.symbol.clone())
-                .and_modify(|existing_quote| {
-                    if q.timestamp > existing_quote.timestamp {
-                        *existing_quote = q.clone();
-                    }
-                })
-                .or_insert(q);
-        }
-
-        let result: HashMap<String, Quote> = latest_quotes_map
+        let result: HashMap<String, Quote> = ranked_quotes_db
             .into_iter()
-            .map(|(s, q_db)| (s, q_db.into()))
+            .map(|quote_db| (quote_db.symbol.clone(), quote_db.into()))
             .collect();
 
         Ok(result)

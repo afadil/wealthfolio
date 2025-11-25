@@ -30,6 +30,8 @@ export const QueryKeys = {
   CONTRIBUTION_LIMIT_PROGRESS: "contributionLimitProgress",
 
   ASSET_DATA: "asset_data",
+  ASSETS: "assets",
+  LATEST_QUOTES: "latest_quotes",
   IMPORT_MAPPING: "import_mapping",
 
   PERFORMANCE_SUMMARY: "performanceSummary",
