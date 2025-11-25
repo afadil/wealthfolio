@@ -173,7 +173,7 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent side="bottom" className="flex h-[90vh] flex-col p-0">
+      <SheetContent side="bottom" className="mx-1 flex h-[90vh] flex-col rounded-t-4xl p-0">
         <SheetHeader className="border-b px-6 py-4">
           <div className="flex flex-col items-center space-y-2">
             <SheetTitle>{activity?.id ? "Update Activity" : "Add Activity"}</SheetTitle>

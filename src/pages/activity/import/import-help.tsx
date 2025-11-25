@@ -134,7 +134,7 @@ export function ImportHelpPopover() {
             <Icons.HelpCircle className="h-6 w-6" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="bottom" className="h-[85vh]">
+        <SheetContent side="bottom" className="mx-1 h-[85vh] rounded-t-4xl">
           <SheetHeader>
             <SheetTitle>How to Import CSV</SheetTitle>
           </SheetHeader>

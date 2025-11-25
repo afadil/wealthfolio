@@ -109,13 +109,18 @@ export default function AssetsPage() {
           useIsMobile={useIsMobileViewport}
         >
           {editingAsset ? (
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[720px]">
-              <AssetForm
-                asset={editingAsset}
-                onSubmit={handleSubmit}
-                onCancel={closeEditor}
-                isSaving={updateAssetMutation.isPending}
-              />
+            <DialogContent className="mx-1 max-h-[90vh] overflow-y-auto rounded-t-4xl sm:max-w-[720px]">
+              <SheetHeader>
+                <SheetTitle>Edit Security</SheetTitle>
+              </SheetHeader>
+              <div className="px-6 py-4">
+                <AssetForm
+                  asset={editingAsset}
+                  onSubmit={handleSubmit}
+                  onCancel={closeEditor}
+                  isSaving={updateAssetMutation.isPending}
+                />
+              </div>
             </DialogContent>
           ) : null}
         </Dialog>

@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@/lib/utils";
 import * as React from "react";
 import { Sheet, SheetContent } from "./sheet";
 import {
@@ -110,7 +111,7 @@ export const DialogContent = React.forwardRef<React.ElementRef<typeof SimpleDial
 
     if (isMobile) {
       return (
-        <SheetContent side={side} className={mobileClassName}>
+        <SheetContent side={side} className={cn(mobileClassName, "mx-1 !rounded-t-4xl")}>
           {children}
         </SheetContent>
       );

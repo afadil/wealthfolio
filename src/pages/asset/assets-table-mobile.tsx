@@ -55,6 +55,7 @@ export function AssetsTableMobile({
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDataSources, setSelectedDataSources] = useState<string[]>([]);
+  const [selectedAssetSubClasses, setSelectedAssetSubClasses] = useState<string[]>([]);
   const [selectedPriceStatus, setSelectedPriceStatus] = useState<string[]>([]);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
 
@@ -79,6 +80,14 @@ export function AssetsTableMobile({
     return Array.from(sources);
   }, [assets]);
 
+  // Get unique asset sub classes
+  const assetSubClassOptions = useMemo(() => {
+    const subClasses = new Set(
+      assets.map((asset) => asset.assetSubClass).filter((c): c is string => !!c),
+    );
+    return Array.from(subClasses).sort();
+  }, [assets]);
+
   const filteredAssets = useMemo(() => {
     let filtered = assets;
 
@@ -97,6 +106,13 @@ export function AssetsTableMobile({
       filtered = filtered.filter((asset) => selectedDataSources.includes(asset.dataSource));
     }
 
+    // Filter by asset sub class
+    if (selectedAssetSubClasses.length > 0) {
+      filtered = filtered.filter(
+        (asset) => asset.assetSubClass && selectedAssetSubClasses.includes(asset.assetSubClass),
+      );
+    }
+
     // Filter by price status
     if (selectedPriceStatus.length > 0) {
       filtered = filtered.filter((asset) => {
@@ -106,13 +122,27 @@ export function AssetsTableMobile({
       });
     }
 
-    return filtered;
-  }, [assets, searchQuery, selectedDataSources, selectedPriceStatus, latestQuotes]);
+    // Sort by symbol
+    filtered.sort((a, b) => a.symbol.localeCompare(b.symbol));
 
-  const hasActiveFilters = selectedDataSources.length > 0 || selectedPriceStatus.length > 0;
+    return filtered;
+  }, [
+    assets,
+    searchQuery,
+    selectedDataSources,
+    selectedAssetSubClasses,
+    selectedPriceStatus,
+    latestQuotes,
+  ]);
+
+  const hasActiveFilters =
+    selectedDataSources.length > 0 ||
+    selectedAssetSubClasses.length > 0 ||
+    selectedPriceStatus.length > 0;
 
   const handleResetFilters = () => {
     setSelectedDataSources([]);
+    setSelectedAssetSubClasses([]);
     setSelectedPriceStatus([]);
   };
 
@@ -156,7 +186,7 @@ export function AssetsTableMobile({
         <Input
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search assets"
+          placeholder="Search securities..."
           className="bg-secondary/30 flex-1 border-none"
         />
         <Button
@@ -167,7 +197,7 @@ export function AssetsTableMobile({
         >
           <Icons.ListFilter className="h-4 w-4" />
           {hasActiveFilters && (
-            <span className="bg-primary absolute -top-1 -right-1 h-2 w-2 rounded-full" />
+            <span className="bg-destructive absolute top-0.5 right-0 h-2 w-2 rounded-full" />
           )}
         </Button>
       </div>
@@ -267,7 +297,7 @@ export function AssetsTableMobile({
 
       {/* Filter Sheet */}
       <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
-        <SheetContent side="bottom" className="flex h-[70vh] flex-col rounded-t-xl">
+        <SheetContent side="bottom" className="mx-1 flex h-[70vh] flex-col rounded-t-4xl">
           <SheetHeader className="text-left">
             <SheetTitle>Filter Options</SheetTitle>
           </SheetHeader>
@@ -319,9 +349,70 @@ export function AssetsTableMobile({
                                 : "border-muted-foreground/30",
                             )}
                           >
-                            {isSelected && <Icons.Check className="h-3 w-3 text-white" />}
+                            {isSelected && <Icons.Check className="text-secondary h-3 w-3" />}
                           </div>
                           <span className="font-medium uppercase">{source}</span>
+                        </div>
+                        <Badge variant="secondary" className="ml-auto">
+                          {count}
+                        </Badge>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Asset Class Filter */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+                    Asset Class
+                  </h4>
+                  {selectedAssetSubClasses.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto p-0 text-xs"
+                      onClick={() => setSelectedAssetSubClasses([])}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {assetSubClassOptions.map((subClass) => {
+                    const isSelected = selectedAssetSubClasses.includes(subClass);
+                    const count = assets.filter((a) => a.assetSubClass === subClass).length;
+                    return (
+                      <button
+                        key={subClass}
+                        type="button"
+                        onClick={() => {
+                          setSelectedAssetSubClasses((prev) =>
+                            isSelected ? prev.filter((s) => s !== subClass) : [...prev, subClass],
+                          );
+                        }}
+                        className={cn(
+                          "flex w-full items-center justify-between rounded-lg border p-3 text-sm transition-colors",
+                          isSelected
+                            ? "border-primary/50 bg-primary/5"
+                            : "hover:bg-muted/50 border-border",
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={cn(
+                              "flex h-5 w-5 items-center justify-center rounded border-2 transition-colors",
+                              isSelected
+                                ? "border-primary bg-primary"
+                                : "border-muted-foreground/30",
+                            )}
+                          >
+                            {isSelected && <Icons.Check className="text-secondary h-3 w-3" />}
+                          </div>
+                          <span className="font-medium uppercase">{subClass}</span>
                         </div>
                         <Badge variant="secondary" className="ml-auto">
                           {count}
@@ -389,7 +480,7 @@ export function AssetsTableMobile({
                                 : "border-muted-foreground/30",
                             )}
                           >
-                            {isSelected && <Icons.Check className="h-3 w-3 text-white" />}
+                            {isSelected && <Icons.Check className="text-secondary h-3 w-3" />}
                           </div>
                           <span className="font-medium">{option.label}</span>
                         </div>
@@ -404,16 +495,16 @@ export function AssetsTableMobile({
             </div>
           </ScrollArea>
           <SheetFooter className="flex-row gap-2">
-            <SheetClose asChild>
-              <Button variant="outline" className="flex-1">
-                Close
-              </Button>
-            </SheetClose>
             {hasActiveFilters && (
-              <Button variant="default" className="flex-1" onClick={handleResetFilters}>
+              <Button variant="outline" className="flex-1" onClick={handleResetFilters}>
                 Reset All
               </Button>
             )}
+            <SheetClose asChild>
+              <Button variant="default" className="flex-1">
+                Apply
+              </Button>
+            </SheetClose>
           </SheetFooter>
         </SheetContent>
       </Sheet>

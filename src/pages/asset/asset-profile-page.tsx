@@ -21,9 +21,9 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import AssetDetailCard from "./asset-detail-card";
 import AssetHistoryCard from "./asset-history-card";
 import AssetLotsTable from "./asset-lots-table";
+import { useAssetProfileMutations } from "./hooks/use-asset-profile-mutations";
+import { useQuoteMutations } from "./hooks/use-quote-mutations";
 import QuoteHistoryTable from "./quote-history-table";
-import { useAssetProfileMutations } from "./use-asset-profile-mutations";
-import { useQuoteMutations } from "./use-quote-mutations";
 
 interface AssetProfileFormData {
   name: string;

@@ -140,7 +140,7 @@ export function BenchmarkSymbolSelectorMobile({
           {!iconOnly && "Add Benchmark"}
         </Button>
       </SheetTrigger>
-      <SheetContent side="bottom" className="h-[85vh] p-0">
+      <SheetContent side="bottom" className="mx-1 h-[85vh] rounded-t-4xl p-0">
         <SheetHeader className="border-border border-b px-6 py-4">
           <SheetTitle>Select Benchmark</SheetTitle>
           <SheetDescription>Choose a benchmark or search for any symbol</SheetDescription>
