@@ -5,7 +5,7 @@ import {
   isCashTransfer,
   isIncomeActivity,
 } from "@/lib/activity-utils";
-import { ActivityType, ActivityTypeNames } from "@/lib/constants";
+import { ActivityType, ActivityTypeNames, DataSource } from "@/lib/constants";
 import {
   Account,
   ActivityBulkMutationRequest,
@@ -13,7 +13,17 @@ import {
   ActivityDetails,
   ActivityUpdate,
 } from "@/lib/types";
-import { cn, formatDateTimeDisplay, formatDateTimeLocal } from "@/lib/utils";
+import {
+  cn,
+  formatDateTimeDisplay,
+  formatDateTimeLocal,
+  getNumericCellValue,
+  parseDecimalInput,
+  parseLocalDateTime,
+  roundDecimal,
+  toFiniteNumberOrUndefined,
+  toPayloadNumber,
+} from "@/lib/utils";
 import { useAssets } from "@/pages/asset/hooks/use-assets";
 import type { SortingState } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -24,6 +34,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  formatAmount,
   Icons,
   Table,
   TableBody,
@@ -31,7 +42,6 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  formatAmount,
   worldCurrencies,
 } from "@wealthfolio/ui";
 import type { Dispatch, SetStateAction } from "react";
@@ -42,6 +52,11 @@ import { ActivityTypeBadge } from "../activity-type-badge";
 import { EditableCell } from "./editable-cell";
 import { SelectCell } from "./select-cell";
 import { SymbolAutocompleteCell } from "./symbol-autocomplete-cell";
+import {
+  generateTempActivityId,
+  LocalTransaction,
+  useActivityGridState,
+} from "./use-activity-grid-state";
 
 type EditableField =
   | "activityType"
@@ -58,10 +73,6 @@ type EditableField =
 interface CellCoordinate {
   rowId: string;
   field: EditableField;
-}
-
-interface LocalTransaction extends ActivityDetails {
-  isNew?: boolean;
 }
 
 interface ActivityDatagridProps {
@@ -85,34 +96,6 @@ const editableFields: EditableField[] = [
   "currency",
   "comment",
 ];
-
-const generateTempActivityId = () => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return `temp-${crypto.randomUUID()}`;
-  }
-  return `temp-${Date.now().toString(36)}`;
-};
-
-const getNumericCellValue = (value: unknown): string => {
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value.toString() : "";
-  }
-  if (typeof value === "string") {
-    return value;
-  }
-  return "";
-};
-
-const toFiniteNumberOrUndefined = (value: unknown): number | undefined => {
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value : undefined;
-  }
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Number.parseFloat(value);
-    return Number.isFinite(parsed) ? parsed : undefined;
-  }
-  return undefined;
-};
 
 const resolveAssetIdForTransaction = (
   transaction: LocalTransaction,
@@ -146,7 +129,11 @@ const formatAmountDisplay = (
     return "";
   }
   try {
-    return formatAmount(numericValue, currency ?? fallbackCurrency, displayCurrency);
+    return formatAmount(
+      roundDecimal(numericValue, 6),
+      currency ?? fallbackCurrency,
+      displayCurrency,
+    );
   } catch {
     return "";
   }
@@ -216,7 +203,11 @@ function SortableHeader({
     <TableHead className={className}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="data-[state=open]:bg-accent -ml-3 h-8">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="data-[state=open]:bg-accent h-8 w-full justify-start rounded-sm px-2"
+          >
             <span>{title}</span>
             {icon}
           </Button>
@@ -244,11 +235,17 @@ export function ActivityDatagrid({
   sorting,
   onSortingChange,
 }: ActivityDatagridProps) {
-  const [localTransactions, setLocalTransactions] = useState<LocalTransaction[]>([]);
+  const {
+    localTransactions,
+    setLocalTransactions,
+    dirtyTransactionIds,
+    setDirtyTransactionIds,
+    pendingDeleteIds,
+    setPendingDeleteIds,
+    hasUnsavedChanges,
+  } = useActivityGridState(activities);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [focusedCell, setFocusedCell] = useState<CellCoordinate | null>(null);
-  const [dirtyTransactionIds, setDirtyTransactionIds] = useState<Set<string>>(new Set());
-  const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<string>>(new Set());
   const { saveActivitiesMutation } = useActivityMutations();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -311,6 +308,17 @@ export function ActivityDatagrid({
     return entries;
   }, [assets]);
 
+  const localCurrenciesKey = useMemo(() => {
+    const currencies = new Set<string>();
+    localTransactions.forEach((transaction) => {
+      if (transaction.currency) {
+        currencies.add(transaction.currency);
+      }
+    });
+
+    return Array.from(currencies).sort().join("|");
+  }, [localTransactions]);
+
   const currencyOptions = useMemo(() => {
     const entries = new Map<string, string>();
 
@@ -324,23 +332,18 @@ export function ActivityDatagrid({
       }
     });
 
-    localTransactions.forEach((transaction) => {
-      if (transaction.currency) {
-        entries.set(
-          transaction.currency,
-          entries.get(transaction.currency) ?? transaction.currency,
-        );
-      }
-    });
+    if (localCurrenciesKey) {
+      localCurrenciesKey.split("|").forEach((currency) => {
+        entries.set(currency, entries.get(currency) ?? currency);
+      });
+    }
 
     return Array.from(entries.entries()).map(([value, label]) => ({
       value,
       label: value,
       searchValue: label,
     }));
-  }, [accounts, localTransactions]);
-
-  const serverTransactions = useMemo(() => activities, [activities]);
+  }, [accounts, localCurrenciesKey]);
 
   const resolveTransactionCurrency = useCallback(
     (
@@ -369,32 +372,42 @@ export function ActivityDatagrid({
     [assetCurrencyLookup, fallbackCurrency],
   );
 
-  useEffect(() => {
-    setLocalTransactions((previous) => {
-      const dirtyIds = new Set(dirtyTransactionIds);
-      const deletedIds = new Set(pendingDeleteIds);
-      const preservedDrafts = previous.filter(
-        (transaction) => transaction.isNew && !deletedIds.has(transaction.id),
-      );
+  const dirtyCurrencyLookup = useMemo(() => {
+    const idsToResolve = new Set<string>();
 
-      const mergedFromServer = serverTransactions
-        .filter((transaction) => !deletedIds.has(transaction.id))
-        .map((transaction) => {
-          if (dirtyIds.has(transaction.id)) {
-            const localVersion = previous.find((local) => local.id === transaction.id);
-            return localVersion ?? transaction;
-          }
-          return transaction;
-        });
-
-      return [...preservedDrafts, ...mergedFromServer];
+    localTransactions.forEach((transaction) => {
+      if (dirtyTransactionIds.has(transaction.id) || transaction.isNew) {
+        idsToResolve.add(transaction.id);
+      }
     });
-  }, [dirtyTransactionIds, pendingDeleteIds, serverTransactions]);
+
+    if (idsToResolve.size === 0) {
+      return new Map<string, string>();
+    }
+
+    const lookup = new Map<string, string>();
+    localTransactions.forEach((transaction) => {
+      if (!idsToResolve.has(transaction.id)) {
+        return;
+      }
+      const resolved =
+        transaction.currency ??
+        resolveTransactionCurrency(transaction) ??
+        transaction.accountCurrency ??
+        fallbackCurrency;
+      if (resolved) {
+        lookup.set(transaction.id, resolved);
+      }
+    });
+
+    return lookup;
+  }, [dirtyTransactionIds, fallbackCurrency, localTransactions, resolveTransactionCurrency]);
 
   const activeSorting = sorting[0] ?? { id: "date", desc: true };
 
   const sortedTransactions = useMemo(() => {
     const transactions = [...localTransactions];
+    const isNewRow = (transaction: LocalTransaction) => Boolean(transaction.isNew);
 
     const compare = (a: LocalTransaction, b: LocalTransaction) => {
       switch (activeSorting.id) {
@@ -418,6 +431,12 @@ export function ActivityDatagrid({
     };
 
     transactions.sort((a, b) => {
+      const newA = isNewRow(a);
+      const newB = isNewRow(b);
+      if (newA !== newB) {
+        return newA ? -1 : 1;
+      }
+
       const result = compare(a, b);
       return activeSorting.desc ? -result : result;
     });
@@ -437,16 +456,11 @@ export function ActivityDatagrid({
 
   const rowVirtualizer = useVirtualizer({
     count: sortedTransactions.length,
-    getItemKey: (index) => sortedTransactions[index]?.id ?? index,
+    getItemKey: (index) => sortedTransactions[index].id,
     getScrollElement: () => scrollContainerRef.current,
     estimateSize: () => 44,
     overscan: 8,
   });
-
-  const hasUnsavedChanges =
-    dirtyTransactionIds.size > 0 ||
-    pendingDeleteIds.size > 0 ||
-    localTransactions.some((t) => t.isNew);
 
   const virtualRows = rowVirtualizer.getVirtualItems();
   const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
@@ -505,7 +519,13 @@ export function ActivityDatagrid({
   );
 
   const addNewRow = useCallback(() => {
-    const draft = createDraftTransaction(accounts, fallbackCurrency);
+    const now = new Date();
+    const draft = {
+      ...createDraftTransaction(accounts, fallbackCurrency),
+      date: now,
+      createdAt: now,
+      updatedAt: now,
+    };
     setLocalTransactions((prev) => [draft, ...prev]);
     setDirtyTransactionIds((prev) => {
       const next = new Set(prev);
@@ -515,20 +535,15 @@ export function ActivityDatagrid({
     setTimeout(() => {
       setFocusedCell({ rowId: draft.id, field: "activityType" });
     }, 0);
-  }, [accounts, fallbackCurrency]);
+  }, [accounts, fallbackCurrency, setDirtyTransactionIds, setFocusedCell, setLocalTransactions]);
 
   const updateTransaction = useCallback(
-    (id: string, field: EditableField, value: string) => {
+    (id: string, field: EditableField, value: string, meta?: { dataSource?: DataSource }) => {
       setLocalTransactions((prev) =>
         prev.map((transaction) => {
           if (transaction.id !== id) return transaction;
 
           const updated: LocalTransaction = { ...transaction };
-
-          const toNumber = (input: string) => {
-            const parsed = Number.parseFloat(input);
-            return Number.isFinite(parsed) ? parsed : 0;
-          };
 
           const applyCashDefaults = () => {
             if (!isCashActivity(updated.activityType)) {
@@ -551,24 +566,27 @@ export function ActivityDatagrid({
           };
 
           if (field === "date") {
-            updated.date = value ? new Date(value) : new Date();
+            updated.date = parseLocalDateTime(value);
           } else if (field === "quantity") {
-            updated.quantity = toNumber(value);
+            updated.quantity = parseDecimalInput(value);
             applySplitDefaults();
           } else if (field === "unitPrice") {
-            updated.unitPrice = toNumber(value);
+            updated.unitPrice = parseDecimalInput(value);
             if (isCashActivity(updated.activityType) || isIncomeActivity(updated.activityType)) {
               updated.amount = updated.unitPrice;
             }
             applySplitDefaults();
           } else if (field === "amount") {
-            updated.amount = toNumber(value);
+            updated.amount = parseDecimalInput(value);
           } else if (field === "fee") {
-            updated.fee = toNumber(value);
+            updated.fee = parseDecimalInput(value);
           } else if (field === "assetSymbol") {
             const upper = value.trim().toUpperCase();
             updated.assetSymbol = upper;
             updated.assetId = upper;
+            if (meta?.dataSource) {
+              updated.assetDataSource = meta.dataSource;
+            }
             const assetCurrency = resolveTransactionCurrency(updated, { includeFallback: false });
             if (assetCurrency) {
               updated.currency = assetCurrency;
@@ -606,26 +624,44 @@ export function ActivityDatagrid({
         return next;
       });
     },
-    [accountLookup, fallbackCurrency, resolveTransactionCurrency],
+    [
+      accountLookup,
+      fallbackCurrency,
+      resolveTransactionCurrency,
+      setDirtyTransactionIds,
+      setLocalTransactions,
+    ],
   );
 
   const duplicateRow = useCallback(
     (id: string) => {
-      const source = localTransactions.find((transaction) => transaction.id === id);
-      if (!source) return;
       const now = new Date();
-      const duplicated: LocalTransaction = {
-        ...source,
-        id: generateTempActivityId(),
-        date: now,
-        createdAt: now,
-        updatedAt: now,
-        isNew: true,
-      };
-      setLocalTransactions((prev) => [duplicated, ...prev]);
+      let newId: string | null = null;
+
+      setLocalTransactions((prev) => {
+        const source = prev.find((transaction) => transaction.id === id);
+        if (!source) return prev;
+
+        newId = generateTempActivityId();
+        const duplicated: LocalTransaction = {
+          ...source,
+          id: newId,
+          date: now,
+          createdAt: now,
+          updatedAt: now,
+          isNew: true,
+        };
+
+        return [duplicated, ...prev];
+      });
+
+      if (!newId) return;
+
+      const duplicatedId = newId;
+
       setDirtyTransactionIds((prev) => {
         const next = new Set(prev);
-        next.add(duplicated.id);
+        next.add(duplicatedId);
         return next;
       });
       setSelectedIds((prev) => {
@@ -634,15 +670,19 @@ export function ActivityDatagrid({
         return next;
       });
       setTimeout(() => {
-        setFocusedCell({ rowId: duplicated.id, field: "activityType" });
+        setFocusedCell({ rowId: duplicatedId, field: "activityType" });
       }, 0);
     },
-    [localTransactions],
+    [setDirtyTransactionIds, setFocusedCell, setLocalTransactions, setSelectedIds],
   );
 
   const deleteRow = useCallback(
     (id: string) => {
-      setLocalTransactions((prev) => prev.filter((transaction) => transaction.id !== id));
+      let deletedTransaction: LocalTransaction | undefined;
+      setLocalTransactions((prev) => {
+        deletedTransaction = prev.find((transaction) => transaction.id === id);
+        return prev.filter((transaction) => transaction.id !== id);
+      });
       setSelectedIds((prev) => {
         const next = new Set(prev);
         next.delete(id);
@@ -654,8 +694,7 @@ export function ActivityDatagrid({
         return next;
       });
 
-      const target = localTransactions.find((transaction) => transaction.id === id);
-      if (target && !target.isNew) {
+      if (deletedTransaction && !deletedTransaction.isNew) {
         setPendingDeleteIds((prev) => {
           const next = new Set(prev);
           next.add(id);
@@ -663,13 +702,51 @@ export function ActivityDatagrid({
         });
       }
     },
-    [localTransactions],
+    [setDirtyTransactionIds, setLocalTransactions, setPendingDeleteIds, setSelectedIds],
   );
 
   const deleteSelected = useCallback(() => {
     const idsToDelete = Array.from(selectedIds);
-    idsToDelete.forEach((id) => deleteRow(id));
-  }, [deleteRow, selectedIds]);
+
+    // Clear selection first to avoid state conflicts
+    setSelectedIds(new Set());
+
+    // Track which transactions to delete from state
+    const transactionsToDelete: LocalTransaction[] = [];
+    setLocalTransactions((prev) => {
+      idsToDelete.forEach((id) => {
+        const transaction = prev.find((t) => t.id === id);
+        if (transaction) {
+          transactionsToDelete.push(transaction);
+        }
+      });
+      return prev.filter((transaction) => !idsToDelete.includes(transaction.id));
+    });
+
+    // Clean up dirty transaction IDs
+    setDirtyTransactionIds((prev) => {
+      const next = new Set(prev);
+      idsToDelete.forEach((id) => next.delete(id));
+      return next;
+    });
+
+    // Add non-new transactions to pending deletes
+    setPendingDeleteIds((prev) => {
+      const next = new Set(prev);
+      transactionsToDelete.forEach((transaction) => {
+        if (!transaction.isNew) {
+          next.add(transaction.id);
+        }
+      });
+      return next;
+    });
+  }, [
+    selectedIds,
+    setDirtyTransactionIds,
+    setLocalTransactions,
+    setPendingDeleteIds,
+    setSelectedIds,
+  ]);
 
   const toggleSelectAll = useCallback(() => {
     if (selectedIds.size === sortedTransactions.length) {
@@ -698,7 +775,7 @@ export function ActivityDatagrid({
         setFocusedCell({ rowId: activity.id, field: "activityType" });
       }
     },
-    [onEditActivity],
+    [onEditActivity, setFocusedCell],
   );
 
   useEffect(() => {
@@ -706,7 +783,14 @@ export function ActivityDatagrid({
       return;
     }
     const targetIndex = transactionIndexLookup.get(focusedCell.rowId);
-    if (targetIndex !== undefined) {
+    if (targetIndex === undefined) {
+      return;
+    }
+
+    const virtualItems = rowVirtualizer.getVirtualItems();
+    const isVisible = virtualItems.some((item) => item.index === targetIndex);
+
+    if (!isVisible) {
       rowVirtualizer.scrollToIndex(targetIndex, { align: "auto" });
     }
   }, [focusedCell, rowVirtualizer, transactionIndexLookup]);
@@ -723,7 +807,9 @@ export function ActivityDatagrid({
     const updates: ActivityUpdate[] = [];
 
     dirtyTransactions.forEach((transaction) => {
-      const resolvedCurrency = resolveTransactionCurrency(transaction, { includeFallback: false });
+      const resolvedCurrency =
+        resolveTransactionCurrency(transaction, { includeFallback: false }) ??
+        dirtyCurrencyLookup.get(transaction.id);
       const currencyFallback = transaction.accountCurrency ?? fallbackCurrency;
       const assetKey = (transaction.assetId ?? transaction.assetSymbol ?? "").toUpperCase();
       const currencyForPayload =
@@ -738,11 +824,12 @@ export function ActivityDatagrid({
             ? transaction.date.toISOString()
             : new Date(transaction.date).toISOString(),
         assetId: resolveAssetIdForTransaction(transaction, fallbackCurrency),
-        quantity: toFiniteNumberOrUndefined(transaction.quantity),
-        unitPrice: toFiniteNumberOrUndefined(transaction.unitPrice),
-        amount: toFiniteNumberOrUndefined(transaction.amount),
+        assetDataSource: transaction.assetDataSource,
+        quantity: toPayloadNumber(transaction.quantity),
+        unitPrice: toPayloadNumber(transaction.unitPrice),
+        amount: toPayloadNumber(transaction.amount),
         currency: currencyForPayload,
-        fee: toFiniteNumberOrUndefined(transaction.fee),
+        fee: toPayloadNumber(transaction.fee),
         isDraft: false,
         comment: transaction.comment ?? undefined,
       };
@@ -816,6 +903,11 @@ export function ActivityDatagrid({
     onRefetch,
     saveActivitiesMutation,
     resolveTransactionCurrency,
+    dirtyCurrencyLookup,
+    setDirtyTransactionIds,
+    setLocalTransactions,
+    setPendingDeleteIds,
+    setSelectedIds,
   ]);
 
   const handleCancelChanges = useCallback(() => {
@@ -829,10 +921,28 @@ export function ActivityDatagrid({
       description: "Unsaved edits and drafts have been cleared.",
       variant: "default",
     });
-  }, [onRefetch]);
+  }, [
+    onRefetch,
+    setDirtyTransactionIds,
+    setLocalTransactions,
+    setPendingDeleteIds,
+    setSelectedIds,
+  ]);
+
+  const changesCounts = useMemo(() => {
+    const newCount = localTransactions.filter(
+      (t) => t.isNew && dirtyTransactionIds.has(t.id),
+    ).length;
+    const updatedCount = localTransactions.filter(
+      (t) => !t.isNew && dirtyTransactionIds.has(t.id),
+    ).length;
+    const deletedCount = pendingDeleteIds.size;
+
+    return { newCount, updatedCount, deletedCount };
+  }, [localTransactions, dirtyTransactionIds, pendingDeleteIds]);
 
   return (
-    <div className="space-y-3">
+    <div className="flex min-h-0 flex-1 flex-col space-y-3">
       <div className="bg-muted/20 flex flex-wrap items-center justify-between gap-2 rounded-md border px-2.5 py-1.5">
         <div className="text-muted-foreground flex items-center gap-2.5 text-xs">
           {selectedIds.size > 0 && (
@@ -841,10 +951,33 @@ export function ActivityDatagrid({
             </span>
           )}
           {hasUnsavedChanges && (
-            <span className="text-primary font-medium">
-              {dirtyTransactionIds.size + pendingDeleteIds.size} pending change
-              {dirtyTransactionIds.size + pendingDeleteIds.size === 1 ? "" : "s"}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-primary font-medium">
+                {dirtyTransactionIds.size + pendingDeleteIds.size} pending change
+                {dirtyTransactionIds.size + pendingDeleteIds.size === 1 ? "" : "s"}
+              </span>
+              <div className="bg-border h-3.5 w-px" />
+              <div className="flex items-center gap-4">
+                {changesCounts.newCount > 0 && (
+                  <span className="text-success flex items-center gap-1">
+                    <Icons.PlusCircle className="h-3 w-3" />
+                    <span className="font-medium">{changesCounts.newCount}</span>
+                  </span>
+                )}
+                {changesCounts.updatedCount > 0 && (
+                  <span className="flex items-center gap-1 text-blue-500 dark:text-blue-400">
+                    <Icons.Pencil className="h-3 w-3" />
+                    <span className="font-medium">{changesCounts.updatedCount}</span>
+                  </span>
+                )}
+                {changesCounts.deletedCount > 0 && (
+                  <span className="text-destructive flex items-center gap-1">
+                    <Icons.Trash className="h-3 w-3" />
+                    <span className="font-medium">{changesCounts.deletedCount}</span>
+                  </span>
+                )}
+              </div>
+            </div>
           )}
         </div>
 
@@ -917,7 +1050,7 @@ export function ActivityDatagrid({
 
       <div
         ref={scrollContainerRef}
-        className="bg-background max-h-[70vh] overflow-auto rounded-lg border [&>div]:overflow-visible"
+        className="bg-background min-h-[320px] flex-1 overflow-auto rounded-lg border [&>div]:overflow-visible"
       >
         <Table className="min-w-[1080px]">
           <TableHeader>
@@ -1023,8 +1156,13 @@ export function ActivityDatagrid({
                       onDelete={deleteRow}
                       onNavigate={handleCellNavigation}
                       setFocusedCell={setFocusedCell}
+                      resolvedCurrency={
+                        dirtyCurrencyLookup.get(transaction.id) ??
+                        transaction.currency ??
+                        transaction.accountCurrency ??
+                        fallbackCurrency
+                      }
                       fallbackCurrency={fallbackCurrency}
-                      resolveTransactionCurrency={resolveTransactionCurrency}
                       rowRef={rowVirtualizer.measureElement}
                     />
                   </Fragment>
@@ -1054,265 +1192,246 @@ interface TransactionRowProps {
   isDirty: boolean;
   focusedField: EditableField | null;
   onToggleSelect: (id: string) => void;
-  onUpdateTransaction: (id: string, field: EditableField, value: string) => void;
+  onUpdateTransaction: (
+    id: string,
+    field: EditableField,
+    value: string,
+    meta?: { dataSource?: DataSource },
+  ) => void;
   onEditTransaction: (transaction: ActivityDetails) => void;
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
   onNavigate: (direction: "up" | "down" | "left" | "right") => void;
   setFocusedCell: Dispatch<SetStateAction<CellCoordinate | null>>;
+  resolvedCurrency: string;
   fallbackCurrency: string;
-  resolveTransactionCurrency: (transaction: LocalTransaction) => string | undefined;
   rowRef?: (instance: HTMLTableRowElement | null) => void;
 }
 
-const TransactionRow = memo(
-  function TransactionRow({
-    transaction,
-    activityTypeOptions,
-    accountOptions,
-    currencyOptions,
-    accountLookup,
-    isSelected,
-    isDirty,
-    focusedField,
-    onToggleSelect,
-    onUpdateTransaction,
-    onEditTransaction,
-    onDuplicate,
-    onDelete,
-    onNavigate,
-    setFocusedCell,
-    fallbackCurrency,
-    resolveTransactionCurrency,
-    rowRef,
-  }: TransactionRowProps) {
-    const isCash = isCashActivity(transaction.activityType);
-    const isSplit = transaction.activityType === ActivityType.SPLIT;
-    const handleFocus = useCallback(
-      (field: EditableField) => {
-        setFocusedCell({ rowId: transaction.id, field });
-      },
-      [setFocusedCell, transaction.id],
-    );
+const TransactionRow = memo(function TransactionRow({
+  transaction,
+  activityTypeOptions,
+  accountOptions,
+  currencyOptions,
+  accountLookup,
+  isSelected,
+  isDirty,
+  focusedField,
+  onToggleSelect,
+  onUpdateTransaction,
+  onEditTransaction,
+  onDuplicate,
+  onDelete,
+  onNavigate,
+  setFocusedCell,
+  resolvedCurrency,
+  fallbackCurrency,
+  rowRef,
+}: TransactionRowProps) {
+  const isCash = isCashActivity(transaction.activityType);
+  const isSplit = transaction.activityType === ActivityType.SPLIT;
+  const handleFocus = useCallback(
+    (field: EditableField) => {
+      setFocusedCell({ rowId: transaction.id, field });
+    },
+    [setFocusedCell, transaction.id],
+  );
 
-    const accountLabel =
-      accountLookup.get(transaction.accountId)?.name ?? transaction.accountName ?? "";
-    const totalValue = calculateActivityValue(transaction);
-    const currency =
-      resolveTransactionCurrency(transaction) ?? transaction.accountCurrency ?? fallbackCurrency;
-    const normalizedCurrency = currency.toUpperCase();
-    const assetSymbolDisplay =
-      transaction.assetSymbol ??
-      (isCash ? `$CASH-${normalizedCurrency}` : (transaction.assetSymbol ?? ""));
-    const assetSymbol = transaction.assetSymbol ?? "";
-    const unitPriceDisplay = (() => {
-      if (transaction.activityType === ActivityType.FEE) {
-        return "-";
-      }
-      if (transaction.activityType === ActivityType.SPLIT) {
-        const ratio = toFiniteNumberOrUndefined(transaction.amount);
-        return ratio !== undefined ? `${ratio.toFixed(0)} : 1` : "";
-      }
-      if (
-        isCashActivity(transaction.activityType) ||
-        isIncomeActivity(transaction.activityType) ||
-        isCashTransfer(transaction.activityType, assetSymbol)
-      ) {
-        return formatAmountDisplay(transaction.amount, currency, false, fallbackCurrency);
-      }
-      return formatAmountDisplay(transaction.unitPrice, currency, false, fallbackCurrency);
-    })();
-    const amountDisplay =
-      transaction.activityType === ActivityType.SPLIT
-        ? getNumericCellValue(transaction.amount)
-        : formatAmountDisplay(transaction.amount, currency, false, fallbackCurrency);
-    const feeDisplay =
-      transaction.activityType === ActivityType.SPLIT
-        ? "-"
-        : formatAmountDisplay(transaction.fee, currency, false, fallbackCurrency);
-    const totalDisplay =
-      transaction.activityType === ActivityType.SPLIT
-        ? "-"
-        : formatAmountDisplay(totalValue, currency, false, fallbackCurrency);
+  const accountLabel =
+    accountLookup.get(transaction.accountId)?.name ?? transaction.accountName ?? "";
+  const totalValue = roundDecimal(calculateActivityValue(transaction), 6);
+  const currency = resolvedCurrency || fallbackCurrency;
+  const normalizedCurrency = currency.toUpperCase();
+  const assetSymbolDisplay =
+    transaction.assetSymbol ??
+    (isCash ? `$CASH-${normalizedCurrency}` : (transaction.assetSymbol ?? ""));
+  const assetSymbol = transaction.assetSymbol ?? "";
+  const unitPriceDisplay = (() => {
+    if (transaction.activityType === ActivityType.FEE) {
+      return "-";
+    }
+    if (transaction.activityType === ActivityType.SPLIT) {
+      const ratio = toFiniteNumberOrUndefined(transaction.amount);
+      return ratio !== undefined ? `${ratio.toFixed(0)} : 1` : "";
+    }
+    if (
+      isCashActivity(transaction.activityType) ||
+      isIncomeActivity(transaction.activityType) ||
+      isCashTransfer(transaction.activityType, assetSymbol)
+    ) {
+      return formatAmountDisplay(transaction.amount, currency, false, fallbackCurrency);
+    }
+    return formatAmountDisplay(transaction.unitPrice, currency, false, fallbackCurrency);
+  })();
+  const amountDisplay =
+    transaction.activityType === ActivityType.SPLIT
+      ? getNumericCellValue(transaction.amount)
+      : formatAmountDisplay(transaction.amount, currency, false, fallbackCurrency);
+  const feeDisplay =
+    transaction.activityType === ActivityType.SPLIT
+      ? "-"
+      : formatAmountDisplay(transaction.fee, currency, false, fallbackCurrency);
+  const totalDisplay =
+    transaction.activityType === ActivityType.SPLIT
+      ? "-"
+      : formatAmountDisplay(totalValue, currency, false, fallbackCurrency);
 
-    return (
-      <TableRow
-        ref={rowRef}
-        className={cn(
-          "group hover:bg-muted/40",
-          isSelected && "bg-muted/60",
-          transaction.isNew && "bg-primary/5",
-          isDirty && "border-l-primary border-l-2",
-        )}
-      >
-        <TableCell className="h-9 w-12 border-r px-0 py-0 text-center">
-          <div className="flex h-full items-center justify-center">
-            <Checkbox checked={isSelected} onCheckedChange={() => onToggleSelect(transaction.id)} />
-          </div>
-        </TableCell>
-        <TableCell className="h-9 border-r px-0 py-0">
-          <SelectCell
-            value={transaction.activityType}
-            options={activityTypeOptions}
-            onChange={(value) => onUpdateTransaction(transaction.id, "activityType", value)}
-            onFocus={() => handleFocus("activityType")}
-            onNavigate={onNavigate}
-            isFocused={focusedField === "activityType"}
-            renderValue={(value) => (
-              <ActivityTypeBadge type={value as ActivityType} className="font-mono text-xs" />
-            )}
+  return (
+    <TableRow
+      ref={rowRef}
+      className={cn(
+        "group hover:bg-muted/40",
+        isSelected && "bg-muted/60",
+        transaction.isNew && "bg-primary/5",
+        isDirty && "border-l-primary border-l-2",
+      )}
+    >
+      <TableCell className="h-9 w-12 border-r px-0 py-0 text-center">
+        <div className="flex h-full items-center justify-center">
+          <Checkbox checked={isSelected} onCheckedChange={() => onToggleSelect(transaction.id)} />
+        </div>
+      </TableCell>
+      <TableCell className="h-9 border-r px-0 py-0">
+        <SelectCell
+          value={transaction.activityType}
+          options={activityTypeOptions}
+          onChange={(value) => onUpdateTransaction(transaction.id, "activityType", value)}
+          onFocus={() => handleFocus("activityType")}
+          onNavigate={onNavigate}
+          isFocused={focusedField === "activityType"}
+          renderValue={(value) => (
+            <ActivityTypeBadge type={value as ActivityType} className="font-mono text-xs" />
+          )}
+        />
+      </TableCell>
+      <TableCell className="h-9 border-r px-0 py-0">
+        <EditableCell
+          value={formatDateTimeLocal(transaction.date)}
+          displayValue={formatDateTimeDisplay(transaction.date)}
+          onChange={(value) => onUpdateTransaction(transaction.id, "date", value)}
+          onFocus={() => handleFocus("date")}
+          onNavigate={onNavigate}
+          isFocused={focusedField === "date"}
+          type="datetime-local"
+          className="font-mono"
+        />
+      </TableCell>
+      <TableCell className="h-9 border-r px-0 py-0">
+        <SymbolAutocompleteCell
+          value={assetSymbolDisplay}
+          onChange={(value, meta) =>
+            onUpdateTransaction(transaction.id, "assetSymbol", value, meta)
+          }
+          onFocus={() => handleFocus("assetSymbol")}
+          onNavigate={onNavigate}
+          isFocused={focusedField === "assetSymbol"}
+          className="font-mono text-xs font-semibold uppercase"
+          disabled={isCash}
+        />
+      </TableCell>
+      <TableCell className="h-9 border-r px-0 py-0 text-right">
+        <EditableCell
+          value={getNumericCellValue(transaction.quantity)}
+          onChange={(value) => onUpdateTransaction(transaction.id, "quantity", value)}
+          onFocus={() => handleFocus("quantity")}
+          onNavigate={onNavigate}
+          isFocused={focusedField === "quantity"}
+          type="number"
+          inputMode="decimal"
+          className="justify-end text-right font-mono tabular-nums"
+          disabled={isCash}
+        />
+      </TableCell>
+      <TableCell className="h-9 border-r px-0 py-0 text-right">
+        <EditableCell
+          value={getNumericCellValue(transaction.unitPrice)}
+          displayValue={unitPriceDisplay}
+          onChange={(value) => onUpdateTransaction(transaction.id, "unitPrice", value)}
+          onFocus={() => handleFocus("unitPrice")}
+          onNavigate={onNavigate}
+          isFocused={focusedField === "unitPrice"}
+          type="number"
+          inputMode="decimal"
+          step="0.01"
+          className="justify-end text-right font-mono tabular-nums"
+          disabled={isCash || isSplit}
+        />
+      </TableCell>
+      <TableCell className="h-9 w-24 border-r px-0 py-0 text-right">
+        <EditableCell
+          value={getNumericCellValue(transaction.amount)}
+          displayValue={amountDisplay}
+          onChange={(value) => onUpdateTransaction(transaction.id, "amount", value)}
+          onFocus={() => handleFocus("amount")}
+          onNavigate={onNavigate}
+          isFocused={focusedField === "amount"}
+          type="number"
+          inputMode="decimal"
+          step="0.01"
+          className="justify-end text-right font-mono tabular-nums"
+        />
+      </TableCell>
+      <TableCell className="h-9 border-r px-0 py-0 text-right">
+        <EditableCell
+          value={getNumericCellValue(transaction.fee)}
+          displayValue={feeDisplay}
+          onChange={(value) => onUpdateTransaction(transaction.id, "fee", value)}
+          onFocus={() => handleFocus("fee")}
+          onNavigate={onNavigate}
+          isFocused={focusedField === "fee"}
+          type="number"
+          inputMode="decimal"
+          step="0.01"
+          className="justify-end text-right font-mono tabular-nums"
+          disabled={isSplit}
+        />
+      </TableCell>
+      <TableCell className="h-9 border-r px-2 py-1.5 text-right">
+        <span className="font-mono text-xs font-semibold tabular-nums">{totalDisplay}</span>
+      </TableCell>
+      <TableCell className="h-9 border-r px-0 py-0">
+        <SelectCell
+          value={transaction.accountId ?? ""}
+          options={accountOptions}
+          onChange={(value) => onUpdateTransaction(transaction.id, "accountId", value)}
+          onFocus={() => handleFocus("accountId")}
+          onNavigate={onNavigate}
+          isFocused={focusedField === "accountId"}
+          renderValue={() => accountLabel || transaction.accountId || ""}
+          className="text-xs"
+        />
+      </TableCell>
+      <TableCell className="h-9 border-r px-0 py-0">
+        <SelectCell
+          value={transaction.currency ?? ""}
+          options={currencyOptions}
+          onChange={(value) => onUpdateTransaction(transaction.id, "currency", value)}
+          onFocus={() => handleFocus("currency")}
+          onNavigate={onNavigate}
+          isFocused={focusedField === "currency"}
+          className="font-mono text-xs"
+        />
+      </TableCell>
+      <TableCell className="h-9 border-r px-0 py-0">
+        <EditableCell
+          value={transaction.comment ?? ""}
+          onChange={(value) => onUpdateTransaction(transaction.id, "comment", value)}
+          onFocus={() => handleFocus("comment")}
+          onNavigate={onNavigate}
+          isFocused={focusedField === "comment"}
+          className="text-muted-foreground"
+        />
+      </TableCell>
+      <TableCell className="h-9 px-2 py-0">
+        <div className="pointer-events-none flex justify-end opacity-0 transition-opacity group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
+          <ActivityOperations
+            activity={transaction}
+            onEdit={onEditTransaction}
+            onDuplicate={(activity) => onDuplicate(activity.id)}
+            onDelete={(activity) => onDelete(activity.id)}
           />
-        </TableCell>
-        <TableCell className="h-9 border-r px-0 py-0">
-          <EditableCell
-            value={formatDateTimeLocal(transaction.date)}
-            displayValue={formatDateTimeDisplay(transaction.date)}
-            onChange={(value) => onUpdateTransaction(transaction.id, "date", value)}
-            onFocus={() => handleFocus("date")}
-            onNavigate={onNavigate}
-            isFocused={focusedField === "date"}
-            type="datetime-local"
-            className="font-mono"
-          />
-        </TableCell>
-        <TableCell className="h-9 border-r px-0 py-0">
-          <SymbolAutocompleteCell
-            value={assetSymbolDisplay}
-            onChange={(value) =>
-              onUpdateTransaction(transaction.id, "assetSymbol", value.toUpperCase())
-            }
-            onFocus={() => handleFocus("assetSymbol")}
-            onNavigate={onNavigate}
-            isFocused={focusedField === "assetSymbol"}
-            className="font-mono text-xs font-semibold uppercase"
-            disabled={isCash}
-          />
-        </TableCell>
-        <TableCell className="h-9 border-r px-0 py-0 text-right">
-          <EditableCell
-            value={getNumericCellValue(transaction.quantity)}
-            onChange={(value) => onUpdateTransaction(transaction.id, "quantity", value)}
-            onFocus={() => handleFocus("quantity")}
-            onNavigate={onNavigate}
-            isFocused={focusedField === "quantity"}
-            type="number"
-            inputMode="decimal"
-            className="justify-end text-right font-mono tabular-nums"
-            disabled={isCash}
-          />
-        </TableCell>
-        <TableCell className="h-9 border-r px-0 py-0 text-right">
-          <EditableCell
-            value={getNumericCellValue(transaction.unitPrice)}
-            displayValue={unitPriceDisplay}
-            onChange={(value) => onUpdateTransaction(transaction.id, "unitPrice", value)}
-            onFocus={() => handleFocus("unitPrice")}
-            onNavigate={onNavigate}
-            isFocused={focusedField === "unitPrice"}
-            type="number"
-            inputMode="decimal"
-            step="0.01"
-            className="justify-end text-right font-mono tabular-nums"
-            disabled={isCash || isSplit}
-          />
-        </TableCell>
-        <TableCell className="h-9 w-24 border-r px-0 py-0 text-right">
-          <EditableCell
-            value={getNumericCellValue(transaction.amount)}
-            displayValue={amountDisplay}
-            onChange={(value) => onUpdateTransaction(transaction.id, "amount", value)}
-            onFocus={() => handleFocus("amount")}
-            onNavigate={onNavigate}
-            isFocused={focusedField === "amount"}
-            type="number"
-            inputMode="decimal"
-            step="0.01"
-            className="justify-end text-right font-mono tabular-nums"
-          />
-        </TableCell>
-        <TableCell className="h-9 border-r px-0 py-0 text-right">
-          <EditableCell
-            value={getNumericCellValue(transaction.fee)}
-            displayValue={feeDisplay}
-            onChange={(value) => onUpdateTransaction(transaction.id, "fee", value)}
-            onFocus={() => handleFocus("fee")}
-            onNavigate={onNavigate}
-            isFocused={focusedField === "fee"}
-            type="number"
-            inputMode="decimal"
-            step="0.01"
-            className="justify-end text-right font-mono tabular-nums"
-            disabled={isSplit}
-          />
-        </TableCell>
-        <TableCell className="h-9 border-r px-2 py-1.5 text-right">
-          <span className="font-mono text-xs font-semibold tabular-nums">{totalDisplay}</span>
-        </TableCell>
-        <TableCell className="h-9 border-r px-0 py-0">
-          <SelectCell
-            value={transaction.accountId ?? ""}
-            options={accountOptions}
-            onChange={(value) => onUpdateTransaction(transaction.id, "accountId", value)}
-            onFocus={() => handleFocus("accountId")}
-            onNavigate={onNavigate}
-            isFocused={focusedField === "accountId"}
-            renderValue={() => accountLabel || transaction.accountId || ""}
-            className="text-xs"
-          />
-        </TableCell>
-        <TableCell className="h-9 border-r px-0 py-0">
-          <SelectCell
-            value={transaction.currency ?? ""}
-            options={currencyOptions}
-            onChange={(value) => onUpdateTransaction(transaction.id, "currency", value)}
-            onFocus={() => handleFocus("currency")}
-            onNavigate={onNavigate}
-            isFocused={focusedField === "currency"}
-            className="font-mono text-xs"
-          />
-        </TableCell>
-        <TableCell className="h-9 border-r px-0 py-0">
-          <EditableCell
-            value={transaction.comment ?? ""}
-            onChange={(value) => onUpdateTransaction(transaction.id, "comment", value)}
-            onFocus={() => handleFocus("comment")}
-            onNavigate={onNavigate}
-            isFocused={focusedField === "comment"}
-            className="text-muted-foreground"
-          />
-        </TableCell>
-        <TableCell className="h-9 px-2 py-0">
-          <div className="pointer-events-none flex justify-end opacity-0 transition-opacity group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
-            <ActivityOperations
-              activity={transaction}
-              onEdit={onEditTransaction}
-              onDuplicate={(activity) => onDuplicate(activity.id)}
-              onDelete={(activity) => onDelete(activity.id)}
-            />
-          </div>
-        </TableCell>
-      </TableRow>
-    );
-  },
-  function areEqualTransactionRowProps(prev, next) {
-    return (
-      prev.transaction === next.transaction &&
-      prev.isSelected === next.isSelected &&
-      prev.isDirty === next.isDirty &&
-      prev.focusedField === next.focusedField &&
-      prev.activityTypeOptions === next.activityTypeOptions &&
-      prev.accountOptions === next.accountOptions &&
-      prev.currencyOptions === next.currencyOptions &&
-      prev.accountLookup === next.accountLookup &&
-      prev.onToggleSelect === next.onToggleSelect &&
-      prev.onUpdateTransaction === next.onUpdateTransaction &&
-      prev.onEditTransaction === next.onEditTransaction &&
-      prev.onDuplicate === next.onDuplicate &&
-      prev.onDelete === next.onDelete &&
-      prev.onNavigate === next.onNavigate &&
-      prev.setFocusedCell === next.setFocusedCell &&
-      prev.resolveTransactionCurrency === next.resolveTransactionCurrency &&
-      prev.rowRef === next.rowRef
-    );
-  },
-);
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+});

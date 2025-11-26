@@ -708,7 +708,6 @@ export const AssetProfilePage = () => {
                   const url = `${location.pathname}?tab=${next}`;
                   navigate(url, { replace: true });
                 }}
-                size="sm"
                 className="md:text-base"
               />
             </div>

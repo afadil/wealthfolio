@@ -1,28 +1,28 @@
+import { AccountSelector } from "@/components/account-selector";
+import TickerSearchInput from "@/components/ticker-search";
 import { Button } from "@/components/ui/button";
+import { IMPORT_REQUIRED_FIELDS } from "@/lib/constants";
 import {
+  Account,
+  ACTIVITY_TYPE_PREFIX_LENGTH,
+  ActivityType,
+  CsvRowData,
+  ImportFormat,
+  ImportMappingData,
+  ImportRequiredField,
+} from "@/lib/types";
+import { cn } from "@/lib/utils";
+import {
+  Badge,
+  SearchableSelect,
   Select,
   SelectContent,
   SelectItem,
   SelectSeparator,
   SelectTrigger,
   SelectValue,
-  Badge,
-  SearchableSelect,
 } from "@wealthfolio/ui";
-import {
-  ImportFormat,
-  ActivityType,
-  ImportMappingData,
-  CsvRowData,
-  ImportRequiredField,
-  Account,
-} from "@/lib/types";
-import { ACTIVITY_TYPE_PREFIX_LENGTH } from "@/lib/types";
-import TickerSearchInput from "@/components/ticker-search";
 import { useState } from "react";
-import { cn } from "@/lib/utils";
-import { IMPORT_REQUIRED_FIELDS } from "@/lib/constants";
-import { AccountSelector } from "@/components/account-selector";
 
 const SKIP_FIELD_VALUE = "__skip__";
 
@@ -310,7 +310,7 @@ function SymbolDisplayCell({
       <div className="w-full sm:w-auto sm:min-w-[180px]">
         <TickerSearchInput
           defaultValue={mappedSymbol || ""}
-          onSelectResult={(newSymbol) => handleSymbolMapping(csvSymbol, newSymbol)}
+          onSelectResult={(newSymbol, _quoteSummary) => handleSymbolMapping(csvSymbol, newSymbol)}
         />
       </div>
     </div>

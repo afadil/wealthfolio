@@ -1,3 +1,4 @@
+import { getRunEnv, invokeTauri, invokeWeb, logger, RUN_ENV } from "@/adapters";
 import {
   Activity,
   ActivityBulkMutationRequest,
@@ -7,7 +8,6 @@ import {
   ActivitySearchResponse,
   ActivityUpdate,
 } from "@/lib/types";
-import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb, logger } from "@/adapters";
 
 interface Filters {
   accountId?: string;
@@ -116,6 +116,7 @@ export const saveActivities = async (
     deleteIds: request.deleteIds ?? [],
   };
   try {
+    console.log("Saving activities with payload:", payload);
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri("save_activities", { request: payload });

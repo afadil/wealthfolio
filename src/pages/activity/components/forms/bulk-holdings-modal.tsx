@@ -1,6 +1,6 @@
 import { toast } from "@/components/ui/use-toast";
-import { ActivityType } from "@/lib/constants";
-import { Account, ActivityImport } from "@/lib/types";
+import { ActivityType, DataSource } from "@/lib/constants";
+import { Account, ActivityBulkMutationRequest, ActivityCreate } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Button,
@@ -15,7 +15,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { FormProvider, useForm, type Resolver, type SubmitHandler } from "react-hook-form";
 import { z } from "zod";
-import { useActivityImportMutations } from "../../import/hooks/use-activity-import-mutations";
+import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import { BulkHoldingsForm } from "./bulk-holdings-form";
 import { bulkHoldingsFormSchema } from "./schemas";
 
@@ -29,6 +29,7 @@ interface BulkHoldingsModalProps {
 
 export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModalProps) => {
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const { saveActivitiesMutation } = useActivityMutations();
 
   const form = useForm<BulkHoldingsFormValues>({
     resolver: zodResolver(bulkHoldingsFormSchema) as Resolver<BulkHoldingsFormValues>,
@@ -45,6 +46,7 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
           ticker: "",
           name: "",
           assetId: "",
+          assetDataSource: DataSource.YAHOO,
         },
       ],
     },
@@ -87,22 +89,8 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
     [form],
   );
 
-  const { confirmImportMutation } = useActivityImportMutations({
-    onSuccess: () => {
-      toast({
-        title: "Import successful",
-        description: "Holdings have been imported successfully.",
-        variant: "default",
-      });
-      form.reset();
-      setSelectedAccount(null);
-      onSuccess?.();
-      onClose();
-    },
-  });
-
   const handleSubmit: SubmitHandler<BulkHoldingsFormValues> = useCallback(
-    (data) => {
+    async (data) => {
       // Validate holdings data
       const validHoldings = data.holdings.filter(
         (holding) =>
@@ -121,24 +109,43 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
         return;
       }
 
-      // Transform to ActivityImport format
-      const activitiesToImport: ActivityImport[] = validHoldings.map((holding) => ({
+      const activityDate =
+        data.activityDate instanceof Date ? data.activityDate : new Date(data.activityDate);
+      const currency = data.currency || selectedAccount?.currency || "USD";
+
+      const creates: ActivityCreate[] = validHoldings.map((holding) => ({
         accountId: data.accountId,
         activityType: ActivityType.ADD_HOLDING,
-        symbol: holding.ticker.toUpperCase().trim(),
+        activityDate: activityDate.toISOString(),
+        assetId: (holding.assetId || holding.ticker || "").toUpperCase().trim(),
+        assetDataSource: holding.assetDataSource ?? DataSource.YAHOO,
         quantity: Number(holding.sharesOwned),
         unitPrice: Number(holding.averageCost),
-        date: data.activityDate,
-        currency: data.currency || selectedAccount?.currency || "USD",
+        amount: Number(holding.sharesOwned) * Number(holding.averageCost),
+        currency,
         fee: 0,
-        isDraft: false,
-        isValid: true,
-        comment: data.comment || "",
+        isDraft: data.isDraft ?? false,
+        comment: data.comment?.trim() || undefined,
       }));
 
-      confirmImportMutation.mutate({ activities: activitiesToImport });
+      const request: ActivityBulkMutationRequest = { creates };
+
+      try {
+        await saveActivitiesMutation.mutateAsync(request);
+        toast({
+          title: "Holdings saved",
+          description: "Your holdings have been added to this account.",
+          variant: "success",
+        });
+        form.reset();
+        setSelectedAccount(null);
+        onSuccess?.();
+        onClose();
+      } catch {
+        // Error handling is managed by the mutation hook toast.
+      }
     },
-    [confirmImportMutation, selectedAccount],
+    [form, onClose, onSuccess, saveActivitiesMutation, selectedAccount],
   );
 
   const handleFormError = useCallback((errors: Record<string, any>) => {
@@ -154,7 +161,7 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
   }, []);
 
   const isSubmitDisabled =
-    confirmImportMutation.isPending ||
+    saveActivitiesMutation.isPending ||
     !hasValidHoldings ||
     !selectedAccount ||
     !form.formState.isValid;
@@ -202,7 +209,7 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isSubmitDisabled}>
-                  {confirmImportMutation.isPending ? "Importing..." : "Confirm"}
+                  {saveActivitiesMutation.isPending ? "Saving..." : "Confirm"}
                 </Button>
               </DialogFooter>
             </form>

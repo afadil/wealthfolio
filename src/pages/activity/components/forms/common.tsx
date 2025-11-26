@@ -1,22 +1,25 @@
-import { useFormContext } from "react-hook-form";
-import { AccountSelectOption } from "../activity-form";
-import { FormField } from "@wealthfolio/ui";
-import { FormItem } from "@wealthfolio/ui";
-import { FormLabel } from "@wealthfolio/ui";
-import { FormControl } from "@wealthfolio/ui";
-import { FormMessage } from "@wealthfolio/ui";
-import { Select } from "@wealthfolio/ui";
-import { SelectContent } from "@wealthfolio/ui";
-import { SelectItem } from "@wealthfolio/ui";
-import { SelectTrigger } from "@wealthfolio/ui";
-import { SelectValue } from "@wealthfolio/ui";
+import TickerSearchInput from "@/components/ticker-search";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { CurrencyInput } from "@wealthfolio/ui";
-import { DatePickerInput } from "@wealthfolio/ui";
 import { Textarea } from "@/components/ui/textarea";
-import TickerSearchInput from "@/components/ticker-search";
 import { DataSource } from "@/lib/constants";
+import type { QuoteSummary } from "@/lib/types";
+import {
+  CurrencyInput,
+  DatePickerInput,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@wealthfolio/ui";
+import { useFormContext } from "react-hook-form";
+import { AccountSelectOption } from "../activity-form";
 
 export interface ConfigurationCheckboxProps {
   showCurrencyOption?: boolean;
@@ -184,6 +187,16 @@ export function AssetSymbolInput({
   field: { value?: string; onChange: (v: string) => void } & Record<string, unknown>;
   isManualAsset: boolean;
 }) {
+  const { setValue } = useFormContext();
+
+  const handleTickerSelect = (symbol: string, quoteSummary?: QuoteSummary) => {
+    field.onChange(symbol);
+    // If the selected ticker is a custom/manual entry, automatically enable skip lookup
+    if (quoteSummary?.dataSource === DataSource.MANUAL) {
+      setValue("assetDataSource", DataSource.MANUAL);
+    }
+  };
+
   return (
     <FormItem className="-mt-2">
       <FormLabel>Symbol</FormLabel>
@@ -197,7 +210,7 @@ export function AssetSymbolInput({
             aria-label="Symbol"
           />
         ) : (
-          <TickerSearchInput onSelectResult={field.onChange} {...field} aria-label="Symbol" />
+          <TickerSearchInput onSelectResult={handleTickerSelect} {...field} aria-label="Symbol" />
         )}
       </FormControl>
       <FormMessage className="text-xs" />

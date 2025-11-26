@@ -2,7 +2,8 @@ import { AccountSelector } from "@/components/account-selector";
 import { TickerAvatar } from "@/components/ticker-avatar";
 import TickerSearchInput from "@/components/ticker-search";
 import { Icons } from "@/components/ui/icons";
-import { Account } from "@/lib/types";
+import { Account, QuoteSummary } from "@/lib/types";
+import { DataSource } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import {
   Button,
@@ -19,6 +20,10 @@ import {
 } from "@wealthfolio/ui";
 import { memo, useCallback, useMemo, useState } from "react";
 import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
+import { z } from "zod";
+import { bulkHoldingsFormSchema } from "./schemas";
+
+type BulkHoldingsFormValues = z.infer<typeof bulkHoldingsFormSchema>;
 
 export interface BulkHoldingRow {
   id: string;
@@ -28,6 +33,7 @@ export interface BulkHoldingRow {
   averageCost: number | string;
   totalValue: number;
   assetId?: string;
+  assetDataSource?: DataSource;
 }
 
 interface BulkHoldingsFormProps {
@@ -54,10 +60,10 @@ const HoldingRow = memo(
     isLast: boolean;
     isSelected: boolean;
     onSelectRow: (id: string) => void;
-    setFocus: (name: string) => void;
+    setFocus: ReturnType<typeof useFormContext<BulkHoldingsFormValues>>["setFocus"];
     canRemove: boolean;
   }) => {
-    const { control } = useFormContext();
+    const { control, setValue } = useFormContext<BulkHoldingsFormValues>();
 
     // Use useWatch for specific fields instead of watch() in parent
     const ticker = useWatch({
@@ -111,10 +117,15 @@ const HoldingRow = memo(
     );
 
     const handleTickerSelect = useCallback(
-      (_symbol: string) => {
+      (_symbol: string, quoteSummary?: QuoteSummary) => {
+        if (quoteSummary?.dataSource === DataSource.MANUAL) {
+          setValue(`holdings.${index}.assetDataSource`, DataSource.MANUAL, { shouldDirty: true });
+        } else {
+          setValue(`holdings.${index}.assetDataSource`, DataSource.YAHOO, { shouldDirty: true });
+        }
         setFocus(`holdings.${index}.sharesOwned`);
       },
-      [index, setFocus],
+      [index, setFocus, setValue],
     );
 
     const handleRemoveClick = useCallback(
@@ -148,9 +159,9 @@ const HoldingRow = memo(
                 render={({ field: tickerField }) => (
                   <TickerSearchInput
                     ref={tickerField.ref}
-                    onSelectResult={(symbol: string) => {
+                    onSelectResult={(symbol: string, quoteSummary) => {
                       tickerField.onChange(symbol);
-                      handleTickerSelect(symbol);
+                      handleTickerSelect(symbol, quoteSummary);
                     }}
                     value={tickerField.value}
                     placeholder="Search ticker..."
@@ -228,7 +239,7 @@ const HoldingRow = memo(
 HoldingRow.displayName = "HoldingRow";
 
 export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => {
-  const { control, setFocus } = useFormContext();
+  const { control, setFocus } = useFormContext<BulkHoldingsFormValues>();
   const { fields, append, remove } = useFieldArray({
     control,
     name: "holdings",
@@ -260,6 +271,9 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
       ticker: "",
       name: "",
       assetId: "",
+      assetDataSource: DataSource.YAHOO,
+      sharesOwned: 0,
+      averageCost: 0,
     });
 
     // Use requestAnimationFrame for smoother focus transition

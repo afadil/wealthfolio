@@ -42,6 +42,7 @@ export interface Activity {
   createdAt: Date | string;
   symbolProfileId: string;
   updatedAt: Date | string;
+  assetDataSource?: DataSource;
 }
 
 export interface ActivityDetails {
@@ -80,6 +81,7 @@ export interface ActivityCreate {
   activityType: string;
   activityDate: string | Date;
   assetId?: string;
+  assetDataSource?: DataSource;
   quantity?: number;
   unitPrice?: number;
   amount?: number;
@@ -162,7 +164,7 @@ export interface QuoteSummary {
   longName: string;
   sector?: string;
   industry?: string;
-  dataSource?: boolean;
+  dataSource?: string;
 }
 
 export interface MarketDataProviderInfo {

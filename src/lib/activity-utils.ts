@@ -1,6 +1,14 @@
 import { ActivityType, CASH_ACTIVITY_TYPES, INCOME_ACTIVITY_TYPES } from "./constants";
 import { ActivityDetails } from "./types";
 
+const roundCurrency = (value: number, precision = 6) => {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  const factor = 10 ** precision;
+  return Math.round(value * factor) / factor;
+};
+
 /**
  * Determines if an activity is a cash activity based on its type
  * @param activityType The activity type to check
@@ -102,7 +110,7 @@ export const calculateActivityValue = (activity: ActivityDetails): number => {
   }
 
   if (activityType === ActivityType.FEE || activityType === ActivityType.TAX) {
-    return Number(getFee(activity));
+    return roundCurrency(Number(getFee(activity)));
   }
 
   // Handle cash activities
@@ -116,29 +124,29 @@ export const calculateActivityValue = (activity: ActivityDetails): number => {
 
     // For outgoing cash activities, subtract fee from amount
     if (activityType === ActivityType.WITHDRAWAL || activityType === ActivityType.TRANSFER_OUT) {
-      return Number(amount) + Number(fee);
+      return roundCurrency(Number(amount) + Number(fee));
     }
 
     // For incoming cash activities, subtract fee from amount
-    return Number(amount) - Number(fee);
+    return roundCurrency(Number(amount) - Number(fee));
   }
 
   // Handle trading activities
   const quantity = getQuantity(activity);
   const unitPrice = getUnitPrice(activity);
   const fee = getFee(activity);
-  const activityAmount = Number(quantity) * Number(unitPrice);
+  const activityAmount = roundCurrency(Number(quantity) * Number(unitPrice));
 
   if (activityType === ActivityType.BUY) {
-    return Number(activityAmount) + Number(fee); // Total cost including fees
+    return roundCurrency(Number(activityAmount) + Number(fee)); // Total cost including fees
   }
 
   if (activityType === ActivityType.SELL) {
-    return Number(activityAmount) - Number(fee); // Net proceeds after fees
+    return roundCurrency(Number(activityAmount) - Number(fee)); // Net proceeds after fees
   }
 
   // Default case - just return the activity amount
-  return Number(activityAmount);
+  return roundCurrency(Number(activityAmount));
 };
 
 /**
