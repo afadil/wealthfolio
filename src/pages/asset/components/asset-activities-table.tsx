@@ -1,11 +1,14 @@
+import { getAccounts } from "@/commands/account";
+import { QueryKeys } from "@/lib/query-keys";
 import { useActivitySearch } from "@/pages/activity/hooks/use-activity-search";
 import { ActivityTable } from "@/pages/activity/components/activity-table/activity-table";
 import { useActivityMutations } from "@/pages/activity/hooks/use-activity-mutations";
 import { useState } from "react";
 import { SortingState } from "@tanstack/react-table";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui";
 import { useTranslation } from "react-i18next";
-import { ActivityDetails } from "@/lib/types";
+import { Account, ActivityDetails } from "@/lib/types";
 import { ActivityDeleteModal } from "@/pages/activity/components/activity-delete-modal";
 import { ActivityForm } from "@/pages/activity/components/activity-form";
 
@@ -19,6 +22,12 @@ export function AssetActivitiesTable({ symbol }: AssetActivitiesTableProps) {
   const [selectedActivity, setSelectedActivity] = useState<Partial<ActivityDetails> | undefined>();
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [showForm, setShowForm] = useState(false);
+
+  const { data: accountsData } = useQuery<Account[], Error>({
+    queryKey: [QueryKeys.ACCOUNTS],
+    queryFn: getAccounts,
+  });
+  const accounts = accountsData ?? [];
 
   const {
     flatData,
@@ -86,10 +95,19 @@ export function AssetActivitiesTable({ symbol }: AssetActivitiesTableProps) {
 
       {showForm && (
         <ActivityForm
+          accounts={
+            accounts
+              ?.filter((acc) => acc.isActive)
+              .map((account) => ({
+                value: account.id,
+                label: account.name,
+                currency: account.currency,
+              })) || []
+          }
           open={showForm}
           onOpenChange={onFormClose}
           activity={selectedActivity}
-          onSuccess={onFormSuccess}
+          onClose={onFormSuccess}
         />
       )}
     </>

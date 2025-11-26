@@ -37,7 +37,7 @@ export function SymbolAutocompleteCell({
   onNavigate,
   isFocused = false,
   className,
-  disabled,
+  disabled: _disabled,
 }: SymbolAutocompleteCellProps) {
   const { t } = useTranslation(["activity"]);
   const [isEditing, setIsEditing] = useState(false);

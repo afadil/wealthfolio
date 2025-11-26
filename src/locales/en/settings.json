@@ -25,6 +25,10 @@
       "title": "Market Data",
       "subtitle": "Providers and data update"
     },
+    "securities": {
+      "title": "Securities",
+      "subtitle": "Manage security definitions"
+    },
     "addons": {
       "title": "Add-ons",
       "subtitle": "Extend Wealthfolio with features"

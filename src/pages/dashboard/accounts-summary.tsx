@@ -56,7 +56,7 @@ const AccountSummaryComponent = React.memo(
     isLoadingValuation = false,
     displayInAccountCurrency = false,
     isNested = false,
-    t,
+    t: _t,
   }: {
     item: AccountSummaryDisplayData;
     isExpanded?: boolean;
@@ -64,7 +64,7 @@ const AccountSummaryComponent = React.memo(
     isLoadingValuation?: boolean;
     displayInAccountCurrency?: boolean;
     isNested?: boolean;
-    t: any;
+    t: unknown;
   }) => {
     const isGroup = item.isGroup ?? false;
     const useAccountCurrency =

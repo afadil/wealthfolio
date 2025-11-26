@@ -16,7 +16,7 @@ import { Icons } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
 import { InputTags } from "@/components/ui/tag-input";
 import { Textarea } from "@/components/ui/textarea";
-import { DataSource } from "@/lib/constants";
+import { DataSource, dataSourceSchema } from "@/lib/constants";
 import { UpdateAssetProfile } from "@/lib/types";
 import { ResponsiveSelect, type ResponsiveSelectOption } from "@wealthfolio/ui";
 
@@ -28,7 +28,7 @@ const assetFormSchema = z.object({
   assetClass: z.string().optional(),
   assetSubClass: z.string().optional(),
   currency: z.string().min(1),
-  dataSource: z.enum([DataSource.YAHOO, DataSource.MANUAL]),
+  dataSource: dataSourceSchema,
   notes: z.string().optional(),
   sectors: z.array(z.string()),
   countries: z.array(z.string()),

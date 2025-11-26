@@ -33,7 +33,7 @@ export function EditableCell({
   inputMode = "text",
   placeholder,
   className,
-  disabled,
+  disabled: _disabled,
 }: EditableCellProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);

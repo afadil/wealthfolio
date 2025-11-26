@@ -27,7 +27,7 @@ const appearanceFormSchema = z.object({
     invalid_type_error: "Select a font",
     required_error: "Please select a font.",
   }),
-  language: z.enum(["en", "vi"], {
+  language: z.string({
     required_error: "Please select a language.",
   }),
   menuBarVisible: z.boolean(),
@@ -42,7 +42,7 @@ export function AppearanceForm() {
   const defaultValues: Partial<AppearanceFormValues> = {
     theme: settings?.theme as AppearanceFormValues["theme"],
     font: settings?.font as AppearanceFormValues["font"],
-    language: (settings?.language as AppearanceFormValues["language"]) ?? "en",
+    language: settings?.language ?? "en",
     menuBarVisible: settings?.menuBarVisible ?? true,
   };
   const form = useForm<AppearanceFormValues>({
@@ -131,7 +131,7 @@ export function AppearanceForm() {
                   value={field.value}
                   onChange={(value) => {
                     field.onChange(value);
-                    handlePartialUpdate({ language: value as AppearanceFormValues["language"] });
+                    handlePartialUpdate({ language: value });
                   }}
                 />
               </FormControl>

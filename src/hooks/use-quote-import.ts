@@ -52,6 +52,7 @@ export function useQuoteImport(): QuoteImportState & QuoteImportActions {
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [overwriteExisting, setOverwriteExisting] = useState(false);
 
   const validateFile = useCallback(async () => {
     if (!file) {
@@ -192,6 +193,7 @@ export function useQuoteImport(): QuoteImportState & QuoteImportActions {
     isImporting,
     importProgress,
     error,
+    overwriteExisting,
 
     // Actions
     setFile,

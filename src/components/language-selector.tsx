@@ -1,4 +1,10 @@
 import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@wealthfolio/ui";
 
 interface LanguageSelectorProps {
   value?: string;
@@ -26,34 +32,30 @@ export function LanguageSelector({
   className,
   compact = false,
 }: LanguageSelectorProps) {
+  const selectedLanguage = languages.find((lang) => lang.value === value);
+
   return (
-    <div className={cn("grid grid-cols-2", compact ? "gap-1.5" : "gap-2 md:gap-4", className)}>
-      {languages.map((language) => (
-        <button
-          key={language.value}
-          type="button"
-          onClick={() => onChange(language.value)}
-          className={cn(
-            "hover:bg-accent/50 relative flex flex-col items-center justify-center rounded-lg border-2 transition-all duration-200",
-            compact ? "p-1.5 sm:p-2" : "p-3 sm:p-4",
-            value === language.value
-              ? "border-primary bg-accent/30"
-              : "border-muted hover:border-accent",
-          )}
-        >
-          <div className={cn("mb-0.5", compact ? "text-base sm:text-lg" : "text-2xl sm:text-3xl")}>
-            {language.flag}
-          </div>
-          <div
-            className={cn("font-medium", compact ? "text-[10px] sm:text-xs" : "text-xs sm:text-sm")}
-          >
-            {language.label}
-          </div>
-          {value === language.value && (
-            <div className="bg-primary absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full" />
-          )}
-        </button>
-      ))}
-    </div>
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className={cn(compact ? "w-[140px]" : "w-[200px]", className)}>
+        {selectedLanguage ? (
+          <span className="flex items-center gap-2">
+            <span>{selectedLanguage.flag}</span>
+            <span> {selectedLanguage.label}</span>
+          </span>
+        ) : (
+          <span className="text-muted-foreground">Select language</span>
+        )}
+      </SelectTrigger>
+      <SelectContent>
+        {languages.map((language) => (
+          <SelectItem key={language.value} value={language.value}>
+            <span className="flex items-center gap-2">
+              <span>{language.flag}</span>
+              <span>{language.label}</span>
+            </span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

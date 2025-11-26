@@ -38,10 +38,10 @@ export const HoldingsMobileFilterSheet = ({
   selectedTypes,
   setSelectedTypes,
   showAccountFilter = true,
-  sortBy,
-  setSortBy,
-  showTotalReturn,
-  setShowTotalReturn,
+  sortBy: _sortBy,
+  setSortBy: _setSortBy,
+  showTotalReturn: _showTotalReturn,
+  setShowTotalReturn: _setShowTotalReturn,
 }: HoldingsMobileFilterSheetProps) => {
   const { t } = useTranslation("holdings");
 
