@@ -45,6 +45,12 @@ export function EditableCell({
   }, [value]);
 
   useEffect(() => {
+    if (disabled) {
+      setIsEditing(false);
+    }
+  }, [disabled]);
+
+  useEffect(() => {
     if (isFocused && !isEditing && cellRef.current) {
       cellRef.current.focus();
     }
@@ -78,6 +84,26 @@ export function EditableCell({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (disabled) {
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        onNavigate?.("up");
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        onNavigate?.("down");
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        onNavigate?.("left");
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        onNavigate?.("right");
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+        onNavigate?.(e.shiftKey ? "left" : "right");
+      }
+      return;
+    }
+
     if (isEditing) {
       if (type === "number") {
         const allowedKeys = [
@@ -163,6 +189,10 @@ export function EditableCell({
   };
 
   const handleClick = () => {
+    if (disabled) {
+      onFocus?.();
+      return;
+    }
     onFocus?.();
     setIsEditing(true);
   };
@@ -170,19 +200,6 @@ export function EditableCell({
   const handleCellFocus = () => {
     onFocus?.();
   };
-
-  if (disabled) {
-    return (
-      <div
-        className={cn(
-          "flex h-full w-full cursor-not-allowed items-center px-2 py-1.5 text-xs text-muted-foreground",
-          className,
-        )}
-      >
-        {displayValue ?? value ?? "\u00A0"}
-      </div>
-    );
-  }
 
   if (isEditing) {
     return (
@@ -226,7 +243,8 @@ export function EditableCell({
       onFocus={handleCellFocus}
       onKeyDown={handleKeyDown}
       className={cn(
-        "flex h-full w-full cursor-cell items-center px-2 py-1.5 text-xs transition-colors outline-none",
+        "flex h-full w-full items-center px-2 py-1.5 text-xs transition-colors outline-none",
+        disabled ? "cursor-not-allowed text-muted-foreground" : "cursor-cell",
         isFocused && "ring-primary ring-2 ring-inset",
         !displayContent && "text-muted-foreground",
         className,

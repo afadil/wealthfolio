@@ -231,6 +231,8 @@ const ActivityPage = () => {
               activities={flatData}
               onRefetch={refetch}
               onEditActivity={handleEdit}
+              sorting={sorting}
+              onSortingChange={setSorting}
             />
           ) : (
             <ActivityTable

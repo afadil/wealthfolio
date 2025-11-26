@@ -14,9 +14,16 @@ import {
   ActivityUpdate,
 } from "@/lib/types";
 import { cn, formatDateTimeDisplay, formatDateTimeLocal } from "@/lib/utils";
+import { useAssets } from "@/pages/asset/hooks/use-assets";
+import type { SortingState } from "@tanstack/react-table";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   Button,
   Checkbox,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   Icons,
   Table,
   TableBody,
@@ -28,7 +35,7 @@ import {
   worldCurrencies,
 } from "@wealthfolio/ui";
 import type { Dispatch, SetStateAction } from "react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";
@@ -62,6 +69,8 @@ interface ActivityDatagridProps {
   activities: ActivityDetails[];
   onRefetch: () => Promise<unknown>;
   onEditActivity: (activity: ActivityDetails) => void;
+  sorting: SortingState;
+  onSortingChange: (sorting: SortingState) => void;
 }
 
 const editableFields: EditableField[] = [
@@ -175,11 +184,65 @@ const createDraftTransaction = (
   };
 };
 
+interface SortableHeaderProps {
+  title: string;
+  columnId: string;
+  sorting: SortingState;
+  onSortingChange: (sorting: SortingState) => void;
+  className?: string;
+}
+
+function SortableHeader({
+  title,
+  columnId,
+  sorting,
+  onSortingChange,
+  className,
+}: SortableHeaderProps) {
+  const currentSort = sorting.find((entry) => entry.id === columnId);
+  const icon = currentSort ? (
+    currentSort.desc ? (
+      <Icons.ArrowDown className="ml-2 h-4 w-4" />
+    ) : (
+      <Icons.ArrowUp className="ml-2 h-4 w-4" />
+    )
+  ) : null;
+
+  const handleSortingChange = (desc: boolean) => {
+    onSortingChange([{ id: columnId, desc }]);
+  };
+
+  return (
+    <TableHead className={className}>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className="data-[state=open]:bg-accent -ml-3 h-8">
+            <span>{title}</span>
+            {icon}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuItem onClick={() => handleSortingChange(false)}>
+            <Icons.ArrowUp className="text-muted-foreground/70 mr-2 h-3.5 w-3.5" />
+            Asc
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleSortingChange(true)}>
+            <Icons.ArrowDown className="text-muted-foreground/70 mr-2 h-3.5 w-3.5" />
+            Desc
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </TableHead>
+  );
+}
+
 export function ActivityDatagrid({
   accounts,
   activities,
   onRefetch,
   onEditActivity,
+  sorting,
+  onSortingChange,
 }: ActivityDatagridProps) {
   const [localTransactions, setLocalTransactions] = useState<LocalTransaction[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -187,6 +250,9 @@ export function ActivityDatagrid({
   const [dirtyTransactionIds, setDirtyTransactionIds] = useState<Set<string>>(new Set());
   const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<string>>(new Set());
   const { saveActivitiesMutation } = useActivityMutations();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const { assets } = useAssets();
 
   const fallbackCurrency = useMemo(() => {
     const defaultAccount = accounts.find((account) => account.isDefault);
@@ -224,6 +290,27 @@ export function ActivityDatagrid({
     return new Map(accounts.map((account) => [account.id, account]));
   }, [accounts]);
 
+  const assetCurrencyLookup = useMemo(() => {
+    const entries = new Map<string, string>();
+
+    assets.forEach((asset) => {
+      if (!asset.currency) {
+        return;
+      }
+      const symbolKey = asset.symbol?.trim().toUpperCase();
+      const idKey = asset.id?.trim().toUpperCase();
+
+      if (symbolKey) {
+        entries.set(symbolKey, asset.currency);
+      }
+      if (idKey) {
+        entries.set(idKey, asset.currency);
+      }
+    });
+
+    return entries;
+  }, [assets]);
+
   const currencyOptions = useMemo(() => {
     const entries = new Map<string, string>();
 
@@ -255,6 +342,33 @@ export function ActivityDatagrid({
 
   const serverTransactions = useMemo(() => activities, [activities]);
 
+  const resolveTransactionCurrency = useCallback(
+    (
+      transaction: LocalTransaction,
+      options: { includeFallback?: boolean } = { includeFallback: true },
+    ): string | undefined => {
+      const assetKey = (transaction.assetId ?? transaction.assetSymbol ?? "").trim().toUpperCase();
+      const isCashAsset = assetKey.startsWith("$CASH-");
+      const cashCurrency = isCashAsset ? assetKey.replace("$CASH-", "") : undefined;
+      const assetCurrency = cashCurrency ?? assetCurrencyLookup.get(assetKey);
+
+      if (transaction.currency) {
+        return transaction.currency;
+      }
+
+      if (assetCurrency) {
+        return assetCurrency;
+      }
+
+      if (options.includeFallback !== false) {
+        return transaction.accountCurrency ?? fallbackCurrency;
+      }
+
+      return undefined;
+    },
+    [assetCurrencyLookup, fallbackCurrency],
+  );
+
   useEffect(() => {
     setLocalTransactions((previous) => {
       const dirtyIds = new Set(dirtyTransactionIds);
@@ -277,62 +391,118 @@ export function ActivityDatagrid({
     });
   }, [dirtyTransactionIds, pendingDeleteIds, serverTransactions]);
 
-  const filteredTransactionsRef = useRef(localTransactions);
+  const activeSorting = sorting[0] ?? { id: "date", desc: true };
+
+  const sortedTransactions = useMemo(() => {
+    const transactions = [...localTransactions];
+
+    const compare = (a: LocalTransaction, b: LocalTransaction) => {
+      switch (activeSorting.id) {
+        case "activityType": {
+          const left = (a.activityType ?? "").toString();
+          const right = (b.activityType ?? "").toString();
+          return left.localeCompare(right);
+        }
+        case "assetSymbol": {
+          const left = (a.assetSymbol ?? "").toString();
+          const right = (b.assetSymbol ?? "").toString();
+          return left.localeCompare(right);
+        }
+        case "date":
+        default: {
+          const left = a.date ? new Date(a.date).getTime() : 0;
+          const right = b.date ? new Date(b.date).getTime() : 0;
+          return left - right;
+        }
+      }
+    };
+
+    transactions.sort((a, b) => {
+      const result = compare(a, b);
+      return activeSorting.desc ? -result : result;
+    });
+
+    return transactions;
+  }, [activeSorting.desc, activeSorting.id, localTransactions]);
+
+  const filteredTransactionsRef = useRef(sortedTransactions);
 
   useEffect(() => {
-    filteredTransactionsRef.current = localTransactions;
-  }, [localTransactions]);
+    filteredTransactionsRef.current = sortedTransactions;
+  }, [sortedTransactions]);
+
+  const transactionIndexLookup = useMemo(() => {
+    return new Map(sortedTransactions.map((transaction, index) => [transaction.id, index]));
+  }, [sortedTransactions]);
+
+  const rowVirtualizer = useVirtualizer({
+    count: sortedTransactions.length,
+    getItemKey: (index) => sortedTransactions[index]?.id ?? index,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: () => 44,
+    overscan: 8,
+  });
 
   const hasUnsavedChanges =
     dirtyTransactionIds.size > 0 ||
     pendingDeleteIds.size > 0 ||
     localTransactions.some((t) => t.isNew);
 
-  const handleCellNavigation = useCallback((direction: "up" | "down" | "left" | "right") => {
-    setFocusedCell((current) => {
-      if (!current) return current;
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
+  const paddingBottom =
+    virtualRows.length > 0
+      ? rowVirtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end
+      : 0;
 
-      const transactions = filteredTransactionsRef.current;
-      if (!transactions || transactions.length === 0) return current;
+  const handleCellNavigation = useCallback(
+    (direction: "up" | "down" | "left" | "right") => {
+      setFocusedCell((current) => {
+        if (!current) return current;
 
-      const currentRowIndex = transactions.findIndex((t) => t.id === current.rowId);
-      if (currentRowIndex === -1) return current;
+        const transactions = filteredTransactionsRef.current;
+        if (!transactions || transactions.length === 0) return current;
 
-      const currentFieldIndex = editableFields.indexOf(current.field);
-      if (currentFieldIndex === -1) return current;
+        const currentRowIndex = transactionIndexLookup.get(current.rowId) ?? -1;
+        if (currentRowIndex === -1) return current;
 
-      let newRowIndex = currentRowIndex;
-      let newFieldIndex = currentFieldIndex;
+        const currentFieldIndex = editableFields.indexOf(current.field);
+        if (currentFieldIndex === -1) return current;
 
-      switch (direction) {
-        case "up":
-          newRowIndex = Math.max(0, currentRowIndex - 1);
-          break;
-        case "down":
-          newRowIndex = Math.min(transactions.length - 1, currentRowIndex + 1);
-          break;
-        case "left":
-          newFieldIndex = Math.max(0, currentFieldIndex - 1);
-          break;
-        case "right":
-          newFieldIndex = Math.min(editableFields.length - 1, currentFieldIndex + 1);
-          break;
-      }
+        let newRowIndex = currentRowIndex;
+        let newFieldIndex = currentFieldIndex;
 
-      const nextRow = transactions[newRowIndex];
-      const nextField = editableFields[newFieldIndex];
+        switch (direction) {
+          case "up":
+            newRowIndex = Math.max(0, currentRowIndex - 1);
+            break;
+          case "down":
+            newRowIndex = Math.min(transactions.length - 1, currentRowIndex + 1);
+            break;
+          case "left":
+            newFieldIndex = Math.max(0, currentFieldIndex - 1);
+            break;
+          case "right":
+            newFieldIndex = Math.min(editableFields.length - 1, currentFieldIndex + 1);
+            break;
+        }
 
-      if (!nextRow || !nextField) {
-        return current;
-      }
+        const nextRow = transactions[newRowIndex];
+        const nextField = editableFields[newFieldIndex];
 
-      if (nextRow.id === current.rowId && nextField === current.field) {
-        return current;
-      }
+        if (!nextRow || !nextField) {
+          return current;
+        }
 
-      return { rowId: nextRow.id, field: nextField };
-    });
-  }, []);
+        if (nextRow.id === current.rowId && nextField === current.field) {
+          return current;
+        }
+
+        return { rowId: nextRow.id, field: nextField };
+      });
+    },
+    [transactionIndexLookup],
+  );
 
   const addNewRow = useCallback(() => {
     const draft = createDraftTransaction(accounts, fallbackCurrency);
@@ -364,7 +534,7 @@ export function ActivityDatagrid({
             if (!isCashActivity(updated.activityType)) {
               return;
             }
-            const derivedCurrency = updated.currency ?? updated.accountCurrency ?? fallbackCurrency;
+            const derivedCurrency = resolveTransactionCurrency(updated) ?? fallbackCurrency;
             const cashSymbol = `$CASH-${derivedCurrency.toUpperCase()}`;
             updated.assetSymbol = cashSymbol;
             updated.assetId = cashSymbol;
@@ -396,9 +566,13 @@ export function ActivityDatagrid({
           } else if (field === "fee") {
             updated.fee = toNumber(value);
           } else if (field === "assetSymbol") {
-            const upper = value.toUpperCase();
+            const upper = value.trim().toUpperCase();
             updated.assetSymbol = upper;
             updated.assetId = upper;
+            const assetCurrency = resolveTransactionCurrency(updated, { includeFallback: false });
+            if (assetCurrency) {
+              updated.currency = assetCurrency;
+            }
           } else if (field === "activityType") {
             updated.activityType = value as ActivityType;
             applyCashDefaults();
@@ -432,7 +606,7 @@ export function ActivityDatagrid({
         return next;
       });
     },
-    [accountLookup, fallbackCurrency],
+    [accountLookup, fallbackCurrency, resolveTransactionCurrency],
   );
 
   const duplicateRow = useCallback(
@@ -498,12 +672,12 @@ export function ActivityDatagrid({
   }, [deleteRow, selectedIds]);
 
   const toggleSelectAll = useCallback(() => {
-    if (selectedIds.size === localTransactions.length) {
+    if (selectedIds.size === sortedTransactions.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(localTransactions.map((transaction) => transaction.id)));
+      setSelectedIds(new Set(sortedTransactions.map((transaction) => transaction.id)));
     }
-  }, [localTransactions, selectedIds.size]);
+  }, [selectedIds.size, sortedTransactions]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -527,6 +701,16 @@ export function ActivityDatagrid({
     [onEditActivity],
   );
 
+  useEffect(() => {
+    if (!focusedCell) {
+      return;
+    }
+    const targetIndex = transactionIndexLookup.get(focusedCell.rowId);
+    if (targetIndex !== undefined) {
+      rowVirtualizer.scrollToIndex(targetIndex, { align: "auto" });
+    }
+  }, [focusedCell, rowVirtualizer, transactionIndexLookup]);
+
   const handleSaveChanges = useCallback(async () => {
     if (!hasUnsavedChanges) return;
 
@@ -539,8 +723,11 @@ export function ActivityDatagrid({
     const updates: ActivityUpdate[] = [];
 
     dirtyTransactions.forEach((transaction) => {
-      const resolvedCurrency =
-        transaction.currency ?? transaction.accountCurrency ?? fallbackCurrency;
+      const resolvedCurrency = resolveTransactionCurrency(transaction, { includeFallback: false });
+      const currencyFallback = transaction.accountCurrency ?? fallbackCurrency;
+      const assetKey = (transaction.assetId ?? transaction.assetSymbol ?? "").toUpperCase();
+      const currencyForPayload =
+        resolvedCurrency ?? (!assetCurrencyLookup.has(assetKey) ? currencyFallback : undefined);
 
       const payload: ActivityCreate = {
         id: transaction.id,
@@ -554,14 +741,15 @@ export function ActivityDatagrid({
         quantity: toFiniteNumberOrUndefined(transaction.quantity),
         unitPrice: toFiniteNumberOrUndefined(transaction.unitPrice),
         amount: toFiniteNumberOrUndefined(transaction.amount),
-        currency: resolvedCurrency,
+        currency: currencyForPayload,
         fee: toFiniteNumberOrUndefined(transaction.fee),
         isDraft: false,
         comment: transaction.comment ?? undefined,
       };
 
       if (!payload.assetId && isCashActivity(payload.activityType)) {
-        payload.assetId = `$CASH-${resolvedCurrency.toUpperCase().trim()}`;
+        const cashCurrency = (resolvedCurrency ?? currencyFallback).toUpperCase().trim();
+        payload.assetId = `$CASH-${cashCurrency}`;
       }
 
       if (payload.activityType === ActivityType.SPLIT) {
@@ -623,9 +811,11 @@ export function ActivityDatagrid({
     hasUnsavedChanges,
     localTransactions,
     pendingDeleteIds,
+    assetCurrencyLookup,
+    fallbackCurrency,
     onRefetch,
     saveActivitiesMutation,
-    fallbackCurrency,
+    resolveTransactionCurrency,
   ]);
 
   const handleCancelChanges = useCallback(() => {
@@ -725,29 +915,45 @@ export function ActivityDatagrid({
         </div>
       </div>
 
-      <div className="bg-background overflow-x-auto rounded-lg border">
-        <Table>
+      <div
+        ref={scrollContainerRef}
+        className="bg-background max-h-[70vh] overflow-auto rounded-lg border [&>div]:overflow-visible"
+      >
+        <Table className="min-w-[1080px]">
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="bg-muted/30 h-9 w-12 border-r px-0 py-0">
                 <div className="flex h-full items-center justify-center">
                   <Checkbox
                     checked={
-                      localTransactions.length > 0 && selectedIds.size === localTransactions.length
+                      sortedTransactions.length > 0 &&
+                      selectedIds.size === sortedTransactions.length
                     }
                     onCheckedChange={toggleSelectAll}
                   />
                 </div>
               </TableHead>
-              <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
-                Type
-              </TableHead>
-              <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
-                Date & Time
-              </TableHead>
-              <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
-                Symbol
-              </TableHead>
+              <SortableHeader
+                className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold"
+                title="Type"
+                columnId="activityType"
+                sorting={sorting}
+                onSortingChange={onSortingChange}
+              />
+              <SortableHeader
+                className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold"
+                title="Date & Time"
+                columnId="date"
+                sorting={sorting}
+                onSortingChange={onSortingChange}
+              />
+              <SortableHeader
+                className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold"
+                title="Symbol"
+                columnId="assetSymbol"
+                sorting={sorting}
+                onSortingChange={onSortingChange}
+              />
               <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
                 Quantity
               </TableHead>
@@ -775,37 +981,63 @@ export function ActivityDatagrid({
               <TableHead className="bg-muted/30 h-9 px-2 py-1.5" />
             </TableRow>
           </TableHeader>
-          <TableBody>
-            {localTransactions.length === 0 ? (
+          {sortedTransactions.length === 0 ? (
+            <TableBody>
               <TableRow>
                 <TableCell colSpan={12} className="text-muted-foreground h-32 text-center">
                   No transactions yet. Click &quot;Add Transaction&quot; to get started.
                 </TableCell>
               </TableRow>
-            ) : (
-              localTransactions.map((transaction) => (
-                <TransactionRow
-                  key={transaction.id}
-                  transaction={transaction}
-                  activityTypeOptions={activityTypeOptions}
-                  accountOptions={accountOptions}
-                  currencyOptions={currencyOptions}
-                  accountLookup={accountLookup}
-                  isSelected={selectedIds.has(transaction.id)}
-                  isDirty={dirtyTransactionIds.has(transaction.id)}
-                  focusedField={focusedCell?.rowId === transaction.id ? focusedCell.field : null}
-                  onToggleSelect={toggleSelect}
-                  onUpdateTransaction={updateTransaction}
-                  onEditTransaction={handleEditTransaction}
-                  onDuplicate={duplicateRow}
-                  onDelete={deleteRow}
-                  onNavigate={handleCellNavigation}
-                  setFocusedCell={setFocusedCell}
-                  fallbackCurrency={fallbackCurrency}
-                />
-              ))
-            )}
-          </TableBody>
+            </TableBody>
+          ) : (
+            <TableBody>
+              {paddingTop > 0 ? (
+                <TableRow key="virtual-padding-top">
+                  <TableCell colSpan={12} style={{ height: paddingTop }} />
+                </TableRow>
+              ) : null}
+
+              {virtualRows.map((virtualRow) => {
+                const transaction = sortedTransactions[virtualRow.index];
+                if (!transaction) {
+                  return null;
+                }
+
+                return (
+                  <Fragment key={virtualRow.key}>
+                    <TransactionRow
+                      transaction={transaction}
+                      activityTypeOptions={activityTypeOptions}
+                      accountOptions={accountOptions}
+                      currencyOptions={currencyOptions}
+                      accountLookup={accountLookup}
+                      isSelected={selectedIds.has(transaction.id)}
+                      isDirty={dirtyTransactionIds.has(transaction.id)}
+                      focusedField={
+                        focusedCell?.rowId === transaction.id ? focusedCell.field : null
+                      }
+                      onToggleSelect={toggleSelect}
+                      onUpdateTransaction={updateTransaction}
+                      onEditTransaction={handleEditTransaction}
+                      onDuplicate={duplicateRow}
+                      onDelete={deleteRow}
+                      onNavigate={handleCellNavigation}
+                      setFocusedCell={setFocusedCell}
+                      fallbackCurrency={fallbackCurrency}
+                      resolveTransactionCurrency={resolveTransactionCurrency}
+                      rowRef={rowVirtualizer.measureElement}
+                    />
+                  </Fragment>
+                );
+              })}
+
+              {paddingBottom > 0 ? (
+                <TableRow key="virtual-padding-bottom">
+                  <TableCell colSpan={12} style={{ height: paddingBottom }} />
+                </TableRow>
+              ) : null}
+            </TableBody>
+          )}
         </Table>
       </div>
     </div>
@@ -829,6 +1061,8 @@ interface TransactionRowProps {
   onNavigate: (direction: "up" | "down" | "left" | "right") => void;
   setFocusedCell: Dispatch<SetStateAction<CellCoordinate | null>>;
   fallbackCurrency: string;
+  resolveTransactionCurrency: (transaction: LocalTransaction) => string | undefined;
+  rowRef?: (instance: HTMLTableRowElement | null) => void;
 }
 
 const TransactionRow = memo(
@@ -849,6 +1083,8 @@ const TransactionRow = memo(
     onNavigate,
     setFocusedCell,
     fallbackCurrency,
+    resolveTransactionCurrency,
+    rowRef,
   }: TransactionRowProps) {
     const isCash = isCashActivity(transaction.activityType);
     const isSplit = transaction.activityType === ActivityType.SPLIT;
@@ -862,7 +1098,8 @@ const TransactionRow = memo(
     const accountLabel =
       accountLookup.get(transaction.accountId)?.name ?? transaction.accountName ?? "";
     const totalValue = calculateActivityValue(transaction);
-    const currency = transaction.currency ?? transaction.accountCurrency ?? fallbackCurrency;
+    const currency =
+      resolveTransactionCurrency(transaction) ?? transaction.accountCurrency ?? fallbackCurrency;
     const normalizedCurrency = currency.toUpperCase();
     const assetSymbolDisplay =
       transaction.assetSymbol ??
@@ -900,6 +1137,7 @@ const TransactionRow = memo(
 
     return (
       <TableRow
+        ref={rowRef}
         className={cn(
           "group hover:bg-muted/40",
           isSelected && "bg-muted/60",
@@ -1072,7 +1310,9 @@ const TransactionRow = memo(
       prev.onDuplicate === next.onDuplicate &&
       prev.onDelete === next.onDelete &&
       prev.onNavigate === next.onNavigate &&
-      prev.setFocusedCell === next.setFocusedCell
+      prev.setFocusedCell === next.setFocusedCell &&
+      prev.resolveTransactionCurrency === next.resolveTransactionCurrency &&
+      prev.rowRef === next.rowRef
     );
   },
 );
