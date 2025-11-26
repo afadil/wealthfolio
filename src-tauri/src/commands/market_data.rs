@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::{
@@ -96,6 +97,17 @@ pub async fn get_quote_history(
     state
         .market_data_service()
         .get_historical_quotes_for_symbol(&symbol)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_latest_quotes(
+    symbols: Vec<String>,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<HashMap<String, Quote>, String> {
+    state
+        .market_data_service()
+        .get_latest_quotes_for_symbols(&symbols)
         .map_err(|e| e.to_string())
 }
 

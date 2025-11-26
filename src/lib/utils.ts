@@ -206,32 +206,64 @@ export function formatDateTimeLocal(date: Date | string | undefined): string {
   return format(value, "yyyy-MM-dd'T'HH:mm");
 }
 
+/**
+ * Formats a date for display in the UI.
+ * Returns format: "YYYY/MM/DD HH:mm" in local timezone.
+ * @param date Date string, Date object, or undefined
+ * @returns Formatted string for display, or empty string if invalid
+ */
+export function formatDateTimeDisplay(date: Date | string | undefined): string {
+  if (!date) return "";
+  const value = typeof date === "string" ? new Date(date) : date;
+  if (!isValid(value)) return "";
+  // Display format: YYYY/MM/DD HH:mm
+  return format(value, "yyyy/MM/dd HH:mm");
+}
+const DECIMAL_FORMAT_OPTIONS: Intl.NumberFormatOptions = {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+};
 
-export function formatAmount(amount: number, currency: string, displayCurrency = true) {
-  // Handle pence (GBp) specially
-  if (currency === "GBp" || currency === "GBX") {
-    if (!displayCurrency) {
-      return new Intl.NumberFormat("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(amount);
-    }
+const decimalFormatter = new Intl.NumberFormat("en-US", DECIMAL_FORMAT_OPTIONS);
+const currencyFormatterCache = new Map<string, Intl.NumberFormat>();
 
-    // For pence, format as "123.45p" or "1,234.56p"
-    const formattedNumber = new Intl.NumberFormat("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
+const getCurrencyFormatter = (currency: string) => {
+  const normalizedCurrency = currency?.toUpperCase?.() ?? "USD";
+  const cacheKey = normalizedCurrency;
 
-    return `${formattedNumber}p`;
+  if (currencyFormatterCache.has(cacheKey)) {
+    return currencyFormatterCache.get(cacheKey)!;
   }
 
-  return new Intl.NumberFormat("en-US", {
-    style: displayCurrency ? "currency" : undefined,
-    currency: currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
+  let formatter: Intl.NumberFormat;
+  try {
+    formatter = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: normalizedCurrency,
+      ...DECIMAL_FORMAT_OPTIONS,
+    });
+  } catch {
+    formatter = decimalFormatter;
+  }
+
+  currencyFormatterCache.set(cacheKey, formatter);
+  return formatter;
+};
+
+export function formatAmount(amount: number, currency: string, displayCurrency = true) {
+  const rawCurrency = currency ?? "USD";
+  const isPenceCurrency = rawCurrency === "GBp" || rawCurrency === "GBX";
+
+  if (isPenceCurrency) {
+    const formattedNumber = decimalFormatter.format(amount);
+    return displayCurrency ? `${formattedNumber}p` : formattedNumber;
+  }
+
+  if (!displayCurrency) {
+    return decimalFormatter.format(amount);
+  }
+
+  return getCurrencyFormatter(rawCurrency).format(amount);
 }
 
 export function formatPercent(value: number | null | undefined) {

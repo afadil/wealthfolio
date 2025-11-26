@@ -19,6 +19,9 @@ pub enum Error {
     #[error("Asset operation failed: {0}")]
     Asset(String),
 
+    #[error("Constraint violation: {0}")]
+    ConstraintViolation(String),
+
     #[error("Failed to convert between currencies: {0}")]
     CurrencyConversionFailed(String),
     #[error("Currency '{0}' is not supported")]
@@ -193,12 +196,6 @@ impl From<diesel::ConnectionError> for Error {
     }
 }
 
-impl From<keyring::Error> for Error {
-    fn from(err: keyring::Error) -> Self {
-        Error::Secret(err.to_string())
-    }
-}
-
 // Add From implementation for FxError
 // impl From<FxError> for Error {
 //     fn from(err: FxError) -> Self {
@@ -224,5 +221,12 @@ impl From<ChronoParseError> for Error {
 impl From<Error> for String {
     fn from(err: Error) -> Self {
         err.to_string()
+    }
+}
+
+// Add From implementation for keyring::Error
+impl From<keyring::Error> for Error {
+    fn from(err: keyring::Error) -> Self {
+        Error::Secret(err.to_string())
     }
 }

@@ -13,22 +13,35 @@ import { useTranslation } from "react-i18next";
 
 export interface ActivityDeleteModalProps {
   isOpen?: boolean;
+  open?: boolean;
   isDeleting?: boolean;
   onConfirm: () => void;
   onCancel?: () => void;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function ActivityDeleteModal({
   isOpen,
+  open,
   isDeleting,
   onConfirm,
   onCancel,
+  onOpenChange,
 }: ActivityDeleteModalProps) {
   const { t } = useTranslation("activity");
   // const MemoizedAlertDialogContent = React.memo(AlertDialogContent);
   // const MemoizedAlertDialogFooter = React.memo(AlertDialogFooter);
+  
+  const show = isOpen ?? open;
+  const handleOpenChange = (val: boolean) => {
+    onOpenChange?.(val);
+    if (!val) {
+      onCancel?.();
+    }
+  };
+
   return (
-    <AlertDialog open={isOpen} onOpenChange={onCancel}>
+    <AlertDialog open={show} onOpenChange={handleOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{t("delete.title")}</AlertDialogTitle>

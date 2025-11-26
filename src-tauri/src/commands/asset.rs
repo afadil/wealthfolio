@@ -19,6 +19,14 @@ pub async fn get_asset_profile(
 }
 
 #[tauri::command]
+pub async fn get_assets(state: State<'_, Arc<ServiceContext>>) -> Result<Vec<Asset>, String> {
+    state
+        .asset_service()
+        .get_assets()
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn update_asset_profile(
     id: String,
     payload: UpdateAssetProfile,
@@ -56,4 +64,16 @@ pub async fn update_asset_data_source(
     });
 
     Ok(asset)
+}
+
+#[tauri::command]
+pub async fn delete_asset(
+    id: String,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<(), String> {
+    state
+        .asset_service()
+        .delete_asset(&id)
+        .await
+        .map_err(|e| e.to_string())
 }

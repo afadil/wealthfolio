@@ -1,8 +1,8 @@
-import * as React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { XIcon } from "lucide-react";
+import * as React from "react";
 
 type InputProps = React.ComponentProps<"input">;
 
@@ -35,12 +35,13 @@ const InputTags = React.forwardRef<HTMLInputElement, InputTagsProps>(
       <div
         className={cn(
           // caveat: :has() variant requires tailwind v3.4 or above: https://tailwindcss.com/blog/tailwindcss-v3-4#new-has-variant
-          "flex min-h-10 w-full flex-wrap gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm ring-offset-white disabled:cursor-not-allowed disabled:opacity-50 has-focus-visible:ring-2 has-focus-visible:ring-neutral-950 has-focus-visible:ring-offset-2 has-focus-visible:outline-none dark:border-neutral-800 dark:bg-neutral-950 dark:ring-offset-neutral-950 dark:has-focus-visible:ring-neutral-300",
+          "border-input dark:bg-input/30 flex min-h-11 w-full flex-wrap gap-2 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+          "has-focus-visible:border-ring has-focus-visible:ring-ring/50 has-focus-visible:ring-[3px]",
           className,
         )}
       >
         {value.map((item: string) => (
-          <Badge key={item} variant="secondary">
+          <Badge key={item} variant="secondary" className="!rounded-md text-xs">
             {item}
             <Button
               variant="ghost"

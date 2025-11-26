@@ -164,15 +164,6 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             activity_repository.clone(),
         ));
 
-<<<<<<< HEAD
-    let activity_service: Arc<dyn ActivityServiceTrait + Send + Sync> = Arc::new(CoreActivityService::new(
-        activity_repository.clone(),
-        account_service.clone(),
-        asset_service.clone(),
-        fx_service.clone(),
-        market_data_service.clone(),
-    ));
-=======
     let activity_service: Arc<dyn ActivityServiceTrait + Send + Sync> =
         Arc::new(CoreActivityService::new(
             activity_repository.clone(),
@@ -181,7 +172,6 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             fx_service.clone(),
             market_data_service.clone(),
         ));
->>>>>>> sub-main
 
     // Determine data root directory (parent of DB path)
     let data_root = std::path::Path::new(&db_path)

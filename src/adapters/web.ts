@@ -1,4 +1,8 @@
+import { getAuthToken, notifyUnauthorized } from "@/lib/auth-token";
+import type { EventCallback, UnlistenFn } from "./tauri";
+
 const API_PREFIX = "/api/v1";
+const EVENTS_ENDPOINT = `${API_PREFIX}/events/stream`;
 
 type CommandMap = Record<string, { method: string; path: string }>;
 
@@ -10,6 +14,8 @@ const COMMANDS: CommandMap = {
   get_settings: { method: "GET", path: "/settings" },
   update_settings: { method: "PUT", path: "/settings" },
   is_auto_update_check_enabled: { method: "GET", path: "/settings/auto-update-enabled" },
+  get_app_info: { method: "GET", path: "/app/info" },
+  check_update: { method: "GET", path: "/app/check-update" },
   backup_database: { method: "POST", path: "/utilities/database/backup" },
   backup_database_to_path: { method: "POST", path: "/utilities/database/backup-to-path" },
   restore_database: { method: "POST", path: "/utilities/database/restore" },
@@ -58,14 +64,18 @@ const COMMANDS: CommandMap = {
   delete_contribution_limit: { method: "DELETE", path: "/limits" },
   calculate_deposits_for_contribution_limit: { method: "GET", path: "/limits" },
   // Asset profile
+  get_assets: { method: "GET", path: "/assets" },
+  delete_asset: { method: "DELETE", path: "/assets" },
   get_asset_profile: { method: "GET", path: "/assets/profile" },
   update_asset_profile: { method: "PUT", path: "/assets/profile" },
   update_asset_data_source: { method: "PUT", path: "/assets/data-source" },
   // Market data
   search_symbol: { method: "GET", path: "/market-data/search" },
   get_quote_history: { method: "GET", path: "/market-data/quotes/history" },
+  get_latest_quotes: { method: "POST", path: "/market-data/quotes/latest" },
   update_quote: { method: "PUT", path: "/market-data/quotes" },
   delete_quote: { method: "DELETE", path: "/market-data/quotes/id" },
+  import_quotes_csv: { method: "POST", path: "/market-data/quotes/import" },
   synch_quotes: { method: "POST", path: "/market-data/sync/history" },
   sync_market_data: { method: "POST", path: "/market-data/sync" },
   // Secrets
@@ -201,6 +211,20 @@ export const invokeWeb = async <T>(
       body = JSON.stringify({ itemType, itemId, startDate, endDate });
       break;
     }
+    case "check_update": {
+      const { currentVersion, target, arch } = (payload ?? {}) as {
+        currentVersion?: string;
+        target?: string;
+        arch?: string;
+      };
+      const params = new URLSearchParams();
+      if (currentVersion) params.set("currentVersion", currentVersion);
+      if (target) params.set("target", target);
+      if (arch) params.set("arch", arch);
+      const qs = params.toString();
+      if (qs) url += `?${qs}`;
+      break;
+    }
     case "get_income_summary":
       break;
     case "delete_goal": {
@@ -301,6 +325,11 @@ export const invokeWeb = async <T>(
       url += `/${encodeURIComponent(id)}`;
       break;
     }
+    case "delete_asset": {
+      const { id } = payload as { id: string };
+      url += `/${encodeURIComponent(id)}`;
+      break;
+    }
     case "calculate_deposits_for_contribution_limit": {
       const { limitId } = payload as { limitId: string };
       url += `/${encodeURIComponent(limitId)}/deposits`;
@@ -342,6 +371,11 @@ export const invokeWeb = async <T>(
       url += `?${params.toString()}`;
       break;
     }
+    case "get_latest_quotes": {
+      const { symbols } = payload as { symbols: string[] };
+      body = JSON.stringify({ symbols });
+      break;
+    }
     case "update_quote": {
       const { symbol, quote } = payload as { symbol: string; quote: Record<string, unknown> };
       url += `/${encodeURIComponent(symbol)}`;
@@ -351,6 +385,14 @@ export const invokeWeb = async <T>(
     case "delete_quote": {
       const { id } = payload as { id: string };
       url += `/${encodeURIComponent(id)}`;
+      break;
+    }
+    case "import_quotes_csv": {
+      const { quotes, overwriteExisting } = payload as {
+        quotes: unknown;
+        overwriteExisting: boolean;
+      };
+      body = JSON.stringify({ quotes, overwriteExisting });
       break;
     }
     case "sync_market_data": {
@@ -476,11 +518,23 @@ export const invokeWeb = async <T>(
       break;
   }
 
+  const headers: HeadersInit = {};
+  if (body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
+  const token = getAuthToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
   const res = await fetch(url, {
     method: config.method,
-    headers: { "Content-Type": "application/json" },
+    headers,
     body,
   });
+  if (res.status === 401) {
+    notifyUnauthorized();
+  }
   if (!res.ok) {
     let msg = res.statusText;
     try {
@@ -515,6 +569,153 @@ export const logger = {
   info: (...args: unknown[]) => console.warn(...args),
   debug: (...args: unknown[]) => console.warn(...args),
   trace: (...args: unknown[]) => console.warn(...args),
+};
+
+class ServerEventBridge {
+  private eventSource: EventSource | null = null;
+  private readonly listeners = new Map<string, Set<EventCallback<unknown>>>();
+  private readonly eventHandlers = new Map<string, EventListener>();
+  private nextEventId = 0;
+
+  constructor(private readonly url: string) {}
+
+  async listen<T>(eventName: string, handler: EventCallback<T>): Promise<UnlistenFn> {
+    if (typeof window === "undefined" || typeof EventSource === "undefined") {
+      throw new Error("EventSource is not available in this environment.");
+    }
+    this.ensureConnection();
+    this.addListener(eventName, handler as EventCallback<unknown>);
+    return async () => {
+      this.removeListener(eventName, handler as EventCallback<unknown>);
+    };
+  }
+
+  private ensureConnection() {
+    if (this.eventSource) {
+      return;
+    }
+    const eventUrl = this.buildEventUrl();
+    this.eventSource = new EventSource(eventUrl);
+    this.eventSource.onerror = (error) => {
+      logger.warn("Portfolio event stream error", error);
+    };
+  }
+
+  private buildEventUrl(): string {
+    const token = getAuthToken();
+    if (!token) {
+      return this.url;
+    }
+
+    const separator = this.url.includes("?") ? "&" : "?";
+    return `${this.url}${separator}access_token=${encodeURIComponent(token)}`;
+  }
+
+  private addListener(eventName: string, handler: EventCallback<unknown>) {
+    const listeners = this.listeners.get(eventName) ?? new Set<EventCallback<unknown>>();
+    listeners.add(handler);
+    this.listeners.set(eventName, listeners);
+
+    if (!this.eventHandlers.has(eventName) && this.eventSource) {
+      const listener = (event: MessageEvent) => {
+        const payload = this.parsePayload(event.data);
+        this.emit(eventName, payload);
+      };
+      this.eventSource.addEventListener(eventName, listener as EventListener);
+      this.eventHandlers.set(eventName, listener as EventListener);
+    }
+  }
+
+  private removeListener(eventName: string, handler: EventCallback<unknown>) {
+    const listeners = this.listeners.get(eventName);
+    if (!listeners) {
+      return;
+    }
+    listeners.delete(handler);
+    if (listeners.size === 0) {
+      this.listeners.delete(eventName);
+      const registered = this.eventHandlers.get(eventName);
+      if (registered && this.eventSource) {
+        this.eventSource.removeEventListener(eventName, registered);
+      }
+      this.eventHandlers.delete(eventName);
+    }
+
+    if (this.listeners.size === 0) {
+      this.teardown();
+    }
+  }
+
+  private teardown() {
+    if (!this.eventSource) {
+      return;
+    }
+    this.eventHandlers.forEach((handler, name) => {
+      this.eventSource?.removeEventListener(name, handler);
+    });
+    this.eventHandlers.clear();
+    this.eventSource.close();
+    this.eventSource = null;
+  }
+
+  private parsePayload(raw: string | null): unknown {
+    if (raw === null || raw === undefined || raw.length === 0 || raw === "null") {
+      return null;
+    }
+    try {
+      return JSON.parse(raw);
+    } catch (_err) {
+      return raw;
+    }
+  }
+
+  private emit(eventName: string, payload: unknown) {
+    const listeners = this.listeners.get(eventName);
+    if (!listeners || listeners.size === 0) {
+      return;
+    }
+    const eventObject = {
+      event: eventName,
+      id: ++this.nextEventId,
+      payload,
+      windowLabel: undefined,
+    };
+    listeners.forEach((listener) => {
+      listener(eventObject as Parameters<EventCallback<unknown>>[0]);
+    });
+  }
+}
+
+const portfolioEventBridge = new ServerEventBridge(EVENTS_ENDPOINT);
+
+export const listenPortfolioUpdateStartWeb = async <T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> => {
+  return portfolioEventBridge.listen("portfolio:update-start", handler);
+};
+
+export const listenPortfolioUpdateCompleteWeb = async <T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> => {
+  return portfolioEventBridge.listen("portfolio:update-complete", handler);
+};
+
+export const listenPortfolioUpdateErrorWeb = async <T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> => {
+  return portfolioEventBridge.listen("portfolio:update-error", handler);
+};
+
+export const listenMarketSyncStartWeb = async <T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> => {
+  return portfolioEventBridge.listen("market:sync-start", handler);
+};
+
+export const listenMarketSyncCompleteWeb = async <T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> => {
+  return portfolioEventBridge.listen("market:sync-complete", handler);
 };
 
 // Helpers

@@ -11,8 +11,8 @@ import type { AccountValuation } from "@/lib/types";
 import { calculatePerformanceMetrics } from "@/lib/utils";
 import { GainAmount, GainPercent, PrivacyAmount } from "@wealthfolio/ui";
 import React, { useCallback, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 interface AccountSummaryDisplayData {
   accountName: string;
@@ -29,6 +29,7 @@ interface AccountSummaryDisplayData {
   isGroup?: boolean;
   accountCount?: number;
   accounts?: AccountSummaryDisplayData[];
+  displayInAccountCurrency?: boolean;
 }
 
 const AccountSummarySkeleton = () => (
@@ -66,7 +67,8 @@ const AccountSummaryComponent = React.memo(
     t: any;
   }) => {
     const isGroup = item.isGroup ?? false;
-    const useAccountCurrency = !isGroup && displayInAccountCurrency;
+    const useAccountCurrency =
+      displayInAccountCurrency || (item.displayInAccountCurrency && Boolean(item.accountCurrency));
 
     if (!isGroup && isLoadingValuation) {
       return (
@@ -88,10 +90,12 @@ const AccountSummaryComponent = React.memo(
     const name = item.accountName;
     const accountId = item.accountId;
 
-    const subText = useAccountCurrency
-      ? item.accountCurrency
-      : isGroup
-        ? `${item.accountCount} ${t(item.accountCount === 1 ? "accounts.account" : "accounts.accounts")}`
+    const subText = isGroup
+      ? useAccountCurrency
+        ? `${item.accountCurrency} • ${item.accountCount} ${item.accountCount === 1 ? "account" : "accounts"}`
+        : `${item.accountCount} ${item.accountCount === 1 ? "account" : "accounts"}`
+      : useAccountCurrency
+        ? (item.accountCurrency ?? item.baseCurrency)
         : item.baseCurrency;
 
     const totalValue = useAccountCurrency
@@ -116,7 +120,7 @@ const AccountSummaryComponent = React.memo(
           <p className="text-muted-foreground truncate text-xs md:text-sm">{subText}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2 md:gap-3">
-          <div className="flex flex-col items-end gap-1 md:gap-1.5">
+          <div className="flex min-h-[3rem] flex-col items-end justify-center gap-1 md:gap-1.5">
             <p className="text-sm leading-tight font-semibold md:text-base md:font-semibold">
               <PrivacyAmount value={totalValue} currency={currency} />
             </p>
@@ -333,6 +337,15 @@ export const AccountsSummary = React.memo(() => {
           standaloneAccounts.push(groupAccounts[0]);
         } else {
           const baseCurrency = groupAccounts[0]?.baseCurrency ?? settings?.baseCurrency ?? "USD";
+          const groupCurrencies = new Set(
+            groupAccounts
+              .map((acc) => acc.accountCurrency ?? acc.baseCurrency)
+              .filter((currency): currency is string => Boolean(currency)),
+          );
+          const groupDisplaysAccountCurrency = groupCurrencies.size === 1;
+          const groupDisplayCurrency = groupDisplaysAccountCurrency
+            ? groupAccounts[0]?.accountCurrency ?? groupAccounts[0]?.baseCurrency ?? baseCurrency
+            : baseCurrency;
 
           const totalValueBaseCurrency = groupAccounts.reduce(
             (sum, acc) => sum + Number(acc.totalValueBaseCurrency),
@@ -350,10 +363,38 @@ export const AccountsSummary = React.memo(() => {
             return sum + netContribution;
           }, 0);
 
-          const groupTotalReturnPercent =
+          const groupTotalReturnPercentBase =
             totalNetContributionBase !== 0
               ? totalGainLossAmountBase / totalNetContributionBase
               : null;
+
+          const totalValueAccountCurrency = groupDisplaysAccountCurrency
+            ? groupAccounts.reduce(
+                (sum, acc) => sum + Number(acc.totalValueAccountCurrency ?? acc.totalValueBaseCurrency),
+                0,
+              )
+            : undefined;
+
+          const totalGainLossAmountAccountCurrency = groupDisplaysAccountCurrency
+            ? groupAccounts.reduce(
+                (sum, acc) => sum + Number(acc.totalGainLossAmountAccountCurrency ?? 0),
+                0,
+              )
+            : undefined;
+
+          const totalNetContributionAccountCurrency = groupDisplaysAccountCurrency
+            ? groupAccounts.reduce((sum, acc) => {
+                const accountValue = Number(acc.totalValueAccountCurrency ?? acc.totalValueBaseCurrency);
+                const accountGainLoss = Number(acc.totalGainLossAmountAccountCurrency ?? 0);
+                return sum + (accountValue - accountGainLoss);
+              }, 0)
+            : undefined;
+
+          const groupTotalReturnPercent = groupDisplaysAccountCurrency
+            ? totalNetContributionAccountCurrency !== undefined && totalNetContributionAccountCurrency !== 0
+              ? (totalGainLossAmountAccountCurrency ?? 0) / totalNetContributionAccountCurrency
+              : null
+            : groupTotalReturnPercentBase;
 
           actualGroups.push({
             accountName: groupName,
@@ -361,9 +402,13 @@ export const AccountsSummary = React.memo(() => {
             baseCurrency,
             totalGainLossAmountBaseCurrency: totalGainLossAmountBase,
             totalGainLossPercent: groupTotalReturnPercent,
+            accountCurrency: groupDisplayCurrency,
+            totalValueAccountCurrency,
+            totalGainLossAmountAccountCurrency: totalGainLossAmountAccountCurrency ?? null,
             isGroup: true,
             accountCount: groupAccounts.length,
             accounts: groupAccounts,
+            displayInAccountCurrency: groupDisplaysAccountCurrency,
           });
         }
       });

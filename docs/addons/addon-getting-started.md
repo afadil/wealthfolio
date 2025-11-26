@@ -50,7 +50,7 @@ This enables:
 cd ~/Documents/WealthfolioAddons
 
 # Create addon using CLI
-npx @wealthfolio/create-addon hello-world-addon
+npx @wealthfolio/addon-dev-tools create hello-world-addon
 
 # Navigate and install
 cd hello-world-addon

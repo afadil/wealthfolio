@@ -23,6 +23,10 @@ interface HoldingsMobileFilterSheetProps {
   selectedTypes: string[];
   setSelectedTypes: (types: string[]) => void;
   showAccountFilter?: boolean;
+  sortBy?: "symbol" | "marketValue";
+  setSortBy?: (value: "symbol" | "marketValue") => void;
+  showTotalReturn?: boolean;
+  setShowTotalReturn?: (value: boolean) => void;
 }
 
 export const HoldingsMobileFilterSheet = ({
@@ -34,6 +38,10 @@ export const HoldingsMobileFilterSheet = ({
   selectedTypes,
   setSelectedTypes,
   showAccountFilter = true,
+  sortBy,
+  setSortBy,
+  showTotalReturn,
+  setShowTotalReturn,
 }: HoldingsMobileFilterSheetProps) => {
   const { t } = useTranslation("holdings");
 

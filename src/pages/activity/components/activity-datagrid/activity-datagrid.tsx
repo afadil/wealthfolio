@@ -1,10 +1,11 @@
+import { toast } from "@/components/ui/use-toast";
 import {
   calculateActivityValue,
   isCashActivity,
   isCashTransfer,
   isIncomeActivity,
 } from "@/lib/activity-utils";
-import { ActivityType, getActivityTypeName } from "@/lib/constants";
+import { ActivityType, ActivityTypeNames } from "@/lib/constants";
 import {
   Account,
   ActivityBulkMutationRequest,
@@ -12,7 +13,7 @@ import {
   ActivityDetails,
   ActivityUpdate,
 } from "@/lib/types";
-import { cn, formatDateTimeLocal } from "@/lib/utils";
+import { cn, formatDateTimeDisplay, formatDateTimeLocal } from "@/lib/utils";
 import {
   Button,
   Checkbox,
@@ -24,13 +25,10 @@ import {
   TableHeader,
   TableRow,
   formatAmount,
-  toast,
   worldCurrencies,
 } from "@wealthfolio/ui";
 import type { Dispatch, SetStateAction } from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { useDateFormatter } from "@/hooks/use-date-formatter";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";
@@ -107,25 +105,48 @@ const toFiniteNumberOrUndefined = (value: unknown): number | undefined => {
   return undefined;
 };
 
-const DEFAULT_CURRENCY = "USD";
+const resolveAssetIdForTransaction = (
+  transaction: LocalTransaction,
+  fallbackCurrency: string,
+): string | undefined => {
+  const existingAssetId = transaction.assetId?.trim() || transaction.assetSymbol?.trim();
+  if (existingAssetId) {
+    return existingAssetId;
+  }
+
+  if (isCashActivity(transaction.activityType)) {
+    const currency = (transaction.currency || transaction.accountCurrency || fallbackCurrency)
+      .toUpperCase()
+      .trim();
+    if (currency.length > 0) {
+      return `$CASH-${currency}`;
+    }
+  }
+
+  return undefined;
+};
 
 const formatAmountDisplay = (
   value: unknown,
   currency?: string,
   displayCurrency = false,
+  fallbackCurrency = "USD",
 ): string => {
   const numericValue = toFiniteNumberOrUndefined(value);
   if (numericValue === undefined) {
     return "";
   }
   try {
-    return formatAmount(numericValue, currency ?? DEFAULT_CURRENCY, displayCurrency);
+    return formatAmount(numericValue, currency ?? fallbackCurrency, displayCurrency);
   } catch {
     return "";
   }
 };
 
-const createDraftTransaction = (accounts: Account[]): LocalTransaction => {
+const createDraftTransaction = (
+  accounts: Account[],
+  fallbackCurrency: string,
+): LocalTransaction => {
   const defaultAccount = accounts.find((account) => account.isActive) ?? accounts[0];
   const now = new Date();
 
@@ -137,7 +158,7 @@ const createDraftTransaction = (accounts: Account[]): LocalTransaction => {
     unitPrice: 0,
     amount: 0,
     fee: 0,
-    currency: defaultAccount?.currency ?? "USD",
+    currency: defaultAccount?.currency ?? fallbackCurrency,
     isDraft: true,
     comment: "",
     createdAt: now,
@@ -145,7 +166,7 @@ const createDraftTransaction = (accounts: Account[]): LocalTransaction => {
     updatedAt: now,
     accountId: defaultAccount?.id ?? "",
     accountName: defaultAccount?.name ?? "",
-    accountCurrency: defaultAccount?.currency ?? "",
+    accountCurrency: defaultAccount?.currency ?? fallbackCurrency,
     assetSymbol: "",
     assetName: "",
     assetDataSource: undefined,
@@ -160,7 +181,6 @@ export function ActivityDatagrid({
   onRefetch,
   onEditActivity,
 }: ActivityDatagridProps) {
-  const { t } = useTranslation(["activity"]);
   const [localTransactions, setLocalTransactions] = useState<LocalTransaction[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [focusedCell, setFocusedCell] = useState<CellCoordinate | null>(null);
@@ -168,17 +188,26 @@ export function ActivityDatagrid({
   const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<string>>(new Set());
   const { saveActivitiesMutation } = useActivityMutations();
 
+  const fallbackCurrency = useMemo(() => {
+    const defaultAccount = accounts.find((account) => account.isDefault);
+    if (defaultAccount?.currency) {
+      return defaultAccount.currency;
+    }
+    const activeAccount = accounts.find((account) => account.isActive);
+    if (activeAccount?.currency) {
+      return activeAccount.currency;
+    }
+    return accounts[0]?.currency ?? "USD";
+  }, [accounts]);
+
   const activityTypeOptions = useMemo(
     () =>
-      (Object.values(ActivityType) as ActivityType[]).map((type) => {
-        const label = getActivityTypeName(type, t);
-        return {
-          value: type,
-          label,
-          searchValue: `${label} ${type}`,
-        };
-      }),
-    [t],
+      (Object.values(ActivityType) as ActivityType[]).map((type) => ({
+        value: type,
+        label: ActivityTypeNames[type],
+        searchValue: `${ActivityTypeNames[type]} ${type}`,
+      })),
+    [],
   );
 
   const accountOptions = useMemo(
@@ -306,7 +335,7 @@ export function ActivityDatagrid({
   }, []);
 
   const addNewRow = useCallback(() => {
-    const draft = createDraftTransaction(accounts);
+    const draft = createDraftTransaction(accounts, fallbackCurrency);
     setLocalTransactions((prev) => [draft, ...prev]);
     setDirtyTransactionIds((prev) => {
       const next = new Set(prev);
@@ -316,7 +345,7 @@ export function ActivityDatagrid({
     setTimeout(() => {
       setFocusedCell({ rowId: draft.id, field: "activityType" });
     }, 0);
-  }, [accounts]);
+  }, [accounts, fallbackCurrency]);
 
   const updateTransaction = useCallback(
     (id: string, field: EditableField, value: string) => {
@@ -331,15 +360,37 @@ export function ActivityDatagrid({
             return Number.isFinite(parsed) ? parsed : 0;
           };
 
+          const applyCashDefaults = () => {
+            if (!isCashActivity(updated.activityType)) {
+              return;
+            }
+            const derivedCurrency = updated.currency ?? updated.accountCurrency ?? fallbackCurrency;
+            const cashSymbol = `$CASH-${derivedCurrency.toUpperCase()}`;
+            updated.assetSymbol = cashSymbol;
+            updated.assetId = cashSymbol;
+            updated.quantity = 0;
+            updated.unitPrice = 0;
+          };
+
+          const applySplitDefaults = () => {
+            if (updated.activityType !== ActivityType.SPLIT) {
+              return;
+            }
+            updated.quantity = 0;
+            updated.unitPrice = 0;
+          };
+
           if (field === "date") {
             updated.date = value ? new Date(value) : new Date();
           } else if (field === "quantity") {
             updated.quantity = toNumber(value);
+            applySplitDefaults();
           } else if (field === "unitPrice") {
             updated.unitPrice = toNumber(value);
             if (isCashActivity(updated.activityType) || isIncomeActivity(updated.activityType)) {
               updated.amount = updated.unitPrice;
             }
+            applySplitDefaults();
           } else if (field === "amount") {
             updated.amount = toNumber(value);
           } else if (field === "fee") {
@@ -350,6 +401,8 @@ export function ActivityDatagrid({
             updated.assetId = upper;
           } else if (field === "activityType") {
             updated.activityType = value as ActivityType;
+            applyCashDefaults();
+            applySplitDefaults();
           } else if (field === "accountId") {
             updated.accountId = value;
             const account = accountLookup.get(value);
@@ -358,8 +411,12 @@ export function ActivityDatagrid({
               updated.accountCurrency = account.currency;
               updated.currency = account.currency;
             }
+            applyCashDefaults();
+            applySplitDefaults();
           } else if (field === "currency") {
             updated.currency = value;
+            applyCashDefaults();
+            applySplitDefaults();
           } else if (field === "comment") {
             updated.comment = value;
           }
@@ -375,7 +432,7 @@ export function ActivityDatagrid({
         return next;
       });
     },
-    [accountLookup],
+    [accountLookup, fallbackCurrency],
   );
 
   const duplicateRow = useCallback(
@@ -482,7 +539,10 @@ export function ActivityDatagrid({
     const updates: ActivityUpdate[] = [];
 
     dirtyTransactions.forEach((transaction) => {
-      const payload = {
+      const resolvedCurrency =
+        transaction.currency ?? transaction.accountCurrency ?? fallbackCurrency;
+
+      const payload: ActivityCreate = {
         id: transaction.id,
         accountId: transaction.accountId,
         activityType: transaction.activityType,
@@ -490,15 +550,24 @@ export function ActivityDatagrid({
           transaction.date instanceof Date
             ? transaction.date.toISOString()
             : new Date(transaction.date).toISOString(),
-        assetId: transaction.assetSymbol || undefined,
+        assetId: resolveAssetIdForTransaction(transaction, fallbackCurrency),
         quantity: toFiniteNumberOrUndefined(transaction.quantity),
         unitPrice: toFiniteNumberOrUndefined(transaction.unitPrice),
         amount: toFiniteNumberOrUndefined(transaction.amount),
-        currency: transaction.currency,
+        currency: resolvedCurrency,
         fee: toFiniteNumberOrUndefined(transaction.fee),
         isDraft: false,
         comment: transaction.comment ?? undefined,
       };
+
+      if (!payload.assetId && isCashActivity(payload.activityType)) {
+        payload.assetId = `$CASH-${resolvedCurrency.toUpperCase().trim()}`;
+      }
+
+      if (payload.activityType === ActivityType.SPLIT) {
+        delete payload.quantity;
+        delete payload.unitPrice;
+      }
 
       if (transaction.isNew) {
         creates.push(payload);
@@ -540,8 +609,8 @@ export function ActivityDatagrid({
       setSelectedIds(new Set());
 
       toast({
-        title: t("activity:datagrid.saveSuccess.title"),
-        description: t("activity:datagrid.saveSuccess.description"),
+        title: "Activities saved",
+        description: "Your pending changes are now saved.",
         variant: "success",
       });
 
@@ -556,7 +625,7 @@ export function ActivityDatagrid({
     pendingDeleteIds,
     onRefetch,
     saveActivitiesMutation,
-    t,
+    fallbackCurrency,
   ]);
 
   const handleCancelChanges = useCallback(() => {
@@ -566,11 +635,11 @@ export function ActivityDatagrid({
     setLocalTransactions((prev) => prev.filter((transaction) => !transaction.isNew));
     onRefetch();
     toast({
-      title: t("activity:datagrid.discardSuccess.title"),
-      description: t("activity:datagrid.discardSuccess.description"),
+      title: "Changes discarded",
+      description: "Unsaved edits and drafts have been cleared.",
       variant: "default",
     });
-  }, [onRefetch, t]);
+  }, [onRefetch]);
 
   return (
     <div className="space-y-3">
@@ -595,8 +664,8 @@ export function ActivityDatagrid({
             variant="outline"
             size="xs"
             className="shrink-0 rounded-md"
-            title={t("activity:datagrid.addTransaction")}
-            aria-label={t("activity:datagrid.addTransaction")}
+            title="Add transaction"
+            aria-label="Add transaction"
           >
             <Icons.Plus className="h-3.5 w-3.5" />
             <span>Add</span>
@@ -610,8 +679,8 @@ export function ActivityDatagrid({
                 size="xs"
                 variant="destructive"
                 className="shrink-0 rounded-md text-xs"
-                title={t("activity:datagrid.deleteSelected")}
-                aria-label={t("activity:datagrid.deleteSelected")}
+                title="Delete selected"
+                aria-label="Delete selected"
                 disabled={saveActivitiesMutation.isPending}
               >
                 <Icons.Trash className="h-3.5 w-3.5" />
@@ -627,8 +696,8 @@ export function ActivityDatagrid({
                 onClick={handleSaveChanges}
                 size="xs"
                 className="shrink-0 rounded-md text-xs"
-                title={t("activity:datagrid.saveChanges")}
-                aria-label={t("activity:datagrid.saveChanges")}
+                title="Save changes"
+                aria-label="Save changes"
                 disabled={saveActivitiesMutation.isPending}
               >
                 {saveActivitiesMutation.isPending ? (
@@ -644,8 +713,8 @@ export function ActivityDatagrid({
                 size="xs"
                 variant="outline"
                 className="shrink-0 rounded-md text-xs"
-                title={t("activity:datagrid.discardChanges")}
-                aria-label={t("activity:datagrid.discardChanges")}
+                title="Discard changes"
+                aria-label="Discard changes"
                 disabled={saveActivitiesMutation.isPending}
               >
                 <Icons.Undo className="h-3.5 w-3.5" />
@@ -732,6 +801,7 @@ export function ActivityDatagrid({
                   onDelete={deleteRow}
                   onNavigate={handleCellNavigation}
                   setFocusedCell={setFocusedCell}
+                  fallbackCurrency={fallbackCurrency}
                 />
               ))
             )}
@@ -758,6 +828,7 @@ interface TransactionRowProps {
   onDelete: (id: string) => void;
   onNavigate: (direction: "up" | "down" | "left" | "right") => void;
   setFocusedCell: Dispatch<SetStateAction<CellCoordinate | null>>;
+  fallbackCurrency: string;
 }
 
 const TransactionRow = memo(
@@ -777,8 +848,10 @@ const TransactionRow = memo(
     onDelete,
     onNavigate,
     setFocusedCell,
+    fallbackCurrency,
   }: TransactionRowProps) {
-    const { formatDateTimeDisplay } = useDateFormatter();
+    const isCash = isCashActivity(transaction.activityType);
+    const isSplit = transaction.activityType === ActivityType.SPLIT;
     const handleFocus = useCallback(
       (field: EditableField) => {
         setFocusedCell({ rowId: transaction.id, field });
@@ -789,7 +862,11 @@ const TransactionRow = memo(
     const accountLabel =
       accountLookup.get(transaction.accountId)?.name ?? transaction.accountName ?? "";
     const totalValue = calculateActivityValue(transaction);
-    const currency = transaction.currency ?? transaction.accountCurrency ?? DEFAULT_CURRENCY;
+    const currency = transaction.currency ?? transaction.accountCurrency ?? fallbackCurrency;
+    const normalizedCurrency = currency.toUpperCase();
+    const assetSymbolDisplay =
+      transaction.assetSymbol ??
+      (isCash ? `$CASH-${normalizedCurrency}` : (transaction.assetSymbol ?? ""));
     const assetSymbol = transaction.assetSymbol ?? "";
     const unitPriceDisplay = (() => {
       if (transaction.activityType === ActivityType.FEE) {
@@ -804,22 +881,22 @@ const TransactionRow = memo(
         isIncomeActivity(transaction.activityType) ||
         isCashTransfer(transaction.activityType, assetSymbol)
       ) {
-        return formatAmountDisplay(transaction.amount, currency);
+        return formatAmountDisplay(transaction.amount, currency, false, fallbackCurrency);
       }
-      return formatAmountDisplay(transaction.unitPrice, currency);
+      return formatAmountDisplay(transaction.unitPrice, currency, false, fallbackCurrency);
     })();
     const amountDisplay =
       transaction.activityType === ActivityType.SPLIT
         ? getNumericCellValue(transaction.amount)
-        : formatAmountDisplay(transaction.amount, currency);
+        : formatAmountDisplay(transaction.amount, currency, false, fallbackCurrency);
     const feeDisplay =
       transaction.activityType === ActivityType.SPLIT
         ? "-"
-        : formatAmountDisplay(transaction.fee, currency);
+        : formatAmountDisplay(transaction.fee, currency, false, fallbackCurrency);
     const totalDisplay =
       transaction.activityType === ActivityType.SPLIT
         ? "-"
-        : formatAmountDisplay(totalValue, currency);
+        : formatAmountDisplay(totalValue, currency, false, fallbackCurrency);
 
     return (
       <TableRow
@@ -862,7 +939,7 @@ const TransactionRow = memo(
         </TableCell>
         <TableCell className="h-9 border-r px-0 py-0">
           <SymbolAutocompleteCell
-            value={transaction.assetSymbol ?? ""}
+            value={assetSymbolDisplay}
             onChange={(value) =>
               onUpdateTransaction(transaction.id, "assetSymbol", value.toUpperCase())
             }
@@ -870,6 +947,7 @@ const TransactionRow = memo(
             onNavigate={onNavigate}
             isFocused={focusedField === "assetSymbol"}
             className="font-mono text-xs font-semibold uppercase"
+            disabled={isCash}
           />
         </TableCell>
         <TableCell className="h-9 border-r px-0 py-0 text-right">
@@ -882,6 +960,7 @@ const TransactionRow = memo(
             type="number"
             inputMode="decimal"
             className="justify-end text-right font-mono tabular-nums"
+            disabled={isCash}
           />
         </TableCell>
         <TableCell className="h-9 border-r px-0 py-0 text-right">
@@ -896,6 +975,7 @@ const TransactionRow = memo(
             inputMode="decimal"
             step="0.01"
             className="justify-end text-right font-mono tabular-nums"
+            disabled={isCash || isSplit}
           />
         </TableCell>
         <TableCell className="h-9 w-24 border-r px-0 py-0 text-right">
@@ -924,6 +1004,7 @@ const TransactionRow = memo(
             inputMode="decimal"
             step="0.01"
             className="justify-end text-right font-mono tabular-nums"
+            disabled={isSplit}
           />
         </TableCell>
         <TableCell className="h-9 border-r px-2 py-1.5 text-right">

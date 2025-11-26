@@ -314,7 +314,7 @@ impl MarketDataServiceTrait for MarketDataService {
         let provider_settings = self.repository.get_all_providers()?;
 
         let mut providers_info = Vec::new();
-        let known_providers = vec![(DATA_SOURCE_YAHOO, "Yahoo Finance", "yahoo-finance.png")];
+        let _known_providers = vec![(DATA_SOURCE_YAHOO, "Yahoo Finance", "yahoo-finance.png")];
 
         for setting in provider_settings {
             let last_synced_naive: Option<NaiveDateTime> =

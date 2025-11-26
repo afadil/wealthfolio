@@ -38,6 +38,7 @@ interface ActivityFormProps {
   activity?: Partial<ActivityDetails>;
   open?: boolean;
   onClose?: () => void;
+  onOpenChange?: (open: boolean) => void;
 }
 
 const ACTIVITY_TYPE_TO_TAB: Record<string, string> = {
@@ -57,9 +58,22 @@ const ACTIVITY_TYPE_TO_TAB: Record<string, string> = {
   REMOVE_HOLDING: "holdings",
 };
 
-export function ActivityForm({ accounts, activity, open, onClose }: ActivityFormProps) {
+export function ActivityForm({
+  accounts,
+  activity,
+  open,
+  onClose,
+  onOpenChange,
+}: ActivityFormProps) {
   const { t } = useTranslation("activity");
   const { addActivityMutation, updateActivityMutation } = useActivityMutations(onClose);
+
+  const handleOpenChange = (val: boolean) => {
+    onOpenChange?.(val);
+    if (!val) {
+      onClose?.();
+    }
+  };
 
   const isValidActivityType = (
     type: string | undefined,
@@ -213,7 +227,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
     : "trade";
 
   return (
-    <Sheet open={open} onOpenChange={onClose}>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent className="space-y-8 overflow-y-auto sm:max-w-[625px]">
         <SheetHeader>
           <div className="flex items-center gap-2">

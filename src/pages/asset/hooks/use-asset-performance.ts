@@ -57,7 +57,7 @@ export function useAssetPerformance(symbol: string) {
     // Update positions with current market prices
     const updatedPositions = openPositions.map((position) => {
       const holding = holdings?.find((h) => h.instrument?.symbol === position.symbol);
-      let currentPrice = position.entryPrice; // Default fallback
+      let currentPrice = position.averageCost; // Default fallback
 
       if (holding?.price != null && holding.price > 0) {
         currentPrice = holding.price;

@@ -262,7 +262,7 @@ class AddonDevServer {
 
     // Start vite build in watch mode
     const { spawn } = require("child_process");
-    this.viteWatcher = spawn("npm", ["run", "dev"], {
+    this.viteWatcher = spawn("pnpm", ["run", "dev"], {
       cwd: this.config.addonPath,
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -342,7 +342,7 @@ function main() {
     port,
     addonPath: path.resolve(addonPath),
     manifestPath: path.resolve(addonPath, "manifest.json"),
-    buildCommand: "npm run build",
+    buildCommand: "pnpm run build",
     watchPaths: [path.resolve(addonPath, "src"), path.resolve(addonPath, "manifest.json")],
   };
 

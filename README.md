@@ -46,7 +46,7 @@ Data Storage. No Subscriptions, No Cloud.
 
 Visit the app website at [Wealthfolio App](https://wealthfolio.app/).
 
-![Screenshot](public/screenshot.png)
+![Screenshot](public/screenshot.webp)
 
 ### ✨ Key Features
 
@@ -80,8 +80,7 @@ functionality:
   data
 - **🔐 Secrets Management** - Secure storage for API keys and sensitive data
 
-**Get started building addons:**
-[Addon Developer Guide](docs/addons/addon-developer-guide.md)
+**Get started building addons:** See the [Addon Documentation Hub](docs/addons/index.md)
 
 Documentation for all Activity types, including the required form fields, is
 available in
@@ -107,21 +106,15 @@ See [ROADMAP.md](./ROADMAP.md).
 
 - **[Addon Documentation Hub](docs/addons/index.md)** - Main entry point for
   addon development
-- **[Developer Guide](docs/addons/addon-developer-guide.md)** - Comprehensive
-  guide from setup to advanced patterns
+- **[Getting Started](docs/addons/addon-getting-started.md)** - Guide to get
+  started with addon development
 - **[API Reference](docs/addons/addon-api-reference.md)** - Complete API
   documentation with examples
-- **[Permission System](docs/addons/addon-permissions.md)** - Security and
-  permission system guide
-- **[Examples & Tutorials](docs/addons/addon-examples.md)** - Practical examples
-  and step-by-step tutorials
+- **[Architecture](docs/addons/addon-architecture.md)** - Design patterns and
+  architecture guide
 
 ### Quick Links
 
-- 🚀
-  **[Get Started with Addons](docs/addons/addon-developer-guide.md#quick-start)**
-- 🔒
-  **[Security Best Practices](docs/addons/addon-permissions.md#security-best-practices)**
 - 💡 **[Example Addons](addons/)** - Browse sample addons in the repository
 - 🛠️ **[Development Tools](packages/addon-dev-tools/)** - CLI tools for addon
   development
@@ -176,6 +169,18 @@ Build and run the desktop application using Tauri:
 pnpm tauri dev
 ```
 
+#### Addon Development Mode
+
+Addon hot reload servers now start only when you explicitly opt in. Use the
+dedicated Vite mode:
+
+```bash
+pnpm dev:addons
+```
+
+Alternatively, set `VITE_ENABLE_ADDON_DEV_MODE=true` in your environment before
+running any dev script.
+
 5. **Build for Production**:
 
 Build the application for production:
@@ -186,70 +191,252 @@ pnpm tauri build
 
 ### Web Mode (Browser + REST API server)
 
-Run the web UI with a local Axum server, with one command.
+Run the web UI with a local Axum server with one command.
 
-1. Optional: create `.env.web` for web dev overrides (copy from
-   `.env.web.example`):
+#### Quick Start
 
-```
-WF_LISTEN_ADDR=127.0.0.1:8080
-WF_DB_PATH=./db/web-dev.db
-WF_CORS_ALLOW_ORIGINS=http://localhost:1420
-WF_REQUEST_TIMEOUT_MS=30000
-WF_STATIC_DIR=dist
-VITE_API_TARGET=http://127.0.0.1:8080
-```
+1. **Setup environment** (optional but recommended):
 
-2. Start both backend and Vite:
+   Copy the example environment file and customize it for your setup:
 
-```
-pnpm run dev:web
-```
+   ```bash
+   cp .env.web.example .env.web
+   ```
 
-Vite runs at `http://localhost:1420` and proxies API calls to the backend.
+   Edit `.env.web` to configure database path, ports, and other settings as
+   needed.
 
-Notes
+2. **Start both backend and Vite dev server**:
 
-- The server logs the effective database path on startup.
-- Stop either process (Ctrl+C) to shut everything down.
+   ```bash
+   pnpm run dev:web
+   ```
+
+   The Vite dev server runs at `http://localhost:1420` and proxies API calls to
+   the Axum backend server.
+
+#### Configuration
+
+All configuration is done via environment variables in `.env.web`.
+
+**Server Configuration (WF\_\* variables)**:
+
+- `WF_LISTEN_ADDR` - Server bind address (default: `0.0.0.0:8080`)
+- `WF_DB_PATH` - SQLite database path or directory (default: `./db/app.db`)
+  - If a directory is provided, `app.db` will be used inside it
+- `WF_CORS_ALLOW_ORIGINS` - Comma-separated list of allowed CORS origins
+  (default: `*`)
+  - Example: `http://localhost:1420,http://localhost:3000`
+- `WF_REQUEST_TIMEOUT_MS` - Request timeout in milliseconds (default: `30000`)
+- `WF_STATIC_DIR` - Directory for serving static frontend assets (default:
+  `dist`)
+- `WF_SECRET_KEY` - **Required** 32-byte key used for secrets encryption and JWT
+  signing
+- `WF_AUTH_PASSWORD_HASH` - Argon2id PHC string enabling password-only
+  authentication for web mode
+- `WF_AUTH_TOKEN_TTL_MINUTES` - Optional JWT access token expiry in minutes
+  (default `60`)
+  - Generate with: `openssl rand -base64 32`
+- `WF_SECRET_FILE` - **Optional** path to secrets storage file (default:
+  `<data-root>/secrets.json`)
+- `WF_ADDONS_DIR` - **Optional** path to addons directory (default: derived from
+  database path)
+
+**Vite Configuration**:
+
+- `VITE_API_TARGET` - Backend API URL for Vite proxy (default:
+  `http://127.0.0.1:8080`)
+
+#### Authentication (Web Mode)
+
+- Set `WF_AUTH_PASSWORD_HASH` to an Argon2id PHC string to require a password
+  before accessing the Web App.
+
+  You can generate the hash with online tools like
+  [argon2.online](argon2.online) or the following command:
+
+  ```bash
+  argon2 "your-password" -id -e
+  ```
+
+  Copy the full output (starting with `$argon2id$...`) into `.env.web`.
+
+- Tokens are short-lived (default 60 minutes) and stored in memory on the
+  client; refresh the page to re-authenticate.
+
+#### Notes
+
+- The server logs the effective database path on startup
+- Environment variables from `.env.web` are loaded automatically by the
+  `dev:web` script
+- Stop with Ctrl+C to shut down both processes gracefully
 
 ### Server Only
 
-Run just the HTTP server (from repo root):
+Run just the HTTP server without the Vite dev server (from repo root):
 
-```
+```bash
 cargo run --manifest-path src-server/Cargo.toml
 ```
 
-Common env vars:
+The server accepts the same `WF_*` environment variables as documented in the
+[Web Mode Configuration](#configuration) section above. You can set them inline
+or via `.env.web`:
 
-- `WF_LISTEN_ADDR` (e.g., `0.0.0.0:8080`)
-- `WF_DB_PATH` (e.g., `./db/app.db`)
-- `WF_CORS_ALLOW_ORIGINS` (e.g., `http://localhost:1420`)
-- `WF_STATIC_DIR` (defaults to `dist`)
+```bash
+WF_LISTEN_ADDR=127.0.0.1:8080 WF_DB_PATH=./db/app.db cargo run --manifest-path src-server/Cargo.toml
+```
+
+See [Web Mode Configuration](#configuration) for a complete list of supported
+environment variables.
 
 ## Docker
 
-Build image
+You can either pull the official Docker image or build it yourself locally.
 
-```
-docker build -t wealthfolio-web .
+### Using the Pre-built Image
+
+The latest server build is published to Docker Hub.
+
+```bash
+docker pull afadil/wealthfolio:latest
 ```
 
-Run container (with data volume and CORS for Vite)
+After pulling, use `afadil/wealthfolio:latest` in the run commands below. If you
+build the image locally, swap the image name back to `wealthfolio`.
 
+### Building the Image
+
+Build the Docker image directly from source (no pre-build required):
+
+```bash
+docker build -t wealthfolio .
 ```
+
+The build process:
+
+1. Builds frontend assets from source (`pnpm install` + `pnpm vite build`)
+2. Compiles Rust backend from source (`cargo build --release`)
+3. Creates minimal Alpine-based image with only the runtime artifacts
+
+The final image includes:
+
+- Compiled frontend assets in `/app/dist`
+- `wealthfolio-server` binary at `/usr/local/bin/wealthfolio-server`
+- Alpine Linux base (small footprint)
+
+### Configuration
+
+You can configure the container using either:
+
+1. **Environment variables** (inline with `-e` flag)
+2. **Environment file** (using `--env-file` flag)
+
+**Option 1: Create an environment file** (recommended for production):
+
+```bash
+# Create a Docker-specific environment file
+cat > .env.docker << 'EOF'
+WF_LISTEN_ADDR=0.0.0.0:8088
+WF_DB_PATH=/data/wealthfolio.db
+WF_SECRET_KEY=<generate-with-openssl-rand>
+WF_CORS_ALLOW_ORIGINS=*
+WF_REQUEST_TIMEOUT_MS=30000
+WF_STATIC_DIR=dist
+EOF
+```
+
+Generate and add your secret key:
+
+```bash
+echo "WF_SECRET_KEY=$(openssl rand -base64 32)" >> .env.docker
+```
+
+**Option 2: Use inline environment variables** (simpler for testing):
+
+See examples below for inline configuration.
+
+### Running the Container
+
+All examples below use the published image (`afadil/wealthfolio:latest`). If you
+built locally, substitute your local tag (e.g., `wealthfolio`).
+
+**Using environment file** (recommended):
+
+```bash
+docker run --rm -d \
+  --name wealthfolio \
+  --env-file .env.docker \
+  -p 8088:8088 \
+  -v "$(pwd)/wealthfolio-data:/data" \
+  afadil/wealthfolio:latest
+```
+
+**Basic usage** (inline environment variables):
+
+```bash
+docker run --rm -d \
+  --name wealthfolio \
+  -e WF_LISTEN_ADDR=0.0.0.0:8088 \
+  -e WF_DB_PATH=/data/wealthfolio.db \
+  -p 8088:8088 \
+  -v "$(pwd)/wealthfolio-data:/data" \
+  afadil/wealthfolio:latest
+```
+
+**Development mode** (with CORS for local Vite dev server):
+
+```bash
 docker run --rm -it \
-  -e WF_LISTEN_ADDR=0.0.0.0:8080 \
+  --name wealthfolio \
+  -e WF_LISTEN_ADDR=0.0.0.0:8088 \
   -e WF_DB_PATH=/data/wealthfolio.db \
   -e WF_CORS_ALLOW_ORIGINS=http://localhost:1420 \
-  -p 8080:8080 \
+  -p 8088:8088 \
   -v "$(pwd)/wealthfolio-data:/data" \
-  wealthfolio-web
+  afadil/wealthfolio:latest
 ```
 
-The image contains the compiled frontend in `/app/dist` and the
-`wealthfolio-server` binary.
+**Production with encryption** (recommended):
+
+```bash
+docker run --rm -d \
+  --name wealthfolio \
+  -e WF_LISTEN_ADDR=0.0.0.0:8088 \
+  -e WF_DB_PATH=/data/wealthfolio.db \
+  -e WF_SECRET_KEY=$(openssl rand -base64 32) \
+  -p 8088:8088 \
+  -v "$(pwd)/wealthfolio-data:/data" \
+  afadil/wealthfolio:latest
+```
+
+### Environment Variables
+
+The container supports all `WF_*` environment variables documented in the
+[Web Mode Configuration](#configuration) section. Key variables:
+
+- `WF_LISTEN_ADDR` - Bind address (**must use `0.0.0.0:PORT` for Docker**, not
+  `127.0.0.1`)
+- `WF_DB_PATH` - Database path (typically `/data/wealthfolio.db`)
+- `WF_CORS_ALLOW_ORIGINS` - CORS origins (set for dev/frontend access)
+- `WF_SECRET_KEY` - Required 32-byte key used for secrets encryption and JWT
+  signing
+
+### Volumes
+
+- `/data` - Persistent storage for database and secrets
+  - Database: `/data/wealthfolio.db`
+  - Secrets: `/data/secrets.json` (encrypted with `WF_SECRET_KEY`)
+
+### Ports
+
+- `8088` - HTTP server (serves both API and static frontend)
+
+Access the application at `http://localhost:8088` after starting the container.
+
+**Important:** The server must bind to `0.0.0.0` (all interfaces) inside the
+container to be accessible from your host machine. Binding to `127.0.0.1` will
+make the app only accessible from within the container.
 
 ### Development with DevContainer
 
@@ -340,18 +527,49 @@ Your addon will be automatically discovered and loaded with hot reload support!
 Check out the [addons/](addons/) directory for sample addons including:
 
 - **Goal Progress Tracker**: Visual goal tracking with calendar like interface
-- More examples in the [documentation](docs/addons/addon-examples.md)
+- **Investment Fees Tracker**: Track and analyze investment fees
 
 ### Resources
 
-- **[Complete Developer Guide](docs/addons/addon-developer-guide.md)** -
-  Everything you need to know
+- **[Getting Started Guide](docs/addons/addon-getting-started.md)** -
+  Everything you need to know to start building addons
 - **[API Reference](docs/addons/addon-api-reference.md)** - Full API
   documentation
-- **[Permission System](docs/addons/addon-permissions.md)** - Security and
-  permissions guide
-- **[Examples & Tutorials](docs/addons/addon-examples.md)** - Step-by-step
-  tutorials
+- **[Architecture Guide](docs/addons/addon-architecture.md)** - Design patterns
+  and best practices
+
+## Language Support
+
+Wealthfolio is available in multiple languages with full internationalization
+support.
+
+### Supported Languages
+
+- **English** (en) 🇬🇧
+- **Tiếng Việt** (vi) 🇻🇳
+
+### Switching Languages
+
+To change the application language:
+
+1. Open **Settings** from the sidebar
+2. Navigate to **General Settings**
+3. Select your preferred language from the **Language** dropdown
+4. The interface will update immediately
+
+All UI elements, including menus, buttons, forms, and messages, will be
+displayed in your selected language.
+
+### Contributing Translations
+
+We welcome contributions for new languages! If you'd like to help translate
+Wealthfolio:
+
+- See the **[Translation Guide](docs/translation-guide.md)** for step-by-step
+  instructions
+- Check the **[i18n Developer Guide](docs/i18n-guide.md)** for technical details
+- Join our [Discord](https://discord.gg/WDMCY6aPWK) to coordinate with other
+  translators
 
 ## Language Support
 

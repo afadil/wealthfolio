@@ -60,8 +60,13 @@ pub async fn initialize_context(
     let base_currency = Arc::new(RwLock::new(base_currency_string.clone()));
     let instance_id = Arc::new(settings.instance_id.clone());
 
-    let market_data_service: Arc<dyn MarketDataServiceTrait> =
-        Arc::new(MarketDataService::new(market_data_repo.clone(), asset_repository.clone()).await?);
+    let market_data_service: Arc<dyn MarketDataServiceTrait> = Arc::new(
+        MarketDataService::new(
+            market_data_repo.clone(),
+            asset_repository.clone(),
+        )
+        .await?,
+    );
 
     let asset_service = Arc::new(AssetService::new(
         asset_repository.clone(),

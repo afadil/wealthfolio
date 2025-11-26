@@ -40,6 +40,10 @@ impl AssetServiceTrait for AssetService {
         self.asset_repository.get_by_id(asset_id)
     }
 
+    async fn delete_asset(&self, asset_id: &str) -> Result<()> {
+        self.asset_repository.delete(asset_id).await
+    }
+
     /// Updates an asset profile
     async fn update_asset_profile(
         &self,

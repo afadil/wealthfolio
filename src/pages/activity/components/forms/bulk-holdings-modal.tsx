@@ -180,18 +180,15 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
             fee: 0,
             isDraft: false,
             isValid: true,
-            comment:
-              data.comment ||
-              `${t("activity:form.bulkImportComment", { count: validHoldings.length })}`,
+            comment: data.comment || `Bulk import - ${validHoldings.length} holdings`,
             assetDataSource: shouldBeManual ? "MANUAL" : undefined,
           }),
         );
 
-        console.log("Importing activities:", activitiesToImport);
         confirmImportMutation.mutate({ activities: activitiesToImport });
       } catch (error) {
+        console.error("Error submitting bulk holdings:", error);
         setIsSubmitting(false);
-        throw error;
       }
     },
     [confirmImportMutation, selectedAccount, manualHoldings, checkSymbolExists],

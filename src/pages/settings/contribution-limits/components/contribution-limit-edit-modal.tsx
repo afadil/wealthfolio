@@ -15,7 +15,7 @@ export function ContributionLimitEditModal({
 }: ContributionLimitEditModalProps) {
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="w-[50vw] max-w-5xl">
+      <DialogContent className="max-h-[90vh] w-[50vw] max-w-5xl overflow-y-auto">
         <ContributionLimitForm
           defaultValues={
             limit ?? {

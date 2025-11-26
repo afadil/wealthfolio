@@ -35,56 +35,56 @@ impl AssetProfiler for MetalPriceApiProvider {
     async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile, MarketDataError> {
         let (name, asset_type, description, categories, attributes) = match symbol {
             "XAU" => (
-                "Gold", 
-                "Commodity", 
+                "Gold",
+                "Commodity",
                 "Gold is a precious metal and one of the most sought-after commodities in the world. It has been used as a store of value and medium of exchange for thousands of years.",
                 "Precious Metals,Physical Commodities",
                 "Safe Haven,Inflation Hedge,Store of Value"
             ),
             "XAG" => (
-                "Silver", 
+                "Silver",
                 "Commodity",
                 "Silver is a precious metal with both industrial and investment applications. It is widely used in electronics, solar panels, and jewelry.",
                 "Precious Metals,Industrial Metals,Physical Commodities",
                 "Industrial Use,Safe Haven,Inflation Hedge"
-            ), 
+            ),
             "XPT" => (
-                "Platinum", 
+                "Platinum",
                 "Commodity",
                 "Platinum is a rare precious metal primarily used in automotive catalysts, jewelry, and industrial applications. It is rarer than gold.",
                 "Precious Metals,Industrial Metals,Physical Commodities",
                 "Industrial Use,Automotive Industry,Rare Metal"
             ),
             "XPD" => (
-                "Palladium", 
+                "Palladium",
                 "Commodity",
                 "Palladium is a precious metal primarily used in automotive catalytic converters and electronics. It has significant industrial demand.",
                 "Precious Metals,Industrial Metals,Physical Commodities",
                 "Automotive Industry,Industrial Use,Electronics"
             ),
             "XRH" => (
-                "Rhodium", 
+                "Rhodium",
                 "Commodity",
                 "Rhodium is one of the rarest and most expensive precious metals. It is primarily used in automotive catalytic converters.",
                 "Precious Metals,Industrial Metals,Physical Commodities",
                 "Automotive Industry,Rare Metal,Industrial Use"
             ),
             "XRU" => (
-                "Ruthenium", 
+                "Ruthenium",
                 "Commodity",
                 "Ruthenium is a rare precious metal of the platinum group, used in electronics and chemical applications.",
                 "Precious Metals,Industrial Metals,Physical Commodities",
                 "Electronics,Chemical Industry,Rare Metal"
             ),
             "XIR" => (
-                "Iridium", 
+                "Iridium",
                 "Commodity",
                 "Iridium is one of the rarest elements on Earth and is highly resistant to corrosion. It is used in specialized industrial applications.",
                 "Precious Metals,Industrial Metals,Physical Commodities",
                 "Industrial Use,Rare Metal,Corrosion Resistant"
             ),
             "XOS" => (
-                "Osmium", 
+                "Osmium",
                 "Commodity",
                 "Osmium is the densest naturally occurring element and is used in specialized applications requiring extreme hardness.",
                 "Precious Metals,Industrial Metals,Physical Commodities",

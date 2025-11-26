@@ -16,6 +16,12 @@ export function useSettingsMutation(
       queryClient.invalidateQueries({ queryKey: [QueryKeys.SETTINGS] });
       setSettings(updatedSettings);
       applySettingsToDocument(updatedSettings);
+      toast({
+        title: "Settings updated",
+        description: "Your settings have been updated successfully.",
+        variant: "success",
+        duration: 1000,
+      });
     },
     onError: (error) => {
       logger.error(`Error updating settings: ${error}`);

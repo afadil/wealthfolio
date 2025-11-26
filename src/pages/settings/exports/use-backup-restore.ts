@@ -1,26 +1,30 @@
-import { listenDatabaseRestoredTauri, logger } from "@/adapters";
+import { getRunEnv, listenDatabaseRestoredTauri, logger, RUN_ENV } from "@/adapters";
 import { openDatabaseFileDialog, openFolderDialog } from "@/commands/file";
-import { backupDatabaseToPath, restoreDatabase } from "@/commands/settings";
+import { backupDatabase, backupDatabaseToPath, restoreDatabase } from "@/commands/settings";
 import { toast } from "@/components/ui/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 export function useBackupRestore() {
   const queryClient = useQueryClient();
+  const runEnv = getRunEnv();
+  const isDesktop = runEnv === RUN_ENV.DESKTOP;
 
   // Listen for database restore completion
   useEffect(() => {
+    if (!isDesktop) {
+      return;
+    }
+
     let unlistenFn: (() => void) | undefined;
 
     const setupListener = async () => {
       unlistenFn = await listenDatabaseRestoredTauri(() => {
         // Invalidate all queries to force a complete refresh
         queryClient.invalidateQueries();
-
-        // Note: The restart dialog is now handled by the backend
         toast({
           title: "Database restored successfully",
-          description: "Application data has been restored.",
+          description: "Please restart the application to ensure all data is properly refreshed.",
           variant: "success",
         });
       });
@@ -33,31 +37,44 @@ export function useBackupRestore() {
         unlistenFn();
       }
     };
-  }, [queryClient]);
+  }, [isDesktop, queryClient]);
 
-  const { mutateAsync: backupWithDirectorySelection, isPending: isBackingUp } = useMutation({
+  const { mutateAsync: backupWithDirectorySelection, isPending: isBackingUp } = useMutation<{
+    location: "local" | "server";
+    value: string;
+  } | null>({
     mutationFn: async () => {
-      // Open folder dialog to let user choose backup location
-      const selectedDir = await openFolderDialog();
+      if (isDesktop) {
+        // Open folder dialog to let user choose backup location
+        const selectedDir = await openFolderDialog();
 
-      if (!selectedDir) {
-        // User cancelled the dialog, return null to indicate cancellation
-        return null;
+        if (!selectedDir) {
+          // User cancelled the dialog, return null to indicate cancellation
+          return null;
+        }
+
+        // Create backup in selected directory
+        const backupPath = await backupDatabaseToPath(selectedDir);
+        return { location: "local" as const, value: backupPath };
       }
 
-      // Create backup in selected directory
-      const backupPath = await backupDatabaseToPath(selectedDir);
-      return backupPath;
+      const { filename } = await backupDatabase();
+      return { location: "server" as const, value: filename };
     },
-    onSuccess: (backupPath) => {
-      if (backupPath === null) {
+    onSuccess: (result) => {
+      if (result === null) {
         // User cancelled the operation, don't show any message
         return;
       }
 
+      const description =
+        result.location === "server"
+          ? `Backup created on the server as ${result.value}`
+          : `Database backed up to: ${result.value}`;
+
       toast({
         title: "Backup completed successfully",
-        description: `Database backed up to: ${backupPath}`,
+        description,
         variant: "success",
       });
     },
@@ -73,6 +90,10 @@ export function useBackupRestore() {
 
   const { mutateAsync: restoreFromBackup, isPending: isRestoring } = useMutation({
     mutationFn: async () => {
+      if (!isDesktop) {
+        throw new Error("Restore is only supported in the desktop app");
+      }
+
       // Open file dialog to let user choose backup file
       const selectedFile = await openDatabaseFileDialog();
 
@@ -90,12 +111,6 @@ export function useBackupRestore() {
         // User cancelled the operation, don't show any message
         return;
       }
-
-      toast({
-        title: "Database restore initiated",
-        description: `Restoring from: ${filePath}`,
-        variant: "success",
-      });
     },
     onError: (error) => {
       logger.error(`Error during restore: ${String(error)}`);
@@ -116,6 +131,14 @@ export function useBackupRestore() {
   };
 
   const performRestore = async () => {
+    if (!isDesktop) {
+      toast({
+        title: "Restore unavailable in web mode",
+        description: "Please use the desktop application to restore backups.",
+      });
+      return;
+    }
+
     try {
       await restoreFromBackup();
     } catch (error) {
@@ -128,5 +151,6 @@ export function useBackupRestore() {
     performRestore,
     isBackingUp,
     isRestoring,
+    isDesktop,
   };
 }

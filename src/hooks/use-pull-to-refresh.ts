@@ -1,4 +1,5 @@
 import { useUpdatePortfolioMutation } from "@/hooks/use-calculate-portfolio";
+import { useHapticFeedback } from "@/hooks/use-haptic-feedback";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef, useState } from "react";
 
@@ -31,6 +32,7 @@ export function usePullToRefresh({
 }: UsePullToRefreshOptions = {}): [boolean, PullToRefreshHandlers, PullToRefreshState] {
   const queryClient = useQueryClient();
   const { mutateAsync: triggerPortfolioUpdate } = useUpdatePortfolioMutation();
+  const triggerHapticFeedback = useHapticFeedback();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPulling, setIsPulling] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
@@ -38,7 +40,7 @@ export function usePullToRefresh({
   const startYRef = useRef(0);
   const currentYRef = useRef(0);
   const activationDistance = activationThreshold ?? threshold + 80;
-  const hasActivePullRef = useRef(false);
+  const hasTriggeredHapticRef = useRef(false);
 
   const handleRefresh = useCallback(async () => {
     if (isRefreshing || disabled) return;
@@ -72,7 +74,7 @@ export function usePullToRefresh({
       const touchY = touch.clientY;
       startYRef.current = touchY;
       currentYRef.current = touchY;
-      hasActivePullRef.current = false;
+      hasTriggeredHapticRef.current = false;
     },
     [disabled, isRefreshing],
   );
@@ -94,6 +96,7 @@ export function usePullToRefresh({
           content.style.transition = "";
           content.style.transform = "";
         }
+        hasTriggeredHapticRef.current = false;
         setIsPulling(false);
         setPullDistance(0);
         return;
@@ -110,12 +113,17 @@ export function usePullToRefresh({
       setIsPulling(isPastStartDistance);
       setPullDistance(distance);
 
+      if (deltaY > activationDistance && !hasTriggeredHapticRef.current) {
+        triggerHapticFeedback();
+        hasTriggeredHapticRef.current = true;
+      }
+
       if (content) {
         content.style.transition = "none";
         content.style.transform = `translateY(${distance}px)`;
       }
     },
-    [disabled, isRefreshing, startPullDistance, threshold],
+    [activationDistance, disabled, isRefreshing, startPullDistance, threshold, triggerHapticFeedback],
   );
 
   const onTouchEnd = useCallback(
@@ -142,7 +150,7 @@ export function usePullToRefresh({
       // Restore UA gesture handling
       target.style.touchAction = "";
       containerRef.current = null;
-      hasActivePullRef.current = false;
+      hasTriggeredHapticRef.current = false;
 
       const content = target.querySelector<HTMLElement>("[data-ptr-content]") ?? null;
       if (content) {

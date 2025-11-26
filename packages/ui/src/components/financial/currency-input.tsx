@@ -84,7 +84,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
           <Sheet open={open} onOpenChange={setOpen}>
-            <SheetContent side="bottom" className="h-[85vh] p-0">
+            <SheetContent side="bottom" className="mx-1 h-[85vh] rounded-t-4xl p-0">
               <SheetHeader className="border-border border-b px-6 pt-6 pb-4">
                 <SheetTitle>Select Currency</SheetTitle>
                 <SheetDescription>Choose your activity currency</SheetDescription>

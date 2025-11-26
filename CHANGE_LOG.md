@@ -6,3 +6,4 @@
 | 2025-11-08 | Fix chart period issue on Dashboard                   | chipheo |
 | 2025-11-08 | Add Trading page                                      | chipheo |
 | 2025-11-11 | Add Vietnamese and multi-language support             | chipheo |
+| 2025-11-25 | Add Swingfolio trading dashboard                      | chipheo |

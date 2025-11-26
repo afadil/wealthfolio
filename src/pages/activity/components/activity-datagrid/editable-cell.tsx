@@ -18,6 +18,7 @@ interface EditableCellProps {
   inputMode?: "text" | "decimal" | "numeric";
   placeholder?: string;
   className?: string;
+  disabled?: boolean;
 }
 
 export function EditableCell({
@@ -32,6 +33,7 @@ export function EditableCell({
   inputMode = "text",
   placeholder,
   className,
+  disabled,
 }: EditableCellProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);

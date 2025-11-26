@@ -29,7 +29,7 @@ pub async fn is_auto_update_check_enabled(
 
 #[tauri::command]
 pub async fn update_settings(
-    mut settings_update: SettingsUpdate,
+    settings_update: SettingsUpdate,
     state: State<'_, Arc<ServiceContext>>,
     handle: AppHandle,
 ) -> Result<Settings, String> {
@@ -46,26 +46,6 @@ pub async fn update_settings(
         if &current_base_currency != updated_currency {
             base_currency_changed = true;
             new_base_currency_val = Some(updated_currency.clone());
-        }
-    }
-
-    // Check onboarding state and sync_enabled change
-    let existing_settings = service
-        .get_settings()
-        .map_err(|e| format!("Failed to load settings: {}", e))?;
-
-    // Check if sync_enabled is being toggled and track the new value
-    #[cfg(feature = "wealthfolio-pro")]
-    let mut sync_change = settings_update.sync_enabled;
-    #[cfg(not(feature = "wealthfolio-pro"))]
-    let sync_change: Option<bool> = None;
-
-    // During onboarding, ignore sync_enabled changes to avoid restart prompts and toggling
-    if !existing_settings.onboarding_completed {
-        settings_update.sync_enabled = None;
-        #[cfg(feature = "wealthfolio-pro")]
-        {
-            sync_change = None;
         }
     }
 
@@ -130,36 +110,6 @@ pub async fn update_settings(
             });
         }
     }
-
-    // If sync_enabled was changed by the user in Settings UI, hot start/stop engine instead of restart.
-    #[cfg(feature = "wealthfolio-pro")]
-    if let Some(new_sync_state) = sync_change {
-        debug!(
-            "Sync {} setting changed",
-            if new_sync_state {
-                "enabled"
-            } else {
-                "disabled"
-            }
-        );
-
-        // Hot start/stop engine (desktop and mobile)
-        if let Some(sync_handles) = handle.try_state::<crate::SyncHandles>() {
-            if new_sync_state {
-                let engine = sync_handles.engine.clone();
-                tauri::async_runtime::spawn(async move {
-                    let _ = engine.start().await;
-                });
-            } else {
-                let engine = sync_handles.engine.clone();
-                tauri::async_runtime::spawn(async move {
-                    engine.stop_server().await;
-                });
-            }
-        }
-    }
-    #[allow(unused_variables)]
-    let _ = sync_change;
 
     // Return the latest settings from the database
     service

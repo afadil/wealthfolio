@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import type { AddonContext } from "@wealthfolio/addon-sdk";
 import {
   Card,
   CardContent,
@@ -11,14 +11,14 @@ import {
   Skeleton,
   useBalancePrivacy,
 } from "@wealthfolio/ui";
-import type { AddonContext } from "@wealthfolio/addon-sdk";
+import React, { useState } from "react";
 import {
-  FeePeriodSelector,
-  FeeOverviewCards,
-  FeeHistoryChart,
   AccountBreakdown,
+  FeeHistoryChart,
+  FeeOverviewCards,
+  FeePeriodSelector,
 } from "../components";
-import { useFeeSummary, useFeeAnalytics } from "../hooks";
+import { useFeeAnalytics, useFeeSummary } from "../hooks";
 
 interface FeesPageProps {
   ctx: AddonContext;
@@ -37,7 +37,6 @@ export default function FeesPage({ ctx }: FeesPageProps) {
 
   const { isBalanceHidden } = useBalancePrivacy();
 
-  const headerSubtitle = "Track and analyze your investment fees and their impact on returns";
   const headerActions = (
     <FeePeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
   );
@@ -59,11 +58,7 @@ export default function FeesPage({ ctx }: FeesPageProps) {
 
     return (
       <Page>
-        <PageHeader
-          heading="Investment Fees Tracker"
-          text={headerSubtitle}
-          actions={headerActions}
-        />
+        <PageHeader heading="Fees Tracker" actions={headerActions} />
         <PageContent>
           <div className="flex h-[calc(100vh-200px)] items-center justify-center">
             <EmptyPlaceholder
@@ -84,11 +79,7 @@ export default function FeesPage({ ctx }: FeesPageProps) {
   if (!periodSummary || !totalSummary) {
     return (
       <Page>
-        <PageHeader
-          heading="Investment Fees Tracker"
-          text={headerSubtitle}
-          actions={headerActions}
-        />
+        <PageHeader heading="Fees Tracker" actions={headerActions} />
         <PageContent>
           <div className="flex h-[calc(100vh-200px)] items-center justify-center">
             <EmptyPlaceholder
@@ -133,28 +124,33 @@ export default function FeesPage({ ctx }: FeesPageProps) {
 
   return (
     <Page>
-      <PageHeader heading="Investment Fees Tracker" text={headerSubtitle} actions={headerActions} />
+      <PageHeader heading="Fees Tracker" actions={headerActions} />
       <PageContent>
-        <FeeOverviewCards
-          feeSummary={periodSummary}
-          feeAnalytics={analyticsData}
-          isBalanceHidden={isBalanceHidden}
-        />
-
-        <div className="grid gap-6 md:grid-cols-3">
-          <FeeHistoryChart
-            monthlyFeeData={monthlyFeeData}
-            previousMonthlyFeeData={previousMonthlyFeeData}
-            selectedPeriod={selectedPeriod}
-            currency={periodSummary.currency}
-            isBalanceHidden={isBalanceHidden}
-          />
-
-          <AccountBreakdown
+        <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 xl:grid-cols-3">
+          <FeeOverviewCards
+            feeSummary={periodSummary}
             feeAnalytics={analyticsData}
-            currency={periodSummary.currency}
             isBalanceHidden={isBalanceHidden}
           />
+        </div>
+        <div className="grid auto-rows-min gap-4 sm:gap-6 items-stretch md:grid-cols-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <div className="md:col-span-2 lg:col-auto">
+            <FeeHistoryChart
+              monthlyFeeData={monthlyFeeData}
+              previousMonthlyFeeData={previousMonthlyFeeData}
+              selectedPeriod={selectedPeriod}
+              currency={periodSummary.currency}
+              isBalanceHidden={isBalanceHidden}
+            />
+          </div>
+
+          <div className="md:col-span-1 lg:col-auto">
+            <AccountBreakdown
+              feeAnalytics={analyticsData}
+              currency={periodSummary.currency}
+              isBalanceHidden={isBalanceHidden}
+            />
+          </div>
         </div>
       </PageContent>
     </Page>
@@ -164,12 +160,7 @@ export default function FeesPage({ ctx }: FeesPageProps) {
 function FeesDashboardSkeleton({ actions }: { actions: React.ReactNode }) {
   return (
     <Page>
-      <PageHeader actions={actions}>
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-[240px]" />
-          <Skeleton className="h-5 w-[320px]" />
-        </div>
-      </PageHeader>
+      <PageHeader heading="Fees Tracker" actions={actions} />
 
       <PageContent>
         <div className="grid gap-6 md:grid-cols-3">

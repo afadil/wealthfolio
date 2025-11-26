@@ -27,6 +27,7 @@ interface SymbolAutocompleteCellProps {
   onNavigate?: (direction: "up" | "down" | "left" | "right") => void;
   isFocused?: boolean;
   className?: string;
+  disabled?: boolean;
 }
 
 export function SymbolAutocompleteCell({
@@ -36,6 +37,7 @@ export function SymbolAutocompleteCell({
   onNavigate,
   isFocused = false,
   className,
+  disabled,
 }: SymbolAutocompleteCellProps) {
   const { t } = useTranslation(["activity"]);
   const [isEditing, setIsEditing] = useState(false);
