@@ -2,6 +2,7 @@
 
 import type React from "react";
 
+import { searchTicker } from "@/commands/market-data";
 import {
   Command,
   CommandEmpty,
@@ -11,17 +12,18 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
-import { Check } from "lucide-react";
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { searchTicker } from "@/commands/market-data";
+import { DataSource } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import type { QuoteSummary } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { Icons } from "@wealthfolio/ui";
+import { Check } from "lucide-react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 interface SymbolAutocompleteCellProps {
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value: string, meta?: { dataSource?: DataSource }) => void;
   onFocus?: () => void;
   onNavigate?: (direction: "up" | "down" | "left" | "right") => void;
   isFocused?: boolean;
@@ -43,6 +45,8 @@ export function SymbolAutocompleteCell({
   const cellRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const deferredQuery = useDeferredValue(searchQuery);
+  const resolveDataSource = (source?: QuoteSummary["dataSource"]) =>
+    source === DataSource.MANUAL ? DataSource.MANUAL : DataSource.YAHOO;
 
   const { data, isLoading, isError } = useQuery<QuoteSummary[], Error>({
     queryKey: [QueryKeys.symbolSearch, deferredQuery],
@@ -58,7 +62,6 @@ export function SymbolAutocompleteCell({
   }, [data]);
 
   useEffect(() => {
-    if (disabled) return;
     if (isFocused && !isEditing && cellRef.current) {
       cellRef.current.focus();
     }
@@ -73,13 +76,41 @@ export function SymbolAutocompleteCell({
     }
   }, [disabled, isEditing]);
 
-  const handleSelect = (symbol: string) => {
-    onChange(symbol);
+  const handleSelectWithDataSource = (symbol: string, dataSource?: DataSource) => {
+    const normalized = symbol.trim().toUpperCase();
+    onChange(normalized, { dataSource });
     setIsEditing(false);
     setSearchQuery("");
   };
 
+  const trimmedQuery = searchQuery.trim();
+
+  const handleCustomSymbol = () => {
+    if (!trimmedQuery) return;
+    handleSelectWithDataSource(trimmedQuery, DataSource.MANUAL);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (disabled) {
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        onNavigate?.("up");
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        onNavigate?.("down");
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        onNavigate?.("left");
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        onNavigate?.("right");
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+        onNavigate?.(e.shiftKey ? "left" : "right");
+      }
+      return;
+    }
+
     if (!isEditing) {
       if (e.key === "Enter" || e.key === " " || e.key === "F2") {
         e.preventDefault();
@@ -131,8 +162,13 @@ export function SymbolAutocompleteCell({
   if (disabled) {
     return (
       <div
+        ref={cellRef}
+        tabIndex={0}
+        onFocus={handleCellFocus}
+        onKeyDown={handleKeyDown}
         className={cn(
-          "flex h-full w-full cursor-not-allowed items-center px-2 py-1.5 text-xs text-muted-foreground",
+          "text-muted-foreground flex h-full w-full cursor-not-allowed items-center px-2 py-1.5 text-xs outline-none",
+          isFocused && "ring-primary ring-2 ring-inset",
           className,
         )}
       >
@@ -175,16 +211,34 @@ export function SymbolAutocompleteCell({
                 e.preventDefault();
                 setIsEditing(false);
                 onNavigate?.(e.shiftKey ? "left" : "right");
+              } else if (e.key === "Enter" && trimmedQuery && options.length === 0) {
+                e.preventDefault();
+                handleCustomSymbol();
               }
             }}
           />
           <CommandList>
             {isLoading ? <CommandEmpty>Loading...</CommandEmpty> : null}
-            {!isLoading && isError ? (
-              <CommandEmpty>Failed to load symbols.</CommandEmpty>
-            ) : null}
-            {!isLoading && !isError && options.length === 0 ? (
-              <CommandEmpty>No symbols found.</CommandEmpty>
+            {!isLoading && (isError || options.length === 0) && trimmedQuery.length > 1 ? (
+              <CommandGroup>
+                <CommandItem
+                  value={trimmedQuery}
+                  onSelect={handleCustomSymbol}
+                  className="flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-3">
+                    <Icons.PlusCircle className="text-muted-foreground h-4 w-4" />
+                    <div className="flex flex-col">
+                      <span className="font-mono text-xs font-semibold uppercase">
+                        {trimmedQuery.toUpperCase()}
+                      </span>
+                      <span className="text-muted-foreground text-xs font-light">
+                        Create custom (manual)
+                      </span>
+                    </div>
+                  </div>
+                </CommandItem>
+              </CommandGroup>
             ) : null}
             {!isLoading && !isError && options.length > 0 ? (
               <CommandGroup>
@@ -192,7 +246,12 @@ export function SymbolAutocompleteCell({
                   <CommandItem
                     key={option.symbol}
                     value={option.symbol}
-                    onSelect={() => handleSelect(option.symbol)}
+                    onSelect={() =>
+                      handleSelectWithDataSource(
+                        option.symbol,
+                        resolveDataSource(option.dataSource),
+                      )
+                    }
                     className="flex items-center justify-between"
                   >
                     <div className="flex flex-col">

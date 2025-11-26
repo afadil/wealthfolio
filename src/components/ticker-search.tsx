@@ -16,7 +16,7 @@ interface SearchProps {
   defaultValue?: string;
   value?: string;
   placeholder?: string;
-  onSelectResult: (symbol: string) => void;
+  onSelectResult: (symbol: string, quoteSummary?: QuoteSummary) => void;
   className?: string;
 }
 
@@ -31,7 +31,23 @@ interface SearchResultsProps {
 
 // Memoize search results component
 const SearchResults = memo(
-  ({ results, isLoading, isError, selectedResult, onSelect }: SearchResultsProps) => {
+  ({ results, query, isLoading, selectedResult, onSelect }: SearchResultsProps) => {
+    const handleCustomSymbol = () => {
+      if (query.trim()) {
+        onSelect({
+          symbol: query.trim().toUpperCase(),
+          longName: query.trim().toUpperCase(),
+          shortName: query.trim().toUpperCase(),
+          exchange: "MANUAL",
+          quoteType: "EQUITY",
+          index: "MANUAL",
+          typeDisplay: "Manual Entry",
+          dataSource: "MANUAL",
+          score: 0,
+        });
+      }
+    };
+
     return (
       <CommandList>
         {isLoading ? (
@@ -43,10 +59,12 @@ const SearchResults = memo(
             </div>
           </CommandPrimitive.Loading>
         ) : null}
-        {!isError && !isLoading && selectedResult && !results?.length && (
-          <div className="p-4 text-sm">No symbols found</div>
+        {!isLoading && !results?.length && query.length > 1 && (
+          <CommandItem onSelect={handleCustomSymbol} value={query} className="h-11 rounded-none">
+            <Icons.Plus className="mr-2 h-4 w-4" />
+            Use custom symbol: <strong className="ml-1">{query.toUpperCase()}</strong>
+          </CommandItem>
         )}
-        {isError && <div className="text-destructive p-4 text-sm">Something went wrong</div>}
 
         {results?.map((ticker) => {
           return (
@@ -54,6 +72,7 @@ const SearchResults = memo(
               key={ticker.symbol}
               onSelect={() => onSelect(ticker)}
               value={ticker.symbol}
+              className="h-11 rounded-none"
             >
               <Icons.Check
                 className={cn(
@@ -121,7 +140,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
 
     const handleSelectResult = useCallback(
       (ticker: QuoteSummary) => {
-        onSelectResult(ticker?.symbol);
+        onSelectResult(ticker?.symbol, ticker);
         const displayText = ticker ? `${ticker.symbol} - ${ticker.longName}` : "";
         setSearchQuery(displayText);
         setSelected(displayText);
