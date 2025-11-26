@@ -89,6 +89,7 @@ const AccountPage = () => {
     useState<TimePeriod>(INITIAL_INTERVAL_CODE);
   const [desktopSelectorOpen, setDesktopSelectorOpen] = useState(false);
   const [mobileSelectorOpen, setMobileSelectorOpen] = useState(false);
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
 
   const { accounts, isLoading: isAccountsLoading } = useAccounts();
   const account = useMemo(() => accounts?.find((acc) => acc.id === id), [accounts, id]);
@@ -188,25 +189,101 @@ const AccountPage = () => {
   return (
     <Page>
       <PageHeader
-        heading={account?.name ?? "Account"}
-        text={account?.group ?? account?.currency}
         onBack={() => navigate(-1)}
         actions={
           <>
+            <div className="hidden items-center gap-2 sm:flex">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => navigate(`/import?account=${id}`)}
+                title="Import CSV"
+              >
+                <Icons.Import className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => navigate(`/activities/manage?account=${id}`)}
+                title="Record Transaction"
+              >
+                <Icons.Plus className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="sm:hidden">
+              <Sheet open={mobileActionsOpen} onOpenChange={setMobileActionsOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="icon" className="h-9 w-9">
+                    <Icons.MoreVertical className="h-4 w-4" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="bottom" className="mx-1 rounded-t-4xl p-0">
+                  <SheetHeader className="border-border border-b px-6 py-4">
+                    <SheetTitle>Account Actions</SheetTitle>
+                    <SheetDescription>Manage this account</SheetDescription>
+                  </SheetHeader>
+                  <div className="flex flex-col gap-3 p-6">
+                    <button
+                      onClick={() => {
+                        navigate(`/import?account=${id}`);
+                        setMobileActionsOpen(false);
+                      }}
+                      className="hover:bg-accent active:bg-accent/80 focus:ring-primary flex items-center gap-4 rounded-lg border p-4 text-left transition-colors focus:ring-2 focus:outline-none"
+                    >
+                      <div className="bg-primary/10 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full">
+                        <Icons.Import className="text-primary h-5 w-5" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-foreground font-medium">Import CSV</div>
+                        <div className="text-muted-foreground text-sm">
+                          Import transactions from file
+                        </div>
+                      </div>
+                      <Icons.ChevronRight className="text-muted-foreground h-5 w-5 flex-shrink-0" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigate(`/activities/manage?account=${id}`);
+                        setMobileActionsOpen(false);
+                      }}
+                      className="hover:bg-accent active:bg-accent/80 focus:ring-primary flex items-center gap-4 rounded-lg border p-4 text-left transition-colors focus:ring-2 focus:outline-none"
+                    >
+                      <div className="bg-primary/10 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full">
+                        <Icons.Plus className="text-primary h-5 w-5" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-foreground font-medium">Record Transaction</div>
+                        <div className="text-muted-foreground text-sm">
+                          Add a new activity manually
+                        </div>
+                      </div>
+                      <Icons.ChevronRight className="text-muted-foreground h-5 w-5 flex-shrink-0" />
+                    </button>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
+          </>
+        }
+      >
+        <div className="flex flex-col" data-tauri-drag-region="true">
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-semibold md:text-xl">{account?.name ?? "Account"}</h1>
             {/* Desktop account selector */}
             <div className="hidden sm:block">
               <Popover open={desktopSelectorOpen} onOpenChange={setDesktopSelectorOpen}>
                 <PopoverTrigger asChild>
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="icon"
-                    className="h-9 w-9"
+                    className="h-8 w-8 rounded-full"
                     aria-label="Switch account"
                   >
-                    <Icons.ChevronDown className="h-4 w-4" />
+                    <Icons.ChevronDown className="text-muted-foreground size-5" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[240px] p-0" align="end">
+                <PopoverContent className="w-[240px] p-0" align="start">
                   <Command>
                     <CommandInput placeholder="Search accounts..." />
                     <CommandList>
@@ -249,12 +326,12 @@ const AccountPage = () => {
               <Sheet open={mobileSelectorOpen} onOpenChange={setMobileSelectorOpen}>
                 <SheetTrigger asChild>
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="icon"
-                    className="h-9 w-9"
+                    className="h-8 w-8 rounded-full"
                     aria-label="Switch account"
                   >
-                    <Icons.ChevronDown className="h-4 w-4" />
+                    <Icons.ChevronDown className="text-muted-foreground h-5 w-5" />
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="bottom" className="mx-1 h-[80vh] rounded-t-4xl p-0">
@@ -307,9 +384,12 @@ const AccountPage = () => {
                 </SheetContent>
               </Sheet>
             </div>
-          </>
-        }
-      />
+          </div>
+          <p className="text-muted-foreground text-sm md:text-base">
+            {account?.group ?? account?.currency}
+          </p>
+        </div>
+      </PageHeader>
       <PageContent>
         {hasHoldings && !isHoldingsLoading ? (
           <>

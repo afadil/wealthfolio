@@ -9,6 +9,7 @@ import { CSVFileViewer } from "../components/csv-file-viewer";
 import { FileDropzone } from "../components/file-dropzone";
 import { HelpTooltip } from "../components/help-tooltip";
 import { ImportAlert } from "../components/import-alert";
+import { useNavigate } from "react-router-dom";
 
 interface AccountSelectionStepProps {
   selectedAccount: Account | null;
@@ -34,6 +35,15 @@ export const AccountSelectionStep = ({
   onBack,
 }: AccountSelectionStepProps) => {
   const { isMobile } = usePlatform();
+  const navigate = useNavigate();
+
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+    navigate(-1);
+  };
 
   // Check if there are any errors
   const hasErrors =
@@ -202,7 +212,7 @@ export const AccountSelectionStep = ({
 
       {/* Row 3: Action buttons */}
       <div className="flex justify-between pt-2">
-        <Button variant="outline" onClick={onBack} disabled={isParsing}>
+        <Button variant="outline" onClick={handleBack} disabled={isParsing}>
           Cancel
         </Button>
         <Button onClick={onNext} disabled={!canProceed}>

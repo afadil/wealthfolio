@@ -73,11 +73,6 @@ const ActivityImportPage = () => {
     resetParserStates();
   };
 
-  // Cancel import and navigate to activities page
-  const cancelImport = () => {
-    navigate("/activities");
-  };
-
   // Handle file selection
   const handleFileChange = (file: File | null) => {
     if (file) {
@@ -145,7 +140,6 @@ const ActivityImportPage = () => {
             isParsing={isParsing}
             errors={parsingErrors}
             onNext={goToNextStep}
-            onBack={cancelImport}
             rawData={rawData}
           />
         );

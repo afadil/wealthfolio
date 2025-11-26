@@ -88,9 +88,7 @@ const AccountSummaryComponent = React.memo(
     const accountId = item.accountId;
 
     const subText = isGroup
-      ? useAccountCurrency
-        ? `${item.accountCurrency} • ${item.accountCount} ${item.accountCount === 1 ? "account" : "accounts"}`
-        : `${item.accountCount} ${item.accountCount === 1 ? "account" : "accounts"}`
+      ? `${item.accountCount} ${item.accountCount === 1 ? "account" : "accounts"}`
       : useAccountCurrency
         ? (item.accountCurrency ?? item.baseCurrency)
         : item.baseCurrency;
@@ -340,7 +338,7 @@ export const AccountsSummary = React.memo(() => {
           );
           const groupDisplaysAccountCurrency = groupCurrencies.size === 1;
           const groupDisplayCurrency = groupDisplaysAccountCurrency
-            ? groupAccounts[0]?.accountCurrency ?? groupAccounts[0]?.baseCurrency ?? baseCurrency
+            ? (groupAccounts[0]?.accountCurrency ?? groupAccounts[0]?.baseCurrency ?? baseCurrency)
             : baseCurrency;
 
           const totalValueBaseCurrency = groupAccounts.reduce(
@@ -366,7 +364,8 @@ export const AccountsSummary = React.memo(() => {
 
           const totalValueAccountCurrency = groupDisplaysAccountCurrency
             ? groupAccounts.reduce(
-                (sum, acc) => sum + Number(acc.totalValueAccountCurrency ?? acc.totalValueBaseCurrency),
+                (sum, acc) =>
+                  sum + Number(acc.totalValueAccountCurrency ?? acc.totalValueBaseCurrency),
                 0,
               )
             : undefined;
@@ -380,14 +379,17 @@ export const AccountsSummary = React.memo(() => {
 
           const totalNetContributionAccountCurrency = groupDisplaysAccountCurrency
             ? groupAccounts.reduce((sum, acc) => {
-                const accountValue = Number(acc.totalValueAccountCurrency ?? acc.totalValueBaseCurrency);
+                const accountValue = Number(
+                  acc.totalValueAccountCurrency ?? acc.totalValueBaseCurrency,
+                );
                 const accountGainLoss = Number(acc.totalGainLossAmountAccountCurrency ?? 0);
                 return sum + (accountValue - accountGainLoss);
               }, 0)
             : undefined;
 
           const groupTotalReturnPercent = groupDisplaysAccountCurrency
-            ? totalNetContributionAccountCurrency !== undefined && totalNetContributionAccountCurrency !== 0
+            ? totalNetContributionAccountCurrency !== undefined &&
+              totalNetContributionAccountCurrency !== 0
               ? (totalGainLossAmountAccountCurrency ?? 0) / totalNetContributionAccountCurrency
               : null
             : groupTotalReturnPercentBase;
