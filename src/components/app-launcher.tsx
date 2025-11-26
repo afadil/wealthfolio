@@ -63,14 +63,20 @@ export function AppLauncher() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Check for Cmd/Ctrl+K
+      // Check for Cmd/Ctrl+K or Cmd/Ctrl+P
       const isModifierK =
         (event.metaKey || event.ctrlKey) &&
         !event.shiftKey &&
         !event.altKey &&
         event.key.toLowerCase() === "k";
 
-      if (!isModifierK) {
+      const isModifierP =
+        (event.metaKey || event.ctrlKey) &&
+        !event.shiftKey &&
+        !event.altKey &&
+        event.key.toLowerCase() === "p";
+
+      if (!isModifierK && !isModifierP) {
         return;
       }
 
@@ -82,7 +88,7 @@ export function AppLauncher() {
         return;
       }
 
-      // Prevent browser's default Cmd/Ctrl+K behavior
+      // Prevent browser's default Cmd/Ctrl+K and Cmd/Ctrl+P behavior
       event.preventDefault();
       event.stopPropagation();
       setOpen((prev) => !prev);
@@ -421,6 +427,7 @@ export function AppLauncher() {
         autoFocus={open}
         value={search}
         onValueChange={setSearch}
+        className="py-8"
       />
       <CommandList>
         {!hasResults && <CommandEmpty>No matches found.</CommandEmpty>}

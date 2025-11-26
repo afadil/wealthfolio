@@ -1,5 +1,6 @@
 import { getAssetProfile } from "@/commands/market-data";
 import { getHolding } from "@/commands/portfolio";
+import { MobileActionsMenu } from "@/components/mobile-actions-menu";
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -68,6 +69,7 @@ export const AssetProfilePage = () => {
   const [activeTab, setActiveTab] = useState<AssetTab>(defaultTab);
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const triggerHaptic = useHapticFeedback();
   const [formData, setFormData] = useState<AssetProfileFormData>({
     name: "",
@@ -595,14 +597,14 @@ export const AssetProfilePage = () => {
           onBack={handleBack}
           actions={
             <Button
-              variant="secondary"
-              size="icon-sm"
+              variant="outline"
+              size="icon"
               onClick={handleRefreshQuotes}
               disabled={syncMarketDataMutation.isPending}
               title="Refresh Quote"
             >
               <Icons.Refresh
-                className={`size-4 ${syncMarketDataMutation.isPending ? "animate-spin" : ""}`}
+                className={`h-4 w-4 ${syncMarketDataMutation.isPending ? "animate-spin" : ""}`}
               />
             </Button>
           }
@@ -670,18 +672,81 @@ export const AssetProfilePage = () => {
   }
   return (
     <Page>
-      <PageHeader>
-        <div className="flex w-full flex-col gap-3 md:flex-row md:items-center">
-          <div className="flex min-w-0 flex-1 items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={handleBack}>
-              <Icons.ArrowLeft className="h-8 w-8 md:h-9 md:w-9" />
-            </Button>
-            {(profile?.symbol ?? holding?.instrument?.symbol) && (
-              <TickerAvatar
-                symbol={profile?.symbol ?? holding?.instrument?.symbol ?? symbol}
-                className="size-8"
+      <PageHeader
+        onBack={handleBack}
+        actions={
+          <>
+            <div className="hidden items-center gap-2 sm:flex">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => navigate(`/activities/manage?symbol=${encodeURIComponent(symbol)}`)}
+                title="Record Transaction"
+              >
+                <Icons.Plus className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleRefreshQuotes}
+                disabled={syncMarketDataMutation.isPending}
+                title="Refresh Quote"
+              >
+                <Icons.Refresh
+                  className={`h-4 w-4 ${syncMarketDataMutation.isPending ? "animate-spin" : ""}`}
+                />
+              </Button>
+              <AnimatedToggleGroup
+                items={toggleItems}
+                value={activeTab}
+                onValueChange={(next: AssetTab) => {
+                  if (next === activeTab) {
+                    return;
+                  }
+                  triggerHaptic();
+                  setActiveTab(next);
+                  const url = `${location.pathname}?tab=${next}`;
+                  navigate(url, { replace: true });
+                }}
+                size="sm"
+                className="md:text-base"
               />
-            )}
+            </div>
+
+            <div className="sm:hidden">
+              <MobileActionsMenu
+                open={mobileActionsOpen}
+                onOpenChange={setMobileActionsOpen}
+                title="Asset Actions"
+                description="Manage this asset"
+                actions={[
+                  {
+                    icon: "Plus",
+                    label: "Record Transaction",
+                    description: "Add a new activity manually",
+                    onClick: () =>
+                      navigate(`/activities/manage?symbol=${encodeURIComponent(symbol)}`),
+                  },
+                  {
+                    icon: "Refresh",
+                    label: "Refresh Quote",
+                    description: "Update market data",
+                    onClick: handleRefreshQuotes,
+                  },
+                ]}
+              />
+            </div>
+          </>
+        }
+      >
+        <div className="flex items-center gap-1" data-tauri-drag-region="true">
+          {(profile?.symbol ?? holding?.instrument?.symbol) && (
+            <TickerAvatar
+              symbol={profile?.symbol ?? holding?.instrument?.symbol ?? symbol}
+              className="size-8"
+            />
+          )}
+          <div className="flex min-w-0 flex-col">
             {isEditingTitle ? (
               <Input
                 value={formData.name}
@@ -708,60 +773,17 @@ export const AssetProfilePage = () => {
                 autoFocus
               />
             ) : (
-              <div className="group flex min-w-0 flex-1 items-center gap-3">
-                <div className="flex min-w-0 flex-col">
-                  <h1 className="text-md truncate font-semibold md:text-xl">
-                    <span
-                      onClick={() => setIsEditingTitle(true)}
-                      className="cursor-pointer md:cursor-default"
-                    >
-                      {formData.name ?? holding?.instrument?.symbol ?? symbol ?? "-"}
-                    </span>
-                  </h1>
-                  {formData.name && (holding?.instrument?.symbol ?? symbol) && (
-                    <span className="text-muted-foreground truncate text-xs md:text-sm">
-                      {holding?.instrument?.symbol ?? symbol}
-                    </span>
-                  )}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsEditingTitle(true)}
-                  className="hidden h-6 w-6 flex-shrink-0 md:inline-flex md:opacity-0 md:group-hover:opacity-100"
-                >
-                  <Icons.Pencil className="h-3 w-3" />
-                </Button>
-              </div>
+              <>
+                <h1 className="text-lg font-semibold md:text-xl">
+                  {formData.name ?? holding?.instrument?.symbol ?? symbol ?? "-"}
+                </h1>
+                {formData.name && (holding?.instrument?.symbol ?? symbol) && (
+                  <p className="text-muted-foreground text-sm md:text-base">
+                    {holding?.instrument?.symbol ?? symbol}
+                  </p>
+                )}
+              </>
             )}
-          </div>
-          <div className="hidden md:flex md:items-center md:gap-2">
-            <Button
-              variant="secondary"
-              size="icon-sm"
-              onClick={handleRefreshQuotes}
-              disabled={syncMarketDataMutation.isPending}
-              title="Refresh Quote"
-            >
-              <Icons.Refresh
-                className={`size-4 ${syncMarketDataMutation.isPending ? "animate-spin" : ""}`}
-              />
-            </Button>
-            <AnimatedToggleGroup
-              items={toggleItems}
-              value={activeTab}
-              onValueChange={(next: AssetTab) => {
-                if (next === activeTab) {
-                  return;
-                }
-                triggerHaptic();
-                setActiveTab(next);
-                const url = `${location.pathname}?tab=${next}`;
-                navigate(url, { replace: true });
-              }}
-              size="sm"
-              className="md:text-base"
-            />
           </div>
         </div>
       </PageHeader>

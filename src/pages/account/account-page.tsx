@@ -15,6 +15,7 @@ import {
 } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
 
+import { MobileActionsMenu } from "@/components/mobile-actions-menu";
 import { PrivacyToggle } from "@/components/privacy-toggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -212,57 +213,26 @@ const AccountPage = () => {
             </div>
 
             <div className="sm:hidden">
-              <Sheet open={mobileActionsOpen} onOpenChange={setMobileActionsOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="outline" size="icon" className="h-9 w-9">
-                    <Icons.MoreVertical className="h-4 w-4" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="bottom" className="mx-1 rounded-t-4xl p-0">
-                  <SheetHeader className="border-border border-b px-6 py-4">
-                    <SheetTitle>Account Actions</SheetTitle>
-                    <SheetDescription>Manage this account</SheetDescription>
-                  </SheetHeader>
-                  <div className="flex flex-col gap-3 p-6">
-                    <button
-                      onClick={() => {
-                        navigate(`/import?account=${id}`);
-                        setMobileActionsOpen(false);
-                      }}
-                      className="hover:bg-accent active:bg-accent/80 focus:ring-primary flex items-center gap-4 rounded-lg border p-4 text-left transition-colors focus:ring-2 focus:outline-none"
-                    >
-                      <div className="bg-primary/10 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full">
-                        <Icons.Import className="text-primary h-5 w-5" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-foreground font-medium">Import CSV</div>
-                        <div className="text-muted-foreground text-sm">
-                          Import transactions from file
-                        </div>
-                      </div>
-                      <Icons.ChevronRight className="text-muted-foreground h-5 w-5 flex-shrink-0" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        navigate(`/activities/manage?account=${id}`);
-                        setMobileActionsOpen(false);
-                      }}
-                      className="hover:bg-accent active:bg-accent/80 focus:ring-primary flex items-center gap-4 rounded-lg border p-4 text-left transition-colors focus:ring-2 focus:outline-none"
-                    >
-                      <div className="bg-primary/10 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full">
-                        <Icons.Plus className="text-primary h-5 w-5" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-foreground font-medium">Record Transaction</div>
-                        <div className="text-muted-foreground text-sm">
-                          Add a new activity manually
-                        </div>
-                      </div>
-                      <Icons.ChevronRight className="text-muted-foreground h-5 w-5 flex-shrink-0" />
-                    </button>
-                  </div>
-                </SheetContent>
-              </Sheet>
+              <MobileActionsMenu
+                open={mobileActionsOpen}
+                onOpenChange={setMobileActionsOpen}
+                title="Account Actions"
+                description="Manage this account"
+                actions={[
+                  {
+                    icon: "Import",
+                    label: "Import CSV",
+                    description: "Import transactions from file",
+                    onClick: () => navigate(`/import?account=${id}`),
+                  },
+                  {
+                    icon: "Plus",
+                    label: "Record Transaction",
+                    description: "Add a new activity manually",
+                    onClick: () => navigate(`/activities/manage?account=${id}`),
+                  },
+                ]}
+              />
             </div>
           </>
         }
