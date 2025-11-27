@@ -1,5 +1,6 @@
 import { useAuth } from "@/context/auth-context";
 import {
+  ApplicationShell,
   Button,
   Card,
   CardContent,
@@ -29,54 +30,56 @@ export function LoginPage() {
   };
 
   return (
-    <div className="bg-muted/50 flex min-h-screen items-center justify-center p-6 pt-0">
-      <Card className="w-full max-w-md border-none bg-transparent shadow-none">
-        <CardHeader className="space-y-4 text-center">
-          <div className="flex justify-center">
-            <img
-              src="/illustration.png"
-              alt="Wealthfolio lock illustration"
-              className="h-16 w-16 sm:h-20 sm:w-20"
-            />
-          </div>
-          <div className="space-y-2">
-            <CardTitle>Wealthfolio</CardTitle>
-            <CardDescription>Your private portfolio tracker.</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <form className="space-y-8" onSubmit={handleSubmit}>
-            <div className="space-y-2">
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                autoComplete="current-password"
-                onChange={(event) => {
-                  if (loginError) {
-                    clearError();
-                  }
-                  setPassword(event.target.value);
-                }}
-                disabled={loginLoading}
-                required
-                placeholder="Enter your password"
-                className="h-12 rounded-full shadow-none"
+    <ApplicationShell className="fixed inset-0 flex items-center justify-center p-6">
+      <div className="w-full max-w-md -translate-y-[5vh]">
+        <Card className="w-full border-none bg-transparent shadow-none">
+          <CardHeader className="space-y-4 text-center">
+            <div className="flex justify-center">
+              <img
+                src="/illustration.png"
+                alt="Wealthfolio logo illustration"
+                className="h-16 w-16 sm:h-20 sm:w-20"
               />
-              {loginError ? (
-                <p className="text-destructive text-sm" role="alert">
-                  {loginError}
-                </p>
-              ) : null}
             </div>
+            <div className="space-y-2">
+              <CardTitle>Wealthfolio</CardTitle>
+              <CardDescription>Your private portfolio tracker.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <form className="space-y-8" onSubmit={handleSubmit}>
+              <div className="space-y-2">
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  autoComplete="current-password"
+                  onChange={(event) => {
+                    if (loginError) {
+                      clearError();
+                    }
+                    setPassword(event.target.value);
+                  }}
+                  disabled={loginLoading}
+                  required
+                  placeholder="Enter your password"
+                  className="h-12 rounded-full shadow-none"
+                />
+                {loginError ? (
+                  <p className="text-destructive text-sm" role="alert">
+                    {loginError}
+                  </p>
+                ) : null}
+              </div>
 
-            <Button type="submit" className="w-full" disabled={loginLoading}>
-              {loginLoading ? "Signing in..." : "Sign In"}
-            </Button>
-          </form>
-        </CardContent>
-        <CardFooter className="text-muted-foreground flex flex-col gap-2 text-center text-xs"></CardFooter>
-      </Card>
-    </div>
+              <Button type="submit" className="w-full" disabled={loginLoading}>
+                {loginLoading ? "Signing in..." : "Sign In"}
+              </Button>
+            </form>
+          </CardContent>
+          <CardFooter className="text-muted-foreground flex flex-col gap-2 text-center text-xs"></CardFooter>
+        </Card>
+      </div>
+    </ApplicationShell>
   );
 }
