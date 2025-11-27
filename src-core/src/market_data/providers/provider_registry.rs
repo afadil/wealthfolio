@@ -292,6 +292,12 @@ impl ProviderRegistry {
         &self,
         symbol: &str,
     ) -> Result<super::models::AssetProfile, MarketDataError> {
+        if symbol.starts_with("$CASH") {
+            if let Some(manual_profiler) = self.asset_profilers.get(DATA_SOURCE_MANUAL) {
+                return manual_profiler.get_asset_profile(symbol).await;
+            }
+        }
+
         for (profiler_id, profiler) in self.get_enabled_profilers() {
             match profiler.get_asset_profile(symbol).await {
                 Ok(profile) => return Ok(profile),
@@ -299,11 +305,6 @@ impl ProviderRegistry {
                     "Profiler '{}' failed to get asset profile for symbol '{}': {:?}. Trying next.",
                     profiler_id, symbol, e
                 ),
-            }
-        }
-        if symbol.starts_with("$CASH") {
-            if let Some(manual_profiler) = self.asset_profilers.get(DATA_SOURCE_MANUAL) {
-                return manual_profiler.get_asset_profile(symbol).await;
             }
         }
         Err(MarketDataError::NotFound(symbol.to_string()))
