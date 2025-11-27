@@ -10,8 +10,8 @@ import {
 import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb, logger } from "@/adapters";
 
 interface Filters {
-  accountId?: string;
-  activityType?: string;
+  accountIds?: string[];
+  activityTypes?: string[];
   symbol?: string;
 }
 
@@ -25,7 +25,7 @@ export const getActivities = async (accountId?: string): Promise<ActivityDetails
     const response = await searchActivities(
       0,
       Number.MAX_SAFE_INTEGER,
-      accountId ? { accountId } : {},
+      accountId ? { accountIds: [accountId] } : {},
       "",
       {
         id: "date",
@@ -52,8 +52,8 @@ export const searchActivities = async (
         return invokeTauri("search_activities", {
           page,
           pageSize,
-          accountIdFilter: filters?.accountId,
-          activityTypeFilter: filters?.activityType,
+          accountIdFilter: filters?.accountIds,
+          activityTypeFilter: filters?.activityTypes,
           assetIdKeyword: searchKeyword,
           sort,
         });
@@ -61,8 +61,8 @@ export const searchActivities = async (
         return invokeWeb("search_activities", {
           page,
           pageSize,
-          accountIdFilter: filters?.accountId,
-          activityTypeFilter: filters?.activityType,
+          accountIdFilter: filters?.accountIds,
+          activityTypeFilter: filters?.activityTypes,
           assetIdKeyword: searchKeyword,
           sort,
         });

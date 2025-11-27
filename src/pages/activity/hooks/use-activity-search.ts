@@ -40,14 +40,14 @@ export function useActivitySearch({
 }: UseActivitySearchOptions): UseActivitySearchResult {
   const normalizedFilters = useMemo(() => {
     return {
-      accountId: filters.accountIds.length > 0 ? filters.accountIds : undefined,
-      activityType: filters.activityTypes.length > 0 ? filters.activityTypes : undefined,
-    } as Record<string, unknown>;
+      accountIds: filters.accountIds.length > 0 ? filters.accountIds : undefined,
+      activityTypes: filters.activityTypes.length > 0 ? filters.activityTypes : undefined
+    };
   }, [filters.accountIds, filters.activityTypes]);
 
   const primarySort =
     sorting.length > 0 && sorting[0]?.id
-      ? ({ id: sorting[0]!.id, desc: sorting[0]!.desc ?? false } as {
+      ? ({ id: sorting[0].id, desc: sorting[0].desc ?? false } as {
           id: string;
           desc: boolean;
         })
