@@ -24,8 +24,8 @@ export const TickerAvatar = ({ symbol, className = "size-8" }: TickerAvatarProps
         <Avatar className="bg-primary/80 dark:bg-primary/20 border-white/20 text-white backdrop-blur-md">
           <AvatarImage src={fallbackLogoUrl} alt={fullSymbol} className="object-contain p-2" />
           <AvatarFallback className="bg-transparent text-xs font-medium">
-            <span className="truncate p-1" title={fullSymbol}>
-              {baseSymbol ? baseSymbol : "•"}
+            <span className="p-1" title={fullSymbol}>
+              {baseSymbol ? baseSymbol.slice(0, 4) : "•"}
             </span>
           </AvatarFallback>
         </Avatar>
