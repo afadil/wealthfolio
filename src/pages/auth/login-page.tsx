@@ -34,7 +34,7 @@ export function LoginPage() {
         <CardHeader className="space-y-4 text-center">
           <div className="flex justify-center">
             <img
-              src="/illustration2.png"
+              src="/illustration.png"
               alt="Wealthfolio lock illustration"
               className="h-16 w-16 sm:h-20 sm:w-20"
             />
