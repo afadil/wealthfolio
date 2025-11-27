@@ -115,9 +115,9 @@ export interface InternalHostAPI {
   searchActivities(
     page: number,
     pageSize: number,
-    filters: { accountId?: string; activityType?: string; symbol?: string },
+    filters: { accountIds?: string | string[]; activityTypes?: string | string[]; symbol?: string },
     searchKeyword: string,
-    sort: { id: string; desc: boolean },
+    sort?: { id: string; desc?: boolean },
   ): Promise<ActivitySearchResponse>;
   createActivity(activity: ActivityCreate): Promise<Activity>;
   updateActivity(activity: ActivityUpdate): Promise<Activity>;

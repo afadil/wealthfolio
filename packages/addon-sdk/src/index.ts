@@ -23,7 +23,7 @@ export type {
 } from './types';
 
 // Host API interface
-export type { HostAPI } from './host-api';
+export type { HostAPI, ActivitySearchFilters, ActivitySort } from './host-api';
 
 // Query Client and Keys exports
 export type { QueryClient } from '@tanstack/react-query';

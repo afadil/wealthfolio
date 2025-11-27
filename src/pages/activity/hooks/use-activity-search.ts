@@ -40,8 +40,8 @@ export function useActivitySearch({
 }: UseActivitySearchOptions): UseActivitySearchResult {
   const normalizedFilters = useMemo(() => {
     return {
-      accountId: filters.accountIds.length > 0 ? filters.accountIds : undefined,
-      activityType: filters.activityTypes.length > 0 ? filters.activityTypes : undefined,
+      accountIds: filters.accountIds.length > 0 ? filters.accountIds : undefined,
+      activityTypes: filters.activityTypes.length > 0 ? filters.activityTypes : undefined,
     } as Record<string, unknown>;
   }, [filters.accountIds, filters.activityTypes]);
 
