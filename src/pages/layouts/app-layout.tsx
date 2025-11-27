@@ -46,9 +46,9 @@ const AppLayout = () => {
               className="draggable pointer-events-auto absolute inset-x-0 top-0 z-50 h-6 cursor-grab opacity-0"
             ></div>
             {shouldUseMobileNavigation ? (
-              <MobileNavigationContainer />
+              <MobileNavigationContainer key={location.pathname} />
             ) : (
-              <PageScrollContainer withMobileNavOffset={false}>
+              <PageScrollContainer key={location.pathname} withMobileNavOffset={false}>
                 <Outlet />
               </PageScrollContainer>
             )}
