@@ -1,6 +1,6 @@
 use crate::market_data::market_data_constants::{
     DATA_SOURCE_ALPHA_VANTAGE, DATA_SOURCE_MANUAL, DATA_SOURCE_MARKET_DATA_APP,
-    DATA_SOURCE_METAL_PRICE_API, DATA_SOURCE_YAHOO,
+    DATA_SOURCE_METAL_PRICE_API, DATA_SOURCE_OPENFIGI, DATA_SOURCE_YAHOO,
 };
 use crate::market_data::market_data_errors::MarketDataError;
 use crate::market_data::market_data_model::{
@@ -11,6 +11,7 @@ use crate::market_data::providers::manual_provider::ManualProvider;
 use crate::market_data::providers::market_data_provider::{AssetProfiler, MarketDataProvider};
 use crate::market_data::providers::marketdata_app_provider::MarketDataAppProvider;
 use crate::market_data::providers::metal_price_api_provider::MetalPriceApiProvider;
+use crate::market_data::providers::openfigi_provider::OpenFigiProvider;
 use crate::market_data::providers::yahoo_provider::YahooProvider;
 use crate::secrets::SecretStore;
 use log::{debug, info, warn};
@@ -36,6 +37,9 @@ impl ProviderRegistry {
             Arc<dyn MarketDataProvider + Send + Sync>,
             Option<Arc<dyn AssetProfiler + Send + Sync>>,
         )> = Vec::new();
+
+        let mut asset_profilers_map: HashMap<String, Arc<dyn AssetProfiler + Send + Sync>> = HashMap::new();
+        let mut ordered_profiler_ids_vec: Vec<String> = Vec::new();
 
         for setting in provider_settings {
             if !setting.enabled {
@@ -122,19 +126,38 @@ impl ProviderRegistry {
                         (None, None)
                     }
                 }
+                DATA_SOURCE_OPENFIGI => {
+                    // OpenFIGI is optional API key (free tier: 25/hour, with key: 250/hour)
+                    let p = Arc::new(OpenFigiProvider::new(api_key));
+                    (
+                        None, // OpenFIGI is only for asset profiling, not quote data
+                        Some(p as Arc<dyn AssetProfiler + Send + Sync>),
+                    )
+                }
                 _ => {
                     warn!("Unknown market data provider ID: {}. Skipping.", setting.id);
                     (None, None)
                 }
             };
 
-            if let Some(p_arc) = provider {
-                active_providers_with_priority.push((
-                    setting.priority,
-                    setting.id.clone(),
-                    p_arc,
-                    profiler,
-                ));
+            // Add to active providers if either provider or profiler is available
+            if provider.is_some() || profiler.is_some() {
+                if let Some(p_arc) = provider {
+                    active_providers_with_priority.push((
+                        setting.priority,
+                        setting.id.clone(),
+                        p_arc,
+                        profiler,
+                    ));
+                } else if let Some(prof_arc) = profiler {
+                    // Profiler-only provider (like OpenFIGI)
+                    // We need to add it differently since there's no MarketDataProvider
+                    // Store it directly in the profilers map
+                    asset_profilers_map.insert(setting.id.clone(), prof_arc);
+                    if !ordered_profiler_ids_vec.contains(&setting.id) {
+                        ordered_profiler_ids_vec.push(setting.id.clone());
+                    }
+                }
                 info!(
                     "Successfully configured and activated provider: {} (ID: {}) with priority {}",
                     setting.name, setting.id, setting.priority
@@ -146,8 +169,6 @@ impl ProviderRegistry {
 
         let mut data_providers_map = HashMap::new();
         let mut ordered_data_provider_ids_vec = Vec::new();
-        let mut asset_profilers_map = HashMap::new();
-        let mut ordered_profiler_ids_vec = Vec::new();
 
         for (_priority, id, provider, profiler_opt) in active_providers_with_priority {
             data_providers_map.insert(id.clone(), provider);

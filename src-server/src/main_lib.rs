@@ -99,6 +99,9 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         resolved_secret_path.to_string_lossy().to_string(),
     );
 
+    // Seed API keys from environment variables if they exist
+    seed_api_keys_from_env(&secret_store)?;
+
     let pool = db::create_pool(&db_path)?;
     db::run_migrations(&pool)?;
     let writer = write_actor::spawn_writer((*pool).clone());
@@ -245,4 +248,34 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         event_bus,
         auth: auth_manager,
     }))
+}
+
+/// Seed API keys from environment variables into the secret store if they exist
+fn seed_api_keys_from_env(secret_store: &Arc<dyn SecretStore>) -> anyhow::Result<()> {
+    let api_key_env_vars = [
+        ("OPENFIGI", "WF_OPENFIGI_API_KEY"),
+        ("ALPHA_VANTAGE", "WF_ALPHA_VANTAGE_API_KEY"),
+        ("MARKETDATA_APP", "WF_MARKETDATA_APP_API_KEY"),
+        ("METAL_PRICE_API", "WF_METAL_PRICE_API_KEY"),
+    ];
+
+    for (provider_id, env_var) in api_key_env_vars {
+        if let Ok(api_key) = std::env::var(env_var) {
+            let trimmed = api_key.trim();
+            if !trimmed.is_empty() {
+                // Only set if not already present (don't overwrite user-configured keys)
+                match secret_store.get_secret(provider_id) {
+                    Ok(None) | Err(_) => {
+                        tracing::info!("Setting {} API key from environment variable {}", provider_id, env_var);
+                        secret_store.set_secret(provider_id, trimmed)?;
+                    }
+                    Ok(Some(_)) => {
+                        tracing::debug!("{} API key already set, skipping environment variable", provider_id);
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
