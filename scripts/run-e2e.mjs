@@ -1,7 +1,7 @@
-import { prepE2eEnv } from "./prep-e2e.mjs";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { setTimeout } from "node:timers/promises";
+import { prepE2eEnv } from "./prep-e2e.mjs";
 
 const DEV_SERVER_URL = process.env.WF_E2E_BASE_URL || "http://localhost:1420";
 const cliArgs = process.argv.slice(2);
@@ -74,8 +74,7 @@ const run = async () => {
 
   try {
     await waitForServer(DEV_SERVER_URL, devServer);
-    const playwrightArgs = shouldUseUi ? ["--ui"] : [];
-    await runPlaywrightTests(playwrightArgs);
+    await runPlaywrightTests(cliArgs);
   } finally {
     await cleanup();
   }
