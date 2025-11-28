@@ -46,6 +46,11 @@ import {
   Badge,
   Button,
   Checkbox,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
   Icons,
   Table,
   TableBody,
@@ -58,6 +63,9 @@ import {
 import type { Dispatch, SetStateAction } from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { ManageCategoriesDialog } from "../components/manage-categories-dialog";
+import { ManageRulesDialog } from "../components/manage-rules-dialog";
+import { ManageEventsDialog } from "../components/manage-events-dialog";
 
 type EditableField =
   | "activityType"
@@ -137,6 +145,14 @@ export function CashImportEditStep({
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState<FilterType>("all");
 
+  // Manual filter refresh state - transactions stay visible until user clicks refresh
+  const [displayedTransactions, setDisplayedTransactions] = useState<CashImportRow[]>([]);
+  const [pendingFilterChanges, setPendingFilterChanges] = useState(0);
+  const [lastAppliedFilter, setLastAppliedFilter] = useState<{
+    filter: FilterType;
+    searchQuery: string;
+  }>({ filter: "all", searchQuery: "" });
+
   // Modal states
   const [bulkCategoryModalOpen, setBulkCategoryModalOpen] = useState(false);
   const [bulkEventModalOpen, setBulkEventModalOpen] = useState(false);
@@ -146,6 +162,11 @@ export function CashImportEditStep({
   const [selectedParentCategory, setSelectedParentCategory] = useState<Category | null>(null);
   const [createRuleOpen, setCreateRuleOpen] = useState(false);
   const [createEventOpen, setCreateEventOpen] = useState(false);
+
+  // Manage dialogs state
+  const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
+  const [manageRulesOpen, setManageRulesOpen] = useState(false);
+  const [manageEventsOpen, setManageEventsOpen] = useState(false);
 
   // Get account info
   const account = useMemo(() => accounts.find((a) => a.id === accountId), [accounts, accountId]);
@@ -268,41 +289,107 @@ export function CashImportEditStep({
   const withEventsCount = localTransactions.filter((t) => t.eventId).length;
   const withoutEventsCount = localTransactions.filter((t) => !t.eventId).length;
 
-  // Filtered transactions
-  const filteredTransactions = useMemo(() => {
-    let result = localTransactions;
+  // Helper function to compute filtered transactions based on filter settings
+  const computeFilteredTransactions = useCallback(
+    (transactions: CashImportRow[], filterType: FilterType, query: string) => {
+      let result = transactions;
 
-    // Apply filter
-    switch (filter) {
-      case "categorized":
-        result = result.filter((t) => t.categoryId);
-        break;
-      case "uncategorized":
-        result = result.filter((t) => !t.categoryId);
-        break;
-      case "with-events":
-        result = result.filter((t) => t.eventId);
-        break;
-      case "without-events":
-        result = result.filter((t) => !t.eventId);
-        break;
-    }
+      // Apply filter
+      switch (filterType) {
+        case "categorized":
+          result = result.filter((t) => t.categoryId);
+          break;
+        case "uncategorized":
+          result = result.filter((t) => !t.categoryId);
+          break;
+        case "with-events":
+          result = result.filter((t) => t.eventId);
+          break;
+        case "without-events":
+          result = result.filter((t) => !t.eventId);
+          break;
+      }
 
-    // Apply search
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(
-        (t) => t.name.toLowerCase().includes(query) || t.description?.toLowerCase().includes(query),
-      );
-    }
+      // Apply search
+      if (query.trim()) {
+        const q = query.toLowerCase();
+        result = result.filter(
+          (t) => t.name.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q),
+        );
+      }
 
-    return result;
-  }, [localTransactions, filter, searchQuery]);
+      return result;
+    },
+    [],
+  );
 
-  const filteredTransactionsRef = useRef(filteredTransactions);
+  // Apply filter refresh - called on initial load and when user clicks refresh
+  const applyFilterRefresh = useCallback(() => {
+    const newDisplayed = computeFilteredTransactions(localTransactions, filter, searchQuery);
+    setDisplayedTransactions(newDisplayed);
+    setLastAppliedFilter({ filter, searchQuery });
+    setPendingFilterChanges(0);
+  }, [localTransactions, filter, searchQuery, computeFilteredTransactions]);
+
+  // Initialize displayed transactions on first load
   useEffect(() => {
-    filteredTransactionsRef.current = filteredTransactions;
-  }, [filteredTransactions]);
+    if (displayedTransactions.length === 0 && localTransactions.length > 0) {
+      applyFilterRefresh();
+    }
+  }, [localTransactions, displayedTransactions.length, applyFilterRefresh]);
+
+  // Track when filter settings change (but don't auto-apply)
+  useEffect(() => {
+    if (filter !== lastAppliedFilter.filter || searchQuery !== lastAppliedFilter.searchQuery) {
+      // Immediately apply filter changes
+      applyFilterRefresh();
+    }
+  }, [filter, searchQuery, lastAppliedFilter, applyFilterRefresh]);
+
+  // Track pending changes when transactions are modified (rows that would be filtered out)
+  useEffect(() => {
+    // Count how many displayed transactions no longer match the current filter
+    const wouldBeFilteredOut = displayedTransactions.filter((displayed) => {
+      const current = localTransactions.find((t) => t.lineNumber === displayed.lineNumber);
+      if (!current) return true; // Deleted
+
+      // Check if it would pass the current filter
+      switch (lastAppliedFilter.filter) {
+        case "categorized":
+          return !current.categoryId;
+        case "uncategorized":
+          return !!current.categoryId;
+        case "with-events":
+          return !current.eventId;
+        case "without-events":
+          return !!current.eventId;
+        default:
+          return false;
+      }
+    }).length;
+
+    setPendingFilterChanges(wouldBeFilteredOut);
+  }, [localTransactions, displayedTransactions, lastAppliedFilter.filter]);
+
+  // Update displayed transactions in place when underlying data changes (preserving visibility)
+  useEffect(() => {
+    setDisplayedTransactions((prev) =>
+      prev
+        .map((displayed) => {
+          const updated = localTransactions.find((t) => t.lineNumber === displayed.lineNumber);
+          return updated || displayed;
+        })
+        .filter((displayed) =>
+          localTransactions.some((t) => t.lineNumber === displayed.lineNumber),
+        ),
+    );
+  }, [localTransactions]);
+
+  // For navigation purposes, use displayed transactions
+  const filteredTransactionsRef = useRef(displayedTransactions);
+  useEffect(() => {
+    filteredTransactionsRef.current = displayedTransactions;
+  }, [displayedTransactions]);
 
   // Navigation
   const handleCellNavigation = useCallback((direction: "up" | "down" | "left" | "right") => {
@@ -404,12 +491,12 @@ export function CashImportEditStep({
   }, []);
 
   const toggleSelectAll = useCallback(() => {
-    if (selectedIds.size === filteredTransactions.length) {
+    if (selectedIds.size === displayedTransactions.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredTransactions.map((t) => t.lineNumber)));
+      setSelectedIds(new Set(displayedTransactions.map((t) => t.lineNumber)));
     }
-  }, [filteredTransactions, selectedIds.size]);
+  }, [displayedTransactions, selectedIds.size]);
 
   const clearSelection = useCallback(() => {
     setSelectedIds(new Set());
@@ -678,6 +765,25 @@ export function CashImportEditStep({
               <SelectItem value="without-events">Without Events ({withoutEventsCount})</SelectItem>
             </SelectContent>
           </Select>
+
+          {/* Refresh Filter Button */}
+          <Button
+            onClick={applyFilterRefresh}
+            variant="outline"
+            size="xs"
+            className="relative shrink-0"
+          >
+            <Icons.Refresh className="mr-1 h-3.5 w-3.5" />
+            Refresh
+            {pendingFilterChanges > 0 && (
+              <Badge
+                variant="secondary"
+                className="bg-primary text-primary-foreground absolute -top-2 -right-2 h-5 min-w-5 px-1 text-xs"
+              >
+                {pendingFilterChanges}
+              </Badge>
+            )}
+          </Button>
         </div>
 
         <div className="flex items-center gap-1">
@@ -699,43 +805,47 @@ export function CashImportEditStep({
 
           <div className="bg-border mx-1 h-4 w-px" />
 
-          {/* Create buttons */}
-          <Button
-            onClick={() => setCreateCategoryOpen(true)}
-            variant="outline"
-            size="xs"
-            className="shrink-0"
-          >
-            <Icons.Plus className="mr-1 h-3.5 w-3.5" />
-            Category
-          </Button>
-          <Button
-            onClick={() => setSelectParentCategoryOpen(true)}
-            variant="outline"
-            size="xs"
-            className="shrink-0"
-          >
-            <Icons.Plus className="mr-1 h-3.5 w-3.5" />
-            Subcategory
-          </Button>
-          <Button
-            onClick={() => setCreateRuleOpen(true)}
-            variant="outline"
-            size="xs"
-            className="shrink-0"
-          >
-            <Icons.Plus className="mr-1 h-3.5 w-3.5" />
-            Rule
-          </Button>
-          <Button
-            onClick={() => setCreateEventOpen(true)}
-            variant="outline"
-            size="xs"
-            className="shrink-0"
-          >
-            <Icons.Plus className="mr-1 h-3.5 w-3.5" />
-            Event
-          </Button>
+          {/* Create/Manage dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="xs" className="shrink-0">
+                <Icons.Plus className="mr-1 h-3.5 w-3.5" />
+                New
+                <Icons.ChevronDown className="ml-1 h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setCreateCategoryOpen(true)}>
+                <Icons.Tag className="mr-2 h-4 w-4" />
+                New Category
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSelectParentCategoryOpen(true)}>
+                <Icons.Tag className="mr-2 h-4 w-4" />
+                New Subcategory
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCreateRuleOpen(true)}>
+                <Icons.ListFilter className="mr-2 h-4 w-4" />
+                New Rule
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCreateEventOpen(true)}>
+                <Icons.Calendar className="mr-2 h-4 w-4" />
+                New Event
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setManageCategoriesOpen(true)}>
+                <Icons.Settings className="mr-2 h-4 w-4" />
+                Manage Categories...
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setManageRulesOpen(true)}>
+                <Icons.Settings className="mr-2 h-4 w-4" />
+                Manage Rules...
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setManageEventsOpen(true)}>
+                <Icons.Settings className="mr-2 h-4 w-4" />
+                Manage Events...
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -784,14 +894,14 @@ export function CashImportEditStep({
       {/* Table */}
       <div className="bg-background flex-1 overflow-auto rounded-lg border">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-muted-foreground/5 sticky top-0 z-10">
             <TableRow className="hover:bg-transparent">
               <TableHead className="bg-muted/30 h-9 w-12 border-r px-0 py-0">
                 <div className="flex h-full items-center justify-center">
                   <Checkbox
                     checked={
-                      filteredTransactions.length > 0 &&
-                      selectedIds.size === filteredTransactions.length
+                      displayedTransactions.length > 0 &&
+                      selectedIds.size === displayedTransactions.length
                     }
                     onCheckedChange={toggleSelectAll}
                   />
@@ -834,14 +944,14 @@ export function CashImportEditStep({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredTransactions.length === 0 ? (
+            {displayedTransactions.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={12} className="text-muted-foreground h-32 text-center">
                   No transactions match your filters.
                 </TableCell>
               </TableRow>
             ) : (
-              filteredTransactions.map((transaction) => (
+              displayedTransactions.map((transaction) => (
                 <ImportTransactionRow
                   key={transaction.lineNumber}
                   transaction={transaction}
@@ -952,6 +1062,24 @@ export function CashImportEditStep({
         categories={categories}
         onSave={handleRuleSave}
         isLoading={createRuleMutation.isPending}
+      />
+
+      {/* Manage Categories Dialog */}
+      <ManageCategoriesDialog
+        open={manageCategoriesOpen}
+        onClose={() => setManageCategoriesOpen(false)}
+      />
+
+      {/* Manage Rules Dialog */}
+      <ManageRulesDialog
+        open={manageRulesOpen}
+        onClose={() => setManageRulesOpen(false)}
+      />
+
+      {/* Manage Events Dialog */}
+      <ManageEventsDialog
+        open={manageEventsOpen}
+        onClose={() => setManageEventsOpen(false)}
       />
     </div>
   );
@@ -1468,3 +1596,4 @@ function SelectParentCategoryModal({
     </Dialog>
   );
 }
+

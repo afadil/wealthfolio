@@ -696,8 +696,9 @@ impl ActivityRepositoryTrait for ActivityRepository {
         let mut conn = get_connection(&self.pool)?;
 
         // Query spending activities from CASH accounts
-        // Spending = activities with expense categories (is_income = 0)
-        // OR activity types: WITHDRAWAL, FEE, TAX
+        // Spending = WITHDRAWAL activities (unless categorized as income)
+        //          + activities with expense categories (is_income = 0)
+        //          + FEE/TAX activities
         let query = r#"
             SELECT
                 strftime('%Y-%m', a.activity_date) as date,
@@ -718,13 +719,14 @@ impl ActivityRepositoryTrait for ActivityRepository {
             LEFT JOIN categories subcat ON a.sub_category_id = subcat.id
             WHERE acc.is_active = 1
               AND acc.account_type = 'CASH'
-              -- Exclude transfers (they represent money movement between accounts, not actual spending)
               AND a.activity_type NOT IN ('TRANSFER_IN', 'TRANSFER_OUT')
               AND (
-                  -- Expense activities by category
-                  (cat.is_income = 0)
-                  -- Or expense activity types without category
-                  OR (a.activity_type IN ('WITHDRAWAL', 'FEE', 'TAX') AND a.category_id IS NULL)
+                  -- Expense category explicitly assigned
+                  cat.is_income = 0
+                  -- Or WITHDRAWAL without category (default expense behavior)
+                  OR (a.activity_type = 'WITHDRAWAL' AND a.category_id IS NULL)
+                  -- Or FEE/TAX (always expense, regardless of category)
+                  OR a.activity_type IN ('FEE', 'TAX')
               )
             ORDER BY a.activity_date
         "#;
