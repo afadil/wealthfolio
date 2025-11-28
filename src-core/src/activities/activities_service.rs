@@ -7,6 +7,7 @@ use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
 use crate::activities::{ActivityRepositoryTrait, ActivityServiceTrait};
 use crate::assets::AssetServiceTrait;
+use crate::events::events_traits::EventServiceTrait;
 use crate::fx::FxServiceTrait;
 use crate::Result;
 use uuid::Uuid;
@@ -17,6 +18,7 @@ pub struct ActivityService {
     account_service: Arc<dyn AccountServiceTrait>,
     asset_service: Arc<dyn AssetServiceTrait>,
     fx_service: Arc<dyn FxServiceTrait>,
+    event_service: Option<Arc<dyn EventServiceTrait>>,
 }
 
 impl ActivityService {
@@ -32,11 +34,38 @@ impl ActivityService {
             account_service,
             asset_service,
             fx_service,
+            event_service: None,
+        }
+    }
+
+    /// Creates a new ActivityService with event service for dynamic date recalculation
+    pub fn with_event_service(
+        activity_repository: Arc<dyn ActivityRepositoryTrait>,
+        account_service: Arc<dyn AccountServiceTrait>,
+        asset_service: Arc<dyn AssetServiceTrait>,
+        fx_service: Arc<dyn FxServiceTrait>,
+        event_service: Arc<dyn EventServiceTrait>,
+    ) -> Self {
+        Self {
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            event_service: Some(event_service),
         }
     }
 }
 
 impl ActivityService {
+    /// Recalculates the dates for a dynamic event if event_id is provided
+    async fn recalculate_event_dates_if_needed(&self, event_id: Option<&str>) {
+        if let (Some(event_svc), Some(eid)) = (&self.event_service, event_id) {
+            // Fire and forget - we don't want to fail the activity operation
+            // if the event date recalculation fails
+            let _ = event_svc.recalculate_dynamic_event_dates(eid).await;
+        }
+    }
+
     async fn prepare_new_activity(&self, mut activity: NewActivity) -> Result<NewActivity> {
         let account: Account = self.account_service.get_account(&activity.account_id)?;
 
@@ -153,7 +182,10 @@ impl ActivityServiceTrait for ActivityService {
         page_size: i64,
         account_id_filter: Option<Vec<String>>,
         activity_type_filter: Option<Vec<String>>,
+        category_id_filter: Option<Vec<String>>,
+        event_id_filter: Option<Vec<String>>,
         asset_id_keyword: Option<String>,
+        account_type_filter: Option<Vec<String>>,
         sort: Option<Sort>,
     ) -> Result<ActivitySearchResponse> {
         self.activity_repository.search_activities(
@@ -161,26 +193,65 @@ impl ActivityServiceTrait for ActivityService {
             page_size,
             account_id_filter,
             activity_type_filter,
+            category_id_filter,
+            event_id_filter,
             asset_id_keyword,
+            account_type_filter,
             sort,
         )
     }
 
     /// Creates a new activity
     async fn create_activity(&self, activity: NewActivity) -> Result<Activity> {
+        let event_id = activity.event_id.clone();
         let prepared = self.prepare_new_activity(activity).await?;
-        self.activity_repository.create_activity(prepared).await
+        let result = self.activity_repository.create_activity(prepared).await?;
+
+        // Recalculate event dates if activity is linked to an event
+        self.recalculate_event_dates_if_needed(event_id.as_deref()).await;
+
+        Ok(result)
     }
 
     /// Updates an existing activity
     async fn update_activity(&self, activity: ActivityUpdate) -> Result<Activity> {
+        // Get old event_id before update to handle event changes
+        let old_event_id = self
+            .activity_repository
+            .get_activity(&activity.id)
+            .ok()
+            .map(|a| a.event_id)
+            .flatten();
+
+        let new_event_id = activity.event_id.clone();
         let prepared = self.prepare_update_activity(activity).await?;
-        self.activity_repository.update_activity(prepared).await
+        let result = self.activity_repository.update_activity(prepared).await?;
+
+        // Recalculate dates for both old and new events (if different)
+        self.recalculate_event_dates_if_needed(new_event_id.as_deref()).await;
+        if old_event_id != new_event_id {
+            self.recalculate_event_dates_if_needed(old_event_id.as_deref()).await;
+        }
+
+        Ok(result)
     }
 
     /// Deletes an activity
     async fn delete_activity(&self, activity_id: String) -> Result<Activity> {
-        self.activity_repository.delete_activity(activity_id).await
+        // Get event_id before deletion to recalculate its dates
+        let event_id = self
+            .activity_repository
+            .get_activity(&activity_id)
+            .ok()
+            .map(|a| a.event_id)
+            .flatten();
+
+        let result = self.activity_repository.delete_activity(activity_id).await?;
+
+        // Recalculate event dates if activity was linked to an event
+        self.recalculate_event_dates_if_needed(event_id.as_deref()).await;
+
+        Ok(result)
     }
 
     async fn bulk_mutate_activities(
@@ -375,6 +446,11 @@ impl ActivityServiceTrait for ActivityService {
                 amount: activity.amount,
                 is_draft: activity.is_draft,
                 comment: activity.comment.clone(),
+                name: activity.name.clone(),
+                category_id: activity.category_id.clone(),
+                sub_category_id: activity.sub_category_id.clone(),
+                event_id: activity.event_id.clone(),
+                transfer_account_id: activity.transfer_account_id.clone(),
             })
             .collect();
 

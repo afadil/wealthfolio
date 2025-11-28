@@ -1,0 +1,266 @@
+import { getAccounts } from "@/commands/account";
+import { CashActivityType } from "@/commands/cash-activity";
+import { QueryKeys } from "@/lib/query-keys";
+import { Account, ActivityDetails } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import type { SortingState } from "@tanstack/react-table";
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  Icons,
+  Page,
+  PageContent,
+  PageHeader,
+} from "@wealthfolio/ui";
+import { useCallback, useState } from "react";
+import { CashActivityFilters, CashActivityViewMode } from "./components/cash-activity-filters";
+import { CashActivityForm } from "./components/cash-activity-form";
+import { CashActivityTable } from "./components/cash-activity-table";
+import { CashActivityDatagrid } from "./components/cash-activity-datagrid";
+import { CashTransferForm } from "./components/cash-transfer-form";
+import { useCashActivities } from "./hooks/use-cash-activities";
+import { useCashActivityMutations } from "./hooks/use-cash-activity-mutations";
+import { ActivityDeleteModal } from "@/pages/activity/components/activity-delete-modal";
+import { ActivityPagination } from "@/pages/activity/components/activity-pagination";
+import { Link } from "react-router-dom";
+
+const CashActivitiesPage = () => {
+  const [showForm, setShowForm] = useState(false);
+  const [showTransferForm, setShowTransferForm] = useState(false);
+  const [selectedActivity, setSelectedActivity] = useState<Partial<ActivityDetails> | undefined>();
+  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+  const [viewMode, setViewMode] = useState<CashActivityViewMode>("view");
+
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
+  const [selectedActivityTypes, setSelectedActivityTypes] = useState<CashActivityType[]>([]);
+  const [selectedParentCategoryIds, setSelectedParentCategoryIds] = useState<string[]>([]);
+  const [selectedSubCategoryIds, setSelectedSubCategoryIds] = useState<string[]>([]);
+  const [selectedEventIds, setSelectedEventIds] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sorting, setSorting] = useState<SortingState>([{ id: "date", desc: true }]);
+
+  const { data: accountsData } = useQuery<Account[], Error>({
+    queryKey: [QueryKeys.ACCOUNTS],
+    queryFn: getAccounts,
+  });
+  const accounts = accountsData ?? [];
+
+  const cashAccounts = accounts.filter((acc) => acc.accountType === "CASH" && acc.isActive);
+
+  const { deleteCashActivityMutation, duplicateCashActivityMutation } = useCashActivityMutations();
+  const {
+    flatData,
+    totalRowCount,
+    fetchNextPage,
+    isFetching,
+    isLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    refetch,
+  } = useCashActivities({
+    filters: {
+      accountIds: selectedAccounts,
+      activityTypes: selectedActivityTypes,
+      categoryIds: [...selectedParentCategoryIds, ...selectedSubCategoryIds],
+      eventIds: selectedEventIds,
+      search: searchQuery,
+    },
+    sorting,
+  });
+  const totalFetched = flatData.length;
+
+  const handleEdit = useCallback((activity?: ActivityDetails) => {
+    if (activity?.activityType === "TRANSFER_IN" || activity?.activityType === "TRANSFER_OUT") {
+      setSelectedActivity(activity);
+      setShowForm(true);
+      return;
+    }
+    setSelectedActivity(activity);
+    setShowForm(true);
+  }, []);
+
+  const handleDelete = useCallback((activity: ActivityDetails) => {
+    setSelectedActivity(activity);
+    setShowDeleteAlert(true);
+  }, []);
+
+  const handleDuplicate = useCallback(
+    async (activity: ActivityDetails) => {
+      await duplicateCashActivityMutation.mutateAsync(activity);
+    },
+    [duplicateCashActivityMutation],
+  );
+
+  const handleDeleteConfirm = async () => {
+    if (!selectedActivity?.id) return;
+    await deleteCashActivityMutation.mutateAsync(selectedActivity.id);
+    setShowDeleteAlert(false);
+    setSelectedActivity(undefined);
+  };
+
+  const handleFormClose = useCallback(() => {
+    setShowForm(false);
+    setSelectedActivity(undefined);
+  }, []);
+
+  const handleTransferFormClose = useCallback(() => {
+    setShowTransferForm(false);
+  }, []);
+
+  const handleAddDeposit = useCallback(() => {
+    setSelectedActivity({ activityType: "DEPOSIT" });
+    setShowForm(true);
+  }, []);
+
+  const handleAddWithdrawal = useCallback(() => {
+    setSelectedActivity({ activityType: "WITHDRAWAL" });
+    setShowForm(true);
+  }, []);
+
+  const headerActions = (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button variant="outline" size="sm" asChild className="hidden sm:inline-flex">
+        <Link to="/cash/activities/import">
+          <Icons.Import className="mr-2 h-4 w-4" />
+          Import
+        </Link>
+      </Button>
+
+      <div className="hidden sm:flex">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm">
+              <Icons.Plus className="mr-2 h-4 w-4" />
+              Add Transaction
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuItem onClick={handleAddDeposit} className="py-2.5">
+              <Icons.ArrowDown className="mr-2 h-4 w-4 text-success" />
+              Deposit
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleAddWithdrawal} className="py-2.5">
+              <Icons.ArrowUp className="mr-2 h-4 w-4 text-destructive" />
+              Withdrawal
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setShowTransferForm(true)} className="py-2.5">
+              <Icons.ArrowRightLeft className="mr-2 h-4 w-4" />
+              Transfer
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      <div className="flex items-center gap-2 sm:hidden">
+        <Button size="icon" variant="outline" title="Import" asChild>
+          <Link to="/cash/activities/import">
+            <Icons.Import className="size-4" />
+          </Link>
+        </Button>
+        <Button size="icon" title="Add" onClick={() => setShowForm(true)}>
+          <Icons.Plus className="size-4" />
+        </Button>
+      </div>
+    </div>
+  );
+
+  return (
+    <Page>
+      <PageHeader
+        heading="Cashflow Activity"
+        text="Track deposits, withdrawals, and transfers for your cash accounts"
+        actions={headerActions}
+      />
+      <PageContent>
+        <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-hidden">
+          <CashActivityFilters
+            accounts={accounts}
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
+            selectedAccountIds={selectedAccounts}
+            onAccountIdsChange={setSelectedAccounts}
+            selectedActivityTypes={selectedActivityTypes}
+            onActivityTypesChange={setSelectedActivityTypes}
+            selectedParentCategoryIds={selectedParentCategoryIds}
+            onParentCategoryIdsChange={setSelectedParentCategoryIds}
+            selectedSubCategoryIds={selectedSubCategoryIds}
+            onSubCategoryIdsChange={setSelectedSubCategoryIds}
+            selectedEventIds={selectedEventIds}
+            onEventIdsChange={setSelectedEventIds}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            totalFetched={totalFetched}
+            totalRowCount={totalRowCount}
+            isFetching={isFetching}
+          />
+
+          {viewMode === "edit" ? (
+            <CashActivityDatagrid
+              accounts={cashAccounts}
+              activities={flatData}
+              onRefetch={refetch}
+              onEditActivity={handleEdit}
+            />
+          ) : (
+            <CashActivityTable
+              activities={flatData}
+              isLoading={isLoading}
+              sorting={sorting}
+              onSortingChange={setSorting}
+              handleEdit={handleEdit}
+              handleDelete={handleDelete}
+              handleDuplicate={handleDuplicate}
+            />
+          )}
+
+          <ActivityPagination
+            hasMore={hasNextPage ?? false}
+            onLoadMore={fetchNextPage}
+            isFetching={isFetchingNextPage}
+            totalFetched={totalFetched}
+            totalCount={totalRowCount}
+          />
+        </div>
+
+        <CashActivityForm
+          key={selectedActivity?.id ?? "new"}
+          accounts={cashAccounts.map((account) => ({
+            value: account.id,
+            label: account.name,
+            currency: account.currency,
+          }))}
+          activity={selectedActivity}
+          open={showForm}
+          onClose={handleFormClose}
+        />
+
+        <CashTransferForm
+          accounts={cashAccounts.map((account) => ({
+            value: account.id,
+            label: account.name,
+            currency: account.currency,
+          }))}
+          open={showTransferForm}
+          onClose={handleTransferFormClose}
+        />
+
+        <ActivityDeleteModal
+          isOpen={showDeleteAlert}
+          isDeleting={deleteCashActivityMutation.isPending}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => {
+            setShowDeleteAlert(false);
+            setSelectedActivity(undefined);
+          }}
+        />
+      </PageContent>
+    </Page>
+  );
+};
+
+export default CashActivitiesPage;

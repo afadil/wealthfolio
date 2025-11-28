@@ -8,6 +8,7 @@ use wealthfolio_core::{
         income::IncomeSummary,
         performance::{PerformanceMetrics, SimplePerformanceMetrics},
     },
+    spending::SpendingSummary,
 };
 
 #[derive(serde::Deserialize)]
@@ -108,6 +109,13 @@ async fn get_income_summary(
     Ok(Json(items))
 }
 
+async fn get_spending_summary(
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<Vec<SpendingSummary>>> {
+    let items = state.spending_service.get_spending_summary()?;
+    Ok(Json(items))
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route(
@@ -117,4 +125,5 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/performance/history", post(calculate_performance_history))
         .route("/performance/summary", post(calculate_performance_summary))
         .route("/income/summary", axum::routing::get(get_income_summary))
+        .route("/spending/summary", axum::routing::get(get_spending_summary))
 }

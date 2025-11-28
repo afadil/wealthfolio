@@ -21,11 +21,14 @@ pub async fn get_activities(
 
 #[tauri::command]
 pub async fn search_activities(
-    page: i64,                                 // Page number, 1-based
+    page: i64,                                 // Page number, 0-based
     page_size: i64,                            // Number of items per page
     account_id_filter: Option<Vec<String>>,    // Optional account_id filter
     activity_type_filter: Option<Vec<String>>, // Optional activity_type filter
+    category_id_filter: Option<Vec<String>>,   // Optional category_id filter
+    event_id_filter: Option<Vec<String>>,      // Optional event_id filter
     asset_id_keyword: Option<String>,          // Optional asset_id keyword for search
+    account_type_filter: Option<Vec<String>>,  // Optional account_type filter (e.g., SECURITIES, CASH)
     sort: Option<Sort>,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ActivitySearchResponse, String> {
@@ -35,7 +38,10 @@ pub async fn search_activities(
         page_size,
         account_id_filter,
         activity_type_filter,
+        category_id_filter,
+        event_id_filter,
         asset_id_keyword,
+        account_type_filter,
         sort,
     )?)
 }

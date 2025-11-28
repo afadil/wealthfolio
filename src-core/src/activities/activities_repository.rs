@@ -13,7 +13,9 @@ use crate::activities::activities_constants::*;
 use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
 use crate::db::{get_connection, WriteHandle};
-use crate::schema::{accounts, activities, activity_import_profiles, assets};
+use crate::schema::{accounts, activities, activity_import_profiles};
+use crate::portfolio::income::{CapitalGainsData, CashIncomeData};
+use crate::spending::SpendingData;
 use crate::{Error, Result};
 use async_trait::async_trait;
 use diesel::dsl::min;
@@ -89,120 +91,200 @@ impl ActivityRepositoryTrait for ActivityRepository {
 
     fn search_activities(
         &self,
-        page: i64,                                 // Page number, 1-based
+        page: i64,                                 // Page number, 0-based
         page_size: i64,                            // Number of items per page
         account_id_filter: Option<Vec<String>>,    // Optional account_id filter
         activity_type_filter: Option<Vec<String>>, // Optional activity_type filter
+        category_id_filter: Option<Vec<String>>,   // Optional category_id filter
+        event_id_filter: Option<Vec<String>>,      // Optional event_id filter
         asset_id_keyword: Option<String>,          // Optional asset_id keyword for search
+        account_type_filter: Option<Vec<String>>,  // Optional account_type filter (e.g., SECURITIES, CASH)
         sort: Option<Sort>,                        // Optional sort
     ) -> Result<ActivitySearchResponse> {
-        let mut conn = get_connection(&self.pool)?;
+        use diesel::sql_query;
 
+        let mut conn = get_connection(&self.pool)?;
         let offset = page * page_size;
 
-        // Function to create base query
-        let create_base_query = |_conn: &SqliteConnection| {
-            let mut query = activities::table
-                .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
-                .inner_join(assets::table.on(activities::asset_id.eq(assets::id)))
-                .filter(accounts::is_active.eq(true))
-                .into_boxed();
+        // Build WHERE clause conditions
+        let mut conditions = vec!["acc.is_active = 1".to_string()];
 
-            if let Some(ref account_ids) = account_id_filter {
-                query = query.filter(activities::account_id.eq_any(account_ids));
+        if let Some(ref account_ids) = account_id_filter {
+            if !account_ids.is_empty() {
+                let ids = account_ids
+                    .iter()
+                    .map(|id| format!("'{}'", id.replace("'", "''")))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                conditions.push(format!("a.account_id IN ({})", ids));
             }
-            if let Some(ref activity_types) = activity_type_filter {
-                query = query.filter(activities::activity_type.eq_any(activity_types));
-            }
-            if let Some(ref keyword) = asset_id_keyword {
-                query = query.filter(assets::id.like(format!("%{}%", keyword)));
-            }
+        }
 
-            // Apply sorting
-            if let Some(ref sort) = sort {
-                match sort.id.as_str() {
-                    "date" => {
-                        if sort.desc {
-                            query = query.order((
-                                activities::activity_date.desc(),
-                                activities::created_at.asc(),
-                            ));
-                        } else {
-                            query = query.order((
-                                activities::activity_date.asc(),
-                                activities::created_at.asc(),
-                            ));
-                        }
+        if let Some(ref activity_types) = activity_type_filter {
+            if !activity_types.is_empty() {
+                let types = activity_types
+                    .iter()
+                    .map(|t| format!("'{}'", t.replace("'", "''")))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                conditions.push(format!("a.activity_type IN ({})", types));
+            }
+        }
+
+        if let Some(ref category_ids) = category_id_filter {
+            if !category_ids.is_empty() {
+                let ids = category_ids
+                    .iter()
+                    .map(|id| format!("'{}'", id.replace("'", "''")))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                // Filter by either category_id or sub_category_id
+                conditions.push(format!(
+                    "(a.category_id IN ({}) OR a.sub_category_id IN ({}))",
+                    ids, ids
+                ));
+            }
+        }
+
+        if let Some(ref event_ids) = event_id_filter {
+            if !event_ids.is_empty() {
+                let ids = event_ids
+                    .iter()
+                    .map(|id| format!("'{}'", id.replace("'", "''")))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                conditions.push(format!("a.event_id IN ({})", ids));
+            }
+        }
+
+        if let Some(ref keyword) = asset_id_keyword {
+            let escaped = keyword.replace("'", "''");
+            // Search in asset symbol, asset name, or activity name
+            conditions.push(format!(
+                "(ast.id LIKE '%{}%' OR ast.symbol LIKE '%{}%' OR ast.name LIKE '%{}%' OR a.name LIKE '%{}%')",
+                escaped, escaped, escaped, escaped
+            ));
+        }
+
+        if let Some(ref account_types) = account_type_filter {
+            if !account_types.is_empty() {
+                let types = account_types
+                    .iter()
+                    .map(|t| format!("'{}'", t.replace("'", "''")))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                conditions.push(format!("acc.account_type IN ({})", types));
+            }
+        }
+
+        let where_clause = conditions.join(" AND ");
+
+        // Build ORDER BY clause
+        let order_clause = if let Some(ref s) = sort {
+            match s.id.as_str() {
+                "date" => {
+                    if s.desc {
+                        "a.activity_date DESC, a.created_at ASC"
+                    } else {
+                        "a.activity_date ASC, a.created_at ASC"
                     }
-                    "activityType" => {
-                        if sort.desc {
-                            query = query.order(activities::activity_type.desc());
-                        } else {
-                            query = query.order(activities::activity_type.asc());
-                        }
-                    }
-                    "assetSymbol" => {
-                        if sort.desc {
-                            query = query.order(activities::asset_id.desc());
-                        } else {
-                            query = query.order(activities::asset_id.asc());
-                        }
-                    }
-                    "accountName" => {
-                        if sort.desc {
-                            query = query.order(accounts::name.desc());
-                        } else {
-                            query = query.order(accounts::name.asc());
-                        }
-                    }
-                    _ => {
-                        query = query.order((
-                            activities::activity_date.desc(),
-                            activities::created_at.asc(),
-                        ))
-                    } // Default order
                 }
-            } else {
-                query = query.order((
-                    activities::activity_date.desc(),
-                    activities::created_at.asc(),
-                )); // Default order
+                "activityType" => {
+                    if s.desc {
+                        "a.activity_type DESC"
+                    } else {
+                        "a.activity_type ASC"
+                    }
+                }
+                "assetSymbol" => {
+                    if s.desc {
+                        "a.asset_id DESC"
+                    } else {
+                        "a.asset_id ASC"
+                    }
+                }
+                "accountName" => {
+                    if s.desc {
+                        "acc.name DESC"
+                    } else {
+                        "acc.name ASC"
+                    }
+                }
+                _ => "a.activity_date DESC, a.created_at ASC",
             }
-
-            query
+        } else {
+            "a.activity_date DESC, a.created_at ASC"
         };
 
         // Count query
-        let total_row_count = create_base_query(&conn)
-            .count()
-            .get_result::<i64>(&mut conn)?;
+        let count_sql = format!(
+            r#"
+            SELECT COUNT(*) as count
+            FROM activities a
+            INNER JOIN accounts acc ON a.account_id = acc.id
+            INNER JOIN assets ast ON a.asset_id = ast.id
+            WHERE {}
+            "#,
+            where_clause
+        );
 
-        // Data fetching query
-        let results = create_base_query(&conn)
-            .select((
-                activities::id,
-                activities::account_id,
-                activities::asset_id,
-                activities::activity_type,
-                activities::activity_date,
-                activities::quantity,
-                activities::unit_price,
-                activities::currency,
-                activities::fee,
-                activities::amount,
-                activities::is_draft,
-                activities::comment,
-                activities::created_at,
-                activities::updated_at,
-                accounts::name,
-                accounts::currency,
-                assets::symbol,
-                assets::name,
-                assets::data_source,
-            ))
-            .limit(page_size)
-            .offset(offset)
-            .load::<ActivityDetails>(&mut conn)?;
+        #[derive(QueryableByName)]
+        struct CountResult {
+            #[diesel(sql_type = diesel::sql_types::BigInt)]
+            count: i64,
+        }
+
+        let count_result: CountResult = sql_query(&count_sql).get_result(&mut conn)?;
+        let total_row_count = count_result.count;
+
+        // Data query with LEFT JOINs for categories, events, and transfer account
+        let data_sql = format!(
+            r#"
+            SELECT
+                a.id,
+                a.account_id,
+                a.asset_id,
+                a.activity_type,
+                a.activity_date as date,
+                a.quantity,
+                a.unit_price,
+                a.currency,
+                a.fee,
+                a.amount,
+                a.is_draft,
+                a.comment,
+                a.created_at,
+                a.updated_at,
+                acc.name as account_name,
+                acc.currency as account_currency,
+                ast.symbol as asset_symbol,
+                ast.name as asset_name,
+                ast.data_source as asset_data_source,
+                a.name,
+                a.category_id,
+                a.sub_category_id,
+                a.event_id,
+                cat.name as category_name,
+                cat.color as category_color,
+                subcat.name as sub_category_name,
+                evt.name as event_name,
+                a.transfer_account_id,
+                transfer_acc.name as transfer_account_name
+            FROM activities a
+            INNER JOIN accounts acc ON a.account_id = acc.id
+            INNER JOIN assets ast ON a.asset_id = ast.id
+            LEFT JOIN categories cat ON a.category_id = cat.id
+            LEFT JOIN categories subcat ON a.sub_category_id = subcat.id
+            LEFT JOIN events evt ON a.event_id = evt.id
+            LEFT JOIN accounts transfer_acc ON a.transfer_account_id = transfer_acc.id
+            WHERE {}
+            ORDER BY {}
+            LIMIT {} OFFSET {}
+            "#,
+            where_clause, order_clause, page_size, offset
+        );
+
+        let results: Vec<ActivityDetails> = sql_query(&data_sql).load(&mut conn)?;
 
         Ok(ActivitySearchResponse {
             data: results,
@@ -608,5 +690,279 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 }),
             None => Ok(None), // If no activity found, return None
         }
+    }
+
+    fn get_spending_activities_data(&self) -> Result<Vec<SpendingData>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        // Query spending activities from CASH accounts
+        // Spending = activities with expense categories (is_income = 0)
+        // OR activity types: WITHDRAWAL, FEE, TAX
+        let query = r#"
+            SELECT
+                strftime('%Y-%m', a.activity_date) as date,
+                a.activity_type,
+                a.category_id,
+                cat.name as category_name,
+                cat.color as category_color,
+                a.sub_category_id,
+                subcat.name as sub_category_name,
+                a.account_id,
+                acc.name as account_name,
+                a.currency,
+                COALESCE(a.amount, '0') as amount,
+                a.name
+            FROM activities a
+            INNER JOIN accounts acc ON a.account_id = acc.id
+            LEFT JOIN categories cat ON a.category_id = cat.id
+            LEFT JOIN categories subcat ON a.sub_category_id = subcat.id
+            WHERE acc.is_active = 1
+              AND acc.account_type = 'CASH'
+              -- Exclude transfers (they represent money movement between accounts, not actual spending)
+              AND a.activity_type NOT IN ('TRANSFER_IN', 'TRANSFER_OUT')
+              AND (
+                  -- Expense activities by category
+                  (cat.is_income = 0)
+                  -- Or expense activity types without category
+                  OR (a.activity_type IN ('WITHDRAWAL', 'FEE', 'TAX') AND a.category_id IS NULL)
+              )
+            ORDER BY a.activity_date
+        "#;
+
+        #[derive(QueryableByName, Debug)]
+        struct RawSpendingData {
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub date: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub activity_type: String,
+            #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+            pub category_id: Option<String>,
+            #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+            pub category_name: Option<String>,
+            #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+            pub category_color: Option<String>,
+            #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+            pub sub_category_id: Option<String>,
+            #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+            pub sub_category_name: Option<String>,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub account_id: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub account_name: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub currency: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub amount: String,
+            #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+            pub name: Option<String>,
+        }
+
+        let raw_results = diesel::sql_query(query)
+            .load::<RawSpendingData>(&mut conn)
+            .map_err(ActivityError::from)?;
+
+        let results = raw_results
+            .into_iter()
+            .map(|raw| {
+                let amount = Decimal::from_str(&raw.amount).unwrap_or_else(|_| Decimal::zero());
+                // Ensure amount is positive for spending calculations
+                let amount = amount.abs();
+                SpendingData {
+                    date: raw.date,
+                    activity_type: raw.activity_type,
+                    category_id: raw.category_id,
+                    category_name: raw.category_name,
+                    category_color: raw.category_color,
+                    sub_category_id: raw.sub_category_id,
+                    sub_category_name: raw.sub_category_name,
+                    account_id: raw.account_id,
+                    account_name: raw.account_name,
+                    currency: raw.currency,
+                    amount,
+                    name: raw.name,
+                }
+            })
+            .collect();
+
+        Ok(results)
+    }
+
+    fn get_cash_income_activities_data(&self) -> Result<Vec<CashIncomeData>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        // Query income activities from CASH accounts
+        // Income = activities with income categories (is_income = 1)
+        // Excludes transfers to avoid double counting
+        // Includes subcategory information when available
+        let query = r#"
+            SELECT
+                strftime('%Y-%m', a.activity_date) as date,
+                a.activity_type,
+                a.category_id,
+                cat.name as category_name,
+                cat.color as category_color,
+                a.sub_category_id,
+                subcat.name as sub_category_name,
+                a.account_id,
+                acc.name as account_name,
+                a.currency,
+                COALESCE(a.amount, '0') as amount,
+                a.name
+            FROM activities a
+            INNER JOIN accounts acc ON a.account_id = acc.id
+            LEFT JOIN categories cat ON a.category_id = cat.id
+            LEFT JOIN categories subcat ON a.sub_category_id = subcat.id
+            WHERE acc.is_active = 1
+              AND acc.account_type = 'CASH'
+              -- Exclude transfers
+              AND a.activity_type NOT IN ('TRANSFER_IN', 'TRANSFER_OUT')
+              -- Income activities by category
+              AND cat.is_income = 1
+            ORDER BY a.activity_date
+        "#;
+
+        #[derive(QueryableByName, Debug)]
+        struct RawCashIncomeData {
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub date: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub activity_type: String,
+            #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+            pub category_id: Option<String>,
+            #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+            pub category_name: Option<String>,
+            #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+            pub category_color: Option<String>,
+            #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+            pub sub_category_id: Option<String>,
+            #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+            pub sub_category_name: Option<String>,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub account_id: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub account_name: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub currency: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub amount: String,
+            #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+            pub name: Option<String>,
+        }
+
+        let raw_results = diesel::sql_query(query)
+            .load::<RawCashIncomeData>(&mut conn)
+            .map_err(ActivityError::from)?;
+
+        let results = raw_results
+            .into_iter()
+            .map(|raw| {
+                let amount = Decimal::from_str(&raw.amount).unwrap_or_else(|_| Decimal::zero());
+                // Ensure amount is positive for income calculations
+                let amount = amount.abs();
+                CashIncomeData {
+                    date: raw.date,
+                    activity_type: raw.activity_type,
+                    category_id: raw.category_id,
+                    category_name: raw.category_name,
+                    category_color: raw.category_color,
+                    sub_category_id: raw.sub_category_id,
+                    sub_category_name: raw.sub_category_name,
+                    account_id: raw.account_id,
+                    account_name: raw.account_name,
+                    currency: raw.currency,
+                    amount,
+                    name: raw.name,
+                }
+            })
+            .collect();
+
+        Ok(results)
+    }
+
+    fn get_capital_gains_data(&self) -> Result<Vec<CapitalGainsData>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        // Query SELL activities with their average cost basis calculated from BUY activities
+        // Capital gains = sale_proceeds - cost_basis
+        // Note: This is a simplified approach using average cost. The actual cost basis
+        // should ideally come from FIFO lot matching.
+        let query = r#"
+            SELECT
+                strftime('%Y-%m', s.activity_date) as date,
+                s.asset_id as symbol,
+                COALESCE(ast.name, s.asset_id) as symbol_name,
+                s.currency,
+                COALESCE(s.quantity, '0') as quantity,
+                COALESCE(s.unit_price, '0') as unit_price,
+                COALESCE(s.fee, '0') as fee,
+                COALESCE(
+                    (SELECT AVG(CAST(b.unit_price AS REAL))
+                     FROM activities b
+                     WHERE b.asset_id = s.asset_id
+                       AND b.activity_type = 'BUY'
+                       AND b.activity_date <= s.activity_date
+                    ), 0
+                ) as avg_cost
+            FROM activities s
+            INNER JOIN accounts acc ON s.account_id = acc.id
+            LEFT JOIN assets ast ON s.asset_id = ast.id
+            WHERE acc.is_active = 1
+              AND s.activity_type = 'SELL'
+            ORDER BY s.activity_date
+        "#;
+
+        #[derive(QueryableByName, Debug)]
+        struct RawSellData {
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub date: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub symbol: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub symbol_name: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub currency: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub quantity: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub unit_price: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub fee: String,
+            #[diesel(sql_type = diesel::sql_types::Double)]
+            pub avg_cost: f64,
+        }
+
+        let raw_results = diesel::sql_query(query)
+            .load::<RawSellData>(&mut conn)
+            .map_err(ActivityError::from)?;
+
+        let results: Vec<CapitalGainsData> = raw_results
+            .into_iter()
+            .map(|raw| {
+                let quantity = Decimal::from_str(&raw.quantity).unwrap_or_else(|_| Decimal::zero());
+                let unit_price =
+                    Decimal::from_str(&raw.unit_price).unwrap_or_else(|_| Decimal::zero());
+                let fee = Decimal::from_str(&raw.fee).unwrap_or_else(|_| Decimal::zero());
+
+                // Sale proceeds = quantity * unit_price - fees
+                let sale_proceeds = quantity * unit_price - fee;
+
+                // Cost basis from average cost of prior BUY activities
+                let avg_cost = Decimal::from_str(&raw.avg_cost.to_string()).unwrap_or(Decimal::zero());
+                let cost_basis = quantity * avg_cost;
+                let gain_amount = sale_proceeds - cost_basis;
+
+                CapitalGainsData {
+                    date: raw.date,
+                    symbol: raw.symbol,
+                    symbol_name: raw.symbol_name,
+                    currency: raw.currency,
+                    sale_proceeds,
+                    cost_basis,
+                    gain_amount,
+                }
+            })
+            .collect();
+
+        Ok(results)
     }
 }

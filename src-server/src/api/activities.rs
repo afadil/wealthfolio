@@ -38,8 +38,14 @@ struct ActivitySearchBody {
     account_id_filter: Option<StringOrVec>,
     #[serde(rename = "activityTypeFilter")]
     activity_type_filter: Option<StringOrVec>,
+    #[serde(rename = "categoryIdFilter")]
+    category_id_filter: Option<StringOrVec>,
+    #[serde(rename = "eventIdFilter")]
+    event_id_filter: Option<StringOrVec>,
     #[serde(rename = "assetIdKeyword")]
     asset_id_keyword: Option<String>,
+    #[serde(rename = "accountTypeFilter")]
+    account_type_filter: Option<StringOrVec>,
     // Allow addons to pass either a single sort or an array (we pick the first)
     sort: Option<SortWrapper>,
 }
@@ -64,12 +70,30 @@ async fn search_activities(
         Some(StringOrVec::Many(v)) => Some(v),
         None => None,
     };
+    let category_ids: Option<Vec<String>> = match body.category_id_filter {
+        Some(StringOrVec::One(s)) => Some(vec![s]),
+        Some(StringOrVec::Many(v)) => Some(v),
+        None => None,
+    };
+    let event_ids: Option<Vec<String>> = match body.event_id_filter {
+        Some(StringOrVec::One(s)) => Some(vec![s]),
+        Some(StringOrVec::Many(v)) => Some(v),
+        None => None,
+    };
+    let account_types: Option<Vec<String>> = match body.account_type_filter {
+        Some(StringOrVec::One(s)) => Some(vec![s]),
+        Some(StringOrVec::Many(v)) => Some(v),
+        None => None,
+    };
     let resp = state.activity_service.search_activities(
         body.page,
         body.page_size,
         account_ids,
         types,
+        category_ids,
+        event_ids,
         body.asset_id_keyword,
+        account_types,
         sort_normalized,
     )?;
     Ok(Json(resp))

@@ -2,6 +2,7 @@ import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb, logger } from "@/adapters";
 import {
   Holding,
   IncomeSummary,
+  SpendingSummary,
   AccountValuation,
   PerformanceMetrics,
   SimplePerformanceMetrics,
@@ -67,6 +68,22 @@ export const getIncomeSummary = async (): Promise<IncomeSummary[]> => {
     }
   } catch (error) {
     logger.error("Error fetching income summary.");
+    throw error;
+  }
+};
+
+export const getSpendingSummary = async (): Promise<SpendingSummary[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri("get_spending_summary");
+      case RUN_ENV.WEB:
+        return invokeWeb("get_spending_summary");
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error("Error fetching spending summary.");
     throw error;
   }
 };

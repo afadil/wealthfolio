@@ -63,6 +63,11 @@ pub struct Activity {
     pub created_at: DateTime<Utc>,
     #[serde(with = "timestamp_format")]
     pub updated_at: DateTime<Utc>,
+    pub name: Option<String>,
+    pub category_id: Option<String>,
+    pub sub_category_id: Option<String>,
+    pub event_id: Option<String>,
+    pub transfer_account_id: Option<String>,
 }
 
 /// Database model for activities
@@ -98,6 +103,11 @@ pub struct ActivityDB {
     pub comment: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    pub name: Option<String>,
+    pub category_id: Option<String>,
+    pub sub_category_id: Option<String>,
+    pub event_id: Option<String>,
+    pub transfer_account_id: Option<String>,
 }
 
 /// Input model for creating a new activity
@@ -117,6 +127,11 @@ pub struct NewActivity {
     pub amount: Option<Decimal>,
     pub is_draft: bool,
     pub comment: Option<String>,
+    pub name: Option<String>,
+    pub category_id: Option<String>,
+    pub sub_category_id: Option<String>,
+    pub event_id: Option<String>,
+    pub transfer_account_id: Option<String>,
 }
 
 impl NewActivity {
@@ -168,6 +183,11 @@ pub struct ActivityUpdate {
     pub amount: Option<Decimal>,
     pub is_draft: bool,
     pub comment: Option<String>,
+    pub name: Option<String>,
+    pub category_id: Option<String>,
+    pub sub_category_id: Option<String>,
+    pub event_id: Option<String>,
+    pub transfer_account_id: Option<String>,
 }
 
 impl ActivityUpdate {
@@ -286,6 +306,26 @@ pub struct ActivityDetails {
     pub asset_name: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub asset_data_source: String,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub name: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub category_id: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub sub_category_id: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub event_id: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub category_name: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub category_color: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub sub_category_name: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub event_name: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub transfer_account_id: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub transfer_account_name: Option<String>,
 }
 
 impl ActivityDetails {
@@ -359,6 +399,12 @@ pub struct ActivityImport {
     pub is_draft: bool,
     pub is_valid: bool,
     pub line_number: Option<i32>,
+    // Cash activity specific fields
+    pub name: Option<String>,
+    pub category_id: Option<String>,
+    pub sub_category_id: Option<String>,
+    pub event_id: Option<String>,
+    pub transfer_account_id: Option<String>,
 }
 
 /// Model for sorting activities
@@ -605,6 +651,11 @@ impl From<ActivityDB> for Activity {
                     log::error!("Failed to parse updated_at '{}': {}", db.updated_at, e);
                     Utc::now() // Fallback to now
                 }),
+            name: db.name,
+            category_id: db.category_id,
+            sub_category_id: db.sub_category_id,
+            event_id: db.event_id,
+            transfer_account_id: db.transfer_account_id,
         }
     }
 }
@@ -679,6 +730,11 @@ impl From<NewActivity> for ActivityDB {
             comment: domain.comment,
             created_at: now.to_rfc3339(),
             updated_at: now.to_rfc3339(),
+            name: domain.name,
+            category_id: domain.category_id,
+            sub_category_id: domain.sub_category_id,
+            event_id: domain.event_id,
+            transfer_account_id: domain.transfer_account_id,
         }
     }
 }
@@ -751,6 +807,11 @@ impl From<ActivityUpdate> for ActivityDB {
             comment: domain.comment,
             created_at: now.to_rfc3339(), // This should ideally preserve original created_at. Need to fetch before update.
             updated_at: now.to_rfc3339(),
+            name: domain.name,
+            category_id: domain.category_id,
+            sub_category_id: domain.sub_category_id,
+            event_id: domain.event_id,
+            transfer_account_id: domain.transfer_account_id,
         }
     }
 }

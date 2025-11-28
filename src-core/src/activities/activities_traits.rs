@@ -1,4 +1,6 @@
 use super::activities_model::*;
+use crate::portfolio::income::{CapitalGainsData, CashIncomeData};
+use crate::spending::SpendingData;
 use crate::Result;
 use async_trait::async_trait;
 use chrono::DateTime;
@@ -28,7 +30,10 @@ pub trait ActivityRepositoryTrait: Send + Sync {
         page_size: i64,
         account_id_filter: Option<Vec<String>>,
         activity_type_filter: Option<Vec<String>>,
+        category_id_filter: Option<Vec<String>>,
+        event_id_filter: Option<Vec<String>>,
         asset_id_keyword: Option<String>,
+        account_type_filter: Option<Vec<String>>,
         sort: Option<Sort>,
     ) -> Result<ActivitySearchResponse>;
     async fn create_activity(&self, new_activity: NewActivity) -> Result<Activity>;
@@ -51,6 +56,9 @@ pub trait ActivityRepositoryTrait: Send + Sync {
     fn calculate_average_cost(&self, account_id: &str, asset_id: &str) -> Result<Decimal>;
     fn get_income_activities_data(&self) -> Result<Vec<IncomeData>>;
     fn get_first_activity_date_overall(&self) -> Result<DateTime<Utc>>;
+    fn get_spending_activities_data(&self) -> Result<Vec<SpendingData>>;
+    fn get_cash_income_activities_data(&self) -> Result<Vec<CashIncomeData>>;
+    fn get_capital_gains_data(&self) -> Result<Vec<CapitalGainsData>>;
 }
 
 /// Trait defining the contract for Activity service operations.
@@ -68,7 +76,10 @@ pub trait ActivityServiceTrait: Send + Sync {
         page_size: i64,
         account_id_filter: Option<Vec<String>>,
         activity_type_filter: Option<Vec<String>>,
+        category_id_filter: Option<Vec<String>>,
+        event_id_filter: Option<Vec<String>>,
         asset_id_keyword: Option<String>,
+        account_type_filter: Option<Vec<String>>,
         sort: Option<Sort>,
     ) -> Result<ActivitySearchResponse>;
     fn get_first_activity_date(

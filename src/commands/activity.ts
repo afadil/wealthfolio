@@ -23,6 +23,7 @@ interface Filters {
   accountIds?: string | string[];
   activityTypes?: string | string[];
   symbol?: string;
+  accountType?: string[];
 }
 
 interface Sort {
@@ -72,6 +73,7 @@ export const searchActivities = async (
           pageSize,
           accountIdFilter,
           activityTypeFilter,
+          accountTypeFilter: filters?.accountType,
           assetIdKeyword,
           sort: sortOption,
         });
@@ -79,8 +81,9 @@ export const searchActivities = async (
         return invokeWeb("search_activities", {
           page,
           pageSize,
-          accountIdFilter,
-          activityTypeFilter,
+          accountIdFilter: filters?.accountIds,
+          activityTypeFilter: filters?.activityTypes,
+          accountTypeFilter: filters?.accountType,
           assetIdKeyword,
           sort: sortOption,
         });

@@ -13,6 +13,7 @@ use wealthfolio_core::{
     holdings::Holding,
     income::IncomeSummary,
     performance::{PerformanceMetrics, SimplePerformanceMetrics},
+    spending::SpendingSummary,
     valuation::DailyAccountValuation,
 };
 
@@ -139,6 +140,17 @@ pub async fn get_income_summary(
     state
         .income_service()
         .get_income_summary()
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_spending_summary(
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<SpendingSummary>, String> {
+    debug!("Fetching spending summary...");
+    state
+        .spending_service()
+        .get_spending_summary()
         .map_err(|e| e.to_string())
 }
 
