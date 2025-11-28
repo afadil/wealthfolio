@@ -19,7 +19,7 @@ import { CategoryEditModal } from "./components/category-edit-modal";
 import { CategoryItem } from "./components/category-item";
 import { useCategoryMutations } from "./use-category-mutations";
 
-const SettingsCategoriesPage = () => {
+function SettingsCategoriesPage() {
   const { data: categories, isLoading } = useQuery<CategoryWithChildren[], Error>({
     queryKey: [QueryKeys.CATEGORIES_HIERARCHICAL],
     queryFn: getCategoriesHierarchical,

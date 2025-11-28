@@ -28,7 +28,7 @@ import { ActivityDeleteModal } from "@/pages/activity/components/activity-delete
 import { ActivityPagination } from "@/pages/activity/components/activity-pagination";
 import { Link } from "react-router-dom";
 
-const CashActivitiesPage = () => {
+function CashActivitiesPage() {
   const [showForm, setShowForm] = useState(false);
   const [showTransferForm, setShowTransferForm] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Partial<ActivityDetails> | undefined>();

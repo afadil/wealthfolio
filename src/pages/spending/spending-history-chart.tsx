@@ -22,13 +22,13 @@ interface SpendingHistoryChartProps {
   isBalanceHidden: boolean;
 }
 
-export const SpendingHistoryChart: React.FC<SpendingHistoryChartProps> = ({
+export function SpendingHistoryChart({
   monthlySpendingData,
   previousMonthlySpendingData,
   selectedPeriod,
   currency,
   isBalanceHidden,
-}) => {
+}: SpendingHistoryChartProps) {
   const [isMobile, setIsMobile] = React.useState(false);
 
   React.useEffect(() => {
@@ -208,4 +208,4 @@ export const SpendingHistoryChart: React.FC<SpendingHistoryChartProps> = ({
       </CardContent>
     </Card>
   );
-};
+}

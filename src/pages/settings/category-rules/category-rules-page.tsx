@@ -22,7 +22,7 @@ import { RuleItem } from "./components/rule-item";
 import { RuleEditModal } from "./components/rule-edit-modal";
 import { useCategoryRuleMutations } from "./use-category-rule-mutations";
 
-const SettingsCategoryRulesPage = () => {
+function SettingsCategoryRulesPage() {
   const { data: rules, isLoading: rulesLoading } = useQuery<CategoryRuleWithNames[], Error>({
     queryKey: [QueryKeys.CATEGORY_RULES_WITH_NAMES],
     queryFn: getCategoryRulesWithNames,

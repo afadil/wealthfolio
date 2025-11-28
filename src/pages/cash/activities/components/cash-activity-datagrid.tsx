@@ -85,14 +85,14 @@ const CASH_ACTIVITY_TYPE_NAMES: Record<CashActivityType, string> = {
   TRANSFER_OUT: "Transfer Out",
 };
 
-const generateTempActivityId = () => {
+function generateTempActivityId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return `temp-${crypto.randomUUID()}`;
   }
   return `temp-${Date.now().toString(36)}`;
-};
+}
 
-const getNumericCellValue = (value: unknown): string => {
+function getNumericCellValue(value: unknown): string {
   if (typeof value === "number") {
     return Number.isFinite(value) ? value.toString() : "";
   }
@@ -100,9 +100,9 @@ const getNumericCellValue = (value: unknown): string => {
     return value;
   }
   return "";
-};
+}
 
-const toFiniteNumberOrUndefined = (value: unknown): number | undefined => {
+function toFiniteNumberOrUndefined(value: unknown): number | undefined {
   if (typeof value === "number") {
     return Number.isFinite(value) ? value : undefined;
   }
@@ -111,14 +111,14 @@ const toFiniteNumberOrUndefined = (value: unknown): number | undefined => {
     return Number.isFinite(parsed) ? parsed : undefined;
   }
   return undefined;
-};
+}
 
-const formatAmountDisplay = (
+function formatAmountDisplay(
   value: unknown,
   currency?: string,
   displayCurrency = false,
   fallbackCurrency = "USD",
-): string => {
+): string {
   const numericValue = toFiniteNumberOrUndefined(value);
   if (numericValue === undefined) {
     return "";
@@ -128,12 +128,12 @@ const formatAmountDisplay = (
   } catch {
     return "";
   }
-};
+}
 
-const createDraftTransaction = (
+function createDraftTransaction(
   accounts: Account[],
   fallbackCurrency: string,
-): LocalTransaction => {
+): LocalTransaction {
   const defaultAccount = accounts.find((account) => account.isActive) ?? accounts[0];
   const now = new Date();
 
@@ -160,7 +160,7 @@ const createDraftTransaction = (
     subRows: undefined,
     isNew: true,
   };
-};
+}
 
 export function CashActivityDatagrid({
   accounts,

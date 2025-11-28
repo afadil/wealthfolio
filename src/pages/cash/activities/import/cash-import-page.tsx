@@ -28,7 +28,7 @@ const STEPS = [
   { id: 5, title: "Import Results" },
 ];
 
-const CashImportPage = () => {
+function CashImportPage() {
   const navigate = useNavigate();
   const { isMobile } = usePlatform();
   const [currentStep, setCurrentStep] = useState(1);
