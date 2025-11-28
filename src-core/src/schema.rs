@@ -31,6 +31,11 @@ diesel::table! {
         comment -> Nullable<Text>,
         created_at -> Text,
         updated_at -> Text,
+        name -> Nullable<Text>,
+        category_id -> Nullable<Text>,
+        sub_category_id -> Nullable<Text>,
+        event_id -> Nullable<Text>,
+        transfer_account_id -> Nullable<Text>,
     }
 }
 
@@ -74,6 +79,60 @@ diesel::table! {
         data_source -> Text,
         sectors -> Nullable<Text>,
         url -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    categories (id) {
+        id -> Text,
+        name -> Text,
+        parent_id -> Nullable<Text>,
+        color -> Nullable<Text>,
+        icon -> Nullable<Text>,
+        is_income -> Integer,
+        sort_order -> Integer,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    category_rules (id) {
+        id -> Text,
+        name -> Text,
+        pattern -> Text,
+        match_type -> Text,
+        category_id -> Text,
+        sub_category_id -> Nullable<Text>,
+        priority -> Integer,
+        is_global -> Nullable<Integer>,
+        account_id -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    event_types (id) {
+        id -> Text,
+        name -> Text,
+        color -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    events (id) {
+        id -> Text,
+        name -> Text,
+        description -> Nullable<Text>,
+        event_type_id -> Text,
+        start_date -> Text,
+        end_date -> Text,
+        is_dynamic_range -> Integer,
+        created_at -> Text,
+        updated_at -> Text,
     }
 }
 
@@ -183,6 +242,8 @@ diesel::table! {
 }
 
 diesel::joinable!(accounts -> platforms (platform_id));
+diesel::joinable!(category_rules -> accounts (account_id));
+diesel::joinable!(category_rules -> categories (category_id));
 diesel::joinable!(goals_allocation -> accounts (account_id));
 diesel::joinable!(goals_allocation -> goals (goal_id));
 diesel::joinable!(quotes -> assets (symbol));
@@ -193,8 +254,12 @@ diesel::allow_tables_to_appear_in_same_query!(
     activity_import_profiles,
     app_settings,
     assets,
+    categories,
+    category_rules,
     contribution_limits,
     daily_account_valuation,
+    event_types,
+    events,
     goals,
     goals_allocation,
     holdings_snapshots,

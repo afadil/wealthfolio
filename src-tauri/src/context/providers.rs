@@ -16,6 +16,7 @@ use wealthfolio_core::{
     },
     settings::{settings_repository::SettingsRepository, SettingsService, SettingsServiceTrait},
     snapshot::{SnapshotRepository, SnapshotService},
+    spending::SpendingService,
     valuation::{ValuationRepository, ValuationService},
     AssetRepository, AssetService,
 };
@@ -101,6 +102,12 @@ pub async fn initialize_context(
         base_currency.clone(),
     ));
 
+    let spending_service = Arc::new(SpendingService::new(
+        fx_service.clone(),
+        activity_repository.clone(),
+        base_currency.clone(),
+    ));
+
     let snapshot_service = Arc::new(SnapshotService::new(
         base_currency.clone(),
         account_repository.clone(),
@@ -147,6 +154,7 @@ pub async fn initialize_context(
         fx_service,
         performance_service,
         income_service,
+        spending_service,
         snapshot_service,
         holdings_service,
         valuation_service,

@@ -11,6 +11,7 @@ export const QueryKeys = {
   HOLDINGS: "holdings",
   HOLDING: "holding",
   INCOME_SUMMARY: "incomeSummary",
+  SPENDING_SUMMARY: "spendingSummary",
   PORTFOLIO_SUMMARY: "portfolioSummary",
   QUOTE_HISTORY: "quoteHistory",
 
@@ -68,4 +69,22 @@ export const QueryKeys = {
   secrets: {
     apiKey: (providerId: string) => ["secrets", "apiKey", providerId],
   },
+
+  // Categories
+  CATEGORIES: "categories",
+  CATEGORIES_HIERARCHICAL: "categories_hierarchical",
+
+  // Category Rules
+  CATEGORY_RULES: "category_rules",
+  CATEGORY_RULES_WITH_NAMES: "category_rules_with_names",
+
+  // Event Types
+  EVENT_TYPES: "event_types",
+
+  // Events
+  EVENTS: "events",
+  EVENTS_WITH_NAMES: "events_with_names",
+
+  // Cash Activities
+  CASH_ACTIVITIES: "cash_activities",
 } as const;

@@ -42,6 +42,24 @@ const sidebarNavItems = [
     icon: <Icons.BadgeDollarSign className="h-5 w-5" />,
   },
   {
+    title: "Categories",
+    href: "categories",
+    subtitle: "Manage transaction categories",
+    icon: <Icons.Tag className="h-5 w-5" />,
+  },
+  {
+    title: "Category Rules",
+    href: "category-rules",
+    subtitle: "Auto-categorize transactions",
+    icon: <Icons.ListFilter className="h-5 w-5" />,
+  },
+  {
+    title: "Events",
+    href: "events",
+    subtitle: "Track and manage transaction events",
+    icon: <Icons.Calendar className="h-5 w-5" />,
+  },
+  {
     title: "Market Data",
     href: "market-data",
     subtitle: "Providers and data update",

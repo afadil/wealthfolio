@@ -13,9 +13,15 @@ import DashboardPage from "@/pages/dashboard/dashboard-page";
 import HoldingsPage from "@/pages/holdings/holdings-page";
 import IncomePage from "@/pages/income/income-page";
 import PortfolioInsightsPage from "@/pages/insights/portfolio-insights";
+import SpendingPage from "@/pages/spending/spending-page";
 import PerformancePage from "@/pages/performance/performance-page";
 import SettingsAccountsPage from "@/pages/settings/accounts/accounts-page";
 import SettingsAppearancePage from "@/pages/settings/appearance/appearance-page";
+import CategoriesPage from "@/pages/settings/categories/categories-page";
+import CategoryRulesPage from "@/pages/settings/category-rules/category-rules-page";
+import { EventsPage } from "@/pages/settings/events/events-page";
+import CashActivitiesPage from "@/pages/cash/activities";
+import CashImportPage from "@/pages/cash/activities/import/cash-import-page";
 import AccountPage from "./pages/account/account-page";
 import AssetProfilePage from "./pages/asset/asset-profile-page";
 import OnboardingPage from "./pages/onboarding/onboarding-page";
@@ -79,8 +85,11 @@ export function AppRoutes() {
           <Route path="import" element={<ActivityImportPage />} />
           <Route path="accounts/:id" element={<AccountPage />} />
           <Route path="income" element={<IncomePage />} />
+          <Route path="spending" element={<SpendingPage />} />
           <Route path="performance" element={<PerformancePage />} />
           <Route path="insights" element={<PortfolioInsightsPage />} />
+          <Route path="cash/activities" element={<CashActivitiesPage />} />
+          <Route path="cash/activities/import" element={<CashImportPage />} />
           {/* Dynamic addon routes */}
           {dynamicRoutes.map(({ path, component: Component }) => (
             <Route
@@ -100,6 +109,9 @@ export function AppRoutes() {
             <Route path="general" element={<GeneralSettingsPage />} />
             <Route path="accounts" element={<SettingsAccountsPage />} />
             <Route path="goals" element={<SettingsGoalsPage />} />
+            <Route path="categories" element={<CategoriesPage />} />
+            <Route path="category-rules" element={<CategoryRulesPage />} />
+            <Route path="events" element={<EventsPage />} />
             <Route path="appearance" element={<SettingsAppearancePage />} />
             <Route path="about" element={<AboutSettingsPage />} />
             <Route path="exports" element={<ExportSettingsPage />} />

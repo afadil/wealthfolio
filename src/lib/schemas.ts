@@ -104,6 +104,12 @@ export const importActivitySchema = z
     lineNumber: z.number().optional(),
     isDraft: z.boolean(),
     comment: z.string().optional(),
+    // Cash activity specific fields
+    name: z.string().optional(),
+    categoryId: z.string().optional(),
+    subCategoryId: z.string().optional(),
+    eventId: z.string().optional(),
+    transferAccountId: z.string().optional(),
   })
   .refine(
     (data) => {

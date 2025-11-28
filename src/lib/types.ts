@@ -56,6 +56,14 @@ export interface ActivityDetails {
   currency: string;
   isDraft: boolean;
   comment?: string;
+  name?: string;
+  categoryId?: string;
+  subCategoryId?: string;
+  eventId?: string;
+  categoryName?: string;
+  categoryColor?: string;
+  subCategoryName?: string;
+  eventName?: string;
   createdAt: Date;
   assetId: string;
   updatedAt: Date;
@@ -65,6 +73,8 @@ export interface ActivityDetails {
   assetSymbol: string;
   assetName?: string;
   assetDataSource?: DataSource;
+  transferAccountId?: string;
+  transferAccountName?: string;
   subRows?: ActivityDetails[];
 }
 
@@ -89,6 +99,11 @@ export interface ActivityCreate {
   fee?: number;
   isDraft: boolean;
   comment?: string | null;
+  name?: string | null;
+  categoryId?: string | null;
+  subCategoryId?: string | null;
+  eventId?: string | null;
+  transferAccountId?: string | null;
 }
 
 export type ActivityUpdate = ActivityCreate & { id: string };
@@ -198,6 +213,52 @@ export interface ImportValidationResult {
     validCount: number;
     invalidCount: number;
   };
+}
+
+// Cash Import Types
+export type CashImportFormat =
+  | "date"
+  | "name"
+  | "amount"
+  | "activityType"
+  | "currency"
+  | "category"
+  | "subcategory"
+  | "description"
+  | "event"
+  | "account";
+
+export interface CashImportMappingData {
+  accountId: string; // Default account ID (selected in step 1)
+  fieldMappings: Partial<Record<CashImportFormat, string>>;
+  invertAmountSign?: boolean;
+  // Value mappings - map CSV values to app values
+  activityTypeMappings?: Partial<Record<ActivityType, string[]>>; // ActivityType -> list of CSV values
+  categoryMappings?: Record<string, { categoryId: string; subCategoryId?: string }>; // CSV value -> category
+  eventMappings?: Record<string, string>; // CSV value -> event ID
+  accountMappings?: Record<string, string>; // CSV account value -> account ID
+}
+
+// Represents a row in the cash import process with rule matching info
+export interface CashImportRow {
+  lineNumber: number;
+  date: string;
+  name: string;
+  amount: number;
+  activityType: ActivityType; // Can be mapped or derived from amount sign
+  currency?: string; // Can be mapped or defaults to account currency
+  accountId?: string; // Can be mapped from CSV or uses default account
+  categoryId?: string;
+  subCategoryId?: string;
+  eventId?: string;
+  description?: string;
+  transferAccountId?: string; // For TRANSFER_IN/TRANSFER_OUT: the other account involved
+  // Rule match tracking
+  matchedRuleId?: string;
+  matchedRuleName?: string;
+  isManualOverride?: boolean; // User manually assigned category
+  isValid: boolean;
+  errors?: Record<string, string[]>;
 }
 
 export type ValidationResult = { status: "success" } | { status: "error"; errors: string[] };
@@ -393,6 +454,26 @@ export interface IncomeSummary {
   yoyGrowth: number | null; // Changed from optional to nullable
 }
 
+export interface CategorySpending {
+  categoryId: string | null;
+  categoryName: string;
+  color: string | null;
+  amount: number;
+  transactionCount: number;
+}
+
+export interface SpendingSummary {
+  period: string;
+  byMonth: Record<string, number>;
+  byCategory: Record<string, CategorySpending>;
+  byAccount: Record<string, number>;
+  totalSpending: number;
+  currency: string;
+  monthlyAverage: number;
+  transactionCount: number;
+  yoyGrowth: number | null;
+}
+
 // Define custom DateRange type matching react-day-picker's
 export interface DateRange {
   from: Date | undefined;
@@ -560,4 +641,139 @@ export interface UpdateInfo {
   storeUrl?: string;
   changelogUrl?: string;
   screenshots?: string[];
+}
+
+// Categories
+export interface Category {
+  id: string;
+  name: string;
+  parentId?: string;
+  color?: string;
+  icon?: string;
+  isIncome: number; // Backend returns 0 or 1, use !!isIncome for boolean checks
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CategoryWithChildren extends Category {
+  children: Category[];
+}
+
+export interface NewCategory {
+  name: string;
+  parentId?: string;
+  color?: string;
+  icon?: string;
+  isIncome: boolean;
+}
+
+export interface UpdateCategory {
+  name?: string;
+  color?: string;
+  icon?: string;
+  sortOrder?: number;
+}
+
+export interface CategoryRule {
+  id: string;
+  name: string;
+  pattern: string;
+  matchType: "contains" | "starts_with" | "exact";
+  categoryId: string;
+  subCategoryId?: string;
+  priority: number;
+  isGlobal?: boolean;
+  accountId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CategoryRuleWithNames extends CategoryRule {
+  categoryName: string;
+  subCategoryName?: string;
+  accountName?: string;
+}
+
+export interface NewCategoryRule {
+  name: string;
+  pattern: string;
+  matchType: "contains" | "starts_with" | "exact";
+  categoryId: string;
+  subCategoryId?: string;
+  priority?: number;
+  isGlobal?: boolean;
+  accountId?: string;
+}
+
+export interface UpdateCategoryRule {
+  name?: string;
+  pattern?: string;
+  matchType?: string;
+  categoryId?: string;
+  subCategoryId?: string;
+  priority?: number;
+  isGlobal?: boolean;
+  accountId?: string;
+}
+
+export type MatchType = "contains" | "starts_with" | "exact" | "regex";
+
+export interface CategoryMatch {
+  categoryId: string;
+  subCategoryId?: string | null;
+  ruleName: string;
+  ruleId: string;
+}
+
+export interface EventType {
+  id: string;
+  name: string;
+  color?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NewEventType {
+  name: string;
+  color?: string;
+}
+
+export interface UpdateEventType {
+  name?: string;
+  color?: string;
+}
+
+export interface Event {
+  id: string;
+  name: string;
+  description?: string;
+  eventTypeId: string;
+  startDate: string;
+  endDate: string;
+  isDynamicRange: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EventWithTypeName extends Event {
+  eventTypeName: string;
+}
+
+export interface NewEvent {
+  name: string;
+  description?: string;
+  eventTypeId: string;
+  startDate: string;
+  endDate: string;
+  isDynamicRange?: boolean;
+}
+
+export interface UpdateEvent {
+  name?: string;
+  description?: string;
+  eventTypeId?: string;
+  startDate?: string;
+  endDate?: string;
+  isDynamicRange?: boolean;
 }

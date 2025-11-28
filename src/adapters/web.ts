@@ -30,6 +30,7 @@ const COMMANDS: CommandMap = {
   calculate_performance_history: { method: "POST", path: "/performance/history" },
   calculate_performance_summary: { method: "POST", path: "/performance/summary" },
   get_income_summary: { method: "GET", path: "/income/summary" },
+  get_spending_summary: { method: "GET", path: "/spending/summary" },
   // Goals
   get_goals: { method: "GET", path: "/goals" },
   create_goal: { method: "POST", path: "/goals" },
@@ -63,6 +64,37 @@ const COMMANDS: CommandMap = {
   update_contribution_limit: { method: "PUT", path: "/limits" },
   delete_contribution_limit: { method: "DELETE", path: "/limits" },
   calculate_deposits_for_contribution_limit: { method: "GET", path: "/limits" },
+  // Categories
+  get_categories: { method: "GET", path: "/categories" },
+  get_categories_hierarchical: { method: "GET", path: "/categories/hierarchical" },
+  get_expense_categories: { method: "GET", path: "/categories/expense" },
+  get_income_categories: { method: "GET", path: "/categories/income" },
+  create_category: { method: "POST", path: "/categories" },
+  update_category: { method: "PUT", path: "/categories" },
+  delete_category: { method: "DELETE", path: "/categories" },
+  // Category Rules
+  get_category_rules: { method: "GET", path: "/category-rules" },
+  get_category_rules_with_names: { method: "GET", path: "/category-rules/with-names" },
+  create_category_rule: { method: "POST", path: "/category-rules" },
+  update_category_rule: { method: "PUT", path: "/category-rules" },
+  delete_category_rule: { method: "DELETE", path: "/category-rules" },
+  apply_category_rules: { method: "POST", path: "/category-rules/apply" },
+  bulk_apply_category_rules: { method: "POST", path: "/category-rules/bulk-apply" },
+  test_category_rule_pattern: { method: "POST", path: "/category-rules/test-pattern" },
+  // Event Types
+  get_event_types: { method: "GET", path: "/event-types" },
+  get_event_type: { method: "GET", path: "/event-types" },
+  create_event_type: { method: "POST", path: "/event-types" },
+  update_event_type: { method: "PUT", path: "/event-types" },
+  delete_event_type: { method: "DELETE", path: "/event-types" },
+  // Events
+  get_events: { method: "GET", path: "/events" },
+  get_events_with_names: { method: "GET", path: "/events/with-names" },
+  get_event: { method: "GET", path: "/events" },
+  create_event: { method: "POST", path: "/events" },
+  update_event: { method: "PUT", path: "/events" },
+  delete_event: { method: "DELETE", path: "/events" },
+  validate_transaction_date: { method: "POST", path: "/events" },
   // Asset profile
   get_assets: { method: "GET", path: "/assets" },
   delete_asset: { method: "DELETE", path: "/assets" },
@@ -226,6 +258,7 @@ export const invokeWeb = async <T>(
       break;
     }
     case "get_income_summary":
+    case "get_spending_summary":
       break;
     case "delete_goal": {
       const { goalId } = payload as { goalId: string };
@@ -512,6 +545,106 @@ export const invokeWeb = async <T>(
       body = JSON.stringify({ host, port });
       break;
     }
+    case "create_category": {
+      const { category } = payload as { category: Record<string, unknown> };
+      body = JSON.stringify(category);
+      break;
+    }
+    case "update_category": {
+      const { id, update } = payload as { id: string; update: Record<string, unknown> };
+      url += `/${encodeURIComponent(id)}`;
+      body = JSON.stringify(update);
+      break;
+    }
+    case "delete_category": {
+      const { categoryId } = payload as { categoryId: string };
+      url += `/${encodeURIComponent(categoryId)}`;
+      break;
+    }
+    case "create_category_rule": {
+      const { rule } = payload as { rule: Record<string, unknown> };
+      body = JSON.stringify(rule);
+      break;
+    }
+    case "update_category_rule": {
+      const { id, update } = payload as { id: string; update: Record<string, unknown> };
+      url += `/${encodeURIComponent(id)}`;
+      body = JSON.stringify(update);
+      break;
+    }
+    case "delete_category_rule": {
+      const { ruleId } = payload as { ruleId: string };
+      url += `/${encodeURIComponent(ruleId)}`;
+      break;
+    }
+    case "test_category_rule_pattern": {
+      body = JSON.stringify(payload);
+      break;
+    }
+    case "get_event_type": {
+      const { id } = payload as { id: string };
+      url += `/${encodeURIComponent(id)}`;
+      break;
+    }
+    case "create_event_type": {
+      const { eventType } = payload as { eventType: Record<string, unknown> };
+      body = JSON.stringify(eventType);
+      break;
+    }
+    case "update_event_type": {
+      const { id, update } = payload as { id: string; update: Record<string, unknown> };
+      url += `/${encodeURIComponent(id)}`;
+      body = JSON.stringify(update);
+      break;
+    }
+    case "delete_event_type": {
+      const { eventTypeId } = payload as { eventTypeId: string };
+      url += `/${encodeURIComponent(eventTypeId)}`;
+      break;
+    }
+    case "get_event": {
+      const { id } = payload as { id: string };
+      url += `/${encodeURIComponent(id)}`;
+      break;
+    }
+    case "create_event": {
+      const { event } = payload as { event: Record<string, unknown> };
+      body = JSON.stringify(event);
+      break;
+    }
+    case "update_event": {
+      const { id, update } = payload as { id: string; update: Record<string, unknown> };
+      url += `/${encodeURIComponent(id)}`;
+      body = JSON.stringify(update);
+      break;
+    }
+    case "delete_event": {
+      const { eventId } = payload as { eventId: string };
+      url += `/${encodeURIComponent(eventId)}`;
+      break;
+    }
+    case "validate_transaction_date": {
+      const { eventId, transactionDate } = payload as { eventId: string; transactionDate: string };
+      url += `/${encodeURIComponent(eventId)}/validate-transaction-date`;
+      body = JSON.stringify({ transactionDate });
+      break;
+    }
+    case "get_categories":
+    case "get_categories_hierarchical":
+    case "get_category_rules":
+    case "get_category_rules_with_names":
+      break;
+    case "apply_category_rules": {
+      body = JSON.stringify(payload);
+      break;
+    }
+    case "bulk_apply_category_rules": {
+      body = JSON.stringify(payload);
+      break;
+    }
+    case "get_event_types":
+    case "get_events":
+    case "get_events_with_names":
     case "generate_pairing_payload":
     case "get_sync_status":
     case "initialize_sync_for_existing_data":

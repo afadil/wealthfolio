@@ -20,6 +20,10 @@ mod accounts;
 mod activities;
 mod addons;
 mod assets;
+pub mod categories;
+mod category_rules;
+mod event_types;
+mod events;
 mod exchange_rates;
 mod goals;
 mod holdings;
@@ -73,6 +77,10 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
         .merge(holdings::router())
         .merge(performance::router())
         .merge(activities::router())
+        .merge(categories::router())
+        .merge(category_rules::router())
+        .merge(event_types::router())
+        .merge(events::router())
         .merge(goals::router())
         .merge(exchange_rates::router())
         .merge(market_data::router())
