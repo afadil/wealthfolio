@@ -1118,7 +1118,7 @@ export function ActivityDatagrid({
             <TableBody>
               <TableRow>
                 <TableCell colSpan={12} className="text-muted-foreground h-32 text-center">
-                  No transactions yet. Click &quot;Add Transaction&quot; to get started.
+                  No investment activity yet. Add a trade or import from your brokerage.
                 </TableCell>
               </TableRow>
             </TableBody>

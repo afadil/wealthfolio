@@ -1,7 +1,7 @@
 import { getAccounts } from "@/commands/account";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { useIsMobileViewport } from "@/hooks/use-platform";
-import { ActivityType } from "@/lib/constants";
+import { AccountType, ActivityType } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { Account, ActivityDetails } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
@@ -85,7 +85,11 @@ const ActivityPage = () => {
     queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
   });
-  const accounts = accountsData ?? [];
+
+  // Filter to only show SECURITIES and CRYPTOCURRENCY accounts (investment accounts)
+  const accounts = (accountsData ?? []).filter(
+    (acc) => acc.accountType === AccountType.SECURITIES || acc.accountType === AccountType.CRYPTOCURRENCY,
+  );
 
   const { deleteActivityMutation, duplicateActivityMutation } = useActivityMutations();
   const {
@@ -98,7 +102,11 @@ const ActivityPage = () => {
     hasNextPage,
     refetch,
   } = useActivitySearch({
-    filters: { accountIds: selectedAccounts, activityTypes: selectedActivityTypes },
+    filters: {
+      accountIds: selectedAccounts,
+      activityTypes: selectedActivityTypes,
+      accountTypes: [AccountType.SECURITIES, AccountType.CRYPTOCURRENCY],
+    },
     searchQuery,
     sorting,
   });
@@ -183,7 +191,11 @@ const ActivityPage = () => {
 
   return (
     <Page>
-      <PageHeader heading="Activity" actions={headerActions} />
+      <PageHeader
+        heading="Investment Activity"
+        text="Track trades, dividends, and other investment transactions"
+        actions={headerActions}
+      />
       <PageContent className="pb-2 md:pb-4 lg:pb-5">
         <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-hidden">
           {/* Unified Controls */}

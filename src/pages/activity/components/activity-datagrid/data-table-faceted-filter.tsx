@@ -22,9 +22,12 @@ interface DataTableFacetedFilterProps {
     label: string;
     value: string;
     icon?: React.ComponentType<{ className?: string }>;
+    color?: string;
+    isIncome?: boolean;
   }[];
   selectedValues: Set<string>;
   onFilterChange: (values: Set<string>) => void;
+  disabled?: boolean;
 }
 
 export function DataTableFacetedFilter({
@@ -32,6 +35,7 @@ export function DataTableFacetedFilter({
   options,
   selectedValues,
   onFilterChange,
+  disabled = false,
 }: DataTableFacetedFilterProps) {
   return (
     <Popover>
@@ -39,9 +43,11 @@ export function DataTableFacetedFilter({
         <Button
           variant="outline"
           size="sm"
+          disabled={disabled}
           className={cn(
             'hover:bg-muted/80" bg-secondary/30 h-8 gap-1.5 rounded-md border-[1.5px] border-none px-3 py-1 text-sm font-medium',
             selectedValues?.size > 0 ? "bg-muted/40" : "shadow-inner-xs bg-muted/90",
+            disabled && "cursor-not-allowed opacity-50",
           )}
         >
           <Icons.PlusCircle className="mr-2 h-4 w-4" />
@@ -109,6 +115,20 @@ export function DataTableFacetedFilter({
                     >
                       <Icons.Check className={cn("h-4 w-4")} />
                     </div>
+                    {option.isIncome !== undefined && (
+                      <span className={cn(
+                        "mr-2 font-semibold",
+                        option.isIncome ? "text-success" : "text-destructive"
+                      )}>
+                        {option.isIncome ? "+" : "−"}
+                      </span>
+                    )}
+                    {option.color && (
+                      <span
+                        className="mr-2 h-3 w-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: option.color }}
+                      />
+                    )}
                     {option.icon && <option.icon className="text-muted-foreground mr-2 h-4 w-4" />}
                     <span>{option.label}</span>
                   </CommandItem>

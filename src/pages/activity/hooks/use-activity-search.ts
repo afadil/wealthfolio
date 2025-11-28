@@ -9,6 +9,7 @@ import { useMemo } from "react";
 export interface ActivitySearchFilters {
   accountIds: string[];
   activityTypes: ActivityType[];
+  accountTypes?: string[];
 }
 
 export interface UseActivitySearchOptions {
@@ -41,9 +42,10 @@ export function useActivitySearch({
   const normalizedFilters = useMemo(() => {
     return {
       accountIds: filters.accountIds.length > 0 ? filters.accountIds : undefined,
-      activityTypes: filters.activityTypes.length > 0 ? filters.activityTypes : undefined,
+      activityTypes: filters.activityTypes.length > 0 ? filters.activityTypes : undefined,,
+      accountType: filters.accountTypes && filters.accountTypes.length > 0 ? filters.accountTypes : undefined,
     } as Record<string, unknown>;
-  }, [filters.accountIds, filters.activityTypes]);
+  }, [filters.accountIds, filters.activityTypes, filters.accountTypes]);
 
   const primarySort =
     sorting.length > 0 && sorting[0]?.id
