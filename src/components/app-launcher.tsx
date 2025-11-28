@@ -170,7 +170,7 @@ export function AppLauncher() {
         ) : (
           <Icons.RectangleEllipsis className="size-6" />
         ),
-        keywords: ["navigation", "sidebar", "floating", "switch", "layout"],
+        keywords: ["navigation", "sidebar", "floating", "bottom", "switch", "layout"],
         label: isLaunchBar ? "Switch to Sidebar Navigation" : "Switch to Floating Navigation",
       },
       {
