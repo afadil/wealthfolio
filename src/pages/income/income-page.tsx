@@ -95,14 +95,21 @@ export default function IncomePage() {
     );
   }
 
-  const { totalIncome, currency, monthlyAverage, byType, byCurrency } = periodSummary;
-  const dividendIncome = byType.DIVIDEND || 0;
-  const interestIncome = byType.INTEREST || 0;
-  const dividendPercentage = totalIncome > 0 ? (dividendIncome / totalIncome) * 100 : 0;
-  const interestPercentage = totalIncome > 0 ? (interestIncome / totalIncome) * 100 : 0;
+  const { totalIncome, currency, monthlyAverage, byCurrency, bySymbol } = periodSummary;
 
-  const topDividendStocks = Object.entries(periodSummary.bySymbol)
-    .filter(([symbol, income]) => income > 0 && !symbol.startsWith("[$CASH-"))
+  // Calculate investment income (non-cash symbols) and cash income (symbols starting with [$CASH])
+  const investmentIncome = Object.entries(bySymbol)
+    .filter(([symbol]) => !symbol.startsWith("[$CASH]"))
+    .reduce((sum, [, amount]) => sum + amount, 0);
+  const cashIncome = Object.entries(bySymbol)
+    .filter(([symbol]) => symbol.startsWith("[$CASH]"))
+    .reduce((sum, [, amount]) => sum + amount, 0);
+  const investmentPercentage = totalIncome > 0 ? (investmentIncome / totalIncome) * 100 : 0;
+  const cashPercentage = totalIncome > 0 ? (cashIncome / totalIncome) * 100 : 0;
+
+  // Top income sources - includes both investment and cash income
+  const topIncomeSources = Object.entries(periodSummary.bySymbol)
+    .filter(([, income]) => income > 0)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 10);
 
@@ -266,28 +273,28 @@ export default function IncomePage() {
               <div className="space-y-2">
                 {[
                   {
-                    name: "Dividends",
+                    name: "Investment Income",
                     amount: (
                       <AmountDisplay
-                        value={dividendIncome}
+                        value={investmentIncome}
                         currency={currency}
                         isHidden={isBalanceHidden}
                       />
                     ),
-                    percentage: dividendPercentage,
+                    percentage: investmentPercentage,
                   },
                   {
-                    name: "Interest",
+                    name: "Cash Income",
                     amount: (
                       <AmountDisplay
-                        value={interestIncome}
+                        value={cashIncome}
                         currency={currency}
                         isHidden={isBalanceHidden}
                       />
                     ),
-                    percentage: interestPercentage,
+                    percentage: cashPercentage,
                   },
-                ].map((source, index) => {
+                ].filter((source) => source.percentage > 0).map((source, index) => {
                   const chartColor = `var(--chart-${index + 1})`;
                   return (
                     <div key={index} className="flex items-center">
@@ -330,39 +337,44 @@ export default function IncomePage() {
           />
           <Card className="flex flex-col">
             <CardHeader>
-              <CardTitle className="text-sm font-medium">Top 10 Dividend Sources</CardTitle>
+              <CardTitle className="text-sm font-medium">Top 10 Income Sources</CardTitle>
             </CardHeader>
             <CardContent className="flex-1 overflow-auto">
-              {topDividendStocks.length === 0 ? (
+              {topIncomeSources.length === 0 ? (
                 <EmptyPlaceholder
                   className="mx-auto flex h-[300px] max-w-[420px] items-center justify-center"
                   icon={<Icons.DollarSign className="h-10 w-10" />}
-                  title="No dividend income recorded"
-                  description="There are no dividend sources for the selected period. Try selecting a different time range or check back later."
+                  title="No income recorded"
+                  description="There are no income sources for the selected period. Try selecting a different time range or check back later."
                 />
               ) : (
                 <div className="space-y-6">
                   {/* Horizontal Bar Chart - Separated Bars */}
                   <div className="flex w-full space-x-0.5">
                     {(() => {
-                      const top5Stocks = topDividendStocks.slice(0, 5);
-                      const otherStocks = topDividendStocks.slice(5);
-                      const otherTotal = otherStocks.reduce((sum, [, income]) => sum + income, 0);
+                      const top5Sources = topIncomeSources.slice(0, 5);
+                      const otherSources = topIncomeSources.slice(5);
+                      const otherTotal = otherSources.reduce((sum, [, income]) => sum + income, 0);
 
                       const chartItems = [
-                        ...top5Stocks.map(([symbol, income]) => ({
-                          symbol: /\[(.*?)\]/.exec(symbol)?.[1] || symbol,
-                          companyName: symbol.replace(/\[.*?\]-/, "").trim(),
-                          income,
-                          isOther: false,
-                        })),
+                        ...top5Sources.map(([symbol, income]) => {
+                          const isCash = symbol.startsWith("[$CASH]");
+                          return {
+                            symbol: isCash ? "Cash" : (/\[(.*?)\]/.exec(symbol)?.[1] || symbol),
+                            companyName: symbol.replace(/\[.*?\]-/, "").trim(),
+                            income,
+                            isOther: false,
+                            isCash,
+                          };
+                        }),
                         ...(otherTotal > 0
                           ? [
                               {
                                 symbol: "Other",
-                                companyName: `${otherStocks.length} other sources`,
+                                companyName: `${otherSources.length} other sources`,
                                 income: otherTotal,
                                 isOther: true,
+                                isCash: false,
                               },
                             ]
                           : []),
@@ -379,7 +391,7 @@ export default function IncomePage() {
 
                       return chartItems.map((item, index) => {
                         const percentage =
-                          dividendIncome > 0 ? (item.income / dividendIncome) * 100 : 0;
+                          totalIncome > 0 ? (item.income / totalIncome) * 100 : 0;
 
                         return (
                           <div
@@ -413,21 +425,51 @@ export default function IncomePage() {
                     })()}
                   </div>
 
-                  {topDividendStocks.map(([symbol, income], index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <Badge className="bg-primary mr-2 flex min-w-[55px] items-center justify-center rounded-sm text-xs">
-                          {/\[(.*?)\]/.exec(symbol)?.[1] || symbol}
-                        </Badge>
-                        <span className="text-muted-foreground mr-16 text-xs">
-                          {symbol.replace(/\[.*?\]-/, "").trim()}
-                        </span>
+                  {topIncomeSources.map(([symbolStr, income], index) => {
+                    const isCash = symbolStr.startsWith("[$CASH]");
+                    const ticker = /\[(.*?)\]/.exec(symbolStr)?.[1] || symbolStr;
+                    const name = symbolStr.replace(/\[.*?\]-/, "").trim();
+
+                    // For cash: parse "Category > Subcategory" format
+                    const nameParts = isCash ? name.split(" > ") : [];
+                    const category = nameParts[0] || name;
+                    const subcategory = nameParts[1];
+
+                    return (
+                      <div key={index} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {isCash ? (
+                            <>
+                              <div className="bg-success/20 flex h-8 w-8 items-center justify-center rounded-full">
+                                <Icons.Wallet className="text-success h-4 w-4" />
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium">{category}</span>
+                                {subcategory && (
+                                  <span className="text-muted-foreground text-xs">{subcategory}</span>
+                                )}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <Badge className="bg-primary flex min-w-[50px] items-center justify-center rounded-sm text-xs">
+                                {ticker}
+                              </Badge>
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-muted-foreground text-xs">{name}</span>
+                                  <span className="text-muted-foreground/60 text-[10px]">• Dividend</span>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                        <div className="text-success text-sm font-medium">
+                          <PrivacyAmount value={income} currency={currency} />
+                        </div>
                       </div>
-                      <div className="text-success text-sm">
-                        <PrivacyAmount value={income} currency={currency} />
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

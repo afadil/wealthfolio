@@ -3,6 +3,46 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Cash income data from cash accounts (deposits, salary, etc.)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CashIncomeData {
+    pub date: String,
+    pub activity_type: String,
+    pub category_id: Option<String>,
+    pub category_name: Option<String>,
+    pub category_color: Option<String>,
+    pub sub_category_id: Option<String>,
+    pub sub_category_name: Option<String>,
+    pub account_id: String,
+    pub account_name: String,
+    pub currency: String,
+    pub amount: Decimal,
+    pub name: Option<String>,
+}
+
+/// Capital gains data from SELL activities
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CapitalGainsData {
+    pub date: String,
+    pub symbol: String,
+    pub symbol_name: String,
+    pub currency: String,
+    pub sale_proceeds: Decimal,
+    pub cost_basis: Decimal,
+    pub gain_amount: Decimal,
+}
+
+/// Source type breakdown for income visualization
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceTypeBreakdown {
+    pub source_type: String,
+    pub amount: Decimal,
+    pub percentage: Decimal,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IncomeSummary {
@@ -12,9 +52,13 @@ pub struct IncomeSummary {
     pub by_symbol: HashMap<String, Decimal>,
     pub by_currency: HashMap<String, Decimal>,
     pub total_income: Decimal,
+    pub investment_income: Decimal,
+    pub cash_income: Decimal,
+    pub capital_gains: Decimal,
     pub currency: String,
     pub monthly_average: Decimal,
     pub yoy_growth: Option<Decimal>,
+    pub by_source_type: Vec<SourceTypeBreakdown>,
 }
 
 impl IncomeSummary {
@@ -26,12 +70,17 @@ impl IncomeSummary {
             by_symbol: HashMap::new(),
             by_currency: HashMap::new(),
             total_income: Decimal::ZERO,
+            investment_income: Decimal::ZERO,
+            cash_income: Decimal::ZERO,
+            capital_gains: Decimal::ZERO,
             currency,
             monthly_average: Decimal::ZERO,
             yoy_growth: None,
+            by_source_type: Vec::new(),
         }
     }
 
+    /// Add investment income (dividends, interest from securities)
     pub fn add_income(&mut self, data: &IncomeData, converted_amount: Decimal) {
         *self
             .by_month
@@ -50,12 +99,99 @@ impl IncomeSummary {
             .entry(data.currency.clone())
             .or_insert_with(|| Decimal::ZERO) += &data.amount;
         self.total_income += &converted_amount;
+        self.investment_income += &converted_amount;
+    }
+
+    /// Add cash income (salary, deposits with income categories)
+    pub fn add_cash_income(&mut self, data: &CashIncomeData, converted_amount: Decimal) {
+        *self
+            .by_month
+            .entry(data.date.to_string())
+            .or_insert_with(|| Decimal::ZERO) += &converted_amount;
+
+        // Use category name for type if available, otherwise use activity type
+        let income_type = data.category_name.clone()
+            .unwrap_or_else(|| data.activity_type.clone());
+        *self
+            .by_type
+            .entry(income_type)
+            .or_insert_with(|| Decimal::ZERO) += &converted_amount;
+
+        // Use account name as the "symbol" for cash income
+        *self
+            .by_symbol
+            .entry(format!("[CASH]-{}", data.account_name))
+            .or_insert_with(|| Decimal::ZERO) += &converted_amount;
+        *self
+            .by_currency
+            .entry(data.currency.clone())
+            .or_insert_with(|| Decimal::ZERO) += &data.amount;
+        self.total_income += &converted_amount;
+        self.cash_income += &converted_amount;
+    }
+
+    /// Add capital gains from SELL activities
+    pub fn add_capital_gains(&mut self, data: &CapitalGainsData, converted_gain: Decimal) {
+        // Only add positive gains to income
+        if converted_gain > Decimal::ZERO {
+            *self
+                .by_month
+                .entry(data.date.to_string())
+                .or_insert_with(|| Decimal::ZERO) += &converted_gain;
+            *self
+                .by_type
+                .entry("Capital Gains".to_string())
+                .or_insert_with(|| Decimal::ZERO) += &converted_gain;
+            *self
+                .by_symbol
+                .entry(format!("[{}]-{}", data.symbol, data.symbol_name))
+                .or_insert_with(|| Decimal::ZERO) += &converted_gain;
+            *self
+                .by_currency
+                .entry(data.currency.clone())
+                .or_insert_with(|| Decimal::ZERO) += &data.gain_amount;
+            self.total_income += &converted_gain;
+            self.capital_gains += &converted_gain;
+        }
     }
 
     pub fn calculate_monthly_average(&mut self, num_months: Option<u32>) {
         let months = num_months.unwrap_or(self.by_month.len() as u32);
         if months > 0 {
             self.monthly_average = self.total_income / Decimal::new(months as i64, 0);
+        }
+    }
+
+    /// Calculate source type breakdown (investment income, cash income, capital gains)
+    pub fn calculate_source_type_breakdown(&mut self) {
+        self.by_source_type.clear();
+
+        if self.total_income > Decimal::ZERO {
+            let hundred = Decimal::new(100, 0);
+
+            if self.investment_income > Decimal::ZERO {
+                self.by_source_type.push(SourceTypeBreakdown {
+                    source_type: "Investment Income".to_string(),
+                    amount: self.investment_income,
+                    percentage: (self.investment_income / self.total_income) * hundred,
+                });
+            }
+
+            if self.cash_income > Decimal::ZERO {
+                self.by_source_type.push(SourceTypeBreakdown {
+                    source_type: "Cash Income".to_string(),
+                    amount: self.cash_income,
+                    percentage: (self.cash_income / self.total_income) * hundred,
+                });
+            }
+
+            if self.capital_gains > Decimal::ZERO {
+                self.by_source_type.push(SourceTypeBreakdown {
+                    source_type: "Capital Gains".to_string(),
+                    amount: self.capital_gains,
+                    percentage: (self.capital_gains / self.total_income) * hundred,
+                });
+            }
         }
     }
 }
