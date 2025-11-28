@@ -1,6 +1,7 @@
 import { Component, ErrorInfo, ReactNode } from "react";
 import { Button } from "../ui/button";
 import { Icons } from "../ui/icons";
+import { ApplicationShell } from "../ui/shell";
 
 interface Props {
   children: ReactNode;
@@ -32,7 +33,7 @@ class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return (
-        <div className="flex h-screen w-full flex-col items-center justify-center p-4">
+        <ApplicationShell className="flex h-screen w-full flex-col items-center justify-center p-4">
           <div className="flex flex-col items-center space-y-4 text-center">
             <Icons.XCircle className="text-destructive h-16 w-16" />
             <h2 className="text-foreground text-2xl font-semibold">Something went wrong</h2>
@@ -41,7 +42,7 @@ class ErrorBoundary extends Component<Props, State> {
               Refresh Page
             </Button>
           </div>
-        </div>
+        </ApplicationShell>
       );
     }
 

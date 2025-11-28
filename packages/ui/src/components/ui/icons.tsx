@@ -39,6 +39,7 @@ import {
   FileText,
   FileUp,
   FileX,
+  Fullscreen,
   GaugeCircle,
   Globe2,
   Goal,
@@ -64,6 +65,7 @@ import {
   MoreVertical,
   Package,
   Palette,
+  PanelLeft,
   PanelLeftOpen,
   PauseCircle,
   Pencil,
@@ -74,6 +76,7 @@ import {
   QrCode,
   Receipt,
   ReceiptText,
+  RectangleEllipsis,
   RefreshCcw,
   Rows3,
   Save,
@@ -157,6 +160,7 @@ export const Icons = {
   Plus: Plus,
   Pencil: Pencil,
   PlusCircle: PlusCircle,
+  PanelLeft: PanelLeft,
   MinusCircle: MinusCircle,
   PauseCircle: PauseCircle,
   Monitor: Monitor,
@@ -209,6 +213,8 @@ export const Icons = {
   Sun: Sun,
   ListFilter: ListFilter,
   Undo: Undo2,
+  Fullscreen: Fullscreen,
+  RectangleEllipsis: RectangleEllipsis,
 
   Dashboard: ({ size, ...props }: LucideProps) => (
     <svg

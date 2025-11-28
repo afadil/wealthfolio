@@ -9,6 +9,7 @@ import { AccountType, HoldingType, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants"
 import { useSettingsContext } from "@/lib/settings-provider";
 import { Account } from "@/lib/types";
 import { useNavigation } from "@/pages/layouts/navigation/app-navigation";
+import { useNavigationMode } from "@/pages/layouts/navigation/navigation-mode-context";
 import {
   CommandDialog,
   CommandEmpty,
@@ -16,6 +17,8 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  DialogDescription,
+  DialogTitle,
   Icons,
   type Icon,
 } from "@wealthfolio/ui";
@@ -60,6 +63,12 @@ export function AppLauncher() {
   const { mutate: updatePortfolio, isPending: isUpdatingPortfolio } = useUpdatePortfolioMutation();
   const { mutate: recalculatePortfolio, isPending: isRecalculatingPortfolio } =
     useRecalculatePortfolioMutation();
+  const {
+    isLaunchBar,
+    setMode: setNavigationMode,
+    isFocusMode,
+    toggleFocusMode,
+  } = useNavigationMode();
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -106,6 +115,14 @@ export function AppLauncher() {
     setSearch("");
   }, [location.pathname]);
 
+  useEffect(() => {
+    const handleOpenLauncher = () => setOpen(true);
+    window.addEventListener("open-app-launcher", handleOpenLauncher);
+    return () => {
+      window.removeEventListener("open-app-launcher", handleOpenLauncher);
+    };
+  }, []);
+
   // Combine navigation items with additional quick actions
   const actionItems = useMemo<LauncherActionItem[]>(() => {
     // Build smart URL with context awareness and optional activity type
@@ -145,6 +162,24 @@ export function AppLauncher() {
 
     // Additional quick actions not in main navigation
     const quickActions: LauncherActionItem[] = [
+      {
+        title: isLaunchBar ? "Switch to Sidebar Navigation" : "Switch to Floating Navigation",
+        href: isLaunchBar ? "#use-sidebar-navigation" : "#use-launchbar-navigation",
+        icon: isLaunchBar ? (
+          <Icons.PanelLeft className="size-6" />
+        ) : (
+          <Icons.RectangleEllipsis className="size-6" />
+        ),
+        keywords: ["navigation", "sidebar", "floating", "switch", "layout"],
+        label: isLaunchBar ? "Switch to Sidebar Navigation" : "Switch to Floating Navigation",
+      },
+      {
+        title: isFocusMode ? "Exit Focus Mode" : "Enter Focus Mode",
+        href: "#toggle-focus-mode",
+        icon: <Icons.Fullscreen className="size-6" />,
+        keywords: ["focus", "hide navigation", "minimal", "distraction-free", "layout"],
+        label: "Toggle Focus Mode",
+      },
       {
         title: isBalanceHidden ? "Show Balance" : "Hide Balance",
         href: "#toggle-privacy",
@@ -282,6 +317,7 @@ export function AppLauncher() {
     return [...quickActions, ...navItems];
   }, [
     isBalanceHidden,
+    isLaunchBar,
     isRecalculatingPortfolio,
     isUpdatingPortfolio,
     location.pathname,
@@ -393,6 +429,27 @@ export function AppLauncher() {
       return;
     }
 
+    if (path === "#use-launchbar-navigation") {
+      setNavigationMode("launchbar");
+      setSearch("");
+      setOpen(false);
+      return;
+    }
+
+    if (path === "#use-sidebar-navigation") {
+      setNavigationMode("sidebar");
+      setSearch("");
+      setOpen(false);
+      return;
+    }
+
+    if (path === "#toggle-focus-mode") {
+      toggleFocusMode();
+      setSearch("");
+      setOpen(false);
+      return;
+    }
+
     setSearch("");
     setOpen(false);
     navigate(path);
@@ -420,8 +477,33 @@ export function AppLauncher() {
   const hasResults =
     filteredActions.length > 0 || filteredHoldings.length > 0 || filteredAccounts.length > 0;
 
+  const renderIcon = (icon?: React.ReactNode) => {
+    if (!icon) {
+      return null;
+    }
+
+    if (React.isValidElement<{ className?: string }>(icon)) {
+      return React.cloneElement(icon, {
+        className: ["text-muted-foreground mr-2 h-4 w-4", icon.props.className]
+          .filter(Boolean)
+          .join(" "),
+      });
+    }
+
+    if (typeof icon === "function") {
+      const IconComponent = icon as React.ComponentType<{ className?: string }>;
+      return <IconComponent className="text-muted-foreground mr-2 h-4 w-4" />;
+    }
+
+    return <span className="text-muted-foreground mr-2 h-4 w-4">{icon}</span>;
+  };
+
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
+      <DialogTitle className="sr-only">Command palette</DialogTitle>
+      <DialogDescription className="sr-only">
+        Search for actions, holdings, accounts, or navigation destinations.
+      </DialogDescription>
       <CommandInput
         placeholder="Search actions, holdings, or accounts..."
         autoFocus={open}
@@ -434,18 +516,7 @@ export function AppLauncher() {
         {filteredActions.length > 0 && (
           <CommandGroup heading="Actions">
             {filteredActions.map((action, index) => {
-              // Extract icon and resize it for the command item
-              const iconElement = action.icon;
-              const resizedIcon = iconElement
-                ? React.cloneElement(iconElement as React.ReactElement<{ className?: string }>, {
-                    className: [
-                      "text-muted-foreground mr-2 h-4 w-4",
-                      (iconElement as React.ReactElement<{ className?: string }>).props.className,
-                    ]
-                      .filter(Boolean)
-                      .join(" "),
-                  })
-                : null;
+              const resizedIcon = renderIcon(action.icon);
 
               // Use label if available, otherwise fall back to title
               const displayText = action.label ?? action.title;
