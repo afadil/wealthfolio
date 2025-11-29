@@ -348,6 +348,7 @@ export const HoldingsPage = () => {
         views={views}
         heading="Holdings"
         defaultView="holdings"
+        showBackButton
         isMobile={isMobilePlatform}
         actions={renderActions}
         withPadding={false}

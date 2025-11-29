@@ -218,7 +218,7 @@ export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsPr
         <Button
           variant="ghost"
           size="sm"
-          className="text-muted-foreground text-xs"
+          className="text-muted-foreground text-xs hover:bg-success/10"
           onClick={() => navigate("/holdings")}
         >
           View All
