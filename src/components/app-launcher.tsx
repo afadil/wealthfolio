@@ -20,6 +20,7 @@ import {
   type Icon,
 } from "@wealthfolio/ui";
 import React, { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 interface LauncherHoldingItem {
   id: string;
@@ -48,6 +49,7 @@ const accountTypeIcons: Record<AccountType | typeof PORTFOLIO_ACCOUNT_ID, Icon> 
 };
 
 export function AppLauncher() {
+  const { t } = useTranslation("common");
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
@@ -140,7 +142,7 @@ export function AppLauncher() {
     // Additional quick actions not in main navigation
     const quickActions: LauncherActionItem[] = [
       {
-        title: isBalanceHidden ? "Show Balance" : "Hide Balance",
+        title: isBalanceHidden ? t("launcher.actions.showBalance") : t("launcher.actions.hideBalance"),
         href: "#toggle-privacy",
         icon: isBalanceHidden ? (
           <Icons.Eye className="size-6" />
@@ -148,31 +150,31 @@ export function AppLauncher() {
           <Icons.EyeOff className="size-6" />
         ),
         keywords: ["privacy", "hide", "show", "balance", "toggle", "visibility"],
-        label: isBalanceHidden ? "Show Balance" : "Hide Balance",
+        label: isBalanceHidden ? t("launcher.actions.showBalance") : t("launcher.actions.hideBalance"),
       },
       {
-        title: "Theme → Light",
+        title: t("launcher.actions.themeLight"),
         href: "#theme-light",
         icon: <Icons.Sun className="size-6" />,
         keywords: ["theme", "light", "appearance", "mode"],
-        label: "Theme → Light",
+        label: t("launcher.actions.themeLight"),
       },
       {
-        title: "Theme → Dark",
+        title: t("launcher.actions.themeDark"),
         href: "#theme-dark",
         icon: <Icons.Moon className="size-6" />,
         keywords: ["theme", "dark", "appearance", "mode"],
-        label: "Theme → Dark",
+        label: t("launcher.actions.themeDark"),
       },
       {
-        title: "Theme → System",
+        title: t("launcher.actions.themeSystem"),
         href: "#theme-system",
         icon: <Icons.Monitor className="size-6" />,
         keywords: ["theme", "system", "appearance", "mode", "auto"],
-        label: "Theme → System",
+        label: t("launcher.actions.themeSystem"),
       },
       {
-        title: "Update Market Data",
+        title: t("launcher.actions.updateMarketData"),
         href: "#update-portfolio",
         icon: isUpdatingPortfolio ? (
           <Icons.Spinner className="size-6 animate-spin" />
@@ -180,11 +182,11 @@ export function AppLauncher() {
           <Icons.Refresh className="size-6" />
         ),
         keywords: ["update", "portfolio", "market data", "quotes", "refresh"],
-        label: isUpdatingPortfolio ? "Updating market data..." : "Update market data",
+        label: isUpdatingPortfolio ? t("launcher.actions.updatingMarketData") : t("launcher.actions.updateMarketData"),
         disabled: isUpdatingPortfolio,
       },
       {
-        title: "Recalculate Portfolio",
+        title: t("launcher.actions.recalculatePortfolio"),
         href: "#recalculate-portfolio",
         icon: isRecalculatingPortfolio ? (
           <Icons.Spinner className="size-6 animate-spin" />
@@ -192,78 +194,78 @@ export function AppLauncher() {
           <Icons.Clock className="size-6" />
         ),
         keywords: ["recalculate", "portfolio", "reprice", "history", "refresh"],
-        label: isRecalculatingPortfolio ? "Recalculating portfolio..." : "Recalculate portfolio",
+        label: isRecalculatingPortfolio ? t("launcher.actions.recalculatingPortfolio") : t("launcher.actions.recalculatePortfolio"),
         disabled: isRecalculatingPortfolio,
       },
       {
-        title: "Record Buy",
+        title: t("launcher.actions.recordBuy"),
         href: buildTransactionUrl("BUY"),
         icon: <Icons.Plus className="size-6" />,
         keywords: ["buy", "purchase", "trade", "stock", "shares", "record"],
-        label: "Record Buy",
+        label: t("launcher.actions.recordBuy"),
       },
       {
-        title: "Record Sell",
+        title: t("launcher.actions.recordSell"),
         href: buildTransactionUrl("SELL"),
         icon: <Icons.TrendingDown className="size-6" />,
         keywords: ["sell", "sale", "trade", "stock", "shares", "record"],
-        label: "Record Sell",
+        label: t("launcher.actions.recordSell"),
       },
       {
-        title: "Record Dividend",
+        title: t("launcher.actions.recordDividend"),
         href: buildTransactionUrl("DIVIDEND"),
         icon: <Icons.Income className="size-6" />,
         keywords: ["dividend", "income", "payout", "distribution", "record"],
-        label: "Record Dividend",
+        label: t("launcher.actions.recordDividend"),
       },
       {
-        title: "Record Deposit",
+        title: t("launcher.actions.recordDeposit"),
         href: buildTransactionUrl("DEPOSIT"),
         icon: <Icons.DollarSign className="size-6" />,
         keywords: ["deposit", "add", "money", "cash", "fund", "record"],
-        label: "Record Deposit",
+        label: t("launcher.actions.recordDeposit"),
       },
       {
-        title: "Record Withdrawal",
+        title: t("launcher.actions.recordWithdrawal"),
         href: buildTransactionUrl("WITHDRAWAL"),
         icon: <Icons.ArrowDown className="size-6" />,
         keywords: ["withdrawal", "withdraw", "money", "cash", "take out", "record"],
-        label: "Record Withdrawal",
+        label: t("launcher.actions.recordWithdrawal"),
       },
       {
-        title: "Add Holding",
+        title: t("launcher.actions.addHolding"),
         href: buildTransactionUrl("ADD_HOLDING"),
         icon: <Icons.Wallet className="size-6" />,
         keywords: ["holding", "add", "position", "import", "record"],
-        label: "Add Holding",
+        label: t("launcher.actions.addHolding"),
       },
       {
-        title: "Record Interest",
+        title: t("launcher.actions.recordInterest"),
         href: buildTransactionUrl("INTEREST"),
         icon: <Icons.Percent className="size-6" />,
         keywords: ["interest", "income", "earned", "bank", "record"],
-        label: "Record Interest",
+        label: t("launcher.actions.recordInterest"),
       },
       {
-        title: "Add Transaction",
+        title: t("launcher.actions.addTransaction"),
         href: buildTransactionUrl(),
         icon: <Icons.Activity className="size-6" />,
         keywords: ["add", "new", "create", "transaction", "activity", "any"],
-        label: "Add Transaction",
+        label: t("launcher.actions.addTransaction"),
       },
       {
-        title: "Import Activities",
+        title: t("launcher.actions.importActivities"),
         href: "/import",
         icon: <Icons.Import className="size-6" />,
         keywords: ["import", "csv", "upload", "file", "bulk"],
-        label: "Import Activities",
+        label: t("launcher.actions.importActivities"),
       },
       {
-        title: "Manage Securities",
+        title: t("launcher.actions.manageSecurities"),
         href: "/settings/securities",
         icon: <Icons.Settings className="size-6" />,
         keywords: ["securities", "assets", "stocks", "manage", "edit", "settings"],
-        label: "Manage Securities",
+        label: t("launcher.actions.manageSecurities"),
       },
     ];
 
@@ -417,15 +419,15 @@ export function AppLauncher() {
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
       <CommandInput
-        placeholder="Search actions, holdings, or accounts..."
+        placeholder={t("launcher.searchPlaceholder")}
         autoFocus={open}
         value={search}
         onValueChange={setSearch}
       />
       <CommandList>
-        {!hasResults && <CommandEmpty>No matches found.</CommandEmpty>}
+        {!hasResults && <CommandEmpty>{t("launcher.noMatches")}</CommandEmpty>}
         {filteredActions.length > 0 && (
-          <CommandGroup heading="Actions">
+          <CommandGroup heading={t("launcher.groups.actions")}>
             {filteredActions.map((action, index) => {
               // Extract icon and resize it for the command item
               const iconElement = action.icon;
@@ -459,9 +461,9 @@ export function AppLauncher() {
           </CommandGroup>
         )}
         {(isHoldingsLoading || filteredHoldings.length > 0) && (
-          <CommandGroup heading="Holdings">
+          <CommandGroup heading={t("launcher.groups.holdings")}>
             {isHoldingsLoading ? (
-              <CommandItem disabled>Loading holdings...</CommandItem>
+              <CommandItem disabled>{t("launcher.loading.holdings")}</CommandItem>
             ) : (
               filteredHoldings.map((holding) => (
                 <CommandItem
@@ -487,9 +489,9 @@ export function AppLauncher() {
           </CommandGroup>
         )}
         {(isAccountsLoading || filteredAccounts.length > 0) && (
-          <CommandGroup heading="Accounts">
+          <CommandGroup heading={t("launcher.groups.accounts")}>
             {isAccountsLoading ? (
-              <CommandItem disabled>Loading accounts...</CommandItem>
+              <CommandItem disabled>{t("launcher.loading.accounts")}</CommandItem>
             ) : (
               filteredAccounts.map((account) => {
                 const IconComponent = accountTypeIcons[account.accountType] ?? Icons.Wallet;

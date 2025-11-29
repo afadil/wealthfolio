@@ -22,7 +22,7 @@ import AssetDetailCard from "./asset-detail-card";
 import AssetHistoryCard from "./asset-history-card";
 import AssetLotsTable from "./asset-lots-table";
 import { AssetActivitiesTable } from "./components/asset-activities-table";
-import { AssetOpenPositions } from "./components/asset-open-positions";
+
 import { useAssetPerformance } from "./hooks/use-asset-performance";
 import { useAssetProfileMutations } from "./hooks/use-asset-profile-mutations";
 import { useQuoteMutations } from "./hooks/use-quote-mutations";
@@ -114,7 +114,7 @@ export const AssetProfilePage = () => {
   });
 
   // Use the new hook to get dividend-adjusted performance data
-  const { openPositions, totalDividends, isLoading: isPerformanceLoading } = useAssetPerformance(symbol);
+  const { totalDividends } = useAssetPerformance(symbol);
 
   const quote = useMemo(() => {
     return quoteHistory?.at(-1) ?? null;
@@ -965,7 +965,7 @@ export const AssetProfilePage = () => {
                 </div>
               </div>
 
-              <AssetOpenPositions openPositions={openPositions} isLoading={isPerformanceLoading} />
+
             </TabsContent>
           )}
 

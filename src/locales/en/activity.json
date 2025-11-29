@@ -11,6 +11,21 @@
     "import": "Import",
     "add": "Add"
   },
+  "manager": {
+    "heading": "Add Activity",
+    "description": "Create a new transaction or activity for your account",
+    "descriptionWithAccount": "Add a new transaction to {{accountName}}",
+    "learnMore": "Learn more",
+    "pleaseReviewEntry": "Please Review Your Entry",
+    "transactionType": "Transaction Type",
+    "invalidValue": "Invalid value",
+    "updateDetails": "Update your transaction details",
+    "allFieldsRequired": "All fields are required unless marked as optional",
+    "cancel": "Cancel",
+    "saving": "Saving...",
+    "updateTransaction": "Update Transaction",
+    "addTransaction": "Add Transaction"
+  },
   "types": {
     "BUY": "Buy",
     "SELL": "Sell",
@@ -302,7 +317,12 @@
     "addTransaction": "Add transaction",
     "deleteSelected": "Delete selected",
     "saveChanges": "Save changes",
-    "discardChanges": "Discard changes"
+    "discardChanges": "Discard changes",
+    "rowsSelected_one": "{{count}} row selected",
+    "rowsSelected_other": "{{count}} rows selected",
+    "pendingChanges_one": "{{count}} pending change",
+    "pendingChanges_other": "{{count}} pending changes",
+    "noTransactions": "No transactions yet. Click \"Add Transaction\" to get started."
   },
   "empty": {
     "title": "No activities yet",

@@ -42,6 +42,40 @@
       "subtitle": "About Wealthfolio"
     }
   },
+  "securities": {
+    "title": "Securities",
+    "subtitle": "Manage security definitions",
+    "description": "Browse and manage the securities available in your portfolio.",
+    "editTitle": "Edit Security",
+    "editDescription": "Update security information and market data settings",
+    "deleteTitle": "Delete security",
+    "deleteConfirm": "Are you sure you want to delete this security? This will also remove related quotes and cannot be undone.",
+    "deleteConfirmWithSymbol": "Are you sure you want to delete {{symbol}}? This will also remove its related quote and cannot be undone.",
+    "deleteButton": "Delete",
+    "deletingButton": "Deleting...",
+    "table": {
+      "asset": "Asset",
+      "currency": "Currency",
+      "class": "Class",
+      "source": "Source",
+      "lastClose": "Last Close",
+      "noQuotes": "No quotes",
+      "staleQuote": "Latest close is not from today",
+      "updateQuotes": "Update quotes",
+      "refetchQuotes": "Refetch quotes",
+      "edit": "Edit",
+      "delete": "Delete",
+      "dataSource": "Data Source",
+      "marketData": "Market Data",
+      "upToDate": "Up to Date",
+      "stale": "Stale",
+      "searchPlaceholder": "Search securities...",
+      "filterOptions": "Filter Options",
+      "assetClass": "Asset Class",
+      "priceStatus": "Price Status",
+      "resetAll": "Reset All"
+    }
+  },
   "appearance": {
     "title": "Appearance",
     "description": "Customize the look and feel of the application",

@@ -1,18 +1,11 @@
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable, formatAmount, GainAmount, GainPercent } from "@wealthfolio/ui";
+import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
+import type { ColumnDef } from "@tanstack/react-table";
 import { Lot } from "@/lib/types";
-import { formatAmount } from "@wealthfolio/ui";
 import { formatDate } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
-import { GainAmount } from "@wealthfolio/ui";
-import { GainPercent } from "@wealthfolio/ui";
 import { useTranslation } from "react-i18next";
+import { useMemo } from "react";
 
 interface AssetLotsTableProps {
   lots: Lot[];
@@ -20,73 +13,214 @@ interface AssetLotsTableProps {
   marketPrice: number;
 }
 
+interface LotWithCalculations extends Lot {
+  marketValue: number;
+  gainLossAmount: number;
+  gainLossPercent: number;
+  holdingDays: number;
+}
+
+const calculateHoldingDays = (acquisitionDate: string): number => {
+  const acquired = new Date(acquisitionDate);
+  const today = new Date();
+  const diffTime = Math.abs(today.getTime() - acquired.getTime());
+  return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+};
+
 export const AssetLotsTable = ({ lots, currency, marketPrice }: AssetLotsTableProps) => {
   const { t } = useTranslation(["assets"]);
+
+  const lotsWithCalculations: LotWithCalculations[] = useMemo(() => {
+    if (!lots || lots.length === 0) return [];
+
+    return [...lots]
+      .sort((a, b) => new Date(a.acquisitionDate).getTime() - new Date(b.acquisitionDate).getTime())
+      .map((lot) => {
+        const marketValue = lot.quantity * marketPrice;
+        const gainLossAmount = marketValue - lot.costBasis;
+        const gainLossPercent = lot.costBasis !== 0 ? gainLossAmount / lot.costBasis : 0;
+        const holdingDays = calculateHoldingDays(lot.acquisitionDate);
+
+        return {
+          ...lot,
+          marketValue,
+          gainLossAmount,
+          gainLossPercent,
+          holdingDays,
+        };
+      });
+  }, [lots, marketPrice]);
+
+  const columns: ColumnDef<LotWithCalculations>[] = useMemo(
+    () => [
+      {
+        id: "acquisitionDate",
+        accessorKey: "acquisitionDate",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t("assets:lotsTable.acquiredDate")} />
+        ),
+        meta: {
+          label: t("assets:lotsTable.acquiredDate"),
+        },
+        cell: ({ row }) => (
+          <div className="font-medium">{formatDate(row.original.acquisitionDate)}</div>
+        ),
+        enableHiding: false,
+      },
+      {
+        id: "holdingDays",
+        accessorKey: "holdingDays",
+        header: ({ column }) => (
+          <DataTableColumnHeader
+            column={column}
+            title={t("assets:lotsTable.holdingDays")}
+            className="justify-center text-center"
+          />
+        ),
+        meta: {
+          label: t("assets:lotsTable.holdingDays"),
+        },
+        cell: ({ row }) => (
+          <div className="text-center">{row.original.holdingDays.toLocaleString()}</div>
+        ),
+        enableHiding: true,
+      },
+      {
+        id: "quantity",
+        accessorKey: "quantity",
+        header: ({ column }) => (
+          <DataTableColumnHeader
+            column={column}
+            title={t("assets:lotsTable.quantity")}
+            className="justify-center text-center"
+          />
+        ),
+        meta: {
+          label: t("assets:lotsTable.quantity"),
+        },
+        cell: ({ row }) => (
+          <div className="text-center">{row.original.quantity.toFixed(2)}</div>
+        ),
+        enableHiding: true,
+      },
+      {
+        id: "acquisitionPrice",
+        accessorKey: "acquisitionPrice",
+        header: ({ column }) => (
+          <DataTableColumnHeader
+            column={column}
+            title={t("assets:lotsTable.acquisitionPrice")}
+            className="justify-center text-center"
+          />
+        ),
+        meta: {
+          label: t("assets:lotsTable.acquisitionPrice"),
+        },
+        cell: ({ row }) => (
+          <div className="text-center">{formatAmount(row.original.acquisitionPrice, currency)}</div>
+        ),
+        enableHiding: true,
+      },
+      {
+        id: "fees",
+        accessorKey: "acquisitionFees",
+        header: ({ column }) => (
+          <DataTableColumnHeader
+            column={column}
+            title={t("assets:lotsTable.fees")}
+            className="justify-center text-center"
+          />
+        ),
+        meta: {
+          label: t("assets:lotsTable.fees"),
+        },
+        cell: ({ row }) => (
+          <div className="text-center">{formatAmount(row.original.acquisitionFees, currency)}</div>
+        ),
+        enableHiding: true,
+      },
+      {
+        id: "costBasis",
+        accessorKey: "costBasis",
+        header: ({ column }) => (
+          <DataTableColumnHeader
+            column={column}
+            title={t("assets:lotsTable.costBasis")}
+            className="justify-center text-center"
+          />
+        ),
+        meta: {
+          label: t("assets:lotsTable.costBasis"),
+        },
+        cell: ({ row }) => (
+          <div className="text-center">{formatAmount(row.original.costBasis, currency)}</div>
+        ),
+        enableHiding: true,
+      },
+      {
+        id: "marketValue",
+        accessorKey: "marketValue",
+        header: ({ column }) => (
+          <DataTableColumnHeader
+            column={column}
+            title={t("assets:lotsTable.marketValue")}
+            className="justify-center text-center"
+          />
+        ),
+        meta: {
+          label: t("assets:lotsTable.marketValue"),
+        },
+        cell: ({ row }) => (
+          <div className="text-center">{formatAmount(row.original.marketValue, currency)}</div>
+        ),
+        enableHiding: true,
+      },
+      {
+        id: "gainLoss",
+        accessorKey: "gainLossAmount",
+        header: ({ column }) => (
+          <DataTableColumnHeader
+            column={column}
+            title={t("assets:lotsTable.gainLoss")}
+            className="justify-end text-right"
+          />
+        ),
+        meta: {
+          label: t("assets:lotsTable.gainLoss"),
+        },
+        cell: ({ row }) => (
+          <div className="flex flex-row items-center justify-end space-x-2">
+            <GainAmount
+              value={row.original.gainLossAmount}
+              currency={currency}
+              displayCurrency={false}
+            />
+            <GainPercent value={row.original.gainLossPercent} variant="badge" />
+          </div>
+        ),
+        enableHiding: false,
+      },
+    ],
+    [currency, t],
+  );
 
   if (!lots || lots.length === 0) {
     return null;
   }
 
-  const sortedLots = [...lots].sort(
-    (a, b) => new Date(a.acquisitionDate).getTime() - new Date(b.acquisitionDate).getTime(),
-  );
-
   return (
     <Card className="mt-4">
-      <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-muted">
-              <TableRow>
-                <TableHead className="w-[160px]">{t("assets:lotsTable.acquiredDate")}</TableHead>
-                <TableHead className="text-right">{t("assets:lotsTable.quantity")}</TableHead>
-                <TableHead className="text-right">
-                  {t("assets:lotsTable.acquisitionPrice")}
-                </TableHead>
-                <TableHead className="text-right">{t("assets:lotsTable.fees")}</TableHead>
-                <TableHead className="text-right">{t("assets:lotsTable.costBasis")}</TableHead>
-                <TableHead className="text-right">{t("assets:lotsTable.marketValue")}</TableHead>
-                <TableHead className="text-right">{t("assets:lotsTable.gainLoss")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedLots.map((lot) => {
-                const marketValue = lot.quantity * marketPrice;
-                const gainLossAmount = marketValue - lot.costBasis;
-                const gainLossPercent = lot.costBasis !== 0 ? gainLossAmount / lot.costBasis : 0;
-
-                return (
-                  <TableRow key={lot.id}>
-                    <TableCell className="font-medium">{formatDate(lot.acquisitionDate)}</TableCell>
-                    <TableCell className="text-right">{lot.quantity.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">
-                      {formatAmount(lot.acquisitionPrice, currency)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatAmount(lot.acquisitionFees, currency)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatAmount(lot.costBasis, currency)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatAmount(marketValue, currency)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex flex-row items-center justify-end space-x-2">
-                        <GainAmount
-                          value={gainLossAmount}
-                          currency={currency}
-                          displayCurrency={false}
-                        />
-                        <GainPercent value={gainLossPercent} variant="badge" />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+      <CardContent className="p-4">
+        <DataTable
+          data={lotsWithCalculations}
+          columns={columns}
+          showColumnToggle={true}
+          defaultColumnVisibility={{
+            fees: false,
+          }}
+          defaultSorting={[{ id: "acquisitionDate", desc: false }]}
+          scrollable={true}
+        />
       </CardContent>
     </Card>
   );

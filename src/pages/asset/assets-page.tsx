@@ -1,24 +1,26 @@
 import { useMemo, useState } from "react";
 
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
 } from "@/components/ui/sheet";
 import { Separator } from "@wealthfolio/ui";
+import { useTranslation } from "react-i18next";
+
 
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { useSyncMarketDataMutation } from "@/hooks/use-sync-market-data";
@@ -32,6 +34,7 @@ import { useAssets } from "./hooks/use-assets";
 import { useLatestQuotes } from "./hooks/use-latest-quotes";
 
 export default function AssetsPage() {
+  const { t } = useTranslation(["settings", "common"]);
   const { assets, isLoading } = useAssets();
   const { updateAssetMutation, deleteAssetMutation } = useAssetManagement();
   const refetchQuotesMutation = useSyncMarketDataMutation(true);
@@ -66,8 +69,8 @@ export default function AssetsPage() {
   return (
     <div className="space-y-6">
       <SettingsHeader
-        heading="Securities"
-        text="Browse and manage the securities available in your portfolio."
+        heading={t("securities.title")}
+        text={t("securities.description")}
       />
       <Separator />
       <div className="w-full">
@@ -111,7 +114,7 @@ export default function AssetsPage() {
           {editingAsset ? (
             <DialogContent className="mx-1 max-h-[90vh] overflow-y-auto rounded-t-4xl sm:max-w-[720px]">
               <SheetHeader>
-                <SheetTitle>Edit Security</SheetTitle>
+                <SheetTitle>{t("securities.editTitle")}</SheetTitle>
               </SheetHeader>
               <div className="px-6 py-4">
                 <AssetForm
@@ -136,9 +139,9 @@ export default function AssetsPage() {
           {editingAsset ? (
             <SheetContent className="sm:max-w-[740px]">
               <SheetHeader className="border-border border-b px-6 pt-6 pb-4">
-                <SheetTitle>Edit Security</SheetTitle>
+                <SheetTitle>{t("securities.editTitle")}</SheetTitle>
                 <SheetDescription>
-                  Update security information and market data settings
+                  {t("securities.editDescription")}
                 </SheetDescription>
               </SheetHeader>
               <div className="max-h-[calc(90vh-7rem)] overflow-y-auto px-6 py-4">
@@ -164,21 +167,21 @@ export default function AssetsPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete security</AlertDialogTitle>
+            <AlertDialogTitle>{t("securities.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
               {assetPendingDelete
-                ? `Are you sure you want to delete ${assetPendingDelete.symbol}? This will also remove its related quote and cannot be undone.`
-                : "Are you sure you want to delete this security? This will also remove related quotes and cannot be undone."}
+                ? t("securities.deleteConfirmWithSymbol", { symbol: assetPendingDelete.symbol })
+                : t("securities.deleteConfirm")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common:actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               disabled={deleteAssetMutation.isPending}
               className="bg-destructive hover:bg-destructive/90 dark:text-foreground"
             >
-              {deleteAssetMutation.isPending ? "Deleting..." : "Delete"}
+              {deleteAssetMutation.isPending ? t("securities.deletingButton") : t("securities.deleteButton")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -8,7 +8,8 @@
     "detailsFor": "Chi tiết cho {{name}}",
     "noHoldings": "Không tìm thấy tài sản nào cho lựa chọn này.",
     "close": "Đóng",
-    "cash": "Tiền mặt"
+    "cash": "Tiền mặt",
+    "unnamedSecurity": "Chứng khoán chưa đặt tên"
   },
   "table": {
     "position": "Vị thế",

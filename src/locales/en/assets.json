@@ -42,6 +42,7 @@
   },
   "lotsTable": {
     "acquiredDate": "Acquired Date",
+    "holdingDays": "Days Held",
     "quantity": "Quantity",
     "acquisitionPrice": "Acquisition Price",
     "fees": "Fees",

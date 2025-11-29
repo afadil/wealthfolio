@@ -54,7 +54,11 @@
     "yes": "Yes",
     "no": "No",
     "moreInfoAbout": "More info about {{label}}",
-    "annualized": "Annualized:"
+    "annualized": "Annualized:",
+    "other": "Other",
+    "na": "N/A",
+    "accountCount_one": "{{count}} account",
+    "accountCount_other": "{{count}} accounts"
   },
   "accounts": {
     "allPortfolio": "All Portfolio",
@@ -88,5 +92,39 @@
     "3Y": "Past 3 years",
     "5Y": "Past 5 years",
     "ALL": "All Time"
+  },
+  "launcher": {
+    "searchPlaceholder": "Search actions, holdings, or accounts...",
+    "noMatches": "No matches found.",
+    "groups": {
+      "actions": "Actions",
+      "holdings": "Holdings",
+      "accounts": "Accounts"
+    },
+    "loading": {
+      "holdings": "Loading holdings...",
+      "accounts": "Loading accounts..."
+    },
+    "actions": {
+      "showBalance": "Show Balance",
+      "hideBalance": "Hide Balance",
+      "themeLight": "Theme → Light",
+      "themeDark": "Theme → Dark",
+      "themeSystem": "Theme → System",
+      "updateMarketData": "Update Market Data",
+      "updatingMarketData": "Updating market data...",
+      "recalculatePortfolio": "Recalculate Portfolio",
+      "recalculatingPortfolio": "Recalculating portfolio...",
+      "recordBuy": "Record Buy",
+      "recordSell": "Record Sell",
+      "recordDividend": "Record Dividend",
+      "recordDeposit": "Record Deposit",
+      "recordWithdrawal": "Record Withdrawal",
+      "addHolding": "Add Holding",
+      "recordInterest": "Record Interest",
+      "addTransaction": "Add Transaction",
+      "importActivities": "Import Activities",
+      "manageSecurities": "Manage Securities"
+    }
   }
 }

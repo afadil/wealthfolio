@@ -1,26 +1,28 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+
 
 import { Badge, Card } from "@wealthfolio/ui";
 
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Icons } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
 import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
+    Sheet,
+    SheetClose,
+    SheetContent,
+    SheetFooter,
+    SheetHeader,
+    SheetTitle,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -53,6 +55,8 @@ export function AssetsTableMobile({
   isRefetchingQuotes,
 }: AssetsTableMobileProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation(["settings", "common"]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDataSources, setSelectedDataSources] = useState<string[]>([]);
   const [selectedAssetSubClasses, setSelectedAssetSubClasses] = useState<string[]>([]);
@@ -186,7 +190,7 @@ export function AssetsTableMobile({
         <Input
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search securities..."
+          placeholder={t("securities.table.searchPlaceholder")}
           className="bg-secondary/30 flex-1 border-none"
         />
         <Button
@@ -232,21 +236,21 @@ export function AssetsTableMobile({
                     onClick={() => onUpdateQuotes(asset)}
                     disabled={isUpdatingQuotes}
                   >
-                    Update quotes
+                    {t("securities.table.updateQuotes")}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => onRefetchQuotes(asset)}
                     disabled={isRefetchingQuotes}
                   >
-                    Refetch quotes
+                    {t("securities.table.refetchQuotes")}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onEdit(asset)}>Edit</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onEdit(asset)}>{t("securities.table.edit")}</DropdownMenuItem>
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
                     onSelect={() => onDelete(asset)}
                   >
-                    Delete
+                    {t("securities.table.delete")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -279,7 +283,7 @@ export function AssetsTableMobile({
                             aria-label="Quote not updated today"
                           />
                         </TooltipTrigger>
-                        <TooltipContent>Latest close is not from today</TooltipContent>
+                        <TooltipContent>{t("securities.table.staleQuote")}</TooltipContent>
                       </Tooltip>
                     ) : null}
                   </span>
@@ -288,7 +292,7 @@ export function AssetsTableMobile({
                   </span>
                 </div>
               ) : (
-                <span className="text-muted-foreground">No quotes</span>
+                <span className="text-muted-foreground">{t("securities.table.noQuotes")}</span>
               )}
             </div>
           </Card>
@@ -299,7 +303,7 @@ export function AssetsTableMobile({
       <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
         <SheetContent side="bottom" className="mx-1 flex h-[70vh] flex-col rounded-t-4xl">
           <SheetHeader className="text-left">
-            <SheetTitle>Filter Options</SheetTitle>
+            <SheetTitle>{t("securities.table.filterOptions")}</SheetTitle>
           </SheetHeader>
           <ScrollArea className="flex-1 py-4">
             <div className="space-y-6">
@@ -307,7 +311,7 @@ export function AssetsTableMobile({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
-                    Data Source
+                    {t("securities.table.dataSource")}
                   </h4>
                   {selectedDataSources.length > 0 && (
                     <Button
@@ -316,7 +320,7 @@ export function AssetsTableMobile({
                       className="h-auto p-0 text-xs"
                       onClick={() => setSelectedDataSources([])}
                     >
-                      Clear
+                      {t("common:actions.clear")}
                     </Button>
                   )}
                 </div>
@@ -368,7 +372,7 @@ export function AssetsTableMobile({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
-                    Asset Class
+                    {t("securities.table.assetClass")}
                   </h4>
                   {selectedAssetSubClasses.length > 0 && (
                     <Button
@@ -377,7 +381,7 @@ export function AssetsTableMobile({
                       className="h-auto p-0 text-xs"
                       onClick={() => setSelectedAssetSubClasses([])}
                     >
-                      Clear
+                      {t("common:actions.clear")}
                     </Button>
                   )}
                 </div>
@@ -429,7 +433,7 @@ export function AssetsTableMobile({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
-                    Price Status
+                    {t("securities.table.priceStatus")}
                   </h4>
                   {selectedPriceStatus.length > 0 && (
                     <Button
@@ -444,8 +448,8 @@ export function AssetsTableMobile({
                 </div>
                 <div className="space-y-2">
                   {[
-                    { label: "Up to Date", value: "false" },
-                    { label: "Stale", value: "true" },
+                    { label: t("securities.table.upToDate"), value: "false" },
+                    { label: t("securities.table.stale"), value: "true" },
                   ].map((option) => {
                     const isSelected = selectedPriceStatus.includes(option.value);
                     const count = assets.filter((a) => {
@@ -482,7 +486,7 @@ export function AssetsTableMobile({
                           >
                             {isSelected && <Icons.Check className="text-secondary h-3 w-3" />}
                           </div>
-                          <span className="font-medium">{option.label}</span>
+                          <span className="font-medium">{option.label as string}</span>
                         </div>
                         <Badge variant="secondary" className="ml-auto">
                           {count}
@@ -497,12 +501,12 @@ export function AssetsTableMobile({
           <SheetFooter className="flex-row gap-2">
             {hasActiveFilters && (
               <Button variant="outline" className="flex-1" onClick={handleResetFilters}>
-                Reset All
+                {t("securities.table.resetAll")}
               </Button>
             )}
             <SheetClose asChild>
               <Button variant="default" className="flex-1">
-                Apply
+                {t("common:actions.apply")}
               </Button>
             </SheetClose>
           </SheetFooter>

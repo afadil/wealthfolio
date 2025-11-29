@@ -1,27 +1,29 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+
 
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { DataTable } from "@/components/ui/data-table";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import { DataTableFacetedFilterProps } from "@/components/ui/data-table/data-table-faceted-filter";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Icons } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@wealthfolio/ui";
@@ -42,9 +44,9 @@ interface AssetsTableProps {
   isRefetchingQuotes?: boolean;
 }
 
-const PRICE_STALE_OPTIONS = [
-  { label: "Up to Date", value: "false" },
-  { label: "Stale", value: "true" },
+const getPriceStaleOptions = (t: any) => [
+  { label: t("securities.table.upToDate"), value: "false" },
+  { label: t("securities.table.stale"), value: "true" },
 ];
 
 const isStaleQuote = (quote?: Quote) => {
@@ -74,13 +76,15 @@ export function AssetsTable({
   isRefetchingQuotes,
 }: AssetsTableProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation("settings");
+
 
   const columns: ColumnDef<ParsedAsset>[] = useMemo(
     () => [
       {
         id: "symbol",
         accessorKey: "symbol",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Asset" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t("securities.table.asset")} />,
         cell: ({ row }) => {
           const asset = row.original;
           const displaySymbol = asset.symbol.startsWith("$CASH")
@@ -108,7 +112,7 @@ export function AssetsTable({
         header: ({ column }) => (
           <DataTableColumnHeader
             column={column}
-            title="Currency"
+            title={t("securities.table.currency")}
             className="w-[50px] text-center"
           />
         ),
@@ -126,7 +130,7 @@ export function AssetsTable({
       {
         accessorKey: "assetClass",
         header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="Class" className="w-[120px]" />
+          <DataTableColumnHeader column={column} title={t("securities.table.class")} className="w-[120px]" />
         ),
         cell: ({ row }) => {
           const { assetClass, assetSubClass } = row.original;
@@ -155,7 +159,7 @@ export function AssetsTable({
       {
         accessorKey: "dataSource",
         header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="Source" className="w-[60px]" />
+          <DataTableColumnHeader column={column} title={t("securities.table.source")} className="w-[60px]" />
         ),
         cell: ({ row }) => (
           <Badge variant="secondary" className="uppercase">
@@ -173,14 +177,14 @@ export function AssetsTable({
       },
       {
         id: "latestQuote",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Last Close" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t("securities.table.lastClose")} />,
         cell: ({ row }) => {
           const asset = row.original;
           const quote = latestQuotes[asset.symbol];
           const stale = isStaleQuote(quote);
 
           if (!quote) {
-            return <div className="text-muted-foreground text-sm">No quotes</div>;
+            return <div className="text-muted-foreground text-sm">{t("securities.table.noQuotes")}</div>;
           }
 
           return (
@@ -197,7 +201,7 @@ export function AssetsTable({
                         aria-label="Quote not updated today"
                       />
                     </TooltipTrigger>
-                    <TooltipContent>Latest close is not from today</TooltipContent>
+                    <TooltipContent>{t("securities.table.staleQuote")}</TooltipContent>
                   </Tooltip>
                 ) : null}
               </div>
@@ -228,21 +232,21 @@ export function AssetsTable({
                     onClick={() => onUpdateQuotes(asset)}
                     disabled={isUpdatingQuotes}
                   >
-                    Update quotes
+                    {t("securities.table.updateQuotes")}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => onRefetchQuotes(asset)}
                     disabled={isRefetchingQuotes}
                   >
-                    Refetch quotes
+                    {t("securities.table.refetchQuotes")}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onEdit(asset)}>Edit</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onEdit(asset)}>{t("securities.table.edit")}</DropdownMenuItem>
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
                     onSelect={() => onDelete(asset)}
                   >
-                    Delete
+                    {t("securities.table.delete")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -259,7 +263,9 @@ export function AssetsTable({
       onUpdateQuotes,
       isRefetchingQuotes,
       isUpdatingQuotes,
+      isUpdatingQuotes,
       navigate,
+      t,
     ],
   );
 
@@ -288,21 +294,21 @@ export function AssetsTable({
     () => [
       {
         id: "assetSubClass",
-        title: "Class",
+        title: t("securities.table.class"),
         options: assetSubClassOptions,
       },
       {
         id: "dataSource",
-        title: "Data Source",
+        title: t("securities.table.dataSource"),
         options: dataSourceOptions,
       },
       {
         id: "isStale",
-        title: "Market Data",
-        options: PRICE_STALE_OPTIONS,
+        title: t("securities.table.marketData"),
+        options: getPriceStaleOptions(t),
       },
     ],
-    [assetSubClassOptions, dataSourceOptions],
+    [assetSubClassOptions, dataSourceOptions, t],
   );
 
   // Add computed field for stale status to enable filtering
@@ -325,11 +331,11 @@ export function AssetsTable({
           <Table>
             <TableHeader className="bg-muted/50 sticky top-0 z-10">
               <TableRow>
-                <TableHead>Asset</TableHead>
-                <TableHead className="text-center">Currency</TableHead>
-                <TableHead>Class</TableHead>
-                <TableHead>Source</TableHead>
-                <TableHead>Last Close</TableHead>
+                <TableHead>{t("securities.table.asset")}</TableHead>
+                <TableHead className="text-center">{t("securities.table.currency")}</TableHead>
+                <TableHead>{t("securities.table.class")}</TableHead>
+                <TableHead>{t("securities.table.source")}</TableHead>
+                <TableHead>{t("securities.table.lastClose")}</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>

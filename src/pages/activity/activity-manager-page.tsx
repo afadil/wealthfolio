@@ -12,14 +12,15 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, Icons, Page, PageContent, PageHeader } from "@wealthfolio/ui";
 import { useMemo } from "react";
 import { useForm, type Resolver, type SubmitHandler } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { TradeForm } from "../../components/forms/trade-form";
 import type { AccountSelectOption } from "./components/activity-form";
 import { CashForm } from "./components/forms/cash-form";
 import { HoldingsForm } from "./components/forms/holdings-form";
 import { IncomeForm } from "./components/forms/income-form";
 import { OtherForm } from "./components/forms/other-form";
 import { newActivitySchema, type NewActivityFormValues } from "./components/forms/schemas";
-import { TradeForm } from "../../components/forms/trade-form";
 import { MobileActivityForm } from "./components/mobile-forms/mobile-activity-form";
 import { useActivityMutations } from "./hooks/use-activity-mutations";
 
@@ -40,6 +41,7 @@ const ACTIVITY_TYPE_TO_TAB: Record<string, string> = {
 };
 
 const ActivityManagerPage = () => {
+  const { t } = useTranslation("activity");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isMobileViewport = useIsMobileViewport();
@@ -195,11 +197,11 @@ const ActivityManagerPage = () => {
     return (
       <Page>
         <PageHeader
-          heading="Add Activity"
+          heading={t("manager.heading")}
           text={
             selectedAccountName
-              ? `Add a new transaction to ${selectedAccountName}`
-              : "Create a new transaction or activity for your account"
+              ? t("manager.descriptionWithAccount", { accountName: selectedAccountName })
+              : t("manager.description")
           }
           onBack={handleClose}
         />
@@ -220,11 +222,11 @@ const ActivityManagerPage = () => {
   return (
     <Page>
       <PageHeader
-        heading="Add Activity"
+        heading={t("manager.heading")}
         text={
           selectedAccountName
-            ? `Add a new transaction to ${selectedAccountName}`
-            : "Create a new transaction or activity for your account"
+            ? t("manager.descriptionWithAccount", { accountName: selectedAccountName })
+            : t("manager.description")
         }
         onBack={handleClose}
         actions={
@@ -236,7 +238,7 @@ const ActivityManagerPage = () => {
               className="flex items-center gap-1.5"
             >
               <Icons.HelpCircle className="h-4 w-4" />
-              Learn more
+              {t("manager.learnMore")}
             </a>
           </Button>
         }
@@ -255,35 +257,35 @@ const ActivityManagerPage = () => {
                         className="data-[state=active]:bg-background flex flex-col items-center gap-1.5 rounded-lg px-4 py-3 data-[state=active]:shadow-sm"
                       >
                         <Icons.ArrowRightLeft className="h-5 w-5" />
-                        <span className="text-xs font-medium">Trade</span>
+                        <span className="text-xs font-medium">{t("form.tabs.trade")}</span>
                       </TabsTrigger>
                       <TabsTrigger
                         value="holdings"
                         className="data-[state=active]:bg-background flex flex-col items-center gap-1.5 rounded-lg px-4 py-3 data-[state=active]:shadow-sm"
                       >
                         <Icons.Wallet className="h-5 w-5" />
-                        <span className="text-xs font-medium">Holdings</span>
+                        <span className="text-xs font-medium">{t("form.tabs.holdings")}</span>
                       </TabsTrigger>
                       <TabsTrigger
                         value="cash"
                         className="data-[state=active]:bg-background flex flex-col items-center gap-1.5 rounded-lg px-4 py-3 data-[state=active]:shadow-sm"
                       >
                         <Icons.DollarSign className="h-5 w-5" />
-                        <span className="text-xs font-medium">Cash</span>
+                        <span className="text-xs font-medium">{t("form.tabs.cash")}</span>
                       </TabsTrigger>
                       <TabsTrigger
                         value="income"
                         className="data-[state=active]:bg-background flex flex-col items-center gap-1.5 rounded-lg px-4 py-3 data-[state=active]:shadow-sm"
                       >
                         <Icons.Income className="h-5 w-5" />
-                        <span className="text-xs font-medium">Income</span>
+                        <span className="text-xs font-medium">{t("form.tabs.income")}</span>
                       </TabsTrigger>
                       <TabsTrigger
                         value="other"
                         className="data-[state=active]:bg-background flex flex-col items-center gap-1.5 rounded-lg px-4 py-3 data-[state=active]:shadow-sm"
                       >
                         <Icons.FileText className="h-5 w-5" />
-                        <span className="text-xs font-medium">Other</span>
+                        <span className="text-xs font-medium">{t("form.tabs.other")}</span>
                       </TabsTrigger>
                     </TabsList>
                   </div>
@@ -296,15 +298,15 @@ const ActivityManagerPage = () => {
                       <div className="bg-destructive/10 border-destructive/20 flex items-start gap-3 rounded-lg border p-4">
                         <Icons.AlertCircle className="text-destructive mt-0.5 h-5 w-5 flex-shrink-0" />
                         <div className="space-y-1">
-                          <h4 className="font-semibold">Please Review Your Entry</h4>
+                          <h4 className="font-semibold">{t("manager.pleaseReviewEntry")}</h4>
                           <ul className="text-muted-foreground list-disc space-y-1 pl-4 text-sm">
                             {Object.entries(form.formState.errors).map(([field, error]) => (
                               <li key={field}>
                                 <span className="font-medium">
-                                  {field === "activityType" ? "Transaction Type" : field}
+                                  {field === "activityType" ? t("manager.transactionType") : field}
                                 </span>
                                 {": "}
-                                {error?.message?.toString() ?? "Invalid value"}
+                                {error?.message?.toString() ?? t("manager.invalidValue")}
                               </li>
                             ))}
                           </ul>
@@ -332,8 +334,8 @@ const ActivityManagerPage = () => {
                     <div className="border-border flex items-center justify-between border-t pt-6">
                       <p className="text-muted-foreground text-sm">
                         {initialActivity?.id
-                          ? "Update your transaction details"
-                          : "All fields are required unless marked as optional"}
+                          ? t("manager.updateDetails")
+                          : t("manager.allFieldsRequired")}
                       </p>
                       <div className="flex gap-3">
                         <Button
@@ -343,23 +345,23 @@ const ActivityManagerPage = () => {
                           disabled={isLoading}
                           size="lg"
                         >
-                          Cancel
+                          {t("manager.cancel")}
                         </Button>
                         <Button type="submit" disabled={isLoading} size="lg">
                           {isLoading ? (
                             <>
                               <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                              Saving...
+                              {t("manager.saving")}
                             </>
                           ) : initialActivity?.id ? (
                             <>
                               <Icons.Check className="mr-2 h-4 w-4" />
-                              Update Transaction
+                              {t("manager.updateTransaction")}
                             </>
                           ) : (
                             <>
                               <Icons.Plus className="mr-2 h-4 w-4" />
-                              Add Transaction
+                              {t("manager.addTransaction")}
                             </>
                           )}
                         </Button>

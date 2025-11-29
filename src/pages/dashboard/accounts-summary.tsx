@@ -56,7 +56,7 @@ const AccountSummaryComponent = React.memo(
     isLoadingValuation = false,
     displayInAccountCurrency = false,
     isNested = false,
-    t: _t,
+    t,
   }: {
     item: AccountSummaryDisplayData;
     isExpanded?: boolean;
@@ -64,7 +64,7 @@ const AccountSummaryComponent = React.memo(
     isLoadingValuation?: boolean;
     displayInAccountCurrency?: boolean;
     isNested?: boolean;
-    t: unknown;
+    t: any;
   }) => {
     const isGroup = item.isGroup ?? false;
     const useAccountCurrency =
@@ -92,8 +92,8 @@ const AccountSummaryComponent = React.memo(
 
     const subText = isGroup
       ? useAccountCurrency
-        ? `${item.accountCurrency} • ${item.accountCount} ${item.accountCount === 1 ? "account" : "accounts"}`
-        : `${item.accountCount} ${item.accountCount === 1 ? "account" : "accounts"}`
+        ? `${item.accountCurrency} • ${t("common:common.accountCount", { count: item.accountCount })}`
+        : t("common:common.accountCount", { count: item.accountCount })
       : useAccountCurrency
         ? (item.accountCurrency ?? item.baseCurrency)
         : item.baseCurrency;
@@ -210,7 +210,7 @@ const AccountSummaryComponent = React.memo(
 AccountSummaryComponent.displayName = "AccountSummaryComponent";
 
 export const AccountsSummary = React.memo(() => {
-  const { t } = useTranslation("dashboard");
+  const { t } = useTranslation(["dashboard", "common"]);
   const { accountsGrouped, setAccountsGrouped, settings } = useSettingsContext();
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 

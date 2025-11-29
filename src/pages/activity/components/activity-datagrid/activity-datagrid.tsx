@@ -1,34 +1,35 @@
 import { toast } from "@/components/ui/use-toast";
 import {
-  calculateActivityValue,
-  isCashActivity,
-  isCashTransfer,
-  isIncomeActivity,
+    calculateActivityValue,
+    isCashActivity,
+    isCashTransfer,
+    isIncomeActivity,
 } from "@/lib/activity-utils";
 import { ActivityType, ActivityTypeNames } from "@/lib/constants";
 import {
-  Account,
-  ActivityBulkMutationRequest,
-  ActivityCreate,
-  ActivityDetails,
-  ActivityUpdate,
+    Account,
+    ActivityBulkMutationRequest,
+    ActivityCreate,
+    ActivityDetails,
+    ActivityUpdate,
 } from "@/lib/types";
 import { cn, formatDateTimeDisplay, formatDateTimeLocal } from "@/lib/utils";
 import {
-  Button,
-  Checkbox,
-  Icons,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  formatAmount,
-  worldCurrencies,
+    Button,
+    Checkbox,
+    Icons,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+    formatAmount,
+    worldCurrencies,
 } from "@wealthfolio/ui";
 import type { Dispatch, SetStateAction } from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";
@@ -181,6 +182,7 @@ export function ActivityDatagrid({
   onRefetch,
   onEditActivity,
 }: ActivityDatagridProps) {
+  const { t } = useTranslation(["activity", "common"]);
   const [localTransactions, setLocalTransactions] = useState<LocalTransaction[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [focusedCell, setFocusedCell] = useState<CellCoordinate | null>(null);
@@ -609,8 +611,8 @@ export function ActivityDatagrid({
       setSelectedIds(new Set());
 
       toast({
-        title: "Activities saved",
-        description: "Your pending changes are now saved.",
+        title: t("activity:datagrid.saveSuccess.title"),
+        description: t("activity:datagrid.saveSuccess.description"),
         variant: "success",
       });
 
@@ -635,8 +637,8 @@ export function ActivityDatagrid({
     setLocalTransactions((prev) => prev.filter((transaction) => !transaction.isNew));
     onRefetch();
     toast({
-      title: "Changes discarded",
-      description: "Unsaved edits and drafts have been cleared.",
+      title: t("activity:datagrid.discardSuccess.title"),
+      description: t("activity:datagrid.discardSuccess.description"),
       variant: "default",
     });
   }, [onRefetch]);
@@ -647,13 +649,14 @@ export function ActivityDatagrid({
         <div className="text-muted-foreground flex items-center gap-2.5 text-xs">
           {selectedIds.size > 0 && (
             <span className="font-medium">
-              {selectedIds.size} row{selectedIds.size === 1 ? "" : "s"} selected
+              {t("activity:datagrid.rowsSelected", { count: selectedIds.size })}
             </span>
           )}
           {hasUnsavedChanges && (
             <span className="text-primary font-medium">
-              {dirtyTransactionIds.size + pendingDeleteIds.size} pending change
-              {dirtyTransactionIds.size + pendingDeleteIds.size === 1 ? "" : "s"}
+              {t("activity:datagrid.pendingChanges", {
+                count: dirtyTransactionIds.size + pendingDeleteIds.size,
+              })}
             </span>
           )}
         </div>
@@ -664,11 +667,11 @@ export function ActivityDatagrid({
             variant="outline"
             size="xs"
             className="shrink-0 rounded-md"
-            title="Add transaction"
-            aria-label="Add transaction"
+            title={t("activity:datagrid.addTransaction")}
+            aria-label={t("activity:datagrid.addTransaction")}
           >
             <Icons.Plus className="h-3.5 w-3.5" />
-            <span>Add</span>
+            <span>{t("common:actions.add")}</span>
           </Button>
 
           {selectedIds.size > 0 && (
@@ -679,12 +682,12 @@ export function ActivityDatagrid({
                 size="xs"
                 variant="destructive"
                 className="shrink-0 rounded-md text-xs"
-                title="Delete selected"
-                aria-label="Delete selected"
+                title={t("activity:datagrid.deleteSelected")}
+                aria-label={t("activity:datagrid.deleteSelected")}
                 disabled={saveActivitiesMutation.isPending}
               >
                 <Icons.Trash className="h-3.5 w-3.5" />
-                <span>Delete</span>
+                <span>{t("common:actions.delete")}</span>
               </Button>
             </>
           )}
@@ -696,8 +699,8 @@ export function ActivityDatagrid({
                 onClick={handleSaveChanges}
                 size="xs"
                 className="shrink-0 rounded-md text-xs"
-                title="Save changes"
-                aria-label="Save changes"
+                title={t("activity:datagrid.saveChanges")}
+                aria-label={t("activity:datagrid.saveChanges")}
                 disabled={saveActivitiesMutation.isPending}
               >
                 {saveActivitiesMutation.isPending ? (
@@ -705,7 +708,7 @@ export function ActivityDatagrid({
                 ) : (
                   <Icons.Save className="h-3.5 w-3.5" />
                 )}
-                <span>Save</span>
+                <span>{t("common:actions.save")}</span>
               </Button>
 
               <Button
@@ -713,12 +716,12 @@ export function ActivityDatagrid({
                 size="xs"
                 variant="outline"
                 className="shrink-0 rounded-md text-xs"
-                title="Discard changes"
-                aria-label="Discard changes"
+                title={t("activity:datagrid.discardChanges")}
+                aria-label={t("activity:datagrid.discardChanges")}
                 disabled={saveActivitiesMutation.isPending}
               >
                 <Icons.Undo className="h-3.5 w-3.5" />
-                <span>Cancel</span>
+                <span>{t("common:actions.cancel")}</span>
               </Button>
             </>
           )}
@@ -740,37 +743,37 @@ export function ActivityDatagrid({
                 </div>
               </TableHead>
               <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
-                Type
+                {t("activity:table.type")}
               </TableHead>
               <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
-                Date & Time
+                {t("activity:mobile.dateTime")}
               </TableHead>
               <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
-                Symbol
+                {t("activity:table.symbol")}
               </TableHead>
               <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
-                Quantity
+                {t("activity:table.quantity")}
               </TableHead>
               <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
-                Unit Price
+                {t("activity:table.unitPrice")}
               </TableHead>
               <TableHead className="bg-muted/30 h-9 w-24 border-r px-2 py-1.5 text-right text-xs font-semibold">
-                Amount
+                {t("activity:table.amount")}
               </TableHead>
               <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
-                Fee
+                {t("activity:table.fee")}
               </TableHead>
               <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
-                Total
+                {t("activity:table.total")}
               </TableHead>
               <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
-                Account
+                {t("activity:table.account")}
               </TableHead>
               <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
-                Currency
+                {t("activity:table.currency")}
               </TableHead>
               <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
-                Comment
+                {t("activity:form.comment")}
               </TableHead>
               <TableHead className="bg-muted/30 h-9 px-2 py-1.5" />
             </TableRow>
@@ -779,7 +782,7 @@ export function ActivityDatagrid({
             {localTransactions.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={12} className="text-muted-foreground h-32 text-center">
-                  No transactions yet. Click &quot;Add Transaction&quot; to get started.
+                  {t("activity:datagrid.noTransactions")}
                 </TableCell>
               </TableRow>
             ) : (

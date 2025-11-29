@@ -54,7 +54,11 @@
     "yes": "Có",
     "no": "Không",
     "moreInfoAbout": "Thêm thông tin về {{label}}",
-    "annualized": "Hàng năm:"
+    "annualized": "Hàng năm:",
+    "other": "Khác",
+    "na": "N/A",
+    "accountCount_one": "{{count}} tài khoản",
+    "accountCount_other": "{{count}} tài khoản"
   },
   "accounts": {
     "allPortfolio": "Toàn bộ Danh mục",
@@ -88,5 +92,39 @@
     "3Y": "3 năm qua",
     "5Y": "5 năm qua",
     "ALL": "Toàn thời gian"
+  },
+  "launcher": {
+    "searchPlaceholder": "Tìm kiếm hành động, danh mục hoặc tài khoản...",
+    "noMatches": "Không tìm thấy kết quả.",
+    "groups": {
+      "actions": "Hành động",
+      "holdings": "Danh mục",
+      "accounts": "Tài khoản"
+    },
+    "loading": {
+      "holdings": "Đang tải danh mục...",
+      "accounts": "Đang tải tài khoản..."
+    },
+    "actions": {
+      "showBalance": "Hiển thị số dư",
+      "hideBalance": "Ẩn số dư",
+      "themeLight": "Giao diện → Sáng",
+      "themeDark": "Giao diện → Tối",
+      "themeSystem": "Giao diện → Hệ thống",
+      "updateMarketData": "Cập nhật dữ liệu thị trường",
+      "updatingMarketData": "Đang cập nhật dữ liệu thị trường...",
+      "recalculatePortfolio": "Tính toán lại danh mục",
+      "recalculatingPortfolio": "Đang tính toán lại danh mục...",
+      "recordBuy": "Ghi nhận Mua",
+      "recordSell": "Ghi nhận Bán",
+      "recordDividend": "Ghi nhận Cổ tức",
+      "recordDeposit": "Ghi nhận Nạp tiền",
+      "recordWithdrawal": "Ghi nhận Rút tiền",
+      "addHolding": "Thêm tài sản",
+      "recordInterest": "Ghi nhận Lãi suất",
+      "addTransaction": "Thêm giao dịch",
+      "importActivities": "Nhập hoạt động",
+      "manageSecurities": "Quản lý chứng khoán"
+    }
   }
 }

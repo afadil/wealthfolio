@@ -18,10 +18,10 @@ import { AccountSelector } from "@/components/account-selector";
 import type { SwipablePageView } from "@/components/page";
 import { SwipablePage } from "@/components/page";
 import { useAccounts } from "@/hooks/use-accounts";
+import { useDividendAdjustedHoldings } from "@/hooks/use-dividend-adjusted-holdings";
 import { useHapticFeedback } from "@/hooks/use-haptic-feedback";
 import { useHoldings } from "@/hooks/use-holdings";
 import { usePlatform } from "@/hooks/use-platform";
-import { useDividendAdjustedHoldings } from "@/hooks/use-dividend-adjusted-holdings";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { Account, Holding, HoldingType, Instrument } from "@/lib/types";
@@ -40,7 +40,7 @@ import { SectorsChart } from "./components/sectors-chart";
 type SheetFilterType = "class" | "sector" | "country" | "currency" | "account" | "composition";
 
 export const HoldingsPage = () => {
-  const { t } = useTranslation("holdings");
+  const { t } = useTranslation(["holdings", "common"]);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>({
     id: PORTFOLIO_ACCOUNT_ID,
     name: t("page.allPortfolio"),
@@ -102,7 +102,7 @@ export const HoldingsPage = () => {
       case "class":
         filteredHoldings = adjustedHoldings.filter((h) => {
           const isCash = h.holdingType === HoldingType.CASH;
-          const assetSubClass = isCash ? t("page.cash") : (h.instrument?.assetSubclass ?? "Other");
+          const assetSubClass = isCash ? t("page.cash") : (h.instrument?.assetSubclass ?? t("common:common.other"));
           return assetSubClass === sheetFilterName;
         });
         break;
@@ -340,16 +340,16 @@ export const HoldingsPage = () => {
             {holdingsForSheet.length > 0 ? (
               <ul className="space-y-2">
                 {holdingsForSheet.map((holding) => {
-                  let displayName = "N/A";
+                  let displayName = t("common:common.na");
                   let symbol = "-";
                   if (holding.holdingType === HoldingType.CASH) {
                     displayName = holding.localCurrency
-                      ? `Cash (${holding.localCurrency})`
-                      : "Cash";
+                      ? `${t("page.cash")} (${holding.localCurrency})`
+                      : t("page.cash");
                     symbol = `$CASH-${holding.localCurrency}`;
                   } else if (holding.instrument) {
                     displayName =
-                      holding.instrument.name ?? holding.instrument.symbol ?? "Unnamed Security";
+                      holding.instrument.name ?? holding.instrument.symbol ?? t("page.unnamedSecurity");
                     symbol = holding.instrument.symbol ?? "-";
                   }
 

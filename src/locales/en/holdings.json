@@ -8,7 +8,8 @@
     "detailsFor": "Details for {{name}}",
     "noHoldings": "No holdings found for this selection.",
     "close": "Close",
-    "cash": "Cash"
+    "cash": "Cash",
+    "unnamedSecurity": "Unnamed Security"
   },
   "table": {
     "position": "Position",

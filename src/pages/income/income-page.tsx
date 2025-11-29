@@ -10,13 +10,13 @@ import { QueryKeys } from "@/lib/query-keys";
 import type { IncomeSummary } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import {
-  AmountDisplay,
-  AnimatedToggleGroup,
-  GainPercent,
-  Page,
-  PageContent,
-  PageHeader,
-  PrivacyAmount,
+    AmountDisplay,
+    AnimatedToggleGroup,
+    GainPercent,
+    Page,
+    PageContent,
+    PageHeader,
+    PrivacyAmount,
 } from "@wealthfolio/ui";
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -46,7 +46,7 @@ const IncomePeriodSelector: React.FC<{
 };
 
 export default function IncomePage() {
-  const { t } = useTranslation(["income"]);
+  const { t } = useTranslation(["income", "common"]);
   const [selectedPeriod, setSelectedPeriod] = useState<"TOTAL" | "YTD" | "LAST_YEAR">("TOTAL");
   const { isBalanceHidden } = useBalancePrivacy();
 
@@ -368,7 +368,7 @@ export default function IncomePage() {
                         ...(otherTotal > 0
                           ? [
                               {
-                                symbol: "Other",
+                                symbol: t("common:common.other"),
                                 companyName: `${otherStocks.length} ${t("income:otherSources")}`,
                                 income: otherTotal,
                                 isOther: true,

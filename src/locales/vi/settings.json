@@ -25,6 +25,10 @@
       "title": "Dữ liệu thị trường",
       "subtitle": "Nhà cung cấp và cập nhật dữ liệu"
     },
+    "securities": {
+      "title": "Chứng khoán",
+      "subtitle": "Quản lý định nghĩa chứng khoán"
+    },
     "addons": {
       "title": "Tiện ích",
       "subtitle": "Mở rộng Wealthfolio với các tính năng"
@@ -36,6 +40,40 @@
     "about": {
       "title": "Về ứng dụng",
       "subtitle": "Về Wealthfolio"
+    }
+  },
+  "securities": {
+    "title": "Chứng khoán",
+    "subtitle": "Quản lý định nghĩa chứng khoán",
+    "description": "Duyệt và quản lý các chứng khoán có sẵn trong danh mục đầu tư của bạn.",
+    "editTitle": "Chỉnh sửa chứng khoán",
+    "editDescription": "Cập nhật thông tin chứng khoán và cài đặt dữ liệu thị trường",
+    "deleteTitle": "Xóa chứng khoán",
+    "deleteConfirm": "Bạn có chắc chắn muốn xóa chứng khoán này không? Hành động này cũng sẽ xóa các báo giá liên quan và không thể hoàn tác.",
+    "deleteConfirmWithSymbol": "Bạn có chắc chắn muốn xóa {{symbol}} không? Hành động này cũng sẽ xóa báo giá liên quan và không thể hoàn tác.",
+    "deleteButton": "Xóa",
+    "deletingButton": "Đang xóa...",
+    "table": {
+      "asset": "Tài sản",
+      "currency": "Tiền tệ",
+      "class": "Lớp",
+      "source": "Nguồn",
+      "lastClose": "Đóng cửa gần nhất",
+      "noQuotes": "Không có báo giá",
+      "staleQuote": "Báo giá gần nhất không phải hôm nay",
+      "updateQuotes": "Cập nhật báo giá",
+      "refetchQuotes": "Tải lại báo giá",
+      "edit": "Chỉnh sửa",
+      "delete": "Xóa",
+      "dataSource": "Nguồn dữ liệu",
+      "marketData": "Dữ liệu thị trường",
+      "upToDate": "Cập nhật",
+      "stale": "Cũ",
+      "searchPlaceholder": "Tìm kiếm chứng khoán...",
+      "filterOptions": "Tùy chọn bộ lọc",
+      "assetClass": "Lớp tài sản",
+      "priceStatus": "Trạng thái giá",
+      "resetAll": "Đặt lại tất cả"
     }
   },
   "appearance": {

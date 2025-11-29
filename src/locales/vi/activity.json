@@ -11,6 +11,21 @@
     "import": "Nhập",
     "add": "Thêm"
   },
+  "manager": {
+    "heading": "Thêm hoạt động",
+    "description": "Tạo giao dịch hoặc hoạt động mới cho tài khoản của bạn",
+    "descriptionWithAccount": "Thêm giao dịch mới vào {{accountName}}",
+    "learnMore": "Tìm hiểu thêm",
+    "pleaseReviewEntry": "Vui lòng xem lại mục nhập",
+    "transactionType": "Loại giao dịch",
+    "invalidValue": "Giá trị không hợp lệ",
+    "updateDetails": "Cập nhật chi tiết giao dịch của bạn",
+    "allFieldsRequired": "Tất cả các trường đều bắt buộc trừ khi được đánh dấu là tùy chọn",
+    "cancel": "Hủy",
+    "saving": "Đang lưu...",
+    "updateTransaction": "Cập nhật giao dịch",
+    "addTransaction": "Thêm giao dịch"
+  },
   "types": {
     "BUY": "Mua",
     "SELL": "Bán",
@@ -216,8 +231,6 @@
       "description": "Chọn tài khoản cho giao dịch này"
     },
     "selectTransactionType": "Chọn loại giao dịch",
-    "back": "Quay lại",
-    "next": "Tiếp theo",
     "categories": {
       "trade": "Giao dịch",
       "holdings": "Tài sản",
@@ -304,7 +317,12 @@
     "addTransaction": "Thêm giao dịch",
     "deleteSelected": "Xóa đã chọn",
     "saveChanges": "Lưu thay đổi",
-    "discardChanges": "Hủy thay đổi"
+    "discardChanges": "Hủy thay đổi",
+    "rowsSelected_one": "{{count}} hàng được chọn",
+    "rowsSelected_other": "{{count}} hàng được chọn",
+    "pendingChanges_one": "{{count}} thay đổi đang chờ",
+    "pendingChanges_other": "{{count}} thay đổi đang chờ",
+    "noTransactions": "Chưa có giao dịch nào. Nhấn \"Thêm giao dịch\" để bắt đầu."
   },
   "empty": {
     "title": "Chưa có hoạt động nào",

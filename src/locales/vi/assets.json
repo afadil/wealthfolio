@@ -42,6 +42,7 @@
   },
   "lotsTable": {
     "acquiredDate": "Ngày mua",
+    "holdingDays": "Ngày nắm giữ",
     "quantity": "Số lượng",
     "acquisitionPrice": "Giá mua",
     "fees": "Phí",
