@@ -117,10 +117,15 @@ impl IncomeSummary {
             .entry(income_type)
             .or_insert_with(|| Decimal::ZERO) += &converted_amount;
 
-        // Use account name as the "symbol" for cash income
+        // Build display name from category/subcategory for cash income
+        let display_name = match (&data.category_name, &data.sub_category_name) {
+            (Some(cat), Some(sub)) => format!("{} > {}", cat, sub),
+            (Some(cat), None) => cat.clone(),
+            _ => data.account_name.clone(),
+        };
         *self
             .by_symbol
-            .entry(format!("[CASH]-{}", data.account_name))
+            .entry(format!("[$CASH]-{}", display_name))
             .or_insert_with(|| Decimal::ZERO) += &converted_amount;
         *self
             .by_currency
@@ -162,18 +167,20 @@ impl IncomeSummary {
         }
     }
 
-    /// Calculate source type breakdown (investment income, cash income, capital gains)
+    /// Calculate source type breakdown (investment income + capital gains combined, cash income)
     pub fn calculate_source_type_breakdown(&mut self) {
         self.by_source_type.clear();
 
         if self.total_income > Decimal::ZERO {
             let hundred = Decimal::new(100, 0);
 
-            if self.investment_income > Decimal::ZERO {
+            // Combine investment income and capital gains into "Investment Income"
+            let combined_investment = self.investment_income + self.capital_gains;
+            if combined_investment > Decimal::ZERO {
                 self.by_source_type.push(SourceTypeBreakdown {
                     source_type: "Investment Income".to_string(),
-                    amount: self.investment_income,
-                    percentage: (self.investment_income / self.total_income) * hundred,
+                    amount: combined_investment,
+                    percentage: (combined_investment / self.total_income) * hundred,
                 });
             }
 
@@ -182,14 +189,6 @@ impl IncomeSummary {
                     source_type: "Cash Income".to_string(),
                     amount: self.cash_income,
                     percentage: (self.cash_income / self.total_income) * hundred,
-                });
-            }
-
-            if self.capital_gains > Decimal::ZERO {
-                self.by_source_type.push(SourceTypeBreakdown {
-                    source_type: "Capital Gains".to_string(),
-                    amount: self.capital_gains,
-                    percentage: (self.capital_gains / self.total_income) * hundred,
                 });
             }
         }

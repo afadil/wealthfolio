@@ -95,17 +95,7 @@ export default function IncomePage() {
     );
   }
 
-  const { totalIncome, currency, monthlyAverage, byCurrency, bySymbol } = periodSummary;
-
-  // Calculate investment income (non-cash symbols) and cash income (symbols starting with [$CASH])
-  const investmentIncome = Object.entries(bySymbol)
-    .filter(([symbol]) => !symbol.startsWith("[$CASH]"))
-    .reduce((sum, [, amount]) => sum + amount, 0);
-  const cashIncome = Object.entries(bySymbol)
-    .filter(([symbol]) => symbol.startsWith("[$CASH]"))
-    .reduce((sum, [, amount]) => sum + amount, 0);
-  const investmentPercentage = totalIncome > 0 ? (investmentIncome / totalIncome) * 100 : 0;
-  const cashPercentage = totalIncome > 0 ? (cashIncome / totalIncome) * 100 : 0;
+  const { totalIncome, currency, monthlyAverage, byCurrency, bySourceType } = periodSummary;
 
   // Top income sources - includes both investment and cash income
   const topIncomeSources = Object.entries(periodSummary.bySymbol)
@@ -271,37 +261,20 @@ export default function IncomePage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {[
-                  {
-                    name: "Investment Income",
-                    amount: (
-                      <AmountDisplay
-                        value={investmentIncome}
-                        currency={currency}
-                        isHidden={isBalanceHidden}
-                      />
-                    ),
-                    percentage: investmentPercentage,
-                  },
-                  {
-                    name: "Cash Income",
-                    amount: (
-                      <AmountDisplay
-                        value={cashIncome}
-                        currency={currency}
-                        isHidden={isBalanceHidden}
-                      />
-                    ),
-                    percentage: cashPercentage,
-                  },
-                ].filter((source) => source.percentage > 0).map((source, index) => {
+                {bySourceType.map((source, index) => {
                   const chartColor = `var(--chart-${index + 1})`;
                   return (
                     <div key={index} className="flex items-center">
                       <div className="w-full">
                         <div className="mb-0 flex justify-between">
-                          <span className="text-xs">{source.name}</span>
-                          <span className="text-muted-foreground text-xs">{source.amount}</span>
+                          <span className="text-xs">{source.sourceType}</span>
+                          <span className="text-muted-foreground text-xs">
+                            <AmountDisplay
+                              value={source.amount}
+                              currency={currency}
+                              isHidden={isBalanceHidden}
+                            />
+                          </span>
                         </div>
                         <div
                           className="relative h-4 w-full rounded-full"
@@ -456,10 +429,7 @@ export default function IncomePage() {
                                 {ticker}
                               </Badge>
                               <div className="flex flex-col">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-muted-foreground text-xs">{name}</span>
-                                  <span className="text-muted-foreground/60 text-[10px]">• Dividend</span>
-                                </div>
+                                <span className="text-muted-foreground text-xs">{name}</span>
                               </div>
                             </>
                           )}

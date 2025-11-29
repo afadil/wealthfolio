@@ -442,6 +442,12 @@ export interface GoalProgress {
   currency: string;
 }
 
+export interface SourceTypeBreakdown {
+  sourceType: string;
+  amount: number;
+  percentage: number;
+}
+
 export interface IncomeSummary {
   period: string;
   byMonth: Record<string, number>;
@@ -449,9 +455,13 @@ export interface IncomeSummary {
   bySymbol: Record<string, number>;
   byCurrency: Record<string, number>;
   totalIncome: number;
+  investmentIncome: number;
+  cashIncome: number;
+  capitalGains: number;
   currency: string;
   monthlyAverage: number;
-  yoyGrowth: number | null; // Changed from optional to nullable
+  yoyGrowth: number | null;
+  bySourceType: SourceTypeBreakdown[];
 }
 
 export interface CategorySpending {
