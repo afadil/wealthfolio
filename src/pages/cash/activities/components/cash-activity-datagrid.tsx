@@ -1,4 +1,5 @@
 import { toast } from "@/components/ui/use-toast";
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { CASH_ACTIVITY_TYPES, CashActivityType } from "@/commands/cash-activity";
 import { getCategoriesHierarchical } from "@/commands/category";
 import { getEvents } from "@/commands/event";
@@ -336,6 +337,11 @@ export function CashActivityDatagrid({
     dirtyTransactionIds.size > 0 ||
     pendingDeleteIds.size > 0 ||
     localTransactions.some((t) => t.isNew);
+
+  const { UnsavedChangesDialog } = useUnsavedChanges({
+    hasUnsavedChanges,
+    message: "You have unsaved changes. Are you sure you want to leave? Your changes will be lost.",
+  });
 
   const handleCellNavigation = useCallback((direction: "up" | "down" | "left" | "right") => {
     setFocusedCell((current) => {
@@ -677,23 +683,25 @@ export function CashActivityDatagrid({
   }, [onRefetch]);
 
   return (
-    <div className="space-y-3">
-      <div className="bg-muted/20 flex flex-wrap items-center justify-between gap-2 rounded-md border px-2.5 py-1.5">
-        <div className="text-muted-foreground flex items-center gap-2.5 text-xs">
-          {selectedIds.size > 0 && (
-            <span className="font-medium">
-              {selectedIds.size} row{selectedIds.size === 1 ? "" : "s"} selected
-            </span>
-          )}
-          {hasUnsavedChanges && (
-            <span className="text-primary font-medium">
-              {dirtyTransactionIds.size + pendingDeleteIds.size} pending change
-              {dirtyTransactionIds.size + pendingDeleteIds.size === 1 ? "" : "s"}
-            </span>
-          )}
-        </div>
+    <>
+      <UnsavedChangesDialog />
+      <div className="space-y-3">
+        <div className="bg-muted/20 flex flex-wrap items-center justify-between gap-2 rounded-md border px-2.5 py-1.5">
+          <div className="text-muted-foreground flex items-center gap-2.5 text-xs">
+            {selectedIds.size > 0 && (
+              <span className="font-medium">
+                {selectedIds.size} row{selectedIds.size === 1 ? "" : "s"} selected
+              </span>
+            )}
+            {hasUnsavedChanges && (
+              <span className="text-primary font-medium">
+                {dirtyTransactionIds.size + pendingDeleteIds.size} pending change
+                {dirtyTransactionIds.size + pendingDeleteIds.size === 1 ? "" : "s"}
+              </span>
+            )}
+          </div>
 
-        <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1">
           <Button
             onClick={addNewRow}
             variant="outline"
@@ -846,7 +854,8 @@ export function CashActivityDatagrid({
           </TableBody>
         </Table>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 

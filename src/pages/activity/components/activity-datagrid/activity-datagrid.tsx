@@ -1,4 +1,5 @@
 import { toast } from "@/components/ui/use-toast";
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import {
   calculateActivityValue,
   isCashActivity,
@@ -97,10 +98,10 @@ const editableFields: EditableField[] = [
   "comment",
 ];
 
-const resolveAssetIdForTransaction = (
+function resolveAssetIdForTransaction(
   transaction: LocalTransaction,
   fallbackCurrency: string,
-): string | undefined => {
+): string | undefined {
   const existingAssetId = transaction.assetId?.trim() || transaction.assetSymbol?.trim();
   if (existingAssetId) {
     return existingAssetId;
@@ -116,14 +117,14 @@ const resolveAssetIdForTransaction = (
   }
 
   return undefined;
-};
+}
 
-const formatAmountDisplay = (
+function formatAmountDisplay(
   value: unknown,
   currency?: string,
   displayCurrency = false,
   fallbackCurrency = "USD",
-): string => {
+): string {
   const numericValue = toFiniteNumberOrUndefined(value);
   if (numericValue === undefined) {
     return "";
@@ -137,12 +138,12 @@ const formatAmountDisplay = (
   } catch {
     return "";
   }
-};
+}
 
-const createDraftTransaction = (
+function createDraftTransaction(
   accounts: Account[],
   fallbackCurrency: string,
-): LocalTransaction => {
+): LocalTransaction {
   const defaultAccount = accounts.find((account) => account.isActive) ?? accounts[0];
   const now = new Date();
 
@@ -468,6 +469,11 @@ export function ActivityDatagrid({
     virtualRows.length > 0
       ? rowVirtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end
       : 0;
+
+  const { UnsavedChangesDialog } = useUnsavedChanges({
+    hasUnsavedChanges,
+    message: "You have unsaved changes. Are you sure you want to leave? Your changes will be lost.",
+  });
 
   const handleCellNavigation = useCallback(
     (direction: "up" | "down" | "left" | "right") => {
@@ -942,8 +948,10 @@ export function ActivityDatagrid({
   }, [localTransactions, dirtyTransactionIds, pendingDeleteIds]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col space-y-3">
-      <div className="bg-muted/20 flex flex-wrap items-center justify-between gap-2 rounded-md border px-2.5 py-1.5">
+    <>
+      <UnsavedChangesDialog />
+      <div className="flex min-h-0 flex-1 flex-col space-y-3">
+        <div className="bg-muted/20 flex flex-wrap items-center justify-between gap-2 rounded-md border px-2.5 py-1.5">
         <div className="text-muted-foreground flex items-center gap-2.5 text-xs">
           {selectedIds.size > 0 && (
             <span className="font-medium">
@@ -1178,7 +1186,8 @@ export function ActivityDatagrid({
           )}
         </Table>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 

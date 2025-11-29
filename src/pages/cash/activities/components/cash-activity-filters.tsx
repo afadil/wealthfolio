@@ -1,9 +1,10 @@
 import { debounce } from "lodash";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CashActivityType, CASH_ACTIVITY_TYPES } from "@/commands/cash-activity";
 import { getCategoriesHierarchical } from "@/commands/category";
 import { getEventsWithNames } from "@/commands/event";
+import { useUnsavedChangesContext } from "@/context/unsaved-changes-context";
 import { Account, CategoryWithChildren, EventWithTypeName } from "@/lib/types";
 import { QueryKeys } from "@/lib/query-keys";
 import { AnimatedToggleGroup, Button, Icons, Input } from "@wealthfolio/ui";
@@ -62,6 +63,26 @@ export function CashActivityFilters({
   isFetching,
 }: CashActivityFiltersProps) {
   const [localSearch, setLocalSearch] = useState(searchQuery);
+  const { confirmAction } = useUnsavedChangesContext();
+
+  // Handle view mode change with unsaved changes check
+  const handleViewModeChange = useCallback(
+    (newMode: CashActivityViewMode) => {
+      if (viewMode === "edit" && newMode === "view") {
+        // Switching from edit to view - check for unsaved changes
+        const canProceed = confirmAction(
+          () => onViewModeChange(newMode),
+          "You have unsaved changes in Edit mode. Switching to View mode will discard your changes."
+        );
+        if (canProceed) {
+          onViewModeChange(newMode);
+        }
+      } else {
+        onViewModeChange(newMode);
+      }
+    },
+    [viewMode, onViewModeChange, confirmAction]
+  );
 
   // Fetch categories for the filter
   const { data: categories = [] } = useQuery<CategoryWithChildren[], Error>({
@@ -289,7 +310,7 @@ export function CashActivityFilters({
           size="sm"
           onValueChange={(value) => {
             if (value === "view" || value === "edit") {
-              onViewModeChange(value);
+              handleViewModeChange(value);
             }
           }}
           className="shrink-0"

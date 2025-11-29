@@ -2,6 +2,7 @@ import { logger } from "@/adapters";
 import { getAccounts } from "@/commands/account";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { usePlatform } from "@/hooks/use-platform";
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, ActivityImport, ImportMappingData } from "@/lib/types";
 import { AccountType } from "@/lib/types";
@@ -27,7 +28,7 @@ const STEPS = [
   { id: 4, title: "Import Results" },
 ];
 
-const ActivityImportPage = () => {
+function ActivityImportPage() {
   const navigate = useNavigate();
   const { isMobile } = usePlatform();
   const [currentStep, setCurrentStep] = useState(1);
@@ -69,6 +70,14 @@ const ActivityImportPage = () => {
     parseCsvFile,
     resetParserStates,
   } = useCsvParser();
+
+  // Track if user has unsaved import progress (past step 1 with data, but not on results step)
+  const hasUnsavedChanges = currentStep > 1 && currentStep < STEPS.length && (data.length > 0 || activities.length > 0);
+
+  const { UnsavedChangesDialog } = useUnsavedChanges({
+    hasUnsavedChanges,
+    message: "You have an import in progress. Are you sure you want to leave? Your import progress will be lost.",
+  });
 
   // Reset the entire import process
   const resetImportProcess = () => {
@@ -186,6 +195,7 @@ const ActivityImportPage = () => {
 
   return (
     <Page>
+      <UnsavedChangesDialog />
       <PageHeader
         heading="Import Investment Activity"
         onBack={isMobile ? () => navigate("/activities") : undefined}

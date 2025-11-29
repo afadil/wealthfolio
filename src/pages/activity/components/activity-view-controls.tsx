@@ -1,6 +1,7 @@
 import { debounce } from "lodash";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useUnsavedChangesContext } from "@/context/unsaved-changes-context";
 import { ActivityType, ActivityTypeNames } from "@/lib/constants";
 import { Account } from "@/lib/types";
 import { AnimatedToggleGroup, Button, Icons, Input } from "@wealthfolio/ui";
@@ -39,6 +40,26 @@ export function ActivityViewControls({
   isFetching,
 }: ActivityViewControlsProps) {
   const [localSearch, setLocalSearch] = useState(searchQuery);
+  const { confirmAction } = useUnsavedChangesContext();
+
+  // Handle view mode change with unsaved changes check
+  const handleViewModeChange = useCallback(
+    (newMode: ActivityViewMode) => {
+      if (viewMode === "datagrid" && newMode === "table") {
+        // Switching from datagrid (edit) to table (view) - check for unsaved changes
+        const canProceed = confirmAction(
+          () => onViewModeChange(newMode),
+          "You have unsaved changes in Edit mode. Switching to View mode will discard your changes."
+        );
+        if (canProceed) {
+          onViewModeChange(newMode);
+        }
+      } else {
+        onViewModeChange(newMode);
+      }
+    },
+    [viewMode, onViewModeChange, confirmAction]
+  );
 
   // Create a stable debounced search function
   const debouncedSearch = useMemo(
@@ -163,7 +184,7 @@ export function ActivityViewControls({
           size="sm"
           onValueChange={(value) => {
             if (value === "datagrid" || value === "table") {
-              onViewModeChange(value);
+              handleViewModeChange(value);
             }
           }}
           className="shrink-0"

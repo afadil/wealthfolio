@@ -1,6 +1,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 
+import { UnsavedChangesProvider } from "@/context/unsaved-changes-context";
 import { AppLayout } from "@/pages/layouts/app-layout";
 import { OnboardingLayout } from "@/pages/layouts/onboarding-layout";
 import SettingsLayout from "@/pages/settings/settings-layout";
@@ -64,66 +65,68 @@ export function AppRoutes() {
 
   return (
     <BrowserRouter>
-      <Routes>
-        {/* QR Scanner - No layout for fullscreen camera access */}
-        {/* <Route path="/qr-scanner" element={<QRScannerPage />} /> */}
+      <UnsavedChangesProvider>
+        <Routes>
+          {/* QR Scanner - No layout for fullscreen camera access */}
+          {/* <Route path="/qr-scanner" element={<QRScannerPage />} /> */}
 
-        {/* Onboarding with dedicated layout */}
-        <Route path="/onboarding" element={<OnboardingLayout />}>
-          <Route index element={<OnboardingPage />} />
-        </Route>
-
-        {/* Main app with sidebar */}
-        <Route path="/" element={<AppLayout />}>
-          <Route index element={<DashboardPage />} />
-          <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="activities" element={<ActivityPage />} />
-          <Route path="activities/manage" element={<ActivityManagerPage />} />
-          <Route path="holdings" element={<HoldingsPage />} />
-          <Route path="holdings-insights" element={<HoldingsInsightsPage />} />
-          <Route path="holdings/:symbol" element={<AssetProfilePage />} />
-          <Route path="import" element={<ActivityImportPage />} />
-          <Route path="accounts/:id" element={<AccountPage />} />
-          <Route path="income" element={<IncomePage />} />
-          <Route path="spending" element={<SpendingPage />} />
-          <Route path="performance" element={<PerformancePage />} />
-          <Route path="insights" element={<PortfolioInsightsPage />} />
-          <Route path="cash/activities" element={<CashActivitiesPage />} />
-          <Route path="cash/activities/import" element={<CashImportPage />} />
-          {/* Dynamic addon routes */}
-          {dynamicRoutes.map(({ path, component: Component }) => (
-            <Route
-              key={path}
-              path={path}
-              element={
-                <Suspense
-                  fallback={<div className="flex h-64 items-center justify-center">Loading...</div>}
-                >
-                  <Component />
-                </Suspense>
-              }
-            />
-          ))}
-          <Route path="settings" element={<SettingsLayout />}>
-            <Route index element={<GeneralSettingsPage />} />
-            <Route path="general" element={<GeneralSettingsPage />} />
-            <Route path="accounts" element={<SettingsAccountsPage />} />
-            <Route path="goals" element={<SettingsGoalsPage />} />
-            <Route path="categories" element={<CategoriesPage />} />
-            <Route path="category-rules" element={<CategoryRulesPage />} />
-            <Route path="events" element={<EventsPage />} />
-            <Route path="appearance" element={<SettingsAppearancePage />} />
-            <Route path="about" element={<AboutSettingsPage />} />
-            <Route path="exports" element={<ExportSettingsPage />} />
-            <Route path="contribution-limits" element={<ContributionLimitPage />} />
-            <Route path="market-data" element={<MarketDataSettingsPage />} />
-            <Route path="market-data/import" element={<MarketDataImportPage />} />
-            <Route path="securities" element={<AssetsPage />} />
-            <Route path="addons" element={<AddonSettingsPage />} />
+          {/* Onboarding with dedicated layout */}
+          <Route path="/onboarding" element={<OnboardingLayout />}>
+            <Route index element={<OnboardingPage />} />
           </Route>
-          <Route path="*" element={<NotFoundPage />} />
-        </Route>
-      </Routes>
+
+          {/* Main app with sidebar */}
+          <Route path="/" element={<AppLayout />}>
+            <Route index element={<DashboardPage />} />
+            <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="activities" element={<ActivityPage />} />
+            <Route path="activities/manage" element={<ActivityManagerPage />} />
+            <Route path="holdings" element={<HoldingsPage />} />
+            <Route path="holdings-insights" element={<HoldingsInsightsPage />} />
+            <Route path="holdings/:symbol" element={<AssetProfilePage />} />
+            <Route path="import" element={<ActivityImportPage />} />
+            <Route path="accounts/:id" element={<AccountPage />} />
+            <Route path="income" element={<IncomePage />} />
+            <Route path="spending" element={<SpendingPage />} />
+            <Route path="performance" element={<PerformancePage />} />
+            <Route path="insights" element={<PortfolioInsightsPage />} />
+            <Route path="cash/activities" element={<CashActivitiesPage />} />
+            <Route path="cash/activities/import" element={<CashImportPage />} />
+            {/* Dynamic addon routes */}
+            {dynamicRoutes.map(({ path, component: Component }) => (
+              <Route
+                key={path}
+                path={path}
+                element={
+                  <Suspense
+                    fallback={<div className="flex h-64 items-center justify-center">Loading...</div>}
+                  >
+                    <Component />
+                  </Suspense>
+                }
+              />
+            ))}
+            <Route path="settings" element={<SettingsLayout />}>
+              <Route index element={<GeneralSettingsPage />} />
+              <Route path="general" element={<GeneralSettingsPage />} />
+              <Route path="accounts" element={<SettingsAccountsPage />} />
+              <Route path="goals" element={<SettingsGoalsPage />} />
+              <Route path="categories" element={<CategoriesPage />} />
+              <Route path="category-rules" element={<CategoryRulesPage />} />
+              <Route path="events" element={<EventsPage />} />
+              <Route path="appearance" element={<SettingsAppearancePage />} />
+              <Route path="about" element={<AboutSettingsPage />} />
+              <Route path="exports" element={<ExportSettingsPage />} />
+              <Route path="contribution-limits" element={<ContributionLimitPage />} />
+              <Route path="market-data" element={<MarketDataSettingsPage />} />
+              <Route path="market-data/import" element={<MarketDataImportPage />} />
+              <Route path="securities" element={<AssetsPage />} />
+              <Route path="addons" element={<AddonSettingsPage />} />
+            </Route>
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
+        </Routes>
+      </UnsavedChangesProvider>
     </BrowserRouter>
   );
 }
