@@ -107,6 +107,8 @@ struct UpdateCheckResponseRaw {
     notes: Option<String>,
     pub_date: Option<String>,
     platforms: HashMap<String, UpdatePlatformInfo>,
+    changelog_url: Option<String>,
+    screenshots: Option<Vec<String>>,
 }
 
 #[derive(serde::Serialize)]
@@ -117,6 +119,8 @@ struct UpdateCheckResponse {
     notes: Option<String>,
     pub_date: Option<String>,
     download_url: Option<String>,
+    changelog_url: Option<String>,
+    screenshots: Option<Vec<String>>,
 }
 
 fn normalize_target(target: Option<String>) -> String {
@@ -147,9 +151,7 @@ fn normalize_arch(arch: Option<String>) -> String {
     }
 }
 
-async fn check_update(
-    State(state): State<Arc<AppState>>,
-) -> ApiResult<Json<UpdateCheckResponse>> {
+async fn check_update(State(state): State<Arc<AppState>>) -> ApiResult<Json<UpdateCheckResponse>> {
     let current_version_str = env!("CARGO_PKG_VERSION").to_string();
     let target = normalize_target(None);
     let arch = normalize_arch(None);
@@ -174,6 +176,8 @@ async fn check_update(
             notes: None,
             pub_date: None,
             download_url: None,
+            changelog_url: None,
+            screenshots: None,
         }));
     }
 
@@ -200,6 +204,8 @@ async fn check_update(
         notes: payload.notes,
         pub_date: payload.pub_date,
         download_url,
+        changelog_url: payload.changelog_url,
+        screenshots: payload.screenshots,
     }))
 }
 

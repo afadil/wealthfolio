@@ -322,6 +322,7 @@ export function AppLauncher() {
     isUpdatingPortfolio,
     location.pathname,
     navigation,
+    isFocusMode,
   ]);
 
   const holdingOptions = useMemo<LauncherHoldingItem[]>(() => {

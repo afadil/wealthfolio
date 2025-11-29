@@ -1,7 +1,8 @@
 // useGlobalEventListener.ts
+import { updatePortfolio } from "@/commands/portfolio";
 import { listenMarketSyncComplete } from "@/commands/portfolio-listener";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 
 import {
@@ -60,6 +61,7 @@ const handlePortfolioUpdateError = (error: string) => {
 
 const useGlobalEventListener = () => {
   const queryClient = useQueryClient();
+  const hasTriggeredInitialUpdate = useRef(false);
 
   const handlePortfolioUpdateComplete = useCallback(() => {
     toast.dismiss(TOAST_IDS.portfolioUpdateStart);
@@ -83,6 +85,18 @@ const useGlobalEventListener = () => {
       });
       const unlistenMarketStart = await listenMarketSyncStart(handleMarketSyncStart);
       const unlistenMarketComplete = await listenMarketSyncComplete(handleMarketSyncComplete);
+
+      // Trigger initial portfolio update after listeners are set up
+      if (!hasTriggeredInitialUpdate.current) {
+        hasTriggeredInitialUpdate.current = true;
+        logger.debug("Triggering initial portfolio update from frontend");
+
+        // Trigger portfolio update
+        updatePortfolio().catch((error) => {
+          logger.error("Failed to trigger initial portfolio update: " + String(error));
+        });
+        // Note: Update check is now handled by useCheckUpdateOnStartup query in UpdateDialog
+      }
 
       return () => {
         unlistenPortfolioSyncStart();

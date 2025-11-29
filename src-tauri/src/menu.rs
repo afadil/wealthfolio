@@ -80,7 +80,28 @@ pub fn handle_menu_event(app: &AppHandle, instance_id: &str, event_id: &str) {
             let app_handle = app.clone();
             let instance_id = instance_id.to_string();
             tauri::async_runtime::spawn(async move {
-                crate::updater::check_for_update(app_handle, &instance_id, true).await;
+                match crate::updater::check_for_update(app_handle.clone(), &instance_id).await {
+                    Ok(Some(update_info)) => {
+                        // Update available - emit event for frontend to show dialog
+                        let _ = app_handle.emit("app:update-available", &update_info);
+                    }
+                    Ok(None) => {
+                        // Already up-to-date - show native dialog
+                        app_handle
+                            .dialog()
+                            .message("You're already running the latest version of Wealthfolio.")
+                            .title("No Updates Available")
+                            .show(|_| {});
+                    }
+                    Err(e) => {
+                        // Error - show native dialog
+                        app_handle
+                            .dialog()
+                            .message(format!("Failed to check for updates: {}", e))
+                            .title("Update Check Failed")
+                            .show(|_| {});
+                    }
+                }
             });
         }
         "show_about_dialog" => {

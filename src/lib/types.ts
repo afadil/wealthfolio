@@ -551,3 +551,14 @@ export interface AddonStoreListing {
   /** Classification tags for filtering */
   tags?: string[];
 }
+
+export interface UpdateInfo {
+  currentVersion: string;
+  latestVersion: string;
+  notes?: string;
+  pubDate?: string;
+  isAppStoreBuild: boolean;
+  storeUrl?: string;
+  changelogUrl?: string;
+  screenshots?: string[];
+}

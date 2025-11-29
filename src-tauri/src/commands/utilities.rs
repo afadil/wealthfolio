@@ -7,6 +7,9 @@ use tauri::Manager;
 use tauri::{AppHandle, Emitter};
 use wealthfolio_core::db;
 
+use crate::context::ServiceContext;
+use crate::updater::{check_for_update, install_update};
+
 /// Normalize file path by removing file:// URI prefix if present (iOS/Android compatibility)
 fn normalize_file_path(path: &str) -> String {
     if path.starts_with("file://") {
@@ -53,6 +56,24 @@ pub async fn get_app_info(app_handle: AppHandle) -> Result<AppInfo, String> {
         db_path,
         logs_dir,
     })
+}
+
+/// Check for updates and return update info if available.
+#[tauri::command]
+pub async fn check_for_updates(app_handle: AppHandle) -> Result<Option<crate::updater::UpdateInfo>, String> {
+    let instance_id = app_handle
+        .try_state::<std::sync::Arc<ServiceContext>>()
+        .map(|state| state.instance_id.clone())
+        .ok_or_else(|| "Failed to access service context".to_string())?;
+
+    check_for_update(app_handle, &instance_id).await
+}
+
+/// Download and install an available update. Shows native dialogs and restarts the app.
+#[tauri::command]
+pub async fn install_app_update(app_handle: AppHandle) -> Result<(), String> {
+    install_update(app_handle).await;
+    Ok(())
 }
 
 #[tauri::command]

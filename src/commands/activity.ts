@@ -136,7 +136,6 @@ export const saveActivities = async (
     deleteIds: request.deleteIds ?? [],
   };
   try {
-    console.log("Saving activities with payload:", payload);
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri("save_activities", { request: payload });
