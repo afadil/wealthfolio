@@ -1,7 +1,7 @@
 use std::sync::{Arc, RwLock};
 use wealthfolio_core::{
-    self, accounts, activities, assets, fx, goals, limits, market_data, portfolio, settings,
-    spending,
+    self, accounts, activities, assets, categories, category_rules, event_types, events, fx, goals,
+    limits, market_data, portfolio, settings, spending,
 };
 pub struct ServiceContext {
     pub base_currency: Arc<RwLock<String>>,
@@ -22,6 +22,10 @@ pub struct ServiceContext {
     pub snapshot_service: Arc<dyn portfolio::snapshot::SnapshotServiceTrait>,
     pub holdings_service: Arc<dyn portfolio::holdings::HoldingsServiceTrait>,
     pub valuation_service: Arc<dyn portfolio::valuation::ValuationServiceTrait>,
+    pub category_service: Arc<dyn categories::CategoryServiceTrait>,
+    pub category_rule_service: Arc<dyn category_rules::CategoryRuleServiceTrait>,
+    pub event_type_service: Arc<dyn event_types::EventTypeServiceTrait>,
+    pub event_service: Arc<dyn events::EventServiceTrait>,
 }
 
 impl ServiceContext {
@@ -87,5 +91,21 @@ impl ServiceContext {
 
     pub fn valuation_service(&self) -> Arc<dyn portfolio::valuation::ValuationServiceTrait> {
         Arc::clone(&self.valuation_service)
+    }
+
+    pub fn category_service(&self) -> Arc<dyn categories::CategoryServiceTrait> {
+        Arc::clone(&self.category_service)
+    }
+
+    pub fn category_rule_service(&self) -> Arc<dyn category_rules::CategoryRuleServiceTrait> {
+        Arc::clone(&self.category_rule_service)
+    }
+
+    pub fn event_type_service(&self) -> Arc<dyn event_types::EventTypeServiceTrait> {
+        Arc::clone(&self.event_type_service)
+    }
+
+    pub fn event_service(&self) -> Arc<dyn events::EventServiceTrait> {
+        Arc::clone(&self.event_service)
     }
 }

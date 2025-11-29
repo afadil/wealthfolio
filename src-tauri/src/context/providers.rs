@@ -4,7 +4,11 @@ use std::sync::{Arc, RwLock};
 use wealthfolio_core::{
     accounts::{AccountRepository, AccountService},
     activities::{ActivityRepository, ActivityService},
+    categories::{CategoryRepository, CategoryService},
+    category_rules::{CategoryRuleRepository, CategoryRuleService},
     db::{self, write_actor},
+    event_types::{EventTypeRepository, EventTypeService},
+    events::{EventRepository, EventService},
     fx::{FxRepository, FxService, FxServiceTrait},
     goals::{GoalRepository, GoalService},
     limits::{ContributionLimitRepository, ContributionLimitService},
@@ -47,6 +51,10 @@ pub async fn initialize_context(
     let fx_repository = Arc::new(FxRepository::new(pool.clone(), writer.clone()));
     let snapshot_repository = Arc::new(SnapshotRepository::new(pool.clone(), writer.clone()));
     let valuation_repository = Arc::new(ValuationRepository::new(pool.clone(), writer.clone()));
+    let category_repository = Arc::new(CategoryRepository::new(pool.clone(), writer.clone()));
+    let category_rule_repository = Arc::new(CategoryRuleRepository::new(pool.clone(), writer.clone()));
+    let event_type_repository = Arc::new(EventTypeRepository::new(pool.clone(), writer.clone()));
+    let event_repository = Arc::new(EventRepository::new(pool.clone(), writer.clone()));
     // Instantiate Transaction Executor using the Arc<DbPool> directly
     let transaction_executor = pool.clone();
 
@@ -141,6 +149,17 @@ pub async fn initialize_context(
         holdings_valuation_service.clone(),
     ));
 
+    let category_service = Arc::new(CategoryService::new(category_repository.clone()));
+    let category_rule_service = Arc::new(CategoryRuleService::new(
+        category_rule_repository.clone(),
+        category_repository.clone(),
+    ));
+    let event_type_service = Arc::new(EventTypeService::new(event_type_repository.clone()));
+    let event_service = Arc::new(EventService::new(
+        event_repository.clone(),
+        event_type_repository.clone(),
+    ));
+
     Ok(ServiceContext {
         base_currency,
         instance_id,
@@ -158,5 +177,9 @@ pub async fn initialize_context(
         snapshot_service,
         holdings_service,
         valuation_service,
+        category_service,
+        category_rule_service,
+        event_type_service,
+        event_service,
     })
 }

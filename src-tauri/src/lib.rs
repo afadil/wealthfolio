@@ -268,6 +268,37 @@ pub fn run() {
             commands::addon::install_addon_from_staging,
             commands::addon::clear_addon_staging,
             commands::addon::submit_addon_rating,
+            // Category commands
+            commands::category::get_categories,
+            commands::category::get_categories_hierarchical,
+            commands::category::get_expense_categories,
+            commands::category::get_income_categories,
+            commands::category::create_category,
+            commands::category::update_category,
+            commands::category::delete_category,
+            // Category rule commands
+            commands::category_rule::get_category_rules,
+            commands::category_rule::get_category_rules_with_names,
+            commands::category_rule::create_category_rule,
+            commands::category_rule::update_category_rule,
+            commands::category_rule::delete_category_rule,
+            commands::category_rule::apply_category_rules,
+            commands::category_rule::bulk_apply_category_rules,
+            commands::category_rule::test_category_rule_pattern,
+            // Event type commands
+            commands::event_type::get_event_types,
+            commands::event_type::get_event_type,
+            commands::event_type::create_event_type,
+            commands::event_type::update_event_type,
+            commands::event_type::delete_event_type,
+            // Event commands
+            commands::event::get_events,
+            commands::event::get_events_with_names,
+            commands::event::get_event,
+            commands::event::create_event,
+            commands::event::update_event,
+            commands::event::delete_event,
+            commands::event::validate_transaction_date,
         ])
         .build(tauri::generate_context!())
         .expect("Failed to build Wealthfolio application")
