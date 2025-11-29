@@ -1,6 +1,6 @@
 [package]
 name = "wealthfolio-app"
-version = "2.0.1"
+version = "2.1.0"
 description = "Portfolio tracker"
 authors = ["Aziz Fadil"]
 license = "AGPL-3.0"
