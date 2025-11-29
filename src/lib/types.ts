@@ -73,8 +73,6 @@ export interface ActivityDetails {
   assetSymbol: string;
   assetName?: string;
   assetDataSource?: DataSource;
-  transferAccountId?: string;
-  transferAccountName?: string;
   subRows?: ActivityDetails[];
 }
 
@@ -103,7 +101,6 @@ export interface ActivityCreate {
   categoryId?: string | null;
   subCategoryId?: string | null;
   eventId?: string | null;
-  transferAccountId?: string | null;
 }
 
 export type ActivityUpdate = ActivityCreate & { id: string };
@@ -252,7 +249,6 @@ export interface CashImportRow {
   subCategoryId?: string;
   eventId?: string;
   description?: string;
-  transferAccountId?: string; // For TRANSFER_IN/TRANSFER_OUT: the other account involved
   // Rule match tracking
   matchedRuleId?: string;
   matchedRuleName?: string;

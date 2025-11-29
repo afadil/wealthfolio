@@ -76,7 +76,6 @@ type EditableField =
   | "categoryId"
   | "subCategoryId"
   | "eventId"
-  | "transferAccountId"
   | "description";
 
 interface CellCoordinate {
@@ -93,7 +92,6 @@ const editableFields: EditableField[] = [
   "categoryId",
   "subCategoryId",
   "eventId",
-  "transferAccountId",
   "description",
 ];
 
@@ -197,19 +195,6 @@ export function CashImportEditStep({
       { value: ActivityType.TRANSFER_OUT, label: "Transfer Out", searchValue: "Transfer Out" },
     ],
     [],
-  );
-
-  // Get transfer account options (CASH accounts excluding current account)
-  const transferAccountOptions = useMemo(
-    () =>
-      accounts
-        .filter((acc) => acc.accountType === "CASH" && acc.id !== accountId)
-        .map((acc) => ({
-          value: acc.id,
-          label: acc.name,
-          searchValue: acc.name,
-        })),
-    [accounts, accountId],
   );
 
   // Category options with colored +/- indicator for income/expense
@@ -464,8 +449,6 @@ export function CashImportEditStep({
             updated.isManualOverride = true;
           } else if (field === "eventId") {
             updated.eventId = value || undefined;
-          } else if (field === "transferAccountId") {
-            updated.transferAccountId = value || undefined;
           } else if (field === "description") {
             updated.description = value;
           }
@@ -934,9 +917,6 @@ export function CashImportEditStep({
               <TableHead className="bg-muted/30 h-9 w-[120px] border-r px-2 py-1.5 text-xs font-semibold">
                 Event
               </TableHead>
-              <TableHead className="bg-muted/30 h-9 w-[120px] border-r px-2 py-1.5 text-xs font-semibold">
-                Transfer Account
-              </TableHead>
               <TableHead className="bg-muted/30 h-9 min-w-[120px] border-r px-2 py-1.5 text-xs font-semibold">
                 Description
               </TableHead>
@@ -946,7 +926,7 @@ export function CashImportEditStep({
           <TableBody>
             {displayedTransactions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={12} className="text-muted-foreground h-32 text-center">
+                <TableCell colSpan={11} className="text-muted-foreground h-32 text-center">
                   No transactions match your filters.
                 </TableCell>
               </TableRow>
@@ -966,7 +946,6 @@ export function CashImportEditStep({
                   eventLookup={eventLookup}
                   accountOptions={accountOptions}
                   accountLookup={accountLookup}
-                  transferAccountOptions={transferAccountOptions}
                   isSelected={selectedIds.has(transaction.lineNumber)}
                   focusedField={
                     focusedCell?.rowId === transaction.lineNumber ? focusedCell.field : null
@@ -1101,7 +1080,6 @@ interface ImportTransactionRowProps {
   eventLookup: Map<string, Event>;
   accountOptions: { value: string; label: string; searchValue?: string }[];
   accountLookup: Map<string, Account>;
-  transferAccountOptions: { value: string; label: string; searchValue?: string }[];
   isSelected: boolean;
   focusedField: EditableField | null;
   onToggleSelect: (lineNumber: number) => void;
@@ -1125,7 +1103,6 @@ const ImportTransactionRow = memo(
     eventLookup,
     accountOptions,
     accountLookup,
-    transferAccountOptions,
     isSelected,
     focusedField,
     onToggleSelect,
@@ -1148,16 +1125,6 @@ const ImportTransactionRow = memo(
       ? subcategoryLookup.get(transaction.subCategoryId)?.name
       : undefined;
     const eventName = transaction.eventId ? eventLookup.get(transaction.eventId)?.name : undefined;
-
-    // Get transfer account name
-    const transferAccountName = transaction.transferAccountId
-      ? accountLookup.get(transaction.transferAccountId)?.name
-      : undefined;
-
-    // Check if this is a transfer activity
-    const isTransfer =
-      transaction.activityType === ActivityType.TRANSFER_IN ||
-      transaction.activityType === ActivityType.TRANSFER_OUT;
 
     // Get effective account ID (transaction's accountId or fall back to default)
     const effectiveAccountId = transaction.accountId || defaultAccountId;
@@ -1295,24 +1262,6 @@ const ImportTransactionRow = memo(
           />
         </TableCell>
         <TableCell className="h-9 border-r px-0 py-0">
-          {isTransfer ? (
-            <SelectCell
-              value={transaction.transferAccountId ?? ""}
-              options={transferAccountOptions}
-              onChange={(value) =>
-                onUpdateTransaction(transaction.lineNumber, "transferAccountId", value)
-              }
-              onFocus={() => handleFocus("transferAccountId")}
-              onNavigate={onNavigate}
-              isFocused={focusedField === "transferAccountId"}
-              renderValue={() => transferAccountName || ""}
-              className="text-xs"
-            />
-          ) : (
-            <span className="text-muted-foreground px-2 text-xs">-</span>
-          )}
-        </TableCell>
-        <TableCell className="h-9 border-r px-0 py-0">
           <EditableCell
             value={transaction.description || ""}
             onChange={(value) => onUpdateTransaction(transaction.lineNumber, "description", value)}
@@ -1350,8 +1299,7 @@ const ImportTransactionRow = memo(
       prev.subcategoryLookup === next.subcategoryLookup &&
       prev.getSubcategoryOptions === next.getSubcategoryOptions &&
       prev.eventOptions === next.eventOptions &&
-      prev.eventLookup === next.eventLookup &&
-      prev.transferAccountOptions === next.transferAccountOptions
+      prev.eventLookup === next.eventLookup
     );
   },
 );

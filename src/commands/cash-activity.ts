@@ -157,7 +157,6 @@ export const createTransfer = async (
       categoryId: transfer.categoryId,
       subCategoryId: transfer.subCategoryId,
       eventId: transfer.eventId,
-      transferAccountId: transfer.destinationAccountId,
     };
 
     // Create TRANSFER_IN on destination account (positive)
@@ -176,7 +175,6 @@ export const createTransfer = async (
       categoryId: transfer.categoryId,
       subCategoryId: transfer.subCategoryId,
       eventId: transfer.eventId,
-      transferAccountId: transfer.sourceAccountId,
     };
 
     const sourceResult = await createCashActivity(sourceActivity);

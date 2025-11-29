@@ -303,7 +303,6 @@ mod tests {
             category_id: None,
             sub_category_id: None,
             event_id: None,
-            transfer_account_id: None,
         }
     }
 
@@ -339,7 +338,6 @@ mod tests {
             category_id: None,
             sub_category_id: None,
             event_id: None,
-            transfer_account_id: None,
         }
     }
 

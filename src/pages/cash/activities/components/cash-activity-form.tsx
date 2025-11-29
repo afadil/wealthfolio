@@ -33,7 +33,7 @@ import {
   SelectValue,
 } from "@wealthfolio/ui";
 import { useCallback, useEffect, useState } from "react";
-import { useForm, type Resolver, type SubmitHandler } from "react-hook-form";
+import { useForm, type Control, type FieldValues, type Resolver, type SubmitHandler } from "react-hook-form";
 import { z } from "zod";
 import { useCashActivityMutations } from "../hooks/use-cash-activity-mutations";
 import { useCategoryRuleMatch } from "../hooks/use-category-rule-match";
@@ -41,6 +41,7 @@ import { CategorySelect } from "./category-select";
 import { getEventsWithNames } from "@/commands/event";
 import { useQuery } from "@tanstack/react-query";
 import { QueryKeys } from "@/lib/query-keys";
+import { ActivityTypeSelector, type ActivityType as ActivityTypeUI } from "@/pages/activity/components/activity-type-selector";
 
 export interface AccountSelectOption {
   value: string;
@@ -55,11 +56,13 @@ interface CashActivityFormProps {
   onClose?: () => void;
 }
 
-// Schema for cash activity (deposit/withdrawal)
+// Schema for cash activity (deposit/withdrawal/transfer)
 const cashActivityFormSchema = z.object({
   id: z.string().optional(),
   accountId: z.string().min(1, { message: "Please select an account." }),
-  activityType: z.enum(["DEPOSIT", "WITHDRAWAL"]),
+  activityType: z.enum(["DEPOSIT", "WITHDRAWAL", "TRANSFER_IN", "TRANSFER_OUT"], {
+    required_error: "Please select a transaction type.",
+  }),
   activityDate: z.union([z.date(), z.string().datetime()]).default(new Date()),
   amount: z.coerce
     .number({
@@ -76,6 +79,34 @@ const cashActivityFormSchema = z.object({
 
 type CashActivityFormValues = z.infer<typeof cashActivityFormSchema>;
 
+// Activity types for the radio button selector
+const cashActivityTypes: ActivityTypeUI[] = [
+  {
+    value: "DEPOSIT",
+    label: "Deposit",
+    icon: "ArrowDown",
+    description: "Increase your account balance by adding funds.",
+  },
+  {
+    value: "WITHDRAWAL",
+    label: "Withdrawal",
+    icon: "ArrowUp",
+    description: "Decrease your account balance by taking out funds.",
+  },
+  {
+    value: "TRANSFER_IN",
+    label: "Transfer In",
+    icon: "ArrowDown",
+    description: "Move funds into this account from another account.",
+  },
+  {
+    value: "TRANSFER_OUT",
+    label: "Transfer Out",
+    icon: "ArrowUp",
+    description: "Move funds from this account to another account.",
+  },
+];
+
 export function CashActivityForm({ accounts, activity, open, onClose }: CashActivityFormProps) {
   const { addCashActivityMutation, updateCashActivityMutation } = useCashActivityMutations(onClose);
   const [isOverridden, setIsOverridden] = useState(false);
@@ -86,13 +117,14 @@ export function CashActivityForm({ accounts, activity, open, onClose }: CashActi
     queryFn: getEventsWithNames,
   });
 
+  const isValidActivityType = (type: string | undefined): type is CashActivityFormValues["activityType"] => {
+    return type === "DEPOSIT" || type === "WITHDRAWAL" || type === "TRANSFER_IN" || type === "TRANSFER_OUT";
+  };
+
   const getDefaultValues = useCallback((): Partial<CashActivityFormValues> => ({
     id: activity?.id,
     accountId: activity?.accountId || "",
-    activityType:
-      activity?.activityType === "DEPOSIT" || activity?.activityType === "WITHDRAWAL"
-        ? activity.activityType
-        : "DEPOSIT",
+    activityType: isValidActivityType(activity?.activityType) ? activity.activityType : undefined,
     amount: activity?.amount ? Math.abs(activity.amount) : undefined,
     comment: activity?.comment ?? null,
     name: activity?.name ?? "",
@@ -219,12 +251,9 @@ export function CashActivityForm({ accounts, activity, open, onClose }: CashActi
     }
   };
 
-  // Filter to only show CASH accounts
-  const cashAccounts = accounts.filter((acc) => acc.value); // All accounts passed should be cash accounts
-
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent className="space-y-8 overflow-y-auto sm:max-w-[500px]">
+      <SheetContent className="space-y-8 overflow-y-auto sm:max-w-[625px]">
         <SheetHeader>
           <div className="flex items-center gap-2">
             <SheetTitle>{activity?.id ? "Update Transaction" : "Add Transaction"}</SheetTitle>
@@ -253,41 +282,41 @@ export function CashActivityForm({ accounts, activity, open, onClose }: CashActi
           <SheetDescription>
             {activity?.id
               ? "Update the details of your cash transaction"
-              : "Record a new deposit or withdrawal"}
+              : "Record a new transaction in your account."}
+            {"→ "}
+            <a
+              href="https://wealthfolio.app/docs/concepts/activity-types"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              Learn more
+            </a>
           </SheetDescription>
         </SheetHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Activity Type Radio Buttons */}
+            {!activity?.id && (
+              <ActivityTypeSelector
+                control={form.control as unknown as Control<FieldValues>}
+                types={cashActivityTypes}
+                columns={4}
+              />
+            )}
+
             <Card>
               <CardContent className="space-y-6 pt-4">
-                {/* Transaction Type */}
+                {/* Amount */}
                 <FormField
                   control={form.control}
-                  name="activityType"
+                  name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Type</FormLabel>
+                      <FormLabel>Amount</FormLabel>
                       <FormControl>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <SelectTrigger aria-label="Transaction Type">
-                            <SelectValue placeholder="Select type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="DEPOSIT">
-                              <span className="flex items-center gap-2">
-                                <Icons.ArrowDown className="h-4 w-4 text-success" />
-                                Deposit
-                              </span>
-                            </SelectItem>
-                            <SelectItem value="WITHDRAWAL">
-                              <span className="flex items-center gap-2">
-                                <Icons.ArrowUp className="h-4 w-4 text-destructive" />
-                                Withdrawal
-                              </span>
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <MoneyInput {...field} aria-label="Amount" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -307,7 +336,7 @@ export function CashActivityForm({ accounts, activity, open, onClose }: CashActi
                             <SelectValue placeholder="Select an account" />
                           </SelectTrigger>
                           <SelectContent className="max-h-[400px] overflow-y-auto">
-                            {cashAccounts.map((account) => (
+                            {accounts.map((account) => (
                               <SelectItem value={account.value} key={account.value}>
                                 {account.label}
                                 <span className="text-muted-foreground ml-1 font-light">
@@ -360,21 +389,6 @@ export function CashActivityForm({ accounts, activity, open, onClose }: CashActi
                           {...field}
                           aria-label="Name"
                         />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Amount */}
-                <FormField
-                  control={form.control}
-                  name="amount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Amount</FormLabel>
-                      <FormControl>
-                        <MoneyInput {...field} aria-label="Amount" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -462,7 +476,7 @@ export function CashActivityForm({ accounts, activity, open, onClose }: CashActi
                       <FormLabel>Description (optional)</FormLabel>
                       <FormControl>
                         <Textarea
-                          placeholder="Add a note or description..."
+                          placeholder="Add an optional description or comment for this transaction..."
                           className="resize-none"
                           rows={3}
                           {...field}
@@ -491,7 +505,7 @@ export function CashActivityForm({ accounts, activity, open, onClose }: CashActi
                 ) : (
                   <Icons.Plus className="h-4 w-4" />
                 )}
-                <span className="ml-2">{activity?.id ? "Update" : "Add"}</span>
+                <span className="ml-2">{activity?.id ? "Update Activity" : "Add Activity"}</span>
               </Button>
             </SheetFooter>
           </form>

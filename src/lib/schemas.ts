@@ -109,7 +109,6 @@ export const importActivitySchema = z
     categoryId: z.string().optional(),
     subCategoryId: z.string().optional(),
     eventId: z.string().optional(),
-    transferAccountId: z.string().optional(),
   })
   .refine(
     (data) => {

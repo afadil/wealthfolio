@@ -267,16 +267,13 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 cat.name as category_name,
                 cat.color as category_color,
                 subcat.name as sub_category_name,
-                evt.name as event_name,
-                a.transfer_account_id,
-                transfer_acc.name as transfer_account_name
+                evt.name as event_name
             FROM activities a
             INNER JOIN accounts acc ON a.account_id = acc.id
             INNER JOIN assets ast ON a.asset_id = ast.id
             LEFT JOIN categories cat ON a.category_id = cat.id
             LEFT JOIN categories subcat ON a.sub_category_id = subcat.id
             LEFT JOIN events evt ON a.event_id = evt.id
-            LEFT JOIN accounts transfer_acc ON a.transfer_account_id = transfer_acc.id
             WHERE {}
             ORDER BY {}
             LIMIT {} OFFSET {}

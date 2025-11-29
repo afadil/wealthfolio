@@ -21,7 +21,6 @@ import { CashActivityFilters, CashActivityViewMode } from "./components/cash-act
 import { CashActivityForm } from "./components/cash-activity-form";
 import { CashActivityTable } from "./components/cash-activity-table";
 import { CashActivityDatagrid } from "./components/cash-activity-datagrid";
-import { CashTransferForm } from "./components/cash-transfer-form";
 import { useCashActivities } from "./hooks/use-cash-activities";
 import { useCashActivityMutations } from "./hooks/use-cash-activity-mutations";
 import { ActivityDeleteModal } from "@/pages/activity/components/activity-delete-modal";
@@ -30,7 +29,6 @@ import { Link } from "react-router-dom";
 
 function CashActivitiesPage() {
   const [showForm, setShowForm] = useState(false);
-  const [showTransferForm, setShowTransferForm] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Partial<ActivityDetails> | undefined>();
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [viewMode, setViewMode] = useState<CashActivityViewMode>("view");
@@ -107,50 +105,32 @@ function CashActivitiesPage() {
     setSelectedActivity(undefined);
   }, []);
 
-  const handleTransferFormClose = useCallback(() => {
-    setShowTransferForm(false);
-  }, []);
-
-  const handleAddDeposit = useCallback(() => {
-    setSelectedActivity({ activityType: "DEPOSIT" });
-    setShowForm(true);
-  }, []);
-
-  const handleAddWithdrawal = useCallback(() => {
-    setSelectedActivity({ activityType: "WITHDRAWAL" });
+  const handleAddTransaction = useCallback(() => {
+    setSelectedActivity(undefined);
     setShowForm(true);
   }, []);
 
   const headerActions = (
     <div className="flex flex-wrap items-center gap-2">
-      <Button variant="outline" size="sm" asChild className="hidden sm:inline-flex">
-        <Link to="/cash/activities/import">
-          <Icons.Import className="mr-2 h-4 w-4" />
-          Import
-        </Link>
-      </Button>
-
       <div className="hidden sm:flex">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="sm">
               <Icons.Plus className="mr-2 h-4 w-4" />
-              Add Transaction
+              Add Activities
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem onClick={handleAddDeposit} className="py-2.5">
-              <Icons.ArrowDown className="mr-2 h-4 w-4 text-success" />
-              Deposit
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleAddWithdrawal} className="py-2.5">
-              <Icons.ArrowUp className="mr-2 h-4 w-4 text-destructive" />
-              Withdrawal
+            <DropdownMenuItem asChild className="py-2.5">
+              <Link to="/cash/activities/import">
+                <Icons.Import className="mr-2 h-4 w-4" />
+                Import from CSV
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setShowTransferForm(true)} className="py-2.5">
-              <Icons.ArrowRightLeft className="mr-2 h-4 w-4" />
-              Transfer
+            <DropdownMenuItem onClick={handleAddTransaction} className="py-2.5">
+              <Icons.Clock className="mr-2 h-4 w-4" />
+              Add Transaction
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -162,7 +142,7 @@ function CashActivitiesPage() {
             <Icons.Import className="size-4" />
           </Link>
         </Button>
-        <Button size="icon" title="Add" onClick={() => setShowForm(true)}>
+        <Button size="icon" title="Add" onClick={handleAddTransaction}>
           <Icons.Plus className="size-4" />
         </Button>
       </div>
@@ -237,16 +217,6 @@ function CashActivitiesPage() {
           activity={selectedActivity}
           open={showForm}
           onClose={handleFormClose}
-        />
-
-        <CashTransferForm
-          accounts={cashAccounts.map((account) => ({
-            value: account.id,
-            label: account.name,
-            currency: account.currency,
-          }))}
-          open={showTransferForm}
-          onClose={handleTransferFormClose}
         />
 
         <ActivityDeleteModal

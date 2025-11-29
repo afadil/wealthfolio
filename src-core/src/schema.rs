@@ -35,7 +35,6 @@ diesel::table! {
         category_id -> Nullable<Text>,
         sub_category_id -> Nullable<Text>,
         event_id -> Nullable<Text>,
-        transfer_account_id -> Nullable<Text>,
     }
 }
 

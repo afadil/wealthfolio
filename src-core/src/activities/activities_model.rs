@@ -67,7 +67,6 @@ pub struct Activity {
     pub category_id: Option<String>,
     pub sub_category_id: Option<String>,
     pub event_id: Option<String>,
-    pub transfer_account_id: Option<String>,
 }
 
 /// Database model for activities
@@ -107,7 +106,6 @@ pub struct ActivityDB {
     pub category_id: Option<String>,
     pub sub_category_id: Option<String>,
     pub event_id: Option<String>,
-    pub transfer_account_id: Option<String>,
 }
 
 /// Input model for creating a new activity
@@ -131,7 +129,6 @@ pub struct NewActivity {
     pub category_id: Option<String>,
     pub sub_category_id: Option<String>,
     pub event_id: Option<String>,
-    pub transfer_account_id: Option<String>,
 }
 
 impl NewActivity {
@@ -187,7 +184,6 @@ pub struct ActivityUpdate {
     pub category_id: Option<String>,
     pub sub_category_id: Option<String>,
     pub event_id: Option<String>,
-    pub transfer_account_id: Option<String>,
 }
 
 impl ActivityUpdate {
@@ -322,10 +318,6 @@ pub struct ActivityDetails {
     pub sub_category_name: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub event_name: Option<String>,
-    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
-    pub transfer_account_id: Option<String>,
-    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
-    pub transfer_account_name: Option<String>,
 }
 
 impl ActivityDetails {
@@ -404,7 +396,6 @@ pub struct ActivityImport {
     pub category_id: Option<String>,
     pub sub_category_id: Option<String>,
     pub event_id: Option<String>,
-    pub transfer_account_id: Option<String>,
 }
 
 /// Model for sorting activities
@@ -655,7 +646,6 @@ impl From<ActivityDB> for Activity {
             category_id: db.category_id,
             sub_category_id: db.sub_category_id,
             event_id: db.event_id,
-            transfer_account_id: db.transfer_account_id,
         }
     }
 }
@@ -734,7 +724,6 @@ impl From<NewActivity> for ActivityDB {
             category_id: domain.category_id,
             sub_category_id: domain.sub_category_id,
             event_id: domain.event_id,
-            transfer_account_id: domain.transfer_account_id,
         }
     }
 }
@@ -811,7 +800,6 @@ impl From<ActivityUpdate> for ActivityDB {
             category_id: domain.category_id,
             sub_category_id: domain.sub_category_id,
             event_id: domain.event_id,
-            transfer_account_id: domain.transfer_account_id,
         }
     }
 }

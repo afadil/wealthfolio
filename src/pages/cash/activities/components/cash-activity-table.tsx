@@ -126,24 +126,7 @@ export const CashActivityTable = ({
         cell: ({ row }) => {
           const accountName = row.original.accountName;
           const accountCurrency = row.original.accountCurrency;
-          const activityType = String(row.getValue("activityType"));
-          const isTransfer = activityType === "TRANSFER_IN" || activityType === "TRANSFER_OUT";
-          const transferAccountName = row.original.transferAccountName;
 
-          // For transfers with transfer account set, show both currency and transfer direction
-          if (isTransfer && transferAccountName) {
-            const directionLabel = activityType === "TRANSFER_IN" ? "From" : "To";
-            return (
-              <div className="flex min-w-[150px] flex-col">
-                <span>{String(accountName)}</span>
-                <span className="text-muted-foreground text-xs font-light">
-                  {String(accountCurrency)} · {directionLabel} {transferAccountName}
-                </span>
-              </div>
-            );
-          }
-
-          // For non-transfers or transfers without transfer account set
           return (
             <div className="flex min-w-[150px] flex-col">
               <span>{String(accountName)}</span>

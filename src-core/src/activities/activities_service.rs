@@ -450,7 +450,6 @@ impl ActivityServiceTrait for ActivityService {
                 category_id: activity.category_id.clone(),
                 sub_category_id: activity.sub_category_id.clone(),
                 event_id: activity.event_id.clone(),
-                transfer_account_id: activity.transfer_account_id.clone(),
             })
             .collect();
 

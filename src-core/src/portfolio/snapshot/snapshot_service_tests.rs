@@ -1160,7 +1160,6 @@ mod tests {
             category_id: None,
             sub_category_id: None,
             event_id: None,
-            transfer_account_id: None,
         };
         let act2 = Activity {
             id: "act2".into(),
@@ -1225,7 +1224,6 @@ mod tests {
             category_id: None,
             sub_category_id: None,
             event_id: None,
-            transfer_account_id: None,
         };
         let mut dividend = deposit("div1".into(), d2, dec!(100000));
         dividend.activity_type = "DIVIDEND".into();
