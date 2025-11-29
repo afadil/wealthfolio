@@ -1,3 +1,4 @@
+import { PERFORMANCE_CHART_COLORS } from "@/components/performance-chart-colors";
 import {
   ChartConfig,
   ChartContainer,
@@ -6,7 +7,6 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { PERFORMANCE_CHART_COLORS } from "@/components/performance-chart-colors";
 import { ReturnData } from "@/lib/types";
 import { formatPercent } from "@wealthfolio/ui";
 import { differenceInDays, differenceInMonths, format, parseISO } from "date-fns";
@@ -122,6 +122,9 @@ export function PerformanceChart({ data }: PerformanceChartProps) {
             <ChartLegend content={<ChartLegendContent payload={[]} />} />
             {data.map((series, seriesIndex) => (
               <Line
+                isAnimationActive={true}
+                animationDuration={300}
+                connectNulls={true}
                 key={series.id}
                 type="linear"
                 dataKey={series.id}
