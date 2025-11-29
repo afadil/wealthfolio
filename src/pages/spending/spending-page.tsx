@@ -6,7 +6,7 @@ import { Icons } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { QueryKeys } from "@/lib/query-keys";
-import type { SpendingSummary } from "@/lib/types";
+import type { SpendingSummary, SubcategorySpending } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import {
   AmountDisplay,
@@ -20,6 +20,15 @@ import {
 import React, { useState } from "react";
 import { Cell, Pie, PieChart } from "recharts";
 import { SpendingHistoryChart } from "./spending-history-chart";
+
+const DEFAULT_CHART_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-6)",
+];
 
 const periods = [
   { value: "YTD" as const, label: "Year to Date" },
@@ -107,7 +116,7 @@ export default function SpendingPage() {
     );
   }
 
-  const { totalSpending, currency, monthlyAverage, byCategory } = periodSummary;
+  const { totalSpending, currency, monthlyAverage, byCategory, bySubcategory } = periodSummary;
 
   // Get top categories sorted by amount
   const topCategories = Object.entries(byCategory)
@@ -165,6 +174,12 @@ export default function SpendingPage() {
     amount: Number(cat.amount) || 0,
     color: cat.color,
   }));
+
+  // Get top subcategories sorted by amount
+  const topSubcategories: [string, SubcategorySpending][] = Object.entries(bySubcategory || {})
+    .filter(([, sub]) => sub.amount > 0)
+    .sort(([, a], [, b]) => b.amount - a.amount)
+    .slice(0, 10);
 
   return (
     <Page>
@@ -331,15 +346,6 @@ export default function SpendingPage() {
                           : []),
                       ];
 
-                      const defaultColors = [
-                        "var(--chart-1)",
-                        "var(--chart-2)",
-                        "var(--chart-3)",
-                        "var(--chart-4)",
-                        "var(--chart-5)",
-                        "var(--chart-6)",
-                      ];
-
                       return chartItems.map((item, index) => {
                         const percentage =
                           totalSpending > 0 ? (item.amount / totalSpending) * 100 : 0;
@@ -350,10 +356,9 @@ export default function SpendingPage() {
                             className="group relative h-5 cursor-pointer rounded-lg transition-all duration-300 ease-in-out hover:brightness-110"
                             style={{
                               width: `${percentage}%`,
-                              backgroundColor: item.color || defaultColors[index % defaultColors.length],
+                              backgroundColor: item.color || DEFAULT_CHART_COLORS[index % DEFAULT_CHART_COLORS.length],
                             }}
                           >
-                            {/* Tooltip */}
                             <div className="absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 transform group-hover:block">
                               <div className="bg-popover text-popover-foreground min-w-[180px] rounded-lg border px-3 py-2 shadow-md">
                                 <div className="text-sm font-medium">{item.name}</div>
@@ -363,7 +368,6 @@ export default function SpendingPage() {
                                 <div className="text-muted-foreground text-xs">
                                   {percentage.toFixed(1)}% of total
                                 </div>
-                                {/* Tooltip arrow */}
                                 <div className="border-t-border absolute top-full left-1/2 h-0 w-0 -translate-x-1/2 transform border-t-4 border-r-4 border-l-4 border-r-transparent border-l-transparent"></div>
                               </div>
                             </div>
@@ -374,14 +378,6 @@ export default function SpendingPage() {
                   </div>
 
                   {topCategories.map(([key, cat], index) => {
-                    const defaultColors = [
-                      "var(--chart-1)",
-                      "var(--chart-2)",
-                      "var(--chart-3)",
-                      "var(--chart-4)",
-                      "var(--chart-5)",
-                      "var(--chart-6)",
-                    ];
                     const percentage = totalSpending > 0 ? (cat.amount / totalSpending) * 100 : 0;
 
                     return (
@@ -390,7 +386,7 @@ export default function SpendingPage() {
                           <div
                             className="mr-2 h-3 w-3 rounded-full"
                             style={{
-                              backgroundColor: cat.color || defaultColors[index % defaultColors.length],
+                              backgroundColor: cat.color || DEFAULT_CHART_COLORS[index % DEFAULT_CHART_COLORS.length],
                             }}
                           />
                           <span className="text-muted-foreground text-xs">{cat.categoryName}</span>
@@ -411,6 +407,47 @@ export default function SpendingPage() {
             </CardContent>
           </Card>
         </div>
+        {topSubcategories.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">Top Spending Subcategories</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                {topSubcategories.map(([key, sub], index) => {
+                  const percentage = totalSpending > 0 ? (sub.amount / totalSpending) * 100 : 0;
+                  const color = sub.color || DEFAULT_CHART_COLORS[index % DEFAULT_CHART_COLORS.length];
+
+                  return (
+                    <div
+                      key={key}
+                      className="bg-muted/30 flex flex-col gap-1 rounded-lg border p-3"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: color }}
+                        />
+                        <span className="text-sm font-medium truncate">{sub.subcategoryName}</span>
+                      </div>
+                      <span className="text-muted-foreground text-xs truncate pl-[18px]">
+                        {sub.categoryName}
+                      </span>
+                      <div className="mt-1 flex items-center justify-between pl-[18px]">
+                        <span className="text-muted-foreground text-xs">
+                          {percentage.toFixed(1)}%
+                        </span>
+                        <div className="text-destructive text-sm font-medium">
+                          <PrivacyAmount value={sub.amount} currency={currency} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </PageContent>
     </Page>
   );

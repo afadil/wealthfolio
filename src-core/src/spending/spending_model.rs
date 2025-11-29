@@ -26,6 +26,7 @@ pub struct SpendingSummary {
     pub period: String,                                    // "TOTAL", "YTD", "LAST_YEAR", etc.
     pub by_month: HashMap<String, Decimal>,                // Month -> Amount
     pub by_category: HashMap<String, CategorySpending>,    // CategoryId -> CategorySpending
+    pub by_subcategory: HashMap<String, SubcategorySpending>, // SubcategoryId -> SubcategorySpending
     pub by_account: HashMap<String, Decimal>,              // AccountId -> Amount
     pub total_spending: Decimal,
     pub currency: String,
@@ -45,12 +46,26 @@ pub struct CategorySpending {
     pub transaction_count: i32,
 }
 
+/// Detailed spending info per subcategory
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SubcategorySpending {
+    pub subcategory_id: Option<String>,
+    pub subcategory_name: String,
+    pub category_id: Option<String>,
+    pub category_name: String,
+    pub color: Option<String>,
+    pub amount: Decimal,
+    pub transaction_count: i32,
+}
+
 impl SpendingSummary {
     pub fn new(period: &str, currency: String) -> Self {
         SpendingSummary {
             period: period.to_string(),
             by_month: HashMap::new(),
             by_category: HashMap::new(),
+            by_subcategory: HashMap::new(),
             by_account: HashMap::new(),
             total_spending: Decimal::ZERO,
             currency,
@@ -87,6 +102,30 @@ impl SpendingSummary {
             });
         category_entry.amount += converted_amount;
         category_entry.transaction_count += 1;
+
+        // Aggregate by subcategory (only if subcategory exists)
+        if let Some(ref subcategory_id) = data.sub_category_id {
+            let subcategory_entry = self
+                .by_subcategory
+                .entry(subcategory_id.clone())
+                .or_insert_with(|| SubcategorySpending {
+                    subcategory_id: data.sub_category_id.clone(),
+                    subcategory_name: data
+                        .sub_category_name
+                        .clone()
+                        .unwrap_or_else(|| "Unknown".to_string()),
+                    category_id: data.category_id.clone(),
+                    category_name: data
+                        .category_name
+                        .clone()
+                        .unwrap_or_else(|| "Uncategorized".to_string()),
+                    color: data.category_color.clone(),
+                    amount: Decimal::ZERO,
+                    transaction_count: 0,
+                });
+            subcategory_entry.amount += converted_amount;
+            subcategory_entry.transaction_count += 1;
+        }
 
         // Aggregate by account
         *self

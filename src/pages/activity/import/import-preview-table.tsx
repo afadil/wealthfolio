@@ -13,9 +13,12 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import { DataTableFacetedFilterProps } from "@/components/ui/data-table/data-table-faceted-filter";
 import { DataTablePagination } from "@/components/ui/data-table/data-table-pagination";
@@ -97,6 +100,31 @@ export const ImportPreviewTable = ({
     pageSize: 10,
   });
 
+  const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({ min: "", max: "" });
+
+  // Client-side amount filtering
+  const filteredActivities = useMemo(() => {
+    const minAmount = amountRange.min ? parseFloat(amountRange.min) : null;
+    const maxAmount = amountRange.max ? parseFloat(amountRange.max) : null;
+
+    if (minAmount === null && maxAmount === null) {
+      return activities;
+    }
+
+    return activities.filter((activity) => {
+      const amount = Math.abs(activity.amount || 0);
+      if (minAmount !== null && amount < minAmount) return false;
+      if (maxAmount !== null && amount > maxAmount) return false;
+      return true;
+    });
+  }, [activities, amountRange]);
+
+  const hasAmountFilter = amountRange.min !== "" || amountRange.max !== "";
+
+  const handleClearAmountFilter = useCallback(() => {
+    setAmountRange({ min: "", max: "" });
+  }, []);
+
   const activitiesType = useMemo(() => {
     const uniqueTypesSet = new Set();
     return activities.reduce(
@@ -129,7 +157,7 @@ export const ImportPreviewTable = ({
   ] satisfies DataTableFacetedFilterProps<ActivityImport, string>[];
 
   const table = useReactTable({
-    data: activities,
+    data: filteredActivities,
     columns: getColumns(accounts),
     state: {
       sorting,
@@ -152,7 +180,70 @@ export const ImportPreviewTable = ({
   return (
     <div className="pt-0">
       <div className="space-y-2">
-        <DataTableToolbar table={table} searchBy="symbol" filters={filters} />
+        <DataTableToolbar
+          table={table}
+          searchBy="symbol"
+          filters={filters}
+          actions={
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`h-8 border-dashed ${hasAmountFilter ? "border-primary" : ""}`}
+                >
+                  <Icons.DollarSign className="mr-2 h-4 w-4" />
+                  Amount
+                  {hasAmountFilter && (
+                    <span className="ml-2 text-xs">
+                      {amountRange.min && amountRange.max
+                        ? `${amountRange.min} - ${amountRange.max}`
+                        : amountRange.min
+                          ? `≥ ${amountRange.min}`
+                          : `≤ ${amountRange.max}`}
+                    </span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-60" align="start">
+                <div className="space-y-3">
+                  <p className="text-sm font-medium">Filter by Amount</p>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      placeholder="Min"
+                      value={amountRange.min}
+                      onChange={(e) =>
+                        setAmountRange((prev) => ({ ...prev, min: e.target.value }))
+                      }
+                      className="h-8"
+                    />
+                    <span className="text-muted-foreground text-sm">to</span>
+                    <Input
+                      type="number"
+                      placeholder="Max"
+                      value={amountRange.max}
+                      onChange={(e) =>
+                        setAmountRange((prev) => ({ ...prev, max: e.target.value }))
+                      }
+                      className="h-8"
+                    />
+                  </div>
+                  {hasAmountFilter && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-full text-xs"
+                      onClick={handleClearAmountFilter}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+          }
+        />
         <div className="rounded-md border">
           <Table>
             <TableHeader className="bg-muted/40">

@@ -45,6 +45,7 @@ const ActivityPage = () => {
   const [selectedActivityTypes, setSelectedActivityTypes] = useState<ActivityType[]>([]);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({ min: "", max: "" });
   const [viewMode, setViewMode] = usePersistentState<ActivityViewMode>(
     "activity-view-mode",
     "table",
@@ -110,7 +111,25 @@ const ActivityPage = () => {
     searchQuery,
     sorting,
   });
-  const totalFetched = flatData.length;
+
+  // Client-side amount filtering
+  const filteredData = useMemo(() => {
+    const minAmount = amountRange.min ? parseFloat(amountRange.min) : null;
+    const maxAmount = amountRange.max ? parseFloat(amountRange.max) : null;
+
+    if (minAmount === null && maxAmount === null) {
+      return flatData;
+    }
+
+    return flatData.filter((activity) => {
+      const amount = Math.abs(activity.amount || 0);
+      if (minAmount !== null && amount < minAmount) return false;
+      if (maxAmount !== null && amount > maxAmount) return false;
+      return true;
+    });
+  }, [flatData, amountRange]);
+
+  const totalFetched = filteredData.length;
 
   const isDatagridView = viewMode === "datagrid";
 
@@ -220,6 +239,8 @@ const ActivityPage = () => {
               onAccountIdsChange={setSelectedAccounts}
               selectedActivityTypes={selectedActivityTypes}
               onActivityTypesChange={setSelectedActivityTypes}
+              amountRange={amountRange}
+              onAmountRangeChange={setAmountRange}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
               totalFetched={totalFetched}
@@ -231,7 +252,7 @@ const ActivityPage = () => {
           {/* View-Specific Renderers */}
           {isMobileViewport ? (
             <ActivityTableMobile
-              activities={flatData}
+              activities={filteredData}
               isCompactView={isCompactView}
               handleEdit={handleEdit}
               handleDelete={handleDelete}
@@ -240,7 +261,7 @@ const ActivityPage = () => {
           ) : isDatagridView ? (
             <ActivityDatagrid
               accounts={accounts}
-              activities={flatData}
+              activities={filteredData}
               onRefetch={refetch}
               onEditActivity={handleEdit}
               sorting={sorting}
@@ -248,7 +269,7 @@ const ActivityPage = () => {
             />
           ) : (
             <ActivityTable
-              activities={flatData}
+              activities={filteredData}
               isLoading={isLoading}
               sorting={sorting}
               onSortingChange={setSorting}

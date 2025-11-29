@@ -185,6 +185,9 @@ impl SpendingServiceTrait for SpendingService {
                 for cat in summary.by_category.values_mut() {
                     cat.amount = cat.amount.round_dp(DISPLAY_DECIMAL_PRECISION);
                 }
+                for subcat in summary.by_subcategory.values_mut() {
+                    subcat.amount = subcat.amount.round_dp(DISPLAY_DECIMAL_PRECISION);
+                }
                 for val in summary.by_account.values_mut() {
                     *val = val.round_dp(DISPLAY_DECIMAL_PRECISION);
                 }

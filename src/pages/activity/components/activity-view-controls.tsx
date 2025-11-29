@@ -4,11 +4,24 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useUnsavedChangesContext } from "@/context/unsaved-changes-context";
 import { ActivityType, ActivityTypeNames } from "@/lib/constants";
 import { Account } from "@/lib/types";
-import { AnimatedToggleGroup, Button, Icons, Input } from "@wealthfolio/ui";
+import {
+  AnimatedToggleGroup,
+  Button,
+  Icons,
+  Input,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@wealthfolio/ui";
 
 import { DataTableFacetedFilter } from "./activity-datagrid/data-table-faceted-filter";
 
 export type ActivityViewMode = "table" | "datagrid";
+
+interface AmountRange {
+  min: string;
+  max: string;
+}
 
 interface ActivityViewControlsProps {
   accounts: Account[];
@@ -18,6 +31,8 @@ interface ActivityViewControlsProps {
   onAccountIdsChange: (ids: string[]) => void;
   selectedActivityTypes: ActivityType[];
   onActivityTypesChange: (types: ActivityType[]) => void;
+  amountRange?: AmountRange;
+  onAmountRangeChange?: (range: AmountRange) => void;
   viewMode: ActivityViewMode;
   onViewModeChange: (mode: ActivityViewMode) => void;
   totalFetched: number;
@@ -33,6 +48,8 @@ export function ActivityViewControls({
   onAccountIdsChange,
   selectedActivityTypes,
   onActivityTypesChange,
+  amountRange,
+  onAmountRangeChange,
   viewMode,
   onViewModeChange,
   totalFetched,
@@ -97,10 +114,13 @@ export function ActivityViewControls({
     [],
   );
 
+  const hasAmountFilter = amountRange && (amountRange.min !== "" || amountRange.max !== "");
+
   const hasActiveFilters =
     searchQuery.trim().length > 0 ||
     selectedAccountIds.length > 0 ||
-    selectedActivityTypes.length > 0;
+    selectedActivityTypes.length > 0 ||
+    hasAmountFilter;
 
   return (
     <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -149,6 +169,72 @@ export function ActivityViewControls({
           }
         />
 
+        {onAmountRangeChange && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={`h-8 border-dashed ${hasAmountFilter ? "border-primary" : ""}`}
+              >
+                <Icons.DollarSign className="mr-2 h-4 w-4" />
+                Amount
+                {hasAmountFilter && (
+                  <span className="ml-2 text-xs">
+                    {amountRange?.min && amountRange?.max
+                      ? `${amountRange.min} - ${amountRange.max}`
+                      : amountRange?.min
+                        ? `≥ ${amountRange.min}`
+                        : `≤ ${amountRange?.max}`}
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-60" align="start">
+              <div className="space-y-3">
+                <p className="text-sm font-medium">Filter by Amount</p>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    placeholder="Min"
+                    value={amountRange?.min ?? ""}
+                    onChange={(e) =>
+                      onAmountRangeChange({
+                        min: e.target.value,
+                        max: amountRange?.max ?? "",
+                      })
+                    }
+                    className="h-8"
+                  />
+                  <span className="text-muted-foreground text-sm">to</span>
+                  <Input
+                    type="number"
+                    placeholder="Max"
+                    value={amountRange?.max ?? ""}
+                    onChange={(e) =>
+                      onAmountRangeChange({
+                        min: amountRange?.min ?? "",
+                        max: e.target.value,
+                      })
+                    }
+                    className="h-8"
+                  />
+                </div>
+                {hasAmountFilter && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-full text-xs"
+                    onClick={() => onAmountRangeChange({ min: "", max: "" })}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
+
         {hasActiveFilters ? (
           <Button
             variant="ghost"
@@ -159,6 +245,7 @@ export function ActivityViewControls({
               onSearchQueryChange("");
               onAccountIdsChange([]);
               onActivityTypesChange([]);
+              onAmountRangeChange?.({ min: "", max: "" });
             }}
           >
             Reset

@@ -468,10 +468,21 @@ export interface CategorySpending {
   transactionCount: number;
 }
 
+export interface SubcategorySpending {
+  subcategoryId: string | null;
+  subcategoryName: string;
+  categoryId: string | null;
+  categoryName: string;
+  color: string | null;
+  amount: number;
+  transactionCount: number;
+}
+
 export interface SpendingSummary {
   period: string;
   byMonth: Record<string, number>;
   byCategory: Record<string, CategorySpending>;
+  bySubcategory: Record<string, SubcategorySpending>;
   byAccount: Record<string, number>;
   totalSpending: number;
   currency: string;

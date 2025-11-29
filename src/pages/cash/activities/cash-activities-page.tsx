@@ -16,7 +16,7 @@ import {
   PageContent,
   PageHeader,
 } from "@wealthfolio/ui";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { CashActivityFilters, CashActivityViewMode } from "./components/cash-activity-filters";
 import { CashActivityForm } from "./components/cash-activity-form";
 import { CashActivityTable } from "./components/cash-activity-table";
@@ -39,6 +39,7 @@ function CashActivitiesPage() {
   const [selectedSubCategoryIds, setSelectedSubCategoryIds] = useState<string[]>([]);
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({ min: "", max: "" });
   const [sorting, setSorting] = useState<SortingState>([{ id: "date", desc: true }]);
 
   const { data: accountsData } = useQuery<Account[], Error>({
@@ -69,7 +70,25 @@ function CashActivitiesPage() {
     },
     sorting,
   });
-  const totalFetched = flatData.length;
+
+  // Client-side amount filtering
+  const filteredData = useMemo(() => {
+    const minAmount = amountRange.min ? parseFloat(amountRange.min) : null;
+    const maxAmount = amountRange.max ? parseFloat(amountRange.max) : null;
+
+    if (minAmount === null && maxAmount === null) {
+      return flatData;
+    }
+
+    return flatData.filter((activity) => {
+      const amount = Math.abs(activity.amount || 0);
+      if (minAmount !== null && amount < minAmount) return false;
+      if (maxAmount !== null && amount > maxAmount) return false;
+      return true;
+    });
+  }, [flatData, amountRange]);
+
+  const totalFetched = filteredData.length;
 
   const handleEdit = useCallback((activity?: ActivityDetails) => {
     if (activity?.activityType === "TRANSFER_IN" || activity?.activityType === "TRANSFER_OUT") {
@@ -172,6 +191,8 @@ function CashActivitiesPage() {
             onSubCategoryIdsChange={setSelectedSubCategoryIds}
             selectedEventIds={selectedEventIds}
             onEventIdsChange={setSelectedEventIds}
+            amountRange={amountRange}
+            onAmountRangeChange={setAmountRange}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
             totalFetched={totalFetched}
@@ -182,13 +203,13 @@ function CashActivitiesPage() {
           {viewMode === "edit" ? (
             <CashActivityDatagrid
               accounts={cashAccounts}
-              activities={flatData}
+              activities={filteredData}
               onRefetch={refetch}
               onEditActivity={handleEdit}
             />
           ) : (
             <CashActivityTable
-              activities={flatData}
+              activities={filteredData}
               isLoading={isLoading}
               sorting={sorting}
               onSortingChange={setSorting}
