@@ -553,13 +553,13 @@ impl VnMarketService {
         if query_lower.contains("gold") || query_lower.contains("vàng") || query_lower == "sjc" {
             results.push(SearchResult {
                 symbol: "VN.GOLD".to_string(),
-                name: "SJC Gold (Lượng)".to_string(),
+                name: "Vàng VN (Lượng)".to_string(),
                 asset_type: VnAssetType::Gold,
                 exchange: "SJC".to_string(),
             });
             results.push(SearchResult {
                 symbol: "VN.GOLD.C".to_string(),
-                name: "SJC Gold (Chỉ)".to_string(),
+                name: "Vàng VN (Chỉ)".to_string(),
                 asset_type: VnAssetType::Gold,
                 exchange: "SJC".to_string(),
             });

@@ -48,6 +48,57 @@
     "description": "Browse and manage the securities available in your portfolio.",
     "editTitle": "Edit Security",
     "editDescription": "Update security information and market data settings",
+    "form": {
+      "symbol": {
+        "label": "Symbol"
+      },
+      "name": {
+        "label": "Name",
+        "placeholder": "Asset display name"
+      },
+      "currency": {
+        "label": "Currency"
+      },
+      "class": {
+        "label": "Class",
+        "placeholder": "Equity, Bond, Cash..."
+      },
+      "subClass": {
+        "label": "Sub-class",
+        "placeholder": "ETF, Stock, Fund..."
+      },
+      "dataSource": {
+        "label": "Data source",
+        "placeholder": "Select a provider",
+        "sheetTitle": "Pick a data source",
+        "sheetDescription": "Choose how prices are loaded for this asset.",
+        "options": {
+          "yahoo": "Yahoo Finance",
+          "manual": "Manual",
+          "marketDataApp": "Market Data App",
+          "alphaVantage": "Alpha Vantage",
+          "metalPriceApi": "Metal Price API",
+          "vnMarket": "VN Market"
+        }
+      },
+      "sectors": {
+        "label": "Sectors (use sector:weight)",
+        "placeholder": "Technology:40%, Healthcare:20%"
+      },
+      "countries": {
+        "label": "Countries (use country:weight)",
+        "placeholder": "United States:50%, Canada:25%"
+      },
+      "notes": {
+        "label": "Notes",
+        "placeholder": "Add any context or links"
+      },
+      "buttons": {
+        "cancel": "Cancel",
+        "save": "Save changes",
+        "saving": "Saving"
+      }
+    },
     "deleteTitle": "Delete security",
     "deleteConfirm": "Are you sure you want to delete this security? This will also remove related quotes and cannot be undone.",
     "deleteConfirmWithSymbol": "Are you sure you want to delete {{symbol}}? This will also remove its related quote and cannot be undone.",

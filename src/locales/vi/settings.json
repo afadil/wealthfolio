@@ -26,8 +26,8 @@
       "subtitle": "Nhà cung cấp và cập nhật dữ liệu"
     },
     "securities": {
-      "title": "Chứng khoán",
-      "subtitle": "Quản lý định nghĩa chứng khoán"
+      "title": "Mã tài sản",
+      "subtitle": "Quản lý các mã tài sản"
     },
     "addons": {
       "title": "Tiện ích",
@@ -48,6 +48,57 @@
     "description": "Duyệt và quản lý các mã tài sản có sẵn trong danh mục đầu tư của bạn.",
     "editTitle": "Chỉnh sửa mã tài sản",
     "editDescription": "Cập nhật thông tin mã tài sản và cài đặt dữ liệu thị trường",
+    "form": {
+      "symbol": {
+        "label": "Mã"
+      },
+      "name": {
+        "label": "Tên",
+        "placeholder": "Tên hiển thị của tài sản"
+      },
+      "currency": {
+        "label": "Tiền tệ"
+      },
+      "class": {
+        "label": "Lớp",
+        "placeholder": "Cổ phiếu, Trái phiếu, Tiền mặt..."
+      },
+      "subClass": {
+        "label": "Lớp con",
+        "placeholder": "ETF, Cổ phiếu, Quỹ..."
+      },
+      "dataSource": {
+        "label": "Nguồn dữ liệu",
+        "placeholder": "Chọn nhà cung cấp",
+        "sheetTitle": "Chọn nguồn dữ liệu",
+        "sheetDescription": "Chọn cách tải giá cho tài sản này.",
+        "options": {
+          "yahoo": "Yahoo Finance",
+          "manual": "Thủ công",
+          "marketDataApp": "Market Data App",
+          "alphaVantage": "Alpha Vantage",
+          "metalPriceApi": "Metal Price API",
+          "vnMarket": "VN Market"
+        }
+      },
+      "sectors": {
+        "label": "Ngành (dùng ngành:trọng số)",
+        "placeholder": "Công nghệ:40%, Chăm sóc sức khỏe:20%"
+      },
+      "countries": {
+        "label": "Quốc gia (dùng quốc gia:trọng số)",
+        "placeholder": "Hoa Kỳ:50%, Canada:25%"
+      },
+      "notes": {
+        "label": "Ghi chú",
+        "placeholder": "Thêm bất kỳ ngữ cảnh hoặc liên kết nào"
+      },
+      "buttons": {
+        "cancel": "Hủy",
+        "save": "Lưu thay đổi",
+        "saving": "Đang lưu"
+      }
+    },
     "deleteTitle": "Xóa mã tài sản",
     "deleteConfirm": "Bạn có chắc chắn muốn xóa mã tài sản này không? Hành động này cũng sẽ xóa các báo giá liên quan và không thể hoàn tác.",
     "deleteConfirmWithSymbol": "Bạn có chắc chắn muốn xóa {{symbol}} không? Hành động này cũng sẽ xóa báo giá liên quan và không thể hoàn tác.",
