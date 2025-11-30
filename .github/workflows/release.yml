@@ -30,7 +30,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871  # v4.2.1
 
       - name: Install dependencies (ubuntu only)
         if: contains(matrix.platform, 'ubuntu')
@@ -39,7 +39,7 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf pkg-config libssl-dev libsoup2.4-dev javascriptcoregtk-4.0 webkit2gtk-4.0
 
       - name: Rust setup
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@be73d84041c3d14e94e3ce96c6057e37d16b0f91  # stable
         with:
           targets:
             ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' ||
@@ -49,12 +49,12 @@ jobs:
         run: npm install -g pnpm
 
       - name: Rust cache
-        uses: swatinem/rust-cache@v2
+        uses: swatinem/rust-cache@23bce251afb140fad6ff19bef1495ef6b5e7c4b7  # v2.7.3
         with:
           workspaces: "./src-tauri -> target"
 
       - name: Sync node version and setup cache
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@1e60f620b9541d910a70470d9ef4d48f17dff2ac  # v4.0.3
         with:
           node-version: "lts/*"
           cache: "pnpm" # Set this to npm, yarn or pnpm.
@@ -68,7 +68,7 @@ jobs:
         run: rustup target add aarch64-pc-windows-msvc x86_64-pc-windows-msvc
 
       - name: Build the app
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@71c7b785b4c0e1a0427ef2ba29c5d0b7a18d5f56  # v0.5.12
 
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
