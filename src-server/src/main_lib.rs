@@ -106,6 +106,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let asset_service = Arc::new(AssetService::new(
         asset_repository.clone(),
         market_data_service.clone(),
+        market_data_repository.clone(),
     )?);
     let activity_repository = Arc::new(ActivityRepository::new(pool.clone(), writer.clone()));
     let snapshot_repository = Arc::new(SnapshotRepository::new(pool.clone(), writer.clone()));

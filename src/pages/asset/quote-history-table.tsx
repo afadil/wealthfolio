@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { format } from "date-fns";
 import { Quote } from "@/lib/types";
 import { useTranslation } from "react-i18next";
+import { DataSource } from "@/lib/constants";
+import { logger } from "@/adapters";
 
 import {
   Button,
@@ -40,13 +42,35 @@ import {
 
 interface QuoteHistoryTableProps {
   data: Quote[];
-  isManualDataSource?: boolean;
+  currentDataSource?: DataSource;
+  originalDataSource?: DataSource;
   onSaveQuote?: (quote: Quote) => void;
   onDeleteQuote?: (quoteId: string) => void;
-  onChangeDataSource?: (isManual: boolean) => void;
+  onChangeDataSource?: (dataSource: DataSource) => void;
+  availableDataSources?: DataSource[];
 }
 
 const ITEMS_PER_PAGE = 10;
+
+// Helper function to get display label for data source
+const getDataSourceLabel = (dataSource: string, t: any): string => {
+  switch (dataSource) {
+    case DataSource.YAHOO:
+      return t("assets:quotesTable.dataSource.yahoo");
+    case DataSource.MANUAL:
+      return t("assets:quotesTable.dataSource.manual");
+    case DataSource.MARKET_DATA_APP:
+      return t("assets:quotesTable.dataSource.marketDataApp");
+    case DataSource.ALPHA_VANTAGE:
+      return t("assets:quotesTable.dataSource.alphaVantage");
+    case DataSource.METAL_PRICE_API:
+      return t("assets:quotesTable.dataSource.metalPriceApi");
+    case DataSource.VN_MARKET:
+      return t("assets:quotesTable.dataSource.vnMarket");
+    default:
+      return dataSource;
+  }
+};
 
 const emptyQuote: Partial<Quote> = {
   timestamp: new Date().toISOString(),
@@ -60,10 +84,18 @@ const emptyQuote: Partial<Quote> = {
 
 export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
   data,
-  isManualDataSource = false,
+  currentDataSource = DataSource.YAHOO,
+  originalDataSource = DataSource.YAHOO,
   onSaveQuote,
   onDeleteQuote,
   onChangeDataSource,
+  availableDataSources = [
+    DataSource.YAHOO,
+    DataSource.MARKET_DATA_APP,
+    DataSource.ALPHA_VANTAGE,
+    DataSource.METAL_PRICE_API,
+    DataSource.VN_MARKET,
+  ],
 }) => {
   const { t } = useTranslation(["assets"]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -71,6 +103,10 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
   const [isAddingQuote, setIsAddingQuote] = useState(false);
   const [newQuote, setNewQuote] = useState<Partial<Quote>>(emptyQuote);
   const [sorting, setSorting] = useState<SortingState>([{ id: "timestamp", desc: true }]);
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const [selectedDataSource, setSelectedDataSource] = useState<DataSource | "">(
+    currentDataSource === DataSource.MANUAL ? originalDataSource : currentDataSource,
+  );
 
   useEffect(() => {
     if (isAddingQuote) {
@@ -258,7 +294,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
         },
         enableSorting: false,
       }),
-      ...(isManualDataSource
+      ...(currentDataSource === DataSource.MANUAL
         ? [
             columnHelper.display({
               id: "actions",
@@ -320,7 +356,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
           ]
         : []),
     ],
-    [isManualDataSource, handleInputChange, handleEdit, handleSave, handleCancel, handleDelete],
+    [currentDataSource, handleInputChange, handleEdit, handleSave, handleCancel, handleDelete],
   );
 
   const table = useReactTable({
@@ -359,25 +395,56 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
             {/* <h4 className="text-sm font-medium">Quote History</h4> */}
           </div>
           <div className="flex items-center space-x-4">
-            <Popover>
+            <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
               <PopoverTrigger asChild>
                 <div className="flex items-center space-x-2">
-                  <Switch id="manual-tracking" checked={isManualDataSource} />
+                  <Switch id="manual-tracking" checked={currentDataSource === DataSource.MANUAL} />
                   <Label htmlFor="manual-tracking" className="cursor-pointer">
                     {t("assets:quotesTable.manualTracking")}
                   </Label>
                 </div>
               </PopoverTrigger>
-              <PopoverContent className="w-[360px] p-4">
+              <PopoverContent className="w-[380px] p-4">
                 <div className="space-y-4">
                   <h4 className="font-medium">{t("assets:quotesTable.changeMode.title")}</h4>
-                  {isManualDataSource ? (
+                  {currentDataSource === DataSource.MANUAL ? (
                     <>
                       <p className="text-muted-foreground text-sm">
-                        {t("assets:quotesTable.changeMode.toAutomatic")}
+                        {t("assets:quotesTable.changeMode.selectDataProvider", {
+                          defaultValue: "Select a data provider to fetch quotes from",
+                        })}
                       </p>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">
+                          {t("assets:quotesTable.dataProvider", {
+                            defaultValue: "Data Provider",
+                          })}
+                        </label>
+                        <Select
+                          value={selectedDataSource as string}
+                          onValueChange={(value) => setSelectedDataSource(value as DataSource)}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue
+                              placeholder={t("assets:quotesTable.selectProvider", {
+                                defaultValue: "Select provider...",
+                              })}
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableDataSources.map((source) => (
+                              <SelectItem key={source} value={source}>
+                                {getDataSourceLabel(source, t)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
-                        {t("assets:quotesTable.changeMode.warningAutomatic")}
+                        {t("assets:quotesTable.changeMode.warningAutomatic", {
+                          defaultValue:
+                            "All existing quotes will be replaced with data from the selected provider.",
+                        })}
                       </p>
                     </>
                   ) : (
@@ -391,13 +458,34 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
                     </>
                   )}
                   <div className="flex justify-end space-x-2">
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" onClick={() => setIsPopoverOpen(false)}>
                       {t("assets:quotesTable.cancel")}
                     </Button>
                     <Button
                       variant="default"
                       size="sm"
-                      onClick={() => onChangeDataSource?.(!isManualDataSource)}
+                      disabled={currentDataSource === DataSource.MANUAL && !selectedDataSource}
+                      onClick={async () => {
+                        try {
+                          const newDataSource =
+                            currentDataSource === DataSource.MANUAL
+                              ? (selectedDataSource as DataSource)
+                              : DataSource.MANUAL;
+
+                          logger.info(
+                            `Changing data source from ${currentDataSource} to ${newDataSource}`,
+                          );
+
+                          // Close popover immediately
+                          setIsPopoverOpen(false);
+
+                          // Call the change handler
+                          await onChangeDataSource?.(newDataSource);
+                        } catch (error) {
+                          logger.error(`Error changing data source: ${error}`);
+                          // Keep popover open on error so user can retry
+                        }
+                      }}
                     >
                       {t("assets:quotesTable.changeMode.confirm")}
                     </Button>
@@ -405,7 +493,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
                 </div>
               </PopoverContent>
             </Popover>
-            {isManualDataSource && (
+            {currentDataSource === DataSource.MANUAL && (
               <Button
                 variant="default"
                 size="sm"

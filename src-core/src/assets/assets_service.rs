@@ -1,7 +1,7 @@
 use log::{debug, error};
 use std::sync::Arc;
 
-use crate::market_data::market_data_traits::MarketDataServiceTrait;
+use crate::market_data::market_data_traits::{MarketDataServiceTrait, MarketDataRepositoryTrait};
 
 use super::assets_model::{Asset, NewAsset, UpdateAssetProfile};
 use super::assets_traits::{AssetRepositoryTrait, AssetServiceTrait};
@@ -12,6 +12,7 @@ use diesel::result::Error as DieselError;
 pub struct AssetService {
     market_data_service: Arc<dyn MarketDataServiceTrait>,
     asset_repository: Arc<dyn AssetRepositoryTrait>,
+    market_data_repository: Arc<dyn MarketDataRepositoryTrait>,
 }
 
 impl AssetService {
@@ -19,10 +20,12 @@ impl AssetService {
     pub fn new(
         asset_repository: Arc<dyn AssetRepositoryTrait>,
         market_data_service: Arc<dyn MarketDataServiceTrait>,
+        market_data_repository: Arc<dyn MarketDataRepositoryTrait>,
     ) -> Result<Self> {
         Ok(Self {
             market_data_service,
             asset_repository,
+            market_data_repository,
         })
     }
 }
@@ -140,11 +143,30 @@ impl AssetServiceTrait for AssetService {
         }
     }
 
-    /// Updates the data source for an asset
+    /// Updates the data source for an asset and removes quotes from other sources
     async fn update_asset_data_source(&self, asset_id: &str, data_source: String) -> Result<Asset> {
-        self.asset_repository
-            .update_data_source(asset_id, data_source)
-            .await
+        // Update the asset's data source
+        let updated_asset = self
+            .asset_repository
+            .update_data_source(asset_id, data_source.clone())
+            .await?;
+
+        // If switching to a specific provider (not MANUAL), delete quotes from other providers
+        if data_source != "MANUAL" {
+            if let Err(e) = self
+                .market_data_repository
+                .delete_quotes_by_symbol_except_source(asset_id, &data_source)
+                .await
+            {
+                error!(
+                    "Failed to clean up old quotes for asset {} when switching to {}: {}",
+                    asset_id, data_source, e
+                );
+                // Don't fail the whole operation if quote cleanup fails
+            }
+        }
+
+        Ok(updated_asset)
     }
 
     async fn get_assets_by_symbols(&self, symbols: &Vec<String>) -> Result<Vec<Asset>> {

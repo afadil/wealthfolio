@@ -69,13 +69,14 @@ pub trait MarketDataServiceTrait: Send + Sync {
 }
 
 #[async_trait]
-pub trait MarketDataRepositoryTrait {
+pub trait MarketDataRepositoryTrait: Send + Sync {
     fn get_all_historical_quotes(&self) -> Result<Vec<Quote>>;
     fn get_historical_quotes_for_symbol(&self, symbol: &str) -> Result<Vec<Quote>>;
     async fn save_quotes(&self, quotes: &[Quote]) -> Result<()>;
     async fn save_quote(&self, quote: &Quote) -> Result<Quote>;
     async fn delete_quote(&self, quote_id: &str) -> Result<()>;
     async fn delete_quotes_for_symbols(&self, symbols: &[String]) -> Result<()>;
+    async fn delete_quotes_by_symbol_except_source(&self, symbol: &str, keep_source: &str) -> Result<()>;
     fn get_quotes_by_source(&self, symbol: &str, source: &str) -> Result<Vec<Quote>>;
     fn get_latest_quote_for_symbol(&self, symbol: &str) -> Result<Quote>;
     fn get_latest_quotes_for_symbols(&self, symbols: &[String]) -> Result<HashMap<String, Quote>>;

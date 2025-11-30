@@ -62,9 +62,16 @@ interface AssetFormProps {
   onSubmit: (values: AssetFormValues) => Promise<void>;
   onCancel?: () => void;
   isSaving?: boolean;
+  onDataSourceChange?: (newSource: string, currentSource: string) => Promise<boolean>;
 }
 
-export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProps) {
+export function AssetForm({
+  asset,
+  onSubmit,
+  onCancel,
+  isSaving,
+  onDataSourceChange,
+}: AssetFormProps) {
   const { t } = useTranslation("settings");
 
   // Generate data source options based on the original source
@@ -102,6 +109,20 @@ export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProp
   useEffect(() => {
     form.reset(defaultValues);
   }, [asset, form]);
+
+  const handleDataSourceChange = async (value: string) => {
+    const currentDataSource = form.getValues("dataSource");
+
+    // If there's a callback and the data source is changing, call it for confirmation
+    if (onDataSourceChange && value !== currentDataSource) {
+      const shouldChange = await onDataSourceChange(value, currentDataSource);
+      if (shouldChange) {
+        form.setValue("dataSource", value as DataSource);
+      }
+    } else {
+      form.setValue("dataSource", value as DataSource);
+    }
+  };
 
   const handleSubmit = async (values: AssetFormValues) => {
     await onSubmit(values);
@@ -185,7 +206,7 @@ export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProp
                 <FormControl>
                   <ResponsiveSelect
                     value={field.value}
-                    onValueChange={field.onChange}
+                    onValueChange={handleDataSourceChange}
                     options={dataSourceOptions}
                     placeholder={t("securities.form.dataSource.placeholder")}
                     sheetTitle={t("securities.form.dataSource.sheetTitle")}

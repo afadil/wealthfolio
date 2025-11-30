@@ -72,6 +72,7 @@ pub async fn initialize_context(
     let asset_service = Arc::new(AssetService::new(
         asset_repository.clone(),
         market_data_service.clone(),
+        market_data_repo.clone(),
     )?);
 
     let account_service = Arc::new(AccountService::new(

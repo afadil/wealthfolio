@@ -70,11 +70,20 @@
     "of": "of",
     "changeMode": {
       "title": "Change Tracking Mode",
-      "toAutomatic": "Switching to automatic tracking will enable data fetching from Market Data Provider. Please note that this will override any manually entered quotes on the next sync.",
+      "toAutomatic": "Switching to automatic tracking will enable data fetching from Market Data Provider. Please note that this will override any manually entered quotes on next sync.",
+      "toOriginal": "Switching to {{source}} will enable automatic data fetching from your original data source. Please note that this will override any manually entered quotes on next sync.",
       "toManual": "Switching to manual tracking will stop automatic data fetching from Market Data Provider. You'll need to enter and maintain price data manually.",
       "warningAutomatic": "⚠️ Your manually entered historical data may be lost.",
       "warningManual": "⚠️ Automatic price updates will be disabled.",
       "confirm": "Confirm Change"
+    },
+    "dataSource": {
+      "yahoo": "Yahoo Finance",
+      "manual": "Manual",
+      "marketDataApp": "Market Data App",
+      "alphaVantage": "Alpha Vantage",
+      "metalPriceApi": "Metal Price API",
+      "vnMarket": "VN Market"
     }
   },
   "details": {

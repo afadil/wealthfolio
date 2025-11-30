@@ -71,10 +71,19 @@
     "changeMode": {
       "title": "Thay đổi chế độ theo dõi",
       "toAutomatic": "Chuyển sang theo dõi tự động sẽ bật tính năng tải dữ liệu từ Nhà cung cấp dữ liệu thị trường. Lưu ý rằng điều này sẽ ghi đè lên bất kỳ giá nhập thủ công nào trong lần đồng bộ tiếp theo.",
+      "toOriginal": "Chuyển sang {{source}} sẽ bật tính năng tải dữ liệu tự động từ nguồn dữ liệu gốc của bạn. Lưu ý rằng điều này sẽ ghi đè lên bất kỳ giá nhập thủ công nào trong lần đồng bộ tiếp theo.",
       "toManual": "Chuyển sang theo dõi thủ công sẽ dừng tải dữ liệu tự động từ Nhà cung cấp dữ liệu thị trường. Bạn sẽ cần nhập và duy trì dữ liệu giá thủ công.",
       "warningAutomatic": "⚠️ Dữ liệu lịch sử nhập thủ công của bạn có thể bị mất.",
       "warningManual": "⚠️ Cập nhật giá tự động sẽ bị tắt.",
       "confirm": "Xác nhận thay đổi"
+    },
+    "dataSource": {
+      "yahoo": "Yahoo Finance",
+      "manual": "Thủ công",
+      "marketDataApp": "Market Data App",
+      "alphaVantage": "Alpha Vantage",
+      "metalPriceApi": "Metal Price API",
+      "vnMarket": "VN Market"
     }
   },
   "details": {

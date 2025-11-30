@@ -114,6 +114,28 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
             .await
     }
 
+    async fn delete_quotes_by_symbol_except_source(
+        &self,
+        input_symbol: &str,
+        keep_source: &str,
+    ) -> Result<()> {
+        let symbol_owned = input_symbol.to_string();
+        let source_owned = keep_source.to_string();
+
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                diesel::delete(
+                    quotes
+                        .filter(symbol.eq(&symbol_owned))
+                        .filter(crate::schema::quotes::dsl::data_source.ne(&source_owned)),
+                )
+                .execute(conn)
+                .map_err(MarketDataError::DatabaseError)?;
+                Ok(())
+            })
+            .await
+    }
+
     fn get_quotes_by_source(&self, input_symbol: &str, source: &str) -> Result<Vec<Quote>> {
         let mut conn = get_connection(&self.pool)?;
         use crate::schema::quotes::dsl::symbol as symbol_col;

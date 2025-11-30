@@ -27,6 +27,7 @@ import { useAssetPerformance } from "./hooks/use-asset-performance";
 import { useAssetProfileMutations } from "./hooks/use-asset-profile-mutations";
 import { useQuoteMutations } from "./hooks/use-quote-mutations";
 import QuoteHistoryTable from "./quote-history-table";
+import { logger } from "@/adapters";
 
 interface AssetProfileFormData {
   name: string;
@@ -219,18 +220,15 @@ export const AssetProfilePage = () => {
     const adjustedCostBasis = Math.max(0, originalCostBasis - totalDividends);
 
     const averageCostPrice =
-      adjustedCostBasis && holding.quantity !== 0
-        ? adjustedCostBasis / holding.quantity
-        : 0;
+      adjustedCostBasis && holding.quantity !== 0 ? adjustedCostBasis / holding.quantity : 0;
 
     const originalTotalReturn = holding.totalGain?.local ?? 0;
     const adjustedTotalReturn = originalTotalReturn + totalDividends;
 
     // Recalculate return percent based on adjusted cost basis
     // If cost basis is reduced to 0, return is infinite (or handled gracefully)
-    const adjustedTotalReturnPercent = adjustedCostBasis > 0
-      ? adjustedTotalReturn / adjustedCostBasis
-      : 0;
+    const adjustedTotalReturnPercent =
+      adjustedCostBasis > 0 ? adjustedTotalReturn / adjustedCostBasis : 0;
 
     const quoteData = quote
       ? {
@@ -342,7 +340,10 @@ export const AssetProfilePage = () => {
       items.push({ value: "lots", label: t("assets:profile.tabs.lots") });
     }
 
-    items.push({ value: "activities", label: t("activity:page.title", { defaultValue: "Activities" }) });
+    items.push({
+      value: "activities",
+      label: t("activity:page.title", { defaultValue: "Activities" }),
+    });
     items.push({ value: "history", label: t("assets:profile.tabs.quotes") });
 
     return items;
@@ -549,36 +550,50 @@ export const AssetProfilePage = () => {
       name: t("assets:profile.tabs.quotes"),
       content: (
         <QuoteHistoryTable
-          data={quoteHistory ?? []}
-          isManualDataSource={formData.dataSource === DataSource.MANUAL}
-          onSaveQuote={(quote: Quote) => {
-            const updatedQuote = { ...quote };
-            if (!updatedQuote.id) {
-              const datePart = new Date(updatedQuote.timestamp)
-                .toISOString()
-                .slice(0, 10)
-                .replace(/-/g, "");
-              updatedQuote.id = `${datePart}_${symbol.toUpperCase()}`;
-            }
-            if (!updatedQuote.currency) {
-              updatedQuote.currency = profile?.currency ?? "USD";
-            }
-            saveQuoteMutation.mutate(updatedQuote);
-          }}
-          onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
-          onChangeDataSource={(isManual) => {
-            if (profile) {
-              updateAssetDataSourceMutation.mutate({
-                symbol,
-                dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
-              });
-              setFormData((prev) => ({
-                ...prev,
-                dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
-              }));
-            }
-          }}
-        />
+           data={quoteHistory ?? []}
+           currentDataSource={formData.dataSource}
+           originalDataSource={(assetProfile?.dataSource ?? formData.dataSource) as DataSource}
+           availableDataSources={[
+             DataSource.YAHOO,
+             DataSource.MARKET_DATA_APP,
+             DataSource.ALPHA_VANTAGE,
+             DataSource.METAL_PRICE_API,
+             DataSource.VN_MARKET,
+           ]}
+           onChangeDataSource={async (dataSource) => {
+             try {
+               await updateAssetDataSourceMutation.mutateAsync({
+                 symbol,
+                 dataSource,
+               });
+
+               // Update form state on successful change
+               setFormData((prev) => ({
+                 ...prev,
+                 dataSource,
+               }));
+
+               logger.info(`Data source changed successfully to ${dataSource}`);
+             } catch (error) {
+               logger.error(`Failed to change data source: ${error}`);
+             }
+           }}
+           onSaveQuote={(quote: Quote) => {
+             const updatedQuote = { ...quote };
+             if (!updatedQuote.id) {
+               const datePart = new Date(updatedQuote.timestamp)
+                 .toISOString()
+                 .slice(0, 10)
+                 .replace(/-/g, "");
+               updatedQuote.id = `${datePart}_${symbol.toUpperCase()}`;
+             }
+             if (!updatedQuote.currency) {
+               updatedQuote.currency = profile?.currency ?? "USD";
+             }
+             saveQuoteMutation.mutate(updatedQuote);
+           }}
+           onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
+         />
       ),
     });
 
@@ -623,7 +638,15 @@ export const AssetProfilePage = () => {
           <QuoteHistoryTable
             data={quoteHistory ?? []}
             // Default to non-manual source, disable changing it as there's no profile context
-            isManualDataSource={assetProfile?.dataSource === DataSource.MANUAL}
+            currentDataSource={assetProfile?.dataSource as DataSource}
+            originalDataSource={assetProfile?.dataSource as DataSource}
+            availableDataSources={[
+              DataSource.YAHOO,
+              DataSource.MARKET_DATA_APP,
+              DataSource.ALPHA_VANTAGE,
+              DataSource.METAL_PRICE_API,
+              DataSource.VN_MARKET,
+            ]}
             onSaveQuote={(quote: Quote) => {
               const updatedQuote = { ...quote };
               // Generate id if missing
@@ -641,15 +664,18 @@ export const AssetProfilePage = () => {
               saveQuoteMutation.mutate(updatedQuote);
             }}
             onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
-            onChangeDataSource={(isManual) => {
-              updateAssetDataSourceMutation.mutate({
-                symbol,
-                dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
-              });
-              setFormData((prev) => ({
-                ...prev,
-                dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
-              }));
+            onChangeDataSource={(dataSource) => {
+              // Only allow changing data source if there's a profile/holding to update
+              if (profile) {
+                updateAssetDataSourceMutation.mutate({
+                  symbol,
+                  dataSource,
+                });
+                setFormData((prev) => ({
+                  ...prev,
+                  dataSource,
+                }));
+              }
             }}
           />
         </PageContent>
@@ -964,8 +990,6 @@ export const AssetProfilePage = () => {
                   )}
                 </div>
               </div>
-
-
             </TabsContent>
           )}
 
@@ -988,39 +1012,47 @@ export const AssetProfilePage = () => {
           {/* History/Quotes Content: Requires quoteHistory */}
           <TabsContent value="history" className="space-y-16 pt-6">
             <QuoteHistoryTable
-              data={quoteHistory ?? []}
-              isManualDataSource={formData.dataSource === DataSource.MANUAL}
-              onSaveQuote={(quote: Quote) => {
-                const updatedQuote = { ...quote };
-                // Generate id if missing
-                if (!updatedQuote.id) {
-                  const datePart = new Date(updatedQuote.timestamp)
-                    .toISOString()
-                    .slice(0, 10)
-                    .replace(/-/g, "");
-                  updatedQuote.id = `${datePart}_${symbol.toUpperCase()}`;
-                }
-                // Set currency if missing
-                if (!updatedQuote.currency) {
-                  updatedQuote.currency = profile?.currency ?? "USD";
-                }
-                saveQuoteMutation.mutate(updatedQuote);
-              }}
-              onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
-              onChangeDataSource={(isManual) => {
-                // Only allow changing data source if there's a profile/holding to update
-                if (profile) {
-                  updateAssetDataSourceMutation.mutate({
-                    symbol,
-                    dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
-                  });
-                  setFormData((prev) => ({
-                    ...prev,
-                    dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
-                  }));
-                }
-              }}
-            />
+               data={quoteHistory ?? []}
+               currentDataSource={formData.dataSource}
+               originalDataSource={(assetProfile?.dataSource ?? formData.dataSource) as DataSource}
+               availableDataSources={[
+                 DataSource.YAHOO,
+                 DataSource.MARKET_DATA_APP,
+                 DataSource.ALPHA_VANTAGE,
+                 DataSource.METAL_PRICE_API,
+                 DataSource.VN_MARKET,
+               ]}
+               onChangeDataSource={(dataSource) => {
+                 // Only allow changing data source if there's a profile/holding to update
+                 if (profile) {
+                   updateAssetDataSourceMutation.mutate({
+                     symbol,
+                     dataSource,
+                   });
+                   setFormData((prev) => ({
+                     ...prev,
+                     dataSource,
+                   }));
+                 }
+               }}
+               onSaveQuote={(quote: Quote) => {
+                 const updatedQuote = { ...quote };
+                 // Generate id if missing
+                 if (!updatedQuote.id) {
+                   const datePart = new Date(updatedQuote.timestamp)
+                     .toISOString()
+                     .slice(0, 10)
+                     .replace(/-/g, "");
+                   updatedQuote.id = `${datePart}_${symbol.toUpperCase()}`;
+                 }
+                 // Set currency if missing
+                 if (!updatedQuote.currency) {
+                   updatedQuote.currency = profile?.currency ?? "USD";
+                 }
+                 saveQuoteMutation.mutate(updatedQuote);
+               }}
+               onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
+             />
           </TabsContent>
         </Tabs>
       </PageContent>
