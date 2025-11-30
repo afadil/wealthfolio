@@ -1,5 +1,5 @@
 import { getCategoriesHierarchical } from "@/commands/category";
-import { bulkApplyCategoryRules } from "@/commands/category-rule";
+import { bulkApplyActivityRules } from "@/commands/activity-rule";
 import { getEvents } from "@/commands/event";
 import { getEventTypes } from "@/commands/event-type";
 import {
@@ -30,9 +30,9 @@ import type {
   Event,
   EventType,
   NewCategory,
-  NewCategoryRule,
+  NewActivityRule,
   UpdateCategory,
-  UpdateCategoryRule,
+  UpdateActivityRule,
 } from "@/lib/types";
 import { cn, formatDateTimeDisplay, formatDateTimeLocal } from "@/lib/utils";
 import { EditableCell } from "@/pages/activity/components/activity-datagrid/editable-cell";
@@ -40,8 +40,8 @@ import { SelectCell } from "@/pages/activity/components/activity-datagrid/select
 import { ActivityTypeBadge } from "@/pages/activity/components/activity-type-badge";
 import { CategoryEditModal } from "@/pages/settings/categories/components/category-edit-modal";
 import { useCategoryMutations } from "@/pages/settings/categories/use-category-mutations";
-import { RuleEditModal } from "@/pages/settings/category-rules/components/rule-edit-modal";
-import { useCategoryRuleMutations } from "@/pages/settings/category-rules/use-category-rule-mutations";
+import { RuleEditModal } from "@/pages/settings/activity-rules/components/rule-edit-modal";
+import { useActivityRuleMutations } from "@/pages/settings/activity-rules/use-activity-rule-mutations";
 import { EventFormDialog } from "@/pages/settings/events/components/event-form-dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -145,7 +145,7 @@ export function CashImportEditStep({
 }: CashImportEditStepProps) {
   const queryClient = useQueryClient();
   const { createCategoryMutation } = useCategoryMutations();
-  const { createRuleMutation } = useCategoryRuleMutations();
+  const { createRuleMutation } = useActivityRuleMutations();
   const [localTransactions, setLocalTransactions] = useState<CashImportRow[]>(initialTransactions);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [focusedCell, setFocusedCell] = useState<CellCoordinate | null>(null);
@@ -712,7 +712,7 @@ export function CashImportEditStep({
         return;
       }
 
-      const results = await bulkApplyCategoryRules(
+      const results = await bulkApplyActivityRules(
         transactionsToApply.map((t) => ({ name: t.name, accountId: t.accountId })),
       );
 
@@ -729,12 +729,14 @@ export function CashImportEditStep({
           if (t.isManualOverride) return t;
 
           const result = resultMap.get(t.lineNumber);
-          if (result && result.categoryId) {
+          if (result && (result.categoryId || result.activityType)) {
             appliedCount++;
             return {
               ...t,
-              categoryId: result.categoryId,
-              subCategoryId: result.subCategoryId || undefined,
+              categoryId: result.categoryId || t.categoryId,
+              subCategoryId: result.subCategoryId || (result.categoryId ? undefined : t.subCategoryId),
+              // Override activity type if the rule specifies one
+              activityType: (result.activityType as ActivityType) || t.activityType,
               matchedRuleId: result.ruleId || undefined,
               matchedRuleName: result.ruleName || undefined,
               isManualOverride: false,
@@ -858,9 +860,9 @@ export function CashImportEditStep({
   );
 
   const handleRuleSave = useCallback(
-    (data: NewCategoryRule | { id: string; update: UpdateCategoryRule }) => {
+    (data: NewActivityRule | { id: string; update: UpdateActivityRule }) => {
       if ("pattern" in data && !("id" in data)) {
-        createRuleMutation.mutate(data as NewCategoryRule, {
+        createRuleMutation.mutate(data as NewActivityRule, {
           onSuccess: () => {
             setCreateRuleOpen(false);
             toast.success("Rule created successfully");

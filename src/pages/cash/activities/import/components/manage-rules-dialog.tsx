@@ -1,16 +1,16 @@
 import { getCategoriesHierarchical } from "@/commands/category";
-import { getCategoryRulesWithNames } from "@/commands/category-rule";
+import { getActivityRulesWithNames } from "@/commands/activity-rule";
 import { QueryKeys } from "@/lib/query-keys";
 import type {
-  CategoryRule,
-  CategoryRuleWithNames,
+  ActivityRule,
+  ActivityRuleWithNames,
   CategoryWithChildren,
-  NewCategoryRule,
-  UpdateCategoryRule,
+  NewActivityRule,
+  UpdateActivityRule,
 } from "@/lib/types";
-import { RuleItem } from "@/pages/settings/category-rules/components/rule-item";
-import { RuleEditModal } from "@/pages/settings/category-rules/components/rule-edit-modal";
-import { useCategoryRuleMutations } from "@/pages/settings/category-rules/use-category-rule-mutations";
+import { RuleItem } from "@/pages/settings/activity-rules/components/rule-item";
+import { RuleEditModal } from "@/pages/settings/activity-rules/components/rule-edit-modal";
+import { useActivityRuleMutations } from "@/pages/settings/activity-rules/use-activity-rule-mutations";
 import { useQuery } from "@tanstack/react-query";
 import {
   Button,
@@ -32,9 +32,9 @@ interface ManageRulesDialogProps {
 }
 
 export function ManageRulesDialog({ open, onClose }: ManageRulesDialogProps) {
-  const { data: rules, isLoading: rulesLoading } = useQuery<CategoryRuleWithNames[], Error>({
-    queryKey: [QueryKeys.CATEGORY_RULES_WITH_NAMES],
-    queryFn: getCategoryRulesWithNames,
+  const { data: rules, isLoading: rulesLoading } = useQuery<ActivityRuleWithNames[], Error>({
+    queryKey: [QueryKeys.ACTIVITY_RULES_WITH_NAMES],
+    queryFn: getActivityRulesWithNames,
     enabled: open,
   });
 
@@ -44,17 +44,17 @@ export function ManageRulesDialog({ open, onClose }: ManageRulesDialogProps) {
     enabled: open,
   });
 
-  const { createRuleMutation, updateRuleMutation, deleteRuleMutation } = useCategoryRuleMutations();
+  const { createRuleMutation, updateRuleMutation, deleteRuleMutation } = useActivityRuleMutations();
 
   const [visibleModal, setVisibleModal] = useState(false);
-  const [selectedRule, setSelectedRule] = useState<CategoryRule | undefined>();
+  const [selectedRule, setSelectedRule] = useState<ActivityRule | undefined>();
 
   const handleAddRule = () => {
     setSelectedRule(undefined);
     setVisibleModal(true);
   };
 
-  const handleEditRule = (rule: CategoryRuleWithNames) => {
+  const handleEditRule = (rule: ActivityRuleWithNames) => {
     setSelectedRule({
       id: rule.id,
       name: rule.name,
@@ -62,6 +62,7 @@ export function ManageRulesDialog({ open, onClose }: ManageRulesDialogProps) {
       matchType: rule.matchType,
       categoryId: rule.categoryId,
       subCategoryId: rule.subCategoryId,
+      activityType: rule.activityType,
       priority: rule.priority,
       isGlobal: rule.isGlobal,
       accountId: rule.accountId,
@@ -71,11 +72,11 @@ export function ManageRulesDialog({ open, onClose }: ManageRulesDialogProps) {
     setVisibleModal(true);
   };
 
-  const handleDeleteRule = (rule: CategoryRuleWithNames) => {
+  const handleDeleteRule = (rule: ActivityRuleWithNames) => {
     deleteRuleMutation.mutate(rule.id);
   };
 
-  const handleSave = (data: NewCategoryRule | { id: string; update: UpdateCategoryRule }) => {
+  const handleSave = (data: NewActivityRule | { id: string; update: UpdateActivityRule }) => {
     if ("id" in data) {
       updateRuleMutation.mutate(data, {
         onSuccess: () => setVisibleModal(false),

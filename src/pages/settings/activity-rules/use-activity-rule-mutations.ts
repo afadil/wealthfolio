@@ -1,28 +1,28 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/use-toast";
 import {
-  createCategoryRule,
-  updateCategoryRule,
-  deleteCategoryRule,
-} from "@/commands/category-rule";
+  createActivityRule,
+  updateActivityRule,
+  deleteActivityRule,
+} from "@/commands/activity-rule";
 import { QueryKeys } from "@/lib/query-keys";
-import type { NewCategoryRule, UpdateCategoryRule } from "@/lib/types";
+import type { NewActivityRule, UpdateActivityRule } from "@/lib/types";
 
-export function useCategoryRuleMutations() {
+export function useActivityRuleMutations() {
   const queryClient = useQueryClient();
 
   const invalidateRules = () => {
-    queryClient.invalidateQueries({ queryKey: [QueryKeys.CATEGORY_RULES] });
-    queryClient.invalidateQueries({ queryKey: [QueryKeys.CATEGORY_RULES_WITH_NAMES] });
+    queryClient.invalidateQueries({ queryKey: [QueryKeys.ACTIVITY_RULES] });
+    queryClient.invalidateQueries({ queryKey: [QueryKeys.ACTIVITY_RULES_WITH_NAMES] });
   };
 
   const createRuleMutation = useMutation({
-    mutationFn: (rule: NewCategoryRule) => createCategoryRule(rule),
+    mutationFn: (rule: NewActivityRule) => createActivityRule(rule),
     onSuccess: () => {
       invalidateRules();
       toast({
         title: "Rule created",
-        description: "The category rule has been created successfully.",
+        description: "The activity rule has been created successfully.",
       });
     },
     onError: (error) => {
@@ -35,13 +35,13 @@ export function useCategoryRuleMutations() {
   });
 
   const updateRuleMutation = useMutation({
-    mutationFn: ({ id, update }: { id: string; update: UpdateCategoryRule }) =>
-      updateCategoryRule(id, update),
+    mutationFn: ({ id, update }: { id: string; update: UpdateActivityRule }) =>
+      updateActivityRule(id, update),
     onSuccess: () => {
       invalidateRules();
       toast({
         title: "Rule updated",
-        description: "The category rule has been updated successfully.",
+        description: "The activity rule has been updated successfully.",
       });
     },
     onError: (error) => {
@@ -54,12 +54,12 @@ export function useCategoryRuleMutations() {
   });
 
   const deleteRuleMutation = useMutation({
-    mutationFn: (ruleId: string) => deleteCategoryRule(ruleId),
+    mutationFn: (ruleId: string) => deleteActivityRule(ruleId),
     onSuccess: () => {
       invalidateRules();
       toast({
         title: "Rule deleted",
-        description: "The category rule has been deleted successfully.",
+        description: "The activity rule has been deleted successfully.",
       });
     },
     onError: (error) => {

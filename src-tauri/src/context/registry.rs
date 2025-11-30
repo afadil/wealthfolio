@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 use wealthfolio_core::{
-    self, accounts, activities, assets, categories, category_rules, event_types, events, fx, goals,
+    self, accounts, activities, activity_rules, assets, categories, event_types, events, fx, goals,
     limits, market_data, portfolio, settings, spending,
 };
 pub struct ServiceContext {
@@ -23,7 +23,7 @@ pub struct ServiceContext {
     pub holdings_service: Arc<dyn portfolio::holdings::HoldingsServiceTrait>,
     pub valuation_service: Arc<dyn portfolio::valuation::ValuationServiceTrait>,
     pub category_service: Arc<dyn categories::CategoryServiceTrait>,
-    pub category_rule_service: Arc<dyn category_rules::CategoryRuleServiceTrait>,
+    pub activity_rule_service: Arc<dyn activity_rules::ActivityRuleServiceTrait>,
     pub event_type_service: Arc<dyn event_types::EventTypeServiceTrait>,
     pub event_service: Arc<dyn events::EventServiceTrait>,
 }
@@ -97,8 +97,8 @@ impl ServiceContext {
         Arc::clone(&self.category_service)
     }
 
-    pub fn category_rule_service(&self) -> Arc<dyn category_rules::CategoryRuleServiceTrait> {
-        Arc::clone(&self.category_rule_service)
+    pub fn activity_rule_service(&self) -> Arc<dyn activity_rules::ActivityRuleServiceTrait> {
+        Arc::clone(&self.activity_rule_service)
     }
 
     pub fn event_type_service(&self) -> Arc<dyn event_types::EventTypeServiceTrait> {

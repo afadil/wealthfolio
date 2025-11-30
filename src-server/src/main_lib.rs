@@ -9,9 +9,9 @@ use wealthfolio_core::{
     activities::{
         ActivityRepository, ActivityService as CoreActivityService, ActivityServiceTrait,
     },
+    activity_rules::{ActivityRuleRepository, ActivityRuleService, ActivityRuleServiceTrait},
     assets::{AssetRepository, AssetService, AssetServiceTrait},
     categories::{CategoryRepository, CategoryService, CategoryServiceTrait},
-    category_rules::{CategoryRuleRepository, CategoryRuleService, CategoryRuleServiceTrait},
     db::{self, write_actor},
     event_types::{EventTypeRepository, EventTypeService, EventTypeServiceTrait},
     events::{EventRepository, EventService, EventServiceTrait},
@@ -53,7 +53,7 @@ pub struct AppState {
     pub activity_service: Arc<dyn ActivityServiceTrait + Send + Sync>,
     pub asset_service: Arc<dyn AssetServiceTrait + Send + Sync>,
     pub category_service: Arc<dyn CategoryServiceTrait + Send + Sync>,
-    pub category_rule_service: Arc<dyn CategoryRuleServiceTrait + Send + Sync>,
+    pub activity_rule_service: Arc<dyn ActivityRuleServiceTrait + Send + Sync>,
     pub event_type_service: Arc<dyn EventTypeServiceTrait + Send + Sync>,
     pub event_service: Arc<dyn EventServiceTrait + Send + Sync>,
     pub addons_root: String,
@@ -212,11 +212,11 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let category_service: Arc<dyn CategoryServiceTrait + Send + Sync> =
         Arc::new(CategoryService::new(category_repository.clone()));
 
-    let category_rule_repository =
-        Arc::new(CategoryRuleRepository::new(pool.clone(), writer.clone()));
-    let category_rule_service: Arc<dyn CategoryRuleServiceTrait + Send + Sync> =
-        Arc::new(CategoryRuleService::new(
-            category_rule_repository,
+    let activity_rule_repository =
+        Arc::new(ActivityRuleRepository::new(pool.clone(), writer.clone()));
+    let activity_rule_service: Arc<dyn ActivityRuleServiceTrait + Send + Sync> =
+        Arc::new(ActivityRuleService::new(
+            activity_rule_repository,
             category_repository,
         ));
 
@@ -268,7 +268,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         activity_service,
         asset_service,
         category_service,
-        category_rule_service,
+        activity_rule_service,
         event_type_service,
         event_service,
         addons_root: config.addons_root.clone(),

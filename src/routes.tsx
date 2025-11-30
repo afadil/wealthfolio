@@ -19,7 +19,7 @@ import PerformancePage from "@/pages/performance/performance-page";
 import SettingsAccountsPage from "@/pages/settings/accounts/accounts-page";
 import SettingsAppearancePage from "@/pages/settings/appearance/appearance-page";
 import CategoriesPage from "@/pages/settings/categories/categories-page";
-import CategoryRulesPage from "@/pages/settings/category-rules/category-rules-page";
+import ActivityRulesPage from "@/pages/settings/activity-rules/activity-rules-page";
 import { EventsPage } from "@/pages/settings/events/events-page";
 import CashActivitiesPage from "@/pages/cash/activities";
 import CashImportPage from "@/pages/cash/activities/import/cash-import-page";
@@ -112,7 +112,7 @@ export function AppRoutes() {
               <Route path="accounts" element={<SettingsAccountsPage />} />
               <Route path="goals" element={<SettingsGoalsPage />} />
               <Route path="categories" element={<CategoriesPage />} />
-              <Route path="category-rules" element={<CategoryRulesPage />} />
+              <Route path="activity-rules" element={<ActivityRulesPage />} />
               <Route path="events" element={<EventsPage />} />
               <Route path="appearance" element={<SettingsAppearancePage />} />
               <Route path="about" element={<AboutSettingsPage />} />

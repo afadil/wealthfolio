@@ -7,25 +7,25 @@ import {
   Skeleton,
   EmptyPlaceholder,
 } from "@wealthfolio/ui";
-import { getCategoryRulesWithNames } from "@/commands/category-rule";
+import { getActivityRulesWithNames } from "@/commands/activity-rule";
 import { getCategoriesHierarchical } from "@/commands/category";
 import { QueryKeys } from "@/lib/query-keys";
 import type {
-  CategoryRule,
-  CategoryRuleWithNames,
+  ActivityRule,
+  ActivityRuleWithNames,
   CategoryWithChildren,
-  NewCategoryRule,
-  UpdateCategoryRule,
+  NewActivityRule,
+  UpdateActivityRule,
 } from "@/lib/types";
 import { SettingsHeader } from "../settings-header";
 import { RuleItem } from "./components/rule-item";
 import { RuleEditModal } from "./components/rule-edit-modal";
-import { useCategoryRuleMutations } from "./use-category-rule-mutations";
+import { useActivityRuleMutations } from "./use-activity-rule-mutations";
 
-function SettingsCategoryRulesPage() {
-  const { data: rules, isLoading: rulesLoading } = useQuery<CategoryRuleWithNames[], Error>({
-    queryKey: [QueryKeys.CATEGORY_RULES_WITH_NAMES],
-    queryFn: getCategoryRulesWithNames,
+function SettingsActivityRulesPage() {
+  const { data: rules, isLoading: rulesLoading } = useQuery<ActivityRuleWithNames[], Error>({
+    queryKey: [QueryKeys.ACTIVITY_RULES_WITH_NAMES],
+    queryFn: getActivityRulesWithNames,
   });
 
   const { data: categories, isLoading: categoriesLoading } = useQuery<CategoryWithChildren[], Error>({
@@ -34,10 +34,10 @@ function SettingsCategoryRulesPage() {
   });
 
   const [visibleModal, setVisibleModal] = useState(false);
-  const [selectedRule, setSelectedRule] = useState<CategoryRule | undefined>();
+  const [selectedRule, setSelectedRule] = useState<ActivityRule | undefined>();
 
   const { createRuleMutation, updateRuleMutation, deleteRuleMutation } =
-    useCategoryRuleMutations();
+    useActivityRuleMutations();
 
   const isLoading = rulesLoading || categoriesLoading;
 
@@ -46,8 +46,8 @@ function SettingsCategoryRulesPage() {
     setVisibleModal(true);
   };
 
-  const handleEditRule = (rule: CategoryRuleWithNames) => {
-    // Extract just the CategoryRule fields
+  const handleEditRule = (rule: ActivityRuleWithNames) => {
+    // Extract just the ActivityRule fields
     setSelectedRule({
       id: rule.id,
       name: rule.name,
@@ -55,6 +55,7 @@ function SettingsCategoryRulesPage() {
       matchType: rule.matchType,
       categoryId: rule.categoryId,
       subCategoryId: rule.subCategoryId,
+      activityType: rule.activityType,
       priority: rule.priority,
       isGlobal: rule.isGlobal,
       accountId: rule.accountId,
@@ -64,11 +65,11 @@ function SettingsCategoryRulesPage() {
     setVisibleModal(true);
   };
 
-  const handleDeleteRule = (rule: CategoryRuleWithNames) => {
+  const handleDeleteRule = (rule: ActivityRuleWithNames) => {
     deleteRuleMutation.mutate(rule.id);
   };
 
-  const handleSave = (data: NewCategoryRule | { id: string; update: UpdateCategoryRule }) => {
+  const handleSave = (data: NewActivityRule | { id: string; update: UpdateActivityRule }) => {
     if ("id" in data) {
       updateRuleMutation.mutate(data, {
         onSuccess: () => setVisibleModal(false),
@@ -97,8 +98,8 @@ function SettingsCategoryRulesPage() {
     <>
       <div className="space-y-6">
         <SettingsHeader
-          heading="Category Rules"
-          text="Auto-categorize transactions based on name patterns."
+          heading="Activity Rules"
+          text="Auto-assign categories and activity types based on transaction name patterns and priority."
         >
           <>
             <Button
@@ -117,18 +118,13 @@ function SettingsCategoryRulesPage() {
         </SettingsHeader>
         <Separator />
 
-        <div className="text-muted-foreground text-sm">
-          Rules are applied in priority order (highest first) when importing transactions.
-          The first matching rule will assign the category.
-        </div>
-
         {sortedRules.length === 0 ? (
           <EmptyPlaceholder>
             <EmptyPlaceholder.Icon name="ListFilter" />
             <EmptyPlaceholder.Title>No rules</EmptyPlaceholder.Title>
             <EmptyPlaceholder.Description>
-              You don&apos;t have any category rules yet. Create rules to automatically
-              categorize transactions during import.
+              You don&apos;t have any activity rules yet. Create rules to automatically
+              assign categories and activity types during import.
             </EmptyPlaceholder.Description>
             <Button onClick={handleAddRule}>
               <Icons.Plus className="mr-2 h-4 w-4" />
@@ -161,4 +157,4 @@ function SettingsCategoryRulesPage() {
   );
 };
 
-export default SettingsCategoryRulesPage;
+export default SettingsActivityRulesPage;

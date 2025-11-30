@@ -5,7 +5,7 @@ use wealthfolio_core::{
     accounts::{AccountRepository, AccountService},
     activities::{ActivityRepository, ActivityService},
     categories::{CategoryRepository, CategoryService},
-    category_rules::{CategoryRuleRepository, CategoryRuleService},
+    activity_rules::{ActivityRuleRepository, ActivityRuleService},
     db::{self, write_actor},
     event_types::{EventTypeRepository, EventTypeService},
     events::{EventRepository, EventService},
@@ -52,7 +52,7 @@ pub async fn initialize_context(
     let snapshot_repository = Arc::new(SnapshotRepository::new(pool.clone(), writer.clone()));
     let valuation_repository = Arc::new(ValuationRepository::new(pool.clone(), writer.clone()));
     let category_repository = Arc::new(CategoryRepository::new(pool.clone(), writer.clone()));
-    let category_rule_repository = Arc::new(CategoryRuleRepository::new(pool.clone(), writer.clone()));
+    let activity_rule_repository = Arc::new(ActivityRuleRepository::new(pool.clone(), writer.clone()));
     let event_type_repository = Arc::new(EventTypeRepository::new(pool.clone(), writer.clone()));
     let event_repository = Arc::new(EventRepository::new(pool.clone(), writer.clone()));
     // Instantiate Transaction Executor using the Arc<DbPool> directly
@@ -150,8 +150,8 @@ pub async fn initialize_context(
     ));
 
     let category_service = Arc::new(CategoryService::new(category_repository.clone()));
-    let category_rule_service = Arc::new(CategoryRuleService::new(
-        category_rule_repository.clone(),
+    let activity_rule_service = Arc::new(ActivityRuleService::new(
+        activity_rule_repository.clone(),
         category_repository.clone(),
     ));
     let event_type_service = Arc::new(EventTypeService::new(event_type_repository.clone()));
@@ -178,7 +178,7 @@ pub async fn initialize_context(
         holdings_service,
         valuation_service,
         category_service,
-        category_rule_service,
+        activity_rule_service,
         event_type_service,
         event_service,
     })

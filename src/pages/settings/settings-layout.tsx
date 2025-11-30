@@ -48,9 +48,9 @@ const sidebarNavItems = [
     icon: <Icons.Tag className="h-5 w-5" />,
   },
   {
-    title: "Category Rules",
-    href: "category-rules",
-    subtitle: "Auto-categorize transactions",
+    title: "Activity Rules",
+    href: "activity-rules",
+    subtitle: "Auto-assign categories and activity types",
     icon: <Icons.ListFilter className="h-5 w-5" />,
   },
   {

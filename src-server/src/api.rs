@@ -18,10 +18,10 @@ use utoipa::OpenApi;
 
 mod accounts;
 mod activities;
+mod activity_rules;
 mod addons;
 mod assets;
 pub mod categories;
-mod category_rules;
 mod event_types;
 mod events;
 mod exchange_rates;
@@ -78,7 +78,7 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
         .merge(performance::router())
         .merge(activities::router())
         .merge(categories::router())
-        .merge(category_rules::router())
+        .merge(activity_rules::router())
         .merge(event_types::router())
         .merge(events::router())
         .merge(goals::router())

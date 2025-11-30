@@ -3,7 +3,7 @@ pub mod activity;
 pub mod addon;
 pub mod asset;
 pub mod category;
-pub mod category_rule;
+pub mod activity_rule;
 pub mod error;
 pub mod event;
 pub mod event_type;

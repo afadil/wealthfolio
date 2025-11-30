@@ -22,8 +22,9 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import type { CategoryRule, CategoryWithChildren } from "@/lib/types";
-import { testCategoryRulePattern } from "@/commands/category-rule";
+import type { ActivityRule, CategoryWithChildren } from "@/lib/types";
+import { testActivityRulePattern } from "@/commands/activity-rule";
+import { ActivityType, ActivityTypeNames } from "@/lib/constants";
 
 type FormMatchType = "contains" | "starts_with" | "exact";
 
@@ -31,21 +32,36 @@ const ruleFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
   pattern: z.string().min(1, "Pattern is required"),
   matchType: z.enum(["contains", "starts_with", "exact"]),
-  categoryId: z.string().min(1, "Category is required"),
+  categoryId: z.string().optional(),
   subCategoryId: z.string().optional(),
+  activityType: z.string().optional(),
   priority: z.coerce.number().int().min(0),
   isGlobal: z.boolean(),
-});
+}).refine(
+  (data) => data.categoryId || data.activityType,
+  { message: "At least a category or activity type is required", path: ["categoryId"] }
+);
 
 type RuleFormValues = z.infer<typeof ruleFormSchema>;
 
 interface RuleFormProps {
-  rule?: CategoryRule;
+  rule?: ActivityRule;
   categories: CategoryWithChildren[];
   onSubmit: (values: RuleFormValues) => void;
   onCancel: () => void;
   isLoading?: boolean;
 }
+
+const RULE_ACTIVITY_TYPE_OPTIONS = [
+  { value: ActivityType.DEPOSIT, label: ActivityTypeNames[ActivityType.DEPOSIT] },
+  { value: ActivityType.WITHDRAWAL, label: ActivityTypeNames[ActivityType.WITHDRAWAL] },
+  { value: ActivityType.INTEREST, label: ActivityTypeNames[ActivityType.INTEREST] },
+  { value: ActivityType.DIVIDEND, label: ActivityTypeNames[ActivityType.DIVIDEND] },
+  { value: ActivityType.FEE, label: ActivityTypeNames[ActivityType.FEE] },
+  { value: ActivityType.TAX, label: ActivityTypeNames[ActivityType.TAX] },
+  { value: ActivityType.TRANSFER_IN, label: ActivityTypeNames[ActivityType.TRANSFER_IN] },
+  { value: ActivityType.TRANSFER_OUT, label: ActivityTypeNames[ActivityType.TRANSFER_OUT] },
+];
 
 const MATCH_TYPE_OPTIONS: { value: FormMatchType; label: string; description: string }[] = [
   { value: "contains", label: "Contains", description: "Pattern found anywhere in text" },
@@ -72,6 +88,7 @@ export function RuleForm({
       matchType: (rule?.matchType as FormMatchType) ?? "contains",
       categoryId: rule?.categoryId ?? "",
       subCategoryId: rule?.subCategoryId ?? undefined,
+      activityType: rule?.activityType ?? "",
       priority: rule?.priority ?? 0,
       isGlobal: rule ? Boolean(rule.isGlobal) : true,
     },
@@ -96,7 +113,7 @@ export function RuleForm({
 
     setTesting(true);
     try {
-      const result = await testCategoryRulePattern(pattern, matchType, testText);
+      const result = await testActivityRulePattern(pattern, matchType, testText);
       setTestResult(result);
     } catch {
       setTestResult(false);
@@ -122,88 +139,99 @@ export function RuleForm({
           )}
         />
 
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control as never}
-            name="pattern"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Pattern</FormLabel>
+        <FormField
+          control={form.control as never}
+          name="matchType"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Match Type</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
-                  <Input placeholder="e.g., walmart" {...field} />
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select match type" />
+                  </SelectTrigger>
                 </FormControl>
-                <FormDescription>Text to match in transaction name</FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+                <SelectContent>
+                  {MATCH_TYPE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-          <FormField
-            control={form.control as never}
-            name="matchType"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Match Type</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select match type" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {MATCH_TYPE_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        <div className="flex flex-col">
-                          <span>{option.label}</span>
-                          <span className="text-muted-foreground text-xs">
-                            {option.description}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+        <FormField
+          control={form.control as never}
+          name="pattern"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Pattern</FormLabel>
+              <FormControl>
+                <Input placeholder="e.g., walmart" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-        {/* Pattern Tester */}
-        <div className="bg-muted/50 rounded-md border p-3">
-          <div className="mb-2 text-sm font-medium">Test Pattern</div>
-          <div className="flex gap-2">
-            <Input
-              placeholder="Enter test text..."
-              value={testText}
-              onChange={(e) => {
-                setTestText(e.target.value);
-                setTestResult(null);
-              }}
-              className="flex-1"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleTest}
-              disabled={testing || !testText || !form.getValues("pattern")}
-            >
-              {testing ? (
-                <Icons.Spinner className="h-4 w-4 animate-spin" />
-              ) : (
-                "Test"
-              )}
-            </Button>
-          </div>
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Test pattern..."
+            value={testText}
+            onChange={(e) => {
+              setTestText(e.target.value);
+              setTestResult(null);
+            }}
+            className="flex-1 text-sm"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleTest}
+            disabled={testing || !testText || !form.getValues("pattern")}
+          >
+            {testing ? (
+              <Icons.Spinner className="h-4 w-4 animate-spin" />
+            ) : (
+              "Test"
+            )}
+          </Button>
           {testResult !== null && (
-            <div className="mt-2">
-              <Badge variant={testResult ? "default" : "destructive"}>
-                {testResult ? "Match" : "No Match"}
-              </Badge>
-            </div>
+            <Badge variant={testResult ? "default" : "destructive"} className="text-xs">
+              {testResult ? "Match" : "No Match"}
+            </Badge>
           )}
         </div>
+
+        <FormField
+          control={form.control as never}
+          name="activityType"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Activity Type</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value || ""}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select activity type" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {RULE_ACTIVITY_TYPE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <div className="grid grid-cols-2 gap-4">
           <FormField
@@ -212,7 +240,7 @@ export function RuleForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Category</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value || ""}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select category" />
@@ -241,7 +269,7 @@ export function RuleForm({
             name="subCategoryId"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Subcategory (Optional)</FormLabel>
+                <FormLabel>Subcategory</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   value={field.value || ""}

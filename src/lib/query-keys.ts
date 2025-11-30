@@ -74,9 +74,12 @@ export const QueryKeys = {
   CATEGORIES: "categories",
   CATEGORIES_HIERARCHICAL: "categories_hierarchical",
 
-  // Category Rules
-  CATEGORY_RULES: "category_rules",
-  CATEGORY_RULES_WITH_NAMES: "category_rules_with_names",
+  // Activity Rules
+  ACTIVITY_RULES: "activity_rules",
+  ACTIVITY_RULES_WITH_NAMES: "activity_rules_with_names",
+  // Legacy aliases
+  CATEGORY_RULES: "activity_rules",
+  CATEGORY_RULES_WITH_NAMES: "activity_rules_with_names",
 
   // Event Types
   EVENT_TYPES: "event_types",

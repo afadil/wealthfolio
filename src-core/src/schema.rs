@@ -96,13 +96,14 @@ diesel::table! {
 }
 
 diesel::table! {
-    category_rules (id) {
+    activity_rules (id) {
         id -> Text,
         name -> Text,
         pattern -> Text,
         match_type -> Text,
-        category_id -> Text,
+        category_id -> Nullable<Text>,
         sub_category_id -> Nullable<Text>,
+        activity_type -> Nullable<Text>,
         priority -> Integer,
         is_global -> Nullable<Integer>,
         account_id -> Nullable<Text>,
@@ -241,8 +242,7 @@ diesel::table! {
 }
 
 diesel::joinable!(accounts -> platforms (platform_id));
-diesel::joinable!(category_rules -> accounts (account_id));
-diesel::joinable!(category_rules -> categories (category_id));
+diesel::joinable!(activity_rules -> accounts (account_id));
 diesel::joinable!(goals_allocation -> accounts (account_id));
 diesel::joinable!(goals_allocation -> goals (goal_id));
 diesel::joinable!(quotes -> assets (symbol));
@@ -251,10 +251,10 @@ diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     activities,
     activity_import_profiles,
+    activity_rules,
     app_settings,
     assets,
     categories,
-    category_rules,
     contribution_limits,
     daily_account_valuation,
     event_types,

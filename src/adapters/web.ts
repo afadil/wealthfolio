@@ -72,15 +72,15 @@ const COMMANDS: CommandMap = {
   create_category: { method: "POST", path: "/categories" },
   update_category: { method: "PUT", path: "/categories" },
   delete_category: { method: "DELETE", path: "/categories" },
-  // Category Rules
-  get_category_rules: { method: "GET", path: "/category-rules" },
-  get_category_rules_with_names: { method: "GET", path: "/category-rules/with-names" },
-  create_category_rule: { method: "POST", path: "/category-rules" },
-  update_category_rule: { method: "PUT", path: "/category-rules" },
-  delete_category_rule: { method: "DELETE", path: "/category-rules" },
-  apply_category_rules: { method: "POST", path: "/category-rules/apply" },
-  bulk_apply_category_rules: { method: "POST", path: "/category-rules/bulk-apply" },
-  test_category_rule_pattern: { method: "POST", path: "/category-rules/test-pattern" },
+  // Activity Rules
+  get_activity_rules: { method: "GET", path: "/activity-rules" },
+  get_activity_rules_with_names: { method: "GET", path: "/activity-rules/with-names" },
+  create_activity_rule: { method: "POST", path: "/activity-rules" },
+  update_activity_rule: { method: "PUT", path: "/activity-rules" },
+  delete_activity_rule: { method: "DELETE", path: "/activity-rules" },
+  apply_activity_rules: { method: "POST", path: "/activity-rules/apply" },
+  bulk_apply_activity_rules: { method: "POST", path: "/activity-rules/bulk-apply" },
+  test_activity_rule_pattern: { method: "POST", path: "/activity-rules/test-pattern" },
   // Event Types
   get_event_types: { method: "GET", path: "/event-types" },
   get_event_type: { method: "GET", path: "/event-types" },
@@ -561,23 +561,23 @@ export const invokeWeb = async <T>(
       url += `/${encodeURIComponent(categoryId)}`;
       break;
     }
-    case "create_category_rule": {
+    case "create_activity_rule": {
       const { rule } = payload as { rule: Record<string, unknown> };
       body = JSON.stringify(rule);
       break;
     }
-    case "update_category_rule": {
+    case "update_activity_rule": {
       const { id, update } = payload as { id: string; update: Record<string, unknown> };
       url += `/${encodeURIComponent(id)}`;
       body = JSON.stringify(update);
       break;
     }
-    case "delete_category_rule": {
+    case "delete_activity_rule": {
       const { ruleId } = payload as { ruleId: string };
       url += `/${encodeURIComponent(ruleId)}`;
       break;
     }
-    case "test_category_rule_pattern": {
+    case "test_activity_rule_pattern": {
       body = JSON.stringify(payload);
       break;
     }
@@ -631,14 +631,14 @@ export const invokeWeb = async <T>(
     }
     case "get_categories":
     case "get_categories_hierarchical":
-    case "get_category_rules":
-    case "get_category_rules_with_names":
+    case "get_activity_rules":
+    case "get_activity_rules_with_names":
       break;
-    case "apply_category_rules": {
+    case "apply_activity_rules": {
       body = JSON.stringify(payload);
       break;
     }
-    case "bulk_apply_category_rules": {
+    case "bulk_apply_activity_rules": {
       body = JSON.stringify(payload);
       break;
     }

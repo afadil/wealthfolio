@@ -3,7 +3,7 @@ pub mod activities;
 pub mod addons;
 pub mod assets;
 pub mod categories;
-pub mod category_rules;
+pub mod activity_rules;
 pub mod constants;
 pub mod db;
 pub mod event_types;

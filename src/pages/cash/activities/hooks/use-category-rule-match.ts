@@ -1,29 +1,32 @@
-import { applyCategoryRules } from "@/commands/category-rule";
-import { CategoryMatch } from "@/lib/types";
+import { applyActivityRules } from "@/commands/activity-rule";
+import { ActivityRuleMatch } from "@/lib/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { debounce } from "lodash";
 
-interface UseCategoryRuleMatchOptions {
+interface UseActivityRuleMatchOptions {
   name: string;
   accountId?: string | null;
   enabled?: boolean;
 }
 
-interface UseCategoryRuleMatchResult {
-  match: CategoryMatch | null;
+interface UseActivityRuleMatchResult {
+  match: ActivityRuleMatch | null;
   isLoading: boolean;
   isAutoCategorized: boolean;
   clearMatch: () => void;
 }
 
+export type UseCategoryRuleMatchOptions = UseActivityRuleMatchOptions;
+export type UseCategoryRuleMatchResult = UseActivityRuleMatchResult;
+
 const DEBOUNCE_MS = 500;
 
-export function useCategoryRuleMatch({
+export function useActivityRuleMatch({
   name,
   accountId,
   enabled = true,
-}: UseCategoryRuleMatchOptions): UseCategoryRuleMatchResult {
-  const [match, setMatch] = useState<CategoryMatch | null>(null);
+}: UseActivityRuleMatchOptions): UseActivityRuleMatchResult {
+  const [match, setMatch] = useState<ActivityRuleMatch | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isAutoCategorized, setIsAutoCategorized] = useState(false);
 
@@ -43,7 +46,7 @@ export function useCategoryRuleMatch({
 
       setIsLoading(true);
       try {
-        const result = await applyCategoryRules(searchName, searchAccountId);
+        const result = await applyActivityRules(searchName, searchAccountId);
 
         // Only update if this is still the latest request
         if (latestRequestRef.current === requestId) {
@@ -109,3 +112,6 @@ export function useCategoryRuleMatch({
     clearMatch,
   };
 }
+
+// Legacy alias for backwards compatibility
+export const useCategoryRuleMatch = useActivityRuleMatch;

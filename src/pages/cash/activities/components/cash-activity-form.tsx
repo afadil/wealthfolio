@@ -36,7 +36,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useForm, type Control, type FieldValues, type Resolver, type SubmitHandler } from "react-hook-form";
 import { z } from "zod";
 import { useCashActivityMutations } from "../hooks/use-cash-activity-mutations";
-import { useCategoryRuleMatch } from "../hooks/use-category-rule-match";
+import { useActivityRuleMatch } from "../hooks/use-category-rule-match";
+import { ActivityTypeNames } from "@/lib/constants";
 import { CategorySelect } from "./category-select";
 import { getEventsWithNames } from "@/commands/event";
 import { useQuery } from "@tanstack/react-query";
@@ -149,18 +150,24 @@ export function CashActivityForm({ accounts, activity, open, onClose }: CashActi
   const watchedAccountId = form.watch("accountId");
   const watchedCategoryId = form.watch("categoryId");
 
-  // Category rule matching hook - only check for matches, don't auto-apply
-  const { match, isLoading: isMatchLoading, clearMatch } = useCategoryRuleMatch({
+  // Activity rule matching hook - only check for matches, don't auto-apply
+  const { match, isLoading: isMatchLoading, clearMatch } = useActivityRuleMatch({
     name: watchedName,
     accountId: watchedAccountId,
     enabled: !activity?.id && !isOverridden, // Only match for new activities when not overridden
   });
 
-  // Handle applying the matched category rule
+  // Handle applying the matched activity rule
   const handleApplyMatch = useCallback(() => {
     if (match) {
-      form.setValue("categoryId", match.categoryId);
-      form.setValue("subCategoryId", match.subCategoryId || null);
+      if (match.categoryId) {
+        form.setValue("categoryId", match.categoryId);
+        form.setValue("subCategoryId", match.subCategoryId || null);
+      }
+      // Apply activity type if the rule specifies one and it's valid for cash activities
+      if (match.activityType && isValidActivityType(match.activityType)) {
+        form.setValue("activityType", match.activityType);
+      }
       setIsOverridden(true); // Mark as manually set so further typing doesn't re-suggest
       clearMatch();
     }
@@ -395,30 +402,41 @@ export function CashActivityForm({ accounts, activity, open, onClose }: CashActi
                   )}
                 />
 
-                {/* Category Rule Match Suggestion */}
+                {/* Activity Rule Match Suggestion */}
                 {match && !watchedCategoryId && (
-                  <div className="flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
-                    <Icons.Sparkles className="h-4 w-4 shrink-0 text-primary" />
-                    <span className="flex-1">
-                      Rule matched: <strong>{match.ruleName}</strong>
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleApplyMatch}
-                    >
-                      Apply
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleDismissMatch}
-                      className="h-8 w-8 p-0"
-                    >
-                      <Icons.Close className="h-4 w-4" />
-                    </Button>
+                  <div className="flex flex-col gap-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Icons.Sparkles className="h-4 w-4 shrink-0 text-primary" />
+                      <span className="flex-1">
+                        Rule matched: <strong>{match.ruleName}</strong>
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleApplyMatch}
+                      >
+                        Apply
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleDismissMatch}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Icons.Close className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {(match.categoryId || match.activityType) && (
+                      <div className="text-muted-foreground text-xs pl-6">
+                        Will apply:{" "}
+                        {[
+                          match.activityType && `Type: ${ActivityTypeNames[match.activityType as keyof typeof ActivityTypeNames] || match.activityType}`,
+                          match.categoryId && "Category",
+                        ].filter(Boolean).join(", ")}
+                      </div>
+                    )}
                   </div>
                 )}
 

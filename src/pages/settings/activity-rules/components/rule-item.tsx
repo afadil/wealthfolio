@@ -16,12 +16,13 @@ import {
   AlertDialogTitle,
 } from "@wealthfolio/ui";
 import { useState } from "react";
-import type { CategoryRuleWithNames } from "@/lib/types";
+import type { ActivityRuleWithNames } from "@/lib/types";
+import { ActivityTypeNames } from "@/lib/constants";
 
 interface RuleItemProps {
-  rule: CategoryRuleWithNames;
-  onEdit: (rule: CategoryRuleWithNames) => void;
-  onDelete: (rule: CategoryRuleWithNames) => void;
+  rule: ActivityRuleWithNames;
+  onEdit: (rule: ActivityRuleWithNames) => void;
+  onDelete: (rule: ActivityRuleWithNames) => void;
 }
 
 const MATCH_TYPE_LABELS: Record<string, string> = {
@@ -38,6 +39,19 @@ export function RuleItem({ rule, onEdit, onDelete }: RuleItemProps) {
     onDelete(rule);
     setShowDeleteDialog(false);
   };
+
+  const appliesTo: string[] = [];
+  if (rule.activityType) {
+    const activityTypeLabel = ActivityTypeNames[rule.activityType as keyof typeof ActivityTypeNames] || rule.activityType;
+    appliesTo.push(activityTypeLabel);
+  }
+  if (rule.categoryName) {
+    appliesTo.push(
+      rule.subCategoryName
+        ? `${rule.categoryName} / ${rule.subCategoryName}`
+        : rule.categoryName
+    );
+  }
 
   return (
     <>
@@ -58,8 +72,7 @@ export function RuleItem({ rule, onEdit, onDelete }: RuleItemProps) {
             <code className="bg-muted rounded px-1.5 py-0.5 text-xs">{rule.pattern}</code>
             <Icons.ArrowRight className="h-3 w-3" />
             <span>
-              {rule.categoryName}
-              {rule.subCategoryName && ` / ${rule.subCategoryName}`}
+              {appliesTo.length > 0 ? appliesTo.join(" • ") : "No assignments"}
             </span>
           </div>
         </div>

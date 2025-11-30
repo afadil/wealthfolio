@@ -692,13 +692,14 @@ export interface UpdateCategory {
   sortOrder?: number;
 }
 
-export interface CategoryRule {
+export interface ActivityRule {
   id: string;
   name: string;
   pattern: string;
   matchType: "contains" | "starts_with" | "exact";
-  categoryId: string;
+  categoryId?: string;
   subCategoryId?: string;
+  activityType?: string;
   priority: number;
   isGlobal?: boolean;
   accountId?: string;
@@ -706,29 +707,31 @@ export interface CategoryRule {
   updatedAt: string;
 }
 
-export interface CategoryRuleWithNames extends CategoryRule {
-  categoryName: string;
+export interface ActivityRuleWithNames extends ActivityRule {
+  categoryName?: string;
   subCategoryName?: string;
   accountName?: string;
 }
 
-export interface NewCategoryRule {
+export interface NewActivityRule {
   name: string;
   pattern: string;
   matchType: "contains" | "starts_with" | "exact";
-  categoryId: string;
+  categoryId?: string;
   subCategoryId?: string;
+  activityType?: string;
   priority?: number;
   isGlobal?: boolean;
   accountId?: string;
 }
 
-export interface UpdateCategoryRule {
+export interface UpdateActivityRule {
   name?: string;
   pattern?: string;
   matchType?: string;
   categoryId?: string;
   subCategoryId?: string;
+  activityType?: string;
   priority?: number;
   isGlobal?: boolean;
   accountId?: string;
@@ -736,12 +739,20 @@ export interface UpdateCategoryRule {
 
 export type MatchType = "contains" | "starts_with" | "exact" | "regex";
 
-export interface CategoryMatch {
-  categoryId: string;
+export interface ActivityRuleMatch {
+  categoryId?: string | null;
   subCategoryId?: string | null;
+  activityType?: string | null;
   ruleName: string;
   ruleId: string;
 }
+
+// Legacy aliases for backwards compatibility during migration
+export type CategoryRule = ActivityRule;
+export type CategoryRuleWithNames = ActivityRuleWithNames;
+export type NewCategoryRule = NewActivityRule;
+export type UpdateCategoryRule = UpdateActivityRule;
+export type CategoryMatch = ActivityRuleMatch;
 
 export interface EventType {
   id: string;

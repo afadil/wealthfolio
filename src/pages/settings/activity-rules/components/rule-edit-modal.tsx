@@ -5,15 +5,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@wealthfolio/ui";
-import type { CategoryRule, CategoryWithChildren, NewCategoryRule, UpdateCategoryRule } from "@/lib/types";
+import type { ActivityRule, CategoryWithChildren, NewActivityRule, UpdateActivityRule } from "@/lib/types";
 import { RuleForm } from "./rule-form";
 
 interface RuleEditModalProps {
   open: boolean;
   onClose: () => void;
-  rule?: CategoryRule;
+  rule?: ActivityRule;
   categories: CategoryWithChildren[];
-  onSave: (data: NewCategoryRule | { id: string; update: UpdateCategoryRule }) => void;
+  onSave: (data: NewActivityRule | { id: string; update: UpdateActivityRule }) => void;
   isLoading?: boolean;
 }
 
@@ -31,8 +31,9 @@ export function RuleEditModal({
     name: string;
     pattern: string;
     matchType: string;
-    categoryId: string;
+    categoryId?: string;
     subCategoryId?: string;
+    activityType?: string;
     priority: number;
     isGlobal: boolean;
   }) => {
@@ -43,8 +44,9 @@ export function RuleEditModal({
           name: values.name,
           pattern: values.pattern,
           matchType: values.matchType as "contains" | "starts_with" | "exact",
-          categoryId: values.categoryId,
+          categoryId: values.categoryId || undefined,
           subCategoryId: values.subCategoryId || undefined,
+          activityType: values.activityType || undefined,
           priority: values.priority,
           isGlobal: values.isGlobal,
         },
@@ -54,8 +56,9 @@ export function RuleEditModal({
         name: values.name,
         pattern: values.pattern,
         matchType: values.matchType as "contains" | "starts_with" | "exact",
-        categoryId: values.categoryId,
+        categoryId: values.categoryId || undefined,
         subCategoryId: values.subCategoryId || undefined,
+        activityType: values.activityType || undefined,
         priority: values.priority,
         isGlobal: values.isGlobal,
       });
@@ -69,8 +72,8 @@ export function RuleEditModal({
           <DialogTitle>{isEditing ? "Edit Rule" : "Add Rule"}</DialogTitle>
           <DialogDescription>
             {isEditing
-              ? "Update the category rule settings below."
-              : "Create a new rule to automatically categorize transactions."}
+              ? "Update the activity rule settings below."
+              : "Create a new rule to automatically assign categories and activity types."}
           </DialogDescription>
         </DialogHeader>
         <RuleForm
