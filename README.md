@@ -42,24 +42,6 @@ Forked from [Wealthfolio](https://github.com/afadil/wealthfolio) by Aziz Fadil.
 - **Cross-Platform** - Available on Windows, macOS, and Linux
 - **VN Market Support** - Built-in support for Vietnamese stock market data
 
-### Addon System
-
-WealthVN features a powerful addon system that allows developers to extend
-functionality:
-
-- **Easy Development** - TypeScript SDK with full type safety and hot reload
-- **Secure** - Comprehensive permission system with user consent
-- **High Performance** - Optimized for speed with minimal overhead
-- **UI Integration** - Add custom pages, navigation items, and components
-- **Real-time Events** - Listen to portfolio updates, market sync, and user
-  actions
-- **Full Data Access** - Access to accounts, holdings, activities, and market
-  data
-- **Secrets Management** - Secure storage for API keys and sensitive data
-
-**Get started building addons:** See the
-[Addon Documentation Hub](docs/addons/index.md)
-
 ## Getting Started
 
 ### Prerequisites
