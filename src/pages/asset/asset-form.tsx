@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import * as z from "zod";
 
+import { useMarketDataProviderSettings } from "@/pages/settings/market-data/use-market-data-settings";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -73,21 +74,46 @@ export function AssetForm({
   onDataSourceChange,
 }: AssetFormProps) {
   const { t } = useTranslation("settings");
+  const { data: providerSettings = [] } = useMarketDataProviderSettings();
 
-  // Generate data source options based on the original source
+  // Generate data source options based on enabled providers and original source
   const dataSourceOptions = useMemo(() => {
     const originalDataSource = (asset.dataSource as DataSource) ?? DataSource.YAHOO;
-    const options: ResponsiveSelectOption[] = [
-      { label: getDataSourceLabel(originalDataSource, t), value: originalDataSource },
-    ];
+    const enabledProviderIds = providerSettings
+      .filter((provider) => provider.enabled)
+      .map((provider) => provider.id);
 
-    // Only add Manual if it's not already the original source
+    const options: ResponsiveSelectOption[] = [];
+
+    // Always include the original data source even if disabled (so user can see current setting)
+    options.push({ label: getDataSourceLabel(originalDataSource, t), value: originalDataSource });
+
+    // Add Manual option if it's not already the original source
     if (originalDataSource !== DataSource.MANUAL) {
       options.push({ label: getDataSourceLabel(DataSource.MANUAL, t), value: DataSource.MANUAL });
     }
 
+    // Add enabled providers that aren't already in the list
+    const allAutoProviders = [
+      DataSource.YAHOO,
+      DataSource.MARKET_DATA_APP,
+      DataSource.ALPHA_VANTAGE,
+      DataSource.METAL_PRICE_API,
+      DataSource.VN_MARKET,
+    ];
+
+    allAutoProviders.forEach((provider) => {
+      if (
+        enabledProviderIds.includes(provider) &&
+        provider !== originalDataSource &&
+        !options.some((opt) => opt.value === provider)
+      ) {
+        options.push({ label: getDataSourceLabel(provider, t), value: provider });
+      }
+    });
+
     return options;
-  }, [asset.dataSource, t]);
+  }, [asset.dataSource, t, providerSettings]);
 
   const defaultValues: AssetFormValues = {
     symbol: asset.id,

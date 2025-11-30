@@ -4,6 +4,7 @@ import { Quote } from "@/lib/types";
 import { useTranslation } from "react-i18next";
 import { DataSource } from "@/lib/constants";
 import { logger } from "@/adapters";
+import { useMarketDataProviderSettings } from "@/pages/settings/market-data/use-market-data-settings";
 
 import {
   Button,
@@ -98,6 +99,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
   ],
 }) => {
   const { t } = useTranslation(["assets"]);
+  const { data: providerSettings = [] } = useMarketDataProviderSettings();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedValues, setEditedValues] = useState<Partial<Quote>>({});
   const [isAddingQuote, setIsAddingQuote] = useState(false);
@@ -107,6 +109,15 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
   const [selectedDataSource, setSelectedDataSource] = useState<DataSource | "">(
     currentDataSource === DataSource.MANUAL ? originalDataSource : currentDataSource,
   );
+
+  // Filter available data sources to only show enabled ones
+  const enabledDataSources = useMemo(() => {
+    const enabledProviders = providerSettings
+      .filter((provider) => provider.enabled)
+      .map((provider) => provider.id);
+
+    return availableDataSources.filter((source) => enabledProviders.includes(source));
+  }, [availableDataSources, providerSettings]);
 
   useEffect(() => {
     if (isAddingQuote) {
@@ -432,7 +443,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
                             />
                           </SelectTrigger>
                           <SelectContent>
-                            {availableDataSources.map((source) => (
+                            {enabledDataSources.map((source) => (
                               <SelectItem key={source} value={source}>
                                 {getDataSourceLabel(source, t)}
                               </SelectItem>
