@@ -1,5 +1,7 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Local, NaiveDate, NaiveDateTime, TimeZone, Utc};
+use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::SqliteConnection;
 use log::{debug, error};
 use rust_decimal::Decimal;
 use std::collections::btree_map::Entry as BTreeEntry;
@@ -7,6 +9,8 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::sync::RwLock;
+
+type DbPool = Pool<ConnectionManager<SqliteConnection>>;
 
 use super::market_data_constants::*;
 use super::market_data_model::{
@@ -33,6 +37,7 @@ pub struct MarketDataService {
     provider_registry: Arc<RwLock<ProviderRegistry>>,
     repository: Arc<dyn MarketDataRepositoryTrait + Send + Sync>,
     asset_repository: Arc<dyn AssetRepositoryTrait + Send + Sync>,
+    pool: Option<Arc<DbPool>>,
 }
 
 #[async_trait]
@@ -488,14 +493,24 @@ impl MarketDataServiceTrait for MarketDataService {
 }
 
 impl MarketDataService {
+    /// Create a new market data service without DB pool (VN gold cache disabled)
     pub async fn new(
         repository: Arc<dyn MarketDataRepositoryTrait + Send + Sync>,
         asset_repository: Arc<dyn AssetRepositoryTrait + Send + Sync>,
     ) -> Result<Self> {
+        Self::with_pool(repository, asset_repository, None).await
+    }
+
+    /// Create a new market data service with optional DB pool for VN gold cache
+    pub async fn with_pool(
+        repository: Arc<dyn MarketDataRepositoryTrait + Send + Sync>,
+        asset_repository: Arc<dyn AssetRepositoryTrait + Send + Sync>,
+        pool: Option<Arc<DbPool>>,
+    ) -> Result<Self> {
         let provider_settings = repository.get_all_providers()?;
         // Be resilient on platforms where certain providers cannot initialize (e.g., mobile TLS differences).
         // Fall back to an empty registry (Manual provider only) instead of aborting app initialization.
-        let registry = match ProviderRegistry::new(provider_settings).await {
+        let registry = match ProviderRegistry::with_pool(provider_settings, pool.clone()).await {
             Ok(reg) => reg,
             Err(e) => {
                 log::warn!(
@@ -512,6 +527,7 @@ impl MarketDataService {
             provider_registry,
             repository,
             asset_repository,
+            pool,
         })
     }
 
@@ -523,7 +539,7 @@ impl MarketDataService {
     async fn refresh_provider_registry(&self) -> Result<()> {
         debug!("Refreshing provider registry with latest settings");
         let provider_settings = self.repository.get_all_providers()?;
-        let new_registry = ProviderRegistry::new(provider_settings).await?;
+        let new_registry = ProviderRegistry::with_pool(provider_settings, self.pool.clone()).await?;
 
         // Replace the registry with the new one
         *self.provider_registry.write().await = new_registry;

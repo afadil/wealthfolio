@@ -83,14 +83,6 @@ pub struct Volume {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct MarketCap {
-    pub raw: Option<f64>,
-    pub fmt: Option<String>,
-    pub long_fmt: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct SummaryProfile {
     pub address1: Option<String>,
     pub city: Option<String>,

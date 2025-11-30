@@ -16,8 +16,12 @@ use crate::market_data::providers::metal_price_api_provider::MetalPriceApiProvid
 use crate::market_data::providers::yahoo_provider::YahooProvider;
 use crate::market_data::providers::vn_market_provider::VnMarketProvider;
 use crate::secrets::SecretManager;
+use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::SqliteConnection;
 use std::sync::Arc;
 use std::time::SystemTime;
+
+type DbPool = Pool<ConnectionManager<SqliteConnection>>;
 
 pub struct ProviderRegistry {
     data_providers: HashMap<String, Arc<dyn MarketDataProvider + Send + Sync>>,
@@ -27,8 +31,17 @@ pub struct ProviderRegistry {
 }
 
 impl ProviderRegistry {
+    /// Create a new provider registry without DB pool (VN gold cache disabled)
     pub async fn new(
         provider_settings: Vec<MarketDataProviderSetting>,
+    ) -> Result<Self, MarketDataError> {
+        Self::with_pool(provider_settings, None).await
+    }
+
+    /// Create a new provider registry with optional DB pool for VN gold cache
+    pub async fn with_pool(
+        provider_settings: Vec<MarketDataProviderSetting>,
+        pool: Option<Arc<DbPool>>,
     ) -> Result<Self, MarketDataError> {
         let mut active_providers_with_priority: Vec<(
             i32,
@@ -123,7 +136,12 @@ impl ProviderRegistry {
                     }
                 }
                 DATA_SOURCE_VN_MARKET => {
-                    let p = Arc::new(VnMarketProvider::new());
+                    // Use pool for VN gold cache if available
+                    let p = if let Some(ref db_pool) = pool {
+                        Arc::new(VnMarketProvider::with_pool((**db_pool).clone()))
+                    } else {
+                        Arc::new(VnMarketProvider::new())
+                    };
                     (
                         Some(p.clone() as Arc<dyn MarketDataProvider + Send + Sync>),
                         Some(p as Arc<dyn AssetProfiler + Send + Sync>),
@@ -382,32 +400,6 @@ impl ProviderRegistry {
             }
         }
         Err(MarketDataError::NotFound(symbol.to_string()))
-    }
-
-    pub async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, MarketDataError> {
-        for (profiler_id, profiler) in self.get_enabled_profilers() {
-            match profiler.search_ticker(query).await {
-                Ok(results) if !results.is_empty() => {
-                    return Ok(results);
-                }
-                Ok(_) => {
-                    info!(
-                        "Profiler '{}' found no results for query '{}'. Trying next.",
-                        profiler_id, query
-                    );
-                }
-                Err(e) => {
-                    debug!(
-                        "Profiler '{}' failed to search for query '{}': {:?}. Trying next.",
-                        profiler_id, query, e
-                    );
-                }
-            }
-        }
-
-        // Return empty array instead of error to allow frontend to show "Add manual asset" option
-        info!("No results found for query '{}' from any provider. Returning empty results.", query);
-        Ok(vec![])
     }
 
     /// Search all providers in parallel and return combined results with provider IDs

@@ -34,20 +34,6 @@ pub struct Asset {
     pub url: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct AssetSummary {
-    pub id: String,
-    pub name: Option<String>,
-    pub asset_type: Option<String>,
-    pub symbol: String,
-    pub asset_class: Option<String>,
-    pub asset_sub_class: Option<String>,
-    pub currency: String,
-    pub countries: Option<Vec<Country>>,
-    pub sectors: Option<Vec<Sector>>,
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Sector {
@@ -279,18 +265,4 @@ impl From<NewAsset> for AssetDB {
             url: domain.url,
         }
     }
-}
-
-/// Domain model representing a quote summary
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct QuoteSummary {
-    pub exchange: String,
-    pub short_name: String,
-    pub quote_type: String,
-    pub symbol: String,
-    pub index: String,
-    pub score: f64,
-    pub type_display: String,
-    pub long_name: String,
 }

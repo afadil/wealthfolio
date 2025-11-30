@@ -15,6 +15,7 @@ pub mod schema;
 pub mod secrets;
 pub mod settings;
 pub mod utils;
+pub mod vn_market;
 pub use assets::*;
 pub use portfolio::*;
 

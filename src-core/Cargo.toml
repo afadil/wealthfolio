@@ -42,12 +42,15 @@ r2d2 = "0.8"
 # Runtime
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync"] }
 
+# In-memory cache with TTL (for VN market quote caching)
+moka = { version = "0.12", features = ["future"] }
+
 # Optional: crypto identity (public-key IDs)
 ed25519-dalek = { version = "2.2", features = ["serde", "rand_core"], optional = true }
 rand_core = { version = "0.6", features = ["getrandom"], optional = true }
 
 # Optional: pro-only sync engine
-wealthfolio_sync = { path = "../../wealthfolio-pro/wealthfolio-sync", package = "wealthfolio-sync", optional = true, default-features = false }
+# wealthfolio_sync = { path = "../../wealthfolio-pro/wealthfolio-sync", package = "wealthfolio-sync", optional = true, default-features = false }
 
 
 [features]
@@ -55,9 +58,9 @@ default = ["p2p", "tls"]          # For Tauri app builds
 p2p = []
 tls = []
 crypto-id = ["ed25519-dalek", "rand_core"]
-wealthfolio-pro-sync = ["wealthfolio_sync/sync"]
-wealthfolio-pro = ["wealthfolio-pro-sync"]
-pro = ["wealthfolio-pro"]
+# wealthfolio-pro-sync = ["wealthfolio_sync/sync"]
+# wealthfolio-pro = ["wealthfolio-pro-sync"]
+# pro = ["wealthfolio-pro"]
 
 
 [dev-dependencies]

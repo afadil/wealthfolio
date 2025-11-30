@@ -182,6 +182,27 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    vn_historical_records (id) {
+        id -> Text,
+        symbol -> Text,
+        asset_type -> Text,
+        date -> Text,
+        open -> Text,
+        high -> Text,
+        low -> Text,
+        close -> Text,
+        adjclose -> Text,
+        volume -> Text,
+        nav -> Nullable<Text>,
+        buy_price -> Nullable<Text>,
+        sell_price -> Nullable<Text>,
+        currency -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
 diesel::joinable!(accounts -> platforms (platform_id));
 diesel::joinable!(goals_allocation -> accounts (account_id));
 diesel::joinable!(goals_allocation -> goals (goal_id));
@@ -201,4 +222,5 @@ diesel::allow_tables_to_appear_in_same_query!(
     market_data_providers,
     platforms,
     quotes,
+    vn_historical_records,
 );
