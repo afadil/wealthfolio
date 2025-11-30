@@ -40,7 +40,6 @@ const ActivityPage = () => {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [showBulkHoldingsForm, setShowBulkHoldingsForm] = useState(false);
 
-  // Filter and search state
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [selectedActivityTypes, setSelectedActivityTypes] = useState<ActivityType[]>([]);
   const [searchInput, setSearchInput] = useState("");
@@ -58,7 +57,6 @@ const ActivityPage = () => {
 
   const isMobileViewport = useIsMobileViewport();
 
-  // Debounced search handler
   const debouncedUpdateSearch = useMemo(
     () =>
       debounce((value: string) => {
@@ -112,7 +110,6 @@ const ActivityPage = () => {
     sorting,
   });
 
-  // Client-side amount filtering
   const filteredData = useMemo(() => {
     const minAmount = amountRange.min ? parseFloat(amountRange.min) : null;
     const maxAmount = amountRange.max ? parseFloat(amountRange.max) : null;
@@ -175,7 +172,7 @@ const ActivityPage = () => {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuItem asChild>
-              <Link to={"/import"} className="flex cursor-pointer items-center py-2.5">
+              <Link to={"/trades/import"} className="flex cursor-pointer items-center py-2.5">
                 <Icons.Import className="mr-2 h-4 w-4" />
                 Import from CSV
               </Link>
@@ -197,7 +194,7 @@ const ActivityPage = () => {
       {/* Mobile add button */}
       <div className="flex items-center gap-2 sm:hidden">
         <Button size="icon" title="Import" variant="outline" asChild>
-          <Link to={"/import"}>
+          <Link to={"/trades/import"}>
             <Icons.Import className="size-4" />
           </Link>
         </Button>
@@ -217,7 +214,6 @@ const ActivityPage = () => {
       />
       <PageContent className="pb-2 md:pb-4 lg:pb-5">
         <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-hidden">
-          {/* Unified Controls */}
           {isMobileViewport ? (
             <ActivityMobileControls
               accounts={accounts}
@@ -249,7 +245,6 @@ const ActivityPage = () => {
             />
           )}
 
-          {/* View-Specific Renderers */}
           {isMobileViewport ? (
             <ActivityTableMobile
               activities={filteredData}

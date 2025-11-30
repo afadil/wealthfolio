@@ -141,10 +141,6 @@ INSERT INTO categories (id, name, parent_id, color, icon, is_income, sort_order,
     ('cat_income_reimbursements', 'Reimbursements', 'cat_income_other', '#1ABC9C', 'Receipt', 1, 3, datetime('now'), datetime('now')),
     ('cat_income_tax_refund', 'Tax Refund', 'cat_income_other', '#1ABC9C', 'FileText', 1, 4, datetime('now'), datetime('now'));
 
--- Create uncategorized category for default
-INSERT INTO categories (id, name, parent_id, color, icon, is_income, sort_order, created_at, updated_at) VALUES
-    ('cat_uncategorized', 'Uncategorized', NULL, '#BDC3C7', 'HelpCircle', 0, 100, datetime('now'), datetime('now'));
-
 -- ============================================================================
 -- PART 2: CATEGORY RULES
 -- ============================================================================
