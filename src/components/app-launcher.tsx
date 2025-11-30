@@ -5,12 +5,16 @@ import {
   useUpdatePortfolioMutation,
 } from "@/hooks/use-calculate-portfolio";
 import { useHoldings } from "@/hooks/use-holdings";
+import { usePersistentState } from "@/hooks/use-persistent-state";
+import { useIsMobileViewport } from "@/hooks/use-platform";
 import { AccountType, HoldingType, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { Account } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { useNavigation } from "@/pages/layouts/navigation/app-navigation";
 import { useNavigationMode } from "@/pages/layouts/navigation/navigation-mode-context";
 import {
+  Command,
   CommandDialog,
   CommandEmpty,
   CommandGroup,
@@ -20,10 +24,25 @@ import {
   DialogDescription,
   DialogTitle,
   Icons,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
   type Icon,
 } from "@wealthfolio/ui";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+
+interface RecentItem {
+  type: "action" | "holding" | "account";
+  id: string; // For actions: href, for holdings: symbol, for accounts: accountId
+  label: string;
+  timestamp: number;
+}
+
+const MAX_RECENT_ITEMS = 5;
+const RECENT_ITEMS_KEY = "app-launcher-recent-items";
+
 interface LauncherHoldingItem {
   id: string;
   symbol: string;
@@ -69,6 +88,27 @@ export function AppLauncher() {
     isFocusMode,
     toggleFocusMode,
   } = useNavigationMode();
+  const isMobileViewport = useIsMobileViewport();
+  const iconClassName = isMobileViewport
+    ? "text-muted-foreground mr-3 h-5 w-5"
+    : "text-muted-foreground mr-2 h-4 w-4";
+
+  // Recent items state
+  const [recentItems, setRecentItems] = usePersistentState<RecentItem[]>(RECENT_ITEMS_KEY, []);
+
+  const addRecentItem = useCallback(
+    (item: Omit<RecentItem, "timestamp">) => {
+      setRecentItems((prev) => {
+        // Remove existing item with same id and type
+        const filtered = prev.filter((i) => !(i.id === item.id && i.type === item.type));
+        // Add new item at the beginning with timestamp
+        const newItem: RecentItem = { ...item, timestamp: Date.now() };
+        const updated = [newItem, ...filtered].slice(0, MAX_RECENT_ITEMS);
+        return updated;
+      });
+    },
+    [setRecentItems],
+  );
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -115,14 +155,6 @@ export function AppLauncher() {
     setSearch("");
   }, [location.pathname]);
 
-  useEffect(() => {
-    const handleOpenLauncher = () => setOpen(true);
-    window.addEventListener("open-app-launcher", handleOpenLauncher);
-    return () => {
-      window.removeEventListener("open-app-launcher", handleOpenLauncher);
-    };
-  }, []);
-
   // Combine navigation items with additional quick actions
   const actionItems = useMemo<LauncherActionItem[]>(() => {
     // Build smart URL with context awareness and optional activity type
@@ -162,24 +194,29 @@ export function AppLauncher() {
 
     // Additional quick actions not in main navigation
     const quickActions: LauncherActionItem[] = [
-      {
-        title: isLaunchBar ? "Switch to Sidebar Navigation" : "Switch to Floating Navigation",
-        href: isLaunchBar ? "#use-sidebar-navigation" : "#use-launchbar-navigation",
-        icon: isLaunchBar ? (
-          <Icons.PanelLeft className="size-6" />
-        ) : (
-          <Icons.RectangleEllipsis className="size-6" />
-        ),
-        keywords: ["navigation", "sidebar", "floating", "bottom", "switch", "layout"],
-        label: isLaunchBar ? "Switch to Sidebar Navigation" : "Switch to Floating Navigation",
-      },
-      {
-        title: isFocusMode ? "Exit Focus Mode" : "Enter Focus Mode",
-        href: "#toggle-focus-mode",
-        icon: <Icons.Fullscreen className="size-6" />,
-        keywords: ["focus", "hide navigation", "minimal", "distraction-free", "layout"],
-        label: "Toggle Focus Mode",
-      },
+      // Navigation mode switch and focus mode are desktop-only
+      ...(isMobileViewport
+        ? []
+        : [
+            {
+              title: isLaunchBar ? "Switch to Sidebar Navigation" : "Switch to Floating Navigation",
+              href: isLaunchBar ? "#use-sidebar-navigation" : "#use-launchbar-navigation",
+              icon: isLaunchBar ? (
+                <Icons.PanelLeft className="size-6" />
+              ) : (
+                <Icons.RectangleEllipsis className="size-6" />
+              ),
+              keywords: ["navigation", "sidebar", "floating", "bottom", "switch", "layout"],
+              label: isLaunchBar ? "Switch to Sidebar Navigation" : "Switch to Floating Navigation",
+            },
+            {
+              title: isFocusMode ? "Exit Focus Mode" : "Enter Focus Mode",
+              href: "#toggle-focus-mode",
+              icon: <Icons.Fullscreen className="size-6" />,
+              keywords: ["focus", "hide navigation", "minimal", "distraction-free", "layout"],
+              label: "Toggle Focus Mode",
+            },
+          ]),
       {
         title: isBalanceHidden ? "Show Balance" : "Hide Balance",
         href: "#toggle-privacy",
@@ -318,6 +355,7 @@ export function AppLauncher() {
   }, [
     isBalanceHidden,
     isLaunchBar,
+    isMobileViewport,
     isRecalculatingPortfolio,
     isUpdatingPortfolio,
     location.pathname,
@@ -359,29 +397,39 @@ export function AppLauncher() {
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [accounts]);
-  const handleSelectHolding = (symbol: string) => {
+  const handleSelectHolding = (symbol: string, name?: string | null) => {
     if (!symbol) {
       return;
     }
+    addRecentItem({
+      type: "holding",
+      id: symbol,
+      label: name ? `${symbol} - ${name}` : symbol,
+    });
     setSearch("");
     setOpen(false);
     navigate(`/holdings/${encodeURIComponent(symbol)}`);
   };
-  const handleSelectAccount = (accountId: string) => {
+  const handleSelectAccount = (accountId: string, accountName: string) => {
     if (!accountId) {
       return;
     }
+    addRecentItem({
+      type: "account",
+      id: accountId,
+      label: accountName,
+    });
     setSearch("");
     setOpen(false);
     navigate(`/accounts/${accountId}`);
   };
 
-  const handleSelectAction = (path: string) => {
+  const handleSelectAction = (path: string, label?: string) => {
     if (!path) {
       return;
     }
 
-    // Handle special toggle actions
+    // Handle special toggle actions (don't track these as recent)
     if (path === "#toggle-privacy") {
       toggleBalanceVisibility();
       setSearch("");
@@ -451,9 +499,42 @@ export function AppLauncher() {
       return;
     }
 
+    // Track navigable actions as recent
+    if (label) {
+      addRecentItem({
+        type: "action",
+        id: path,
+        label,
+      });
+    }
+
     setSearch("");
     setOpen(false);
     navigate(path);
+  };
+
+  const handleSelectRecent = (item: RecentItem) => {
+    // Update the timestamp for this item (move to front)
+    addRecentItem({
+      type: item.type,
+      id: item.id,
+      label: item.label,
+    });
+
+    setSearch("");
+    setOpen(false);
+
+    switch (item.type) {
+      case "holding":
+        navigate(`/holdings/${encodeURIComponent(item.id)}`);
+        break;
+      case "account":
+        navigate(`/accounts/${item.id}`);
+        break;
+      case "action":
+        navigate(item.id);
+        break;
+    }
   };
 
   // Filter items based on search
@@ -475,8 +556,20 @@ export function AppLauncher() {
     return account.name.toLowerCase().includes(searchLower);
   });
 
+  // Filter recent items based on search (only show when searching or when no search)
+  const filteredRecent = recentItems.filter((item) => {
+    if (!searchLower) return true;
+    return item.label.toLowerCase().includes(searchLower);
+  });
+
+  // Show recent items only when there's no search, or when searching and they match
+  const showRecent = !searchLower ? recentItems.length > 0 : filteredRecent.length > 0;
+
   const hasResults =
-    filteredActions.length > 0 || filteredHoldings.length > 0 || filteredAccounts.length > 0;
+    filteredActions.length > 0 ||
+    filteredHoldings.length > 0 ||
+    filteredAccounts.length > 0 ||
+    showRecent;
 
   const renderIcon = (icon?: React.ReactNode) => {
     if (!icon) {
@@ -485,41 +578,71 @@ export function AppLauncher() {
 
     if (React.isValidElement<{ className?: string }>(icon)) {
       return React.cloneElement(icon, {
-        className: ["text-muted-foreground mr-2 h-4 w-4", icon.props.className]
-          .filter(Boolean)
-          .join(" "),
+        className: [iconClassName, icon.props.className].filter(Boolean).join(" "),
       });
     }
 
     if (typeof icon === "function") {
       const IconComponent = icon as React.ComponentType<{ className?: string }>;
-      return <IconComponent className="text-muted-foreground mr-2 h-4 w-4" />;
+      return <IconComponent className={iconClassName} />;
     }
 
-    return <span className="text-muted-foreground mr-2 h-4 w-4">{icon}</span>;
+    return <span className={iconClassName}>{icon}</span>;
   };
 
-  return (
-    <CommandDialog open={open} onOpenChange={setOpen}>
-      <DialogTitle className="sr-only">Command palette</DialogTitle>
-      <DialogDescription className="sr-only">
-        Search for actions, holdings, accounts, or navigation destinations.
-      </DialogDescription>
+  const commandContent = (
+    <>
       <CommandInput
         placeholder="Search actions, holdings, or accounts..."
-        autoFocus={open}
+        autoFocus={!isMobileViewport && open}
         value={search}
         onValueChange={setSearch}
-        className="py-8"
+        className={cn(isMobileViewport ? "text-base" : "py-8")}
       />
-      <CommandList>
+      <CommandList
+        className={cn(
+          "flex-1",
+          isMobileViewport ? "max-h-[calc(80vh-160px)] px-2 pb-8" : "max-h-[420px]",
+        )}
+      >
         {!hasResults && <CommandEmpty>No matches found.</CommandEmpty>}
+        {showRecent && (
+          <CommandGroup heading="Recent">
+            {(searchLower ? filteredRecent : recentItems).map((item) => {
+              const getRecentIcon = () => {
+                switch (item.type) {
+                  case "holding":
+                    return <Icons.TrendingUp className={iconClassName} />;
+                  case "account":
+                    return <Icons.Wallet className={iconClassName} />;
+                  case "action":
+                    return <Icons.Clock className={iconClassName} />;
+                  default:
+                    return <Icons.Clock className={iconClassName} />;
+                }
+              };
+
+              return (
+                <CommandItem
+                  key={`${item.type}-${item.id}`}
+                  value={`recent-${item.label}`}
+                  onSelect={() => handleSelectRecent(item)}
+                  className={cn(isMobileViewport ? "gap-3 py-4 text-base" : undefined)}
+                >
+                  {getRecentIcon()}
+                  <span className="font-medium">{item.label}</span>
+                  <span className="text-muted-foreground ml-auto text-xs capitalize">
+                    {item.type}
+                  </span>
+                </CommandItem>
+              );
+            })}
+          </CommandGroup>
+        )}
         {filteredActions.length > 0 && (
           <CommandGroup heading="Actions">
             {filteredActions.map((action, index) => {
               const resizedIcon = renderIcon(action.icon);
-
-              // Use label if available, otherwise fall back to title
               const displayText = action.label ?? action.title;
 
               return (
@@ -528,7 +651,8 @@ export function AppLauncher() {
                   value={displayText}
                   keywords={action.keywords ?? []}
                   disabled={action.disabled}
-                  onSelect={() => handleSelectAction(action.href)}
+                  onSelect={() => handleSelectAction(action.href, displayText)}
+                  className={cn(isMobileViewport ? "gap-3 py-4 text-base" : undefined)}
                 >
                   {resizedIcon}
                   <span className="font-medium">{displayText}</span>
@@ -540,7 +664,9 @@ export function AppLauncher() {
         {(isHoldingsLoading || filteredHoldings.length > 0) && (
           <CommandGroup heading="Holdings">
             {isHoldingsLoading ? (
-              <CommandItem disabled>Loading holdings...</CommandItem>
+              <CommandItem disabled className={cn(isMobileViewport ? "py-4 text-base" : undefined)}>
+                Loading holdings...
+              </CommandItem>
             ) : (
               filteredHoldings.map((holding) => (
                 <CommandItem
@@ -553,9 +679,10 @@ export function AppLauncher() {
                     "asset",
                     "stock",
                   ].filter((keyword): keyword is string => Boolean(keyword))}
-                  onSelect={() => handleSelectHolding(holding.symbol)}
+                  onSelect={() => handleSelectHolding(holding.symbol, holding.name)}
+                  className={cn(isMobileViewport ? "gap-3 py-4 text-base" : undefined)}
                 >
-                  <Icons.TrendingUp className="text-muted-foreground mr-2 h-4 w-4" />
+                  <Icons.TrendingUp className={iconClassName} />
                   <span className="font-medium">{holding.symbol}</span>
                   {holding.name ? (
                     <span className="text-muted-foreground ml-2 truncate">{holding.name}</span>
@@ -568,7 +695,9 @@ export function AppLauncher() {
         {(isAccountsLoading || filteredAccounts.length > 0) && (
           <CommandGroup heading="Accounts">
             {isAccountsLoading ? (
-              <CommandItem disabled>Loading accounts...</CommandItem>
+              <CommandItem disabled className={cn(isMobileViewport ? "py-4 text-base" : undefined)}>
+                Loading accounts...
+              </CommandItem>
             ) : (
               filteredAccounts.map((account) => {
                 const IconComponent = accountTypeIcons[account.accountType] ?? Icons.Wallet;
@@ -579,9 +708,10 @@ export function AppLauncher() {
                     keywords={[account.name, account.accountType, "account"].filter(
                       (keyword): keyword is string => Boolean(keyword),
                     )}
-                    onSelect={() => handleSelectAccount(account.id)}
+                    onSelect={() => handleSelectAccount(account.id, account.name)}
+                    className={cn(isMobileViewport ? "gap-3 py-4 text-base" : undefined)}
                   >
-                    <IconComponent className="text-muted-foreground mr-2 h-4 w-4" />
+                    <IconComponent className={iconClassName} />
                     <span className="font-medium">{account.name}</span>
                   </CommandItem>
                 );
@@ -590,6 +720,43 @@ export function AppLauncher() {
           </CommandGroup>
         )}
       </CommandList>
+    </>
+  );
+
+  if (isMobileViewport) {
+    return (
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent
+          side="bottom"
+          className="mx-auto flex h-[85vh] w-full max-w-screen-sm flex-col overflow-hidden rounded-t-3xl border-none px-0 pt-4 pb-6"
+        >
+          <SheetHeader className="px-6">
+            <SheetTitle>Quick launch</SheetTitle>
+          </SheetHeader>
+          <Command
+            className={cn(
+              "flex flex-1 flex-col bg-transparent",
+              "[&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:px-4 [&_[cmdk-group-heading]]:font-medium",
+              "[&_[cmdk-group]]:px-2 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0",
+              "[&_[cmdk-input-wrapper]]:px-5 [&_[cmdk-input]]:h-14 [&_[cmdk-input]]:text-base",
+              "[&_[cmdk-item]]:px-4 [&_[cmdk-item]]:py-4 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5",
+              "[&_[data-cmdk-input-wrapper]_svg]:h-5 [&_[data-cmdk-input-wrapper]_svg]:w-5",
+            )}
+          >
+            {commandContent}
+          </Command>
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  return (
+    <CommandDialog open={open} onOpenChange={setOpen}>
+      <DialogTitle className="sr-only">Command palette</DialogTitle>
+      <DialogDescription className="sr-only">
+        Search for actions, holdings, accounts, or navigation destinations.
+      </DialogDescription>
+      {commandContent}
     </CommandDialog>
   );
 }

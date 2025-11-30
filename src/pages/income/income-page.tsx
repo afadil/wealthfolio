@@ -9,15 +9,7 @@ import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { QueryKeys } from "@/lib/query-keys";
 import type { IncomeSummary } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
-import {
-  AmountDisplay,
-  AnimatedToggleGroup,
-  GainPercent,
-  Page,
-  PageContent,
-  PageHeader,
-  PrivacyAmount,
-} from "@wealthfolio/ui";
+import { AmountDisplay, AnimatedToggleGroup, GainPercent, PrivacyAmount } from "@wealthfolio/ui";
 import React, { useState } from "react";
 import { Cell, Pie, PieChart } from "recharts";
 import { IncomeHistoryChart } from "./income-history-chart";
@@ -86,25 +78,20 @@ export default function IncomePage() {
 
   if (!periodSummary || !totalSummary) {
     return (
-      <Page>
-        <PageHeader
-          heading="Income"
-          actions={
-            <IncomePeriodSelector
-              selectedPeriod={selectedPeriod}
-              onPeriodSelect={setSelectedPeriod}
-            />
-          }
-        />
-        <PageContent>
-          <EmptyPlaceholder
-            className="mx-auto flex max-w-[420px] items-center justify-center"
-            icon={<Icons.DollarSign className="h-10 w-10" />}
-            title="No income data available"
-            description="There is no income data for the selected period. Try selecting a different time range or check back later."
+      <>
+        <div className="pointer-events-auto fixed top-4 right-2 z-20 lg:right-4">
+          <IncomePeriodSelector
+            selectedPeriod={selectedPeriod}
+            onPeriodSelect={setSelectedPeriod}
           />
-        </PageContent>
-      </Page>
+        </div>
+        <EmptyPlaceholder
+          className="mx-auto flex max-w-[420px] items-center justify-center pt-12"
+          icon={<Icons.DollarSign className="h-10 w-10" />}
+          title="No income data available"
+          description="There is no income data for the selected period. Try selecting a different time range or check back later."
+        />
+      </>
     );
   }
 
@@ -170,17 +157,19 @@ export default function IncomePage() {
   }));
 
   return (
-    <Page>
-      <PageHeader
-        heading="Income"
-        actions={
+    <>
+      {/* Period selector - fixed position in header area */}
+      <div className="pointer-events-auto fixed top-4 right-2 z-20 hidden md:block lg:right-4">
+        <IncomePeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
+      </div>
+
+      <div className="space-y-6">
+        <div className="flex justify-end md:hidden">
           <IncomePeriodSelector
             selectedPeriod={selectedPeriod}
             onPeriodSelect={setSelectedPeriod}
           />
-        }
-      />
-      <PageContent>
+        </div>
         <div className="grid gap-6 md:grid-cols-3">
           <Card className="border-yellow-500/10 bg-yellow-500/10">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -444,8 +433,8 @@ export default function IncomePage() {
             </CardContent>
           </Card>
         </div>
-      </PageContent>
-    </Page>
+      </div>
+    </>
   );
 }
 

@@ -114,13 +114,26 @@ export function FloatingNavigationBar({ navigation }: FloatingNavigationBarProps
               type="button"
               aria-label="Open launcher"
               className={baseButtonClass}
-              onClick={() => window.dispatchEvent(new Event("open-app-launcher"))}
+              onClick={() => {
+                // Trigger the launcher by dispatching Cmd/Ctrl+K
+                const event = new KeyboardEvent("keydown", {
+                  key: "k",
+                  code: "KeyK",
+                  keyCode: 75,
+                  which: 75,
+                  metaKey: true,
+                  ctrlKey: true,
+                  bubbles: true,
+                  cancelable: true,
+                });
+                document.dispatchEvent(event);
+              }}
             >
               <span
                 className="relative flex size-7 shrink-0 items-center justify-center outline-none"
                 aria-hidden="true"
               >
-                <Icons.Search className="size-6" />
+                <Icons.Search2 className="size-6" />
               </span>
             </button>
             {hasOverflow && (

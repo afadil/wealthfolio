@@ -60,11 +60,17 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
   const primaryItems = navigation?.primary ?? [];
   const secondaryItems = navigation?.secondary ?? [];
   const addonItems = navigation?.addons ?? [];
-  const allItems = [...primaryItems, ...secondaryItems];
 
-  const visibleCount = 3;
-  const visibleItems = allItems.slice(0, visibleCount);
-  const menuItems = allItems.slice(visibleCount);
+  const searchItem = {
+    title: "Search",
+    href: "#search",
+    icon: <Icons.Search2 className="size-6" />,
+  };
+
+  const visibleItems = [primaryItems[0], primaryItems[1], searchItem].filter(Boolean);
+
+  const menuItems = [...primaryItems.slice(2), ...secondaryItems];
+
   const hasMenu = menuItems.length > 0 || addonItems.length > 0;
   const hasAddons = addonItems.length > 0;
   const columnCount = visibleItems.length + (hasMenu ? 1 : 0);
@@ -85,10 +91,30 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
           >
             {visibleItems.map((item) => {
               const isActive = isPathActive(location.pathname, item.href);
+              const isSearch = item.href === "#search";
+
               return (
                 <Link
                   to={item.href}
-                  onClick={() => handleNavigation(item.href, isActive)}
+                  onClick={(e) => {
+                    if (isSearch) {
+                      e.preventDefault();
+                      triggerHaptic();
+                      const event = new KeyboardEvent("keydown", {
+                        key: "k",
+                        code: "KeyK",
+                        keyCode: 75,
+                        which: 75,
+                        metaKey: true,
+                        ctrlKey: true,
+                        bubbles: true,
+                        cancelable: true,
+                      });
+                      document.dispatchEvent(event);
+                    } else {
+                      handleNavigation(item.href, isActive);
+                    }
+                  }}
                   aria-label={item.title}
                   className="text-foreground relative z-10 flex h-14 w-full items-center justify-center rounded-full transition-colors"
                   key={item.href}
