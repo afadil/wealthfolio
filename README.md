@@ -78,7 +78,8 @@ functionality:
   data
 - **🔐 Secrets Management** - Secure storage for API keys and sensitive data
 
-**Get started building addons:** See the [Addon Documentation Hub](docs/addons/index.md)
+**Get started building addons:** See the
+[Addon Documentation Hub](docs/addons/index.md)
 
 Documentation for all Activity types, including the required form fields, is
 available in
@@ -165,15 +166,22 @@ pnpm tauri dev
 
 #### Addon Development Mode
 
-Addon hot reload servers now start only when you explicitly opt in. Use the
-dedicated Vite mode:
+Addon hot reload servers now start only when you explicitly opt in.
+
+**For desktop development with Tauri:**
+
+```bash
+VITE_ENABLE_ADDON_DEV_MODE=true pnpm tauri dev
+```
+
+**For browser-only development (Vite only, no Tauri):**
 
 ```bash
 pnpm dev:addons
 ```
 
-Alternatively, set `VITE_ENABLE_ADDON_DEV_MODE=true` in your environment before
-running any dev script.
+You can also set `VITE_ENABLE_ADDON_DEV_MODE=true` in your `.env` file to
+persist the setting.
 
 5. **Build for Production**:
 
@@ -500,9 +508,9 @@ functionality with custom features.
    npm run dev:server
    ```
 
-3. **Start Wealthfolio in development mode** (in another terminal):
+3. **Start Wealthfolio in addon development mode** (in another terminal):
    ```bash
-   pnpm tauri dev
+   VITE_ENABLE_ADDON_DEV_MODE=true pnpm tauri dev
    ```
 
 Your addon will be automatically discovered and loaded with hot reload support!
@@ -525,8 +533,8 @@ Check out the [addons/](addons/) directory for sample addons including:
 
 ### Resources
 
-- **[Getting Started Guide](docs/addons/addon-getting-started.md)** -
-  Everything you need to know to start building addons
+- **[Getting Started Guide](docs/addons/addon-getting-started.md)** - Everything
+  you need to know to start building addons
 - **[API Reference](docs/addons/addon-api-reference.md)** - Full API
   documentation
 - **[Architecture Guide](docs/addons/addon-architecture.md)** - Design patterns
