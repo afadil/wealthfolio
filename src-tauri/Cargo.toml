@@ -2,7 +2,7 @@
 name = "wealthvn"
 version = "2.0.1"
 description = "A Portfolio Tracker for Vietnamese Market"
-authors = ["Chipheo00 - CFPM Inc. WealthVN Team"]
+authors = ["chipheo00"]
 license = "AGPL-3.0"
 repository = "https://github.com/chipheo00/vn-wealthfolio"
 edition = "2021"
