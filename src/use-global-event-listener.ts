@@ -11,7 +11,7 @@ import {
   listenPortfolioUpdateError,
   listenPortfolioUpdateStart,
 } from "@/commands/portfolio-listener";
-import { logger } from "./adapters";
+import { getRunEnv, listenDatabaseRestoredTauri, logger, RUN_ENV } from "./adapters";
 
 const TOAST_IDS = {
   marketSyncStart: "market-sync-start",
@@ -62,16 +62,23 @@ const handlePortfolioUpdateError = (error: string) => {
 const useGlobalEventListener = () => {
   const queryClient = useQueryClient();
   const hasTriggeredInitialUpdate = useRef(false);
+  const isDesktop = getRunEnv() === RUN_ENV.DESKTOP;
 
   const handlePortfolioUpdateComplete = useCallback(() => {
     toast.dismiss(TOAST_IDS.portfolioUpdateStart);
     queryClient.invalidateQueries();
   }, [queryClient]);
 
+  const handleDatabaseRestored = useCallback(() => {
+    queryClient.invalidateQueries();
+    toast.success("Database restored successfully", {
+      description: "Please restart the application to ensure all data is properly refreshed.",
+    });
+  }, [queryClient]);
+
   useEffect(() => {
-    let actualCleanup = () => {
-      return;
-    };
+    let isMounted = true;
+    let cleanupFn: (() => void) | undefined;
 
     const setupListeners = async () => {
       const unlistenPortfolioSyncStart = await listenPortfolioUpdateStart(
@@ -85,6 +92,26 @@ const useGlobalEventListener = () => {
       });
       const unlistenMarketStart = await listenMarketSyncStart(handleMarketSyncStart);
       const unlistenMarketComplete = await listenMarketSyncComplete(handleMarketSyncComplete);
+      const unlistenDatabaseRestored = isDesktop
+        ? await listenDatabaseRestoredTauri(handleDatabaseRestored)
+        : undefined;
+
+      const cleanup = () => {
+        unlistenPortfolioSyncStart();
+        unlistenPortfolioSyncComplete();
+        unlistenPortfolioSyncError();
+        unlistenMarketStart();
+        unlistenMarketComplete();
+        unlistenDatabaseRestored?.();
+      };
+
+      // If unmounted while setting up, clean up immediately
+      if (!isMounted) {
+        cleanup();
+        return;
+      }
+
+      cleanupFn = cleanup;
 
       // Trigger initial portfolio update after listeners are set up
       if (!hasTriggeredInitialUpdate.current) {
@@ -97,28 +124,17 @@ const useGlobalEventListener = () => {
         });
         // Note: Update check is now handled by useCheckUpdateOnStartup query in UpdateDialog
       }
-
-      return () => {
-        unlistenPortfolioSyncStart();
-        unlistenPortfolioSyncComplete();
-        unlistenPortfolioSyncError();
-        unlistenMarketStart();
-        unlistenMarketComplete();
-      };
     };
 
-    setupListeners()
-      .then((cleanupFromAsync) => {
-        actualCleanup = cleanupFromAsync;
-      })
-      .catch((error) => {
-        console.error("Failed to setup global event listeners:", error);
-      });
+    setupListeners().catch((error) => {
+      console.error("Failed to setup global event listeners:", error);
+    });
 
     return () => {
-      actualCleanup();
+      isMounted = false;
+      cleanupFn?.();
     };
-  }, [handlePortfolioUpdateComplete]);
+  }, [handlePortfolioUpdateComplete, handleDatabaseRestored, isDesktop]);
 
   return null;
 };

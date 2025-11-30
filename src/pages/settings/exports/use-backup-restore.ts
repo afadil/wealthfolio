@@ -1,43 +1,12 @@
-import { getRunEnv, listenDatabaseRestoredTauri, logger, RUN_ENV } from "@/adapters";
+import { getRunEnv, logger, RUN_ENV } from "@/adapters";
 import { openDatabaseFileDialog, openFolderDialog } from "@/commands/file";
 import { backupDatabase, backupDatabaseToPath, restoreDatabase } from "@/commands/settings";
 import { toast } from "@/components/ui/use-toast";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useMutation } from "@tanstack/react-query";
 
 export function useBackupRestore() {
-  const queryClient = useQueryClient();
   const runEnv = getRunEnv();
   const isDesktop = runEnv === RUN_ENV.DESKTOP;
-
-  // Listen for database restore completion
-  useEffect(() => {
-    if (!isDesktop) {
-      return;
-    }
-
-    let unlistenFn: (() => void) | undefined;
-
-    const setupListener = async () => {
-      unlistenFn = await listenDatabaseRestoredTauri(() => {
-        // Invalidate all queries to force a complete refresh
-        queryClient.invalidateQueries();
-        toast({
-          title: "Database restored successfully",
-          description: "Please restart the application to ensure all data is properly refreshed.",
-          variant: "success",
-        });
-      });
-    };
-
-    void setupListener();
-
-    return () => {
-      if (unlistenFn) {
-        unlistenFn();
-      }
-    };
-  }, [isDesktop, queryClient]);
 
   const { mutateAsync: backupWithDirectorySelection, isPending: isBackingUp } = useMutation<{
     location: "local" | "server";
