@@ -182,6 +182,7 @@ export function CashImportEditStep({
     amountMax: "",
   });
 
+  const [bulkActivityTypeModalOpen, setBulkActivityTypeModalOpen] = useState(false);
   const [bulkCategoryModalOpen, setBulkCategoryModalOpen] = useState(false);
   const [bulkEventModalOpen, setBulkEventModalOpen] = useState(false);
   const [createCategoryOpen, setCreateCategoryOpen] = useState(false);
@@ -380,7 +381,6 @@ export function CashImportEditStep({
     setAmountRange({ min: "", max: "" });
   }, []);
 
-  // Helper function to compute filtered transactions based on filter settings
   const computeFilteredTransactions = useCallback(
     (
       transactions: CashImportRow[],
@@ -463,7 +463,6 @@ export function CashImportEditStep({
     [accountId],
   );
 
-  // Apply filter refresh - called on initial load and when user clicks refresh
   const applyFilterRefresh = useCallback(() => {
     const currentFilters = {
       searchQuery,
@@ -556,7 +555,6 @@ export function CashImportEditStep({
     setPendingFilterChanges(wouldBeFilteredOut);
   }, [localTransactions, displayedTransactions, lastAppliedFilter.categorizationStatuses]);
 
-  // Update displayed transactions in place when underlying data changes (preserving visibility)
   useEffect(() => {
     setDisplayedTransactions((prev) =>
       prev
@@ -791,6 +789,20 @@ export function CashImportEditStep({
     [selectedIds],
   );
 
+  const bulkAssignActivityType = useCallback(
+    (activityType: ActivityType) => {
+      setLocalTransactions((prev) =>
+        prev.map((t) =>
+          selectedIds.has(t.lineNumber) ? { ...t, activityType } : t,
+        ),
+      );
+      setSelectedIds(new Set());
+      setBulkActivityTypeModalOpen(false);
+      toast.success(`Activity type assigned to ${selectedIds.size} transaction(s)`);
+    },
+    [selectedIds],
+  );
+
   const clearAllCategories = useCallback(() => {
     setLocalTransactions((prev) =>
       prev.map((t) =>
@@ -871,7 +883,6 @@ export function CashImportEditStep({
 
   return (
     <div className="flex h-full flex-col">
-      {/* Stats Bar */}
       <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <div className="bg-muted/30 flex items-center justify-between rounded-md border px-3 py-2">
           <span className="text-muted-foreground text-xs">Categorized</span>
@@ -1008,11 +1019,9 @@ export function CashImportEditStep({
           selectedValues={selectedCategoryIds}
           onFilterChange={(values) => {
             setSelectedCategoryIds(values);
-            // Clear subcategory selection if parent category is deselected
             if (values.size === 0) {
               setSelectedSubCategoryIds(new Set());
             } else {
-              // Remove subcategories that no longer belong to selected parents
               const validSubCategories = new Set<string>();
               selectedSubCategoryIds.forEach((subId) => {
                 categories.some((cat) => {
@@ -1052,7 +1061,6 @@ export function CashImportEditStep({
           onFilterChange={(values) => setSelectedCategorizationStatuses(values as Set<CategorizationStatus>)}
         />
 
-        {/* Amount Filter */}
         <Popover>
           <PopoverTrigger asChild>
             <Button
@@ -1115,36 +1123,48 @@ export function CashImportEditStep({
         )}
       </div>
 
-      {/* Selection Actions */}
       {selectedCount > 0 && (
-        <div className="bg-primary/5 mb-3 flex flex-wrap items-center gap-2 rounded-md border px-2.5 py-1.5">
+        <div className="bg-primary/5 mb-3 flex items-center gap-2 rounded-md border px-2.5 py-1.5">
           <Badge variant="secondary" className="text-xs">
             {selectedCount} selected
           </Badge>
 
           <div className="bg-border mx-1 h-4 w-px" />
 
+          <Button onClick={() => setBulkActivityTypeModalOpen(true)} variant="outline" size="xs">
+            <Icons.ArrowRightLeft className="mr-1 h-3.5 w-3.5" />
+            Type
+          </Button>
           <Button onClick={() => setBulkCategoryModalOpen(true)} variant="outline" size="xs">
             <Icons.Tag className="mr-1 h-3.5 w-3.5" />
-            Assign Category
+            Category
           </Button>
           <Button onClick={() => setBulkEventModalOpen(true)} variant="outline" size="xs">
             <Icons.Calendar className="mr-1 h-3.5 w-3.5" />
-            Assign Event
+            Event
           </Button>
 
           <div className="bg-border mx-1 h-4 w-px" />
 
-          <Button onClick={clearAllCategories} variant="ghost" size="xs">
-            <Icons.XCircle className="mr-1 h-3.5 w-3.5" />
-            Clear Categories
-          </Button>
-          <Button onClick={clearAllEvents} variant="ghost" size="xs">
-            <Icons.XCircle className="mr-1 h-3.5 w-3.5" />
-            Clear Events
-          </Button>
-
-          <div className="bg-border mx-1 h-4 w-px" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="xs">
+                <Icons.XCircle className="mr-1 h-3.5 w-3.5" />
+                Clear
+                <Icons.ChevronDown className="ml-1 h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={clearAllCategories}>
+                <Icons.Tag className="mr-2 h-4 w-4" />
+                Clear Categories
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={clearAllEvents}>
+                <Icons.Calendar className="mr-2 h-4 w-4" />
+                Clear Events
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <Button onClick={deleteSelected} variant="destructive" size="xs">
             <Icons.Trash className="mr-1 h-3.5 w-3.5" />
@@ -1152,12 +1172,11 @@ export function CashImportEditStep({
           </Button>
 
           <Button onClick={clearSelection} variant="ghost" size="xs" className="ml-auto">
-            Clear Selection
+            Deselect
           </Button>
         </div>
       )}
 
-      {/* Table */}
       <div className="bg-background flex-1 overflow-auto rounded-lg border">
         <Table>
           <TableHeader className="bg-muted-foreground/5 sticky top-0 z-10">
@@ -1245,7 +1264,6 @@ export function CashImportEditStep({
         </Table>
       </div>
 
-      {/* Navigation */}
       <div className="flex justify-between pt-4">
         <Button variant="outline" onClick={onBack}>
           <Icons.ArrowLeft className="mr-2 h-4 w-4" />
@@ -1257,7 +1275,13 @@ export function CashImportEditStep({
         </Button>
       </div>
 
-      {/* Bulk Category Modal */}
+      <BulkActivityTypeAssignModal
+        open={bulkActivityTypeModalOpen}
+        onClose={() => setBulkActivityTypeModalOpen(false)}
+        onAssign={bulkAssignActivityType}
+        selectedCount={selectedCount}
+      />
+
       <BulkCategoryAssignModal
         open={bulkCategoryModalOpen}
         onClose={() => setBulkCategoryModalOpen(false)}
@@ -1266,7 +1290,6 @@ export function CashImportEditStep({
         selectedCount={selectedCount}
       />
 
-      {/* Bulk Event Modal */}
       <BulkEventAssignModal
         open={bulkEventModalOpen}
         onClose={() => setBulkEventModalOpen(false)}
@@ -1275,7 +1298,6 @@ export function CashImportEditStep({
         selectedCount={selectedCount}
       />
 
-      {/* Create Category Dialog */}
       <CategoryEditModal
         open={createCategoryOpen}
         onClose={() => setCreateCategoryOpen(false)}
@@ -1283,7 +1305,6 @@ export function CashImportEditStep({
         isLoading={createCategoryMutation.isPending}
       />
 
-      {/* Create Event Dialog */}
       <EventFormDialog
         eventTypes={eventTypes}
         open={createEventOpen}
@@ -1293,7 +1314,6 @@ export function CashImportEditStep({
         }}
       />
 
-      {/* Select Parent Category Dialog (for subcategory creation) */}
       <SelectParentCategoryModal
         open={selectParentCategoryOpen}
         onClose={() => setSelectParentCategoryOpen(false)}
@@ -1305,7 +1325,6 @@ export function CashImportEditStep({
         }}
       />
 
-      {/* Create Subcategory Dialog */}
       <CategoryEditModal
         open={createSubcategoryOpen}
         onClose={() => {
@@ -1317,7 +1336,6 @@ export function CashImportEditStep({
         isLoading={createCategoryMutation.isPending}
       />
 
-      {/* Create Rule Dialog */}
       <RuleEditModal
         open={createRuleOpen}
         onClose={() => setCreateRuleOpen(false)}
@@ -1326,19 +1344,16 @@ export function CashImportEditStep({
         isLoading={createRuleMutation.isPending}
       />
 
-      {/* Manage Categories Dialog */}
       <ManageCategoriesDialog
         open={manageCategoriesOpen}
         onClose={() => setManageCategoriesOpen(false)}
       />
 
-      {/* Manage Rules Dialog */}
       <ManageRulesDialog
         open={manageRulesOpen}
         onClose={() => setManageRulesOpen(false)}
       />
 
-      {/* Manage Events Dialog */}
       <ManageEventsDialog
         open={manageEventsOpen}
         onClose={() => setManageEventsOpen(false)}
@@ -1347,7 +1362,6 @@ export function CashImportEditStep({
   );
 }
 
-// Transaction Row Component
 interface ImportTransactionRowProps {
   transaction: CashImportRow;
   accountCurrency: string;
@@ -1409,7 +1423,6 @@ const ImportTransactionRow = memo(
       : undefined;
     const eventName = transaction.eventId ? eventLookup.get(transaction.eventId)?.name : undefined;
 
-    // Get effective account ID (transaction's accountId or fall back to default)
     const effectiveAccountId = transaction.accountId || defaultAccountId;
     const accountName = effectiveAccountId
       ? accountLookup.get(effectiveAccountId)?.name
@@ -1587,7 +1600,69 @@ const ImportTransactionRow = memo(
   },
 );
 
-// Bulk Category Assign Modal
+interface BulkActivityTypeAssignModalProps {
+  open: boolean;
+  onClose: () => void;
+  onAssign: (activityType: ActivityType) => void;
+  selectedCount: number;
+}
+
+const ACTIVITY_TYPE_OPTIONS = [
+  { value: ActivityType.DEPOSIT, label: "Deposit", icon: Icons.ArrowDown },
+  { value: ActivityType.WITHDRAWAL, label: "Withdrawal", icon: Icons.ArrowUp },
+  { value: ActivityType.TRANSFER_IN, label: "Transfer In", icon: Icons.ArrowDown },
+  { value: ActivityType.TRANSFER_OUT, label: "Transfer Out", icon: Icons.ArrowUp },
+] as const;
+
+function BulkActivityTypeAssignModal({
+  open,
+  onClose,
+  onAssign,
+  selectedCount,
+}: BulkActivityTypeAssignModalProps) {
+  const handleSelect = (type: ActivityType) => {
+    onAssign(type);
+  };
+
+  if (!open) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            Assign Type to {selectedCount} Transaction{selectedCount !== 1 ? "s" : ""}
+          </DialogTitle>
+          <DialogDescription>
+            Select an activity type to assign.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-2 py-4">
+          {ACTIVITY_TYPE_OPTIONS.map((type) => {
+            const Icon = type.icon;
+            return (
+              <button
+                key={type.value}
+                type="button"
+                onClick={() => handleSelect(type.value)}
+                className="hover:bg-muted hover:border-primary flex flex-col items-center justify-center gap-2 rounded-lg border p-4 transition-colors"
+              >
+                <Icon className="h-5 w-5" />
+                <span className="text-sm font-medium">{type.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 interface BulkCategoryAssignModalProps {
   open: boolean;
   onClose: () => void;
@@ -1688,7 +1763,6 @@ function BulkCategoryAssignModal({
   );
 }
 
-// Bulk Event Assign Modal
 interface BulkEventAssignModalProps {
   open: boolean;
   onClose: () => void;
@@ -1757,7 +1831,6 @@ function BulkEventAssignModal({
   );
 }
 
-// Select Parent Category Modal (for subcategory creation)
 interface SelectParentCategoryModalProps {
   open: boolean;
   onClose: () => void;
