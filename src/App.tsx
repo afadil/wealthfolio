@@ -37,6 +37,14 @@ function App() {
     <AppRoutes />
   );
 
+  const routedContent = isWeb ? (
+    <AuthGate fallback={<LoginPage />}>
+      <AppRoutes />
+    </AuthGate>
+  ) : (
+    <AppRoutes />
+  );
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>

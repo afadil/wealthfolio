@@ -267,7 +267,6 @@ impl FxServiceTrait for FxService {
     ) -> Result<Decimal> {
         // Check for valid currency codes
         if from_currency.len() != 3 || !from_currency.chars().all(|c| c.is_alphabetic()) {
-            // log::error!("Invalid from_currency code: {}", from_currency);
             return Err(FxError::InvalidCurrencyCode(format!(
                 "Invalid currency code: {}",
                 from_currency

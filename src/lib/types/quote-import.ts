@@ -29,7 +29,6 @@ export interface QuoteImportState {
   isImporting: boolean;
   importProgress: number;
   error: string | null;
-  overwriteExisting: boolean;
 }
 
 export interface QuoteImportActions {
