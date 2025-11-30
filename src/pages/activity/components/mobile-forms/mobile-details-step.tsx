@@ -21,7 +21,7 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from "@wealthfolio/ui";
+} from "@wealthvn/ui";
 import { useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { useTranslation } from "react-i18next";

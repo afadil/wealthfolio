@@ -34,8 +34,8 @@ export interface AddonManifest {
   repository?: string;
   /** License identifier (e.g., "MIT", "Apache-2.0") */
   license?: string;
-  /** Minimum Wealthfolio version required */
-  minWealthfolioVersion?: string;
+  /** Minimum WealthVN version required */
+  minWealthVNVersion?: string;
   /** Keywords for discoverability */
   keywords?: string[];
   /** Addon icon (base64 or relative path) */
@@ -164,8 +164,8 @@ export interface AddonUpdateInfo {
   isCritical?: boolean;
   /** Breaking changes in this update */
   hasBreakingChanges?: boolean;
-  /** Minimum Wealthfolio version required for this update */
-  minWealthfolioVersion?: string;
+  /** Minimum WealthVN version required for this update */
+  minWealthVNVersion?: string;
 }
 
 /**
@@ -194,7 +194,7 @@ export interface AddonStoreListing {
   rating?: number;
   /** Number of reviews */
   reviewCount?: number;
-  /** Whether it's verified by Wealthfolio team */
+  /** Whether it's verified by WealthVN team */
   verified?: boolean;
   /** Last update date */
   lastUpdated?: string;

@@ -1,7 +1,7 @@
 import type { FunctionPermission, Permission } from "@/adapters/tauri";
 import { Badge } from "@/components/ui/badge";
 import { getFunctionDisplayName } from "@/pages/settings/addons/components/addon-function-names";
-import { getPermissionCategory } from "@wealthfolio/addon-sdk";
+import { getPermissionCategory } from "@wealthvn/addon-sdk";
 
 interface PermissionForDisplay {
   category: string;

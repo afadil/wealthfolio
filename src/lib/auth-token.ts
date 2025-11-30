@@ -1,4 +1,4 @@
-const AUTH_TOKEN_KEY = "wealthfolio_auth_token";
+const AUTH_TOKEN_KEY = "wealthvn_auth_token";
 
 let authToken: string | null = null;
 let unauthorizedHandler: (() => void) | null = null;

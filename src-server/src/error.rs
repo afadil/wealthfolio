@@ -5,7 +5,7 @@ use axum::{
 };
 use serde::Serialize;
 use thiserror::Error;
-use wealthfolio_core::errors::Error as CoreError;
+use wealthvn_core::errors::Error as CoreError;
 
 #[allow(dead_code)]
 #[derive(Error, Debug)]

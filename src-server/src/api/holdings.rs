@@ -6,7 +6,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use wealthfolio_core::portfolio::{
+use wealthvn_core::portfolio::{
     holdings::holdings_model::Holding, valuation::valuation_model::DailyAccountValuation,
 };
 
@@ -86,7 +86,7 @@ async fn get_latest_valuations(
     State(state): State<Arc<AppState>>,
     raw: axum::extract::RawQuery,
 ) -> ApiResult<Json<Vec<DailyAccountValuation>>> {
-    use wealthfolio_core::accounts::AccountServiceTrait;
+    use wealthvn_core::accounts::AccountServiceTrait;
 
     // Parse query manually for robustness (supports accountIds and accountIds[])
     let mut ids: Vec<String> = Vec::new();

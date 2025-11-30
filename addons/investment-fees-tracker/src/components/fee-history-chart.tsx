@@ -12,8 +12,8 @@ import {
   EmptyPlaceholder,
   formatAmount,
   Icons,
-} from "@wealthfolio/ui";
-import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "@wealthfolio/ui/chart";
+} from "@wealthvn/ui";
+import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "@wealthvn/ui/chart";
 import { format, parseISO } from "date-fns";
 import React from "react";
 

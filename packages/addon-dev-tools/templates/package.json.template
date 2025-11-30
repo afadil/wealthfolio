@@ -4,12 +4,12 @@
   "description": "{{description}}",
   "type": "module",
   "main": "dist/addon.js",
-  "keywords": ["wealthfolio", "addon"],
+  "keywords": ["wealthvn", "addon"],
   "license": "MIT",
   "scripts": {
     "build": "vite build",
     "dev": "vite build --watch",
-    "dev:server": "wealthfolio dev",
+    "dev:server": "wealthvn dev",
     "clean": "rm -rf dist",
     "package": "mkdir -p dist && zip -r dist/$npm_package_name-$npm_package_version.zip manifest.json dist/ assets/ README.md",
     "bundle": "pnpm clean && pnpm build && pnpm package",
@@ -17,14 +17,14 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@wealthfolio/addon-sdk": "^2.0.0",
-    "@wealthfolio/ui": "^2.0.0",
+    "@wealthvn/addon-sdk": "^2.0.0",
+    "@wealthvn/ui": "^2.0.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.13",
-    "@wealthfolio/addon-dev-tools": "^2.0.0",
+    "@wealthvn/addon-dev-tools": "^2.0.0",
     "@types/node": "^20.0.0",
     "@types/react": "^19.1.1",
     "@types/react-dom": "^19.1.1",

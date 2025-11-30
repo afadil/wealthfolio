@@ -10,7 +10,7 @@ import {
   TableRow,
   Icons,
   EmptyPlaceholder,
-} from '@wealthfolio/ui';
+} from '@wealthvn/ui';
 import { TickerAvatar } from './ticker-avatar';
 import type { OpenPosition } from '../types';
 

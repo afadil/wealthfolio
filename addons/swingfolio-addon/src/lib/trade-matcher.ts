@@ -1,4 +1,4 @@
-import type { ActivityDetails } from '@wealthfolio/addon-sdk';
+import type { ActivityDetails } from '@wealthvn/addon-sdk';
 import { differenceInDays } from 'date-fns';
 import type { ClosedTrade, OpenPosition, TradeMatchResult } from '../types';
 

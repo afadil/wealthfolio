@@ -4,7 +4,7 @@ import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@/com
 import { ActivityType, getActivityTypeName } from "@/lib/constants";
 import { Account } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { ScrollArea } from "@wealthfolio/ui";
+import { ScrollArea } from "@wealthvn/ui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 

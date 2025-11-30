@@ -1,16 +1,16 @@
-import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
-import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Alert, AlertDescription } from "@wealthvn/ui/components/ui/alert";
+import { Button } from "@wealthvn/ui/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@wealthfolio/ui/components/ui/card";
-import { Checkbox } from "@wealthfolio/ui/components/ui/checkbox";
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Input } from "@wealthfolio/ui/components/ui/input";
-import { Label } from "@wealthfolio/ui/components/ui/label";
+} from "@wealthvn/ui/components/ui/card";
+import { Checkbox } from "@wealthvn/ui/components/ui/checkbox";
+import { Icons } from "@wealthvn/ui/components/ui/icons";
+import { Input } from "@wealthvn/ui/components/ui/input";
+import { Label } from "@wealthvn/ui/components/ui/label";
 import { AnimatePresence, motion } from "motion/react";
 import React, { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";

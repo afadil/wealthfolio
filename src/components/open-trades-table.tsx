@@ -26,7 +26,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { Badge, GainAmount, GainPercent } from "@wealthfolio/ui";
+import { Badge, GainAmount, GainPercent } from "@wealthvn/ui";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 

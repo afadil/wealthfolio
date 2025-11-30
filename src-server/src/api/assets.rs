@@ -11,7 +11,7 @@ use axum::{
     routing::{delete, get, put},
     Json, Router,
 };
-use wealthfolio_core::assets::{Asset as CoreAsset, UpdateAssetProfile};
+use wealthvn_core::assets::{Asset as CoreAsset, UpdateAssetProfile};
 
 #[derive(serde::Deserialize)]
 struct AssetQuery {

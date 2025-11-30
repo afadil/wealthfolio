@@ -1,6 +1,6 @@
 use super::registry::ServiceContext;
 use std::sync::{Arc, RwLock};
-use wealthfolio_core::{
+use wealthvn_core::{
     accounts::{AccountRepository, AccountService},
     activities::{ActivityRepository, ActivityService},
     db::{self, write_actor},

@@ -1,6 +1,6 @@
-name: wealthfolio-app
+name: wealthvn-app
 options:
-  bundleIdPrefix: com.teymz.wealthfolio
+  bundleIdPrefix: com.wealthvn.app
   deploymentTarget:
     iOS: 14.0
 fileGroups: [../../src]
@@ -10,8 +10,8 @@ configs:
 settingGroups:
   app:
     base:
-      PRODUCT_NAME: Wealthfolio
-      PRODUCT_BUNDLE_IDENTIFIER: com.teymz.wealthfolio
+      PRODUCT_NAME: WealthVN
+      PRODUCT_BUNDLE_IDENTIFIER: com.wealthvn.app
 targetTemplates:
   app:
     type: application
@@ -24,20 +24,20 @@ targetTemplates:
     settings:
       groups: [app]
 targets:
-  wealthfolio-app_iOS:
+  wealthvn-app_iOS:
     type: application
     platform: iOS
     sources:
       - path: Sources
       - path: Assets.xcassets
       - path: Externals
-      - path: wealthfolio-app_iOS
+      - path: wealthvn-app_iOS
       - path: assets
         buildPhase: resources
         type: folder
       - path: LaunchScreen.storyboard
     info:
-      path: wealthfolio-app_iOS/Info.plist
+      path: wealthvn-app_iOS/Info.plist
       properties:
         LSRequiresIPhoneOS: true
         UILaunchStoryboardName: LaunchScreen
@@ -54,7 +54,7 @@ targets:
         CFBundleShortVersionString: 1.2.1
         CFBundleVersion: "1.2.1"
     entitlements:
-      path: wealthfolio-app_iOS/wealthfolio-app_iOS.entitlements
+      path: wealthvn-app_iOS/wealthvn-app_iOS.entitlements
     scheme:
       environmentVariables:
         RUST_BACKTRACE: full

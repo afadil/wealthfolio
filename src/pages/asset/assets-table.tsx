@@ -26,7 +26,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Badge } from "@wealthfolio/ui";
+import { Badge } from "@wealthvn/ui";
 
 import { Quote } from "@/lib/types";
 import { formatAmount, formatDate } from "@/lib/utils";

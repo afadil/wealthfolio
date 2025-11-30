@@ -18,7 +18,7 @@ import {
     SheetHeader,
     SheetTitle,
 } from "@/components/ui/sheet";
-import { Separator } from "@wealthfolio/ui";
+import { Separator } from "@wealthvn/ui";
 import { useTranslation } from "react-i18next";
 
 

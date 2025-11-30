@@ -8,7 +8,7 @@ use log::{debug, error};
 use tauri::{AppHandle, State};
 
 use serde_json::json;
-use wealthfolio_core::accounts::{Account, AccountUpdate, NewAccount};
+use wealthvn_core::accounts::{Account, AccountUpdate, NewAccount};
 
 #[tauri::command]
 pub async fn get_accounts(state: State<'_, Arc<ServiceContext>>) -> Result<Vec<Account>, String> {

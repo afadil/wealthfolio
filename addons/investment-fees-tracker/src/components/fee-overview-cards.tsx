@@ -6,7 +6,7 @@ import {
   CardTitle,
   GainPercent,
   Icons,
-} from "@wealthfolio/ui";
+} from "@wealthvn/ui";
 import type { FeeAnalytics, FeeSummary } from "../lib/fee-calculation.service";
 import { FeeCategoriesWidget } from "./fee-categories-widget";
 

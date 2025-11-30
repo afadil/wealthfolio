@@ -4,7 +4,7 @@ use crate::context::ServiceContext;
 use crate::events::{emit_resource_changed, ResourceEventPayload};
 use log::debug;
 use tauri::{AppHandle, State};
-use wealthfolio_core::activities::{
+use wealthvn_core::activities::{
     Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityImport,
     ActivitySearchResponse, ActivityUpdate, ImportMappingData, NewActivity, Sort,
 };

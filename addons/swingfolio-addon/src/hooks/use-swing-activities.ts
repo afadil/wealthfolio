@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import type { AddonContext } from '@wealthfolio/addon-sdk';
+import type { AddonContext } from '@wealthvn/addon-sdk';
 import type { SwingActivity } from '../types';
 import { useSwingPreferences } from './use-swing-preferences';
 

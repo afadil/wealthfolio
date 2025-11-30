@@ -4,7 +4,7 @@ import { Icons } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Holding, Sector } from "@/lib/types";
-import { formatPercent, PrivacyAmount } from "@wealthfolio/ui";
+import { formatPercent, PrivacyAmount } from "@wealthvn/ui";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 

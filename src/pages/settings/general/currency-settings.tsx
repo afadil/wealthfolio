@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
-import { CurrencyInput } from "@wealthfolio/ui";
+import { CurrencyInput } from "@wealthvn/ui";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 

@@ -7,8 +7,8 @@ declare global {
     __TAURI__?: unknown;
 
     // Exposed for addon integration
-    __wealthfolio_query_client__?: QueryClient;
-    __wealthfolio_navigate__?: (route: string) => void;
+    __wealthvn_query_client__?: QueryClient;
+    __wealthvn_navigate__?: (route: string) => void;
 
     // Dev helpers and framework singletons made available at runtime
     React?: unknown;

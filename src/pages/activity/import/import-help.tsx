@@ -11,7 +11,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from "@wealthfolio/ui";
+} from "@wealthvn/ui";
 
 export function ImportHelpPopover() {
   const { isMobile } = usePlatform();
@@ -115,7 +115,7 @@ export function ImportHelpPopover() {
       <p className="text-xs">
         {t("import.help.documentationText")}{" "}
         <a
-          href="https://wealthfolio.app/docs/concepts/activity-types"
+          href="https://github.com/chipheo00/vn-wealthfolio/blob/main/docs/activities/activity-types.md"
           target="_blank"
           rel="noopener noreferrer"
           className="underline"

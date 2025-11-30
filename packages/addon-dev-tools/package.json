@@ -1,29 +1,29 @@
 {
-  "name": "@wealthfolio/addon-dev-tools",
+  "name": "@wealthvn/addon-dev-tools",
   "version": "2.0.0",
-  "description": "Development tools for Wealthfolio addons - hot reload server and CLI",
+  "description": "Development tools for WealthVN addons - hot reload server and CLI",
   "main": "index.js",
   "bin": {
-    "wealthfolio": "cli.js"
+    "wealthvn": "cli.js"
   },
   "keywords": [
-    "wealthfolio",
+    "wealthvn",
     "addon",
     "development",
     "cli",
     "hot-reload"
   ],
-  "author": "Wealthfolio Team",
+  "author": "Chipheo00 - CFPM Inc. WealthVN Team",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/afadil/wealthfolio.git",
+    "url": "https://github.com/chipheo00/vn-wealthfolio.git",
     "directory": "packages/addon-dev-tools"
   },
   "bugs": {
-    "url": "https://github.com/afadil/wealthfolio/issues"
+    "url": "https://github.com/chipheo00/vn-wealthfolio/issues"
   },
-  "homepage": "https://github.com/afadil/wealthfolio/tree/main/packages/addon-dev-tools#readme",
+  "homepage": "https://github.com/chipheo00/vn-wealthfolio/tree/main/packages/addon-dev-tools#readme",
   "files": [
     "cli.js",
     "dev-server.js",

@@ -1,12 +1,12 @@
 # Goal Progress Tracker Addon
 
-A Wealthfolio addon that helps you visualize your investment progress towards
+A WealthVN addon that helps you visualize your investment progress towards
 financial goals using an interactive calendar-style representation.
 
 ## Features
 
-- **Goal Integration**: Seamlessly integrates with your existing Wealthfolio
-  goals through a searchable dropdown selector
+- **Goal Integration**: Seamlessly integrates with your existing WealthVN goals
+  through a searchable dropdown selector
 - **Visual Progress Tracking**: Calendar grid visualization where each dot
   represents a milestone towards your goal
 - **Real-time Portfolio Sync**: Automatically calculates progress using your
@@ -24,7 +24,7 @@ financial goals using an interactive calendar-style representation.
 
 ## How It Works
 
-1. **Select a Goal**: Choose from your existing Wealthfolio goals using the
+1. **Select a Goal**: Choose from your existing WealthVN goals using the
    searchable dropdown, or work without a goal for custom tracking
 2. **View Real-time Progress**: The addon calculates your current progress
    using:
@@ -53,7 +53,7 @@ financial goals using an interactive calendar-style representation.
    pnpm package
    ```
 
-3. Install in Wealthfolio through the addon settings page
+3. Install in WealthVN through the addon settings page
 
 ## Development
 
@@ -85,7 +85,7 @@ This addon demonstrates how to:
 - Create custom React hooks for complex data fetching and processing
 - Build interactive UI components with tooltips and searchable dropdowns
 - Handle loading states, error states, and empty states gracefully
-- Integrate with the Wealthfolio sidebar navigation and routing system
+- Integrate with the WealthVN sidebar navigation and routing system
 - Use the shared QueryClient for optimal data caching and performance
 
 ## Permissions Required
@@ -123,4 +123,4 @@ Where:
 
 ## License
 
-MIT License - see the main Wealthfolio project for details.
+MIT License - see the main WealthVN project for details.

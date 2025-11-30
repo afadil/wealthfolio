@@ -10,7 +10,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use serde_json::json;
-use wealthfolio_core::{
+use wealthvn_core::{
     accounts::AccountServiceTrait, activities::Activity, constants::PORTFOLIO_TOTAL_ACCOUNT_ID,
 };
 

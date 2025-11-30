@@ -26,7 +26,7 @@ and this project adheres to
 - Multi-currency support with automatic conversion
 - Advanced reporting and visualization of fee structures
 - Sidebar navigation integration for easy access
-- Compatible with Wealthfolio addon SDK v1.0.0
+- Compatible with WealthVN addon SDK v1.0.0
 
 ### Features
 

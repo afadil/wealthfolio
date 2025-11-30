@@ -46,10 +46,10 @@ pub async fn check_for_update(app_handle: AppHandle, instance_id: &str, show_all
                     if is_appstore {
                         // App Store version - show update available but redirect to App Store
                         let update_message = format!(
-                            "A new version of Wealthfolio is available!\n\
+                            "A new version of WealthVN is available!\n\
                              {} → New version: {}\n\n\
                              {}\n\n\
-                             Since you installed Wealthfolio from the App Store, \
+                             Since you installed WealthVN from the App Store, \
                              please update through the App Store to get the latest version.",
                             current_version,
                             update.version,
@@ -59,7 +59,7 @@ pub async fn check_for_update(app_handle: AppHandle, instance_id: &str, show_all
                         let open_store = app_handle
                             .dialog()
                             .message(&update_message)
-                            .title("Wealthfolio Update Available")
+                            .title("WealthVN Update Available")
                             .buttons(MessageDialogButtons::OkCancel)
                             .kind(MessageDialogKind::Info)
                             .blocking_show();
@@ -70,7 +70,7 @@ pub async fn check_for_update(app_handle: AppHandle, instance_id: &str, show_all
                     } else {
                         // Non-App Store version - proceed with normal update
                         let update_message = format!(
-                            "A new version of Wealthfolio is available!\n\
+                            "A new version of WealthVN is available!\n\
                              Current version: {} → New version: {}\n\n\
                              {}\n\n\
                              Would you like to update now? The app will restart automatically.",
@@ -82,7 +82,7 @@ pub async fn check_for_update(app_handle: AppHandle, instance_id: &str, show_all
                         let do_update = app_handle
                             .dialog()
                             .message(&update_message)
-                            .title("Wealthfolio Update Available")
+                            .title("WealthVN Update Available")
                             .buttons(MessageDialogButtons::OkCancel)
                             .kind(MessageDialogKind::Info)
                             .blocking_show();
@@ -114,7 +114,7 @@ pub async fn check_for_update(app_handle: AppHandle, instance_id: &str, show_all
                 } else if show_all_messages {
                     app_handle
                         .dialog()
-                        .message("You're already running the latest version of Wealthfolio.")
+                        .message("You're already running the latest version of WealthVN.")
                         .title("No Updates Available")
                         .kind(MessageDialogKind::Info)
                         .show(|_| {});
@@ -122,7 +122,7 @@ pub async fn check_for_update(app_handle: AppHandle, instance_id: &str, show_all
             } else if show_all_messages {
                 app_handle
                     .dialog()
-                    .message("You're already running the latest version of Wealthfolio.")
+                    .message("You're already running the latest version of WealthVN.")
                     .title("No Updates Available")
                     .kind(MessageDialogKind::Info)
                     .show(|_| {});

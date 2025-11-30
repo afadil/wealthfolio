@@ -15,7 +15,7 @@ import {
   SelectValue,
   Separator,
   Skeleton,
-} from "@wealthfolio/ui";
+} from "@wealthvn/ui";
 import { useMemo, useState } from "react";
 import { useAddonActions } from "../hooks/use-addon-actions";
 import { useAddonStore } from "../hooks/use-addon-store";

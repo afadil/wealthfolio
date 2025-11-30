@@ -8,7 +8,7 @@ use chacha20poly1305::{
 use rand::{rngs::OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 
-use wealthfolio_core::{
+use wealthvn_core::{
     errors::Error,
     secrets::{format_service_id, SecretStore},
     Result,

@@ -1,7 +1,7 @@
 import { LiquidGlass } from "@/components/liquid-glass";
 import { useHapticFeedback } from "@/hooks/use-haptic-feedback";
 import { cn } from "@/lib/utils";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, Icons } from "@wealthfolio/ui";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, Icons } from "@wealthvn/ui";
 import { motion } from "motion/react";
 import { useCallback, useId, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";

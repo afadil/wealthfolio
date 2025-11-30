@@ -1,6 +1,6 @@
 import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb, logger } from "@/adapters";
 import type { InstalledAddon, ExtractedAddon } from "@/adapters/tauri";
-import type { AddonManifest, AddonUpdateCheckResult } from "@wealthfolio/addon-sdk";
+import type { AddonManifest, AddonUpdateCheckResult } from "@wealthvn/addon-sdk";
 import type { AddonStoreListing } from "@/lib/types";
 
 export const getInstalledAddons = async (): Promise<InstalledAddon[]> => {

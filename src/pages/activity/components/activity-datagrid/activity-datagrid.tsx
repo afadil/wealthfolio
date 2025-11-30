@@ -26,7 +26,7 @@ import {
     TableRow,
     formatAmount,
     worldCurrencies,
-} from "@wealthfolio/ui";
+} from "@wealthvn/ui";
 import type { Dispatch, SetStateAction } from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";

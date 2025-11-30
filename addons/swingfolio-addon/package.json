@@ -4,11 +4,11 @@
   "description": "A simple swing stock trading tracker with performance analytics and calendar views",
   "type": "module",
   "main": "dist/addon.js",
-  "author": "Wealthfolio",
+  "author": "chipheo00",
   "license": "MIT",
-  "homepage": "https://github.com/afadil/wealthfolio",
+  "homepage": "https://github.com/chipheo00/vn-wealthfolio",
   "keywords": [
-    "wealthfolio",
+    "wealthvn",
     "addon",
     "swing-trading",
     "performance",
@@ -19,7 +19,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite build --watch",
-    "dev:server": "wealthfolio dev",
+    "dev:server": "wealthvn dev",
     "clean": "rm -rf dist",
     "package": "mkdir -p dist && zip -r dist/$npm_package_name-$npm_package_version.zip manifest.json dist/ assets/ README.md",
     "bundle": "pnpm clean && pnpm build && pnpm package",
@@ -32,8 +32,8 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.5",
-    "@wealthfolio/addon-sdk": "workspace:*",
-    "@wealthfolio/ui": "workspace:*",
+    "@wealthvn/addon-sdk": "workspace:*",
+    "@wealthvn/ui": "workspace:*",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0"
   },
@@ -43,7 +43,7 @@
     "@types/react": "^19.1.1",
     "@types/react-dom": "^19.1.1",
     "@vitejs/plugin-react": "^5.0.2",
-    "@wealthfolio/addon-dev-tools": "workspace:*",
+    "@wealthvn/addon-dev-tools": "workspace:*",
     "rollup-plugin-external-globals": "^0.13.0",
     "tailwindcss": "^4.1.13",
     "typescript": "^5.9.2",

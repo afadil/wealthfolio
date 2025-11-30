@@ -93,7 +93,7 @@ export const OnboardingStep1: React.FC = () => {
           <p className="text-muted-foreground text-xs md:text-sm">
             {t("step1.footer")}{" "}
             <a
-              href="https://wealthfolio.app/docs/concepts/activity-types"
+              href="https://github.com/chipheo00/vn-wealthfolio/blob/main/docs/activities/activity-types.md"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-foreground underline transition-colors"

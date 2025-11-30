@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
   Form,
-} from "@wealthfolio/ui";
+} from "@wealthvn/ui";
 import { useCallback, useEffect, useState } from "react";
 import { FormProvider, useForm, type Resolver } from "react-hook-form";
 import { useTranslation } from "react-i18next";

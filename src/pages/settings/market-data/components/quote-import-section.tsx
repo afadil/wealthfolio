@@ -2,15 +2,15 @@ import { Separator } from "@/components/ui/separator";
 import { useQuoteImport } from "@/hooks/use-quote-import";
 import { cn } from "@/lib/utils";
 import { StepIndicator } from "@/pages/activity/import/components/step-indicator";
-import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Button } from "@wealthvn/ui/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@wealthfolio/ui/components/ui/card";
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
+} from "@wealthvn/ui/components/ui/card";
+import { Icons } from "@wealthvn/ui/components/ui/icons";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";

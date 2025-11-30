@@ -83,9 +83,9 @@ Test Results:
 
 ### Cargo Workaround
 Temporarily disabled pro features due to missing path:
-- Commented out `wealthfolio_sync` dependency in Cargo.toml
+- Commented out `wealthvn_sync` dependency in Cargo.toml
 - Commented out pro-related features in Cargo.toml
-- These should be re-enabled once `wealthfolio-pro` path is available
+- These should be re-enabled once `wealthvn-pro` path is available
 
 ### Fixed Issues
 - Fixed async test in `sjc_client.rs` (replaced `tokio_test::block_on` with `#[tokio::test]`)

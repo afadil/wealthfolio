@@ -24,7 +24,7 @@ import {
 import { Icons } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
 import { newAccountSchema } from "@/lib/schemas";
-import { CurrencyInput, ResponsiveSelect, type ResponsiveSelectOption } from "@wealthfolio/ui";
+import { CurrencyInput, ResponsiveSelect, type ResponsiveSelectOption } from "@wealthvn/ui";
 
 import { useAccountMutations } from "./use-account-mutations";
 

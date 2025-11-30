@@ -11,7 +11,7 @@ import {
 import { ASSET_SUBCLASS_TYPES, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { Account } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { ScrollArea } from "@wealthfolio/ui";
+import { ScrollArea } from "@wealthvn/ui";
 import { useTranslation } from "react-i18next";
 
 interface HoldingsMobileFilterSheetProps {

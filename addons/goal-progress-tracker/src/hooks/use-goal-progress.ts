@@ -4,7 +4,7 @@ import { useGoalAllocations } from "./use-goal-allocations";
 import { useAccounts } from "./use-accounts";
 import { useLatestValuations } from "./use-latest-valuations";
 import { calculateGoalProgress } from "../lib/goal-progress";
-import { type AddonContext } from "@wealthfolio/addon-sdk";
+import { type AddonContext } from "@wealthvn/addon-sdk";
 
 interface UseGoalProgressOptions {
   ctx: AddonContext;

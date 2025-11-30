@@ -4,7 +4,7 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-} from "@wealthfolio/ui";
+} from "@wealthvn/ui";
 
 interface LanguageSelectorProps {
   value?: string;

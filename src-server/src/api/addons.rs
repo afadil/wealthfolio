@@ -9,7 +9,7 @@ use axum::{
     Json, Router,
 };
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
-use wealthfolio_core::addons::{
+use wealthvn_core::addons::{
     self, AddonManifest, AddonUpdateCheckResult, AddonUpdateInfo, ExtractedAddon, InstalledAddon,
 };
 

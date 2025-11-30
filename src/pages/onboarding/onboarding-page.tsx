@@ -98,7 +98,7 @@ const OnboardingPage = () => {
             </div>
 
             <img
-              alt="Wealthfolio Illustration"
+              alt="WealthVN Illustration"
               className="h-20 w-20 sm:h-24 sm:w-24"
               src="/illustration2.png"
               style={{

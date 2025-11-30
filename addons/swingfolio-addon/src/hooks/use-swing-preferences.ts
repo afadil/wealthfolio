@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { AddonContext } from '@wealthfolio/addon-sdk';
+import type { AddonContext } from '@wealthvn/addon-sdk';
 import type { SwingTradePreferences } from '../types';
 
 const DEFAULT_PREFERENCES: SwingTradePreferences = {

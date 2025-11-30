@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
 import { checkAddonUpdate, checkAllAddonUpdates } from "@/commands/addon";
-import type { AddonUpdateCheckResult } from "@wealthfolio/addon-sdk";
+import type { AddonUpdateCheckResult } from "@wealthvn/addon-sdk";
 import type { InstalledAddon } from "@/adapters/tauri";
 import { QueryKeys } from "@/lib/query-keys";
 

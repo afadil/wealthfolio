@@ -10,7 +10,7 @@ use crate::main_lib::AppState;
 
 fn sync_not_supported<T>() -> ApiResult<T> {
     Err(ApiError::NotImplemented(
-        "Wealthfolio Sync is not available in web mode.".into(),
+        "WealthVN Sync is not available in web mode.".into(),
     ))
 }
 

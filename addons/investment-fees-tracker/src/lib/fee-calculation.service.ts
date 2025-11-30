@@ -1,4 +1,4 @@
-import type { ActivityDetails } from "@wealthfolio/addon-sdk";
+import type { ActivityDetails } from "@wealthvn/addon-sdk";
 import { differenceInMonths } from "date-fns";
 
 export interface FeeSummary {

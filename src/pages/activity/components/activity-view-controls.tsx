@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { ActivityType, getActivityTypeName } from "@/lib/constants";
 import { Account } from "@/lib/types";
-import { AnimatedToggleGroup, Button, Icons, Input } from "@wealthfolio/ui";
+import { AnimatedToggleGroup, Button, Icons, Input } from "@wealthvn/ui";
 
 import { DataTableFacetedFilter } from "./activity-datagrid/data-table-faceted-filter";
 

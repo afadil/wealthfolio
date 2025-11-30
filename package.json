@@ -1,5 +1,5 @@
 {
-  "name": "wealthfolio-app",
+  "name": "wealthvn",
   "private": true,
   "version": "2.0.1",
   "type": "module",
@@ -51,7 +51,7 @@
     "@tauri-apps/plugin-shell": "~2.3.1",
     "@tauri-apps/plugin-updater": "~2.9.0",
     "@tauri-apps/plugin-window-state": "~2.4.0",
-    "@wealthfolio/ui": "workspace:*",
+    "@wealthvn/ui": "workspace:*",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",

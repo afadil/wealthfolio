@@ -1,5 +1,5 @@
 import { TradeMatcher } from './trade-matcher';
-import type { ActivityDetails, ActivityType, DataSource } from '@wealthfolio/addon-sdk';
+import type { ActivityDetails, ActivityType, DataSource } from '@wealthvn/addon-sdk';
 
 // Enhanced test data with dividends, fees, and various scenarios
 const jsonActivities = `[

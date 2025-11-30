@@ -1,4 +1,4 @@
-Wealthfolio Server
+WealthVN Server
 
 Overview
 - This crate runs the HTTP API (Axum) and serves static files for the web build.
@@ -9,7 +9,7 @@ Run locally (Rust only)
   - `cargo run --manifest-path src-server/Cargo.toml`
 
 Docker image
-- Pull the latest published server image with `docker pull afadil/wealthfolio:latest`.
+- Pull the latest published server image with `docker pull chipheo00/wealthvn:latest`.
 - Use that tag (or your locally built image) in the Docker run examples inside the root `README.md`.
 
 Key environment variables

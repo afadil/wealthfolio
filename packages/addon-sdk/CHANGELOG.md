@@ -8,7 +8,7 @@ and this project adheres to
 
 ### Added
 
-- **Initial Release** - Complete TypeScript SDK for building Wealthfolio addons
+- **Initial Release** - Complete TypeScript SDK for building WealthVN addons
 - **Core Types**: AddonContext, SidebarManager, RouterManager, and event
   handling
 - **Data Types**: Comprehensive financial data models (Account, Activity, Asset,
@@ -18,7 +18,7 @@ and this project adheres to
 - **Manifest Management**: Validation, compatibility checks, and metadata
   handling
 - **Host API Interface**: Secure communication layer between addons and
-  Wealthfolio
+  WealthVN
 - **Utility Functions**: Addon validation, version compatibility, ID generation,
   and size formatting
 - **Development Tools**: Complete TypeScript definitions and development

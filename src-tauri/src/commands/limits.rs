@@ -7,7 +7,7 @@ use crate::{
 use log::debug;
 use serde_json::json;
 use tauri::{AppHandle, State};
-use wealthfolio_core::limits::{ContributionLimit, DepositsCalculation, NewContributionLimit};
+use wealthvn_core::limits::{ContributionLimit, DepositsCalculation, NewContributionLimit};
 
 #[tauri::command]
 pub async fn get_contribution_limits(

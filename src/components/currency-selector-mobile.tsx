@@ -1,6 +1,6 @@
 import type { ComponentPropsWithoutRef } from "react";
 import { forwardRef } from "react";
-import { CurrencyInput } from "@wealthfolio/ui";
+import { CurrencyInput } from "@wealthvn/ui";
 
 type CurrencyInputComponentProps = ComponentPropsWithoutRef<typeof CurrencyInput>;
 

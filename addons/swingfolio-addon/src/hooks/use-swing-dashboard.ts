@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import type { AddonContext, Holding } from '@wealthfolio/addon-sdk';
+import type { AddonContext, Holding } from '@wealthvn/addon-sdk';
 import type { SwingDashboardData, ClosedTrade, OpenPosition } from '../types';
 import { useSwingActivities } from './use-swing-activities';
 import { useSwingPreferences } from './use-swing-preferences';

@@ -10,7 +10,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { AmountDisplay, AnimatedToggleGroup } from "@wealthfolio/ui";
+import { AmountDisplay, AnimatedToggleGroup } from "@wealthvn/ui";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 

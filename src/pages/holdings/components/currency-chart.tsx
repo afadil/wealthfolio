@@ -2,7 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import type { Holding } from "@/lib/types";
-import { AmountDisplay, formatPercent } from "@wealthfolio/ui";
+import { AmountDisplay, formatPercent } from "@wealthvn/ui";
 import { motion } from "motion/react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";

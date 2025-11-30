@@ -8,7 +8,7 @@ use crate::{
 
 use log::{debug, error};
 use tauri::{AppHandle, State};
-use wealthfolio_core::market_data::{MarketDataProviderInfo, Quote, QuoteImport, QuoteSummary};
+use wealthvn_core::market_data::{MarketDataProviderInfo, Quote, QuoteImport, QuoteSummary};
 
 #[tauri::command]
 pub async fn search_symbol(

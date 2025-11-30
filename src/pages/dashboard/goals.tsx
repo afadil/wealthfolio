@@ -10,7 +10,7 @@ import { useLatestValuations } from "@/hooks/use-latest-valuations";
 import { calculateGoalProgress } from "@/lib/portfolio-helper";
 import { Goal, GoalAllocation } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
-import { AmountDisplay, formatPercent } from "@wealthfolio/ui";
+import { AmountDisplay, formatPercent } from "@wealthvn/ui";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 

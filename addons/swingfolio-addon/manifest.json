@@ -3,7 +3,7 @@
   "name": "Swingfolio: Simple Stock Trading Tracker",
   "version": "1.2.0",
   "description": "A simple swing stock trading tracker with performance analytics and calendar views",
-  "author": "Wealthfolio",
+  "author": "WealthVN",
   "main": "dist/addon.js",
   "sdkVersion": "2.0.0",
   "enabled": true,

@@ -30,8 +30,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@/components/ui": path.resolve(__dirname, "packages/ui/src/components/ui"),
-      "@wealthfolio/addon-sdk": path.resolve(__dirname, "packages/addon-sdk/src"),
-      "@wealthfolio/ui": path.resolve(__dirname, "packages/ui/src"),
+      "@wealthvn/addon-sdk": path.resolve(__dirname, "packages/addon-sdk/src"),
+      "@wealthvn/ui": path.resolve(__dirname, "packages/ui/src"),
       "@": path.resolve(__dirname, "./src"),
     },
     extensions: [".js", ".ts", ".jsx", ".tsx", ".json"],

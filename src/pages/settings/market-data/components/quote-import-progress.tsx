@@ -4,11 +4,11 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@wealthfolio/ui/components/ui/card";
-import { Progress } from "@wealthfolio/ui/components/ui/progress";
-import { Badge } from "@wealthfolio/ui/components/ui/badge";
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Button } from "@wealthfolio/ui/components/ui/button";
+} from "@wealthvn/ui/components/ui/card";
+import { Progress } from "@wealthvn/ui/components/ui/progress";
+import { Badge } from "@wealthvn/ui/components/ui/badge";
+import { Icons } from "@wealthvn/ui/components/ui/icons";
+import { Button } from "@wealthvn/ui/components/ui/button";
 import { useTranslation } from "react-i18next";
 
 interface QuoteImportProgressProps {

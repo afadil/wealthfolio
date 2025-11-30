@@ -7,7 +7,7 @@ use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use rand::{rngs::OsRng, RngCore};
 use tempfile::tempdir;
 use tower::ServiceExt;
-use wealthfolio_server::{api::app_router, build_state, config::Config};
+use wealthvn_server::{api::app_router, build_state, config::Config};
 
 async fn build_test_router(password: &str) -> axum::Router {
     let tmp = tempdir().unwrap();

@@ -5,7 +5,7 @@ use std::io::Read;
 use std::path::Path;
 use tauri::Manager;
 use tauri::{AppHandle, Emitter};
-use wealthfolio_core::db;
+use wealthvn_core::db;
 
 /// Normalize file path by removing file:// URI prefix if present (iOS/Android compatibility)
 fn normalize_file_path(path: &str) -> String {
@@ -104,7 +104,7 @@ pub async fn backup_database_to_path(
 
     // Create a custom backup path in the specified directory
     let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
-    let backup_filename = format!("wealthfolio_backup_{}.db", timestamp);
+    let backup_filename = format!("wealthvn_backup_{}.db", timestamp);
     let backup_path = Path::new(&normalized_backup_dir).join(&backup_filename);
 
     // Ensure the backup directory exists

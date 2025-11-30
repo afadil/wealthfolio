@@ -4,9 +4,9 @@ use axum::{extract::{Path, State, Query, RawQuery}, routing::{get, post, put, de
 use tower_http::{cors::{Any, CorsLayer}, trace::TraceLayer, timeout::TimeoutLayer, request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer}};
 use utoipa::OpenApi;
 use crate::{error::ApiResult, models::{Account, NewAccount, AccountUpdate}, config::Config, main_lib::AppState};
-use wealthfolio_core::addons::{self, *};
+use wealthvn_core::addons::{self, *};
 use axum::http::StatusCode;
-use wealthfolio_core::{
+use wealthvn_core::{
     accounts::AccountServiceTrait,
     settings::{Settings, SettingsUpdate, SettingsServiceTrait},
     portfolio::{holdings::holdings_model::Holding, valuation::valuation_model::DailyAccountValuation, performance::PerformanceMetrics, income::IncomeSummary},
@@ -258,8 +258,8 @@ async fn delete_exchange_rate(Path(id): Path<String>, State(state): State<Arc<Ap
 #[derive(serde::Deserialize)]
 #[serde(untagged)]
 enum SortWrapper {
-    One(wealthfolio_core::activities::Sort),
-    Many(Vec<wealthfolio_core::activities::Sort>),
+    One(wealthvn_core::activities::Sort),
+    Many(Vec<wealthvn_core::activities::Sort>),
 }
 
 #[derive(serde::Deserialize)]
@@ -282,7 +282,7 @@ struct ActivitySearchBody {
 
 async fn search_activities(State(state): State<Arc<AppState>>, Json(body): Json<ActivitySearchBody>) -> ApiResult<Json<ActivitySearchResponse>> {
     // Normalize sort to a single value if provided
-    let sort_normalized: Option<wealthfolio_core::activities::Sort> = match body.sort {
+    let sort_normalized: Option<wealthvn_core::activities::Sort> = match body.sort {
         Some(SortWrapper::One(s)) => Some(s),
         Some(SortWrapper::Many(mut v)) => v.into_iter().next(),
         None => None,
@@ -308,12 +308,12 @@ async fn search_activities(State(state): State<Arc<AppState>>, Json(body): Json<
     Ok(Json(resp))
 }
 
-async fn create_activity(State(state): State<Arc<AppState>>, Json(activity): Json<NewActivity>) -> ApiResult<Json<wealthfolio_core::activities::Activity>> {
+async fn create_activity(State(state): State<Arc<AppState>>, Json(activity): Json<NewActivity>) -> ApiResult<Json<wealthvn_core::activities::Activity>> {
     let created = state.activity_service.create_activity(activity).await?;
     Ok(Json(created))
 }
 
-async fn update_activity(State(state): State<Arc<AppState>>, Json(activity): Json<ActivityUpdate>) -> ApiResult<Json<wealthfolio_core::activities::Activity>> {
+async fn update_activity(State(state): State<Arc<AppState>>, Json(activity): Json<ActivityUpdate>) -> ApiResult<Json<wealthvn_core::activities::Activity>> {
     let updated = state.activity_service.update_activity(activity).await?;
     Ok(Json(updated))
 }
@@ -329,7 +329,7 @@ async fn save_activities(
     Ok(Json(result))
 }
 
-async fn delete_activity(Path(id): Path<String>, State(state): State<Arc<AppState>>) -> ApiResult<Json<wealthfolio_core::activities::Activity>> {
+async fn delete_activity(Path(id): Path<String>, State(state): State<Arc<AppState>>) -> ApiResult<Json<wealthvn_core::activities::Activity>> {
     let deleted = state.activity_service.delete_activity(id).await?;
     Ok(Json(deleted))
 }
@@ -439,7 +439,7 @@ async fn update_asset_data_source(Path(id): Path<String>, State(state): State<Ar
 #[derive(serde::Deserialize)]
 struct SearchQuery { query: String }
 
-async fn search_symbol(State(state): State<Arc<AppState>>, Query(q): Query<SearchQuery>) -> ApiResult<Json<Vec<wealthfolio_core::market_data::QuoteSummary>>> {
+async fn search_symbol(State(state): State<Arc<AppState>>, Query(q): Query<SearchQuery>) -> ApiResult<Json<Vec<wealthvn_core::market_data::QuoteSummary>>> {
     let res = state.market_data_service.search_symbol(&q.query).await?;
     Ok(Json(res))
 }
@@ -505,7 +505,7 @@ async fn delete_secret(Query(q): Query<SecretQuery>) -> ApiResult<()> {
 #[openapi(
     paths(healthz, readyz, list_accounts, create_account, update_account, delete_account),
     components(schemas(Account, NewAccount, AccountUpdate)),
-    tags((name="wealthfolio"))
+    tags((name="wealthvn"))
 )]
 pub struct ApiDoc;
 

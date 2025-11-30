@@ -1,10 +1,10 @@
-import { type AddonContext, type Goal } from "@wealthfolio/addon-sdk";
-import { Icons, EmptyPlaceholder, Button, Page, PageContent, PageHeader } from "@wealthfolio/ui";
+import { type AddonContext, type Goal } from "@wealthvn/addon-sdk";
+import { Icons, EmptyPlaceholder, Button, Page, PageContent, PageHeader } from "@wealthvn/ui";
 import React, { useState, useEffect } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { InvestmentCalendar, GoalSelector, HelpPopover } from "./components";
 import { useGoalProgress } from "./hooks";
-import { useBalancePrivacy } from "@wealthfolio/ui";
+import { useBalancePrivacy } from "@wealthvn/ui";
 
 // Main Investment Target Tracker component
 function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {

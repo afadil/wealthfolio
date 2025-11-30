@@ -9,7 +9,7 @@ use crate::{
 
 use log::debug;
 use tauri::{AppHandle, State};
-use wealthfolio_core::{
+use wealthvn_core::{
     holdings::Holding,
     income::IncomeSummary,
     performance::{PerformanceMetrics, SimplePerformanceMetrics},

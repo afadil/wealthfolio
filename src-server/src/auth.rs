@@ -108,7 +108,7 @@ impl AuthManager {
             .map_err(|_| AuthError::Internal("System clock is before UNIX_EPOCH".into()))?;
         let exp = now + self.token_ttl;
         let claims = Claims {
-            sub: "wealthfolio-web".to_string(),
+            sub: "wealthvn-web".to_string(),
             iat: now.as_secs() as usize,
             exp: exp.as_secs() as usize,
         };

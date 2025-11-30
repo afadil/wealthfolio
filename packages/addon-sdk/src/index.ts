@@ -1,11 +1,11 @@
 /**
- * @wealthfolio/addon-sdk
+ * @wealthvn/addon-sdk
  *
- * TypeScript SDK for building Wealthfolio addons with enhanced functionality,
+ * TypeScript SDK for building WealthVN addons with enhanced functionality,
  * type safety, and comprehensive permission management.
  *
  * @version 1.0.0
- * @author Wealthfolio Team
+ * @author WealthVN Team
  * @license MIT
  */
 

@@ -18,7 +18,7 @@ and this project adheres to
 - Support for multiple investment goals with individual progress tracking
 - Clean and intuitive user interface for goal management
 - Sidebar navigation integration for easy access
-- Compatible with Wealthfolio addon SDK v1.0.0
+- Compatible with WealthVN addon SDK v1.0.0
 
 ### Features
 

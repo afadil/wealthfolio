@@ -9,7 +9,7 @@ export interface BalancePrivacyHook {
 }
 
 /**
- * Custom hook for managing balance privacy across the Wealthfolio ecosystem.
+ * Custom hook for managing balance privacy across the WealthVN ecosystem.
  *
  * This hook provides a consistent way to handle balance privacy in both the main app
  * and addons by using localStorage as the source of truth. It automatically syncs
@@ -19,7 +19,7 @@ export interface BalancePrivacyHook {
  *
  * @example
  * ```tsx
- * import { useBalancePrivacy } from '@wealthfolio/ui';
+ * import { useBalancePrivacy } from '@wealthvn/ui';
  *
  * function MyComponent() {
  *   const { isBalanceHidden, toggleBalanceVisibility } = useBalancePrivacy();

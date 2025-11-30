@@ -9,7 +9,7 @@ import {
   Progress,
   Skeleton,
   formatAmount,
-} from "@wealthfolio/ui";
+} from "@wealthvn/ui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useContributionLimitProgress } from "../use-contribution-limit-mutations";

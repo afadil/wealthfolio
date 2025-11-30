@@ -4238,7 +4238,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "wealthfolio-server"
+name = "wealthvn-server"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -4262,11 +4262,11 @@ dependencies = [
  "utoipa",
  "utoipa-swagger-ui",
  "uuid",
- "wealthfolio_core",
+ "wealthvn_core",
 ]
 
 [[package]]
-name = "wealthfolio_core"
+name = "wealthvn_core"
 version = "2.0.1"
 dependencies = [
  "anyhow",

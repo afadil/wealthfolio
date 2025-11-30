@@ -4,14 +4,14 @@ import { DataTable } from "@/components/ui/data-table";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import { safeDivide } from "@/lib/utils";
 import type { ColumnDef } from "@tanstack/react-table";
-import { GainPercent } from "@wealthfolio/ui";
+import { GainPercent } from "@wealthvn/ui";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { Holding } from "@/lib/types";
 import { useNavigate } from "react-router-dom";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
-import { AmountDisplay } from "@wealthfolio/ui";
-import { QuantityDisplay } from "@wealthfolio/ui";
+import { AmountDisplay } from "@wealthvn/ui";
+import { QuantityDisplay } from "@wealthvn/ui";
 import { useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { TickerAvatar } from "@/components/ticker-avatar";

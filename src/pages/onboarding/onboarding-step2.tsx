@@ -10,8 +10,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Icons } from "@wealthfolio/ui";
-import { worldCurrencies } from "@wealthfolio/ui/lib/currencies";
+import { Icons } from "@wealthvn/ui";
+import { worldCurrencies } from "@wealthvn/ui/lib/currencies";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";

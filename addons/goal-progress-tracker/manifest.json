@@ -3,7 +3,7 @@
   "name": "Goal Progress Tracker",
   "version": "1.2.0",
   "description": "A simple addon to track your investment progress towards target amounts with a visual representation",
-  "author": "Wealthfolio",
+  "author": "WealthVN",
   "main": "dist/addon.js",
   "sdkVersion": "2.0.0",
   "enabled": true,

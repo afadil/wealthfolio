@@ -1,5 +1,5 @@
 [package]
-name = "wealthfolio-server"
+name = "wealthvn-server"
 version = "0.1.0"
 edition = "2021"
 
@@ -25,7 +25,7 @@ reqwest = { version = "0.11", features = ["json"] }
 base64 = "0.21"
 
 # path dependency to core
-wealthfolio_core = { path = "../src-core", package = "wealthfolio_core" }
+wealthvn_core = { path = "../src-core", package = "wealthvn_core" }
 
 hyper = { version = "0.14", features = ["full"] }
 

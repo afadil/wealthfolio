@@ -8,7 +8,7 @@ import { usePersistentState } from "@/hooks/use-persistent-state";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { Holding } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { AnimatedToggleGroup, formatAmount, formatPercent } from "@wealthfolio/ui";
+import { AnimatedToggleGroup, formatAmount, formatPercent } from "@wealthvn/ui";
 import { useMemo, type FC } from "react";
 import { Link } from "react-router-dom";
 import { Tooltip as ChartTooltip, ResponsiveContainer, Treemap } from "recharts";

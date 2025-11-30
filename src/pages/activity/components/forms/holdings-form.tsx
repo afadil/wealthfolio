@@ -10,7 +10,7 @@ import {
   FormLabel,
   FormControl,
   FormMessage,
-} from "@wealthfolio/ui";
+} from "@wealthvn/ui";
 import { ConfigurationCheckbox, CommonFields, AssetSymbolInput } from "./common";
 import { AccountSelectOption } from "../activity-form";
 import {

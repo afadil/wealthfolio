@@ -1,6 +1,6 @@
 # API Reference
 
-Complete reference for Wealthfolio addon APIs. All functions require appropriate
+Complete reference for WealthVN addon APIs. All functions require appropriate
 permissions in `manifest.json`.
 
 ## Context Overview
@@ -59,7 +59,7 @@ const unlistenCancel = await ctx.api.events.import.onDropCancelled(() => {
 
 ## Navigation API
 
-Navigate programmatically within the Wealthfolio application.
+Navigate programmatically within the WealthVN application.
 
 ### Methods
 
@@ -400,7 +400,7 @@ import type {
   PerformanceHistory,
   PerformanceSummary,
   // ... and many more
-} from "@wealthfolio/addon-sdk";
+} from "@wealthvn/addon-sdk";
 
 // Type-safe API usage
 const accounts: Account[] = await ctx.api.accounts.getAll();

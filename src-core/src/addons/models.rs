@@ -48,7 +48,7 @@ pub struct AddonManifest {
     pub homepage: Option<String>,
     pub repository: Option<String>,
     pub license: Option<String>,
-    #[serde(rename = "minWealthfolioVersion")]
+    #[serde(rename = "minWealthVNVersion")]
     pub min_wealthfolio_version: Option<String>,
     pub keywords: Option<Vec<String>>,
     pub icon: Option<String>,

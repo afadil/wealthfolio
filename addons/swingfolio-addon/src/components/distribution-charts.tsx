@@ -8,7 +8,7 @@ import {
   EmptyPlaceholder,
   formatAmount,
   Icons,
-} from '@wealthfolio/ui';
+} from '@wealthvn/ui';
 import {
   Bar,
   BarChart,
@@ -19,7 +19,7 @@ import {
   ChartTooltipContent,
   XAxis,
   YAxis,
-} from '@wealthfolio/ui/chart';
+} from '@wealthvn/ui/chart';
 import type { TradeDistribution } from '../types';
 
 interface DistributionChartsProps {

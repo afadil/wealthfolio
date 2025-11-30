@@ -18,7 +18,7 @@ import {
   PageContent,
   PageHeader,
   Skeleton,
-} from "@wealthfolio/ui";
+} from "@wealthvn/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";

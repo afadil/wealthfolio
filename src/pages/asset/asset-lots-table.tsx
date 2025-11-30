@@ -1,4 +1,4 @@
-import { DataTable, formatAmount, GainAmount, GainPercent } from "@wealthfolio/ui";
+import { DataTable, formatAmount, GainAmount, GainPercent } from "@wealthvn/ui";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Lot } from "@/lib/types";

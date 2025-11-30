@@ -7,7 +7,7 @@ import {
 import { useFormContext } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
-import { MoneyInput, QuantityInput } from "@wealthfolio/ui";
+import { MoneyInput, QuantityInput } from "@wealthvn/ui";
 import { ConfigurationCheckbox, CommonFields, AssetSymbolInput } from "./common";
 
 export const OtherForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {

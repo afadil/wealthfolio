@@ -14,7 +14,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
   formatPercent,
-} from "@wealthfolio/ui";
+} from "@wealthvn/ui";
 import HistoryChart from "@/components/history-chart-symbol";
 import { Quote, TimePeriod, DateRange } from "@/lib/types";
 import { useSyncMarketDataMutation } from "@/hooks/use-sync-market-data";

@@ -10,7 +10,7 @@ use axum::{
     routing::{delete, get, post},
     Json, Router,
 };
-use wealthfolio_core::activities::{
+use wealthvn_core::activities::{
     Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityImport,
     ActivitySearchResponse, ActivityUpdate, ImportMappingData, NewActivity,
 };
@@ -18,8 +18,8 @@ use wealthfolio_core::activities::{
 #[derive(serde::Deserialize)]
 #[serde(untagged)]
 enum SortWrapper {
-    One(wealthfolio_core::activities::Sort),
-    Many(Vec<wealthfolio_core::activities::Sort>),
+    One(wealthvn_core::activities::Sort),
+    Many(Vec<wealthvn_core::activities::Sort>),
 }
 
 #[derive(serde::Deserialize)]
@@ -49,7 +49,7 @@ async fn search_activities(
     Json(body): Json<ActivitySearchBody>,
 ) -> ApiResult<Json<ActivitySearchResponse>> {
     // Normalize sort to a single value if provided
-    let sort_normalized: Option<wealthfolio_core::activities::Sort> = match body.sort {
+    let sort_normalized: Option<wealthvn_core::activities::Sort> = match body.sort {
         Some(SortWrapper::One(s)) => Some(s),
         Some(SortWrapper::Many(v)) => v.into_iter().next(),
         None => None,

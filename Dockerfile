@@ -49,15 +49,15 @@ ENV OPENSSL_STATIC=1
 # Build using xx-cargo which handles target flags
 RUN xx-cargo build --release --manifest-path src-server/Cargo.toml && \
     # Move the binary to a predictable location because the target dir changes with --target
-    cp src-server/target/$(xx-cargo --print-target-triple)/release/wealthfolio-server /wealthfolio-server
+    cp src-server/target/$(xx-cargo --print-target-triple)/release/wealthvn-server /wealthvn-server
 
 # Final stage
 FROM alpine:3.19
 WORKDIR /app
 # Copy from backend (which is now build platform, but binary is target platform)
-COPY --from=backend /wealthfolio-server /usr/local/bin/wealthfolio-server
+COPY --from=backend /wealthvn-server /usr/local/bin/wealthvn-server
 COPY --from=frontend /web-dist ./dist
-ENV WF_DB_PATH=/data/wealthfolio.db
+ENV WF_DB_PATH=/data/wealthvn.db
 VOLUME ["/data"]
 EXPOSE 8080
-CMD ["/usr/local/bin/wealthfolio-server"]
+CMD ["/usr/local/bin/wealthvn-server"]

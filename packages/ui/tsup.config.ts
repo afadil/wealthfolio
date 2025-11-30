@@ -15,7 +15,7 @@ export default defineConfig({
     options.alias = {
       "@/components": "./src/components",
       "@/lib": "./src/lib",
-      "@wealthfolio/ui": "./src",
+      "@wealthvn/ui": "./src",
     };
   },
 });

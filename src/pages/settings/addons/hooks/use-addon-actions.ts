@@ -13,7 +13,7 @@ import {
   clearAddonStaging,
 } from "@/commands/addon";
 import type { InstalledAddon, Permission, ExtractedAddon } from "@/adapters/tauri";
-import type { RiskLevel, AddonManifest } from "@wealthfolio/addon-sdk";
+import type { RiskLevel, AddonManifest } from "@wealthvn/addon-sdk";
 import { QueryKeys } from "@/lib/query-keys";
 
 interface PermissionDialogState {

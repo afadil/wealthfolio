@@ -9,7 +9,7 @@ import { useSettingsContext } from "@/lib/settings-provider";
 import { DateRange, TimePeriod } from "@/lib/types";
 import { calculatePerformanceMetrics } from "@/lib/utils";
 import { PortfolioUpdateTrigger } from "@/pages/dashboard/portfolio-update-trigger";
-import { GainAmount, GainPercent, IntervalSelector, Page } from "@wealthfolio/ui";
+import { GainAmount, GainPercent, IntervalSelector, Page } from "@wealthvn/ui";
 import { subMonths } from "date-fns";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";

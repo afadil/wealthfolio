@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { type AddonContext, type AccountValuation } from "@wealthfolio/addon-sdk";
+import { type AddonContext, type AccountValuation } from "@wealthvn/addon-sdk";
 
 interface UseLatestValuationsOptions {
   accountIds: string[];

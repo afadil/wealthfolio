@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { type AddonContext, type GoalAllocation } from "@wealthfolio/addon-sdk";
+import { type AddonContext, type GoalAllocation } from "@wealthvn/addon-sdk";
 
 interface UseGoalAllocationsOptions {
   ctx: AddonContext;

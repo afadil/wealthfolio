@@ -25,14 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release of {{addonName}} addon
 - Basic addon functionality and core features
-- Integration with Wealthfolio addon SDK v1.0.0
+- Integration with WealthVN addon SDK v1.0.0
 - Sidebar navigation integration for easy access
 - Responsive design for all screen sizes
 
 ### Features
 - {{description}}
 - User-friendly interface
-- Compatible with Wealthfolio platform
+- Compatible with WealthVN platform
 
 ### Permissions
 - UI components access for sidebar and routing

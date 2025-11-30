@@ -4,8 +4,8 @@ use crate::context::ServiceContext;
 use crate::events::{emit_portfolio_trigger_recalculate, PortfolioRequestPayload};
 use log::debug;
 use tauri::{AppHandle, State};
-use wealthfolio_core::fx::fx_model::{ExchangeRate, NewExchangeRate};
-use wealthfolio_core::settings::{Settings, SettingsUpdate};
+use wealthvn_core::fx::fx_model::{ExchangeRate, NewExchangeRate};
+use wealthvn_core::settings::{Settings, SettingsUpdate};
 
 #[tauri::command]
 pub async fn get_settings(state: State<'_, Arc<ServiceContext>>) -> Result<Settings, String> {

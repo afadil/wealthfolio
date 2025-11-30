@@ -31,7 +31,7 @@
     },
     "addons": {
       "title": "Add-ons",
-      "subtitle": "Extend Wealthfolio with features"
+      "subtitle": "Extend WealthVN with features"
     },
     "exports": {
       "title": "Data Export",
@@ -39,7 +39,7 @@
     },
     "about": {
       "title": "About",
-      "subtitle": "About Wealthfolio"
+      "subtitle": "About WealthVN"
     }
   },
   "securities": {
@@ -189,7 +189,7 @@
     "autoUpdate": {
       "title": "Automatic Updates",
       "enableLabel": "Enable automatic update checks",
-      "enableDescription": "When enabled, Wealthfolio will automatically check for updates when the application starts. You can still manually check for updates from the Help menu.",
+      "enableDescription": "When enabled, WealthVN will automatically check for updates when the application starts. You can still manually check for updates from the Help menu.",
       "toast": {
         "successTitle": "Settings updated",
         "successDescription": "Auto-update settings have been saved successfully.",
@@ -329,7 +329,7 @@
   },
   "about": {
     "title": "About",
-    "description": "About Wealthfolio"
+    "description": "About WealthVN"
   },
   "marketData": {
     "title": "Market Data",

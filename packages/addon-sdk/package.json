@@ -1,8 +1,8 @@
 {
-  "name": "@wealthfolio/addon-sdk",
+  "name": "@wealthvn/addon-sdk",
   "version": "2.0.0",
   "type": "module",
-  "description": "TypeScript SDK for building Wealthfolio addons with enhanced functionality and type safety",
+  "description": "TypeScript SDK for building WealthVN addons with enhanced functionality and type safety",
   "main": "dist/index.js",
   "types": "dist/src/index.d.ts",
   "exports": {
@@ -25,7 +25,7 @@
     "CHANGELOG.md"
   ],
   "keywords": [
-    "wealthfolio",
+    "wealthvn",
     "addon",
     "plugin",
     "sdk",
@@ -33,16 +33,16 @@
     "financial",
     "portfolio"
   ],
-  "author": "Wealthfolio Team",
+  "author": "Chipheo00 - CFPM Inc. WealthVN Team",
   "license": "MIT",
-  "homepage": "https://wealthfolio.app/addons",
+  "homepage": "https://github.com/chipheo00/vn-wealthfolio/tree/main/packages/addon-sdk",
   "repository": {
     "type": "git",
-    "url": "https://github.com/afadil/wealthfolio.git",
+    "url": "https://github.com/chipheo00/vn-wealthfolio.git",
     "directory": "packages/addon-sdk"
   },
   "bugs": {
-    "url": "https://github.com/afadil/wealthfolio/issues"
+    "url": "https://github.com/chipheo00/vn-wealthfolio/issues"
   },
   "scripts": {
     "build": "tsup && pnpm run build:types",

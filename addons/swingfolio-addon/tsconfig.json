@@ -8,9 +8,9 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@wealthfolio/addon-sdk": ["../../packages/addon-sdk/src"],
-      "@wealthfolio/ui": ["../../packages/ui/src"],
-      "@wealthfolio/ui/*": ["../../packages/ui/src/*"]
+      "@wealthvn/addon-sdk": ["../../packages/addon-sdk/src"],
+      "@wealthvn/ui": ["../../packages/ui/src"],
+      "@wealthvn/ui/*": ["../../packages/ui/src/*"]
     }
   },
   "include": ["src"],

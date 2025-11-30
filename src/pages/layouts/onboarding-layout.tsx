@@ -1,5 +1,5 @@
 import { Toaster } from "@/components/sonner";
-import { ErrorBoundary } from "@wealthfolio/ui";
+import { ErrorBoundary } from "@wealthvn/ui";
 import { Outlet } from "react-router-dom";
 
 const OnboardingLayout = () => {

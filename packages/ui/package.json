@@ -1,8 +1,8 @@
 {
-  "name": "@wealthfolio/ui",
+  "name": "@wealthvn/ui",
   "version": "2.0.0",
   "type": "module",
-  "description": "Wealthfolio UI components based on shadcn/ui and Tailwind CSS",
+  "description": "WealthVN UI components based on shadcn/ui and Tailwind CSS",
   "main": "dist/index.js",
   "types": "dist/src/index.d.ts",
   "exports": {
@@ -23,7 +23,7 @@
     "README.md"
   ],
   "keywords": [
-    "wealthfolio",
+    "wealthvn",
     "ui",
     "components",
     "shadcn",
@@ -31,17 +31,17 @@
     "react",
     "components"
   ],
-  "author": "Wealthfolio Team",
+  "author": "Chipheo00 - CFPM Inc. WealthVN Team",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/afadil/wealthfolio.git",
+    "url": "https://github.com/chipheo00/vn-wealthfolio.git",
     "directory": "packages/ui"
   },
   "bugs": {
-    "url": "https://github.com/afadil/wealthfolio/issues"
+    "url": "https://github.com/chipheo00/vn-wealthfolio/issues"
   },
-  "homepage": "https://github.com/afadil/wealthfolio/tree/main/packages/ui#readme",
+  "homepage": "https://github.com/chipheo00/vn-wealthfolio/tree/main/packages/ui#readme",
   "publishConfig": {
     "access": "public"
   },

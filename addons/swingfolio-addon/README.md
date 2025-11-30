@@ -1,6 +1,6 @@
 # Swingfolio - Advanced Swing Trading Tracker
 
-A comprehensive Wealthfolio addon for tracking and analyzing swing trading
+A comprehensive WealthVN addon for tracking and analyzing swing trading
 performance with detailed analytics, calendar views, and performance metrics.
 
 ## Features
@@ -43,8 +43,8 @@ performance with detailed analytics, calendar views, and performance metrics.
 
 ## Installation
 
-1. Download the addon package from the Wealthfolio addon marketplace
-2. Install through the Wealthfolio addon manager
+1. Download the addon package from the WealthVN addon marketplace
+2. Install through the WealthVN addon manager
 3. Enable the addon in your settings
 4. Navigate to "Swingfolio" in the sidebar to get started
 
@@ -97,9 +97,9 @@ performance with detailed analytics, calendar views, and performance metrics.
 
 ## Data Privacy & Security
 
-- All preferences and selections are stored securely using Wealthfolio's
-  encrypted storage
-- No data is transmitted outside of your Wealthfolio instance
+- All preferences and selections are stored securely using WealthVN's encrypted
+  storage
+- No data is transmitted outside of your WealthVN instance
 - Full privacy protection for sensitive financial information
 
 ## Permissions Required
@@ -138,9 +138,9 @@ performance with detailed analytics, calendar views, and performance metrics.
 
 For support, feature requests, or bug reports:
 
-- Visit the Wealthfolio community forums
+- Visit the WealthVN community forums
 - Submit issues through the addon feedback system
-- Check the Wealthfolio documentation for addon troubleshooting
+- Check the WealthVN documentation for addon troubleshooting
 
 ## Version History
 

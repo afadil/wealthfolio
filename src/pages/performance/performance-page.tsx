@@ -34,7 +34,7 @@ import {
   PageContent,
   PageHeader,
   Separator,
-} from "@wealthfolio/ui";
+} from "@wealthvn/ui";
 import { subMonths } from "date-fns";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";

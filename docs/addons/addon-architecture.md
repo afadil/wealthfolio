@@ -1,10 +1,10 @@
-# Wealthfolio Addon Architecture
+# WealthVN Addon Architecture
 
-A straightforward explanation of how Wealthfolio's addon system works.
+A straightforward explanation of how WealthVN's addon system works.
 
-## What Are Wealthfolio Addons?
+## What Are WealthVN Addons?
 
-Addons are TypeScript modules that extend Wealthfolio's functionality. Each
+Addons are TypeScript modules that extend WealthVN's functionality. Each
 addon is a JavaScript function that receives an `AddonContext` object and can
 register UI components, add navigation items, and access financial data through
 APIs.
@@ -13,7 +13,7 @@ APIs.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Wealthfolio Host Application                 │
+│                    WealthVN Host Application                 │
 ├─────────────────────────────────────────────────────────────────┤
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
 │  │  Addon Runtime  │  │  Permission     │  │   API Bridge    │  │
@@ -275,7 +275,7 @@ Development addons run from local servers:
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ┌─────────────────┐              ┌─────────────────┐           │
-│  │ Wealthfolio App │◀─ discover ─▶│ Dev Server      │           │
+│  │ WealthVN App │◀─ discover ─▶│ Dev Server      │           │
 │  │                 │              │ localhost:3001  │           │
 │  │ • Auto-discover │              │                 │           │
 │  │ • Load addons   │              │ /health    ✓    │           │

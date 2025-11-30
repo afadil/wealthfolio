@@ -14,7 +14,7 @@ import { Icons } from "@/components/ui/icons";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/use-toast";
-import type { AddonUpdateInfo } from "@wealthfolio/addon-sdk";
+import type { AddonUpdateInfo } from "@wealthvn/addon-sdk";
 import { useState } from "react";
 
 interface AddonUpdateCardProps {
@@ -226,11 +226,11 @@ export function AddonUpdateCard({
         </div>
       </div>
 
-      {updateInfo.minWealthfolioVersion && (
+      {updateInfo.minWealthVNVersion && (
         <div className="mt-3 rounded-md bg-amber-100 p-2 dark:bg-amber-900/20">
           <p className="text-xs text-amber-800 dark:text-amber-200">
             <Icons.Info className="mr-1 inline h-3 w-3" />
-            Requires Wealthfolio {updateInfo.minWealthfolioVersion} or later
+            Requires WealthVN {updateInfo.minWealthVNVersion} or later
           </p>
         </div>
       )}

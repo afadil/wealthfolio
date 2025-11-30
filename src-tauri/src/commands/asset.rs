@@ -5,7 +5,7 @@ use crate::{
     events::{emit_portfolio_trigger_recalculate, PortfolioRequestPayload},
 };
 use tauri::{AppHandle, State};
-use wealthfolio_core::assets::{Asset, UpdateAssetProfile};
+use wealthvn_core::assets::{Asset, UpdateAssetProfile};
 
 #[tauri::command]
 pub async fn get_asset_profile(

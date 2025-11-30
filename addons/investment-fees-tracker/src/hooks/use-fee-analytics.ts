@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { AddonContext } from "@wealthfolio/addon-sdk";
+import type { AddonContext } from "@wealthvn/addon-sdk";
 import { useActivities } from "./use-activities";
 import { useCurrencyConversion } from "./use-currency-conversion";
 import { calculateFeeAnalytics, type FeeAnalytics } from "../lib/fee-calculation.service";

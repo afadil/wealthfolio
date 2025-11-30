@@ -8,7 +8,7 @@ import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { Account, Holding } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { AmountDisplay, GainPercent, Separator } from "@wealthfolio/ui";
+import { AmountDisplay, GainPercent, Separator } from "@wealthvn/ui";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";

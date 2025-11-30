@@ -12,7 +12,7 @@ edits, clear reasoning, and validation via the existing scripts and tests.
   served by an Axum HTTP server.
 - Strong addon system powered by a TypeScript SDK enabling dynamic sidebar
   routes, UI, permissions, and secure secrets.
-- Monorepo-style packages: shared UI (`@wealthfolio/ui`), addon SDK, and addon
+- Monorepo-style packages: shared UI (`@wealthvn/ui`), addon SDK, and addon
   dev tools.
 
 References:
@@ -55,7 +55,7 @@ References:
 - Packages: `packages/`
   - `addon-sdk` — TypeScript SDK for addons
   - `addon-dev-tools` — CLI and dev server for addons
-  - `ui` — Shared UI lib (`@wealthfolio/ui`)
+  - `ui` — Shared UI lib (`@wealthvn/ui`)
 
 ## Architecture Notes
 
@@ -75,7 +75,7 @@ References:
 
 ## Styling & UI
 
-- Use Tailwind v4 (CSS-first) and shared components from `@wealthfolio/ui`.
+- Use Tailwind v4 (CSS-first) and shared components from `@wealthvn/ui`.
 - Prefer composition via `packages/ui/src/components/ui/*` and
   `packages/ui/src/components/common/*`.
 - Theme tokens are declared in `src/styles.css`:1 (light/dark, semantic colors,
@@ -121,7 +121,7 @@ When adding a new user-visible feature that needs backend data:
 1. Frontend route and UI
 
 - Add page under `src/pages/...` and route in `src/routes.tsx`:1.
-- Build UI with components from `@wealthfolio/ui` and Tailwind.
+- Build UI with components from `@wealthvn/ui` and Tailwind.
 
 2. Frontend command wrapper
 
@@ -169,9 +169,9 @@ Common UI tasks:
 
 ## Addon Development (Quickstart)
 
-- Scaffold: `npx @wealthfolio/addon-dev-tools create <my-addon>`
+- Scaffold: `npx @wealthvn/addon-dev-tools create <my-addon>`
 - Start addon dev server: `npm run dev:server` (from addon dir)
-- Run Wealthfolio (desktop): `pnpm tauri dev`
+- Run WealthVN (desktop): `pnpm tauri dev`
 - Add routes and sidebar via the addon context
   (`src/addons/addons-runtime-context.ts`:1)
 - Use `ctx.api.*` for data, events, and query cache integration (see docs below)
@@ -199,7 +199,7 @@ Docs entry points:
   maps/union types); use functional components with interface props.
 - Syntax: use `function` for pure functions; always use curly braces for
   conditionals; favor simple, declarative JSX.
-- UI/styling: use Tailwind utilities; reuse `@wealthfolio/ui` components where
+- UI/styling: use Tailwind utilities; reuse `@wealthvn/ui` components where
   possible.
 - Performance: immutable data; efficient data fetching with React Query;
   minimize network calls; choose efficient data structures; optimize rendering

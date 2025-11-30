@@ -1,4 +1,4 @@
-# Multi-Language Implementation Plan for Wealthfolio
+# Multi-Language Implementation Plan for WealthVN
 
 **Target Languages:** English (en) + Vietnamese (vi)  
 **Framework:** react-i18next + date-fns locales  
@@ -116,7 +116,7 @@ All documentation successfully created:
 
 ### Goal
 
-Implement full internationalization (i18n) support for Wealthfolio with English
+Implement full internationalization (i18n) support for WealthVN with English
 and Vietnamese language options, allowing users to switch languages dynamically
 through the Settings interface.
 
@@ -350,7 +350,7 @@ Create empty JSON structure for all 20 files (10 x 2 languages).
 
 ```json
 {
-  "appName": "Wealthfolio",
+  "appName": "WealthVN",
   "actions": {
     "save": "Save",
     "cancel": "Cancel",
@@ -563,7 +563,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
 ```typescript
 import { useTranslation } from 'react-i18next';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@wealthfolio/ui';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@wealthvn/ui';
 import { useSettings } from '@/lib/settings-provider';
 
 const LANGUAGES = [

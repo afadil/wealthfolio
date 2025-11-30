@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { type AddonContext, type Account } from "@wealthfolio/addon-sdk";
+import { type AddonContext, type Account } from "@wealthvn/addon-sdk";
 
 interface UseAccountsOptions {
   ctx: AddonContext;

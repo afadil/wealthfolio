@@ -1,5 +1,5 @@
 /**
- * Comprehensive data types for Wealthfolio addons
+ * Comprehensive data types for WealthVN addons
  * These types mirror the main application types to ensure compatibility
  */
 

@@ -9,7 +9,7 @@ import {
 import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
 import { Icons } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
-import { formatAmount } from "@wealthfolio/ui";
+import { formatAmount } from "@wealthvn/ui";
 import { parseISO } from "date-fns";
 import React from "react";
 import { useTranslation } from "react-i18next";

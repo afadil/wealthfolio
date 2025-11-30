@@ -31,7 +31,7 @@
     },
     "addons": {
       "title": "Tiện ích",
-      "subtitle": "Mở rộng Wealthfolio với các tính năng"
+      "subtitle": "Mở rộng WealthVN với các tính năng"
     },
     "exports": {
       "title": "Xuất dữ liệu",
@@ -39,7 +39,7 @@
     },
     "about": {
       "title": "Về ứng dụng",
-      "subtitle": "Về Wealthfolio"
+      "subtitle": "Về WealthVN"
     }
   },
   "securities": {
@@ -189,7 +189,7 @@
     "autoUpdate": {
       "title": "Cập nhật tự động",
       "enableLabel": "Bật kiểm tra cập nhật tự động",
-      "enableDescription": "Khi được bật, Wealthfolio sẽ tự động kiểm tra cập nhật khi ứng dụng khởi động. Bạn vẫn có thể kiểm tra cập nhật thủ công từ menu Trợ giúp.",
+      "enableDescription": "Khi được bật, WealthVN sẽ tự động kiểm tra cập nhật khi ứng dụng khởi động. Bạn vẫn có thể kiểm tra cập nhật thủ công từ menu Trợ giúp.",
       "toast": {
         "successTitle": "Đã cập nhật cài đặt",
         "successDescription": "Cài đặt cập nhật tự động đã được lưu thành công.",
@@ -329,7 +329,7 @@
   },
   "about": {
     "title": "Về ứng dụng",
-    "description": "Về Wealthfolio"
+    "description": "Về WealthVN"
   },
   "marketData": {
     "title": "Dữ Liệu Thị Trường",

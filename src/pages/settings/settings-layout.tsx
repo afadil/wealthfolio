@@ -1,6 +1,6 @@
 import { Icons } from "@/components/ui/icons";
 import { Separator } from "@/components/ui/separator";
-import { ApplicationShell } from "@wealthfolio/ui";
+import { ApplicationShell } from "@wealthvn/ui";
 import { useTranslation } from "react-i18next";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { SidebarNav } from "./sidebar-nav";

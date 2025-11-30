@@ -2,7 +2,7 @@ import { ChartConfig, ChartContainer } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useDateFormatter } from "@/hooks/use-date-formatter";
-import { AmountDisplay } from "@wealthfolio/ui";
+import { AmountDisplay } from "@wealthvn/ui";
 import { useState } from "react";
 import { Area, AreaChart, Tooltip, YAxis } from "recharts";
 import { useTranslation } from "react-i18next";

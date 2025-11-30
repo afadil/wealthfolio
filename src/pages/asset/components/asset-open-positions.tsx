@@ -1,6 +1,6 @@
 import type { OpenPosition } from "@/pages/trading/types";
 import { OpenTradesTable } from "@/components/open-trades-table";
-import { Card, CardContent, CardHeader, CardTitle, Icons } from "@wealthfolio/ui";
+import { Card, CardContent, CardHeader, CardTitle, Icons } from "@wealthvn/ui";
 import { useTranslation } from "react-i18next";
 
 interface AssetOpenPositionsProps {

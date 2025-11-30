@@ -263,8 +263,8 @@ None. The refactoring maintains 100% backward compatibility with the `MarketData
 
 ## Next Steps for Deployment
 
-1. **Restore Pro Features** (when wealthfolio-pro path is available):
-   - Uncomment `wealthfolio_sync` in Cargo.toml
+1. **Restore Pro Features** (when wealthvn-pro path is available):
+   - Uncomment `wealthvn_sync` in Cargo.toml
    - Uncomment pro features
 
 2. **Test with Real Data**:

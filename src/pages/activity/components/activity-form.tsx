@@ -258,7 +258,7 @@ export function ActivityForm({
             {activity?.id ? t("form.updateDescription") : t("form.addDescription")}
             {"→ "}
             <a
-              href="https://wealthfolio.app/docs/concepts/activity-types"
+              href="https://github.com/vn-wealthfolio/WealthVN/blob/main/docs/activities/activity-types.md"
               target="_blank"
               rel="noopener noreferrer"
               className="underline"

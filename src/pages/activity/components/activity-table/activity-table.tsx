@@ -39,7 +39,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { Button, formatAmount } from "@wealthfolio/ui";
+import { Button, formatAmount } from "@wealthvn/ui";
 import { Link } from "react-router-dom";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import { ActivityOperations } from "../activity-operations";

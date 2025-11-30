@@ -16,7 +16,7 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger,
-} from "@wealthfolio/ui";
+} from "@wealthvn/ui";
 import { useToast } from "@/components/ui/use-toast";
 import { useState } from "react";
 import { SettingsHeader } from "../settings-header";
@@ -99,7 +99,7 @@ export default function AddonSettingsPage() {
       <div className="flex items-center justify-between">
         <SettingsHeader
           heading="Addon Manager"
-          text="Install and manage add-ons to extend Wealthfolio's functionality."
+          text="Install and manage add-ons to extend WealthVN's functionality."
         />
 
         <div className="flex items-center gap-3">
@@ -114,7 +114,7 @@ export default function AddonSettingsPage() {
                 <div className="space-y-2">
                   <h4 className="font-medium">🔌 Add-ons & Extensions</h4>
                   <p className="text-muted-foreground text-sm">
-                    Add-ons let you extend Wealthfolio with new features, custom analytics, and
+                    Add-ons let you extend WealthVN with new features, custom analytics, and
                     additional functionality to enhance your financial management experience.
                   </p>
                 </div>
@@ -281,7 +281,7 @@ export default function AddonSettingsPage() {
                 <EmptyPlaceholder.Icon name="Package" />
                 <EmptyPlaceholder.Title>No add-ons installed</EmptyPlaceholder.Title>
                 <EmptyPlaceholder.Description>
-                  Get started by installing your first add-on to extend Wealthfolio&apos;s functionality.
+                  Get started by installing your first add-on to extend WealthVN&apos;s functionality.
                 </EmptyPlaceholder.Description>
                 <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:gap-3">
                   <Button onClick={() => setActiveTab("store")} className="w-full sm:w-auto">

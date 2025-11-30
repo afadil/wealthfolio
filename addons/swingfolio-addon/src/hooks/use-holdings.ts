@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { type AddonContext, type Holding } from '@wealthfolio/addon-sdk';
+import { type AddonContext, type Holding } from '@wealthvn/addon-sdk';
 
 interface UseHoldingsOptions {
   ctx: AddonContext;

@@ -26,7 +26,7 @@ import {
   PopoverContent,
   PopoverTrigger,
   formatAmount,
-} from "@wealthfolio/ui";
+} from "@wealthvn/ui";
 import { formatQuantity } from "@/lib/utils";
 import {
   useReactTable,

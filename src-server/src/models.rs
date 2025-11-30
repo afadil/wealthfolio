@@ -1,7 +1,7 @@
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use wealthfolio_core::accounts as core_accounts;
+use wealthvn_core::accounts as core_accounts;
 
 #[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
 #[serde(rename_all = "camelCase")]

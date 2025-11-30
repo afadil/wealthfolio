@@ -157,9 +157,9 @@ Status: ✅ 0 errors, 5 warnings (non-breaking)
 ## Known Issues & Fixes
 
 ### Pro Features Disabled
-**Issue**: `wealthfolio-sync` path not found
+**Issue**: `wealthvn-sync` path not found
 **Fix**: Commented out in Cargo.toml (temporary)
-**Action**: Uncomment when `wealthfolio-pro` path is available
+**Action**: Uncomment when `wealthvn-pro` path is available
 
 ### SJC Test
 **Issue**: Used `tokio_test::block_on` (not available)

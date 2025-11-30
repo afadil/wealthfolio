@@ -2,7 +2,7 @@ use crate::errors::{Error, Result};
 use keyring::Entry;
 
 const USERNAME: &str = "default";
-const SERVICE_PREFIX: &str = "wealthfolio_";
+const SERVICE_PREFIX: &str = "wealthvn_";
 
 /// Provides simple secret storage using the operating system keyring.
 pub struct SecretManager;

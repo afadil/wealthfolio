@@ -14,8 +14,8 @@ import type {
   Permission,
   PermissionCategory,
   RiskLevel,
-} from "@wealthfolio/addon-sdk";
-import { AlertFeedback } from "@wealthfolio/ui";
+} from "@wealthvn/addon-sdk";
+import { AlertFeedback } from "@wealthvn/ui";
 import { PermissionCategoriesDisplay } from "./permission-categories-display";
 
 interface PermissionDialogProps {

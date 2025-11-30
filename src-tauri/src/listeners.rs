@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Instant;
 use tauri::{async_runtime::spawn, AppHandle, Emitter, Listener, Manager};
-use wealthfolio_core::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
+use wealthvn_core::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
 
 use crate::context::ServiceContext;
 use crate::events::{

@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/sheet";
 import { Account } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { Icons, type Icon } from "@wealthfolio/ui";
+import { Icons, type Icon } from "@wealthvn/ui";
 import { forwardRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Skeleton } from "@/components/ui/skeleton";

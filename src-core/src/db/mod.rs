@@ -112,7 +112,7 @@ pub fn create_backup_path(app_data_dir: &str) -> Result<String> {
     })?;
 
     let timestamp = Local::now().format("%Y%m%d_%H%M%S");
-    let backup_file = format!("wealthfolio_backup_{}.db", timestamp);
+    let backup_file = format!("wealthvn_backup_{}.db", timestamp);
     let backup_path = backup_dir.join(backup_file);
 
     Ok(backup_path.to_str().unwrap().to_string())

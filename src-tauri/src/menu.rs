@@ -3,7 +3,7 @@ use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tauri_plugin_dialog::DialogExt;
 
 pub fn create_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>, tauri::Error> {
-    let app_menu = SubmenuBuilder::new(app, "Wealthfolio")
+    let app_menu = SubmenuBuilder::new(app, "WealthVN")
         .item(&MenuItemBuilder::with_id("check_for_update", "Check for Update").build(app)?)
         .separator()
         .item(&MenuItemBuilder::with_id("open_settings", "Settings...").build(app)?)
@@ -39,7 +39,7 @@ pub fn create_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>, tauri::Err
         // Add the new menu item for checking updates
         .item(&MenuItemBuilder::with_id("check_for_update", "Check for Update").build(app)?)
         .separator()
-        .item(&MenuItemBuilder::with_id("show_about_dialog", "About Wealthfolio").build(app)?)
+        .item(&MenuItemBuilder::with_id("show_about_dialog", "About WealthVN").build(app)?)
         .build()?;
 
     let menu = MenuBuilder::new(app)
@@ -62,7 +62,7 @@ pub fn handle_menu_event(app: &AppHandle, instance_id: &str, event_id: &str) {
         }
         "report_issue" => {
             app.dialog()
-                .message("If you encounter any issues, please email us at wealthfolio@teymz.com")
+                .message("If you encounter any issues, please report them at https://github.com/chipheo00/vn-wealthfolio/issues")
                 .title("Report Issue")
                 .show(|_| {});
         }

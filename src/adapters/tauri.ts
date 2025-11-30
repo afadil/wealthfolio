@@ -16,7 +16,7 @@ import type {
   AddonFile as BaseAddonFile,
   FunctionPermission,
   Permission,
-} from "@wealthfolio/addon-sdk";
+} from "@wealthvn/addon-sdk";
 
 // Tauri-specific types with camelCase serialization to match Rust
 export interface AddonFile extends Omit<BaseAddonFile, "is_main"> {

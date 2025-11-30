@@ -15,8 +15,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@wealthfolio/ui';
-import type { AddonContext } from '@wealthfolio/addon-sdk';
+} from '@wealthvn/ui';
+import type { AddonContext } from '@wealthvn/addon-sdk';
 import { useSwingPreferences } from '../hooks/use-swing-preferences';
 
 interface SettingsPageProps {

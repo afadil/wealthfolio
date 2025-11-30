@@ -15,13 +15,13 @@ pub const ACTIVITY_TYPE_DIVIDEND: &str = "DIVIDEND";
 /// Interest earned on cash or fixed-income positions. Increases cash.
 pub const ACTIVITY_TYPE_INTEREST: &str = "INTEREST";
 
-/// Incoming funds from outside Wealthfolio. Increases cash.
+/// Incoming funds from outside WealthVN. Increases cash.
 pub const ACTIVITY_TYPE_DEPOSIT: &str = "DEPOSIT";
 
 /// Outgoing funds to an external account. Decreases cash.
 pub const ACTIVITY_TYPE_WITHDRAWAL: &str = "WITHDRAWAL";
 
-/// Move cash or assets into this account from another Wealthfolio account.
+/// Move cash or assets into this account from another WealthVN account.
 /// Asset cost basis is preserved. Increases cash or quantity.
 pub const ACTIVITY_TYPE_TRANSFER_IN: &str = "TRANSFER_IN";
 

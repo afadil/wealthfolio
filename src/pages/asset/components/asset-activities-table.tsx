@@ -6,7 +6,7 @@ import { useActivityMutations } from "@/pages/activity/hooks/use-activity-mutati
 import { useState } from "react";
 import { SortingState } from "@tanstack/react-table";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui";
+import { Card, CardContent, CardHeader, CardTitle } from "@wealthvn/ui";
 import { useTranslation } from "react-i18next";
 import { Account, ActivityDetails } from "@/lib/types";
 import { ActivityDeleteModal } from "@/pages/activity/components/activity-delete-modal";

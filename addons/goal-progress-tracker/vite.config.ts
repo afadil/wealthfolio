@@ -18,18 +18,24 @@ export default defineConfig({
       formats: ["es"],
     },
     rollupOptions: {
-      // Externalize React and ReactDOM so the addon uses the host's version
-      external: ["react", "react-dom"],
+      // Externalize React, ReactDOM, SDK and UI library so the addon uses the host's version
+      external: ["react", "react-dom", "@wealthvn/ui", "@wealthvn/ui/chart", "@wealthvn/addon-sdk"],
       plugins: [
         externalGlobals({
           react: "React",
           "react-dom": "ReactDOM",
+          "@wealthvn/ui": "WealthVNUI",
+          "@wealthvn/ui/chart": "WealthVNUIChart",
+          "@wealthvn/addon-sdk": "WealthVNAddonSDK",
         }),
       ],
       output: {
         globals: {
-          react: "React", // Assumes React is available as window.React
-          "react-dom": "ReactDOM", // Assumes ReactDOM is available as window.ReactDOM
+          react: "React",
+          "react-dom": "ReactDOM",
+          "@wealthvn/ui": "WealthVNUI",
+          "@wealthvn/ui/chart": "WealthVNUIChart",
+          "@wealthvn/addon-sdk": "WealthVNAddonSDK",
         },
       },
     },

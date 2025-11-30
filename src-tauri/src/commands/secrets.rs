@@ -1,7 +1,7 @@
 use crate::context::ServiceContext;
 use std::sync::Arc;
 use tauri::State;
-use wealthfolio_core::secrets::SecretManager;
+use wealthvn_core::secrets::SecretManager;
 
 #[tauri::command]
 pub async fn set_secret(

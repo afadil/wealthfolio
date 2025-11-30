@@ -9,7 +9,7 @@ import {
   Icons,
   StarRating,
   Textarea,
-} from "@wealthfolio/ui";
+} from "@wealthvn/ui";
 import React from "react";
 import { useAddonRatingMutation } from "../hooks/use-addon-rating-mutation";
 

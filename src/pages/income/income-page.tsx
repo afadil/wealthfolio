@@ -17,7 +17,7 @@ import {
     PageContent,
     PageHeader,
     PrivacyAmount,
-} from "@wealthfolio/ui";
+} from "@wealthvn/ui";
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Cell, Pie, PieChart } from "recharts";

@@ -7,7 +7,7 @@ use axum::{
     routing::{delete, get, put},
     Json, Router,
 };
-use wealthfolio_core::fx::fx_model::{ExchangeRate, NewExchangeRate};
+use wealthvn_core::fx::fx_model::{ExchangeRate, NewExchangeRate};
 
 async fn get_latest_exchange_rates(
     State(state): State<Arc<AppState>>,

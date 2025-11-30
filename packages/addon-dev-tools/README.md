@@ -1,11 +1,11 @@
-# @wealthfolio/addon-dev-tools
+# @wealthvn/addon-dev-tools
 
-Development tools for Wealthfolio addons including hot reload server and CLI.
+Development tools for WealthVN addons including hot reload server and CLI.
 
 ## Installation
 
 ```bash
-npm install -g @wealthfolio/addon-dev-tools
+npm install -g @wealthvn/addon-dev-tools
 ```
 
 ## CLI Commands
@@ -13,32 +13,32 @@ npm install -g @wealthfolio/addon-dev-tools
 ### Create New Addon
 
 ```bash
-wealthfolio create my-awesome-addon
+wealthvn create my-awesome-addon
 ```
 
 ### Start Development Server
 
 ```bash
 # In your addon directory
-wealthfolio dev
+wealthvn dev
 ```
 
 ### Build Addon
 
 ```bash
-wealthfolio build
+wealthvn build
 ```
 
 ### Package for Distribution
 
 ```bash
-wealthfolio package
+wealthvn package
 ```
 
 ### Test Setup
 
 ```bash
-wealthfolio test
+wealthvn test
 ```
 
 ## Development Server
@@ -66,17 +66,17 @@ Add to your addon's `package.json`:
 ```json
 {
   "scripts": {
-    "dev:server": "wealthfolio dev"
+    "dev:server": "wealthvn dev"
   },
   "devDependencies": {
-    "@wealthfolio/addon-dev-tools": "^1.0.0"
+    "@wealthvn/addon-dev-tools": "^1.0.0"
   }
 }
 ```
 
 ## Architecture
 
-This package is separate from `@wealthfolio/addon-sdk` to:
+This package is separate from `@wealthvn/addon-sdk` to:
 
 - Keep the SDK lightweight for production
 - Avoid unnecessary dependencies in addon bundles

@@ -9,7 +9,7 @@ use axum::{
     routing::{get, put},
     Json, Router,
 };
-use wealthfolio_core::limits::{ContributionLimit, DepositsCalculation, NewContributionLimit};
+use wealthvn_core::limits::{ContributionLimit, DepositsCalculation, NewContributionLimit};
 
 async fn get_contribution_limits(
     State(state): State<Arc<AppState>>,

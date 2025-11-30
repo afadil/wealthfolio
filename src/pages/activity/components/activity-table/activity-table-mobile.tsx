@@ -11,7 +11,7 @@ import {
 import { getActivityTypeName } from "@/lib/constants";
 import { ActivityDetails } from "@/lib/types";
 import { useDateFormatter } from "@/hooks/use-date-formatter";
-import { formatAmount, Separator } from "@wealthfolio/ui";
+import { formatAmount, Separator } from "@wealthvn/ui";
 import { useTranslation } from "react-i18next";
 import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";

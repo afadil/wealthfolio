@@ -1,6 +1,6 @@
 import { useFormContext } from "react-hook-form";
 import { useTranslation } from "react-i18next";
-import { Alert, AlertDescription, Icons } from "@wealthfolio/ui";
+import { Alert, AlertDescription, Icons } from "@wealthvn/ui";
 import { useCashBalanceValidation } from "../hooks/use-cash-balance-validation";
 import { NewActivityFormValues } from "./forms/schemas";
 

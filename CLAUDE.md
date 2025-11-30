@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Wealthfolio** is a beautiful, local-first desktop investment tracking application built with:
+**WealthVN** is a beautiful, local-first desktop investment tracking application built with:
 - **Frontend**: React + TypeScript + Vite + Tailwind CSS
 - **Backend**: Rust (Tauri for desktop, Axum for web server)
 - **Database**: SQLite with Diesel ORM
@@ -72,7 +72,7 @@ pnpm check
 ### Addon Development
 ```bash
 # Create a new addon
-npx @wealthfolio/addon-dev-tools create my-addon
+npx @wealthvn/addon-dev-tools create my-addon
 cd my-addon
 npm install
 
@@ -86,7 +86,7 @@ node packages/addon-dev-tools/dev-server.js
 ## Project Structure
 
 ```
-wealthfolio/
+wealthvn/
 ├── src/                          # React frontend source
 │   ├── components/              # Reusable React components
 │   ├── pages/                   # Application pages and routes
@@ -288,18 +288,18 @@ pnpm tauri build --target x86_64-unknown-linux-gnu # Linux
 
 ### Web Server (Docker)
 ```bash
-docker build -t wealthfolio-web .
+docker build -t wealthvn-web .
 docker run --rm -it \
   -e WF_LISTEN_ADDR=0.0.0.0:8080 \
-  -e WF_DB_PATH=/data/wealthfolio.db \
+  -e WF_DB_PATH=/data/wealthvn.db \
   -p 8080:8080 \
-  -v "$(pwd)/wealthfolio-data:/data" \
-  wealthfolio-web
+  -v "$(pwd)/wealthvn-data:/data" \
+  wealthvn-web
 ```
 
 ## Database Location
 
-- **Default**: `../db/wealthfolio.db` (relative to app binary)
+- **Default**: `../db/wealthvn.db` (relative to app binary)
 - **Custom**: Set `DATABASE_URL` environment variable
 - **Web mode**: Use `WF_DB_PATH` in `.env.web`
 
@@ -323,10 +323,10 @@ The app supports various transaction types (buys, sells, dividends, etc.). See `
 ## Addon Development Quick Reference
 
 Creating an addon:
-1. `npx @wealthfolio/addon-dev-tools create my-addon`
+1. `npx @wealthvn/addon-dev-tools create my-addon`
 2. `cd my-addon && npm install`
 3. Start dev server: `pnpm addon:dev` (in project root)
-4. Start Wealthfolio: `pnpm tauri dev` (in another terminal)
+4. Start WealthVN: `pnpm tauri dev` (in another terminal)
 
 Addon features:
 - Custom pages and navigation
@@ -356,5 +356,5 @@ Addon features:
 ### Creating shared components:
 1. Add to `packages/ui/src/components/`
 2. Build: `pnpm -r build`
-3. Import in app: `import { ComponentName } from '@wealthfolio/ui'`
+3. Import in app: `import { ComponentName } from '@wealthvn/ui'`
 

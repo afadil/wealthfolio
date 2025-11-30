@@ -9,7 +9,7 @@ import {
   FormMessage,
   MoneyInput,
   QuantityInput,
-} from "@wealthfolio/ui";
+} from "@wealthvn/ui";
 import { ConfigurationCheckbox, CommonFields, AssetSymbolInput } from "@/pages/activity/components/forms/common";
 import { ActivityTypeSelector, type ActivityType as ActivityTypeUI } from "@/pages/activity/components/activity-type-selector";
 import { CashBalanceWarning } from "@/pages/activity/components/cash-balance-warning";

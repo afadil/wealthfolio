@@ -1,4 +1,4 @@
-import type { ActivityDetails } from '@wealthfolio/addon-sdk';
+import type { ActivityDetails } from '@wealthvn/addon-sdk';
 
 export interface SwingTradePreferences {
   selectedActivityIds: string[];

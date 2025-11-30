@@ -1,8 +1,8 @@
 import { cn } from "@/lib/utils";
-import { SwipableView } from "@wealthfolio/ui";
+import { SwipableView } from "@wealthvn/ui";
 import * as React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Page, PageContent, PageHeader } from "@wealthfolio/ui";
+import { Page, PageContent, PageHeader } from "@wealthvn/ui";
 
 export interface SwipablePageView {
   value: string;

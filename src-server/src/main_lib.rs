@@ -3,7 +3,7 @@ use std::sync::{Arc, RwLock};
 use crate::config::Config;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, EnvFilter};
-use wealthfolio_core::{
+use wealthvn_core::{
     accounts::{AccountRepository, AccountService},
     activities::{
         ActivityRepository, ActivityService as CoreActivityService, ActivityServiceTrait,
@@ -29,7 +29,7 @@ use wealthfolio_core::{
 };
 
 #[cfg(feature = "wealthfolio-pro")]
-use wealthfolio_core::sync::store;
+use wealthvn_core::sync::store;
 
 pub struct AppState {
     pub account_service: Arc<AccountService<Arc<db::DbPool>>>,
@@ -40,7 +40,7 @@ pub struct AppState {
     pub base_currency: Arc<RwLock<String>>,
     pub snapshot_service: Arc<dyn SnapshotServiceTrait + Send + Sync>,
     pub performance_service:
-        Arc<dyn wealthfolio_core::portfolio::performance::PerformanceServiceTrait + Send + Sync>,
+        Arc<dyn wealthvn_core::portfolio::performance::PerformanceServiceTrait + Send + Sync>,
     pub income_service: Arc<dyn IncomeServiceTrait + Send + Sync>,
     pub goal_service: Arc<dyn GoalServiceTrait + Send + Sync>,
     pub limits_service: Arc<dyn ContributionLimitServiceTrait + Send + Sync>,
@@ -138,7 +138,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     ));
 
     let performance_service = Arc::new(
-        wealthfolio_core::portfolio::performance::PerformanceService::new(
+        wealthvn_core::portfolio::performance::PerformanceService::new(
             valuation_service.clone(),
             market_data_service.clone(),
         ),

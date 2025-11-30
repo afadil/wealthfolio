@@ -6,8 +6,8 @@ import {
   triggerAllDisableCallbacks,
 } from "@/addons/addons-runtime-context";
 import { getInstalledAddons, loadAddon as loadAddonRuntime } from "@/commands/addon";
-import type { AddonContext, AddonManifest } from "@wealthfolio/addon-sdk";
-import { ReactVersion, SDK_VERSION } from "@wealthfolio/addon-sdk";
+import type { AddonContext, AddonManifest } from "@wealthvn/addon-sdk";
+import { ReactVersion, SDK_VERSION } from "@wealthvn/addon-sdk";
 
 interface AddonFile {
   path: string;

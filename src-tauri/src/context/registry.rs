@@ -1,5 +1,5 @@
 use std::sync::{Arc, RwLock};
-use wealthfolio_core::{
+use wealthvn_core::{
     self, accounts, activities, assets, fx, goals, limits, market_data, portfolio, settings,
 };
 pub struct ServiceContext {

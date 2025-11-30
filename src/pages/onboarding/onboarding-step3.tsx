@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Icons } from "@wealthfolio/ui";
+import { Icons } from "@wealthvn/ui";
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 

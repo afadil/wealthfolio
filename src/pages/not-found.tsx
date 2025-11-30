@@ -1,4 +1,4 @@
-import { Button } from "@wealthfolio/ui";
+import { Button } from "@wealthvn/ui";
 import { useNavigate } from "react-router-dom";
 
 export default function NotFoundPage() {

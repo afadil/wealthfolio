@@ -1,4 +1,4 @@
-import type { AddonContext, SidebarItemHandle } from "@wealthfolio/addon-sdk";
+import type { AddonContext, SidebarItemHandle } from "@wealthvn/addon-sdk";
 import React from "react";
 import { createSDKHostAPIBridge } from "./type-bridge";
 
@@ -299,9 +299,8 @@ export function createAddonContext(addonId: string): AddonContext {
           // Navigation functions
           navigateToRoute: async (route: string) => {
             // Use the browser's navigation API through React Router
-            const navigate = (
-              window as unknown as { __wealthfolio_navigate__?: (r: string) => void }
-            ).__wealthfolio_navigate__;
+            const navigate = (window as unknown as { __wealthvn_navigate__?: (r: string) => void })
+              .__wealthvn_navigate__;
             if (navigate) {
               navigate(route);
             } else {
@@ -316,16 +315,16 @@ export function createAddonContext(addonId: string): AddonContext {
               invalidateQueries: (opts: { queryKey: string[] }) => unknown;
               refetchQueries: (opts: { queryKey: string[] }) => unknown;
             }
-            return (window as unknown as { __wealthfolio_query_client__?: QueryClientLike })
-              .__wealthfolio_query_client__;
+            return (window as unknown as { __wealthvn_query_client__?: QueryClientLike })
+              .__wealthvn_query_client__;
           },
           invalidateQueries: (queryKey: string | string[]) => {
             interface QueryClientLike {
               invalidateQueries: (opts: { queryKey: string[] }) => unknown;
             }
             const queryClient = (
-              window as unknown as { __wealthfolio_query_client__?: QueryClientLike }
-            ).__wealthfolio_query_client__;
+              window as unknown as { __wealthvn_query_client__?: QueryClientLike }
+            ).__wealthvn_query_client__;
             if (queryClient) {
               queryClient.invalidateQueries({
                 queryKey: Array.isArray(queryKey) ? queryKey : [queryKey],
@@ -337,8 +336,8 @@ export function createAddonContext(addonId: string): AddonContext {
               refetchQueries: (opts: { queryKey: string[] }) => unknown;
             }
             const queryClient = (
-              window as unknown as { __wealthfolio_query_client__?: QueryClientLike }
-            ).__wealthfolio_query_client__;
+              window as unknown as { __wealthvn_query_client__?: QueryClientLike }
+            ).__wealthvn_query_client__;
             if (queryClient) {
               queryClient.refetchQueries({
                 queryKey: Array.isArray(queryKey) ? queryKey : [queryKey],

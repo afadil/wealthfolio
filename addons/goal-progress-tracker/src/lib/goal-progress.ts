@@ -1,4 +1,4 @@
-import { Goal, GoalAllocation, AccountValuation } from "@wealthfolio/addon-sdk";
+import { Goal, GoalAllocation, AccountValuation } from "@wealthvn/addon-sdk";
 
 export interface GoalProgress {
   name: string;

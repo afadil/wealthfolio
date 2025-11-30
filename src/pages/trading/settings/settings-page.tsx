@@ -16,7 +16,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@wealthfolio/ui";
+} from "@wealthvn/ui";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 

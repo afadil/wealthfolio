@@ -1,4 +1,4 @@
-import type { AddonContext } from '@wealthfolio/addon-sdk';
+import type { AddonContext } from '@wealthvn/addon-sdk';
 import {
   AnimatedToggleGroup,
   Button,
@@ -13,7 +13,7 @@ import {
   PageContent,
   PageHeader,
   Skeleton,
-} from '@wealthfolio/ui';
+} from '@wealthvn/ui';
 import { useState } from 'react';
 import { AdaptiveCalendarView } from '../components/adaptive-calendar-view';
 import { DistributionCharts } from '../components/distribution-charts';

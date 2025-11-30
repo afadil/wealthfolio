@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle, GainAmount, GainPercent, Icons } from "@wealthfolio/ui";
+import { Card, CardContent, CardHeader, CardTitle, GainAmount, GainPercent, Icons } from "@wealthvn/ui";
 import type { SwingMetrics } from "../types";
 
 interface KPISummaryCardsProps {

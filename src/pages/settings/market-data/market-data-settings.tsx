@@ -22,7 +22,7 @@ import {
 } from "@/hooks/use-calculate-portfolio";
 import { QueryKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
-import { ActionConfirm } from "@wealthfolio/ui";
+import { ActionConfirm } from "@wealthvn/ui";
 import {
   useDeleteApiKey,
   useMarketDataProviderSettings,

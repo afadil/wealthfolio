@@ -18,7 +18,7 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from "@wealthfolio/ui";
+} from "@wealthvn/ui";
 import { useTranslation } from "react-i18next";
 
 interface SettingsSheetProps {

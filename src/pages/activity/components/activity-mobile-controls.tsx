@@ -1,4 +1,4 @@
-import { Button, Icons, Input } from "@wealthfolio/ui";
+import { Button, Icons, Input } from "@wealthvn/ui";
 import { ActivityType } from "@/lib/constants";
 import { Account } from "@/lib/types";
 import { useState } from "react";

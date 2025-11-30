@@ -1,13 +1,13 @@
-# @wealthfolio/addon-sdk
+# @wealthvn/addon-sdk
 
-[![Version](https://img.shields.io/npm/v/@wealthfolio/addon-sdk?style=flat-square)](https://www.npmjs.com/package/@wealthfolio/addon-sdk)
-[![Downloads](https://img.shields.io/npm/dm/@wealthfolio/addon-sdk?style=flat-square)](https://www.npmjs.com/package/@wealthfolio/addon-sdk)
-[![License](https://img.shields.io/npm/l/@wealthfolio/addon-sdk?style=flat-square)](https://github.com/afadil/wealthfolio/blob/main/LICENSE)
+[![Version](https://img.shields.io/npm/v/@wealthvn/addon-sdk?style=flat-square)](https://www.npmjs.com/package/@wealthvn/addon-sdk)
+[![Downloads](https://img.shields.io/npm/dm/@wealthvn/addon-sdk?style=flat-square)](https://www.npmjs.com/package/@wealthvn/addon-sdk)
+[![License](https://img.shields.io/npm/l/@wealthvn/addon-sdk?style=flat-square)](https://github.com/afadil/wealthvn/blob/main/LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue?style=flat-square)](https://www.typescriptlang.org/)
-[![Node](https://img.shields.io/node/v/@wealthfolio/addon-sdk?style=flat-square)](https://nodejs.org/)
+[![Node](https://img.shields.io/node/v/@wealthvn/addon-sdk?style=flat-square)](https://nodejs.org/)
 
 A comprehensive TypeScript SDK for building secure, feature-rich addons for
-Wealthfolio. Extend your portfolio management experience with custom analytics,
+WealthVN. Extend your portfolio management experience with custom analytics,
 integrations, and visualizations.
 
 ## 📚 Table of Contents
@@ -56,7 +56,7 @@ mkdir my-portfolio-addon && cd my-portfolio-addon
 
 # 2. Initialize and install dependencies
 npm init -y
-npm install @wealthfolio/addon-sdk react react-dom
+npm install @wealthvn/addon-sdk react react-dom
 npm install -D typescript @types/react vite @vitejs/plugin-react
 
 # 3. Create basic files
@@ -70,7 +70,7 @@ mkdir src && touch src/index.ts
 
 ```typescript
 // src/index.ts
-import { getAddonContext, type AddonContext } from '@wealthfolio/addon-sdk';
+import { getAddonContext, type AddonContext } from '@wealthvn/addon-sdk';
 
 export default function enable(context: AddonContext) {
   // Add navigation item
@@ -102,13 +102,13 @@ export default function enable(context: AddonContext) {
 
 ```bash
 # Using npm
-npm install @wealthfolio/addon-sdk @tanstack/react-query
+npm install @wealthvn/addon-sdk @tanstack/react-query
 
 # Using yarn
-yarn add @wealthfolio/addon-sdk @tanstack/react-query
+yarn add @wealthvn/addon-sdk @tanstack/react-query
 
 # Using pnpm
-pnpm add @wealthfolio/addon-sdk @tanstack/react-query
+pnpm add @wealthvn/addon-sdk @tanstack/react-query
 ```
 
 ### Requirements
@@ -120,7 +120,7 @@ pnpm add @wealthfolio/addon-sdk @tanstack/react-query
 
 ### Package Information
 
-- **Package Name**: `@wealthfolio/addon-sdk`
+- **Package Name**: `@wealthvn/addon-sdk`
 - **Current Version**: 1.0.0
 - **Bundle Format**: ESM (ECMAScript Modules)
 - **Type Definitions**: Included (TypeScript ready)
@@ -135,17 +135,17 @@ The SDK supports multiple import patterns:
 
 ```typescript
 // Default import (recommended)
-import { getAddonContext } from '@wealthfolio/addon-sdk';
+import { getAddonContext } from '@wealthvn/addon-sdk';
 
 // Named imports
-import { AddonContext, PermissionLevel } from '@wealthfolio/addon-sdk';
+import { AddonContext, PermissionLevel } from '@wealthvn/addon-sdk';
 
 // Type-only imports
-import type { AddonManifest, Permission } from '@wealthfolio/addon-sdk';
+import type { AddonManifest, Permission } from '@wealthvn/addon-sdk';
 
 // Subpath imports
-import type { PortfolioHolding } from '@wealthfolio/addon-sdk/types';
-import { PERMISSION_CATEGORIES } from '@wealthfolio/addon-sdk/permissions';
+import type { PortfolioHolding } from '@wealthvn/addon-sdk/types';
+import { PERMISSION_CATEGORIES } from '@wealthvn/addon-sdk/permissions';
 ```
 
 ## 🏗️ Project Structure
@@ -185,7 +185,7 @@ Create a `manifest.json` file in your addon root:
   "license": "MIT",
   "main": "dist/addon.js",
   "sdkVersion": "1.0.0",
-  "minWealthfolioVersion": "1.0.0",
+  "minWealthVNVersion": "1.0.0",
   "keywords": ["portfolio", "fees", "tracking", "analytics"],
   "icon": "data:image/svg+xml;base64,...",
   "permissions": [
@@ -222,7 +222,7 @@ Create a `manifest.json` file in your addon root:
 | `main`                  | `string`       | Entry point file (default: "addon.js") |
 | `sdkVersion`            | `string`       | Compatible SDK version                 |
 | `permissions`           | `Permission[]` | Security permissions required          |
-| `minWealthfolioVersion` | `string`       | Minimum Wealthfolio version required   |
+| `minWealthVNVersion` | `string`       | Minimum WealthVN version required   |
 | `keywords`              | `string[]`     | Keywords for discoverability           |
 | `icon`                  | `string`       | Addon icon (base64 or relative path)   |
 
@@ -237,8 +237,8 @@ example:
 // src/addon.tsx
 import React from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import type { AddonContext, AddonEnableFunction } from '@wealthfolio/addon-sdk';
-import { Icons } from '@wealthfolio/ui';
+import type { AddonContext, AddonEnableFunction } from '@wealthvn/addon-sdk';
+import { Icons } from '@wealthvn/ui';
 import FeesPage from './pages/fees-page';
 
 // Main addon component
@@ -321,7 +321,7 @@ export default enable;
 
 1. **Shared Query Client**: Uses `context.api.query.getClient()` for consistent
    data fetching
-2. **UI Icons**: Leverages `@wealthfolio/ui` for consistent iconography
+2. **UI Icons**: Leverages `@wealthvn/ui` for consistent iconography
 3. **Error Handling**: Comprehensive error handling with logging
 4. **Resource Management**: Proper cleanup of sidebar items and event listeners
 5. **TypeScript**: Full type safety with proper imports
@@ -335,8 +335,8 @@ export default enable;
 // components/FeesPage.tsx
 import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { AddonContext } from '@wealthfolio/addon-sdk';
-import type { Holding, Account, Activity } from '@wealthfolio/addon-sdk/types';
+import type { AddonContext } from '@wealthvn/addon-sdk';
+import type { Holding, Account, Activity } from '@wealthvn/addon-sdk/types';
 
 interface FeesPageProps {
   ctx: AddonContext;
@@ -491,8 +491,8 @@ export default AnalyticsDashboard;
 ```typescript
 // hooks/usePortfolioData.ts
 import { useState, useEffect } from 'react';
-import { getAddonContext } from '@wealthfolio/addon-sdk';
-import type { Holding, PerformanceMetrics } from '@wealthfolio/addon-sdk/types';
+import { getAddonContext } from '@wealthvn/addon-sdk';
+import type { Holding, PerformanceMetrics } from '@wealthvn/addon-sdk/types';
 
 export function usePortfolioData(accountId?: string) {
   const [holdings, setHoldings] = useState<Holding[]>([]);
@@ -685,14 +685,14 @@ Your final package should contain:
 
 ## 🚀 Installation & Testing
 
-### Install in Wealthfolio
+### Install in WealthVN
 
-1. Open Wealthfolio
+1. Open WealthVN
 2. Navigate to Settings → Addons
 3. Click "Install Addon"
 4. Select your ZIP package
 5. Review permissions and approve
-6. Restart Wealthfolio to activate
+6. Restart WealthVN to activate
 
 ### Development Testing
 
@@ -702,7 +702,7 @@ For development, you can test addons locally:
 # Build in watch mode
 npm run dev
 
-# Your changes will be reflected after reloading addons in Wealthfolio
+# Your changes will be reflected after reloading addons in WealthVN
 ```
 
 ## 📚 API Reference
@@ -812,7 +812,7 @@ if (ctx.api.logger.isLevelEnabled('debug')) {
 
 ### Shared QueryClient Integration
 
-The SDK provides access to Wealthfolio's shared React Query client for
+The SDK provides access to WealthVN's shared React Query client for
 consistent data fetching and caching:
 
 ```typescript
@@ -860,10 +860,10 @@ function MyAddonComponent() {
 
 ```typescript
 // Before
-import ctx from '@wealthfolio/addon-sdk';
+import ctx from '@wealthvn/addon-sdk';
 
 // After (recommended)
-import { getAddonContext } from '@wealthfolio/addon-sdk';
+import { getAddonContext } from '@wealthvn/addon-sdk';
 const ctx = getAddonContext();
 ```
 
@@ -871,11 +871,11 @@ const ctx = getAddonContext();
 
 ```typescript
 // Before
-import type { AddonContext, AddonManifest } from '@wealthfolio/addon-sdk';
+import type { AddonContext, AddonManifest } from '@wealthvn/addon-sdk';
 
 // After (more specific)
-import type { AddonContext } from '@wealthfolio/addon-sdk';
-import type { AddonManifest } from '@wealthfolio/addon-sdk/manifest';
+import type { AddonContext } from '@wealthvn/addon-sdk';
+import type { AddonManifest } from '@wealthvn/addon-sdk/manifest';
 ```
 
 ## 👩‍💻 Development Guide
@@ -893,7 +893,7 @@ cd my-portfolio-addon
 npm init -y
 
 # Install the SDK and peer dependencies
-npm install @wealthfolio/addon-sdk
+npm install @wealthvn/addon-sdk
 npm install --save-dev typescript @types/react vite @vitejs/plugin-react
 
 # Install React (peer dependency)
@@ -1008,9 +1008,9 @@ If you want to contribute to the SDK itself:
 #### 1. Clone and Setup
 
 ```bash
-# Clone the Wealthfolio repository
-git clone https://github.com/afadil/wealthfolio.git
-cd wealthfolio/packages/addon-sdk
+# Clone the WealthVN repository
+git clone https://github.com/afadil/wealthvn.git
+cd wealthvn/packages/addon-sdk
 
 # Install dependencies
 pnpm install
@@ -1054,7 +1054,7 @@ pnpm build
 npm link
 
 # In your addon project
-npm link @wealthfolio/addon-sdk
+npm link @wealthvn/addon-sdk
 
 # Test your changes
 npm run dev
@@ -1094,7 +1094,7 @@ ctx.api.logger.debug('Debug information:', data);
 
 Access the browser's developer console for debugging:
 
-- Open Wealthfolio
+- Open WealthVN
 - Press F12 or right-click → Inspect
 - Check Console tab for addon logs
 - Use Network tab to monitor API calls
@@ -1118,7 +1118,7 @@ if (process.env.NODE_ENV === 'development') {
 #### 1. Error Handling
 
 ```typescript
-import { getAddonContext } from '@wealthfolio/addon-sdk';
+import { getAddonContext } from '@wealthvn/addon-sdk';
 
 async function fetchPortfolioData() {
   const ctx = getAddonContext();
@@ -1243,8 +1243,8 @@ We welcome contributions to improve the addon SDK!
 1. **Fork and Clone**
 
    ```bash
-   git clone https://github.com/yourusername/wealthfolio.git
-   cd wealthfolio/packages/addon-sdk
+   git clone https://github.com/yourusername/wealthvn.git
+   cd wealthvn/packages/addon-sdk
    ```
 
 2. **Install Dependencies**
@@ -1273,7 +1273,7 @@ We welcome contributions to improve the addon SDK!
    npm link
 
    # In your test addon project
-   npm link @wealthfolio/addon-sdk
+   npm link @wealthvn/addon-sdk
    ```
 
 5. **Submit Changes**
@@ -1296,11 +1296,11 @@ We welcome contributions to improve the addon SDK!
 
 | Field            | Value                                                             |
 | ---------------- | ----------------------------------------------------------------- |
-| **Package Name** | `@wealthfolio/addon-sdk`                                          |
-| **Scope**        | `@wealthfolio`                                                    |
-| **Registry**     | [npmjs.com](https://www.npmjs.com/package/@wealthfolio/addon-sdk) |
+| **Package Name** | `@wealthvn/addon-sdk`                                          |
+| **Scope**        | `@wealthvn`                                                    |
+| **Registry**     | [npmjs.com](https://www.npmjs.com/package/@wealthvn/addon-sdk) |
 | **License**      | MIT                                                               |
-| **Repository**   | [GitHub](https://github.com/afadil/wealthfolio)                   |
+| **Repository**   | [GitHub](https://github.com/afadil/wealthvn)                   |
 
 ### Version History
 
@@ -1312,7 +1312,7 @@ We follow [Semantic Versioning](https://semver.org/) (SemVer):
 
 #### Version Compatibility
 
-| SDK Version | Wealthfolio Version | Node.js   | React   |
+| SDK Version | WealthVN Version | Node.js   | React   |
 | ----------- | ------------------- | --------- | ------- |
 | 1.0.x       | >= 1.0.0            | >= 18.0.0 | ^18.0.0 |
 | 0.9.x       | >= 0.9.0            | >= 16.0.0 | ^17.0.0 |
@@ -1323,52 +1323,52 @@ We follow [Semantic Versioning](https://semver.org/) (SemVer):
 
 ```bash
 # Latest stable version
-npm install @wealthfolio/addon-sdk
+npm install @wealthvn/addon-sdk
 
 # Specific version
-npm install @wealthfolio/addon-sdk@1.0.0
+npm install @wealthvn/addon-sdk@1.0.0
 
 # Version range
-npm install @wealthfolio/addon-sdk@^1.0.0
+npm install @wealthvn/addon-sdk@^1.0.0
 ```
 
 #### Beta/Preview Releases
 
 ```bash
 # Latest beta version
-npm install @wealthfolio/addon-sdk@beta
+npm install @wealthvn/addon-sdk@beta
 
 # Specific beta version
-npm install @wealthfolio/addon-sdk@1.1.0-beta.1
+npm install @wealthvn/addon-sdk@1.1.0-beta.1
 ```
 
 #### Development Version
 
 ```bash
 # Install directly from GitHub
-npm install github:afadil/wealthfolio#main
+npm install github:afadil/wealthvn#main
 
 # Or from a specific branch/commit
-npm install github:afladil/wealthfolio#wealthfolio-addons
+npm install github:afladil/wealthvn#wealthvn-addons
 ```
 
 ### Package Information Commands
 
 ```bash
 # View package information
-npm info @wealthfolio/addon-sdk
+npm info @wealthvn/addon-sdk
 
 # View all available versions
-npm view @wealthfolio/addon-sdk versions --json
+npm view @wealthvn/addon-sdk versions --json
 
 # View latest version
-npm view @wealthfolio/addon-sdk version
+npm view @wealthvn/addon-sdk version
 
 # View package dependencies
-npm view @wealthfolio/addon-sdk dependencies
+npm view @wealthvn/addon-sdk dependencies
 
 # Check for outdated packages
-npm outdated @wealthfolio/addon-sdk
+npm outdated @wealthvn/addon-sdk
 ```
 
 ### Publishing Information (For Maintainers)
@@ -1383,7 +1383,7 @@ npm login
 npm whoami
 
 # Check publishing permissions
-npm access list packages @wealthfolio
+npm access list packages @wealthvn
 ```
 
 #### Release Process
@@ -1397,7 +1397,7 @@ npm run build
 
 # 3. Test the build
 npm pack
-tar -tf wealthfolio-addon-sdk-*.tgz
+tar -tf wealthvn-addon-sdk-*.tgz
 
 # 4. Publish to npm
 npm publish
@@ -1424,11 +1424,11 @@ git push --tags
 View package statistics:
 
 - **Downloads**:
-  [npm-stat.com](https://npm-stat.com/charts.html?package=@wealthfolio/addon-sdk)
+  [npm-stat.com](https://npm-stat.com/charts.html?package=@wealthvn/addon-sdk)
 - **Bundle Size**:
-  [bundlephobia.com](https://bundlephobia.com/package/@wealthfolio/addon-sdk)
+  [bundlephobia.com](https://bundlephobia.com/package/@wealthvn/addon-sdk)
 - **Dependencies**:
-  [npm.anvaka.com](https://npm.anvaka.com/#/view/2d/@wealthfolio/addon-sdk)
+  [npm.anvaka.com](https://npm.anvaka.com/#/view/2d/@wealthvn/addon-sdk)
 
 ### Security
 
@@ -1473,12 +1473,12 @@ npm pack && tar -tf *.tgz
 #### Getting Help
 
 1. **Documentation**: Check this README and
-   [docs](https://docs.wealthfolio.app/addons)
-2. **Issues**: [GitHub Issues](https://github.com/afadil/wealthfolio/issues)
+   [docs](https://docs.wealthvn.app/addons)
+2. **Issues**: [GitHub Issues](https://github.com/afadil/wealthvn/issues)
 3. **Discussions**:
-   [GitHub Discussions](https://github.com/afadil/wealthfolio/discussions)
-4. **Discord**: [Community Discord](https://discord.gg/wealthfolio)
-5. **Email**: [support@wealthfolio.app](mailto:support@wealthfolio.app)
+   [GitHub Discussions](https://github.com/afadil/wealthvn/discussions)
+4. **Discord**: [Community Discord](https://discord.gg/wealthvn)
+5. **Email**: [support@wealthvn.app](mailto:support@wealthvn.app)
 
 ## 📄 License
 
@@ -1486,17 +1486,17 @@ MIT - see [LICENSE](LICENSE) for details.
 
 ## 🔗 Links
 
-- [Wealthfolio Homepage](https://wealthfolio.app)
-- [Addon Gallery](https://wealthfolio.app/addons)
-- [Documentation](https://docs.wealthfolio.app/addons)
-- [GitHub Repository](https://github.com/afadil/wealthfolio)
-- [Issue Tracker](https://github.com/afadil/wealthfolio/issues)
+- [WealthVN Homepage](https://wealthvn.app)
+- [Addon Gallery](https://wealthvn.app/addons)
+- [Documentation](https://docs.wealthvn.app/addons)
+- [GitHub Repository](https://github.com/afadil/wealthvn)
+- [Issue Tracker](https://github.com/afadil/wealthvn/issues)
 
 ## 💬 Support
 
-- [Discord Community](https://discord.gg/wealthfolio)
-- [GitHub Discussions](https://github.com/afadil/wealthfolio/discussions)
-- [Email Support](mailto:support@wealthfolio.app)
+- [Discord Community](https://discord.gg/wealthvn)
+- [GitHub Discussions](https://github.com/afadil/wealthvn/discussions)
+- [Email Support](mailto:support@wealthvn.app)
 
 ## 🔧 Troubleshooting
 
@@ -1504,7 +1504,7 @@ MIT - see [LICENSE](LICENSE) for details.
 
 #### 1. Module Resolution Errors
 
-**Error**: `Cannot resolve module '@wealthfolio/addon-sdk'`
+**Error**: `Cannot resolve module '@wealthvn/addon-sdk'`
 
 **Solutions**:
 
@@ -1537,7 +1537,7 @@ node --version
 }
 
 // Use explicit type imports
-import type { AddonContext } from '@wealthfolio/addon-sdk';
+import type { AddonContext } from '@wealthvn/addon-sdk';
 ```
 
 #### 3. React Peer Dependency Warnings
@@ -1565,7 +1565,7 @@ npm list react react-dom
 export default defineConfig({
   build: {
     rollupOptions: {
-      external: ['react', 'react-dom', '@wealthfolio/addon-sdk'],
+      external: ['react', 'react-dom', '@wealthvn/addon-sdk'],
     },
   },
 });
@@ -1622,7 +1622,7 @@ npm run dev
 ls -la dist/  # Should update when you save files
 ```
 
-#### 2. Addon Not Loading in Wealthfolio
+#### 2. Addon Not Loading in WealthVN
 
 1. Check the addon package structure:
 
@@ -1641,7 +1641,7 @@ ls -la dist/  # Should update when you save files
    cat manifest.json | jq .
    ```
 
-3. Check Wealthfolio logs:
+3. Check WealthVN logs:
    - Open Developer Tools (F12)
    - Look for addon-related errors
    - Check Network tab for failed requests
@@ -1714,7 +1714,7 @@ If you're still experiencing issues:
 1. **Check Version Compatibility**:
 
    ```bash
-   npm list @wealthfolio/addon-sdk
+   npm list @wealthvn/addon-sdk
    ```
 
 2. **Create Minimal Reproduction**:
@@ -1722,7 +1722,7 @@ If you're still experiencing issues:
    - Share the code and error logs
 
 3. **Search Existing Issues**:
-   - Check [GitHub Issues](https://github.com/afadil/wealthfolio/issues)
+   - Check [GitHub Issues](https://github.com/afadil/wealthvn/issues)
    - Look for similar problems and solutions
 
 4. **Provide Complete Information**:

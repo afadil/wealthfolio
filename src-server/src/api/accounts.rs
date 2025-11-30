@@ -12,7 +12,7 @@ use axum::{
     routing::{get, put},
     Json, Router,
 };
-use wealthfolio_core::accounts::AccountServiceTrait;
+use wealthvn_core::accounts::AccountServiceTrait;
 
 #[utoipa::path(get, path="/api/v1/accounts", responses((status=200, body = [Account])))]
 async fn list_accounts(State(state): State<Arc<AppState>>) -> ApiResult<Json<Vec<Account>>> {

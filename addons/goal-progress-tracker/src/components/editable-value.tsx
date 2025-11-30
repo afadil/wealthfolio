@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Input, Icons } from "@wealthfolio/ui";
+import { Button, Input, Icons } from "@wealthvn/ui";
 
 // Editable value component using design system
 function EditableValue({

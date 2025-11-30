@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Button, Icons } from "@wealthfolio/ui";
+import { Button, Icons } from "@wealthvn/ui";
 
 interface ActivityPaginationProps {
   hasMore: boolean;

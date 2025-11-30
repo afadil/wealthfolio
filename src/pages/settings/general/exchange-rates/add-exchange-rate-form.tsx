@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
-import { worldCurrencies } from "@wealthfolio/ui";
+import { worldCurrencies } from "@wealthvn/ui";
 import { ExchangeRate } from "@/lib/types";
 import { Icons } from "@/components/ui/icons";
 import {
@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { MoneyInput } from "@wealthfolio/ui";
+import { MoneyInput } from "@wealthvn/ui";
 
 const exchangeRateSchema = z.object({
   fromCurrency: z.string().min(1, "From Currency is required"),

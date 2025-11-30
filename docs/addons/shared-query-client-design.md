@@ -3,7 +3,7 @@
 ## Overview
 
 This document describes the design for sharing the React Query client between
-the main Wealthfolio application and addons, enabling automatic cache
+the main WealthVN application and addons, enabling automatic cache
 invalidation and data synchronization.
 
 ## Architecture
@@ -41,7 +41,7 @@ const [queryClient] = useState(
       /* config */
     }),
 );
-(window as any).__wealthfolio_query_client__ = queryClient;
+(window as any).__wealthvn_query_client__ = queryClient;
 ```
 
 ### 3. Shared Query Keys
@@ -50,7 +50,7 @@ Both the main app and addons use the same query keys to ensure cache
 consistency:
 
 ```typescript
-// Shared in @wealthfolio/addon-sdk
+// Shared in @wealthvn/addon-sdk
 export const QueryKeys = {
   GOALS: "goals",
   GOALS_ALLOCATIONS: "goals_allocations",
@@ -160,7 +160,7 @@ With the shared query client approach, cache invalidation happens automatically:
 Always import and use QueryKeys from the addon SDK:
 
 ```typescript
-import { QueryKeys } from "@wealthfolio/addon-sdk";
+import { QueryKeys } from "@wealthvn/addon-sdk";
 ```
 
 ### 2. Listen for Relevant Events
@@ -204,4 +204,4 @@ queryKey: [QueryKeys.latestValuations, accountIds];
 
 This design provides a robust foundation for data synchronization between the
 main application and addons, ensuring a seamless user experience across all
-components of the Wealthfolio ecosystem.
+components of the WealthVN ecosystem.

@@ -75,7 +75,7 @@ export type EventCallback<T> = (event: { payload: T }) => void;
 export type UnlistenFn = () => void;
 
 /**
- * Main addon context interface providing access to Wealthfolio APIs
+ * Main addon context interface providing access to WealthVN APIs
  */
 export interface AddonContext {
   /** Sidebar management */

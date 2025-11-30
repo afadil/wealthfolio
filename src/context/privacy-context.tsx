@@ -2,7 +2,7 @@ import { createContext } from "react";
 import {
   useBalancePrivacy as useBalancePrivacyHook,
   type BalancePrivacyHook,
-} from "@wealthfolio/ui";
+} from "@wealthvn/ui";
 
 type PrivacyContextType = BalancePrivacyHook;
 

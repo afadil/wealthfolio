@@ -17,7 +17,7 @@ use reqwest::StatusCode as HttpStatusCode;
 use semver::Version;
 use serde::Deserialize;
 use tokio::{fs, task};
-use wealthfolio_core::{
+use wealthvn_core::{
     db,
     settings::{Settings, SettingsServiceTrait, SettingsUpdate},
 };
@@ -153,53 +153,14 @@ async fn check_update(
     let current_version_str = env!("CARGO_PKG_VERSION").to_string();
     let target = normalize_target(None);
     let arch = normalize_arch(None);
-    let request_url = format!(
-        "https://wealthfolio.app/releases/{}/{}/{}",
-        target, arch, current_version_str
-    );
-
-    let client = reqwest::Client::new();
-    let response = client
-        .get(&request_url)
-        .header("X-Instance-Id", state.instance_id.clone())
-        .header("X-Client-Runtime", WEB_RUNTIME_TARGET)
-        .send()
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to query update endpoint: {e}"))?;
-
-    if response.status() == HttpStatusCode::NOT_FOUND {
-        return Ok(Json(UpdateCheckResponse {
-            update_available: false,
-            latest_version: current_version_str,
-            notes: None,
-            pub_date: None,
-            download_url: None,
-        }));
-    }
-
-    let payload: UpdateCheckResponseRaw = response
-        .json()
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to parse update response: {e}"))?;
-
-    let current_version =
-        Version::parse(&current_version_str).unwrap_or_else(|_| Version::new(0, 0, 0));
-    let latest_version =
-        Version::parse(&payload.version).unwrap_or_else(|_| current_version.clone());
-    let update_available = latest_version > current_version;
-
-    let platform_key = format!("{}-{}", target, arch);
-    let download_url = payload
-        .platforms
-        .get(&platform_key)
-        .and_then(|p| p.url.clone());
-
+    // Update check disabled for WealthVN fork
+    // The update check endpoint is not available for this fork
     Ok(Json(UpdateCheckResponse {
-        update_available,
-        latest_version: payload.version,
-        notes: payload.notes,
-        pub_date: payload.pub_date,
-        download_url,
+        update_available: false,
+        latest_version: current_version_str,
+        notes: None,
+        pub_date: None,
+        download_url: None,
     }))
 }
 
@@ -257,7 +218,7 @@ async fn backup_database_to_path_route(
         let normalized_backup_dir = normalize_file_path(&target_dir);
 
         let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
-        let backup_filename = format!("wealthfolio_backup_{}.db", timestamp);
+        let backup_filename = format!("wealthvn_backup_{}.db", timestamp);
         let backup_path = StdPath::new(&normalized_backup_dir).join(&backup_filename);
 
         if let Some(parent) = backup_path.parent() {

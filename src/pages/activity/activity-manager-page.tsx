@@ -9,7 +9,7 @@ import { QueryKeys } from "@/lib/query-keys";
 import { Account, ActivityDetails } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, Icons, Page, PageContent, PageHeader } from "@wealthfolio/ui";
+import { Card, CardContent, Icons, Page, PageContent, PageHeader } from "@wealthvn/ui";
 import { useMemo } from "react";
 import { useForm, type Resolver, type SubmitHandler } from "react-hook-form";
 import { useTranslation } from "react-i18next";
@@ -232,7 +232,7 @@ const ActivityManagerPage = () => {
         actions={
           <Button variant="ghost" size="sm" asChild>
             <a
-              href="https://wealthfolio.app/docs/concepts/activity-types"
+              href="https://github.com/chipheo00/vn-wealthfolio/blob/main/docs/activities/activity-types.md"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1.5"

@@ -1,6 +1,6 @@
 import type React from "react";
 import { PieChart, Pie, Cell, Sector } from "recharts";
-import { useBalancePrivacy } from "@wealthfolio/ui";
+import { useBalancePrivacy } from "@wealthvn/ui";
 
 const COLORS = [
   "var(--chart-1)",

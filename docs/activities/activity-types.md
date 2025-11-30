@@ -1,7 +1,7 @@
 # Activity Types Reference
 
 This document provides a comprehensive reference for Activity types used in
-Wealthfolio. Understanding these types is essential for creating activities
+WealthVN. Understanding these types is essential for creating activities
 programmatically through the addon API.
 
 > **Note**: For complete addon development guidance, see the
@@ -16,11 +16,11 @@ programmatically through the addon API.
 | **SELL**           | Disposal of a security or asset.                                                                        | Increases cash             | Decreases quantity              |
 | **DIVIDEND**       | Cash dividend paid into the account.                                                                    | Increases cash             | –                               |
 | **INTEREST**       | Interest earned on cash or fixed-income positions.                                                      | Increases cash             | –                               |
-| **DEPOSIT**        | Incoming funds from outside Wealthfolio.                                                                | Increases cash             | –                               |
+| **DEPOSIT**        | Incoming funds from outside WealthVN.                                                                | Increases cash             | –                               |
 | **WITHDRAWAL**     | Outgoing funds to an external account.                                                                  | Decreases cash             | –                               |
 | **ADD_HOLDING**    | Bring in a position without recording a trade (e.g. opening balance, gift received, option assignment). | Fee only                   | Increases quantity              |
 | **REMOVE_HOLDING** | Write-off, gift, or expire a position without recording a sale.                                         | Fee only                   | Decreases quantity              |
-| **TRANSFER_IN**    | Move cash or assets into this account from another Wealthfolio account (asset cost basis preserved).    | Increases cash or quantity | Increases quantity for assets   |
+| **TRANSFER_IN**    | Move cash or assets into this account from another WealthVN account (asset cost basis preserved).    | Increases cash or quantity | Increases quantity for assets   |
 | **TRANSFER_OUT**   | Move cash or assets out of this account (asset cost basis exported).                                    | Decreases cash or quantity | Decreases quantity for assets   |
 | **FEE**            | Stand-alone brokerage or platform fee not tied to a trade.                                              | Decreases cash             | –                               |
 | **TAX**            | Tax paid from the account (e.g. dividend withholding, realised CGT).                                    | Decreases cash             | –                               |
@@ -82,5 +82,5 @@ below lists the additional mandatory inputs shown in the add-activity forms.
 
 - Good for precise IRR, cash-flow and tax analytics.
 
-Activities can be inserted retroactively; Wealthfolio recalculates balances
+Activities can be inserted retroactively; WealthVN recalculates balances
 automatically.

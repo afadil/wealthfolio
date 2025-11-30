@@ -1,6 +1,5 @@
 import { getVersion } from "@tauri-apps/api/app";
 import { appDataDir, appLogDir } from "@tauri-apps/api/path";
-import { check } from "@tauri-apps/plugin-updater";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -42,27 +41,6 @@ export default function AboutSettingsPage() {
     }
   }, [isMobile]);
 
-  const handleCheckForUpdates = async () => {
-    try {
-      const update = await check();
-      if (update) {
-        toast({
-          title: "Update available",
-          description: `Version ${update.version} is available.`,
-        });
-      } else {
-        toast({ title: "Up to date", description: "You have the latest version." });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to check for updates.",
-        variant: "destructive",
-      });
-      console.error("Failed to check for updates:", error);
-    }
-  };
-
   const handleCopy = async (value: string, label: string) => {
     try {
       await navigator.clipboard.writeText(value);
@@ -84,51 +62,39 @@ export default function AboutSettingsPage() {
 
       <Card>
         <CardHeader className="flex flex-row items-center gap-4">
-          <img src="/logo.svg" alt="Wealthfolio logo" className="h-12 w-12 rounded-md shadow" />
+          <img src="/logo.svg" alt="WealthVN logo" className="h-12 w-12 rounded-md shadow" />
           <div className="flex flex-col">
-            <CardTitle className="text-xl">Wealthfolio</CardTitle>
+            <CardTitle className="text-xl">WealthVN</CardTitle>
             <CardDescription>Version {version || "N/A"}</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-4">
             <p className="text-muted-foreground text-sm">
-              A beautiful, simple, and secure personal finance and investment tracker that helps you
-              take control of your wealth.
+              A beautiful, simple, and secure personal finance and investment tracker designed for
+              the Vietnamese market.
             </p>
             <div className="flex flex-wrap items-center gap-3">
-              {!isMobile && <Button onClick={handleCheckForUpdates}>Check for Update</Button>}
               <Button variant="outline" asChild>
                 <a
-                  href="https://wealthfolio.app"
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="inline-flex items-center gap-2"
-                >
-                  <Icons.Globe className="h-4 w-4" />
-                  Visit Website
-                </a>
-              </Button>
-              <Button variant="outline" asChild>
-                <a
-                  href="https://wealthfolio.app/docs/introduction/"
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="inline-flex items-center gap-2"
-                >
-                  <Icons.FileText className="h-4 w-4" />
-                  Documentation
-                </a>
-              </Button>
-              <Button variant="outline" asChild>
-                <a
-                  href="https://github.com/afadil/wealthfolio"
+                  href="https://github.com/chipheo00/vn-wealthfolio"
                   target="_blank"
                   rel="noreferrer noopener"
                   className="inline-flex items-center gap-2"
                 >
                   <Icons.ExternalLink className="h-4 w-4" />
                   GitHub
+                </a>
+              </Button>
+              <Button variant="outline" asChild>
+                <a
+                  href="https://github.com/chipheo00/vn-wealthfolio/releases"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="inline-flex items-center gap-2"
+                >
+                  <Icons.FileText className="h-4 w-4" />
+                  Releases
                 </a>
               </Button>
             </div>
@@ -188,19 +154,12 @@ export default function AboutSettingsPage() {
 
           <div className="space-y-4">
             <p className="text-muted-foreground text-sm">
-              Have questions or found a bug? Please email us at{" "}
-              <span className="font-mono font-semibold select-all">wealthfolio@teymz.com</span>
+              Have questions or found a bug? Please open an issue on GitHub.
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" size="sm" asChild>
-                <a href="mailto:wealthfolio@teymz.com" className="inline-flex items-center gap-2">
-                  <Icons.ExternalLink className="h-4 w-4" />
-                  Email Us
-                </a>
-              </Button>
-              <Button variant="outline" size="sm" asChild>
                 <a
-                  href="https://github.com/afadil/wealthfolio/issues"
+                  href="https://github.com/chipheo00/vn-wealthfolio/issues"
                   target="_blank"
                   rel="noreferrer noopener"
                   className="inline-flex items-center gap-2"
@@ -214,32 +173,17 @@ export default function AboutSettingsPage() {
             <Separator />
 
             <p className="text-muted-foreground text-sm">
+              <span>Forked from </span>
               <a
-                href="https://wealthfolio.app/legal/privacy-policy"
+                href="https://github.com/afadil/wealthfolio"
                 target="_blank"
                 rel="noreferrer noopener"
                 className="hover:text-foreground underline underline-offset-4"
               >
-                Privacy Policy
+                Wealthfolio
               </a>
               <span className="mx-2">•</span>
-              <a
-                href="https://wealthfolio.app/legal/terms-of-use"
-                target="_blank"
-                rel="noreferrer noopener"
-                className="hover:text-foreground underline underline-offset-4"
-              >
-                Terms of Use
-              </a>
-              <span className="mx-2">•</span>
-              <a
-                href="https://wealthfolio.app"
-                target="_blank"
-                rel="noreferrer noopener"
-                className="hover:text-foreground underline underline-offset-4"
-              >
-                Website
-              </a>
+              <span>By Chipheo00 - CFPM Inc. WealthVN Team</span>
             </p>
           </div>
         </CardContent>
