@@ -21,6 +21,7 @@ interface PullToRefreshState {
   isPulling: boolean;
   pullDistance: number; // clamped 0..threshold
   progress: number; // 0..1
+  isActivated: boolean; // user pulled beyond activation distance
 }
 
 export function usePullToRefresh({
@@ -28,7 +29,7 @@ export function usePullToRefresh({
   onRefresh,
   disabled = false,
   activationThreshold,
-  startPullDistance = 48,
+  startPullDistance = 55,
 }: UsePullToRefreshOptions = {}): [boolean, PullToRefreshHandlers, PullToRefreshState] {
   const queryClient = useQueryClient();
   const { mutateAsync: triggerPortfolioUpdate } = useUpdatePortfolioMutation();
@@ -38,9 +39,13 @@ export function usePullToRefresh({
   const [pullDistance, setPullDistance] = useState(0);
   const containerRef = useRef<HTMLElement | null>(null);
   const startYRef = useRef(0);
+  const startXRef = useRef(0);
   const currentYRef = useRef(0);
-  const activationDistance = activationThreshold ?? threshold + 80;
+  const activationDistance = activationThreshold ?? threshold * 2.5;
   const hasTriggeredHapticRef = useRef(false);
+  const shouldCancelRef = useRef(false);
+  const gestureRef = useRef<"PENDING" | "PULL" | "IGNORE">("PENDING");
+  const [isActivated, setIsActivated] = useState(false);
 
   const handleRefresh = useCallback(async () => {
     if (isRefreshing || disabled) return;
@@ -72,16 +77,30 @@ export function usePullToRefresh({
 
       containerRef.current = target;
       const touchY = touch.clientY;
+      const touchX = touch.clientX;
       startYRef.current = touchY;
+      startXRef.current = touchX;
       currentYRef.current = touchY;
       hasTriggeredHapticRef.current = false;
+      shouldCancelRef.current = false;
+      gestureRef.current = "PENDING";
+
+      // Check if we are scrolling an inner container
+      let element = e.target as HTMLElement;
+      while (element && element !== target) {
+        if (element.scrollTop > 0) {
+          shouldCancelRef.current = true;
+          break;
+        }
+        element = element.parentElement!;
+      }
     },
     [disabled, isRefreshing],
   );
 
   const onTouchMove = useCallback(
     (e: React.TouchEvent) => {
-      if (disabled || isRefreshing || !containerRef.current) {
+      if (disabled || isRefreshing || !containerRef.current || shouldCancelRef.current) {
         return;
       }
 
@@ -89,41 +108,61 @@ export function usePullToRefresh({
       const content = target.querySelector<HTMLElement>("[data-ptr-content]") ?? null;
       const touch = e.touches[0];
       const touchY = touch?.clientY ?? startYRef.current;
+      const touchX = touch?.clientX ?? startXRef.current;
       const deltaY = touchY - startYRef.current;
+      const deltaX = Math.abs(touchX - startXRef.current);
 
-      if (deltaY <= 0 || target.scrollTop > 0) {
-        if (content) {
-          content.style.transition = "";
-          content.style.transform = "";
-        }
-        hasTriggeredHapticRef.current = false;
-        setIsPulling(false);
-        setPullDistance(0);
+      if (gestureRef.current === "IGNORE") {
         return;
       }
 
-      e.preventDefault();
-      target.style.touchAction = "none";
-      currentYRef.current = touchY;
+      if (gestureRef.current === "PENDING") {
+        // Ignore small movements to avoid jitter
+        if (Math.abs(deltaY) < 10 && deltaX < 10) {
+          return;
+        }
 
-      const effectiveDelta = Math.max(deltaY - startPullDistance, 0);
-      const distance = Math.min(effectiveDelta * 0.5, threshold);
-      const isPastStartDistance = distance > 0;
+        // Determine gesture intent
+        if (deltaY <= 0 || target.scrollTop > 0 || deltaX > deltaY) {
+          gestureRef.current = "IGNORE";
+          return;
+        }
 
-      setIsPulling(isPastStartDistance);
-      setPullDistance(distance);
-
-      if (deltaY > activationDistance && !hasTriggeredHapticRef.current) {
-        triggerHapticFeedback();
-        hasTriggeredHapticRef.current = true;
+        gestureRef.current = "PULL";
       }
 
-      if (content) {
-        content.style.transition = "none";
-        content.style.transform = `translateY(${distance}px)`;
+      if (gestureRef.current === "PULL") {
+        e.preventDefault();
+        target.style.touchAction = "none";
+        currentYRef.current = touchY;
+
+        const effectiveDelta = Math.max(deltaY - startPullDistance, 0);
+        const distance = Math.min(effectiveDelta * 0.5, threshold);
+        const isPastStartDistance = distance > 0;
+
+        setIsPulling(isPastStartDistance);
+        setPullDistance(distance);
+        setIsActivated(deltaY > activationDistance);
+
+        if (deltaY > activationDistance && !hasTriggeredHapticRef.current) {
+          triggerHapticFeedback();
+          hasTriggeredHapticRef.current = true;
+        }
+
+        if (content) {
+          content.style.transition = "none";
+          content.style.transform = `translateY(${distance}px)`;
+        }
       }
     },
-    [activationDistance, disabled, isRefreshing, startPullDistance, threshold, triggerHapticFeedback],
+    [
+      activationDistance,
+      disabled,
+      isRefreshing,
+      startPullDistance,
+      threshold,
+      triggerHapticFeedback,
+    ],
   );
 
   const onTouchEnd = useCallback(
@@ -145,8 +184,10 @@ export function usePullToRefresh({
       // Reset state
       setIsPulling(false);
       setPullDistance(0);
+      setIsActivated(false);
       startYRef.current = 0;
       currentYRef.current = 0;
+      gestureRef.current = "PENDING";
       // Restore UA gesture handling
       target.style.touchAction = "";
       containerRef.current = null;
@@ -176,6 +217,7 @@ export function usePullToRefresh({
       isPulling,
       pullDistance,
       progress: Math.min(1, pullDistance / threshold),
+      isActivated,
     },
   ];
 }
