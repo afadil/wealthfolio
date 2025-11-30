@@ -21,7 +21,7 @@
   },
   "productName": "Wealth VN",
   "mainBinaryName": "WealthVN",
-  "version": "2.0.1",
+  "version": "1.0.0",
   "identifier": "com.wealthvn.app",
   "plugins": {},
   "app": {
@@ -43,5 +43,13 @@
     "security": {
       "csp": null
   }
+  },
+  "plugins": {
+  "updater": {
+    "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE1NTI3QTlCOUQ1ODczNzUKUldSMWMxaWRtM3BTRlpxQ1JmUzZGb29jSld1ZHM0RW1wMnZsb2tWUXNmaTNZcmNGeGVwbUl3cHgK",
+    "endpoints": [
+      "https://github.com/chipheo00/vn-wealthfolio/releases/latest/download/latest.json"
+    ]
   }
+}
 }

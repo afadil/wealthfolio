@@ -1,6 +1,6 @@
 [package]
 name = "wealthvn_core"
-version = "2.0.1"
+version = "1.0.0"
 description = "A Portfolio Tracker for Vietnamese Market"
 authors = ["Chipheo00 - CFPM Inc. WealthVN Team"]
 license = "AGPL-3.0"
@@ -58,8 +58,8 @@ default = ["p2p", "tls"]          # For Tauri app builds
 p2p = []
 tls = []
 crypto-id = ["ed25519-dalek", "rand_core"]
+wealthfolio-pro = []
 # wealthfolio-pro-sync = ["wealthfolio_sync/sync"]
-# wealthfolio-pro = ["wealthfolio-pro-sync"]
 # pro = ["wealthfolio-pro"]
 
 

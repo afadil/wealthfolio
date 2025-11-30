@@ -4267,7 +4267,7 @@ dependencies = [
 
 [[package]]
 name = "wealthvn_core"
-version = "2.0.1"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
