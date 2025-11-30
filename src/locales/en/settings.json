@@ -329,7 +329,42 @@
   },
   "about": {
     "title": "About",
-    "description": "About WealthVN"
+    "description": "About WealthVN",
+    "appName": "WealthVN",
+    "appDescription": "A beautiful, simple, and secure personal finance and investment tracker designed for the Vietnamese market.",
+    "version": "Version {{version}}",
+    "versionNA": "N/A",
+    "links": {
+      "github": "GitHub",
+      "releases": "Releases"
+    },
+    "database": {
+      "title": "Database directory",
+      "unavailable": "Unavailable",
+      "file": "Database file:",
+      "copyButton": "Copy database directory"
+    },
+    "logs": {
+      "title": "Logs directory",
+      "unavailable": "Unavailable",
+      "copyButton": "Copy logs directory"
+    },
+    "support": {
+      "text": "Have questions or found a bug? Please open an issue on GitHub.",
+      "reportButton": "Report Issue",
+      "coffeeText": "Like WealthVN? Buy me a coffee to support development.",
+      "coffeeButton": "Buy Me a Coffee"
+    },
+    "credits": {
+      "forked": "Forked from",
+      "by": "By Chipheo00 - CFPM Inc. WealthVN Team"
+    },
+    "copy": {
+      "title": "Copied",
+      "copied": "{{label}} copied to clipboard.",
+      "failedTitle": "Copy failed",
+      "failed": "Could not copy {{label}}."
+    }
   },
   "marketData": {
     "title": "Market Data",

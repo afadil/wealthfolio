@@ -329,7 +329,42 @@
   },
   "about": {
     "title": "Về ứng dụng",
-    "description": "Về WealthVN"
+    "description": "Về WealthVN",
+    "appName": "WealthVN",
+    "appDescription": "Ứng dụng theo dõi tài chính và đầu tư cá nhân đơn giản, an toàn và đẹp mắt được thiết kế cho thị trường Việt Nam.",
+    "version": "Phiên bản {{version}}",
+    "versionNA": "N/A",
+    "links": {
+      "github": "GitHub",
+      "releases": "Phát hành"
+    },
+    "database": {
+      "title": "Thư mục cơ sở dữ liệu",
+      "unavailable": "Không khả dụng",
+      "file": "Tệp cơ sở dữ liệu:",
+      "copyButton": "Sao chép thư mục cơ sở dữ liệu"
+    },
+    "logs": {
+      "title": "Thư mục nhật ký",
+      "unavailable": "Không khả dụng",
+      "copyButton": "Sao chép thư mục nhật ký"
+    },
+    "support": {
+      "text": "Có câu hỏi hoặc tìm thấy lỗi? Vui lòng mở issue trên GitHub.",
+      "reportButton": "Báo cáo vấn đề",
+      "coffeeText": "Bạn thích WealthVN? Hãy mua cho tôi một tách cà phê để hỗ trợ phát triển.",
+      "coffeeButton": "Mời cà phê nha!"
+    },
+    "credits": {
+      "forked": "Dựa trên",
+      "by": "Bởi Chipheo00 - CFPM Inc. WealthVN Team"
+    },
+    "copy": {
+      "title": "Đã sao chép",
+      "copied": "{{label}} đã được sao chép vào bộ nhớ tạm.",
+      "failedTitle": "Sao chép thất bại",
+      "failed": "Không thể sao chép {{label}}."
+    }
   },
   "marketData": {
     "title": "Dữ Liệu Thị Trường",
