@@ -211,7 +211,7 @@ const ActivityPage = () => {
   return (
     <Page>
       <PageHeader
-        heading="Investment Activity"
+        heading="Trades"
         text="Track trades, dividends, and other investment transactions"
         actions={headerActions}
       />

@@ -60,7 +60,7 @@ const AccountHoldings = ({ accountId, showEmptyState = true }: AccountHoldingsPr
               size="default"
               onClick={() =>
                 navigate(
-                  `/activities/manage?account=${accountId}&redirect-to=/accounts/${accountId}`,
+                  `/trades/manage?account=${accountId}&redirect-to=/accounts/${accountId}`,
                 )
               }
             >

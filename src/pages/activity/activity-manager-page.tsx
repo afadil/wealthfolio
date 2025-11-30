@@ -71,7 +71,8 @@ const ActivityManagerPage = () => {
   const handleClose = () => {
     if (redirectTo) {
       navigate(redirectTo);
-      return;
+    } else {
+      navigate("/trades");
     }
     navigate(-1);
   };

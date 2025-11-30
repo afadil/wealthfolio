@@ -189,7 +189,7 @@ export function AppLauncher() {
         }
       }
 
-      return `/activities/manage${params.toString() ? `?${params.toString()}` : ""}`;
+      return `/trades/manage${params.toString() ? `?${params.toString()}` : ""}`;
     };
 
     // Additional quick actions not in main navigation

@@ -79,19 +79,19 @@ export function AppRoutes() {
           <Route path="/" element={<AppLayout />}>
             <Route index element={<DashboardPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
-            <Route path="activities" element={<ActivityPage />} />
-            <Route path="activities/manage" element={<ActivityManagerPage />} />
+            <Route path="trades" element={<ActivityPage />} />
+            <Route path="trades/manage" element={<ActivityManagerPage />} />
+            <Route path="trades/import" element={<ActivityImportPage />} />
             <Route path="holdings" element={<HoldingsPage />} />
             <Route path="holdings-insights" element={<HoldingsInsightsPage />} />
             <Route path="holdings/:symbol" element={<AssetProfilePage />} />
-            <Route path="import" element={<ActivityImportPage />} />
             <Route path="accounts/:id" element={<AccountPage />} />
             <Route path="income" element={<IncomePage />} />
             <Route path="spending" element={<SpendingPage />} />
             <Route path="performance" element={<PerformancePage />} />
             <Route path="insights" element={<PortfolioInsightsPage />} />
-            <Route path="cash/activities" element={<CashActivitiesPage />} />
-            <Route path="cash/activities/import" element={<CashImportPage />} />
+            <Route path="cashflow" element={<CashActivitiesPage />} />
+            <Route path="cashflow/import" element={<CashImportPage />} />
             {/* Dynamic addon routes */}
             {dynamicRoutes.map(({ path, component: Component }) => (
               <Route

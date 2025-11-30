@@ -34,12 +34,10 @@ export const CashResultStep = ({ activities, onBack, onReset }: CashResultStepPr
     };
   }, [activities]);
 
-  // Navigate to cash activities page
   const goToActivities = () => {
-    navigate("/cash/activities");
+    navigate("/cashflow");
   };
 
-  // Start a new import
   const startNewImport = () => {
     onReset();
   };
@@ -189,7 +187,7 @@ export const CashResultStep = ({ activities, onBack, onReset }: CashResultStepPr
 
           <Button onClick={goToActivities}>
             <Icons.Wallet className="mr-2 h-4 w-4" />
-            View Cash Activities
+            View Cashflow
           </Button>
         </div>
       </motion.div>

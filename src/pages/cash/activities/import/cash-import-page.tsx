@@ -88,9 +88,8 @@ function CashImportPage() {
     resetParserStates();
   };
 
-  // Cancel import and navigate to cash activities page
   const cancelImport = () => {
-    navigate("/cash/activities");
+    navigate("/cashflow");
   };
 
   // Handle file selection
@@ -237,8 +236,8 @@ function CashImportPage() {
     <Page>
       <UnsavedChangesDialog />
       <PageHeader
-        heading="Import Cashflow Activity"
-        onBack={isMobile ? () => navigate("/cash/activities") : undefined}
+        heading="Import Cashflow"
+        onBack={isMobile ? () => navigate("/cashflow") : undefined}
         actions={<CashImportHelpPopover />}
       />
       <PageContent withPadding={false}>

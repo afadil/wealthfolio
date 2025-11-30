@@ -87,6 +87,11 @@ function ActivityImportPage() {
     resetParserStates();
   };
 
+  // Cancel import and navigate to activities page
+  const cancelImport = () => {
+    navigate("/trades");
+  };
+
   // Handle file selection
   const handleFileChange = (file: File | null) => {
     if (file) {
@@ -197,8 +202,8 @@ function ActivityImportPage() {
     <Page>
       <UnsavedChangesDialog />
       <PageHeader
-        heading="Import Investment Activity"
-        onBack={isMobile ? () => navigate("/activities") : undefined}
+        heading="Import Trades"
+        onBack={isMobile ? () => navigate("/trades") : undefined}
         actions={<ImportHelpPopover />}
       />
       <PageContent withPadding={false}>

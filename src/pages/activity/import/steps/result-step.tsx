@@ -36,12 +36,10 @@ export const ResultStep = ({ activities, accounts, onBack, onReset }: ResultStep
     };
   }, [activities]);
 
-  // Navigate to activities page
   const goToActivities = () => {
-    navigate("/activities");
+    navigate("/trades");
   };
 
-  // Start a new import
   const startNewImport = () => {
     onReset();
   };

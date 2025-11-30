@@ -161,7 +161,7 @@ function CashActivitiesPage() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuItem asChild className="py-2.5">
-              <Link to="/cash/activities/import">
+              <Link to="/cashflow/import">
                 <Icons.Import className="mr-2 h-4 w-4" />
                 Import from CSV
               </Link>
@@ -177,7 +177,7 @@ function CashActivitiesPage() {
 
       <div className="flex items-center gap-2 sm:hidden">
         <Button size="icon" variant="outline" title="Import" asChild>
-          <Link to="/cash/activities/import">
+          <Link to="/cashflow/import">
             <Icons.Import className="size-4" />
           </Link>
         </Button>
@@ -191,7 +191,7 @@ function CashActivitiesPage() {
   return (
     <Page>
       <PageHeader
-        heading="Cashflow Activity"
+        heading="Cashflow"
         text="Track deposits, withdrawals, and transfers for your cash accounts"
         actions={headerActions}
       />
