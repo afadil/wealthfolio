@@ -59,11 +59,9 @@ export function ActivityViewControls({
   const [localSearch, setLocalSearch] = useState(searchQuery);
   const { confirmAction } = useUnsavedChangesContext();
 
-  // Handle view mode change with unsaved changes check
   const handleViewModeChange = useCallback(
     (newMode: ActivityViewMode) => {
       if (viewMode === "datagrid" && newMode === "table") {
-        // Switching from datagrid (edit) to table (view) - check for unsaved changes
         const canProceed = confirmAction(
           () => onViewModeChange(newMode),
           "You have unsaved changes in Edit mode. Switching to View mode will discard your changes."
@@ -78,20 +76,17 @@ export function ActivityViewControls({
     [viewMode, onViewModeChange, confirmAction]
   );
 
-  // Create a stable debounced search function
   const debouncedSearch = useMemo(
     () => debounce((value: string) => onSearchQueryChange(value), 200),
     [onSearchQueryChange],
   );
 
-  // Cleanup debounce on unmount
   useEffect(() => {
     return () => {
       debouncedSearch.cancel();
     };
   }, [debouncedSearch]);
 
-  // Sync local state when search query changes externally (e.g., reset)
   useEffect(() => {
     setLocalSearch(searchQuery);
   }, [searchQuery]);
@@ -123,8 +118,8 @@ export function ActivityViewControls({
     hasAmountFilter;
 
   return (
-    <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex flex-1 flex-wrap items-center gap-2">
+    <div className="mb-4 flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
         <div className="relative">
           <Input
             value={localSearch}
@@ -134,7 +129,7 @@ export function ActivityViewControls({
               debouncedSearch(value);
             }}
             placeholder="Search..."
-            className="h-8 w-[160px] pr-8 lg:w-[240px]"
+            className="h-8 w-[250px] pr-8 lg:w-[350px]"
           />
           {localSearch && (
             <Button
@@ -153,6 +148,54 @@ export function ActivityViewControls({
           )}
         </div>
 
+        <div className="flex items-center gap-3">
+          <span className="text-muted-foreground text-xs">
+            {isFetching ? (
+              <span className="inline-flex items-center gap-1">
+                <Icons.Spinner className="h-4 w-4 animate-spin" />
+                Loading…
+              </span>
+            ) : (
+              `${totalFetched} / ${totalRowCount} activities`
+            )}
+          </span>
+          <AnimatedToggleGroup
+            value={viewMode}
+            rounded="lg"
+            size="sm"
+            onValueChange={(value) => {
+              if (value === "datagrid" || value === "table") {
+                handleViewModeChange(value);
+              }
+            }}
+            className="shrink-0"
+            items={[
+              {
+                value: "table",
+                label: (
+                  <>
+                    <Icons.Rows3 className="h-4 w-4" aria-hidden="true" />
+                    <span className="sr-only">View mode</span>
+                  </>
+                ),
+                title: "View mode",
+              },
+              {
+                value: "datagrid",
+                label: (
+                  <>
+                    <Icons.Grid3x3 className="h-4 w-4" aria-hidden="true" />
+                    <span className="sr-only">Edit mode</span>
+                  </>
+                ),
+                title: "Edit mode",
+              },
+            ]}
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
         <DataTableFacetedFilter
           title="Account"
           options={accountOptions}
@@ -252,52 +295,6 @@ export function ActivityViewControls({
             <Icons.Close className="ml-2 h-4 w-4" />
           </Button>
         ) : null}
-      </div>
-
-      <div className="flex items-center gap-3">
-        <span className="text-muted-foreground text-xs">
-          {isFetching ? (
-            <span className="inline-flex items-center gap-1">
-              <Icons.Spinner className="h-4 w-4 animate-spin" />
-              Loading…
-            </span>
-          ) : (
-            `${totalFetched} / ${totalRowCount} activities`
-          )}
-        </span>
-        <AnimatedToggleGroup
-          value={viewMode}
-          rounded="lg"
-          size="sm"
-          onValueChange={(value) => {
-            if (value === "datagrid" || value === "table") {
-              handleViewModeChange(value);
-            }
-          }}
-          className="shrink-0"
-          items={[
-            {
-              value: "table",
-              label: (
-                <>
-                  <Icons.Rows3 className="h-4 w-4" aria-hidden="true" />
-                  <span className="sr-only">View mode</span>
-                </>
-              ),
-              title: "View mode",
-            },
-            {
-              value: "datagrid",
-              label: (
-                <>
-                  <Icons.Grid3x3 className="h-4 w-4" aria-hidden="true" />
-                  <span className="sr-only">Edit mode</span>
-                </>
-              ),
-              title: "Edit mode",
-            },
-          ]}
-        />
       </div>
     </div>
   );

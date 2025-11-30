@@ -20,6 +20,7 @@ import { DataTableFacetedFilter } from "@/pages/activity/components/activity-dat
 import { useQuery } from "@tanstack/react-query";
 
 export type CashActivityViewMode = "view" | "edit";
+export type CategorizationStatus = "uncategorized" | "categorized" | "with_events" | "without_events";
 
 interface AmountRange {
   min: string;
@@ -40,6 +41,8 @@ interface CashActivityFiltersProps {
   onSubCategoryIdsChange: (ids: string[]) => void;
   selectedEventIds: string[];
   onEventIdsChange: (ids: string[]) => void;
+  selectedCategorizationStatuses: CategorizationStatus[];
+  onCategorizationStatusesChange: (statuses: CategorizationStatus[]) => void;
   amountRange?: AmountRange;
   onAmountRangeChange?: (range: AmountRange) => void;
   viewMode: CashActivityViewMode;
@@ -49,13 +52,19 @@ interface CashActivityFiltersProps {
   isFetching: boolean;
 }
 
-// Labels for cash activity types
 const CASH_ACTIVITY_TYPE_NAMES: Record<CashActivityType, string> = {
   DEPOSIT: "Deposit",
   WITHDRAWAL: "Withdrawal",
   TRANSFER_IN: "Transfer In",
   TRANSFER_OUT: "Transfer Out",
 };
+
+const CATEGORIZATION_STATUS_OPTIONS: { value: CategorizationStatus; label: string }[] = [
+  { value: "uncategorized", label: "Uncategorized" },
+  { value: "categorized", label: "Categorized" },
+  { value: "with_events", label: "With Events" },
+  { value: "without_events", label: "Without Events" },
+];
 
 export function CashActivityFilters({
   accounts,
@@ -71,6 +80,8 @@ export function CashActivityFilters({
   onSubCategoryIdsChange,
   selectedEventIds,
   onEventIdsChange,
+  selectedCategorizationStatuses,
+  onCategorizationStatusesChange,
   amountRange,
   onAmountRangeChange,
   viewMode,
@@ -82,11 +93,9 @@ export function CashActivityFilters({
   const [localSearch, setLocalSearch] = useState(searchQuery);
   const { confirmAction } = useUnsavedChangesContext();
 
-  // Handle view mode change with unsaved changes check
   const handleViewModeChange = useCallback(
     (newMode: CashActivityViewMode) => {
       if (viewMode === "edit" && newMode === "view") {
-        // Switching from edit to view - check for unsaved changes
         const canProceed = confirmAction(
           () => onViewModeChange(newMode),
           "You have unsaved changes in Edit mode. Switching to View mode will discard your changes."
@@ -101,32 +110,27 @@ export function CashActivityFilters({
     [viewMode, onViewModeChange, confirmAction]
   );
 
-  // Fetch categories for the filter
   const { data: categories = [] } = useQuery<CategoryWithChildren[], Error>({
     queryKey: [QueryKeys.CATEGORIES_HIERARCHICAL],
     queryFn: getCategoriesHierarchical,
   });
 
-  // Fetch events for the filter
   const { data: events = [] } = useQuery<EventWithTypeName[], Error>({
     queryKey: [QueryKeys.EVENTS_WITH_NAMES],
     queryFn: getEventsWithNames,
   });
 
-  // Create a stable debounced search function
   const debouncedSearch = useMemo(
     () => debounce((value: string) => onSearchQueryChange(value), 200),
     [onSearchQueryChange],
   );
 
-  // Cleanup debounce on unmount
   useEffect(() => {
     return () => {
       debouncedSearch.cancel();
     };
   }, [debouncedSearch]);
 
-  // Sync local state when search query changes externally (e.g., reset)
   useEffect(() => {
     setLocalSearch(searchQuery);
   }, [searchQuery]);
@@ -151,7 +155,6 @@ export function CashActivityFilters({
     [],
   );
 
-  // Build parent category options (only parent categories) with colored +/- indicator
   const parentCategoryOptions = useMemo(() => {
     return categories.map((category) => ({
       value: category.id,
@@ -161,11 +164,8 @@ export function CashActivityFilters({
     }));
   }, [categories]);
 
-  // Build subcategory options (only from selected parent categories)
   const subCategoryOptions = useMemo(() => {
     const options: { value: string; label: string; color?: string }[] = [];
-
-    // Only show subcategories from selected parent categories
     const selectedParents = categories.filter((cat) =>
       selectedParentCategoryIds.includes(cat.id)
     );
@@ -176,7 +176,7 @@ export function CashActivityFilters({
           options.push({
             value: sub.id,
             label: sub.name,
-            color: category.color, // Use parent color for subcategories
+            color: category.color,
           });
         });
       }
@@ -185,7 +185,6 @@ export function CashActivityFilters({
     return options;
   }, [categories, selectedParentCategoryIds]);
 
-  // Build event options
   const eventOptions = useMemo(() => {
     return events.map((event) => ({
       value: event.id,
@@ -202,11 +201,12 @@ export function CashActivityFilters({
     selectedParentCategoryIds.length > 0 ||
     selectedSubCategoryIds.length > 0 ||
     selectedEventIds.length > 0 ||
+    selectedCategorizationStatuses.length > 0 ||
     hasAmountFilter;
 
   return (
-    <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex flex-1 flex-wrap items-center gap-2">
+    <div className="mb-4 flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
         <div className="relative">
           <Input
             value={localSearch}
@@ -216,7 +216,7 @@ export function CashActivityFilters({
               debouncedSearch(value);
             }}
             placeholder="Search..."
-            className="h-8 w-[160px] pr-8 lg:w-[240px]"
+            className="h-8 w-[200px] pr-8 lg:w-[300px]"
           />
           {localSearch && (
             <Button
@@ -235,6 +235,54 @@ export function CashActivityFilters({
           )}
         </div>
 
+        <div className="flex items-center gap-3">
+          <span className="text-muted-foreground text-xs">
+            {isFetching ? (
+              <span className="inline-flex items-center gap-1">
+                <Icons.Spinner className="h-4 w-4 animate-spin" />
+                Loading...
+              </span>
+            ) : (
+              `${totalFetched} / ${totalRowCount} transactions`
+            )}
+          </span>
+          <AnimatedToggleGroup
+            value={viewMode}
+            rounded="lg"
+            size="sm"
+            onValueChange={(value) => {
+              if (value === "view" || value === "edit") {
+                handleViewModeChange(value);
+              }
+            }}
+            className="shrink-0"
+            items={[
+              {
+                value: "view",
+                label: (
+                  <>
+                    <Icons.Rows3 className="h-4 w-4" aria-hidden="true" />
+                    <span className="sr-only">View mode</span>
+                  </>
+                ),
+                title: "View mode",
+              },
+              {
+                value: "edit",
+                label: (
+                  <>
+                    <Icons.Grid3x3 className="h-4 w-4" aria-hidden="true" />
+                    <span className="sr-only">Edit mode</span>
+                  </>
+                ),
+                title: "Edit mode",
+              },
+            ]}
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
         <DataTableFacetedFilter
           title="Account"
           options={accountOptions}
@@ -290,6 +338,15 @@ export function CashActivityFilters({
           options={eventOptions}
           selectedValues={new Set(selectedEventIds)}
           onFilterChange={(values: Set<string>) => onEventIdsChange(Array.from(values))}
+        />
+
+        <DataTableFacetedFilter
+          title="Status"
+          options={CATEGORIZATION_STATUS_OPTIONS}
+          selectedValues={new Set(selectedCategorizationStatuses)}
+          onFilterChange={(values: Set<string>) =>
+            onCategorizationStatusesChange(Array.from(values) as CategorizationStatus[])
+          }
         />
 
         {onAmountRangeChange && (
@@ -371,6 +428,7 @@ export function CashActivityFilters({
               onParentCategoryIdsChange([]);
               onSubCategoryIdsChange([]);
               onEventIdsChange([]);
+              onCategorizationStatusesChange([]);
               onAmountRangeChange?.({ min: "", max: "" });
             }}
           >
@@ -378,52 +436,6 @@ export function CashActivityFilters({
             <Icons.Close className="ml-2 h-4 w-4" />
           </Button>
         ) : null}
-      </div>
-
-      <div className="flex items-center gap-3">
-        <span className="text-muted-foreground text-xs">
-          {isFetching ? (
-            <span className="inline-flex items-center gap-1">
-              <Icons.Spinner className="h-4 w-4 animate-spin" />
-              Loading...
-            </span>
-          ) : (
-            `${totalFetched} / ${totalRowCount} transactions`
-          )}
-        </span>
-        <AnimatedToggleGroup
-          value={viewMode}
-          rounded="lg"
-          size="sm"
-          onValueChange={(value) => {
-            if (value === "view" || value === "edit") {
-              handleViewModeChange(value);
-            }
-          }}
-          className="shrink-0"
-          items={[
-            {
-              value: "view",
-              label: (
-                <>
-                  <Icons.Rows3 className="h-4 w-4" aria-hidden="true" />
-                  <span className="sr-only">View mode</span>
-                </>
-              ),
-              title: "View mode",
-            },
-            {
-              value: "edit",
-              label: (
-                <>
-                  <Icons.Grid3x3 className="h-4 w-4" aria-hidden="true" />
-                  <span className="sr-only">Edit mode</span>
-                </>
-              ),
-              title: "Edit mode",
-            },
-          ]}
-        />
       </div>
     </div>
   );

@@ -140,6 +140,24 @@ export const ImportPreviewTable = ({
     );
   }, [activities]);
 
+  const accountOptions = useMemo(() => {
+    const uniqueAccountIds = new Set<string>();
+    return activities.reduce(
+      (result, activity) => {
+        const accountId = activity?.accountId;
+        if (accountId && !uniqueAccountIds.has(accountId)) {
+          uniqueAccountIds.add(accountId);
+          const account = accounts.find((acc) => acc.id === accountId);
+          if (account) {
+            result.push({ label: `${account.name} (${account.currency})`, value: accountId });
+          }
+        }
+        return result;
+      },
+      [] as { label: string; value: string }[],
+    );
+  }, [activities, accounts]);
+
   const filters = [
     {
       id: "isValid",
@@ -148,6 +166,11 @@ export const ImportPreviewTable = ({
         { label: "Error", value: "false" },
         { label: "Valid", value: "true" },
       ],
+    },
+    {
+      id: "accountId",
+      title: "Account",
+      options: accountOptions,
     },
     {
       id: "activityType",
@@ -420,8 +443,8 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       },
     },
     {
-      id: "account",
-      accessorKey: "account",
+      id: "accountId",
+      accessorKey: "accountId",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Account" />,
       cell: ({ row }) => {
         const accountId = row.original.accountId;
@@ -436,6 +459,9 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
             </Badge>
           </ErrorCell>
         );
+      },
+      filterFn: (row, id, value: string) => {
+        return value.includes(row.getValue(id));
       },
     },
     {

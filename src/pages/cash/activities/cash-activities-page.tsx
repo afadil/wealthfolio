@@ -17,7 +17,7 @@ import {
   PageHeader,
 } from "@wealthfolio/ui";
 import { useCallback, useMemo, useState } from "react";
-import { CashActivityFilters, CashActivityViewMode } from "./components/cash-activity-filters";
+import { CashActivityFilters, CashActivityViewMode, CategorizationStatus } from "./components/cash-activity-filters";
 import { CashActivityForm } from "./components/cash-activity-form";
 import { CashActivityTable } from "./components/cash-activity-table";
 import { CashActivityDatagrid } from "./components/cash-activity-datagrid";
@@ -38,6 +38,7 @@ function CashActivitiesPage() {
   const [selectedParentCategoryIds, setSelectedParentCategoryIds] = useState<string[]>([]);
   const [selectedSubCategoryIds, setSelectedSubCategoryIds] = useState<string[]>([]);
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>([]);
+  const [selectedCategorizationStatuses, setSelectedCategorizationStatuses] = useState<CategorizationStatus[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({ min: "", max: "" });
   const [sorting, setSorting] = useState<SortingState>([{ id: "date", desc: true }]);
@@ -71,22 +72,41 @@ function CashActivitiesPage() {
     sorting,
   });
 
-  // Client-side amount filtering
+  // Client-side filtering (amount and categorization status)
   const filteredData = useMemo(() => {
     const minAmount = amountRange.min ? parseFloat(amountRange.min) : null;
     const maxAmount = amountRange.max ? parseFloat(amountRange.max) : null;
 
-    if (minAmount === null && maxAmount === null) {
-      return flatData;
-    }
-
     return flatData.filter((activity) => {
-      const amount = Math.abs(activity.amount || 0);
-      if (minAmount !== null && amount < minAmount) return false;
-      if (maxAmount !== null && amount > maxAmount) return false;
+      // Amount filtering
+      if (minAmount !== null || maxAmount !== null) {
+        const amount = Math.abs(activity.amount || 0);
+        if (minAmount !== null && amount < minAmount) return false;
+        if (maxAmount !== null && amount > maxAmount) return false;
+      }
+
+      // Categorization status filtering
+      if (selectedCategorizationStatuses.length > 0) {
+        const hasCategoryMatch = selectedCategorizationStatuses.some((status) => {
+          switch (status) {
+            case "uncategorized":
+              return !activity.categoryId;
+            case "categorized":
+              return !!activity.categoryId;
+            case "with_events":
+              return !!activity.eventId;
+            case "without_events":
+              return !activity.eventId;
+            default:
+              return true;
+          }
+        });
+        if (!hasCategoryMatch) return false;
+      }
+
       return true;
     });
-  }, [flatData, amountRange]);
+  }, [flatData, amountRange, selectedCategorizationStatuses]);
 
   const totalFetched = filteredData.length;
 
@@ -191,6 +211,8 @@ function CashActivitiesPage() {
             onSubCategoryIdsChange={setSelectedSubCategoryIds}
             selectedEventIds={selectedEventIds}
             onEventIdsChange={setSelectedEventIds}
+            selectedCategorizationStatuses={selectedCategorizationStatuses}
+            onCategorizationStatusesChange={setSelectedCategorizationStatuses}
             amountRange={amountRange}
             onAmountRangeChange={setAmountRange}
             viewMode={viewMode}

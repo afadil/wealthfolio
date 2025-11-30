@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ActivityType, ActivityTypeNames } from "@/lib/constants";
-import type { ActivityImport, CashImportRow, Category, CategoryWithChildren, Event } from "@/lib/types";
+import type { Account, ActivityImport, CashImportRow, Category, CategoryWithChildren, Event } from "@/lib/types";
 import { cn, formatDateTime, toPascalCase } from "@/lib/utils";
 import { formatAmount } from "@wealthfolio/ui";
 import { motion } from "motion/react";
@@ -124,6 +124,8 @@ const getTypeBadgeVariant = (type: ActivityType) => {
 // Props for the preview table
 interface CashImportPreviewTableProps {
   activities: ActivityImport[];
+  // Account data for filtering
+  accounts?: Account[];
   // Optional props for editable mode (used in preview step)
   editable?: boolean;
   categories?: CategoryWithChildren[];
@@ -139,6 +141,7 @@ interface CashImportPreviewTableProps {
 
 export const CashImportPreviewTable = ({
   activities,
+  accounts = [],
   editable = false,
   categories = [],
   categoryMap,
@@ -166,6 +169,7 @@ export const CashImportPreviewTable = ({
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     lineNumber: false,
     validationErrors: false,
+    subCategoryId: false,
   });
 
   const [pagination, setPagination] = useState<PaginationState>({
@@ -252,21 +256,104 @@ export const CashImportPreviewTable = ({
     );
   }, [activities]);
 
-  const filters = [
-    {
-      id: "isValid",
-      title: "Status",
-      options: [
-        { label: "Error", value: "false" },
-        { label: "Valid", value: "true" },
-      ],
-    },
-    {
-      id: "activityType",
-      title: "Type",
-      options: activitiesType,
-    },
-  ] satisfies DataTableFacetedFilterProps<ActivityImport, string>[];
+  const accountOptions = useMemo(() => {
+    const uniqueAccountIds = new Set<string>();
+    return activities.reduce(
+      (result, activity) => {
+        const accountId = activity?.accountId;
+        if (accountId && !uniqueAccountIds.has(accountId)) {
+          uniqueAccountIds.add(accountId);
+          const account = accounts.find((acc) => acc.id === accountId);
+          if (account) {
+            result.push({ label: `${account.name} (${account.currency})`, value: accountId });
+          }
+        }
+        return result;
+      },
+      [] as { label: string; value: string }[],
+    );
+  }, [activities, accounts]);
+
+  const categoryOptions = useMemo(() => {
+    return categories.map((category) => ({
+      value: category.id,
+      label: category.name,
+    }));
+  }, [categories]);
+
+  const subCategoryOptions = useMemo(() => {
+    const options: { value: string; label: string }[] = [];
+    categories.forEach((category) => {
+      if (category.children && category.children.length > 0) {
+        category.children.forEach((sub) => {
+          options.push({
+            value: sub.id,
+            label: `${category.name} / ${sub.name}`,
+          });
+        });
+      }
+    });
+    return options;
+  }, [categories]);
+
+  const eventOptions = useMemo(() => {
+    return events.map((event) => ({
+      value: event.id,
+      label: event.name,
+    }));
+  }, [events]);
+
+  const filters = useMemo(() => {
+    const baseFilters: DataTableFacetedFilterProps<ActivityImport, string>[] = [
+      {
+        id: "isValid",
+        title: "Status",
+        options: [
+          { label: "Error", value: "false" },
+          { label: "Valid", value: "true" },
+        ],
+      },
+      {
+        id: "activityType",
+        title: "Type",
+        options: activitiesType,
+      },
+    ];
+
+    if (accountOptions.length > 0) {
+      baseFilters.push({
+        id: "accountId",
+        title: "Account",
+        options: accountOptions,
+      });
+    }
+
+    if (categoryOptions.length > 0) {
+      baseFilters.push({
+        id: "categoryId",
+        title: "Category",
+        options: categoryOptions,
+      });
+    }
+
+    if (subCategoryOptions.length > 0) {
+      baseFilters.push({
+        id: "subCategoryId",
+        title: "Subcategory",
+        options: subCategoryOptions,
+      });
+    }
+
+    if (eventOptions.length > 0) {
+      baseFilters.push({
+        id: "eventId",
+        title: "Event",
+        options: eventOptions,
+      });
+    }
+
+    return baseFilters;
+  }, [activitiesType, accountOptions, categoryOptions, subCategoryOptions, eventOptions]);
 
   const columns = useMemo<ColumnDef<ActivityImport>[]>(
     () => {
@@ -420,9 +507,34 @@ export const CashImportPreviewTable = ({
         },
       );
 
+      // Account column (used for filtering, hidden in view)
+      cols.push({
+        id: "accountId",
+        accessorKey: "accountId",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Account" />,
+        cell: ({ row }) => {
+          const accountId = row.original.accountId;
+          const account = accountId ? accounts.find((acc) => acc.id === accountId) : null;
+          return (
+            <div className="text-sm">
+              {account ? (
+                <Badge variant="outline" className="text-xs">
+                  {account.name}
+                </Badge>
+              ) : (
+                <span className="text-muted-foreground">-</span>
+              )}
+            </div>
+          );
+        },
+        filterFn: (row, id, value: string) => {
+          return value.includes(row.getValue(id));
+        },
+      });
+
       // Category column (always shown)
       cols.push({
-        id: "category",
+        id: "categoryId",
         accessorKey: "categoryId",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Category" />,
         cell: ({ row }) => {
@@ -467,11 +579,26 @@ export const CashImportPreviewTable = ({
             </div>
           );
         },
+        filterFn: (row, id, value: string) => {
+          return value.includes(row.getValue(id));
+        },
+      });
+
+      // Subcategory column (for filtering)
+      cols.push({
+        id: "subCategoryId",
+        accessorKey: "subCategoryId",
+        header: () => null,
+        cell: () => null,
+        filterFn: (row, id, value: string) => {
+          return value.includes(row.getValue(id));
+        },
+        enableHiding: true,
       });
 
       // Event column (always shown)
       cols.push({
-        id: "event",
+        id: "eventId",
         accessorKey: "eventId",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Event" />,
         cell: ({ row }) => {
@@ -489,6 +616,9 @@ export const CashImportPreviewTable = ({
               )}
             </div>
           );
+        },
+        filterFn: (row, id, value: string) => {
+          return value.includes(row.getValue(id));
         },
       });
 
@@ -552,7 +682,7 @@ export const CashImportPreviewTable = ({
 
       return cols;
     },
-    [editable, categories, categoryMap, events, eventMap, onRowChange, selectable],
+    [accounts, editable, categories, categoryMap, events, eventMap, onRowChange, selectable],
   );
 
   const table = useReactTable({

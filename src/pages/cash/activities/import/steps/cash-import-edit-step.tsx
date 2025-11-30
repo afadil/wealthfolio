@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -18,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DataTableFacetedFilter } from "@/pages/activity/components/activity-datagrid/data-table-faceted-filter";
 import { ActivityType } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import type {
@@ -95,7 +97,15 @@ const editableFields: EditableField[] = [
   "description",
 ];
 
-type FilterType = "all" | "categorized" | "uncategorized" | "with-events" | "without-events";
+type CategorizationStatus = "categorized" | "uncategorized" | "with-events" | "without-events";
+
+const setsEqual = <T,>(a: Set<T>, b: Set<T>): boolean => {
+  if (a.size !== b.size) return false;
+  for (const item of a) {
+    if (!b.has(item)) return false;
+  }
+  return true;
+};
 
 interface CashImportEditStepProps {
   transactions: CashImportRow[];
@@ -141,17 +151,37 @@ export function CashImportEditStep({
   const [focusedCell, setFocusedCell] = useState<CellCoordinate | null>(null);
   const [isApplyingRules, setIsApplyingRules] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filter, setFilter] = useState<FilterType>("all");
-
-  // Manual filter refresh state - transactions stay visible until user clicks refresh
+  const [selectedAccountIds, setSelectedAccountIds] = useState<Set<string>>(new Set());
+  const [selectedActivityTypes, setSelectedActivityTypes] = useState<Set<string>>(new Set());
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<string>>(new Set());
+  const [selectedSubCategoryIds, setSelectedSubCategoryIds] = useState<Set<string>>(new Set());
+  const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
+  const [selectedCategorizationStatuses, setSelectedCategorizationStatuses] = useState<Set<CategorizationStatus>>(new Set());
+  const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({ min: "", max: "" });
   const [displayedTransactions, setDisplayedTransactions] = useState<CashImportRow[]>([]);
   const [pendingFilterChanges, setPendingFilterChanges] = useState(0);
   const [lastAppliedFilter, setLastAppliedFilter] = useState<{
-    filter: FilterType;
     searchQuery: string;
-  }>({ filter: "all", searchQuery: "" });
+    accountIds: Set<string>;
+    activityTypes: Set<string>;
+    categoryIds: Set<string>;
+    subCategoryIds: Set<string>;
+    eventIds: Set<string>;
+    categorizationStatuses: Set<CategorizationStatus>;
+    amountMin: string;
+    amountMax: string;
+  }>({
+    searchQuery: "",
+    accountIds: new Set(),
+    activityTypes: new Set(),
+    categoryIds: new Set(),
+    subCategoryIds: new Set(),
+    eventIds: new Set(),
+    categorizationStatuses: new Set(),
+    amountMin: "",
+    amountMax: "",
+  });
 
-  // Modal states
   const [bulkCategoryModalOpen, setBulkCategoryModalOpen] = useState(false);
   const [bulkEventModalOpen, setBulkEventModalOpen] = useState(false);
   const [createCategoryOpen, setCreateCategoryOpen] = useState(false);
@@ -160,17 +190,13 @@ export function CashImportEditStep({
   const [selectedParentCategory, setSelectedParentCategory] = useState<Category | null>(null);
   const [createRuleOpen, setCreateRuleOpen] = useState(false);
   const [createEventOpen, setCreateEventOpen] = useState(false);
-
-  // Manage dialogs state
   const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
   const [manageRulesOpen, setManageRulesOpen] = useState(false);
   const [manageEventsOpen, setManageEventsOpen] = useState(false);
 
-  // Get account info
   const account = useMemo(() => accounts.find((a) => a.id === accountId), [accounts, accountId]);
   const accountCurrency = account?.currency ?? "USD";
 
-  // Fetch categories and events
   const { data: categories = [] } = useQuery<CategoryWithChildren[]>({
     queryKey: [QueryKeys.CATEGORIES_HIERARCHICAL],
     queryFn: getCategoriesHierarchical,
@@ -186,7 +212,6 @@ export function CashImportEditStep({
     queryFn: getEventTypes,
   });
 
-  // Activity type options
   const activityTypeOptions = useMemo(
     () => [
       { value: ActivityType.DEPOSIT, label: "Deposit", searchValue: "Deposit Income" },
@@ -197,7 +222,6 @@ export function CashImportEditStep({
     [],
   );
 
-  // Category options with colored +/- indicator for income/expense
   const categoryOptions = useMemo(
     () =>
       categories.map((cat) => ({
@@ -209,13 +233,11 @@ export function CashImportEditStep({
     [categories],
   );
 
-  // Category lookup
   const categoryLookup = useMemo(
     () => new Map(categories.map((cat) => [cat.id, cat])),
     [categories],
   );
 
-  // Subcategory lookup
   const subcategoryLookup = useMemo(() => {
     const map = new Map<string, { name: string; parentId: string }>();
     categories.forEach((cat) => {
@@ -226,7 +248,6 @@ export function CashImportEditStep({
     return map;
   }, [categories]);
 
-  // Get subcategory options filtered by category
   const getSubcategoryOptions = useCallback(
     (categoryId: string | undefined) => {
       if (!categoryId) return [];
@@ -240,7 +261,6 @@ export function CashImportEditStep({
     [categoryLookup],
   );
 
-  // Event options
   const eventOptions = useMemo(
     () =>
       events.map((event) => ({
@@ -251,10 +271,8 @@ export function CashImportEditStep({
     [events],
   );
 
-  // Event lookup
   const eventLookup = useMemo(() => new Map(events.map((event) => [event.id, event])), [events]);
 
-  // Account options
   const accountOptions = useMemo(
     () =>
       accounts.map((acc) => ({
@@ -265,96 +283,278 @@ export function CashImportEditStep({
     [accounts],
   );
 
-  // Account lookup
   const accountLookup = useMemo(() => new Map(accounts.map((acc) => [acc.id, acc])), [accounts]);
 
-  // Stats
+  const filterAccountOptions = useMemo(
+    () =>
+      accounts.map((acc) => ({
+        value: acc.id,
+        label: `${acc.name} (${acc.currency})`,
+      })),
+    [accounts],
+  );
+
+  const filterActivityTypeOptions = useMemo(
+    () => [
+      { value: ActivityType.DEPOSIT, label: "Deposit" },
+      { value: ActivityType.WITHDRAWAL, label: "Withdrawal" },
+      { value: ActivityType.TRANSFER_IN, label: "Transfer In" },
+      { value: ActivityType.TRANSFER_OUT, label: "Transfer Out" },
+    ],
+    [],
+  );
+
+  const filterCategoryOptions = useMemo(
+    () =>
+      categories.map((cat) => ({
+        value: cat.id,
+        label: cat.name,
+        color: cat.color,
+        isIncome: !!cat.isIncome,
+      })),
+    [categories],
+  );
+
+  const filterSubCategoryOptions = useMemo(() => {
+    if (selectedCategoryIds.size === 0) return [];
+    const options: { value: string; label: string; color?: string }[] = [];
+    categories
+      .filter((cat) => selectedCategoryIds.has(cat.id))
+      .forEach((category) => {
+        if (category.children && category.children.length > 0) {
+          category.children.forEach((sub) => {
+            options.push({
+              value: sub.id,
+              label: sub.name,
+              color: category.color,
+            });
+          });
+        }
+      });
+    return options;
+  }, [categories, selectedCategoryIds]);
+
+  const filterEventOptions = useMemo(
+    () =>
+      events.map((event) => ({
+        value: event.id,
+        label: event.name,
+      })),
+    [events],
+  );
+
+  const categorizationStatusOptions = useMemo(
+    () => [
+      { value: "uncategorized" as CategorizationStatus, label: "Uncategorized" },
+      { value: "categorized" as CategorizationStatus, label: "Categorized" },
+      { value: "with-events" as CategorizationStatus, label: "With Events" },
+      { value: "without-events" as CategorizationStatus, label: "Without Events" },
+    ],
+    [],
+  );
+
   const categorizedCount = localTransactions.filter((t) => t.categoryId).length;
   const uncategorizedCount = localTransactions.filter((t) => !t.categoryId).length;
   const withEventsCount = localTransactions.filter((t) => t.eventId).length;
   const withoutEventsCount = localTransactions.filter((t) => !t.eventId).length;
 
+  const hasAmountFilter = amountRange.min !== "" || amountRange.max !== "";
+  const hasActiveFilters =
+    searchQuery.trim().length > 0 ||
+    selectedAccountIds.size > 0 ||
+    selectedActivityTypes.size > 0 ||
+    selectedCategoryIds.size > 0 ||
+    selectedSubCategoryIds.size > 0 ||
+    selectedEventIds.size > 0 ||
+    selectedCategorizationStatuses.size > 0 ||
+    hasAmountFilter;
+
+  const clearAllFilters = useCallback(() => {
+    setSearchQuery("");
+    setSelectedAccountIds(new Set());
+    setSelectedActivityTypes(new Set());
+    setSelectedCategoryIds(new Set());
+    setSelectedSubCategoryIds(new Set());
+    setSelectedEventIds(new Set());
+    setSelectedCategorizationStatuses(new Set());
+    setAmountRange({ min: "", max: "" });
+  }, []);
+
   // Helper function to compute filtered transactions based on filter settings
   const computeFilteredTransactions = useCallback(
-    (transactions: CashImportRow[], filterType: FilterType, query: string) => {
+    (
+      transactions: CashImportRow[],
+      filters: {
+        searchQuery: string;
+        accountIds: Set<string>;
+        activityTypes: Set<string>;
+        categoryIds: Set<string>;
+        subCategoryIds: Set<string>;
+        eventIds: Set<string>;
+        categorizationStatuses: Set<CategorizationStatus>;
+        amountMin: string;
+        amountMax: string;
+      },
+    ) => {
       let result = transactions;
 
-      // Apply filter
-      switch (filterType) {
-        case "categorized":
-          result = result.filter((t) => t.categoryId);
-          break;
-        case "uncategorized":
-          result = result.filter((t) => !t.categoryId);
-          break;
-        case "with-events":
-          result = result.filter((t) => t.eventId);
-          break;
-        case "without-events":
-          result = result.filter((t) => !t.eventId);
-          break;
-      }
-
-      // Apply search
-      if (query.trim()) {
-        const q = query.toLowerCase();
+      if (filters.searchQuery.trim()) {
+        const q = filters.searchQuery.toLowerCase();
         result = result.filter(
           (t) => t.name.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q),
         );
       }
 
+      if (filters.accountIds.size > 0) {
+        result = result.filter((t) => {
+          const effectiveAccountId = t.accountId || accountId;
+          return filters.accountIds.has(effectiveAccountId);
+        });
+      }
+
+      if (filters.activityTypes.size > 0) {
+        result = result.filter((t) => filters.activityTypes.has(t.activityType));
+      }
+
+      if (filters.categoryIds.size > 0) {
+        result = result.filter((t) => t.categoryId && filters.categoryIds.has(t.categoryId));
+      }
+
+      if (filters.subCategoryIds.size > 0) {
+        result = result.filter((t) => t.subCategoryId && filters.subCategoryIds.has(t.subCategoryId));
+      }
+
+      if (filters.eventIds.size > 0) {
+        result = result.filter((t) => t.eventId && filters.eventIds.has(t.eventId));
+      }
+
+      if (filters.categorizationStatuses.size > 0) {
+        result = result.filter((t) => {
+          return Array.from(filters.categorizationStatuses).some((status) => {
+            switch (status) {
+              case "categorized":
+                return !!t.categoryId;
+              case "uncategorized":
+                return !t.categoryId;
+              case "with-events":
+                return !!t.eventId;
+              case "without-events":
+                return !t.eventId;
+              default:
+                return true;
+            }
+          });
+        });
+      }
+
+      const minAmount = filters.amountMin ? parseFloat(filters.amountMin) : null;
+      const maxAmount = filters.amountMax ? parseFloat(filters.amountMax) : null;
+      if (minAmount !== null || maxAmount !== null) {
+        result = result.filter((t) => {
+          const amount = Math.abs(t.amount || 0);
+          if (minAmount !== null && amount < minAmount) return false;
+          if (maxAmount !== null && amount > maxAmount) return false;
+          return true;
+        });
+      }
+
       return result;
     },
-    [],
+    [accountId],
   );
 
   // Apply filter refresh - called on initial load and when user clicks refresh
   const applyFilterRefresh = useCallback(() => {
-    const newDisplayed = computeFilteredTransactions(localTransactions, filter, searchQuery);
+    const currentFilters = {
+      searchQuery,
+      accountIds: selectedAccountIds,
+      activityTypes: selectedActivityTypes,
+      categoryIds: selectedCategoryIds,
+      subCategoryIds: selectedSubCategoryIds,
+      eventIds: selectedEventIds,
+      categorizationStatuses: selectedCategorizationStatuses,
+      amountMin: amountRange.min,
+      amountMax: amountRange.max,
+    };
+    const newDisplayed = computeFilteredTransactions(localTransactions, currentFilters);
     setDisplayedTransactions(newDisplayed);
-    setLastAppliedFilter({ filter, searchQuery });
+    setLastAppliedFilter(currentFilters);
     setPendingFilterChanges(0);
-  }, [localTransactions, filter, searchQuery, computeFilteredTransactions]);
+  }, [
+    localTransactions,
+    searchQuery,
+    selectedAccountIds,
+    selectedActivityTypes,
+    selectedCategoryIds,
+    selectedSubCategoryIds,
+    selectedEventIds,
+    selectedCategorizationStatuses,
+    amountRange,
+    computeFilteredTransactions,
+  ]);
 
-  // Initialize displayed transactions on first load
   useEffect(() => {
     if (displayedTransactions.length === 0 && localTransactions.length > 0) {
       applyFilterRefresh();
     }
   }, [localTransactions, displayedTransactions.length, applyFilterRefresh]);
 
-  // Track when filter settings change (but don't auto-apply)
   useEffect(() => {
-    if (filter !== lastAppliedFilter.filter || searchQuery !== lastAppliedFilter.searchQuery) {
-      // Immediately apply filter changes
+    const hasFilterChanged =
+      searchQuery !== lastAppliedFilter.searchQuery ||
+      !setsEqual(selectedAccountIds, lastAppliedFilter.accountIds) ||
+      !setsEqual(selectedActivityTypes, lastAppliedFilter.activityTypes) ||
+      !setsEqual(selectedCategoryIds, lastAppliedFilter.categoryIds) ||
+      !setsEqual(selectedSubCategoryIds, lastAppliedFilter.subCategoryIds) ||
+      !setsEqual(selectedEventIds, lastAppliedFilter.eventIds) ||
+      !setsEqual(selectedCategorizationStatuses, lastAppliedFilter.categorizationStatuses) ||
+      amountRange.min !== lastAppliedFilter.amountMin ||
+      amountRange.max !== lastAppliedFilter.amountMax;
+
+    if (hasFilterChanged) {
       applyFilterRefresh();
     }
-  }, [filter, searchQuery, lastAppliedFilter, applyFilterRefresh]);
+  }, [
+    searchQuery,
+    selectedAccountIds,
+    selectedActivityTypes,
+    selectedCategoryIds,
+    selectedSubCategoryIds,
+    selectedEventIds,
+    selectedCategorizationStatuses,
+    amountRange,
+    lastAppliedFilter,
+    applyFilterRefresh,
+  ]);
 
-  // Track pending changes when transactions are modified (rows that would be filtered out)
   useEffect(() => {
-    // Count how many displayed transactions no longer match the current filter
     const wouldBeFilteredOut = displayedTransactions.filter((displayed) => {
       const current = localTransactions.find((t) => t.lineNumber === displayed.lineNumber);
       if (!current) return true; // Deleted
 
-      // Check if it would pass the current filter
-      switch (lastAppliedFilter.filter) {
-        case "categorized":
-          return !current.categoryId;
-        case "uncategorized":
-          return !!current.categoryId;
-        case "with-events":
-          return !current.eventId;
-        case "without-events":
-          return !!current.eventId;
-        default:
-          return false;
+      if (lastAppliedFilter.categorizationStatuses.size > 0) {
+        const matchesStatus = Array.from(lastAppliedFilter.categorizationStatuses).some((status) => {
+          switch (status) {
+            case "categorized":
+              return !!current.categoryId;
+            case "uncategorized":
+              return !current.categoryId;
+            case "with-events":
+              return !!current.eventId;
+            case "without-events":
+              return !current.eventId;
+            default:
+              return true;
+          }
+        });
+        if (!matchesStatus) return true;
       }
+
+      return false;
     }).length;
 
     setPendingFilterChanges(wouldBeFilteredOut);
-  }, [localTransactions, displayedTransactions, lastAppliedFilter.filter]);
+  }, [localTransactions, displayedTransactions, lastAppliedFilter.categorizationStatuses]);
 
   // Update displayed transactions in place when underlying data changes (preserving visibility)
   useEffect(() => {
@@ -370,13 +570,11 @@ export function CashImportEditStep({
     );
   }, [localTransactions]);
 
-  // For navigation purposes, use displayed transactions
   const filteredTransactionsRef = useRef(displayedTransactions);
   useEffect(() => {
     filteredTransactionsRef.current = displayedTransactions;
   }, [displayedTransactions]);
 
-  // Navigation
   const handleCellNavigation = useCallback((direction: "up" | "down" | "left" | "right") => {
     setFocusedCell((current) => {
       if (!current) return current;
@@ -418,7 +616,6 @@ export function CashImportEditStep({
     });
   }, []);
 
-  // Update transaction
   const updateTransaction = useCallback(
     (lineNumber: number, field: EditableField, value: string) => {
       setLocalTransactions((prev) =>
@@ -438,9 +635,7 @@ export function CashImportEditStep({
             updated.activityType = value as ActivityType;
           } else if (field === "categoryId") {
             updated.categoryId = value || undefined;
-            // Clear subcategory when category changes
             updated.subCategoryId = undefined;
-            // Mark as manual override
             updated.isManualOverride = true;
             updated.matchedRuleId = undefined;
             updated.matchedRuleName = undefined;
@@ -460,7 +655,6 @@ export function CashImportEditStep({
     [],
   );
 
-  // Selection handlers
   const toggleSelect = useCallback((lineNumber: number) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -485,7 +679,6 @@ export function CashImportEditStep({
     setSelectedIds(new Set());
   }, []);
 
-  // Delete row
   const deleteRow = useCallback((lineNumber: number) => {
     setLocalTransactions((prev) => prev.filter((t) => t.lineNumber !== lineNumber));
     setSelectedIds((prev) => {
@@ -495,18 +688,15 @@ export function CashImportEditStep({
     });
   }, []);
 
-  // Delete selected
   const deleteSelected = useCallback(() => {
     setLocalTransactions((prev) => prev.filter((t) => !selectedIds.has(t.lineNumber)));
     setSelectedIds(new Set());
     toast.success(`Deleted ${selectedIds.size} transaction(s)`);
   }, [selectedIds]);
 
-  // Apply rules
   const applyRules = useCallback(async () => {
     setIsApplyingRules(true);
     try {
-      // Build list of transactions to apply rules to (exclude manual overrides)
       const transactionsToApply: { lineNumber: number; name: string; accountId: string }[] = [];
       localTransactions.forEach((t) => {
         if (!t.isManualOverride) {
@@ -524,12 +714,10 @@ export function CashImportEditStep({
         return;
       }
 
-      // Call bulk apply
       const results = await bulkApplyCategoryRules(
         transactionsToApply.map((t) => ({ name: t.name, accountId: t.accountId })),
       );
 
-      // Create a map of lineNumber -> result for correct lookup
       const resultMap = new Map<number, (typeof results)[number]>();
       transactionsToApply.forEach((t, index) => {
         if (results[index]) {
@@ -537,7 +725,6 @@ export function CashImportEditStep({
         }
       });
 
-      // Update transactions with results
       let appliedCount = 0;
       setLocalTransactions((prev) =>
         prev.map((t) => {
@@ -567,7 +754,6 @@ export function CashImportEditStep({
     }
   }, [localTransactions, accountId]);
 
-  // Bulk assign category
   const bulkAssignCategory = useCallback(
     (categoryId: string, subCategoryId?: string) => {
       setLocalTransactions((prev) =>
@@ -591,7 +777,6 @@ export function CashImportEditStep({
     [selectedIds],
   );
 
-  // Bulk assign event
   const bulkAssignEvent = useCallback(
     (eventId: string | undefined) => {
       setLocalTransactions((prev) =>
@@ -606,7 +791,6 @@ export function CashImportEditStep({
     [selectedIds],
   );
 
-  // Clear all categories
   const clearAllCategories = useCallback(() => {
     setLocalTransactions((prev) =>
       prev.map((t) =>
@@ -626,7 +810,6 @@ export function CashImportEditStep({
     toast.success(`Cleared categories from ${selectedIds.size} transaction(s)`);
   }, [selectedIds]);
 
-  // Clear all events
   const clearAllEvents = useCallback(() => {
     setLocalTransactions((prev) =>
       prev.map((t) => (selectedIds.has(t.lineNumber) ? { ...t, eventId: undefined } : t)),
@@ -635,10 +818,8 @@ export function CashImportEditStep({
     toast.success(`Cleared events from ${selectedIds.size} transaction(s)`);
   }, [selectedIds]);
 
-  // Handle category save (from CategoryEditModal)
   const handleCategorySave = useCallback(
     (data: NewCategory | { id: string; update: UpdateCategory }) => {
-      // Only handle create since we're not editing existing categories
       if ("name" in data && !("id" in data)) {
         createCategoryMutation.mutate(data as NewCategory, {
           onSuccess: () => {
@@ -650,7 +831,6 @@ export function CashImportEditStep({
     [createCategoryMutation],
   );
 
-  // Handle subcategory save
   const handleSubcategorySave = useCallback(
     (data: NewCategory | { id: string; update: UpdateCategory }) => {
       if ("name" in data && !("id" in data)) {
@@ -665,7 +845,6 @@ export function CashImportEditStep({
     [createCategoryMutation],
   );
 
-  // Handle rule save
   const handleRuleSave = useCallback(
     (data: NewCategoryRule | { id: string; update: UpdateCategoryRule }) => {
       if ("pattern" in data && !("id" in data)) {
@@ -684,7 +863,6 @@ export function CashImportEditStep({
     queryClient.invalidateQueries({ queryKey: [QueryKeys.EVENTS] });
   }, [queryClient]);
 
-  // Handle next
   const handleNext = useCallback(() => {
     onNext(localTransactions);
   }, [localTransactions, onNext]);
@@ -721,60 +899,40 @@ export function CashImportEditStep({
         </div>
       </div>
 
-      {/* Action Bar */}
-      <div className="bg-muted/20 mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border px-2.5 py-1.5">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="relative">
+          <Icons.Search className="text-muted-foreground absolute top-1/2 left-2 h-3.5 w-3.5 -translate-y-1/2" />
+          <Input
+            placeholder="Search..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-8 w-[250px] pl-7 text-xs lg:w-[350px]"
+          />
+        </div>
+
         <div className="flex items-center gap-2">
-          {/* Search */}
-          <div className="relative">
-            <Icons.Search className="text-muted-foreground absolute top-1/2 left-2 h-3.5 w-3.5 -translate-y-1/2" />
-            <Input
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-7 w-[180px] pl-7 text-xs"
-            />
-          </div>
-
-          {/* Filter */}
-          <Select value={filter} onValueChange={(v) => setFilter(v as FilterType)}>
-            <SelectTrigger className="h-7 w-[150px] text-xs">
-              <SelectValue placeholder="Filter" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All ({localTransactions.length})</SelectItem>
-              <SelectItem value="categorized">Categorized ({categorizedCount})</SelectItem>
-              <SelectItem value="uncategorized">Uncategorized ({uncategorizedCount})</SelectItem>
-              <SelectItem value="with-events">With Events ({withEventsCount})</SelectItem>
-              <SelectItem value="without-events">Without Events ({withoutEventsCount})</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Refresh Filter Button */}
-          <Button
-            onClick={applyFilterRefresh}
-            variant="outline"
-            size="xs"
-            className="relative shrink-0"
-          >
-            <Icons.Refresh className="mr-1 h-3.5 w-3.5" />
-            Refresh
-            {pendingFilterChanges > 0 && (
+          {pendingFilterChanges > 0 && (
+            <Button
+              onClick={applyFilterRefresh}
+              variant="outline"
+              size="sm"
+              className="relative shrink-0"
+            >
+              <Icons.Refresh className="mr-1 h-3.5 w-3.5" />
+              Refresh
               <Badge
                 variant="secondary"
                 className="bg-primary text-primary-foreground absolute -top-2 -right-2 h-5 min-w-5 px-1 text-xs"
               >
                 {pendingFilterChanges}
               </Badge>
-            )}
-          </Button>
-        </div>
+            </Button>
+          )}
 
-        <div className="flex items-center gap-1">
-          {/* Apply Rules */}
           <Button
             onClick={applyRules}
             variant="outline"
-            size="xs"
+            size="sm"
             className="shrink-0"
             disabled={isApplyingRules}
           >
@@ -786,12 +944,9 @@ export function CashImportEditStep({
             Apply Rules
           </Button>
 
-          <div className="bg-border mx-1 h-4 w-px" />
-
-          {/* Create/Manage dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="xs" className="shrink-0">
+              <Button variant="outline" size="sm" className="shrink-0">
                 <Icons.Plus className="mr-1 h-3.5 w-3.5" />
                 New
                 <Icons.ChevronDown className="ml-1 h-3 w-3" />
@@ -830,6 +985,134 @@ export function CashImportEditStep({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <DataTableFacetedFilter
+          title="Account"
+          options={filterAccountOptions}
+          selectedValues={selectedAccountIds}
+          onFilterChange={setSelectedAccountIds}
+        />
+
+        <DataTableFacetedFilter
+          title="Type"
+          options={filterActivityTypeOptions}
+          selectedValues={selectedActivityTypes}
+          onFilterChange={setSelectedActivityTypes}
+        />
+
+        <DataTableFacetedFilter
+          title="Category"
+          options={filterCategoryOptions}
+          selectedValues={selectedCategoryIds}
+          onFilterChange={(values) => {
+            setSelectedCategoryIds(values);
+            // Clear subcategory selection if parent category is deselected
+            if (values.size === 0) {
+              setSelectedSubCategoryIds(new Set());
+            } else {
+              // Remove subcategories that no longer belong to selected parents
+              const validSubCategories = new Set<string>();
+              selectedSubCategoryIds.forEach((subId) => {
+                categories.some((cat) => {
+                  if (values.has(cat.id) && cat.children?.some((child) => child.id === subId)) {
+                    validSubCategories.add(subId);
+                    return true;
+                  }
+                  return false;
+                });
+              });
+              if (validSubCategories.size !== selectedSubCategoryIds.size) {
+                setSelectedSubCategoryIds(validSubCategories);
+              }
+            }
+          }}
+        />
+
+        <DataTableFacetedFilter
+          title="Subcategory"
+          options={filterSubCategoryOptions}
+          selectedValues={selectedSubCategoryIds}
+          onFilterChange={setSelectedSubCategoryIds}
+          disabled={selectedCategoryIds.size === 0}
+        />
+
+        <DataTableFacetedFilter
+          title="Event"
+          options={filterEventOptions}
+          selectedValues={selectedEventIds}
+          onFilterChange={setSelectedEventIds}
+        />
+
+        <DataTableFacetedFilter
+          title="Status"
+          options={categorizationStatusOptions}
+          selectedValues={selectedCategorizationStatuses as Set<string>}
+          onFilterChange={(values) => setSelectedCategorizationStatuses(values as Set<CategorizationStatus>)}
+        />
+
+        {/* Amount Filter */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className={`h-8 border-dashed ${hasAmountFilter ? "border-primary" : ""}`}
+            >
+              <Icons.DollarSign className="mr-2 h-4 w-4" />
+              Amount
+              {hasAmountFilter && (
+                <span className="ml-2 text-xs">
+                  {amountRange.min && amountRange.max
+                    ? `${amountRange.min} - ${amountRange.max}`
+                    : amountRange.min
+                      ? `≥ ${amountRange.min}`
+                      : `≤ ${amountRange.max}`}
+                </span>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-60" align="start">
+            <div className="space-y-3">
+              <p className="text-sm font-medium">Filter by Amount</p>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  placeholder="Min"
+                  value={amountRange.min}
+                  onChange={(e) => setAmountRange({ ...amountRange, min: e.target.value })}
+                  className="h-8"
+                />
+                <span className="text-muted-foreground text-sm">to</span>
+                <Input
+                  type="number"
+                  placeholder="Max"
+                  value={amountRange.max}
+                  onChange={(e) => setAmountRange({ ...amountRange, max: e.target.value })}
+                  className="h-8"
+                />
+              </div>
+              {hasAmountFilter && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-full text-xs"
+                  onClick={() => setAmountRange({ min: "", max: "" })}
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={clearAllFilters}>
+            Reset
+            <Icons.Close className="ml-2 h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       {/* Selection Actions */}

@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Icons } from "@/components/ui/icons";
 import { ProgressIndicator } from "@/components/ui/progress-indicator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { ActivityImport, Category, CategoryWithChildren, CsvRowData, Event } from "@/lib/types";
+import type { Account, ActivityImport, Category, CategoryWithChildren, CsvRowData, Event } from "@/lib/types";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
 import { CSVFileViewer } from "@/pages/activity/import/components/csv-file-viewer";
@@ -12,6 +12,7 @@ import { useCashImportMutations } from "../hooks/use-cash-import-mutations";
 import { CashImportPreviewTable } from "../components/cash-import-preview-table";
 import { useQuery } from "@tanstack/react-query";
 import { QueryKeys } from "@/lib/query-keys";
+import { getAccounts } from "@/commands/account";
 import { getCategoriesHierarchical } from "@/commands/category";
 import { getEvents } from "@/commands/event";
 
@@ -36,6 +37,12 @@ export const CashPreviewStep = ({
   const [confirmationState, setConfirmationState] = useState<"initial" | "confirm" | "processing">(
     "initial",
   );
+
+  // Fetch accounts for filtering
+  const { data: accounts = [] } = useQuery<Account[]>({
+    queryKey: [QueryKeys.ACCOUNTS],
+    queryFn: getAccounts,
+  });
 
   // Fetch categories for display
   const { data: categories = [] } = useQuery<CategoryWithChildren[]>({
@@ -255,6 +262,7 @@ export const CashPreviewStep = ({
               <TabsContent value="preview" className="m-0 overflow-x-auto">
                 <CashImportPreviewTable
                   activities={activities}
+                  accounts={accounts}
                   categories={categories}
                   categoryMap={categoryMap}
                   events={events}
