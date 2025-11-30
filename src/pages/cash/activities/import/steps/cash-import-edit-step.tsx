@@ -1,4 +1,4 @@
-import { getCategoriesHierarchical } from "@/commands/category";
+import { getExpenseCategories, getIncomeCategories } from "@/commands/category";
 import { bulkApplyActivityRules } from "@/commands/activity-rule";
 import { getEvents } from "@/commands/event";
 import { getEventTypes } from "@/commands/event-type";
@@ -198,10 +198,20 @@ export function CashImportEditStep({
   const account = useMemo(() => accounts.find((a) => a.id === accountId), [accounts, accountId]);
   const accountCurrency = account?.currency ?? "USD";
 
-  const { data: categories = [] } = useQuery<CategoryWithChildren[]>({
-    queryKey: [QueryKeys.CATEGORIES_HIERARCHICAL],
-    queryFn: getCategoriesHierarchical,
+  const { data: expenseCategories = [] } = useQuery<CategoryWithChildren[]>({
+    queryKey: [QueryKeys.EXPENSE_CATEGORIES],
+    queryFn: getExpenseCategories,
   });
+
+  const { data: incomeCategories = [] } = useQuery<CategoryWithChildren[]>({
+    queryKey: [QueryKeys.INCOME_CATEGORIES],
+    queryFn: getIncomeCategories,
+  });
+
+  const categories = useMemo(
+    () => [...expenseCategories, ...incomeCategories],
+    [expenseCategories, incomeCategories]
+  );
 
   const { data: events = [] } = useQuery<Event[]>({
     queryKey: [QueryKeys.EVENTS],
@@ -223,15 +233,29 @@ export function CashImportEditStep({
     [],
   );
 
-  const categoryOptions = useMemo(
+  const expenseCategoryOptions = useMemo(
     () =>
-      categories.map((cat) => ({
+      expenseCategories.map((cat) => ({
         value: cat.id,
         label: cat.name,
         searchValue: cat.name,
-        isIncome: !!cat.isIncome,
       })),
-    [categories],
+    [expenseCategories],
+  );
+
+  const incomeCategoryOptions = useMemo(
+    () =>
+      incomeCategories.map((cat) => ({
+        value: cat.id,
+        label: cat.name,
+        searchValue: cat.name,
+      })),
+    [incomeCategories],
+  );
+
+  const allCategoryOptions = useMemo(
+    () => [...expenseCategoryOptions, ...incomeCategoryOptions],
+    [expenseCategoryOptions, incomeCategoryOptions]
   );
 
   const categoryLookup = useMemo(
@@ -311,7 +335,6 @@ export function CashImportEditStep({
         value: cat.id,
         label: cat.name,
         color: cat.color,
-        isIncome: !!cat.isIncome,
       })),
     [categories],
   );
@@ -1242,7 +1265,7 @@ export function CashImportEditStep({
                   accountCurrency={accountCurrency}
                   defaultAccountId={accountId}
                   activityTypeOptions={activityTypeOptions}
-                  categoryOptions={categoryOptions}
+                  categoryOptions={allCategoryOptions}
                   categoryLookup={categoryLookup}
                   subcategoryLookup={subcategoryLookup}
                   getSubcategoryOptions={getSubcategoryOptions}
@@ -1724,9 +1747,12 @@ function BulkCategoryAssignModal({
                 {categories.map((cat) => (
                   <SelectItem key={cat.id} value={cat.id}>
                     <span className="flex items-center gap-2">
-                      <span className={`font-semibold ${cat.isIncome ? "text-success" : "text-destructive"}`}>
-                        {cat.isIncome ? "+" : "−"}
-                      </span>
+                      {cat.color && (
+                        <span
+                          className="h-3 w-3 rounded-full"
+                          style={{ backgroundColor: cat.color }}
+                        />
+                      )}
                       {cat.name}
                     </span>
                   </SelectItem>
@@ -1880,9 +1906,12 @@ function SelectParentCategoryModal({
               {categories.map((cat) => (
                 <SelectItem key={cat.id} value={cat.id}>
                   <span className="flex items-center gap-2">
-                    <span className={`font-semibold ${cat.isIncome ? "text-success" : "text-destructive"}`}>
-                      {cat.isIncome ? "+" : "−"}
-                    </span>
+                    {cat.color && (
+                      <span
+                        className="h-3 w-3 rounded-full"
+                        style={{ backgroundColor: cat.color }}
+                      />
+                    )}
                     {cat.name}
                   </span>
                 </SelectItem>

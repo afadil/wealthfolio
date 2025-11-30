@@ -1,7 +1,7 @@
 import { toast } from "@/components/ui/use-toast";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { CASH_ACTIVITY_TYPES, CashActivityType } from "@/commands/cash-activity";
-import { getCategoriesHierarchical } from "@/commands/category";
+import { getExpenseCategories, getIncomeCategories } from "@/commands/category";
 import { getEvents } from "@/commands/event";
 import {
   Account,
@@ -188,10 +188,20 @@ export function CashActivityDatagrid({
     return accounts[0]?.currency ?? "USD";
   }, [accounts]);
 
-  const { data: categories = [] } = useQuery<CategoryWithChildren[], Error>({
-    queryKey: [QueryKeys.CATEGORIES_HIERARCHICAL],
-    queryFn: getCategoriesHierarchical,
+  const { data: expenseCategories = [] } = useQuery<CategoryWithChildren[], Error>({
+    queryKey: [QueryKeys.EXPENSE_CATEGORIES],
+    queryFn: getExpenseCategories,
   });
+
+  const { data: incomeCategories = [] } = useQuery<CategoryWithChildren[], Error>({
+    queryKey: [QueryKeys.INCOME_CATEGORIES],
+    queryFn: getIncomeCategories,
+  });
+
+  const categories = useMemo(
+    () => [...expenseCategories, ...incomeCategories],
+    [expenseCategories, incomeCategories]
+  );
 
   const { data: events = [] } = useQuery<Event[], Error>({
     queryKey: [QueryKeys.EVENTS],
@@ -222,15 +232,37 @@ export function CashActivityDatagrid({
     return new Map(accounts.map((account) => [account.id, account]));
   }, [accounts]);
 
-  const categoryOptions = useMemo(
+  const expenseCategoryOptions = useMemo(
     () =>
-      categories.map((cat) => ({
+      expenseCategories.map((cat) => ({
         value: cat.id,
         label: cat.name,
         searchValue: cat.name,
-        isIncome: !!cat.isIncome,
       })),
-    [categories]
+    [expenseCategories]
+  );
+
+  const incomeCategoryOptions = useMemo(
+    () =>
+      incomeCategories.map((cat) => ({
+        value: cat.id,
+        label: cat.name,
+        searchValue: cat.name,
+      })),
+    [incomeCategories]
+  );
+
+  const getCategoryOptionsForActivityType = useCallback(
+    (activityType: string | undefined) => {
+      if (activityType === "DEPOSIT" || activityType === "TRANSFER_IN") {
+        return incomeCategoryOptions;
+      }
+      if (activityType === "WITHDRAWAL" || activityType === "TRANSFER_OUT") {
+        return expenseCategoryOptions;
+      }
+      return [...expenseCategoryOptions, ...incomeCategoryOptions];
+    },
+    [expenseCategoryOptions, incomeCategoryOptions]
   );
 
   const categoryLookup = useMemo(() => {
@@ -833,7 +865,7 @@ export function CashActivityDatagrid({
                   activityTypeOptions={activityTypeOptions}
                   accountOptions={accountOptions}
                   currencyOptions={currencyOptions}
-                  categoryOptions={categoryOptions}
+                  getCategoryOptionsForActivityType={getCategoryOptionsForActivityType}
                   getSubcategoryOptions={getSubcategoryOptions}
                   eventOptions={eventOptions}
                   accountLookup={accountLookup}
@@ -864,7 +896,7 @@ interface TransactionRowProps {
   activityTypeOptions: { value: string; label: string; searchValue?: string }[];
   accountOptions: { value: string; label: string; searchValue?: string }[];
   currencyOptions: { value: string; label: string; searchValue?: string }[];
-  categoryOptions: { value: string; label: string; searchValue?: string }[];
+  getCategoryOptionsForActivityType: (activityType: string | undefined) => { value: string; label: string; searchValue?: string }[];
   getSubcategoryOptions: (categoryId: string | undefined) => { value: string; label: string; searchValue?: string }[];
   eventOptions: { value: string; label: string; searchValue?: string }[];
   accountLookup: Map<string, Account>;
@@ -887,7 +919,7 @@ const TransactionRow = memo(
     activityTypeOptions,
     accountOptions,
     currencyOptions,
-    categoryOptions,
+    getCategoryOptionsForActivityType,
     getSubcategoryOptions,
     eventOptions,
     accountLookup,
@@ -996,7 +1028,7 @@ const TransactionRow = memo(
         <TableCell className="h-9 border-r px-0 py-0">
           <SelectCell
             value={transaction.categoryId ?? ""}
-            options={categoryOptions}
+            options={getCategoryOptionsForActivityType(transaction.activityType)}
             onChange={(value) => onUpdateTransaction(transaction.id, "categoryId", value)}
             onFocus={() => handleFocus("categoryId")}
             onNavigate={onNavigate}
@@ -1106,7 +1138,7 @@ const TransactionRow = memo(
       prev.activityTypeOptions === next.activityTypeOptions &&
       prev.accountOptions === next.accountOptions &&
       prev.currencyOptions === next.currencyOptions &&
-      prev.categoryOptions === next.categoryOptions &&
+      prev.getCategoryOptionsForActivityType === next.getCategoryOptionsForActivityType &&
       prev.getSubcategoryOptions === next.getSubcategoryOptions &&
       prev.eventOptions === next.eventOptions &&
       prev.accountLookup === next.accountLookup &&

@@ -23,7 +23,6 @@ interface DataTableFacetedFilterProps {
     value: string;
     icon?: React.ComponentType<{ className?: string }>;
     color?: string;
-    isIncome?: boolean;
   }[];
   selectedValues: Set<string>;
   onFilterChange: (values: Set<string>) => void;
@@ -115,14 +114,6 @@ export function DataTableFacetedFilter({
                     >
                       <Icons.Check className={cn("h-4 w-4")} />
                     </div>
-                    {option.isIncome !== undefined && (
-                      <span className={cn(
-                        "mr-2 font-semibold",
-                        option.isIncome ? "text-success" : "text-destructive"
-                      )}>
-                        {option.isIncome ? "+" : "−"}
-                      </span>
-                    )}
                     {option.color && (
                       <span
                         className="mr-2 h-3 w-3 rounded-full flex-shrink-0"

@@ -250,9 +250,12 @@ export function RuleForm({
                     {categories.map((cat) => (
                       <SelectItem key={cat.id} value={cat.id}>
                         <div className="flex items-center gap-2">
-                          <span className={`font-semibold ${cat.isIncome ? "text-success" : "text-destructive"}`}>
-                            {cat.isIncome ? "+" : "−"}
-                          </span>
+                          {cat.color && (
+                            <span
+                              className="h-3 w-3 rounded-full"
+                              style={{ backgroundColor: cat.color }}
+                            />
+                          )}
                           {cat.name}
                         </div>
                       </SelectItem>

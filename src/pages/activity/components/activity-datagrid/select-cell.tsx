@@ -22,10 +22,6 @@ interface SelectOption {
    * Defaults to the rendered label when omitted.
    */
   searchValue?: string;
-  /**
-   * Optional flag for income/expense categories
-   */
-  isIncome?: boolean;
 }
 
 interface SelectCellProps {
@@ -188,14 +184,6 @@ export function SelectCell({
                 >
                   {value === option.value && (
                     <Check className="mr-2 h-4 w-4" />
-                  )}
-                  {option.isIncome !== undefined && (
-                    <span className={cn(
-                      "mr-2 font-semibold",
-                      option.isIncome ? "text-success" : "text-destructive"
-                    )}>
-                      {option.isIncome ? "+" : "−"}
-                    </span>
                   )}
                   <span className="text-xs">{option.label}</span>
                 </CommandItem>

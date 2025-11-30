@@ -73,6 +73,8 @@ export const QueryKeys = {
   // Categories
   CATEGORIES: "categories",
   CATEGORIES_HIERARCHICAL: "categories_hierarchical",
+  EXPENSE_CATEGORIES: "expense_categories",
+  INCOME_CATEGORIES: "income_categories",
 
   // Activity Rules
   ACTIVITY_RULES: "activity_rules",

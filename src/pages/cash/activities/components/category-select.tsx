@@ -1,4 +1,4 @@
-import { getCategoriesHierarchical } from "@/commands/category";
+import { getExpenseCategories, getIncomeCategories } from "@/commands/category";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Icons } from "@/components/ui/icons";
 import { QueryKeys } from "@/lib/query-keys";
@@ -18,6 +18,8 @@ import {
 } from "@wealthfolio/ui";
 import { Control, FieldValues, Path } from "react-hook-form";
 
+type CategoryType = "income" | "expense";
+
 interface CategorySelectProps<T extends FieldValues> {
   control: Control<T>;
   categoryFieldName: Path<T>;
@@ -28,6 +30,7 @@ interface CategorySelectProps<T extends FieldValues> {
   ruleName?: string;
   onOverride?: () => void;
   isOverridden?: boolean;
+  categoryType?: CategoryType;
 }
 
 export function CategorySelect<T extends FieldValues>({
@@ -40,11 +43,23 @@ export function CategorySelect<T extends FieldValues>({
   ruleName,
   onOverride,
   isOverridden = false,
+  categoryType,
 }: CategorySelectProps<T>) {
-  const { data: categories = [] } = useQuery<CategoryWithChildren[], Error>({
-    queryKey: [QueryKeys.CATEGORIES_HIERARCHICAL],
-    queryFn: getCategoriesHierarchical,
+  const { data: expenseCategories = [] } = useQuery<CategoryWithChildren[], Error>({
+    queryKey: [QueryKeys.EXPENSE_CATEGORIES],
+    queryFn: getExpenseCategories,
   });
+
+  const { data: incomeCategories = [] } = useQuery<CategoryWithChildren[], Error>({
+    queryKey: [QueryKeys.INCOME_CATEGORIES],
+    queryFn: getIncomeCategories,
+  });
+
+  const categories = categoryType === "income"
+    ? incomeCategories
+    : categoryType === "expense"
+      ? expenseCategories
+      : [...expenseCategories, ...incomeCategories];
 
   // Find the selected category to get its children (subcategories)
   const selectedCategory = categories.find((cat) => cat.id === selectedCategoryId);
@@ -105,9 +120,6 @@ export function CategorySelect<T extends FieldValues>({
                   {categories.map((category) => (
                     <SelectItem value={category.id} key={category.id}>
                       <span className="flex items-center gap-2">
-                        <span className={`font-semibold ${category.isIncome ? "text-success" : "text-destructive"}`}>
-                          {category.isIncome ? "+" : "−"}
-                        </span>
                         {category.color && (
                           <span
                             className="h-3 w-3 rounded-full"

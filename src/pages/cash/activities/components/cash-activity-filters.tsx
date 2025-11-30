@@ -160,7 +160,6 @@ export function CashActivityFilters({
       value: category.id,
       label: category.name,
       color: category.color,
-      isIncome: !!category.isIncome,
     }));
   }, [categories]);
 
