@@ -82,7 +82,7 @@ jobs:
           # TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }} # This only works if the workflow triggers on new tags.
-          releaseName: "Wealthfolio v__VERSION__" # tauri-action replaces \_\_VERSION\_\_ with the app version.
+          releaseName: "WealthVN v__VERSION__" # tauri-action replaces \_\_VERSION\_\_ with the app version.
           releaseBody: "See the assets to download and install this version."
           releaseDraft: true
           prerelease: false
