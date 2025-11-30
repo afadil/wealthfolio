@@ -101,7 +101,7 @@ mod mobile {
                     emit_app_ready(&handle);
                 }
                 Err(e) => {
-                    log::error!("Failed to initialize context on mobile: {}", e);
+                    error!("Failed to initialize context on mobile: {}", e);
                     // Emit ready so UI can show error state
                     emit_app_ready(&handle);
                 }
