@@ -231,8 +231,7 @@ pub async fn load_addon_for_runtime(
         let normalized_main_file = main_file.replace('\\', "/");
 
         file.is_main = normalized_file_name == normalized_main_file
-            || normalized_file_name.ends_with(&normalized_main_file)
-            || (normalized_main_file.contains('/') && normalized_file_name == normalized_main_file);
+            || normalized_file_name.ends_with(&normalized_main_file);
     }
 
     // Verify that we found the main file

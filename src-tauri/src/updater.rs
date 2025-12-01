@@ -85,7 +85,7 @@ pub async fn check_for_update(
     match update {
         Some(update) => {
             let current_version = app_handle.package_info().version.to_string();
-            if update.version.to_string() != current_version {
+            if update.version != current_version {
                 let pub_date = update.date.and_then(|d| {
                     let seconds = d.unix_timestamp();
                     let nanos = d.nanosecond();

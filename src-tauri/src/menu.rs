@@ -111,7 +111,7 @@ pub fn handle_menu_event(app: &AppHandle, instance_id: &str, event_id: &str) {
             let message = format!("{} version {}", app_name, app_version);
             app.dialog()
                 .message(message)
-                .title(&format!("About {}", app_name))
+                .title(format!("About {}", app_name))
                 .show(|_| {});
         }
         _ => {}
