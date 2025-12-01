@@ -181,8 +181,13 @@ impl FxServiceTrait for FxService {
     }
 
     async fn add_exchange_rate(&self, new_rate: NewExchangeRate) -> Result<ExchangeRate> {
-        // First register the currency pair
-        self.register_currency_pair_manual(&new_rate.from_currency, &new_rate.to_currency)
+        // Create the FX asset with the original currency codes (not normalized)
+        self.repository
+            .create_fx_asset(
+                &new_rate.from_currency,
+                &new_rate.to_currency,
+                new_rate.source.as_str(),
+            )
             .await?;
 
         let rate = ExchangeRate {

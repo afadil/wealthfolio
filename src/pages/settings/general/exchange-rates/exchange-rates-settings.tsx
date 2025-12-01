@@ -1,22 +1,28 @@
-import { useState } from "react";
-import { useExchangeRates } from "./use-exchange-rate";
-import { DataTable } from "@/components/ui/data-table";
-import { ColumnDef } from "@tanstack/react-table";
-import { ExchangeRate } from "@/lib/types";
-import { Skeleton } from "@/components/ui/skeleton";
-import { RateCell } from "./rate-cell";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { AddExchangeRateForm } from "./add-exchange-rate-form";
-import { Icons } from "@/components/ui/icons";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Link } from "react-router-dom";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DataTable } from "@/components/ui/data-table";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Icons } from "@/components/ui/icons";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ExchangeRate } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
+import { ColumnDef } from "@tanstack/react-table";
+import { ActionConfirm } from "@wealthfolio/ui";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { AddExchangeRateForm } from "./add-exchange-rate-form";
+import { RateCell } from "./rate-cell";
+import { useExchangeRates } from "./use-exchange-rate";
 
 export function ExchangeRatesSettings() {
-  const { exchangeRates, isLoadingRates, updateExchangeRate, addExchangeRate, deleteExchangeRate } =
-    useExchangeRates();
+  const {
+    exchangeRates,
+    isLoadingRates,
+    updateExchangeRate,
+    addExchangeRate,
+    deleteExchangeRate,
+    isDeletingRate,
+  } = useExchangeRates();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
   const columns: ColumnDef<ExchangeRate>[] = [
@@ -81,38 +87,35 @@ export function ExchangeRatesSettings() {
       id: "actions",
       enableHiding: false,
       cell: ({ row }) => {
-        // Only show delete for Manual source
-        if (row.original.source !== "MANUAL") {
-          return null;
-        }
+        const rate = row.original;
+        const currencyPair = `${rate.fromCurrency}/${rate.toCurrency}`;
 
         return (
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="ghost" size="sm">
+          <ActionConfirm
+            confirmTitle="Delete Exchange Rate"
+            confirmMessage={
+              <>
+                <p className="mb-2">
+                  Are you sure you want to delete the <strong>{currencyPair}</strong> exchange rate?
+                </p>
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  <Icons.AlertTriangle className="mr-1 inline h-3 w-3" />
+                  If you have holdings or transactions in {rate.fromCurrency}, you may need to
+                  recreate this exchange rate for accurate portfolio calculations.
+                </p>
+              </>
+            }
+            handleConfirm={() => deleteExchangeRate(rate.id)}
+            isPending={isDeletingRate}
+            confirmButtonText="Delete"
+            confirmButtonVariant="destructive"
+            button={
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                 <Icons.Trash className="h-4 w-4" />
+                <span className="sr-only">Delete</span>
               </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-80" align="end">
-              <div className="grid gap-4">
-                <div className="space-y-2">
-                  <h4 className="leading-none font-medium">Delete Exchange Rate</h4>
-                  <p className="text-muted-foreground text-sm">
-                    Are you sure you want to delete this exchange rate?
-                  </p>
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => deleteExchangeRate(row.original.id)}
-                  >
-                    Delete
-                  </Button>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
+            }
+          />
         );
       },
     },
