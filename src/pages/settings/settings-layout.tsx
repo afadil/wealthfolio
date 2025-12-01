@@ -36,30 +36,23 @@ const sidebarNavItems = [
     icon: <Icons.Goal className="h-5 w-5" />,
   },
   {
+    title: "Securities",
+    href: "securities",
+    subtitle: "Manage security definitions",
+    icon: <Icons.BadgeDollarSign className="h-5 w-5" />,
+  },
+  {
     title: "Market Data",
     href: "market-data",
     subtitle: "Providers and data update",
     icon: <Icons.BarChart className="h-5 w-5" />,
   },
   {
-    title: "Securities",
-    href: "securities",
-    subtitle: "Manage security definitions",
-    icon: <Icons.BadgeDollarSign className="h-5 w-5" />,
-  },
-
-  {
     title: "Add-ons",
     href: "addons",
     subtitle: "Extend Wealthfolio with features",
     icon: <Icons.Package className="h-5 w-5" />,
   },
-  // {
-  //   title: "Sync",
-  //   href: "sync",
-  //   subtitle: "Sync between devices",
-  //   icon: <Icons.Smartphone className="h-5 w-5" />,
-  // },
   {
     title: "Data Export",
     href: "exports",

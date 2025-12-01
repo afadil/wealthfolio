@@ -52,7 +52,9 @@ export function DataTable<TData, TValue>({
   const [columnVisibility, setColumnVisibility] = storageKey
     ? usePersistentState<VisibilityState>(`${storageKey}:column-visibility`, defaultColumnVisibility || {})
     : React.useState<VisibilityState>(defaultColumnVisibility || {});
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
+  const [columnFilters, setColumnFilters] = storageKey
+    ? usePersistentState<ColumnFiltersState>(`${storageKey}:column-filters`, [])
+    : React.useState<ColumnFiltersState>([]);
   const [sorting, setSorting] = React.useState<SortingState>(defaultSorting || []);
 
   const table = useReactTable({

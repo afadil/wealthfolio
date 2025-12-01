@@ -387,6 +387,7 @@ export function AssetsTable({
       filters={filters}
       defaultColumnVisibility={{ isStale: false, assetSubClass: false }}
       defaultSorting={[{ id: "symbol", desc: false }]}
+      storageKey="assets-table"
       scrollable
     />
   );
