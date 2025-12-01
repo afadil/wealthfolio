@@ -383,11 +383,7 @@ impl FxServiceTrait for FxService {
         // Create FX asset and add default rate if no rate exists
         if existing_rate.is_none() {
             self.repository
-                .create_fx_asset(
-                    normalized_from,
-                    normalized_to,
-                    DataSource::Manual.as_str(),
-                )
+                .create_fx_asset(normalized_from, normalized_to, DataSource::Manual.as_str())
                 .await?;
         }
 

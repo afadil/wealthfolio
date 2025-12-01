@@ -130,7 +130,9 @@ impl Position {
             if !self.quantity.is_zero() && !self.quantity.is_sign_negative() {
                 warn!("Position {} quantity ({}) became insignificant after recalculation. Average cost zeroed.", self.id, self.quantity);
             }
-            if (self.quantity.is_zero() || self.quantity.is_sign_negative()) && !self.lots.is_empty() {
+            if (self.quantity.is_zero() || self.quantity.is_sign_negative())
+                && !self.lots.is_empty()
+            {
                 warn!(
                     "Position {} quantity became zero or negative ({}). Aggregates zeroed, but lots retained.",
                     self.id, self.quantity
@@ -198,9 +200,9 @@ impl Position {
             position_id: self.id.clone(),
             acquisition_date: activity.activity_date,
             quantity,
-            cost_basis,                           // Store unrounded in position currency
+            cost_basis,        // Store unrounded in position currency
             acquisition_price, // Store unrounded in position currency
-            acquisition_fees,   // Store unrounded in position currency
+            acquisition_fees,  // Store unrounded in position currency
         };
 
         self.lots.push_back(new_lot);

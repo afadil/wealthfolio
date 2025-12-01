@@ -27,7 +27,6 @@ pub enum ReturnMethod {
     NotApplicable,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ReturnData {
     pub date: NaiveDate,

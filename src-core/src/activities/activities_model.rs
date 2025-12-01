@@ -659,10 +659,7 @@ impl From<NewActivity> for ActivityDB {
             // For other activities, use the provided values
             (
                 domain.quantity.unwrap_or(Decimal::ZERO).to_string(),
-                domain
-                    .unit_price
-                    .unwrap_or(Decimal::ZERO)
-                    .to_string(),
+                domain.unit_price.unwrap_or(Decimal::ZERO).to_string(),
                 domain.amount.as_ref().map(|a| a.to_string()),
             )
         };
@@ -734,10 +731,7 @@ impl From<ActivityUpdate> for ActivityDB {
             // For other activities, use the provided values
             (
                 domain.quantity.unwrap_or(Decimal::ZERO).to_string(),
-                domain
-                    .unit_price
-                    .unwrap_or(Decimal::ZERO)
-                    .to_string(),
+                domain.unit_price.unwrap_or(Decimal::ZERO).to_string(),
                 domain.amount.as_ref().map(|a| a.to_string()),
             )
         };

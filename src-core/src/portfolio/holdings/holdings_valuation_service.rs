@@ -46,10 +46,7 @@ impl HoldingsValuationService {
             Err(e) => {
                 warn!(
                     "{}: Error getting FX rate {}->{}: {}. Using 1.0.",
-                    context_msg,
-                    from_curr,
-                    to_curr,
-                    e
+                    context_msg, from_curr, to_curr, e
                 );
                 Decimal::ONE // Fallback
             }
