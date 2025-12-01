@@ -1,6 +1,6 @@
-import type React from "react";
-import { PieChart, Pie, Cell, Sector } from "recharts";
 import { useBalancePrivacy } from "@wealthfolio/ui";
+import type React from "react";
+import { Cell, Pie, PieChart, Sector } from "recharts";
 
 const COLORS = [
   "var(--chart-1)",
@@ -143,6 +143,7 @@ export const DonutChart: React.FC<DonutChartProps> = ({
           animationDuration={100}
           dataKey="value"
           nameKey="name"
+          // @ts-expect-error - recharts types don't include activeIndex but it works at runtime
           activeIndex={activeIndex !== -1 ? activeIndex : undefined}
           activeShape={renderActiveShape}
           inactiveShape={renderInactiveShape}

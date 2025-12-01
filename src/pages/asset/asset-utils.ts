@@ -1,6 +1,9 @@
 import { Asset, Country, Sector } from "@/lib/types";
 
-export type WeightedBreakdown = { name: string; weight: number };
+export interface WeightedBreakdown {
+  name: string;
+  weight: number;
+}
 
 export interface ParsedAsset extends Asset {
   sectorsList: Sector[];
@@ -8,8 +11,16 @@ export interface ParsedAsset extends Asset {
 }
 
 const normalizeWeight = (weight: unknown): number => {
-  const parsed =
-    typeof weight === "number" ? weight : parseFloat(String(weight ?? "").replace("%", ""));
+  if (weight === null || weight === undefined) {
+    return 0;
+  }
+  if (typeof weight === "number") {
+    return Number.isNaN(weight) ? 0 : weight;
+  }
+  if (typeof weight !== "string") {
+    return 0;
+  }
+  const parsed = parseFloat(weight.replace("%", ""));
   if (Number.isNaN(parsed)) {
     return 0;
   }

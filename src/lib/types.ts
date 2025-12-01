@@ -345,7 +345,6 @@ export interface Settings {
   onboardingCompleted: boolean;
   autoUpdateCheckEnabled: boolean;
   menuBarVisible: boolean;
-  isPro: boolean;
   syncEnabled: boolean;
 }
 

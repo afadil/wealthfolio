@@ -17,9 +17,9 @@ export function useSwingActivities(ctx: AddonContext) {
         }
 
         const filters = {
-          activityType: activityTypes,
+          activityTypes: activityTypes,
           ...(preferences.selectedAccounts.length > 0 && {
-            accountId: preferences.selectedAccounts,
+            accountIds: preferences.selectedAccounts,
           }),
         };
 

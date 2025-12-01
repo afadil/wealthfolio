@@ -67,10 +67,7 @@ pub async fn update_asset_data_source(
 }
 
 #[tauri::command]
-pub async fn delete_asset(
-    id: String,
-    state: State<'_, Arc<ServiceContext>>,
-) -> Result<(), String> {
+pub async fn delete_asset(id: String, state: State<'_, Arc<ServiceContext>>) -> Result<(), String> {
     state
         .asset_service()
         .delete_asset(&id)

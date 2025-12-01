@@ -6,12 +6,7 @@ use tauri::{AppHandle, State};
 // Import addon modules
 use crate::context::ServiceContext;
 use wealthfolio_core::addons::{
-    self,
-    AddonManifest,
-    AddonUpdateCheckResult,
-    AddonUpdateInfo,
-    ExtractedAddon,
-    InstalledAddon,
+    self, AddonManifest, AddonUpdateCheckResult, AddonUpdateInfo, ExtractedAddon, InstalledAddon,
 };
 
 #[tauri::command]
@@ -297,7 +292,8 @@ pub async fn check_addon_update(
 ) -> Result<AddonUpdateCheckResult, String> {
     let instance_id = state.instance_id.as_str();
     // Check for updates from addon store
-    match addons::check_addon_update_from_api(&addon_id, &current_version, Some(instance_id)).await {
+    match addons::check_addon_update_from_api(&addon_id, &current_version, Some(instance_id)).await
+    {
         Ok(update_check_result) => {
             // The API already provides the complete result, just return it
             Ok(update_check_result)

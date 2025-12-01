@@ -3,37 +3,37 @@
  * These utilities help convert between the main app's internal types and the SDK's public types
  */
 
-import type { HostAPI as SDKHostAPI } from "@wealthfolio/addon-sdk";
 import type { EventCallback, UnlistenFn } from "@/adapters";
 import type {
-  Holding,
-  Activity,
   Account,
+  AccountValuation,
+  Activity,
   ActivityBulkMutationRequest,
   ActivityBulkMutationResult,
-  ActivityDetails,
   ActivityCreate,
-  ActivityUpdate,
+  ActivityDetails,
   ActivityImport,
   ActivitySearchResponse,
-  ExchangeRate,
+  ActivityUpdate,
+  Asset,
   ContributionLimit,
-  NewContributionLimit,
   DepositsCalculation,
+  ExchangeRate,
   Goal,
   GoalAllocation,
-  QuoteSummary,
-  Asset,
-  Quote,
-  UpdateAssetProfile,
-  MarketDataProviderInfo,
-  IncomeSummary,
-  AccountValuation,
-  PerformanceMetrics,
-  SimplePerformanceMetrics,
-  Settings,
+  Holding,
   ImportMappingData,
+  IncomeSummary,
+  MarketDataProviderInfo,
+  NewContributionLimit,
+  PerformanceMetrics,
+  Quote,
+  QuoteSummary,
+  Settings,
+  SimplePerformanceMetrics,
+  UpdateAssetProfile,
 } from "@/lib/types";
+import type { HostAPI as SDKHostAPI } from "@wealthfolio/addon-sdk";
 
 /**
  * Internal HostAPI interface that matches the actual command function signatures
@@ -256,7 +256,7 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: s
       openSaveDialog: internalAPI.openFileSaveDialog,
     },
 
-    logger: createAddonLogger(addonId ?? "unknown-addon"),
+    logger: createAddonLogger(addonId || "unknown-addon"),
 
     events: {
       import: {

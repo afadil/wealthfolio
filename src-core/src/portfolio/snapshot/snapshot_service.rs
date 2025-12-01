@@ -673,15 +673,12 @@ impl SnapshotService {
 
                 if !pos.lots.is_empty() {
                     let agg_position_id = agg_pos.id.clone();
-                    agg_pos.lots.extend(
-                        pos.lots
-                            .iter()
-                            .cloned()
-                            .map(|mut lot: Lot| {
-                                lot.position_id = agg_position_id.clone();
-                                lot
-                            }),
-                    );
+                    agg_pos
+                        .lots
+                        .extend(pos.lots.iter().cloned().map(|mut lot: Lot| {
+                            lot.position_id = agg_position_id.clone();
+                            lot
+                        }));
                 }
 
                 // Convert this specific position's total_cost_basis (in asset currency) to base_portfolio_currency

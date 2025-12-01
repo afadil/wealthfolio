@@ -1,10 +1,17 @@
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { type AddonContext, type Goal } from "@wealthfolio/addon-sdk";
-import { Icons, EmptyPlaceholder, Button, Page, PageContent, PageHeader } from "@wealthfolio/ui";
-import React, { useState, useEffect } from "react";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { InvestmentCalendar, GoalSelector, HelpPopover } from "./components";
+import {
+  Button,
+  EmptyPlaceholder,
+  Icons,
+  Page,
+  PageContent,
+  PageHeader,
+  useBalancePrivacy,
+} from "@wealthfolio/ui";
+import React, { useEffect, useState } from "react";
+import { GoalSelector, HelpPopover, InvestmentCalendar } from "./components";
 import { useGoalProgress } from "./hooks";
-import { useBalancePrivacy } from "@wealthfolio/ui";
 
 // Main Investment Target Tracker component
 function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
@@ -185,7 +192,7 @@ export default function enable(ctx: AddonContext) {
 
     // Create wrapper component with QueryClientProvider using shared client
     const InvestmentTargetTrackerWrapper = () => {
-      const sharedQueryClient = ctx.api.query.getClient();
+      const sharedQueryClient = ctx.api.query.getClient() as QueryClient;
       return (
         <QueryClientProvider client={sharedQueryClient}>
           <InvestmentTargetTracker ctx={ctx} />

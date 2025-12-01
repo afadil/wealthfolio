@@ -71,7 +71,10 @@ async fn update_asset_data_source(
     Ok(Json(asset))
 }
 
-async fn delete_asset(State(state): State<Arc<AppState>>, Path(id): Path<String>) -> ApiResult<StatusCode> {
+async fn delete_asset(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> ApiResult<StatusCode> {
     state.asset_service.delete_asset(&id).await?;
     Ok(StatusCode::NO_CONTENT)
 }

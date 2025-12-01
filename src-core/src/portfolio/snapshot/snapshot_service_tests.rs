@@ -1009,7 +1009,11 @@ mod tests {
             id: "LOT2".to_string(),
             position_id: format!("pos_AAPL_{}", acc2.id),
             acquisition_date: DateTime::<Utc>::from_naive_utc_and_offset(
-                target_date.succ_opt().unwrap().and_hms_opt(0, 0, 0).unwrap(),
+                target_date
+                    .succ_opt()
+                    .unwrap()
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap(),
                 Utc,
             ),
             quantity: dec!(2),

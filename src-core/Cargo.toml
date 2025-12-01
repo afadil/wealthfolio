@@ -13,7 +13,6 @@ edition = "2021"
 
 [features]
 default = []
-wealthfolio-pro = []
 
 [dependencies]
 anyhow = "1"
