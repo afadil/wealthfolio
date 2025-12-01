@@ -339,9 +339,16 @@ export function AppLauncher() {
       {
         title: "Manage Securities",
         href: "/settings/securities",
-        icon: <Icons.Settings className="size-6" />,
+        icon: <Icons.BadgeDollarSign className="size-6" />,
         keywords: ["securities", "assets", "stocks", "manage", "edit", "settings"],
         label: "Manage Securities",
+      },
+      {
+        title: "Manage Accounts",
+        href: "/settings/accounts",
+        icon: <Icons.CreditCard className="size-6" />,
+        keywords: ["accounts", "manage", "edit", "settings"],
+        label: "Manage Accounts",
       },
     ];
 
