@@ -60,7 +60,7 @@ export const ActivityTableMobile = ({
             <Card key={activity.id} className="p-3">
               <div className="flex items-center gap-3">
                 {isCash ? (
-                  <div className="flex flex-1 items-center gap-3 min-w-0">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
                     <TickerAvatar symbol={avatarSymbol} className="h-10 w-10 flex-shrink-0" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-2">
@@ -89,7 +89,7 @@ export const ActivityTableMobile = ({
                 ) : (
                   <Link
                     to={`/holdings/${encodeURIComponent(symbol)}`}
-                    className="flex flex-1 items-center gap-3 min-w-0"
+                    className="flex min-w-0 flex-1 items-center gap-3"
                   >
                     <TickerAvatar symbol={avatarSymbol} className="h-10 w-10 flex-shrink-0" />
                     <div className="min-w-0 flex-1">

@@ -244,7 +244,7 @@ export function EditableCell({
       onKeyDown={handleKeyDown}
       className={cn(
         "flex h-full w-full items-center px-2 py-1.5 text-xs transition-colors outline-none",
-        disabled ? "cursor-not-allowed text-muted-foreground" : "cursor-cell",
+        disabled ? "text-muted-foreground cursor-not-allowed" : "cursor-cell",
         isFocused && "ring-primary ring-2 ring-inset",
         !displayContent && "text-muted-foreground",
         className,

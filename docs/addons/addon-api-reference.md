@@ -234,20 +234,20 @@ try {
 ```
 
 #### `search(
-  page: number,
-  pageSize: number,
-  filters: ActivitySearchFilters,
-  searchKeyword: string,
-  sort?: ActivitySort,
-): Promise<ActivitySearchResponse>`
+
+page: number, pageSize: number, filters: ActivitySearchFilters, searchKeyword:
+string, sort?: ActivitySort, ): Promise<ActivitySearchResponse>`
 
 Search activities with pagination, filters, and a single optional sort.
 
-- `page`: Zero-based page index. Use `0` for the first page (e.g., for exports you can pass `0` with a large `pageSize` such as `1000`).
+- `page`: Zero-based page index. Use `0` for the first page (e.g., for exports
+  you can pass `0` with a large `pageSize` such as `1000`).
 - `pageSize`: Number of rows per page.
-- `filters`: Accepts single strings or arrays for `accountIds` and `activityTypes`. Empty strings/arrays are ignored.
+- `filters`: Accepts single strings or arrays for `accountIds` and
+  `activityTypes`. Empty strings/arrays are ignored.
 - `searchKeyword`: Free-form keyword search; pass an empty string when unused.
-- `sort`: Optional sort object (defaults to `{ id: "date", desc: true }`). Only one sort is supported.
+- `sort`: Optional sort object (defaults to `{ id: "date", desc: true }`). Only
+  one sort is supported.
 
 ```typescript
 const { data, meta } = await ctx.api.activities.search(

@@ -149,16 +149,14 @@ export function SelectCell({
           onKeyDown={handleKeyDown}
           className={cn(
             "flex h-full w-full items-center justify-between gap-2 px-2 py-1.5 text-xs transition-colors outline-none",
-            disabled
-              ? "cursor-not-allowed text-muted-foreground"
-              : "cursor-cell",
+            disabled ? "text-muted-foreground cursor-not-allowed" : "cursor-cell",
             isFocused && "ring-primary ring-2 ring-inset",
             !value && !selectedOption && "text-muted-foreground",
             className,
           )}
         >
           <span className="flex-1">
-            {renderValue ? renderValue(value) : selectedOption?.label ?? value}
+            {renderValue ? renderValue(value) : (selectedOption?.label ?? value)}
           </span>
           <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
         </div>

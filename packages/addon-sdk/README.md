@@ -771,22 +771,22 @@ ctx.api.logger.debug('Debug info:', debugData);
 
 ### Available API Methods
 
-| Method                                          | Description                        | Permission Required  |
-| ----------------------------------------------- | ---------------------------------- | -------------------- |
-| `portfolio.getHoldings(accountId)`              | Get portfolio holdings for account | `portfolio`          |
-| `portfolio.getHolding(accountId, assetId)`      | Get specific holding               | `portfolio`          |
-| `portfolio.calculatePerformanceSummary(params)` | Calculate performance metrics      | `portfolio`          |
-| `portfolio.getIncomeSummary()`                  | Get income summary data            | `portfolio`          |
-| `accounts.getAll()`                             | Get all account information        | `accounts`           |
-| `accounts.create(account)`                      | Create new account                 | `accounts`           |
+| Method                                          | Description                                               | Permission Required  |
+| ----------------------------------------------- | --------------------------------------------------------- | -------------------- |
+| `portfolio.getHoldings(accountId)`              | Get portfolio holdings for account                        | `portfolio`          |
+| `portfolio.getHolding(accountId, assetId)`      | Get specific holding                                      | `portfolio`          |
+| `portfolio.calculatePerformanceSummary(params)` | Calculate performance metrics                             | `portfolio`          |
+| `portfolio.getIncomeSummary()`                  | Get income summary data                                   | `portfolio`          |
+| `accounts.getAll()`                             | Get all account information                               | `accounts`           |
+| `accounts.create(account)`                      | Create new account                                        | `accounts`           |
 | `activities.getAll(accountId?)`                 | Get activity history (optionally filtered to one account) | `activities`         |
-| `activities.create(activity)`                   | Create new activity                | `activities`         |
-| `marketData.getQuoteHistory(symbol)`            | Get historical quotes              | `market-data`        |
-| `marketData.getAssetProfile(assetId)`           | Get asset profile                  | `market-data`        |
-| `marketData.searchTicker(query)`                | Search for tickers                 | `market-data`        |
-| `goals.getAll()`                                | Get financial goals                | `financial-planning` |
-| `settings.get()`                                | Get app settings                   | `settings`           |
-| `query.getClient()`                             | Get shared QueryClient instance    | None                 |
+| `activities.create(activity)`                   | Create new activity                                       | `activities`         |
+| `marketData.getQuoteHistory(symbol)`            | Get historical quotes                                     | `market-data`        |
+| `marketData.getAssetProfile(assetId)`           | Get asset profile                                         | `market-data`        |
+| `marketData.searchTicker(query)`                | Search for tickers                                        | `market-data`        |
+| `goals.getAll()`                                | Get financial goals                                       | `financial-planning` |
+| `settings.get()`                                | Get app settings                                          | `settings`           |
+| `query.getClient()`                             | Get shared QueryClient instance                           | None                 |
 
 > Tip: `activities.getAll` accepts an optional account ID string to scope
 > results to a single account. The SDK normalizes this for both desktop (Tauri)
@@ -798,23 +798,23 @@ ctx.api.logger.debug('Debug info:', debugData);
 and `activityTypes`. The host normalizes these inputs for both desktop and web
 runtime paths and will also accept an explicit `symbol` filter when you want to
 target a single ticker without a free-form search query. Sorting takes a single
-sort object and defaults to `{ id: "date", desc: true }` when none is
-provided. The first two parameters are pagination controls: `page` is a
-zero-based index (use `0` for the first page) and `pageSize` is the number of
-rows to return. For exports you can pass a large `pageSize` (for example, 1000)
-alongside `page` = 0 to fetch a wide slice in one call.
+sort object and defaults to `{ id: "date", desc: true }` when none is provided.
+The first two parameters are pagination controls: `page` is a zero-based index
+(use `0` for the first page) and `pageSize` is the number of rows to return. For
+exports you can pass a large `pageSize` (for example, 1000) alongside `page` = 0
+to fetch a wide slice in one call.
 
 ```typescript
 const response = await ctx.api.activities.search(
   0,
   50,
   {
-    accountIds: "account-1", // single string or string[] both work
-    activityTypes: ["BUY", "DIVIDEND"],
-    symbol: "AAPL",
+    accountIds: 'account-1', // single string or string[] both work
+    activityTypes: ['BUY', 'DIVIDEND'],
+    symbol: 'AAPL',
   },
-  "", // optional keyword search (ignored when empty)
-  { id: "date", desc: true },
+  '', // optional keyword search (ignored when empty)
+  { id: 'date', desc: true },
 );
 ```
 

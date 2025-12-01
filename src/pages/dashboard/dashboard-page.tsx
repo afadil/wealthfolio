@@ -16,8 +16,6 @@ import Balance from "./balance";
 import SavingGoals from "./goals";
 import TopHoldings from "./top-holdings";
 
-
-
 // Helper function to get the initial date range for 3M
 const getInitialDateRange = (): DateRange => ({
   from: subMonths(new Date(), 3),

@@ -126,14 +126,14 @@ export default function FeesPage({ ctx }: FeesPageProps) {
     <Page>
       <PageHeader heading="Fees Tracker" actions={headerActions} />
       <PageContent>
-        <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-3">
           <FeeOverviewCards
             feeSummary={periodSummary}
             feeAnalytics={analyticsData}
             isBalanceHidden={isBalanceHidden}
           />
         </div>
-        <div className="grid auto-rows-min gap-4 sm:gap-6 items-stretch md:grid-cols-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="grid auto-rows-min items-stretch gap-4 sm:gap-6 md:grid-cols-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <div className="md:col-span-2 lg:col-auto">
             <FeeHistoryChart
               monthlyFeeData={monthlyFeeData}

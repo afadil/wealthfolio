@@ -7,13 +7,10 @@ const DEV_SERVER_URL = process.env.WF_E2E_BASE_URL || "http://localhost:1420";
 const cliArgs = process.argv.slice(2);
 const shouldUseUi = cliArgs.includes("--ui");
 
-const buildHealthUrl = (base, path = "/") => new URL(path, `${base.replace(/\/$/, "")}/`).toString();
+const buildHealthUrl = (base, path = "/") =>
+  new URL(path, `${base.replace(/\/$/, "")}/`).toString();
 
-const waitForServer = async (
-  url,
-  serverProcess,
-  { timeout = 60_000, interval = 500 } = {},
-) => {
+const waitForServer = async (url, serverProcess, { timeout = 60_000, interval = 500 } = {}) => {
   const deadline = Date.now() + timeout;
   const healthUrl = buildHealthUrl(url);
 

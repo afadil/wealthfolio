@@ -8,7 +8,8 @@ export interface ParsedAsset extends Asset {
 }
 
 const normalizeWeight = (weight: unknown): number => {
-  const parsed = typeof weight === "number" ? weight : parseFloat(String(weight ?? "").replace("%", ""));
+  const parsed =
+    typeof weight === "number" ? weight : parseFloat(String(weight ?? "").replace("%", ""));
   if (Number.isNaN(parsed)) {
     return 0;
   }
@@ -32,7 +33,9 @@ const parseJsonBreakdown = (value?: string | null): WeightedBreakdown[] => {
 };
 
 export const formatBreakdownTags = (items: WeightedBreakdown[]): string[] =>
-  items.map((item) => `${item.name}:${item.weight <= 1 ? (item.weight * 100).toFixed(0) : item.weight}%`);
+  items.map(
+    (item) => `${item.name}:${item.weight <= 1 ? (item.weight * 100).toFixed(0) : item.weight}%`,
+  );
 
 export const tagsToBreakdown = (values: string[]): WeightedBreakdown[] =>
   values

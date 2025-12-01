@@ -59,9 +59,7 @@ export const searchActivities = async (
   const accountIdFilter = normalizeStringArray(filters?.accountIds);
   const activityTypeFilter = normalizeStringArray(filters?.activityTypes);
   const assetIdKeywordRaw = filters?.symbol ?? searchKeyword;
-  const assetIdKeyword = assetIdKeywordRaw?.trim()
-    ? assetIdKeywordRaw.trim()
-    : undefined;
+  const assetIdKeyword = assetIdKeywordRaw?.trim() ? assetIdKeywordRaw.trim() : undefined;
   const sortOption = sort?.id
     ? { id: sort.id, desc: sort.desc ?? false }
     : { id: "date", desc: true };
