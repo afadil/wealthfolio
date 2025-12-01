@@ -350,6 +350,20 @@ export function AppLauncher() {
         keywords: ["accounts", "manage", "edit", "settings"],
         label: "Manage Accounts",
       },
+      {
+        title: "Manage Goals",
+        href: "/settings/goals",
+        icon: <Icons.Goal className="size-6" />,
+        keywords: ["goals", "manage", "edit", "settings"],
+        label: "Manage Goals",
+      },
+      {
+        title: "Manage Contribution Limits",
+        href: "/settings/contribution-limits",
+        icon: <Icons.TrendingUp className="size-6" />,
+        keywords: ["contribution", "limits", "manage", "edit", "settings"],
+        label: "Manage Contribution Limits",
+      },
     ];
 
     const navItems = [
