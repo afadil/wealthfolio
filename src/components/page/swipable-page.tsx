@@ -206,7 +206,7 @@ export function SwipablePage({
       <div
         data-ptr-content
         className={cn(
-          "relative mx-auto flex w-full max-w-screen-2xl grow flex-col overflow-hidden",
+          "relative mx-auto flex w-full max-w-screen-2xl grow flex-col",
           contentClassName,
         )}
       >
@@ -222,16 +222,12 @@ export function SwipablePage({
               />
             </div>
 
-            <div className="min-h-0 flex-1">
+            <div className="min-h-0 flex-1 overflow-hidden">
               <SwipableView
                 initialIndex={initialIndex}
                 items={views.map((v) => ({
                   name: v.label,
-                  content: (
-                    <div className={cn("pb-safe min-h-full", withPadding && "p-2")}>
-                      {v.content}
-                    </div>
-                  ),
+                  content: <div className={cn("pb-safe", withPadding && "p-2")}>{v.content}</div>,
                 }))}
                 displayToggle={false}
                 onViewChange={(_index: number, name: string) => {
