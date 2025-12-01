@@ -184,7 +184,7 @@ const ActivityPage = () => {
   return (
     <Page>
       <PageHeader heading="Activity" actions={headerActions} />
-      <PageContent>
+      <PageContent className="pb-2 md:pb-4 lg:pb-5">
         <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-hidden">
           {/* Unified Controls */}
           {isMobileViewport ? (
@@ -231,6 +231,8 @@ const ActivityPage = () => {
               activities={flatData}
               onRefetch={refetch}
               onEditActivity={handleEdit}
+              sorting={sorting}
+              onSortingChange={setSorting}
             />
           ) : (
             <ActivityTable

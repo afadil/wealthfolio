@@ -18,10 +18,7 @@ const replaceDbPath = (content, timestamp) => {
     throw new Error("WF_DB_PATH entry not found in .env.web");
   }
 
-  return content.replace(
-    /^WF_DB_PATH=.*$/m,
-    `WF_DB_PATH=./db/app-testing-${timestamp}.db`,
-  );
+  return content.replace(/^WF_DB_PATH=.*$/m, `WF_DB_PATH=./db/app-testing-${timestamp}.db`);
 };
 
 export const prepE2eEnv = async () => {

@@ -130,13 +130,13 @@ impl Position {
             if !self.quantity.is_zero() && !self.quantity.is_sign_negative() {
                 warn!("Position {} quantity ({}) became insignificant after recalculation. Average cost zeroed.", self.id, self.quantity);
             }
-            if self.quantity.is_zero() || self.quantity.is_sign_negative() {
-                if !self.lots.is_empty() {
-                    warn!(
-                        "Position {} quantity became zero or negative ({}). Aggregates zeroed, but lots retained.",
-                        self.id, self.quantity
-                    );
-                }
+            if (self.quantity.is_zero() || self.quantity.is_sign_negative())
+                && !self.lots.is_empty()
+            {
+                warn!(
+                    "Position {} quantity became zero or negative ({}). Aggregates zeroed, but lots retained.",
+                    self.id, self.quantity
+                );
             }
             self.quantity = Decimal::ZERO;
             self.total_cost_basis = Decimal::ZERO;
@@ -200,9 +200,9 @@ impl Position {
             position_id: self.id.clone(),
             acquisition_date: activity.activity_date,
             quantity,
-            cost_basis,                           // Store unrounded in position currency
-            acquisition_price: acquisition_price, // Store unrounded in position currency
-            acquisition_fees: acquisition_fees,   // Store unrounded in position currency
+            cost_basis,        // Store unrounded in position currency
+            acquisition_price, // Store unrounded in position currency
+            acquisition_fees,  // Store unrounded in position currency
         };
 
         self.lots.push_back(new_lot);
@@ -335,11 +335,11 @@ impl Position {
             split_ratio, self.id
         );
         for lot in self.lots.iter_mut() {
-            lot.quantity = lot.quantity * split_ratio;
+            lot.quantity *= split_ratio;
             // Price adjustment is informational, cost basis remains key
             // Ensure division by zero is handled if split_ratio could be zero (though checked earlier)
             if !split_ratio.is_zero() {
-                lot.acquisition_price = lot.acquisition_price / split_ratio;
+                lot.acquisition_price /= split_ratio;
             } else {
                 warn!("Split ratio is zero for activity {}. Cannot adjust acquisition price for lot {}.", activity_id, lot.id);
                 lot.acquisition_price = Decimal::ZERO; // Or some other indicator

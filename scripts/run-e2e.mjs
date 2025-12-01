@@ -1,19 +1,16 @@
-import { prepE2eEnv } from "./prep-e2e.mjs";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { setTimeout } from "node:timers/promises";
+import { prepE2eEnv } from "./prep-e2e.mjs";
 
 const DEV_SERVER_URL = process.env.WF_E2E_BASE_URL || "http://localhost:1420";
 const cliArgs = process.argv.slice(2);
 const shouldUseUi = cliArgs.includes("--ui");
 
-const buildHealthUrl = (base, path = "/") => new URL(path, `${base.replace(/\/$/, "")}/`).toString();
+const buildHealthUrl = (base, path = "/") =>
+  new URL(path, `${base.replace(/\/$/, "")}/`).toString();
 
-const waitForServer = async (
-  url,
-  serverProcess,
-  { timeout = 60_000, interval = 500 } = {},
-) => {
+const waitForServer = async (url, serverProcess, { timeout = 60_000, interval = 500 } = {}) => {
   const deadline = Date.now() + timeout;
   const healthUrl = buildHealthUrl(url);
 
@@ -74,8 +71,7 @@ const run = async () => {
 
   try {
     await waitForServer(DEV_SERVER_URL, devServer);
-    const playwrightArgs = shouldUseUi ? ["--ui"] : [];
-    await runPlaywrightTests(playwrightArgs);
+    await runPlaywrightTests(cliArgs);
   } finally {
     await cleanup();
   }

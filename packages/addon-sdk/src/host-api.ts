@@ -34,6 +34,17 @@ import type {
   ImportMappingData,
 } from './data-types';
 
+export interface ActivitySearchFilters {
+  accountIds?: string | string[];
+  activityTypes?: string | string[];
+  symbol?: string;
+}
+
+export interface ActivitySort {
+  id: string;
+  desc?: boolean;
+}
+
 /**
  * Account management APIs
  */
@@ -133,9 +144,9 @@ export interface ActivitiesAPI {
   search(
     page: number,
     pageSize: number,
-    filters: unknown,
+    filters: ActivitySearchFilters,
     searchKeyword: string,
-    sort: unknown,
+    sort?: ActivitySort,
   ): Promise<ActivitySearchResponse>;
 
   /**

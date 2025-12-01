@@ -1,21 +1,21 @@
 import { useEffect, useState } from "react";
 
-import { getRunEnv, RUN_ENV } from "@/adapters";
-import { checkForUpdates, getAppInfo } from "@/commands/app";
+import { getAppInfo } from "@/commands/app";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icons } from "@/components/ui/icons";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/components/ui/use-toast";
 import { usePlatform } from "@/hooks/use-platform";
+import { useCheckForUpdates } from "@/hooks/use-updater";
 import { SettingsHeader } from "../settings-header";
 
 export default function AboutSettingsPage() {
   const [version, setVersion] = useState<string>("");
   const [dbPath, setDbPath] = useState<string>("");
   const [logsDir, setLogsDir] = useState<string>("");
-  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const { isMobile } = usePlatform();
+  const checkUpdateMutation = useCheckForUpdates();
 
   useEffect(() => {
     // Use unified command for both desktop and web
@@ -34,60 +34,11 @@ export default function AboutSettingsPage() {
     }
   }, [isMobile]);
 
-  const handleCheckForUpdates = async () => {
-    setIsCheckingUpdate(true);
-    try {
-      const runEnv = getRunEnv();
-      if (runEnv === RUN_ENV.DESKTOP) {
-        const { check } = await import("@tauri-apps/plugin-updater");
-        const update = await check();
-
-        if (update) {
-          toast({
-            title: "Update available",
-            description: [
-              `Version ${update.version} is available.`,
-              update.body ? update.body : null,
-            ]
-              .filter(Boolean)
-              .join("\n\n"),
-          });
-        } else {
-          toast({ title: "Up to date", description: "You have the latest version." });
-        }
-        return;
-      }
-
-      const update = await checkForUpdates();
-
-      if (!update) {
-        throw new Error("Update check unavailable");
-      }
-
-      if (update.updateAvailable) {
-        toast({
-          title: "Update available",
-          description: [
-            `Version ${update.latestVersion} is available.`,
-            update.notes ? update.notes : null,
-          ]
-            .filter(Boolean)
-            .join("\n\n"),
-        });
-      } else {
-        toast({ title: "Up to date", description: "You have the latest version." });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to check for updates.",
-        variant: "destructive",
-      });
-      console.error("Failed to check for updates:", error);
-    } finally {
-      setIsCheckingUpdate(false);
-    }
+  const handleCheckForUpdates = () => {
+    checkUpdateMutation.mutate();
   };
+
+  const isCheckingUpdate = checkUpdateMutation.isPending;
 
   const handleCopy = async (value: string, label: string) => {
     try {

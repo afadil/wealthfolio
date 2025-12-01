@@ -42,6 +42,7 @@ export interface Activity {
   createdAt: Date | string;
   symbolProfileId: string;
   updatedAt: Date | string;
+  assetDataSource?: DataSource;
 }
 
 export interface ActivityDetails {
@@ -80,6 +81,7 @@ export interface ActivityCreate {
   activityType: string;
   activityDate: string | Date;
   assetId?: string;
+  assetDataSource?: DataSource;
   quantity?: number;
   unitPrice?: number;
   amount?: number;
@@ -162,7 +164,7 @@ export interface QuoteSummary {
   longName: string;
   sector?: string;
   industry?: string;
-  dataSource?: boolean;
+  dataSource?: string;
 }
 
 export interface MarketDataProviderInfo {
@@ -343,7 +345,6 @@ export interface Settings {
   onboardingCompleted: boolean;
   autoUpdateCheckEnabled: boolean;
   menuBarVisible: boolean;
-  isPro: boolean;
   syncEnabled: boolean;
 }
 
@@ -548,4 +549,15 @@ export interface AddonStoreListing {
   images: string[];
   /** Classification tags for filtering */
   tags?: string[];
+}
+
+export interface UpdateInfo {
+  currentVersion: string;
+  latestVersion: string;
+  notes?: string;
+  pubDate?: string;
+  isAppStoreBuild: boolean;
+  storeUrl?: string;
+  changelogUrl?: string;
+  screenshots?: string[];
 }

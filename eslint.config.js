@@ -26,6 +26,12 @@ export default [
       // Additional ignores for generated/vendor files
       "src/lib/recharts-patch.ts",
       "src/lib/react-qr-code-patch.ts",
+      // Test and build artifacts
+      "playwright-report/**",
+      "test-results/**",
+      "scripts/**",
+      "e2e-tests/**",
+      "target/**",
     ],
   },
 

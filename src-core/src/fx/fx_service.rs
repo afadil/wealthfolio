@@ -181,8 +181,13 @@ impl FxServiceTrait for FxService {
     }
 
     async fn add_exchange_rate(&self, new_rate: NewExchangeRate) -> Result<ExchangeRate> {
-        // First register the currency pair
-        self.register_currency_pair_manual(&new_rate.from_currency, &new_rate.to_currency)
+        // Create the FX asset with the original currency codes (not normalized)
+        self.repository
+            .create_fx_asset(
+                &new_rate.from_currency,
+                &new_rate.to_currency,
+                new_rate.source.as_str(),
+            )
             .await?;
 
         let rate = ExchangeRate {
@@ -201,7 +206,7 @@ impl FxServiceTrait for FxService {
         let normalized_from = normalize_currency_code(from);
         let normalized_to = normalize_currency_code(to);
 
-        let symbol = ExchangeRate::make_fx_symbol(&normalized_from, &normalized_to);
+        let symbol = ExchangeRate::make_fx_symbol(normalized_from, normalized_to);
         let end = Utc::now();
         let start = end - chrono::Duration::days(days);
 
@@ -349,13 +354,13 @@ impl FxServiceTrait for FxService {
 
         // Try to get existing rate first
         let existing_rate = self
-            .load_latest_exchange_rate(&normalized_from, &normalized_to)
+            .load_latest_exchange_rate(normalized_from, normalized_to)
             .ok();
 
         // Create FX asset and add default rate if no rate exists
         if existing_rate.is_none() {
             self.repository
-                .create_fx_asset(&normalized_from, &normalized_to, DataSource::Yahoo.as_str())
+                .create_fx_asset(normalized_from, normalized_to, DataSource::Yahoo.as_str())
                 .await?;
         }
 
@@ -372,17 +377,13 @@ impl FxServiceTrait for FxService {
 
         // Try to get existing rate first
         let existing_rate = self
-            .load_latest_exchange_rate(&normalized_from, &normalized_to)
+            .load_latest_exchange_rate(normalized_from, normalized_to)
             .ok();
 
         // Create FX asset and add default rate if no rate exists
         if existing_rate.is_none() {
             self.repository
-                .create_fx_asset(
-                    &normalized_from,
-                    &normalized_to,
-                    DataSource::Manual.as_str(),
-                )
+                .create_fx_asset(normalized_from, normalized_to, DataSource::Manual.as_str())
                 .await?;
         }
 

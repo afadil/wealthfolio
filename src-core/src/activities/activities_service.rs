@@ -51,6 +51,15 @@ impl ActivityService {
             .get_or_create_asset(&activity.asset_id, Some(asset_context_currency))
             .await?;
 
+        if let Some(requested_source) = activity.asset_data_source.as_ref() {
+            let requested = requested_source.to_uppercase();
+            if !requested.is_empty() && asset.data_source.to_uppercase() != requested {
+                self.asset_service
+                    .update_asset_data_source(&asset.id, requested)
+                    .await?;
+            }
+        }
+
         if activity.currency.is_empty() {
             activity.currency = asset.currency.clone();
         }
@@ -81,6 +90,15 @@ impl ActivityService {
             .get_or_create_asset(&activity.asset_id, Some(asset_context_currency))
             .await?;
 
+        if let Some(requested_source) = activity.asset_data_source.as_ref() {
+            let requested = requested_source.to_uppercase();
+            if !requested.is_empty() && asset.data_source.to_uppercase() != requested {
+                self.asset_service
+                    .update_asset_data_source(&asset.id, requested)
+                    .await?;
+            }
+        }
+
         if activity.currency.is_empty() {
             activity.currency = asset.currency.clone();
         }
@@ -107,7 +125,7 @@ impl ActivityServiceTrait for ActivityService {
     }
 
     /// Retrieves activities by account ID
-    fn get_activities_by_account_id(&self, account_id: &String) -> Result<Vec<Activity>> {
+    fn get_activities_by_account_id(&self, account_id: &str) -> Result<Vec<Activity>> {
         self.activity_repository
             .get_activities_by_account_id(account_id)
     }
@@ -216,8 +234,10 @@ impl ActivityServiceTrait for ActivityService {
         }
 
         if !errors.is_empty() {
-            let mut outcome = ActivityBulkMutationResult::default();
-            outcome.errors = errors;
+            let outcome = ActivityBulkMutationResult {
+                errors,
+                ..Default::default()
+            };
             return Ok(outcome);
         }
 
@@ -332,7 +352,7 @@ impl ActivityServiceTrait for ActivityService {
                 || activity
                     .errors
                     .as_ref()
-                    .map_or(false, |errors| !errors.is_empty())
+                    .is_some_and(|errors| !errors.is_empty())
         });
 
         if has_errors {
@@ -345,6 +365,7 @@ impl ActivityServiceTrait for ActivityService {
                 id: activity.id.clone(),
                 account_id: activity.account_id.clone().unwrap_or_default(),
                 asset_id: activity.symbol.clone(),
+                asset_data_source: None,
                 activity_type: activity.activity_type.clone(),
                 activity_date: activity.date.clone(),
                 quantity: Some(activity.quantity),

@@ -33,16 +33,18 @@ interface AccountSummaryDisplayData {
 
 const AccountSummarySkeleton = () => (
   <div className="flex w-full items-center justify-between gap-3">
-    <div className="flex flex-1 flex-col gap-2">
+    <div className="flex min-w-0 flex-1 flex-col gap-1 md:gap-1.5">
       <Skeleton className="h-5 w-40 rounded md:h-6" />
       <Skeleton className="h-4 w-32 rounded md:h-4" />
     </div>
-    <div className="flex items-center gap-2">
-      <div className="flex flex-col items-end gap-2">
+    <div className="flex shrink-0 items-center gap-2 md:gap-3">
+      <div className="flex min-h-[3rem] flex-col items-end justify-center gap-1 md:gap-1.5">
         <Skeleton className="h-5 w-24 rounded md:h-6" />
         <Skeleton className="h-4 w-32 rounded md:h-4" />
       </div>
-      <Skeleton className="h-6 w-6 rounded-full" />
+      <div className="flex items-center justify-center">
+        <Skeleton className="h-5 w-5 rounded-full" />
+      </div>
     </div>
   </div>
 );
@@ -68,18 +70,17 @@ const AccountSummaryComponent = React.memo(
       displayInAccountCurrency || (item.displayInAccountCurrency && Boolean(item.accountCurrency));
 
     if (!isGroup && isLoadingValuation) {
+      const skeletonContent = <AccountSummarySkeleton />;
+
+      if (isNested) {
+        return (
+          <div className="flex w-full items-center justify-between gap-3">{skeletonContent}</div>
+        );
+      }
+
       return (
-        <div className="flex w-full items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 flex-col gap-2 md:gap-2">
-            <Skeleton className="h-5 w-32 rounded md:h-6" />
-            <Skeleton className="h-4 w-40 rounded md:h-4" />
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex flex-col items-end gap-2">
-              <Skeleton className="h-5 w-24 rounded md:h-6" />
-              <Skeleton className="h-4 w-32 rounded md:h-4" />
-            </div>
-          </div>
+        <div className="border-border bg-card flex w-full items-center justify-between gap-3 rounded-lg border px-4 py-3 shadow-xs md:px-5 md:py-4">
+          {skeletonContent}
         </div>
       );
     }
@@ -88,9 +89,7 @@ const AccountSummaryComponent = React.memo(
     const accountId = item.accountId;
 
     const subText = isGroup
-      ? useAccountCurrency
-        ? `${item.accountCurrency} • ${item.accountCount} ${item.accountCount === 1 ? "account" : "accounts"}`
-        : `${item.accountCount} ${item.accountCount === 1 ? "account" : "accounts"}`
+      ? `${item.accountCount} ${item.accountCount === 1 ? "account" : "accounts"}`
       : useAccountCurrency
         ? (item.accountCurrency ?? item.baseCurrency)
         : item.baseCurrency;
@@ -302,8 +301,15 @@ export const AccountsSummary = React.memo(() => {
 
     if (!combinedAccountViews || combinedAccountViews.length === 0) {
       return (
-        <div className="border-border/50 bg-secondary/30 rounded-lg border p-6 text-center md:p-8">
-          <p className="text-muted-foreground text-sm">No accounts found.</p>
+        <div className="border-border/50 bg-success/10 rounded-lg border p-6 text-center md:p-8">
+          <p className="text-sm">No accounts found.</p>
+          <Link
+            to="/settings/accounts"
+            className="text-muted-foreground hover:text-foreground mt-2 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
+          >
+            Add your first account
+            <Icons.ChevronRight className="h-3 w-3" />
+          </Link>
         </div>
       );
     }
@@ -340,7 +346,7 @@ export const AccountsSummary = React.memo(() => {
           );
           const groupDisplaysAccountCurrency = groupCurrencies.size === 1;
           const groupDisplayCurrency = groupDisplaysAccountCurrency
-            ? groupAccounts[0]?.accountCurrency ?? groupAccounts[0]?.baseCurrency ?? baseCurrency
+            ? (groupAccounts[0]?.accountCurrency ?? groupAccounts[0]?.baseCurrency ?? baseCurrency)
             : baseCurrency;
 
           const totalValueBaseCurrency = groupAccounts.reduce(
@@ -366,7 +372,8 @@ export const AccountsSummary = React.memo(() => {
 
           const totalValueAccountCurrency = groupDisplaysAccountCurrency
             ? groupAccounts.reduce(
-                (sum, acc) => sum + Number(acc.totalValueAccountCurrency ?? acc.totalValueBaseCurrency),
+                (sum, acc) =>
+                  sum + Number(acc.totalValueAccountCurrency ?? acc.totalValueBaseCurrency),
                 0,
               )
             : undefined;
@@ -380,14 +387,17 @@ export const AccountsSummary = React.memo(() => {
 
           const totalNetContributionAccountCurrency = groupDisplaysAccountCurrency
             ? groupAccounts.reduce((sum, acc) => {
-                const accountValue = Number(acc.totalValueAccountCurrency ?? acc.totalValueBaseCurrency);
+                const accountValue = Number(
+                  acc.totalValueAccountCurrency ?? acc.totalValueBaseCurrency,
+                );
                 const accountGainLoss = Number(acc.totalGainLossAmountAccountCurrency ?? 0);
                 return sum + (accountValue - accountGainLoss);
               }, 0)
             : undefined;
 
           const groupTotalReturnPercent = groupDisplaysAccountCurrency
-            ? totalNetContributionAccountCurrency !== undefined && totalNetContributionAccountCurrency !== 0
+            ? totalNetContributionAccountCurrency !== undefined &&
+              totalNetContributionAccountCurrency !== 0
               ? (totalGainLossAmountAccountCurrency ?? 0) / totalNetContributionAccountCurrency
               : null
             : groupTotalReturnPercentBase;
@@ -497,7 +507,7 @@ export const AccountsSummary = React.memo(() => {
         <h2 className="text-md font-semibold tracking-tight">Accounts</h2>
         <Button
           variant="outline"
-          className="rounded-lg bg-transparent transition-colors duration-150"
+          className="hover:bg-success/10 rounded-lg bg-transparent transition-colors duration-150"
           size="sm"
           onClick={() => setAccountsGrouped(!accountsGrouped)}
           aria-label={accountsGrouped ? "List view" : "Group view"}

@@ -12,7 +12,7 @@ import {
   SheetTitle,
 } from "@wealthfolio/ui";
 import { motion } from "motion/react";
-import { useCallback, useId, useState } from "react";
+import React, { useCallback, useId, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { type NavigationProps, isPathActive } from "./app-navigation";
 
@@ -25,8 +25,11 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [addonsSheetOpen, setAddonsSheetOpen] = useState(false);
-  const triggerHaptic = useHapticFeedback();
+  const hapticFeedback = useHapticFeedback();
   const uniqueId = useId();
+  const triggerHaptic = useMemo(() => hapticFeedback, [hapticFeedback]);
+
+  const containerClassName = "pointer-events-none fixed inset-x-0 bottom-0 z-50 md:hidden";
 
   const handleNavigation = useCallback(
     (href: string, isActive: boolean) => {
@@ -37,39 +40,81 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
     [triggerHaptic, navigate],
   );
 
+  const renderIcon = useCallback((icon?: React.ReactNode) => {
+    if (!icon) {
+      return <Icons.ArrowRight className="size-6" />;
+    }
+
+    if (React.isValidElement<{ className?: string }>(icon)) {
+      return icon.props.className ? icon : React.cloneElement(icon, { className: "size-6" });
+    }
+
+    if (typeof icon === "function") {
+      const IconComponent = icon as React.ComponentType<{ className?: string }>;
+      return <IconComponent className="size-6" />;
+    }
+
+    return <span className="size-6">{icon}</span>;
+  }, []);
+
   const primaryItems = navigation?.primary ?? [];
   const secondaryItems = navigation?.secondary ?? [];
   const addonItems = navigation?.addons ?? [];
-  const allItems = [...primaryItems, ...secondaryItems];
 
-  // Show first 3 items in main menu, rest in dropdown
-  const visibleItems = allItems.slice(0, 3);
-  const menuItems = allItems.slice(3);
+  const searchItem = {
+    title: "Search",
+    href: "#search",
+    icon: <Icons.Search2 className="size-6" />,
+  };
+
+  const visibleItems = [primaryItems[0], primaryItems[1], searchItem].filter(Boolean);
+
+  const menuItems = [...primaryItems.slice(2), ...secondaryItems];
+
   const hasMenu = menuItems.length > 0 || addonItems.length > 0;
   const hasAddons = addonItems.length > 0;
+  const columnCount = visibleItems.length + (hasMenu ? 1 : 0);
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 md:hidden">
+    <div className={containerClassName}>
       {/* Lift off bottom by the design gap while respecting safe area */}
       <div className="flex justify-center px-4 pb-[max(var(--mobile-nav-gap),env(safe-area-inset-bottom))]">
         <LiquidGlass
           variant="floating"
           intensity="subtle"
-          className={cn(
-            "pointer-events-auto w-full px-1 py-1",
-            "h-[var(--mobile-nav-ui-height)]", // fixed UI height
-          )}
+          className={cn("pointer-events-auto w-full px-1 py-1", "h-[var(--mobile-nav-ui-height)]")}
         >
           <nav
-            aria-label="Primary navigation p-0"
-            className={cn("grid place-items-center gap-2", hasMenu ? "grid-cols-4" : "grid-cols-3")}
+            aria-label="Primary navigation"
+            className={cn("grid place-items-center gap-2")}
+            style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
           >
             {visibleItems.map((item) => {
               const isActive = isPathActive(location.pathname, item.href);
+              const isSearch = item.href === "#search";
+
               return (
                 <Link
                   to={item.href}
-                  onClick={() => handleNavigation(item.href, isActive)}
+                  onClick={(e) => {
+                    if (isSearch) {
+                      e.preventDefault();
+                      triggerHaptic();
+                      const event = new KeyboardEvent("keydown", {
+                        key: "k",
+                        code: "KeyK",
+                        keyCode: 75,
+                        which: 75,
+                        metaKey: true,
+                        ctrlKey: true,
+                        bubbles: true,
+                        cancelable: true,
+                      });
+                      document.dispatchEvent(event);
+                    } else {
+                      handleNavigation(item.href, isActive);
+                    }
+                  }}
                   aria-label={item.title}
                   className="text-foreground relative z-10 flex h-14 w-full items-center justify-center rounded-full transition-colors"
                   key={item.href}
@@ -91,7 +136,7 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
                     className="relative flex size-7 shrink-0 items-center justify-center outline-none"
                     aria-hidden="true"
                   >
-                    {item.icon ?? <Icons.ArrowRight className="size-6" />}
+                    {renderIcon(item.icon)}
                   </span>
                 </Link>
               );
@@ -147,7 +192,7 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
                           className="relative z-10 flex w-full items-center gap-3 rounded-full px-3 py-2 text-sm"
                         >
                           <span className="flex size-6 shrink-0 items-center justify-center">
-                            {item.icon ?? <Icons.ArrowRight className="size-5" />}
+                            {renderIcon(item.icon)}
                           </span>
                           <span className="truncate text-left">{item.title}</span>
                         </Link>
@@ -202,7 +247,7 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
                   )}
                 >
                   <span className="flex size-5 shrink-0 items-center justify-center">
-                    {item.icon ?? <Icons.ArrowRight className="h-5 w-5" />}
+                    {renderIcon(item.icon)}
                   </span>
                   <span className="text-base font-medium">{item.title}</span>
                 </Link>

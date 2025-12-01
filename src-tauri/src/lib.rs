@@ -7,83 +7,127 @@ mod events;
 mod listeners;
 mod secret_store;
 
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
+#[cfg(desktop)]
 mod menu;
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
+#[cfg(desktop)]
 mod updater;
 
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
-use log::error;
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
-use updater::check_for_update;
-
-use dotenvy::dotenv;
-use std::env;
 use std::sync::Arc;
 
-use tauri::AppHandle;
-use tauri::Manager;
+use dotenvy::dotenv;
+use log::error;
+use tauri::{AppHandle, Manager};
 
-use context::ServiceContext;
-use events::{emit_app_ready, emit_portfolio_trigger_update, PortfolioRequestPayload};
+use events::emit_app_ready;
 
-/// Spawns background tasks such as menu setup, update checks, and initial portfolio update.
-fn spawn_background_tasks(
-    handle: AppHandle,
-    context: Arc<ServiceContext>,
-    instance_id: Arc<String>,
-) {
-    // Set up menu and updater (desktop only)
-    #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    {
-        let menu_handle = handle.clone();
-        let instance_id_menu = instance_id.clone();
-        tauri::async_runtime::spawn(async move {
-            match menu::create_menu(&menu_handle) {
-                Ok(menu) => {
-                    if let Err(e) = menu_handle.set_menu(menu) {
-                        error!("Failed to set menu: {}", e);
-                    }
-                }
-                Err(e) => {
-                    error!("Failed to create menu: {}", e);
+// ─────────────────────────────────────────────────────────────────────────────
+// Desktop-only setup
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[cfg(desktop)]
+mod desktop {
+    use super::*;
+
+    /// Sets up the application menu and its event handler.
+    pub fn setup_menu(handle: &AppHandle, instance_id: &Arc<String>) {
+        match menu::create_menu(handle) {
+            Ok(menu) => {
+                if let Err(e) = handle.set_menu(menu) {
+                    error!("Failed to set menu: {}", e);
                 }
             }
-            // Set up the menu event handler
-            menu_handle.on_menu_event(move |app, event| {
-                menu::handle_menu_event(app, &*instance_id_menu, event.id().as_ref());
-            });
-        });
+            Err(e) => {
+                error!("Failed to create menu: {}", e);
+            }
+        }
 
-        // Check for updates on startup (if enabled)
-        let update_handle = handle.clone();
-        let instance_id_update = instance_id.clone();
-        let update_context = context.clone();
+        let instance_id = Arc::clone(instance_id);
+        handle.on_menu_event(move |app, event| {
+            menu::handle_menu_event(app, &instance_id, event.id().as_ref());
+        });
+    }
+
+    /// Initializes desktop-specific plugins.
+    pub fn init_plugins(handle: &AppHandle) {
+        let _ = handle.plugin(tauri_plugin_updater::Builder::new().build());
+        let _ = handle.plugin(tauri_plugin_window_state::Builder::new().build());
+    }
+
+    /// Performs synchronous setup on desktop: initializes context, menu, and registers listeners.
+    pub fn setup(handle: AppHandle, app_data_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
+        // Initialize context synchronously (required before any commands can work)
+        let context = tauri::async_runtime::block_on(async {
+            context::initialize_context(app_data_dir).await
+        })?;
+        let context = Arc::new(context);
+
+        // Make context available to all commands
+        handle.manage(Arc::clone(&context));
+
+        // Menu setup is synchronous (no I/O)
+        setup_menu(&handle, &context.instance_id);
+
+        // Notify frontend that app is ready
+        // The frontend will trigger the initial portfolio update and update check after it's mounted
+        emit_app_ready(&handle);
+
+        Ok(())
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mobile-only setup
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[cfg(mobile)]
+mod mobile {
+    use super::*;
+
+    /// Initializes mobile-specific plugins.
+    pub fn init_plugins(handle: &AppHandle) {
+        let _ = handle.plugin(tauri_plugin_haptics::init());
+    }
+
+    /// Performs async setup on mobile without blocking the main thread.
+    pub fn setup(handle: AppHandle, app_data_dir: String) {
         tauri::async_runtime::spawn(async move {
-            if let Ok(is_enabled) = update_context
-                .settings_service()
-                .is_auto_update_check_enabled()
-            {
-                if is_enabled {
-                    check_for_update(update_handle, &*instance_id_update, false).await;
+            match context::initialize_context(&app_data_dir).await {
+                Ok(ctx) => {
+                    let context = Arc::new(ctx);
+                    handle.manage(Arc::clone(&context));
+
+                    // Notify frontend that app is ready
+                    // The frontend will trigger the initial portfolio update after it's mounted
+                    emit_app_ready(&handle);
+                }
+                Err(e) => {
+                    error!("Failed to initialize context on mobile: {}", e);
+                    // Emit ready so UI can show error state
+                    emit_app_ready(&handle);
                 }
             }
         });
     }
-
-    // Trigger initial portfolio update on startup
-    let initial_payload = PortfolioRequestPayload::builder()
-        .account_ids(None)
-        .refetch_all_market_data(false)
-        .build();
-    emit_portfolio_trigger_update(&handle, initial_payload);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Returns the app data directory path.
+fn get_app_data_dir(handle: &AppHandle) -> Result<String, Box<dyn std::error::Error>> {
+    Ok(handle.path().app_data_dir()?.to_string_lossy().into_owned())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Application entry point
+// ─────────────────────────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    dotenv().ok(); // Load environment variables from .env file if available
+    dotenv().ok();
 
-    let app = tauri::Builder::default()
+    tauri::Builder::default()
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(if cfg!(debug_assertions) {
@@ -96,104 +140,42 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .setup(move |app| {
-            // Only initialize desktop-only plugins on non-mobile platforms
-            #[cfg(not(any(target_os = "android", target_os = "ios")))]
-            {
-                let _ = app
-                    .handle()
-                    .plugin(tauri_plugin_updater::Builder::new().build());
-                let _ = app
-                    .handle()
-                    .plugin(tauri_plugin_window_state::Builder::new().build());
-            }
-
-            // Initialize mobile-only plugins
-            #[cfg(any(target_os = "android", target_os = "ios"))]
-            {
-                let handle = app.handle();
-                let _ = handle.plugin(tauri_plugin_haptics::init());
-            }
-
+        .setup(|app| {
             let handle = app.handle().clone();
 
-            // Derive the app data directory path once (sync) and reuse in both branches.
-            let app_data_dir = handle
-                .path()
-                .app_data_dir()? // tauri::Result<PathBuf>
-                .to_string_lossy()
-                .to_string();
+            // Platform-specific plugin initialization
+            #[cfg(desktop)]
+            desktop::init_plugins(&handle);
 
-            // --- Setup event listeners early (does not require context to register) ---
+            #[cfg(mobile)]
+            mobile::init_plugins(&handle);
+
+            // Get app data directory
+            let app_data_dir = get_app_data_dir(&handle)?;
+
+            // Setup event listeners (platform-agnostic)
             listeners::setup_event_listeners(handle.clone());
 
-            // Desktop platforms: perform essential async setup synchronously
-            #[cfg(not(any(target_os = "android", target_os = "ios")))]
-            {
-                tauri::async_runtime::block_on(async {
-                    // Initialize context asynchronously
-                    let context = match context::initialize_context(&app_data_dir).await {
-                        Ok(ctx) => Arc::new(ctx),
-                        Err(e) => {
-                            error!("Failed to initialize context: {}", e);
-                            // Propagate the original boxed error
-                            return Err(e);
-                        }
-                    };
+            // Platform-specific setup
+            #[cfg(desktop)]
+            desktop::setup(handle, &app_data_dir).map_err(|e| {
+                error!("Desktop setup failed: {}", e);
+                e
+            })?;
 
-                    // Make context available to all commands before setup returns
-                    handle.manage(context.clone());
-
-                    // Spawn background non-critical tasks
-                    let instance_id = context.instance_id.clone();
-                    spawn_background_tasks(handle.clone(), context.clone(), instance_id);
-
-                    // Optionally notify frontend that the app is ready
-                    emit_app_ready(&handle);
-
-                    Ok(())
-                })
-                .map_err(|e: Box<dyn std::error::Error>| {
-                    error!("Critical setup failed: {}", e);
-                    // Forward the original error
-                    e
-                })?;
-            }
-
-            // Mobile platforms (iOS/Android): do NOT block the main thread; spawn setup
-            #[cfg(any(target_os = "android", target_os = "ios"))]
-            {
-                let handle_clone = handle.clone();
-                let app_data_dir_clone = app_data_dir.clone();
-                tauri::async_runtime::spawn(async move {
-                    match context::initialize_context(&app_data_dir_clone).await {
-                        Ok(ctx) => {
-                            let ctx = Arc::new(ctx);
-                            handle_clone.manage(ctx.clone());
-                            // Spawn background non-critical tasks
-                            let instance_id = ctx.instance_id.clone();
-                            spawn_background_tasks(handle_clone.clone(), ctx.clone(), instance_id);
-                            // Signal readiness to the frontend
-                            emit_app_ready(&handle_clone);
-                        }
-                        Err(e) => {
-                            // Use fully-qualified log macro to avoid import issues on mobile
-                            log::error!("Failed to initialize context on mobile: {}", e);
-                            // Still emit a ready event so UI can show an error state if desired
-                            emit_app_ready(&handle_clone);
-                        }
-                    }
-                });
-            }
+            #[cfg(mobile)]
+            mobile::setup(handle, app_data_dir);
 
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            // Account commands
             commands::account::get_accounts,
             commands::account::get_active_accounts,
             commands::account::create_account,
             commands::account::update_account,
             commands::account::delete_account,
+            // Activity commands
             commands::activity::search_activities,
             commands::activity::get_activities,
             commands::activity::create_activity,
@@ -204,6 +186,7 @@ pub fn run() {
             commands::activity::import_activities,
             commands::activity::get_account_import_mapping,
             commands::activity::save_account_import_mapping,
+            // Settings commands
             commands::settings::get_settings,
             commands::settings::is_auto_update_check_enabled,
             commands::settings::update_settings,
@@ -211,12 +194,14 @@ pub fn run() {
             commands::settings::update_exchange_rate,
             commands::settings::add_exchange_rate,
             commands::settings::delete_exchange_rate,
+            // Goal commands
             commands::goal::create_goal,
             commands::goal::update_goal,
             commands::goal::delete_goal,
             commands::goal::get_goals,
             commands::goal::update_goal_allocations,
             commands::goal::load_goals_allocations,
+            // Portfolio commands
             commands::portfolio::get_holdings,
             commands::portfolio::get_holding,
             commands::portfolio::get_income_summary,
@@ -227,20 +212,26 @@ pub fn run() {
             commands::portfolio::recalculate_portfolio,
             commands::portfolio::calculate_performance_summary,
             commands::portfolio::calculate_performance_history,
+            // Contribution limit commands
             commands::limits::get_contribution_limits,
             commands::limits::create_contribution_limit,
             commands::limits::update_contribution_limit,
             commands::limits::delete_contribution_limit,
             commands::limits::calculate_deposits_for_contribution_limit,
+            // Utility commands
             commands::utilities::get_app_info,
+            commands::utilities::check_for_updates,
+            commands::utilities::install_app_update,
             commands::utilities::backup_database,
             commands::utilities::backup_database_to_path,
             commands::utilities::restore_database,
+            // Asset commands
             commands::asset::get_asset_profile,
             commands::asset::get_assets,
             commands::asset::update_asset_profile,
             commands::asset::update_asset_data_source,
             commands::asset::delete_asset,
+            // Market data commands
             commands::market_data::search_symbol,
             commands::market_data::sync_market_data,
             commands::market_data::update_quote,
@@ -249,14 +240,18 @@ pub fn run() {
             commands::market_data::get_latest_quotes,
             commands::market_data::get_market_data_providers,
             commands::market_data::import_quotes_csv,
+            // Platform commands
             commands::platform::get_platform,
             commands::platform::is_mobile,
             commands::platform::is_desktop,
+            // Secrets commands
             commands::secrets::set_secret,
             commands::secrets::get_secret,
             commands::secrets::delete_secret,
+            // Provider settings commands
             commands::providers_settings::get_market_data_providers_settings,
             commands::providers_settings::update_market_data_provider_settings,
+            // Addon commands
             commands::addon::extract_addon_zip,
             commands::addon::install_addon_zip,
             commands::addon::list_installed_addons,
@@ -274,7 +269,6 @@ pub fn run() {
             commands::addon::submit_addon_rating,
         ])
         .build(tauri::generate_context!())
-        .expect("error while running wealthfolio application");
-
-    app.run(|_app_handle, _event| {});
+        .expect("Failed to build Wealthfolio application")
+        .run(|_handle, _event| {});
 }

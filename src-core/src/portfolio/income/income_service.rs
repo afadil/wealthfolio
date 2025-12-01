@@ -111,7 +111,7 @@ impl IncomeServiceTrait for IncomeService {
 
             // Correctly call methods on the FxService instance within the Arc
             let converted_amount = match self.fx_service.convert_currency(
-                activity.amount.clone(),
+                activity.amount,
                 &activity.currency,
                 &base_currency,
             ) {
@@ -119,7 +119,7 @@ impl IncomeServiceTrait for IncomeService {
                 Err(e) => {
                     error!("Error converting currency: {:?}", e);
                     // Consider if returning the original amount is the correct fallback
-                    activity.amount.clone()
+                    activity.amount
                 }
             };
 
@@ -130,22 +130,22 @@ impl IncomeServiceTrait for IncomeService {
                 symbol: activity.symbol.clone(),
                 symbol_name: activity.symbol_name.clone(),
                 currency: activity.currency.clone(),
-                amount: activity.amount.clone(), // Keep original amount in activity_copy if needed elsewhere
+                amount: activity.amount, // Keep original amount in activity_copy if needed elsewhere
             };
 
-            total_summary.add_income(&activity_copy, converted_amount.clone());
+            total_summary.add_income(&activity_copy, converted_amount);
 
             if date.year() == current_year {
-                ytd_summary.add_income(&activity_copy, converted_amount.clone());
+                ytd_summary.add_income(&activity_copy, converted_amount);
             } else if date.year() == last_year {
-                last_year_summary.add_income(&activity_copy, converted_amount.clone());
+                last_year_summary.add_income(&activity_copy, converted_amount);
             } else if date.year() == two_years_ago {
-                two_years_ago_summary.add_income(&activity_copy, converted_amount.clone());
+                two_years_ago_summary.add_income(&activity_copy, converted_amount);
             }
         }
 
         total_summary.calculate_monthly_average(Some(months_since_first_transaction as u32));
-        ytd_summary.calculate_monthly_average(Some(current_month as u32));
+        ytd_summary.calculate_monthly_average(Some(current_month));
         last_year_summary.calculate_monthly_average(Some(months_in_last_year as u32));
         two_years_ago_summary.calculate_monthly_average(Some(months_two_years_ago as u32));
 

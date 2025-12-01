@@ -1,9 +1,9 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { updateQuote, deleteQuote } from "@/commands/market-data";
+import { logger } from "@/adapters";
+import { deleteQuote, updateQuote } from "@/commands/market-data";
 import { toast } from "@/components/ui/use-toast";
 import { QueryKeys } from "@/lib/query-keys";
-import { logger } from "@/adapters";
 import { Quote } from "@/lib/types";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 export const useQuoteMutations = (symbol: string) => {
   const queryClient = useQueryClient();
@@ -33,9 +33,9 @@ export const useQuoteMutations = (symbol: string) => {
         createdAt: quote.createdAt || new Date().toISOString(),
       });
     },
-    onSuccess: (_, quote) => {
-      handleSuccess(quote.id ? "Quote updated successfully." : "Quote added successfully.");
-    },
+    // onSuccess: (_, quote) => {
+    //   handleSuccess(quote.id ? "Quote updated successfully." : "Quote added successfully.");
+    // },
     onError: (error) => {
       logger.error(`Error saving quote: ${error}`);
       handleError("saving the quote");

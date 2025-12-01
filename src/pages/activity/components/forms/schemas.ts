@@ -46,6 +46,7 @@ export const bulkHoldingRowSchema = z.object({
     .positive({ message: "Average cost must be greater than 0" }),
   totalValue: z.number().optional(),
   assetId: z.string().optional(),
+  assetDataSource: z.enum([DataSource.YAHOO, DataSource.MANUAL]).optional(),
 });
 
 export const bulkHoldingsFormSchema = baseActivitySchema.extend({

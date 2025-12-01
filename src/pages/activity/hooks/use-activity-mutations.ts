@@ -178,9 +178,8 @@ export function useActivityMutations(
       logger.error(`Error saving activities: ${String(error)}`);
       toast({
         title: "Uh oh! Something went wrong saving activities.",
-        description: `Please try again or report an issue if the problem persists. Error: ${String(
-          error,
-        )}`,
+        description:
+          "Please make sure every activity has a symbol or cash currency, date, and account, then try again. If the problem persists, please report the issue.",
         variant: "destructive",
       });
     },

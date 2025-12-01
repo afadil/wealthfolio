@@ -1,16 +1,16 @@
-import React from 'react';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { AddonContext, AddonEnableFunction } from '@wealthfolio/addon-sdk';
-import DashboardPage from './pages/dashboard-page';
-import ActivitySelectorPage from './pages/activity-selector-page';
-import SettingsPage from './pages/settings-page';
+import React from 'react';
 import { SwingfolioIcon } from './components/swingfolio-icon';
+import ActivitySelectorPage from './pages/activity-selector-page';
+import DashboardPage from './pages/dashboard-page';
+import SettingsPage from './pages/settings-page';
 
 // Main addon component wrapper
 function SwingfolioAddon({ ctx }: { ctx: AddonContext }) {
   return (
     <div className="swingfolio-addon">
-      <QueryClientProvider client={ctx.api.query.getClient()}>
+      <QueryClientProvider client={ctx.api.query.getClient() as QueryClient}>
         <DashboardPage ctx={ctx} />
       </QueryClientProvider>
     </div>
@@ -37,7 +37,7 @@ const enable: AddonEnableFunction = (context) => {
 
     // Create wrapper component with QueryClientProvider using shared client
     const SwingfolioWrapper = () => {
-      const sharedQueryClient = context.api.query.getClient();
+      const sharedQueryClient = context.api.query.getClient() as QueryClient;
       return (
         <QueryClientProvider client={sharedQueryClient}>
           <SwingfolioAddon ctx={context} />
@@ -63,7 +63,7 @@ const enable: AddonEnableFunction = (context) => {
       component: React.lazy(() =>
         Promise.resolve({
           default: () => {
-            const sharedQueryClient = context.api.query.getClient();
+            const sharedQueryClient = context.api.query.getClient() as QueryClient;
             return (
               <QueryClientProvider client={sharedQueryClient}>
                 <ActivitySelectorPage ctx={context} />
@@ -80,7 +80,7 @@ const enable: AddonEnableFunction = (context) => {
       component: React.lazy(() =>
         Promise.resolve({
           default: () => {
-            const sharedQueryClient = context.api.query.getClient();
+            const sharedQueryClient = context.api.query.getClient() as QueryClient;
             return (
               <QueryClientProvider client={sharedQueryClient}>
                 <SettingsPage ctx={context} />

@@ -446,7 +446,10 @@ export function calculateFeeAnalytics({
           }
           return acc;
         },
-        { earliest: new Date(relevantActivities[0].date), latest: new Date(relevantActivities[0].date) },
+        {
+          earliest: new Date(relevantActivities[0].date),
+          latest: new Date(relevantActivities[0].date),
+        },
       );
 
       const monthsElapsed = Math.max(1, differenceInMonths(latest, earliest) + 1);

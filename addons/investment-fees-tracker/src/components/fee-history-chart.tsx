@@ -74,7 +74,7 @@ export function FeeHistoryChart({
         <CardTitle className="text-xl">Fee History</CardTitle>
         <CardDescription>{periodDescription}</CardDescription>
       </CardHeader>
-      <CardContent className="flex h-full flex-col px-4 pb-6 pt-0 sm:px-6">
+      <CardContent className="flex h-full flex-col px-4 pt-0 pb-6 sm:px-6">
         {chartData.length === 0 ? (
           <EmptyPlaceholder
             className="mx-auto flex h-[300px] max-w-[420px] items-center justify-center"
@@ -84,7 +84,7 @@ export function FeeHistoryChart({
           />
         ) : (
           <ChartContainer
-            className="flex-1 w-full max-w-full min-h-[280px] sm:min-h-[320px] lg:min-h-[360px] xl:min-h-[420px]"
+            className="min-h-[280px] w-full max-w-full flex-1 sm:min-h-[320px] lg:min-h-[360px] xl:min-h-[420px]"
             config={{
               currentFees: {
                 label: "Monthly Fees",
@@ -108,7 +108,9 @@ export function FeeHistoryChart({
                 tickMargin={10}
                 axisLine={false}
                 interval={xAxisInterval}
-                tickFormatter={(value) => format(parseISO(`${value}-01`), isCondensedXAxis ? "MMM" : "MMM yy")}
+                tickFormatter={(value) =>
+                  format(parseISO(`${value}-01`), isCondensedXAxis ? "MMM" : "MMM yy")
+                }
                 tick={{
                   fontSize: 11,
                 }}

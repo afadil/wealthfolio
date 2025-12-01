@@ -17,18 +17,14 @@ pub struct TotalReturn {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub enum ReturnMethod {
+    #[default]
     TimeWeighted,
     MoneyWeighted,
     SimpleReturn,
     SymbolPriceBased,
     NotApplicable,
-}
-
-impl Default for ReturnMethod {
-    fn default() -> Self {
-        ReturnMethod::TimeWeighted
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

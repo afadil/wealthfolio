@@ -84,7 +84,7 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
 
     async fn save_quote(&self, quote: &Quote) -> Result<Quote> {
         let quote_cloned = quote.clone();
-        let save_result = self.save_quotes(&[quote_cloned.clone()]).await;
+        let save_result = self.save_quotes(std::slice::from_ref(&quote_cloned)).await;
         save_result?;
         Ok(quote_cloned)
     }
@@ -491,7 +491,7 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
                 debug!("🔄 Inside database transaction");
                 let mut total_upserted = 0;
                 let chunk_size = 1000;
-                let total_chunks = (db_rows.len() + chunk_size - 1) / chunk_size;
+                let total_chunks = db_rows.len().div_ceil(chunk_size);
 
                 debug!(
                     "📦 Processing {} quotes in {} chunks of {}",

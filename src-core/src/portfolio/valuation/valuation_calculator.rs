@@ -92,7 +92,7 @@ pub fn calculate_valuation(
         valuation_date: target_date,
         account_currency: account_currency.to_string(),
         base_currency: base_currency.to_string(),
-        fx_rate_to_base: fx_rate_to_base,
+        fx_rate_to_base,
         cash_balance: total_cash_value_acct_ccy,
         investment_market_value: total_investment_market_value_acct_ccy,
         total_value: total_market_value_acct_ccy,
@@ -123,7 +123,7 @@ fn calculate_investment_market_value_acct(
             } else {
                 get_rate_from_map(
                     fx_rates_today,
-                    &normalized_quote_currency,
+                    normalized_quote_currency,
                     account_currency,
                     target_date,
                 )? // Propagate error if FX rate is missing
@@ -158,7 +158,7 @@ fn calculate_cash_value_acct(
         } else {
             get_rate_from_map(
                 fx_rates_today,
-                &normalized_cash_currency,
+                normalized_cash_currency,
                 account_currency,
                 target_date,
             )?

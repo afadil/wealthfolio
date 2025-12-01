@@ -31,8 +31,8 @@ describe("convertToCSV", () => {
 
     expect(rows.length).toBe(3); // Header + 2 data rows
     expect(rows[0]).toBe('"id","name","value"');
-    expect(rows[1]).toBe('1,"Test 1",100');
-    expect(rows[2]).toBe('2,"Test 2",200');
+    expect(rows[1]).toBe('"1","Test 1","100"');
+    expect(rows[2]).toBe('"2","Test 2","200"');
   });
 
   it("should handle data with special characters in strings", () => {
@@ -42,7 +42,7 @@ describe("convertToCSV", () => {
 
     expect(rows[0]).toBe('"id","description","notes"');
     // Values with quotes, commas, or newlines should be properly stringified
-    expect(rows[1]).toBe('1,"Item with \\"quotes\\"","Comma, and new\\nline"');
+    expect(rows[1]).toBe('"1","Item with \\"quotes\\"","Comma, and new\\nline"');
   });
 
   it('should use "symbol" as header when assetId is present along with other columns', () => {

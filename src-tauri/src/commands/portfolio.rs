@@ -209,7 +209,7 @@ pub async fn calculate_performance_history(
         .performance_service()
         .calculate_performance_history(&item_type, &item_id, start_date_opt, end_date_opt)
         .await
-        .map_err(|e| format!("Failed to calculate performance: {}", e.to_string()))
+        .map_err(|e| format!("Failed to calculate performance: {}", e))
 }
 
 /// Calculates performance summary for a given item (account or symbol) over a given date range.
@@ -246,5 +246,5 @@ pub async fn calculate_performance_summary(
         .performance_service()
         .calculate_performance_summary(&item_type, &item_id, start_date_opt, end_date_opt)
         .await
-        .map_err(|e| format!("Failed to calculate performance: {}", e.to_string()))
+        .map_err(|e| format!("Failed to calculate performance: {}", e))
 }

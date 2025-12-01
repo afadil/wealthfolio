@@ -171,7 +171,8 @@ Common UI tasks:
 
 - Scaffold: `npx @wealthfolio/addon-dev-tools create <my-addon>`
 - Start addon dev server: `npm run dev:server` (from addon dir)
-- Run Wealthfolio (desktop): `pnpm tauri dev`
+- Run Wealthfolio (desktop) with addon dev mode:
+  `VITE_ENABLE_ADDON_DEV_MODE=true pnpm tauri dev`
 - Add routes and sidebar via the addon context
   (`src/addons/addons-runtime-context.ts`:1)
 - Use `ctx.api.*` for data, events, and query cache integration (see docs below)

@@ -19,6 +19,10 @@ export interface SwipableViewProps {
   labelClassName?: string;
   onViewChange?: (index: number, name: string) => void;
   onInit?: (api: CarouselApi) => void;
+  /**
+   * The index to start on. Crucial for syncing with URL on first load.
+   */
+  initialIndex?: number;
 }
 
 export function SwipableView({
@@ -29,17 +33,19 @@ export function SwipableView({
   labelClassName,
   onViewChange,
   onInit: onInitProp,
+  initialIndex = 0,
 }: SwipableViewProps) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: false,
     align: "start",
     skipSnaps: false,
     dragFree: false,
+    startIndex: initialIndex, // OPTIMIZATION: Start at correct slide instantly
   });
 
-  const [selectedIndex, setSelectedIndex] = React.useState(0);
+  const [selectedIndex, setSelectedIndex] = React.useState(initialIndex);
   const [scrollSnaps, setScrollSnaps] = React.useState<number[]>([]);
-  const previousIndexRef = React.useRef<number>(0);
+  const previousIndexRef = React.useRef<number>(initialIndex);
 
   const scrollTo = React.useCallback((index: number) => emblaApi && emblaApi.scrollTo(index), [emblaApi]);
 
@@ -83,11 +89,16 @@ export function SwipableView({
     };
   }, [emblaApi, onInit, onSelect]);
 
+  // MEMORY OPTIMIZATION:
+  // Only render the Active Slide and its immediate neighbors (±1).
+  // Distant slides are kept as empty divs to maintain scroll width but free up DOM nodes/RAM.
+  const shouldRender = (index: number) => Math.abs(selectedIndex - index) <= 1;
+
   return (
-    <div className={cn("relative w-full", className)}>
+    <div className={cn("relative flex h-full w-full flex-col", className)}>
       {/* Navigation Toggle */}
       {displayToggle && items.length > 1 && (
-        <div className="flex items-center justify-center gap-3 py-2.5">
+        <div className="flex shrink-0 items-center justify-center gap-3 py-2.5">
           {scrollSnaps.map((_, index) => (
             <React.Fragment key={index}>
               {selectedIndex === index ? (
@@ -125,16 +136,29 @@ export function SwipableView({
       )}
 
       {/* Swipable Content */}
-      <div ref={emblaRef} className="overflow-hidden">
+      <div ref={emblaRef} className="h-full grow overflow-hidden">
         <div
-          className="flex touch-pan-y"
+          className="flex h-full touch-pan-y"
           style={{
             overflowX: "visible",
           }}
         >
           {items.map((item, index) => (
-            <div key={index} className="min-w-0 shrink-0 grow-0 basis-full">
-              {item.content}
+            <div key={index} className="relative h-full min-w-0 shrink-0 grow-0 basis-full">
+              {/*
+                 SCROLL ARCHITECTURE:
+                 1. We use a nested div for scrolling.
+                 2. This ensures the Header stays fixed while content scrolls.
+                 3. touch-pan-y allows vertical scrolling while horizontal swipes trigger the carousel.
+               */}
+              <div className="h-full w-full overflow-x-hidden overflow-y-auto">
+                {shouldRender(index) ? (
+                  item.content
+                ) : (
+                  // Placeholder for unmounted heavy slides
+                  <div className="h-full w-full" />
+                )}
+              </div>
             </div>
           ))}
         </div>

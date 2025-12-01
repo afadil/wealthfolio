@@ -111,7 +111,7 @@ impl AssetServiceTrait for AssetService {
             .await
     }
 
-    async fn get_assets_by_symbols(&self, symbols: &Vec<String>) -> Result<Vec<Asset>> {
+    async fn get_assets_by_symbols(&self, symbols: &[String]) -> Result<Vec<Asset>> {
         self.asset_repository.list_by_symbols(symbols)
     }
 }

@@ -1,7 +1,7 @@
-import React from "react";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import type { AddonContext, AddonEnableFunction } from "@wealthfolio/addon-sdk";
 import { Icons } from "@wealthfolio/ui";
+import React from "react";
 import FeesPage from "./pages/fees-page";
 
 // Main addon component
@@ -35,7 +35,7 @@ const enable: AddonEnableFunction = (context) => {
 
     // Create wrapper component with QueryClientProvider using shared client
     const InvestmentFeesTrackerWrapper = () => {
-      const sharedQueryClient = context.api.query.getClient();
+      const sharedQueryClient = context.api.query.getClient() as QueryClient;
       return (
         <QueryClientProvider client={sharedQueryClient}>
           <InvestmentFeesTrackerAddon ctx={context} />

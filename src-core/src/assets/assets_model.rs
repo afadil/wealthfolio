@@ -36,6 +36,7 @@ pub struct Asset {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct AssetSummary {
     pub id: String,
     pub name: Option<String>,
@@ -284,6 +285,7 @@ impl From<NewAsset> for AssetDB {
 /// Domain model representing a quote summary
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct QuoteSummary {
     pub exchange: String,
     pub short_name: String,

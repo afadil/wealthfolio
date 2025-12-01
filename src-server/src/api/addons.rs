@@ -261,9 +261,8 @@ async fn load_addon_for_runtime_web(
     for f in &mut files {
         let normalized_name = f.name.replace('\\', "/");
         let normalized_main = main_file.replace('\\', "/");
-        f.is_main = normalized_name == normalized_main
-            || normalized_name.ends_with(&normalized_main)
-            || (normalized_main.contains('/') && normalized_name == normalized_main);
+        f.is_main =
+            normalized_name == normalized_main || normalized_name.ends_with(&normalized_main);
     }
     if !files.iter().any(|f| f.is_main) {
         return Err(anyhow::anyhow!("Main addon file not found").into());

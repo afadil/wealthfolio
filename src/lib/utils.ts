@@ -364,3 +364,91 @@ export function calculatePerformanceMetrics(
 
   return result;
 }
+
+/**
+ * Rounds a decimal number to a specified precision.
+ * @param value The number to round
+ * @param precision The number of decimal places (default: 6)
+ * @returns The rounded number, or 0 if the value is not finite
+ */
+export function roundDecimal(value: number, precision = 6): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  const factor = 10 ** precision;
+  return Math.round(value * factor) / factor;
+}
+
+/**
+ * Parses a string or number input as a decimal with specified precision.
+ * @param value The value to parse (string or number)
+ * @param precision The number of decimal places (default: 6)
+ * @returns The parsed and rounded number, or 0 if parsing fails
+ */
+export function parseDecimalInput(value: string | number, precision = 6): number {
+  const parsed =
+    typeof value === "number" ? value : typeof value === "string" ? Number.parseFloat(value) : NaN;
+  return Number.isFinite(parsed) ? roundDecimal(parsed, precision) : 0;
+}
+
+/**
+ * Parses a local datetime string in format "YYYY-MM-DDTHH:mm" to a Date object.
+ * @param value The datetime string to parse
+ * @returns A Date object, or current date if parsing fails
+ */
+export function parseLocalDateTime(value: string): Date {
+  if (!value) {
+    return new Date();
+  }
+
+  const [datePart, timePart = ""] = value.split("T");
+  const [year, month, day] = datePart.split("-").map((segment) => Number.parseInt(segment, 10));
+  const [hour = 0, minute = 0] = timePart.split(":").map((segment) => Number.parseInt(segment, 10));
+  const parsed = new Date(year, (month ?? 1) - 1, day ?? 1, hour, minute);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
+/**
+ * Converts an unknown value to a string suitable for numeric cell display.
+ * @param value The value to convert
+ * @returns A string representation of the number, or empty string if invalid
+ */
+export function getNumericCellValue(value: unknown): string {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value.toString() : "";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  return "";
+}
+
+/**
+ * Converts an unknown value to a finite number or undefined.
+ * @param value The value to convert
+ * @returns A finite number if valid, undefined otherwise
+ */
+export function toFiniteNumberOrUndefined(value: unknown): number | undefined {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : undefined;
+  }
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Converts an unknown value to a rounded number suitable for API payloads.
+ * @param value The value to convert
+ * @param precision The number of decimal places (default: 6)
+ * @returns A rounded number if valid, undefined otherwise
+ */
+export function toPayloadNumber(value: unknown, precision = 6): number | undefined {
+  const parsed = toFiniteNumberOrUndefined(value);
+  if (parsed === undefined) {
+    return undefined;
+  }
+  return roundDecimal(parsed, precision);
+}

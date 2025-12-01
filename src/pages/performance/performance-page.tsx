@@ -36,9 +36,6 @@ import {
   DropdownMenuTrigger,
   GainPercent,
   Icons,
-  Page,
-  PageContent,
-  PageHeader,
   Separator,
 } from "@wealthfolio/ui";
 import { subMonths } from "date-fns";
@@ -350,12 +347,17 @@ export default function PerformancePage() {
   };
 
   return (
-    <Page>
-      <PageHeader
-        heading="Performance"
-        actions={<DateRangeSelector value={dateRange} onChange={setDateRange} />}
-      />
-      <PageContent>
+    <>
+      {/* Date range selector - fixed position in header area */}
+      <div className="pointer-events-auto fixed top-4 right-2 z-20 hidden md:block lg:right-4">
+        <DateRangeSelector value={dateRange} onChange={setDateRange} />
+      </div>
+
+      <div className="flex h-full flex-col space-y-4">
+        <div className="flex justify-end md:hidden">
+          <DateRangeSelector value={dateRange} onChange={setDateRange} />
+        </div>
+
         {/* Mobile: Carousel + Plus button in same row */}
         <div className="flex items-center gap-2 md:hidden">
           {/* Selected items badges carousel */}
@@ -677,7 +679,7 @@ export default function PerformancePage() {
             </CardContent>
           </Card>
         </div>
-      </PageContent>
-    </Page>
+      </div>
+    </>
   );
 }

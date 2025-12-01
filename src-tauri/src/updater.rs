@@ -1,5 +1,8 @@
+use chrono::DateTime;
+use log::{error, info, warn};
+use serde::Serialize;
 use tauri::AppHandle;
-use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_updater::UpdaterExt;
 
 // Helper function to detect if this is an App Store build
@@ -7,138 +10,178 @@ fn is_app_store_build() -> bool {
     cfg!(feature = "appstore")
 }
 
-// Helper function to open App Store page
-fn open_app_store_page(_app_handle: &AppHandle) {
+// Helper function to retrieve platform-specific store URLs
+fn app_store_url() -> Option<&'static str> {
     #[cfg(target_os = "macos")]
     {
-        let app_store_url = "macappstore://apps.apple.com/app/6732888445";
-        let _ = std::process::Command::new("open")
-            .arg(app_store_url)
-            .spawn();
+        Some("macappstore://apps.apple.com/app/6732888445")
     }
 
     #[cfg(target_os = "windows")]
     {
-        // For Microsoft Store
-        let store_url = "ms-windows-store://pdp/?productid=YOUR_PRODUCT_ID";
-        let _ = std::process::Command::new("cmd")
-            .args(&["/c", "start", store_url])
-            .spawn();
+        Some("ms-windows-store://pdp/?productid=YOUR_PRODUCT_ID")
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        None
     }
 }
 
-pub async fn check_for_update(app_handle: AppHandle, instance_id: &str, show_all_messages: bool) {
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateInfo {
+    pub current_version: String,
+    pub latest_version: String,
+    pub notes: Option<String>,
+    pub pub_date: Option<String>,
+    pub is_app_store_build: bool,
+    pub store_url: Option<String>,
+    pub changelog_url: Option<String>,
+    pub screenshots: Option<Vec<String>>,
+}
+
+/// Extract changelog_url from raw_json
+fn extract_changelog_url(raw_json: &serde_json::Value) -> Option<String> {
+    raw_json
+        .get("changelog_url")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+}
+
+/// Extract screenshots from raw_json
+fn extract_screenshots(raw_json: &serde_json::Value) -> Option<Vec<String>> {
+    raw_json.get("screenshots").and_then(|v| {
+        v.as_array().map(|arr| {
+            arr.iter()
+                .filter_map(|item| item.as_str().map(|s| s.to_string()))
+                .collect()
+        })
+    })
+}
+
+/// Check for updates and return update info if available.
+/// Returns `Ok(Some(UpdateInfo))` if an update is available,
+/// `Ok(None)` if already up-to-date.
+pub async fn check_for_update(
+    app_handle: AppHandle,
+    instance_id: &str,
+) -> Result<Option<UpdateInfo>, String> {
     let is_appstore = is_app_store_build();
 
-    match app_handle
+    let update = app_handle
         .updater_builder()
         .header("X-Instance-Id", instance_id)
-        .expect("Failed to get updater")
+        .map_err(|e| format!("Failed to set header: {}", e))?
         .build()
-        .expect("Failed to build updater")
+        .map_err(|e| format!("Failed to build updater: {}", e))?
         .check()
         .await
-    {
-        Ok(update) => {
-            if let Some(update) = update {
-                let current_version = app_handle.package_info().version.to_string();
-                if update.version.to_string() != current_version {
-                    if is_appstore {
-                        // App Store version - show update available but redirect to App Store
-                        let update_message = format!(
-                            "A new version of Wealthfolio is available!\n\
-                             {} → New version: {}\n\n\
-                             {}\n\n\
-                             Since you installed Wealthfolio from the App Store, \
-                             please update through the App Store to get the latest version.",
-                            current_version,
-                            update.version,
-                            update.body.clone().unwrap_or_default()
-                        );
+        .map_err(|e| {
+            warn!("Update check failed: {}", e);
+            format!("Failed to check for updates: {}", e)
+        })?;
 
-                        let open_store = app_handle
-                            .dialog()
-                            .message(&update_message)
-                            .title("Wealthfolio Update Available")
-                            .buttons(MessageDialogButtons::OkCancel)
-                            .kind(MessageDialogKind::Info)
-                            .blocking_show();
+    match update {
+        Some(update) => {
+            let current_version = app_handle.package_info().version.to_string();
+            if update.version != current_version {
+                let pub_date = update.date.and_then(|d| {
+                    let seconds = d.unix_timestamp();
+                    let nanos = d.nanosecond();
+                    DateTime::from_timestamp(seconds, nanos).map(|dt| dt.to_rfc3339())
+                });
 
-                        if open_store {
-                            open_app_store_page(&app_handle);
-                        }
-                    } else {
-                        // Non-App Store version - proceed with normal update
-                        let update_message = format!(
-                            "A new version of Wealthfolio is available!\n\
-                             Current version: {} → New version: {}\n\n\
-                             {}\n\n\
-                             Would you like to update now? The app will restart automatically.",
-                            current_version,
-                            update.version,
-                            update.body.clone().unwrap_or_default()
-                        );
+                let changelog_url = extract_changelog_url(&update.raw_json);
+                let screenshots = extract_screenshots(&update.raw_json);
 
-                        let do_update = app_handle
-                            .dialog()
-                            .message(&update_message)
-                            .title("Wealthfolio Update Available")
-                            .buttons(MessageDialogButtons::OkCancel)
-                            .kind(MessageDialogKind::Info)
-                            .blocking_show();
-
-                        if do_update {
-                            match update.download_and_install(|_, _| {}, || {}).await {
-                                Ok(_) => {
-                                    // Show a message that update is complete and app will restart
-                                    app_handle
-                                        .dialog()
-                                        .message("Update installed successfully. The application will now restart.")
-                                        .title("Update Complete")
-                                        .kind(MessageDialogKind::Info)
-                                        .blocking_show();
-                                    // Restart the app
-                                    app_handle.restart();
-                                }
-                                Err(e) => {
-                                    app_handle
-                                        .dialog()
-                                        .message(format!("Failed to install update: {}", e))
-                                        .title("Update Failed")
-                                        .kind(MessageDialogKind::Error)
-                                        .blocking_show();
-                                }
-                            }
-                        }
-                    }
-                } else if show_all_messages {
-                    app_handle
-                        .dialog()
-                        .message("You're already running the latest version of Wealthfolio.")
-                        .title("No Updates Available")
-                        .kind(MessageDialogKind::Info)
-                        .show(|_| {});
-                }
-            } else if show_all_messages {
-                app_handle
-                    .dialog()
-                    .message("You're already running the latest version of Wealthfolio.")
-                    .title("No Updates Available")
-                    .kind(MessageDialogKind::Info)
-                    .show(|_| {});
+                Ok(Some(UpdateInfo {
+                    current_version,
+                    latest_version: update.version.to_string(),
+                    notes: update.body.clone(),
+                    pub_date,
+                    is_app_store_build: is_appstore,
+                    store_url: app_store_url().map(|url| url.to_string()),
+                    changelog_url,
+                    screenshots,
+                }))
+            } else {
+                Ok(None)
             }
         }
-        Err(e) if show_all_messages => {
+        None => Ok(None),
+    }
+}
+
+/// Download and install an available update, then restart the app.
+/// Shows native dialogs for success/failure and handles restart.
+pub async fn install_update(app_handle: AppHandle) {
+    info!("Starting update download and installation");
+
+    // Check for updates
+    let update = match app_handle.updater_builder().build() {
+        Ok(updater) => match updater.check().await {
+            Ok(Some(update)) => update,
+            Ok(None) => {
+                app_handle
+                    .dialog()
+                    .message("No update available.")
+                    .title("Update")
+                    .kind(MessageDialogKind::Info)
+                    .blocking_show();
+                return;
+            }
+            Err(e) => {
+                error!("Failed to check for updates: {}", e);
+                app_handle
+                    .dialog()
+                    .message(format!("Failed to check for updates: {}", e))
+                    .title("Update Failed")
+                    .kind(MessageDialogKind::Error)
+                    .blocking_show();
+                return;
+            }
+        },
+        Err(e) => {
+            error!("Failed to build updater: {}", e);
             app_handle
                 .dialog()
-                .message(format!(
-                    "We encountered an issue while checking for updates:\n\n{}\n\nPlease try again later or contact support if the problem persists.",
-                    e
-                ))
-                .title("Update Check Failed")
+                .message(format!("Failed to initialize updater: {}", e))
+                .title("Update Failed")
                 .kind(MessageDialogKind::Error)
-                .show(|_| {});
+                .blocking_show();
+            return;
         }
-        _ => {}
+    };
+
+    info!(
+        "Downloading update from version {} to {}",
+        update.current_version, update.version
+    );
+
+    // Download and install
+    match update.download_and_install(|_, _| {}, || {}).await {
+        Ok(_) => {
+            info!("Update installed successfully, showing dialog and restarting");
+
+            app_handle
+                .dialog()
+                .message("Update installed successfully. The application will now restart.")
+                .title("Update Complete")
+                .kind(MessageDialogKind::Info)
+                .blocking_show();
+
+            app_handle.restart();
+        }
+        Err(e) => {
+            error!("Failed to download and install update: {}", e);
+
+            app_handle
+                .dialog()
+                .message(format!("Failed to install update: {}", e))
+                .title("Update Failed")
+                .kind(MessageDialogKind::Error)
+                .blocking_show();
+        }
     }
 }

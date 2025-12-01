@@ -15,7 +15,7 @@ impl ManualProvider {
 #[async_trait::async_trait]
 impl AssetProfiler for ManualProvider {
     async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile, MarketDataError> {
-        if symbol.starts_with("$CASH-") {
+        if let Some(currency) = symbol.strip_prefix("$CASH-") {
             Ok(AssetProfile {
                 id: Some(symbol.to_string()),
                 isin: None,
@@ -25,7 +25,7 @@ impl AssetProfiler for ManualProvider {
                 asset_sub_class: Some("CASH".to_string()),
                 symbol: symbol.to_string(),
                 data_source: DataSource::Manual.as_str().to_string(),
-                currency: symbol[6..].to_string(),
+                currency: currency.to_string(),
                 ..Default::default()
             })
         } else {

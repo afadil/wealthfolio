@@ -83,6 +83,7 @@ pub struct Volume {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct MarketCap {
     pub raw: Option<f64>,
     pub fmt: Option<String>,

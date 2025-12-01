@@ -14,21 +14,7 @@ import { useMemo, useState } from "react";
 import { AccountsSummary } from "./accounts-summary";
 import Balance from "./balance";
 import SavingGoals from "./goals";
-
-function DashboardSkeleton() {
-  return (
-    <div className="grid h-full gap-4 sm:grid-cols-1 md:grid-cols-3">
-      <div className="flex h-full p-4 md:col-span-2">
-        <Skeleton className="h-full w-full" />
-      </div>
-      <div className="h-full w-full space-y-4 p-4">
-        <Skeleton className="h-12" />
-        <Skeleton className="h-12" />
-        <Skeleton className="h-12" />
-      </div>
-    </div>
-  );
-}
+import TopHoldings from "./top-holdings";
 
 // Helper function to get the initial date range for 3M
 const getInitialDateRange = (): DateRange => ({
@@ -77,10 +63,6 @@ export default function DashboardPage() {
     );
   }, [valuationHistory, baseCurrency]);
 
-  if ((isValuationHistoryLoading && !valuationHistory) || (isHoldingsLoading && !holdings)) {
-    return <DashboardSkeleton />;
-  }
-
   // Callback for IntervalSelector
   const handleIntervalSelect = (
     code: TimePeriod,
@@ -109,18 +91,28 @@ export default function DashboardPage() {
                   <PrivacyToggle />
                 </div>
                 <div className="text-md flex space-x-3">
-                  <GainAmount
-                    className="lg:text-md text-sm font-light"
-                    value={gainLossAmount}
-                    currency={baseCurrency}
-                    displayCurrency={false}
-                  ></GainAmount>
-                  <div className="border-secondary my-1 border-r pr-2" />
-                  <GainPercent
-                    className="lg:text-md text-sm font-light"
-                    value={simpleReturn}
-                    animated={true}
-                  ></GainPercent>
+                  {isValuationHistoryLoading && !valuationHistory ? (
+                    <div className="flex items-center gap-3 pt-1">
+                      <Skeleton className="h-4 w-24" />
+                      <div className="border-secondary my-1 border-r pr-2" />
+                      <Skeleton className="h-4 w-16" />
+                    </div>
+                  ) : (
+                    <>
+                      <GainAmount
+                        className="lg:text-md text-sm font-light"
+                        value={gainLossAmount}
+                        currency={baseCurrency}
+                        displayCurrency={false}
+                      ></GainAmount>
+                      <div className="border-secondary my-1 border-r pr-2" />
+                      <GainPercent
+                        className="lg:text-md text-sm font-light"
+                        value={simpleReturn}
+                        animated={true}
+                      ></GainPercent>
+                    </>
+                  )}
                   {selectedIntervalDescription && (
                     <span className="lg:text-md text-muted-foreground ml-1 text-sm font-light">
                       {selectedIntervalDescription}
@@ -133,27 +125,30 @@ export default function DashboardPage() {
         </div>
 
         <div className="h-[300px]">
-          {valuationHistory && chartData.length > 0 ? (
-            <>
-              <HistoryChart data={chartData} />
-              <div className="flex w-full justify-center">
-                <IntervalSelector
-                  className="pointer-events-auto relative z-20 w-full max-w-screen-sm sm:max-w-screen-md md:max-w-2xl lg:max-w-3xl"
-                  onIntervalSelect={handleIntervalSelect}
-                  isLoading={isValuationHistoryLoading}
-                  initialSelection={INITIAL_INTERVAL_CODE}
-                />
-              </div>
-            </>
-          ) : null}
+          <HistoryChart data={chartData} isLoading={isValuationHistoryLoading} />
+          {valuationHistory && chartData.length > 0 && (
+            <div className="flex w-full justify-center">
+              <IntervalSelector
+                className="pointer-events-auto relative z-20 w-full max-w-screen-sm sm:max-w-screen-md md:max-w-2xl lg:max-w-3xl"
+                onIntervalSelect={handleIntervalSelect}
+                isLoading={isValuationHistoryLoading}
+                initialSelection={INITIAL_INTERVAL_CODE}
+              />
+            </div>
+          )}
         </div>
 
         <div className="from-success/30 via-success/15 to-success/10 grow bg-linear-to-t px-4 pt-12 md:px-6 md:pt-12 lg:px-10 lg:pt-20">
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-3 md:gap-20">
-            <div className="md:col-span-2">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:gap-20">
+            <div className="lg:col-span-2">
               <AccountsSummary />
             </div>
-            <div className="sm:col-span-1">
+            <div className="space-y-6 lg:col-span-1">
+              <TopHoldings
+                holdings={holdings}
+                isLoading={isHoldingsLoading}
+                baseCurrency={baseCurrency}
+              />
               <SavingGoals />
             </div>
           </div>

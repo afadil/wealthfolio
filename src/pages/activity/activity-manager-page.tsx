@@ -71,9 +71,9 @@ const ActivityManagerPage = () => {
   const handleClose = () => {
     if (redirectTo) {
       navigate(redirectTo);
-    } else {
-      navigate("/activities");
+      return;
     }
+    navigate(-1);
   };
 
   const { addActivityMutation, updateActivityMutation } = useActivityMutations(handleClose);

@@ -243,7 +243,7 @@ pub fn detect_addon_permissions(addon_files: &[AddonFile]) -> Vec<AddonPermissio
                                 );
                                 category_functions
                                     .entry(category.to_string())
-                                    .or_insert_with(Vec::new)
+                                    .or_default()
                                     .push(function.to_string());
                                 function_detected = true;
                                 break;
@@ -319,7 +319,7 @@ pub fn detect_addon_permissions(addon_files: &[AddonFile]) -> Vec<AddonPermissio
                             );
                             category_functions
                                 .entry(category.to_string())
-                                .or_insert_with(Vec::new)
+                                .or_default()
                                 .push(function.to_string());
                             pattern_found = true;
                             break;
@@ -338,7 +338,7 @@ pub fn detect_addon_permissions(addon_files: &[AddonFile]) -> Vec<AddonPermissio
                                 );
                                 category_functions
                                     .entry(category.to_string())
-                                    .or_insert_with(Vec::new)
+                                    .or_default()
                                     .push(function.to_string());
                                 pattern_found = true;
                                 break;
@@ -358,7 +358,7 @@ pub fn detect_addon_permissions(addon_files: &[AddonFile]) -> Vec<AddonPermissio
                                 );
                                 category_functions
                                     .entry(category.to_string())
-                                    .or_insert_with(Vec::new)
+                                    .or_default()
                                     .push(function.to_string());
                                 break; // Only add once per function per file
                             }
@@ -476,9 +476,7 @@ pub fn extract_addon_zip_internal(zip_data: Vec<u8>) -> Result<ExtractedAddon, S
     // Now set the is_main flag correctly based on the metadata.main path
     let main_file = metadata.get_main()?;
     for file in &mut files {
-        file.is_main = file.name == main_file
-            || file.name.ends_with(main_file)
-            || (main_file.contains('/') && file.name == main_file);
+        file.is_main = file.name == main_file || file.name.ends_with(main_file);
     }
 
     // Verify that we found the main file
@@ -1240,7 +1238,7 @@ pub async fn submit_addon_rating(
     review: Option<String>,
     instance_id: &str,
 ) -> Result<serde_json::Value, String> {
-    if rating < 1 || rating > 5 {
+    if !(1..=5).contains(&rating) {
         return Err("Rating must be between 1 and 5".to_string());
     }
 

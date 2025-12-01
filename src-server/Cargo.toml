@@ -1,6 +1,6 @@
 [package]
 name = "wealthfolio-server"
-version = "2.0.1"
+version = "2.1.0"
 edition = "2021"
 
 [dependencies]
@@ -38,7 +38,6 @@ hyper = { version = "0.14", features = ["full"] }
 
 [features]
 default = []
-wealthfolio-pro = ["wealthfolio_core/wealthfolio-pro"]
 
 [dev-dependencies]
 reqwest = { version = "0.12", features = ["json"] }

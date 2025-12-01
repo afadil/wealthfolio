@@ -139,7 +139,10 @@ export default function AddonSettingsPage() {
         onValueChange={(value: string) => setActiveTab(value as "installed" | "store")}
       >
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="installed" className="flex items-center justify-center gap-1.5 sm:gap-2">
+          <TabsTrigger
+            value="installed"
+            className="flex items-center justify-center gap-1.5 sm:gap-2"
+          >
             <Icons.Package className="h-4 w-4 flex-shrink-0" />
             <span className="truncate">Installed</span>
             {installedAddons.length > 0 && (
@@ -274,21 +277,29 @@ export default function AddonSettingsPage() {
             {isLoadingAddons ? (
               <div className="flex items-center justify-center py-12">
                 <Icons.Loader className="text-muted-foreground h-8 w-8 animate-spin" />
-                <span className="text-muted-foreground ml-2 text-sm sm:text-base">Loading add-ons...</span>
+                <span className="text-muted-foreground ml-2 text-sm sm:text-base">
+                  Loading add-ons...
+                </span>
               </div>
             ) : installedAddons.length === 0 ? (
               <EmptyPlaceholder>
                 <EmptyPlaceholder.Icon name="Package" />
                 <EmptyPlaceholder.Title>No add-ons installed</EmptyPlaceholder.Title>
                 <EmptyPlaceholder.Description>
-                  Get started by installing your first add-on to extend Wealthfolio&apos;s functionality.
+                  Get started by installing your first add-on to extend Wealthfolio&apos;s
+                  functionality.
                 </EmptyPlaceholder.Description>
                 <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:gap-3">
                   <Button onClick={() => setActiveTab("store")} className="w-full sm:w-auto">
                     <Icons.Store className="mr-2 h-4 w-4" />
                     Browse Add-ons
                   </Button>
-                  <Button variant="outline" onClick={handleLoadAddon} disabled={isLoading} className="w-full sm:w-auto">
+                  <Button
+                    variant="outline"
+                    onClick={handleLoadAddon}
+                    disabled={isLoading}
+                    className="w-full sm:w-auto"
+                  >
                     <Icons.Plus className="mr-2 h-4 w-4" />
                     Install from File
                   </Button>

@@ -45,5 +45,5 @@ fn entry_for(service: &str) -> Result<Entry> {
 }
 
 pub fn shared_secret_store() -> Arc<dyn SecretStore> {
-    Arc::new(KeyringSecretStore::default())
+    Arc::new(KeyringSecretStore)
 }

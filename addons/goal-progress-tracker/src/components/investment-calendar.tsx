@@ -1,7 +1,7 @@
+import { type Goal } from "@wealthfolio/addon-sdk";
 import { Card, CardContent } from "@wealthfolio/ui";
 import { useState } from "react";
 import { EditableValue } from "./editable-value";
-import { type Goal } from "@wealthfolio/addon-sdk";
 
 // Helper function to format currency with privacy support
 function formatCurrency(amount: number, isHidden: boolean = false): string {
@@ -19,6 +19,7 @@ function CalendarDot({
   stepIndex,
   stepAmount,
   stepSize,
+  onHover,
   onLeave,
   onClick,
 }: {

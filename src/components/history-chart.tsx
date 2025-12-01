@@ -1,5 +1,4 @@
 import { ChartConfig, ChartContainer } from "@/components/ui/chart";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { formatDate } from "@/lib/utils";
 import { AmountDisplay } from "@wealthfolio/ui";
@@ -111,7 +110,7 @@ export function HistoryChart({
   } satisfies ChartConfig;
 
   if (isLoading && data.length === 0) {
-    return <Skeleton className="h-full w-full" />;
+    return null;
   }
 
   return (

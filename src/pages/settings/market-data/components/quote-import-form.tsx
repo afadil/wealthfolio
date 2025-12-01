@@ -303,7 +303,8 @@ export function QuoteImportForm({
         <Alert>
           <Icons.Info className="h-4 w-4" />
           <AlertDescription className="text-xs sm:text-sm">
-            Quotes with the same symbol and date in your CSV will overwrite existing data during import.
+            Quotes with the same symbol and date in your CSV will overwrite existing data during
+            import.
           </AlertDescription>
         </Alert>
 

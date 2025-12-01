@@ -762,7 +762,7 @@ impl MarketDataService {
         }
 
         // Validate date format
-        if let Err(_) = chrono::NaiveDate::parse_from_str(&quote.date, "%Y-%m-%d") {
+        if chrono::NaiveDate::parse_from_str(&quote.date, "%Y-%m-%d").is_err() {
             return ImportValidationStatus::Error(
                 "Invalid date format. Expected YYYY-MM-DD".to_string(),
             );

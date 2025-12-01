@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn test_single_static_rate_works_anywhere() {
-        let rates = vec![make_rate("GBP", "GBX", 100.0, 2023, 06, 15)];
+        let rates = vec![make_rate("GBP", "GBX", 100.0, 2023, 6, 15)];
         let converter = CurrencyConverter::new(rates).unwrap();
 
         // 1. Way Past

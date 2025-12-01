@@ -61,12 +61,12 @@ impl MarketDataProvider for MarketDataAppProvider {
         if response_json["s"] == "ok" {
             let mid_price = response_json["mid"]
                 .as_array()
-                .and_then(|arr| arr.get(0))
+                .and_then(|arr| arr.first())
                 .and_then(|v| v.as_f64())
                 .unwrap_or(0.0);
             let timestamp = response_json["updated"]
                 .as_array()
-                .and_then(|arr| arr.get(0))
+                .and_then(|arr| arr.first())
                 .and_then(|v| v.as_i64())
                 .unwrap_or(0);
             let quote_timestamp: DateTime<Utc> =

@@ -48,7 +48,7 @@ pub fn create_pool(db_path: &str) -> Result<Arc<DbPool>> {
         .connection_timeout(std::time::Duration::from_secs(30))
         .connection_customizer(Box::new(ConnectionCustomizer {}))
         .build(manager)
-        .map_err(|e| DatabaseError::PoolCreationFailed(e))?;
+        .map_err(DatabaseError::PoolCreationFailed)?;
     Ok(Arc::new(pool))
 }
 
@@ -96,11 +96,11 @@ pub fn get_db_path(input: &str) -> String {
             }
         }
 
-        return Path::new(input)
+        Path::new(input)
             .join("app.db")
             .to_str()
             .unwrap()
-            .to_string();
+            .to_string()
     }
 }
 
@@ -400,7 +400,7 @@ fn copy_with_retries(
             }
         }
     }
-    let e = last_err.unwrap_or_else(|| io::Error::new(io::ErrorKind::Other, "unknown copy error"));
+    let e = last_err.unwrap_or_else(|| io::Error::other("unknown copy error"));
     error!("Failed to copy '{}' -> '{}': {}", src, dst, e);
     Err(Error::Database(DatabaseError::BackupFailed(e.to_string())))
 }

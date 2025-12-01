@@ -1,0 +1,72 @@
+import { SwipablePage, SwipablePageView } from "@/components/page";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import IncomePage from "@/pages/income/income-page";
+import PerformancePage from "@/pages/performance/performance-page";
+import { Icons } from "@wealthfolio/ui";
+import { Suspense, useMemo } from "react";
+import HoldingsInsightsPage from "../holdings/holdings-insights-page";
+
+// Loading skeleton to show while the dashboard is loading
+const DashboardLoader = () => (
+  <div className="flex h-full w-full flex-col space-y-4 p-4">
+    <Card>
+      <CardHeader className="space-y-2">
+        <Skeleton className="h-8 w-3/4" />
+        <Skeleton className="h-4 w-1/2" />
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-3">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+        <Skeleton className="h-64 w-full" />
+      </CardContent>
+    </Card>
+    <div className="flex items-center justify-center py-8">
+      <span className="text-muted-foreground text-sm">Loading dashboard...</span>
+    </div>
+  </div>
+);
+
+export default function PortfolioInsightsPage() {
+  // Define the views with icons
+  const views: SwipablePageView[] = useMemo(
+    () => [
+      {
+        value: "holdings",
+        label: "Holdings",
+        icon: Icons.PieChart,
+        content: (
+          <Suspense fallback={<DashboardLoader />}>
+            <HoldingsInsightsPage />
+          </Suspense>
+        ),
+      },
+      {
+        value: "performance",
+        label: "Performance",
+        icon: Icons.TrendingUp,
+        content: (
+          <Suspense fallback={<DashboardLoader />}>
+            <PerformancePage />
+          </Suspense>
+        ),
+      },
+      {
+        value: "income",
+        label: "Income",
+        icon: Icons.HandCoins,
+        content: (
+          <Suspense fallback={<DashboardLoader />}>
+            <IncomePage />
+          </Suspense>
+        ),
+      },
+    ],
+    [],
+  );
+
+  return <SwipablePage views={views} defaultView="holdings" withPadding={true} />;
+}

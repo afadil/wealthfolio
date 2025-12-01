@@ -46,10 +46,7 @@ impl HoldingsValuationService {
             Err(e) => {
                 warn!(
                     "{}: Error getting FX rate {}->{}: {}. Using 1.0.",
-                    context_msg,
-                    from_curr,
-                    to_curr,
-                    e.to_string()
+                    context_msg, from_curr, to_curr, e
                 );
                 Decimal::ONE // Fallback
             }
@@ -200,7 +197,7 @@ impl HoldingsValuationService {
             }
 
             let fx_rate_quote_to_base = self.get_fx_rate_or_fallback(
-                &normalized_quote_currency,
+                normalized_quote_currency,
                 base_currency,
                 &format!("{}: FX Quote->Base", context_msg),
             );
@@ -210,7 +207,7 @@ impl HoldingsValuationService {
             holding.price = Some(market_price_quote_curr);
 
             let fx_rate_quote_to_local = self.get_fx_rate_or_fallback(
-                &normalized_quote_currency,
+                normalized_quote_currency,
                 pos_currency,
                 &format!("{}: FX Quote->Local", context_msg),
             );

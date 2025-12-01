@@ -9,7 +9,7 @@ pub async fn set_secret(
     secret: String,
     _state: State<'_, Arc<ServiceContext>>, // keep signature consistent
 ) -> Result<(), String> {
-    KeyringSecretStore::default()
+    KeyringSecretStore
         .set_secret(&provider_id, &secret)
         .map_err(|e| e.to_string())
 }
@@ -19,7 +19,7 @@ pub async fn get_secret(
     provider_id: String,
     _state: State<'_, Arc<ServiceContext>>,
 ) -> Result<Option<String>, String> {
-    KeyringSecretStore::default()
+    KeyringSecretStore
         .get_secret(&provider_id)
         .map_err(|e| e.to_string())
 }
@@ -29,7 +29,7 @@ pub async fn delete_secret(
     provider_id: String,
     _state: State<'_, Arc<ServiceContext>>,
 ) -> Result<(), String> {
-    KeyringSecretStore::default()
+    KeyringSecretStore
         .delete_secret(&provider_id)
         .map_err(|e| e.to_string())
 }

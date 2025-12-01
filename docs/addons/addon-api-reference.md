@@ -233,6 +233,38 @@ try {
   const accounts = await ctx.api.accounts.getAll();
 ```
 
+#### `search(
+
+page: number, pageSize: number, filters: ActivitySearchFilters, searchKeyword:
+string, sort?: ActivitySort, ): Promise<ActivitySearchResponse>`
+
+Search activities with pagination, filters, and a single optional sort.
+
+- `page`: Zero-based page index. Use `0` for the first page (e.g., for exports
+  you can pass `0` with a large `pageSize` such as `1000`).
+- `pageSize`: Number of rows per page.
+- `filters`: Accepts single strings or arrays for `accountIds` and
+  `activityTypes`. Empty strings/arrays are ignored.
+- `searchKeyword`: Free-form keyword search; pass an empty string when unused.
+- `sort`: Optional sort object (defaults to `{ id: "date", desc: true }`). Only
+  one sort is supported.
+
+```typescript
+const { data, meta } = await ctx.api.activities.search(
+  0,
+  50,
+  {
+    accountIds: "account-1", // single string or string[] both work
+    activityTypes: ["BUY", "DIVIDEND"],
+    symbol: "AAPL", // optional exact symbol filter
+  },
+  "", // optional search keyword
+  { id: "date", desc: true },
+);
+
+console.log(meta.totalRowCount);
+```
+
 #### `update(activity: ActivityUpdate): Promise<Activity>`
 
 Updates an existing activity with conflict detection.
@@ -329,6 +361,25 @@ const activities = await Promise.all([
   ctx.api.activities.getAll("account-2"),
   ctx.api.activities.getAll("account-3"),
 ]);
+
+// You can also scope results to a single account by passing its ID as a string.
+// The host normalizes this for both desktop (Tauri) and web modes—no need to
+// wrap the value in an array.
+
+// Activity search accepts single values or arrays for filters.
+const { data, meta } = await ctx.api.activities.search(
+  0,
+  50,
+  {
+    accountIds: "account-1", // single string or string[] both work
+    activityTypes: ["BUY", "DIVIDEND"],
+    symbol: "AAPL", // optional exact symbol filter
+  },
+  "", // optional search keyword
+  { id: "date", desc: true },
+);
+
+console.log(meta.totalRowCount);
 
 // Batch create
 const newActivities = await ctx.api.activities.saveMany([

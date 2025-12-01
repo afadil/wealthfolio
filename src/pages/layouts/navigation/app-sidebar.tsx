@@ -43,7 +43,7 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
               >
                 <div
                   data-tauri-drag-region="true"
-                  className="draggable flex items-center justify-center pb-12"
+                  className="draggable flex items-center justify-center pb-6"
                 >
                   <Link to="/">
                     <img
@@ -68,6 +68,50 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
                   </span>
                 </div>
 
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    // Trigger the launcher by dispatching Cmd/Ctrl+K
+                    const event = new KeyboardEvent("keydown", {
+                      key: "k",
+                      code: "KeyK",
+                      keyCode: 75,
+                      which: 75,
+                      metaKey: true,
+                      ctrlKey: true,
+                      bubbles: true,
+                      cancelable: true,
+                    });
+                    document.dispatchEvent(event);
+                  }}
+                  className={cn(
+                    "text-foreground mb-4 h-12 transition-all duration-300 [&_svg]:size-5!",
+                    collapsed
+                      ? "justify-center rounded-md"
+                      : "bg-muted/50 hover:bg-muted/80 justify-start rounded-full px-4 shadow-none",
+                  )}
+                  title="Search (⌘K)"
+                >
+                  <span aria-hidden="true">
+                    <Icons.Search2 className="h-5 w-5 opacity-60" />
+                  </span>
+                  <span
+                    className={cn({
+                      "text-muted-foreground ml-2 flex-1 text-left text-sm transition-opacity delay-100 duration-300 ease-in-out": true,
+                      "sr-only opacity-0": collapsed,
+                      "block opacity-100": !collapsed,
+                    })}
+                  >
+                    Search...
+                  </span>
+                  {!collapsed && (
+                    <kbd className="bg-background text-muted-foreground pointer-events-none inline-flex h-5 items-center gap-1 rounded border px-1.5 font-mono text-[10px] font-medium opacity-100 select-none">
+                      <span className="text-xs">⌘</span>K
+                    </kbd>
+                  )}
+                </Button>
+
                 {navigation?.primary?.map((item) => (
                   <NavItem key={item.title} item={item} collapsed={collapsed} />
                 ))}
@@ -79,42 +123,6 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
             </div>
 
             <div className="flex shrink-0 flex-col p-2">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  // Trigger the launcher by dispatching Cmd/Ctrl+K
-                  const event = new KeyboardEvent("keydown", {
-                    key: "k",
-                    code: "KeyK",
-                    keyCode: 75,
-                    which: 75,
-                    metaKey: true,
-                    ctrlKey: true,
-                    bubbles: true,
-                    cancelable: true,
-                  });
-                  document.dispatchEvent(event);
-                }}
-                className={cn(
-                  "text-foreground mb-1 h-12 rounded-md transition-all duration-300 [&_svg]:size-5!",
-                  collapsed ? "justify-center" : "justify-start",
-                )}
-                title="Command Launcher (⌘K)"
-              >
-                <span aria-hidden="true">
-                  <Icons.Launcher className="h-5 w-5" />
-                </span>
-                <span
-                  className={cn({
-                    "ml-2 transition-opacity delay-100 duration-300 ease-in-out": true,
-                    "sr-only opacity-0": collapsed,
-                    "block opacity-100": !collapsed,
-                  })}
-                >
-                  Launcher
-                </span>
-              </Button>
               {navigation?.secondary?.map((item) => (
                 <NavItem key={item.title} item={item} collapsed={collapsed} />
               ))}

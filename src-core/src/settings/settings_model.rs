@@ -12,7 +12,6 @@ pub struct Settings {
     pub onboarding_completed: bool,
     pub auto_update_check_enabled: bool,
     pub menu_bar_visible: bool,
-    pub is_pro: bool,
     pub sync_enabled: bool,
 }
 
@@ -26,7 +25,6 @@ impl Default for Settings {
             onboarding_completed: false,
             auto_update_check_enabled: true,
             menu_bar_visible: true,
-            is_pro: false,
             sync_enabled: true,
         }
     }
@@ -41,7 +39,6 @@ pub struct SettingsUpdate {
     pub onboarding_completed: Option<bool>,
     pub auto_update_check_enabled: Option<bool>,
     pub menu_bar_visible: Option<bool>,
-    pub is_pro: Option<bool>,
     pub sync_enabled: Option<bool>,
 }
 

@@ -1,3 +1,4 @@
+import { getRunEnv, invokeTauri, invokeWeb, logger, RUN_ENV } from "@/adapters";
 import {
   Activity,
   ActivityBulkMutationRequest,
@@ -7,17 +8,26 @@ import {
   ActivitySearchResponse,
   ActivityUpdate,
 } from "@/lib/types";
-import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb, logger } from "@/adapters";
+
+function normalizeStringArray(input?: string | string[]): string[] | undefined {
+  if (!input) return undefined;
+
+  if (Array.isArray(input)) {
+    return input.length > 0 ? input : undefined;
+  }
+
+  return input.length > 0 ? [input] : undefined;
+}
 
 interface Filters {
-  accountIds?: string[];
-  activityTypes?: string[];
+  accountIds?: string | string[];
+  activityTypes?: string | string[];
   symbol?: string;
 }
 
 interface Sort {
   id: string;
-  desc: boolean;
+  desc?: boolean;
 }
 
 export const getActivities = async (accountId?: string): Promise<ActivityDetails[]> => {
@@ -44,27 +54,35 @@ export const searchActivities = async (
   pageSize: number,
   filters: Filters,
   searchKeyword: string,
-  sort: Sort,
+  sort?: Sort,
 ): Promise<ActivitySearchResponse> => {
+  const accountIdFilter = normalizeStringArray(filters?.accountIds);
+  const activityTypeFilter = normalizeStringArray(filters?.activityTypes);
+  const assetIdKeywordRaw = filters?.symbol ?? searchKeyword;
+  const assetIdKeyword = assetIdKeywordRaw?.trim() ? assetIdKeywordRaw.trim() : undefined;
+  const sortOption = sort?.id
+    ? { id: sort.id, desc: sort.desc ?? false }
+    : { id: "date", desc: true };
+
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri("search_activities", {
           page,
           pageSize,
-          accountIdFilter: filters?.accountIds,
-          activityTypeFilter: filters?.activityTypes,
-          assetIdKeyword: searchKeyword,
-          sort,
+          accountIdFilter,
+          activityTypeFilter,
+          assetIdKeyword,
+          sort: sortOption,
         });
       case RUN_ENV.WEB:
         return invokeWeb("search_activities", {
           page,
           pageSize,
-          accountIdFilter: filters?.accountIds,
-          activityTypeFilter: filters?.activityTypes,
-          assetIdKeyword: searchKeyword,
-          sort,
+          accountIdFilter,
+          activityTypeFilter,
+          assetIdKeyword,
+          sort: sortOption,
         });
       default:
         throw new Error(`Unsupported`);

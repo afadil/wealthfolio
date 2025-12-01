@@ -47,7 +47,7 @@ impl FxRepository {
             let quote = Quote::from(quote_db);
             grouped_quotes
                 .entry(quote.symbol.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(quote);
         }
 

@@ -1,13 +1,17 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
-import { worldCurrencies } from "@wealthfolio/ui";
-import { ExchangeRate } from "@/lib/types";
-import { Icons } from "@/components/ui/icons";
+import {
+  Command,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   DialogDescription,
   DialogFooter,
@@ -18,33 +22,52 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Icons } from "@/components/ui/icons";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Command,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useMarketDataProviders } from "@/hooks/use-market-data-providers";
+import { ExchangeRate } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { MoneyInput } from "@wealthfolio/ui";
+import { MoneyInput, worldCurrencies } from "@wealthfolio/ui";
 
-const exchangeRateSchema = z.object({
-  fromCurrency: z.string().min(1, "From Currency is required"),
-  toCurrency: z.string().min(1, "To Currency is required"),
-  rate: z.coerce
-    .number({
-      required_error: "Please enter a valid rate.",
-      invalid_type_error: "Rate must be a valid positive number.",
-    })
-    .min(0, { message: "Rate must be a non-negative number." }),
-});
+const exchangeRateSchema = z
+  .object({
+    fromCurrency: z.string().min(1, "From Currency is required"),
+    toCurrency: z.string().min(1, "To Currency is required"),
+    rate: z.coerce
+      .number({
+        invalid_type_error: "Rate must be a valid positive number.",
+      })
+      .min(0, { message: "Rate must be a non-negative number." })
+      .optional(),
+    source: z.string().min(1, "Data source is required"),
+  })
+  .refine(
+    (data) => {
+      // Rate is required only for MANUAL source
+      if (data.source === "MANUAL") {
+        return data.rate !== undefined && data.rate > 0;
+      }
+      return true;
+    },
+    {
+      message: "Please enter a valid exchange rate.",
+      path: ["rate"],
+    },
+  );
 
 type ExchangeRateFormData = z.infer<typeof exchangeRateSchema>;
 
@@ -54,19 +77,27 @@ interface AddExchangeRateFormProps {
 }
 
 export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormProps) {
+  const { data: providers } = useMarketDataProviders();
   const form = useForm<ExchangeRateFormData>({
     resolver: zodResolver(exchangeRateSchema),
     defaultValues: {
       fromCurrency: "",
       toCurrency: "",
-      rate: 0,
+      rate: undefined,
+      source: "MANUAL",
     },
   });
 
+  const selectedSource = form.watch("source");
+  const isManualSource = selectedSource === "MANUAL";
+
   const handleSubmit = (data: ExchangeRateFormData) => {
     onSubmit({
-      ...data,
-      source: "MANUAL",
+      fromCurrency: data.fromCurrency,
+      toCurrency: data.toCurrency,
+      source: data.source,
+      // Only include rate for manual sources
+      rate: isManualSource ? data.rate! : 1,
       timestamp: new Date().toISOString(),
     });
   };
@@ -186,17 +217,50 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
 
           <FormField
             control={form.control}
-            name="rate"
+            name="source"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Exchange Rate</FormLabel>
-                <FormControl>
-                  <MoneyInput placeholder="Enter exchange rate" {...field} />
-                </FormControl>
+                <FormLabel>Data Source</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a data source" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="MANUAL">Manual</SelectItem>
+                    {providers?.map((provider) => (
+                      <SelectItem key={provider.id} value={provider.id}>
+                        {provider.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormDescription>
+                  {isManualSource
+                    ? "You'll need to manually update this rate."
+                    : "Rate will be automatically fetched from the selected provider."}
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
+
+          {isManualSource && (
+            <FormField
+              control={form.control}
+              name="rate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Exchange Rate</FormLabel>
+                  <FormControl>
+                    <MoneyInput placeholder="Enter exchange rate" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
         </div>
 
         <DialogFooter>

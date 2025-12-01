@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { Link, useNavigate } from "react-router-dom";
 
 interface ApplicationHeaderProps {
-  heading: string;
+  heading?: string;
   headingPrefix?: string;
   text?: string;
   className?: string;
