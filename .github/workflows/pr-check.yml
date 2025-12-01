@@ -78,6 +78,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev
 
+      - name: Create dist folder for Tauri context
+        run:
+          mkdir -p dist && echo '<!DOCTYPE html><html><head></head><body></body></html>' >
+          dist/index.html
+
       - name: Check formatting (src-core)
         run: cargo fmt --manifest-path src-core/Cargo.toml --all -- --check
 
