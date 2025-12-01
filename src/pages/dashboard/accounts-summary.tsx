@@ -301,8 +301,15 @@ export const AccountsSummary = React.memo(() => {
 
     if (!combinedAccountViews || combinedAccountViews.length === 0) {
       return (
-        <div className="border-border/50 bg-secondary/30 rounded-lg border p-6 text-center md:p-8">
-          <p className="text-muted-foreground text-sm">No accounts found.</p>
+        <div className="border-border/50 bg-success/10 rounded-lg border p-6 text-center md:p-8">
+          <p className="text-sm">No accounts found.</p>
+          <Link
+            to="/settings/accounts"
+            className="text-muted-foreground hover:text-foreground mt-2 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
+          >
+            Add your first account
+            <Icons.ChevronRight className="h-3 w-3" />
+          </Link>
         </div>
       );
     }

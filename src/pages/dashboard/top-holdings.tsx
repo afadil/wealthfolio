@@ -4,16 +4,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { HoldingType } from "@/lib/constants";
 import { Holding } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import {
-  AmountDisplay,
-  Button,
-  EmptyPlaceholder,
-  GainAmount,
-  GainPercent,
-  Icons,
-} from "@wealthfolio/ui";
+import { AmountDisplay, Button, GainAmount, GainPercent, Icons } from "@wealthfolio/ui";
 import { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const MAX_DISPLAYED_HOLDINGS = 5;
 const MAX_STACKED_AVATARS = 5;
@@ -156,32 +149,24 @@ function TopHoldingsSkeleton() {
 }
 
 function TopHoldingsEmptyState() {
-  const navigate = useNavigate();
-
   return (
-    <Card className="w-full border-0 bg-transparent shadow-none">
-      <CardHeader className="py-2">
+    <Card className="w-full border-0 bg-transparent p-0 shadow-none">
+      <CardHeader className="px-0 py-2">
         <CardTitle className="text-md">Top Holdings</CardTitle>
       </CardHeader>
-      <CardContent>
-        <Card className="w-full shadow-xs">
-          <CardContent className="pt-6">
-            <EmptyPlaceholder
-              icon={<Icons.TrendingUp className="text-muted-foreground h-10 w-10" />}
-              title="No holdings yet"
-              description="Start building your portfolio by adding transactions or importing your existing holdings."
-            >
-              <div className="flex flex-col items-center gap-3 sm:flex-row">
-                <Button size="sm" onClick={() => navigate("/activities/manage")}>
-                  <Icons.Plus className="mr-2 h-4 w-4" />
-                  Add Transaction
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => navigate("/import")}>
-                  <Icons.Import className="mr-2 h-4 w-4" />
-                  Import from CSV
-                </Button>
-              </div>
-            </EmptyPlaceholder>
+      <CardContent className="p-0">
+        <Card className="border-border/50 bg-success/10 w-full shadow-xs">
+          <CardContent className="px-4 py-6">
+            <div className="text-center">
+              <p className="text-sm">No holdings yet.</p>
+              <Link
+                to="/activities/manage"
+                className="text-muted-foreground hover:text-foreground mt-2 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
+              >
+                Add your first transaction
+                <Icons.ChevronRight className="h-3 w-3" />
+              </Link>
+            </div>
           </CardContent>
         </Card>
       </CardContent>
@@ -218,7 +203,7 @@ export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsPr
         <Button
           variant="ghost"
           size="sm"
-          className="text-muted-foreground text-xs hover:bg-success/10"
+          className="text-muted-foreground hover:bg-success/10 text-xs"
           onClick={() => navigate("/holdings")}
         >
           View All
