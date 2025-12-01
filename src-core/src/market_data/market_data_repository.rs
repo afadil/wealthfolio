@@ -84,7 +84,7 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
 
     async fn save_quote(&self, quote: &Quote) -> Result<Quote> {
         let quote_cloned = quote.clone();
-        let save_result = self.save_quotes(&[quote_cloned.clone()]).await;
+        let save_result = self.save_quotes(std::slice::from_ref(&quote_cloned)).await;
         save_result?;
         Ok(quote_cloned)
     }

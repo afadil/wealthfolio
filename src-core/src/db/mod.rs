@@ -400,7 +400,7 @@ fn copy_with_retries(
             }
         }
     }
-    let e = last_err.unwrap_or_else(|| io::Error::new(io::ErrorKind::Other, "unknown copy error"));
+    let e = last_err.unwrap_or_else(|| io::Error::other("unknown copy error"));
     error!("Failed to copy '{}' -> '{}': {}", src, dst, e);
     Err(Error::Database(DatabaseError::BackupFailed(e.to_string())))
 }

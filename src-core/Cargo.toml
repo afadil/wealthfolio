@@ -29,9 +29,9 @@ lazy_static = "1.5"
 thiserror = "1.0"
 dashmap = "6.1"
 async-trait = "0.1"
-rust_decimal = { version = "1.37", features = ["maths","serde-float"] }
+rust_decimal = { version = "1.39", features = ["maths","serde-float"] }
 num-traits = "0.2"
-rust_decimal_macros = "1.37"
+rust_decimal_macros = "1.39"
 serde_with = "3"
 urlencoding = "2"
 csv = "1.4.0"

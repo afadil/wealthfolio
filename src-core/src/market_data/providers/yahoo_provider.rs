@@ -548,8 +548,12 @@ impl YahooProvider {
             }
         }
 
-        if quote_type == "FUTURE" && short_name.is_some() {
-            name = short_name.unwrap()[..short_name.unwrap().len() - 7].to_string();
+        if quote_type == "FUTURE" {
+            if let Some(sn) = short_name {
+                if sn.len() >= 7 {
+                    name = sn[..sn.len() - 7].to_string();
+                }
+            }
         }
 
         if name.is_empty() {
