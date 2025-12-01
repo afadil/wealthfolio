@@ -36,11 +36,11 @@ impl ExchangeRate {
             id: format!("{}_{}", formatted_date, symbol),
             symbol,
             timestamp: self.timestamp,
-            open: self.rate.clone(),
-            high: self.rate.clone(),
-            low: self.rate.clone(),
-            close: self.rate.clone(),
-            adjclose: self.rate.clone(),
+            open: self.rate,
+            high: self.rate,
+            low: self.rate,
+            close: self.rate,
+            adjclose: self.rate,
             volume: Decimal::ZERO,
             data_source: self.source.clone(),
             created_at: self.timestamp,
@@ -49,8 +49,7 @@ impl ExchangeRate {
     }
 
     pub fn parse_fx_symbol(symbol: &str) -> (String, String) {
-        if symbol.ends_with("=X") {
-            let base_symbol = &symbol[..symbol.len() - 2];
+        if let Some(base_symbol) = symbol.strip_suffix("=X") {
             (base_symbol[..3].to_string(), base_symbol[3..].to_string())
         } else {
             (symbol[..3].to_string(), symbol[3..6].to_string())
@@ -89,11 +88,11 @@ impl NewExchangeRate {
             id: format!("{}_{}", formatted_date, symbol),
             symbol,
             timestamp: now,
-            open: self.rate.clone(),
-            high: self.rate.clone(),
-            low: self.rate.clone(),
-            close: self.rate.clone(),
-            adjclose: self.rate.clone(),
+            open: self.rate,
+            high: self.rate,
+            low: self.rate,
+            close: self.rate,
+            adjclose: self.rate,
             volume: Decimal::ZERO,
             data_source: self.source.clone(),
             created_at: now,

@@ -401,30 +401,28 @@ impl SnapshotService {
                     "Force full calculation: Setting effective_start_date for account {} to {}. Deletion handled by overwrite methods.",
                     acc_id, effective_start_date
                 );
+            } else if let Some(latest_snapshot) = self
+                .snapshot_repository
+                .get_latest_snapshot_before_date(acc_id, calculation_end_date)?
+            {
+                // Re-evaluate the key-frame’s own date without duplicating its activities
+                let snapshot_day = latest_snapshot.snapshot_date;
+                let day_before = snapshot_day.pred_opt().unwrap_or(snapshot_day);
+
+                // fresh, empty state as of D-1
+                start_keyframes.insert(
+                    acc_id.clone(),
+                    Self::create_initial_snapshot(account, day_before),
+                );
+
+                effective_start_date = snapshot_day;
             } else {
-                if let Some(latest_snapshot) = self
-                    .snapshot_repository
-                    .get_latest_snapshot_before_date(acc_id, calculation_end_date)?
-                {
-                    // Re-evaluate the key-frame’s own date without duplicating its activities
-                    let snapshot_day = latest_snapshot.snapshot_date;
-                    let day_before = snapshot_day.pred_opt().unwrap_or(snapshot_day);
-
-                    // fresh, empty state as of D-1
-                    start_keyframes.insert(
-                        acc_id.clone(),
-                        Self::create_initial_snapshot(account, day_before),
-                    );
-
-                    effective_start_date = snapshot_day;
-                } else {
-                    effective_start_date =
-                        min_activity_date_for_account.unwrap_or(calculation_end_date);
-                    debug!(
-                        "No snapshot found for account {}. Starting from earliest activity: {} or end_date.",
-                        acc_id, effective_start_date
-                    );
-                }
+                effective_start_date =
+                    min_activity_date_for_account.unwrap_or(calculation_end_date);
+                debug!(
+                    "No snapshot found for account {}. Starting from earliest activity: {} or end_date.",
+                    acc_id, effective_start_date
+                );
             }
 
             if let Some(min_act_date) = min_activity_date_for_account {
@@ -506,7 +504,7 @@ impl SnapshotService {
                 .filter(|(id, _)| {
                     effective_start_dates
                         .get(*id)
-                        .map_or(false, |start_date| *start_date <= current_date)
+                        .is_some_and(|start_date| *start_date <= current_date)
                 })
                 .collect();
 
@@ -648,7 +646,7 @@ impl SnapshotService {
             overall_net_contribution_base_ccy += individual_snapshot.net_contribution_base;
 
             // 3. Aggregate Positions & Calculate Overall Cost Basis for TOTAL (in base_portfolio_currency)
-            for (_pos_asset_id, pos) in &individual_snapshot.positions {
+            for pos in individual_snapshot.positions.values() {
                 let agg_pos = aggregated_positions
                     .entry(pos.asset_id.clone())
                     .or_insert_with(|| Position {

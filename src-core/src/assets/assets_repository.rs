@@ -148,8 +148,8 @@ impl AssetRepositoryTrait for AssetRepository {
     }
 
     /// Lists assets by their symbols
-    fn list_by_symbols(&self, symbols: &Vec<String>) -> Result<Vec<Asset>> {
-        self.list_by_symbols_impl(symbols)
+    fn list_by_symbols(&self, symbols: &[String]) -> Result<Vec<Asset>> {
+        self.list_by_symbols_impl(&symbols.to_vec())
     }
 
     async fn delete(&self, asset_id: &str) -> Result<()> {

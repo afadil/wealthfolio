@@ -652,16 +652,16 @@ impl From<NewActivity> for ActivityDB {
             // Use amount if provided, otherwise use quantity
             let amount_str = match &domain.amount {
                 Some(amount) => amount.to_string(),
-                None => domain.quantity.unwrap_or_else(|| Decimal::ZERO).to_string(),
+                None => domain.quantity.unwrap_or(Decimal::ZERO).to_string(),
             };
             ("0".to_string(), "0".to_string(), Some(amount_str))
         } else {
             // For other activities, use the provided values
             (
-                domain.quantity.unwrap_or_else(|| Decimal::ZERO).to_string(),
+                domain.quantity.unwrap_or(Decimal::ZERO).to_string(),
                 domain
                     .unit_price
-                    .unwrap_or_else(|| Decimal::ZERO)
+                    .unwrap_or(Decimal::ZERO)
                     .to_string(),
                 domain.amount.as_ref().map(|a| a.to_string()),
             )
@@ -676,7 +676,7 @@ impl From<NewActivity> for ActivityDB {
             quantity,
             unit_price,
             currency: domain.currency,
-            fee: domain.fee.unwrap_or_else(|| Decimal::ZERO).to_string(),
+            fee: domain.fee.unwrap_or(Decimal::ZERO).to_string(),
             amount,
             is_draft: domain.is_draft,
             comment: domain.comment,
@@ -727,16 +727,16 @@ impl From<ActivityUpdate> for ActivityDB {
             // Use amount if provided, otherwise use quantity
             let amount_str = match &domain.amount {
                 Some(amount) => amount.to_string(),
-                None => domain.quantity.unwrap_or_else(|| Decimal::ZERO).to_string(),
+                None => domain.quantity.unwrap_or(Decimal::ZERO).to_string(),
             };
             ("0".to_string(), "0".to_string(), Some(amount_str))
         } else {
             // For other activities, use the provided values
             (
-                domain.quantity.unwrap_or_else(|| Decimal::ZERO).to_string(),
+                domain.quantity.unwrap_or(Decimal::ZERO).to_string(),
                 domain
                     .unit_price
-                    .unwrap_or_else(|| Decimal::ZERO)
+                    .unwrap_or(Decimal::ZERO)
                     .to_string(),
                 domain.amount.as_ref().map(|a| a.to_string()),
             )
@@ -751,7 +751,7 @@ impl From<ActivityUpdate> for ActivityDB {
             quantity,
             unit_price,
             currency: domain.currency,
-            fee: domain.fee.unwrap_or_else(|| Decimal::ZERO).to_string(),
+            fee: domain.fee.unwrap_or(Decimal::ZERO).to_string(),
             amount,
             is_draft: domain.is_draft,
             comment: domain.comment,

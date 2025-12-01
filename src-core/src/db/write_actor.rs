@@ -13,6 +13,7 @@ pub struct WriteHandle {
     // Sender part of the MPSC channel to send jobs.
     // Each job is a boxed closure, and a oneshot sender is used for the reply.
     // The Box<dyn Any + Send> is used for type erasure of the job's return type.
+    #[allow(clippy::type_complexity)]
     tx: mpsc::Sender<(
         Job<Box<dyn Any + Send + 'static>>,
         oneshot::Sender<Result<Box<dyn Any + Send + 'static>>>,
@@ -24,7 +25,7 @@ impl WriteHandle {
     ///
     /// # Arguments
     /// * `job`: A closure that takes a mutable reference to `SqliteConnection`
-    ///          and performs database operations.
+    ///   and performs database operations.
     ///
     /// # Returns
     /// A `Result<T>` containing the outcome of the job.

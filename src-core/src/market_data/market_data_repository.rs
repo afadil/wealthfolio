@@ -491,7 +491,7 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
                 debug!("🔄 Inside database transaction");
                 let mut total_upserted = 0;
                 let chunk_size = 1000;
-                let total_chunks = (db_rows.len() + chunk_size - 1) / chunk_size;
+                let total_chunks = db_rows.len().div_ceil(chunk_size);
 
                 debug!(
                     "📦 Processing {} quotes in {} chunks of {}",

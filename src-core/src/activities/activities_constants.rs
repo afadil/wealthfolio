@@ -2,7 +2,6 @@
 ///
 /// Each constant represents one of the supported activity categories.
 /// The descriptions mirror `docs/activity-types.md` for quick reference.
-
 /// Purchase of a security or other asset. Decreases cash and increases quantity.
 pub const ACTIVITY_TYPE_BUY: &str = "BUY";
 

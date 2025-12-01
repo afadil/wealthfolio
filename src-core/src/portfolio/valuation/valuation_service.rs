@@ -208,7 +208,7 @@ impl ValuationServiceTrait for ValuationService {
                         .insert((position_currency.to_string(), account_curr.to_string()));
                 }
             }
-            for (cash_curr, _amount) in &snapshot.cash_balances {
+            for cash_curr in snapshot.cash_balances.keys() {
                 let normalized_cash_currency = normalize_currency_code(cash_curr);
                 if normalized_cash_currency != account_curr {
                     required_fx_pairs.insert((

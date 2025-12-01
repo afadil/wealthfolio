@@ -30,6 +30,7 @@ impl ProviderRegistry {
         provider_settings: Vec<MarketDataProviderSetting>,
         secret_store: Arc<dyn SecretStore>,
     ) -> Result<Self, MarketDataError> {
+        #[allow(clippy::type_complexity)]
         let mut active_providers_with_priority: Vec<(
             i32,
             String,

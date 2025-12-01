@@ -147,7 +147,6 @@ pub struct AddonUpdateCheckResult {
 }
 
 /// Helper functions for working with function-level permissions
-
 /// Get all declared functions from a permission
 #[allow(dead_code)]
 pub fn get_declared_functions(permission: &AddonPermission) -> Vec<String> {

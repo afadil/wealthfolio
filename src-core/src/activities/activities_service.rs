@@ -125,7 +125,7 @@ impl ActivityServiceTrait for ActivityService {
     }
 
     /// Retrieves activities by account ID
-    fn get_activities_by_account_id(&self, account_id: &String) -> Result<Vec<Activity>> {
+    fn get_activities_by_account_id(&self, account_id: &str) -> Result<Vec<Activity>> {
         self.activity_repository
             .get_activities_by_account_id(account_id)
     }
@@ -234,8 +234,10 @@ impl ActivityServiceTrait for ActivityService {
         }
 
         if !errors.is_empty() {
-            let mut outcome = ActivityBulkMutationResult::default();
-            outcome.errors = errors;
+            let outcome = ActivityBulkMutationResult {
+                errors,
+                ..Default::default()
+            };
             return Ok(outcome);
         }
 
@@ -350,7 +352,7 @@ impl ActivityServiceTrait for ActivityService {
                 || activity
                     .errors
                     .as_ref()
-                    .map_or(false, |errors| !errors.is_empty())
+                    .is_some_and(|errors| !errors.is_empty())
         });
 
         if has_errors {

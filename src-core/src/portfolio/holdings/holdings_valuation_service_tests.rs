@@ -253,7 +253,7 @@ mod tests {
             &self,
             symbols: &[String],
         ) -> Result<HashMap<String, LatestQuotePair>> {
-            if self.should_fail.lock().unwrap().clone() {
+            if *self.should_fail.lock().unwrap() {
                 return Err(Error::MarketData(MarketDataError::ProviderError(
                     "Intentional market data failure".to_string(),
                 )));
@@ -294,6 +294,7 @@ mod tests {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn create_holding(
         id: &str,
         holding_type: HoldingType,

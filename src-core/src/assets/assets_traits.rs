@@ -20,7 +20,7 @@ pub trait AssetServiceTrait: Send + Sync {
         context_currency: Option<String>,
     ) -> Result<Asset>;
     async fn update_asset_data_source(&self, asset_id: &str, data_source: String) -> Result<Asset>;
-    async fn get_assets_by_symbols(&self, symbols: &Vec<String>) -> Result<Vec<Asset>>;
+    async fn get_assets_by_symbols(&self, symbols: &[String]) -> Result<Vec<Asset>>;
 }
 
 /// Trait defining the contract for Asset repository operations.
@@ -32,6 +32,6 @@ pub trait AssetRepositoryTrait: Send + Sync {
     fn get_by_id(&self, asset_id: &str) -> Result<Asset>;
     fn list(&self) -> Result<Vec<Asset>>;
     fn list_cash_assets(&self, base_currency: &str) -> Result<Vec<Asset>>;
-    fn list_by_symbols(&self, symbols: &Vec<String>) -> Result<Vec<Asset>>;
+    fn list_by_symbols(&self, symbols: &[String]) -> Result<Vec<Asset>>;
     async fn delete(&self, asset_id: &str) -> Result<()>;
 }

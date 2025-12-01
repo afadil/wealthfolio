@@ -294,11 +294,7 @@ impl PerformanceService {
         let gain_loss_amount = end_value - start_value - net_cash_flow;
 
         let simple_total_return = if start_value.is_zero() {
-            if end_value == start_value && net_cash_flow.is_zero() {
-                Decimal::ZERO
-            } else {
-                Decimal::ZERO
-            }
+            Decimal::ZERO
         } else {
             (end_value - start_value - net_cash_flow) / start_value
         };
@@ -593,12 +589,10 @@ impl PerformanceService {
         let denominator_cumulative_return = current.net_contribution;
         let cumulative_return_percent = if !denominator_cumulative_return.is_zero() {
             Some((total_gain_loss_amount / denominator_cumulative_return).round_dp(4))
+        } else if total_gain_loss_amount.is_zero() {
+            Some(Decimal::ZERO)
         } else {
-            if total_gain_loss_amount.is_zero() {
-                Some(Decimal::ZERO)
-            } else {
-                None
-            }
+            None
         };
 
         let (day_gain_loss_amount, day_return_percent_mod_dietz) = if let Some(prev) = previous {
@@ -611,12 +605,10 @@ impl PerformanceService {
 
             let percent_day_mod_dietz = if !denominator_mod_dietz.is_zero() {
                 Some((gain_day / denominator_mod_dietz).round_dp(4))
+            } else if gain_day.is_zero() {
+                Some(Decimal::ZERO)
             } else {
-                if gain_day.is_zero() {
-                    Some(Decimal::ZERO)
-                } else {
-                    None
-                }
+                None
             };
             (Some(gain_day.round_dp(2)), percent_day_mod_dietz)
         } else {
@@ -632,12 +624,10 @@ impl PerformanceService {
                         .min(Decimal::ONE)
                         .round_dp(4),
                 )
+            } else if total_value_base.is_zero() {
+                Some(Decimal::ZERO)
             } else {
-                if total_value_base.is_zero() {
-                    Some(Decimal::ZERO)
-                } else {
-                    None
-                }
+                None
             }
         } else {
             None

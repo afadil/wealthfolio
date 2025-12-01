@@ -53,9 +53,9 @@ impl IncomeSummary {
     }
 
     pub fn calculate_monthly_average(&mut self, num_months: Option<u32>) {
-        let months = num_months.unwrap_or_else(|| self.by_month.len() as u32);
+        let months = num_months.unwrap_or(self.by_month.len() as u32);
         if months > 0 {
-            self.monthly_average = &self.total_income / Decimal::new(months as i64, 0);
+            self.monthly_average = self.total_income / Decimal::new(months as i64, 0);
         }
     }
 }

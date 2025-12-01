@@ -246,7 +246,7 @@ mod tests {
             Ok(vec![])
         }
 
-        fn list_by_symbols(&self, symbols: &Vec<String>) -> AppResult<Vec<Asset>> {
+        fn list_by_symbols(&self, symbols: &[String]) -> AppResult<Vec<Asset>> {
             Ok(self
                 .assets
                 .values()
@@ -294,7 +294,7 @@ mod tests {
                 .read()
                 .unwrap()
                 .values()
-                .filter(|a| active_only.map_or(true, |active| a.is_active == active))
+                .filter(|a| active_only.is_none_or(|active| a.is_active == active))
                 .cloned()
                 .collect();
 
@@ -333,7 +333,7 @@ mod tests {
         fn get_activities(&self) -> AppResult<Vec<Activity>> {
             unimplemented!()
         }
-        fn get_activities_by_account_id(&self, _account_id: &String) -> AppResult<Vec<Activity>> {
+        fn get_activities_by_account_id(&self, _account_id: &str) -> AppResult<Vec<Activity>> {
             unimplemented!()
         }
         fn get_activities_by_account_ids(
@@ -434,12 +434,12 @@ mod tests {
         fn get_activities(&self) -> AppResult<Vec<Activity>> {
             Ok(self.activities.clone())
         }
-        fn get_activities_by_account_id(&self, account_id: &String) -> AppResult<Vec<Activity>> {
+        fn get_activities_by_account_id(&self, account_id: &str) -> AppResult<Vec<Activity>> {
             Ok(self
                 .activities
                 .iter()
+                .filter(|&a| a.account_id == account_id)
                 .cloned()
-                .filter(|a| &a.account_id == account_id)
                 .collect())
         }
         fn get_activities_by_account_ids(
@@ -449,8 +449,8 @@ mod tests {
             Ok(self
                 .activities
                 .iter()
+                .filter(|&a| account_ids.contains(&a.account_id))
                 .cloned()
-                .filter(|a| account_ids.contains(&a.account_id))
                 .collect())
         }
         fn get_trading_activities(&self) -> AppResult<Vec<Activity>> {
@@ -541,7 +541,7 @@ mod tests {
             for snapshot in snapshots {
                 store
                     .entry(snapshot.account_id.clone())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(snapshot);
             }
         }
@@ -585,9 +585,8 @@ mod tests {
                 let filtered: Vec<AccountStateSnapshot> = account_snapshots
                     .iter()
                     .filter(|snap| {
-                        let date_ok = start_date.map_or(true, |start| snap.snapshot_date >= start)
-                            && end_date.map_or(true, |end| snap.snapshot_date <= end);
-                        date_ok
+                        start_date.is_none_or(|start| snap.snapshot_date >= start)
+                            && end_date.is_none_or(|end| snap.snapshot_date <= end)
                     })
                     .cloned()
                     .collect();
@@ -691,9 +690,8 @@ mod tests {
                 let filtered: Vec<AccountStateSnapshot> = account_snapshots
                     .iter()
                     .filter(|snap| {
-                        let date_ok = start_date.map_or(true, |start| snap.snapshot_date >= start)
-                            && end_date.map_or(true, |end| snap.snapshot_date <= end);
-                        date_ok
+                        start_date.is_none_or(|start| snap.snapshot_date >= start)
+                            && end_date.is_none_or(|end| snap.snapshot_date <= end)
                     })
                     .cloned()
                     .collect();

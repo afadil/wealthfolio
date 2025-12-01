@@ -11,10 +11,11 @@ use rust_decimal::Decimal; // Assuming Result is defined in activities_model or 
 pub trait ActivityRepositoryTrait: Send + Sync {
     fn get_activity(&self, activity_id: &str) -> Result<Activity>;
     fn get_activities(&self) -> Result<Vec<Activity>>;
-    fn get_activities_by_account_id(&self, account_id: &String) -> Result<Vec<Activity>>;
+    fn get_activities_by_account_id(&self, account_id: &str) -> Result<Vec<Activity>>;
     fn get_activities_by_account_ids(&self, account_ids: &[String]) -> Result<Vec<Activity>>;
     fn get_trading_activities(&self) -> Result<Vec<Activity>>;
     fn get_income_activities(&self) -> Result<Vec<Activity>>;
+    #[allow(clippy::type_complexity)]
     fn get_deposit_activities(
         &self,
         account_ids: &[String],
@@ -57,7 +58,7 @@ pub trait ActivityRepositoryTrait: Send + Sync {
 pub trait ActivityServiceTrait: Send + Sync {
     fn get_activity(&self, activity_id: &str) -> Result<Activity>;
     fn get_activities(&self) -> Result<Vec<Activity>>;
-    fn get_activities_by_account_id(&self, account_id: &String) -> Result<Vec<Activity>>;
+    fn get_activities_by_account_id(&self, account_id: &str) -> Result<Vec<Activity>>;
     fn get_activities_by_account_ids(&self, account_ids: &[String]) -> Result<Vec<Activity>>;
     fn get_trading_activities(&self) -> Result<Vec<Activity>>;
     fn get_income_activities(&self) -> Result<Vec<Activity>>;

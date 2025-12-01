@@ -335,7 +335,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
     }
 
     /// Retrieves activities by account ID
-    fn get_activities_by_account_id(&self, account_id: &String) -> Result<Vec<Activity>> {
+    fn get_activities_by_account_id(&self, account_id: &str) -> Result<Vec<Activity>> {
         let mut conn = get_connection(&self.pool)?;
 
         let activities_db = activities::table
