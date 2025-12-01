@@ -47,7 +47,7 @@ export function useActivitySearch({
 
   const primarySort =
     sorting.length > 0 && sorting[0]?.id
-      ? ({ id: sorting[0]!.id, desc: sorting[0]!.desc ?? false } as {
+      ? ({ id: sorting[0].id, desc: sorting[0].desc ?? false } as {
           id: string;
           desc: boolean;
         })
