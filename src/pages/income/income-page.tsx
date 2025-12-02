@@ -1,3 +1,4 @@
+import { getCategoriesHierarchical } from "@/commands/category";
 import { getIncomeSummary } from "@/commands/portfolio";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,10 +8,12 @@ import { Icons } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { QueryKeys } from "@/lib/query-keys";
-import type { IncomeSummary } from "@/lib/types";
+import { buildCashflowUrl, periodToDateRange, type SpendingPeriod } from "@/lib/navigation/cashflow-navigation";
+import type { CategoryWithChildren, IncomeSummary } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { AmountDisplay, AnimatedToggleGroup, GainPercent, PrivacyAmount } from "@wealthfolio/ui";
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { Cell, Pie, PieChart } from "recharts";
 import { IncomeHistoryChart } from "./income-history-chart";
 
@@ -55,6 +58,7 @@ const IncomePeriodSelector: React.FC<{
 export default function IncomePage() {
   const [selectedPeriod, setSelectedPeriod] = useState<"TOTAL" | "YTD" | "LAST_YEAR">("TOTAL");
   const { isBalanceHidden } = useBalancePrivacy();
+  const navigate = useNavigate();
 
   const {
     data: incomeData,
@@ -64,6 +68,34 @@ export default function IncomePage() {
     queryKey: [QueryKeys.INCOME_SUMMARY],
     queryFn: getIncomeSummary,
   });
+
+  const { data: categoriesData } = useQuery<CategoryWithChildren[], Error>({
+    queryKey: [QueryKeys.CATEGORIES],
+    queryFn: getCategoriesHierarchical,
+  });
+
+  const handleCashIncomeClick = useCallback(
+    (categoryName: string | null | undefined, subcategoryName: string | null | undefined) => {
+      if (!categoryName) return;
+
+      const dateRange = periodToDateRange(selectedPeriod as SpendingPeriod);
+      const parentCategory = categoriesData?.find(cat => cat.name === categoryName);
+      const categoryId = parentCategory?.id;
+
+      let subcategoryId: string | undefined;
+      if (subcategoryName && parentCategory?.children) {
+        const subcat = parentCategory.children.find(sub => sub.name === subcategoryName);
+        subcategoryId = subcat?.id;
+      }
+
+      navigate(buildCashflowUrl({
+        categoryId: subcategoryId ? undefined : categoryId,
+        subcategoryId,
+        ...dateRange
+      }));
+    },
+    [navigate, selectedPeriod, categoriesData]
+  );
 
   if (isLoading) {
     return <IncomeDashboardSkeleton />;
@@ -97,7 +129,6 @@ export default function IncomePage() {
 
   const { totalIncome, currency, monthlyAverage, byCurrency, bySourceType } = periodSummary;
 
-  // Top income sources - includes both investment and cash income
   const topIncomeSources = Object.entries(periodSummary.bySymbol)
     .filter(([, income]) => income > 0)
     .sort(([, a], [, b]) => b - a)
@@ -322,7 +353,6 @@ export default function IncomePage() {
                 />
               ) : (
                 <div className="space-y-6">
-                  {/* Horizontal Bar Chart - Separated Bars */}
                   <div className="flex w-full space-x-0.5">
                     {(() => {
                       const top5Sources = topIncomeSources.slice(0, 5);
@@ -375,7 +405,6 @@ export default function IncomePage() {
                               backgroundColor: colors[index % colors.length],
                             }}
                           >
-                            {/* Tooltip */}
                             <div className="absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 transform group-hover:block">
                               <div className="bg-popover text-popover-foreground min-w-[180px] rounded-lg border px-3 py-2 shadow-md">
                                 <div className="text-sm font-medium">{item.symbol}</div>
@@ -388,7 +417,6 @@ export default function IncomePage() {
                                 <div className="text-muted-foreground text-xs">
                                   {percentage.toFixed(1)}% of total
                                 </div>
-                                {/* Tooltip arrow */}
                                 <div className="border-t-border absolute top-full left-1/2 h-0 w-0 -translate-x-1/2 transform border-t-4 border-r-4 border-l-4 border-r-transparent border-l-transparent"></div>
                               </div>
                             </div>
@@ -403,13 +431,16 @@ export default function IncomePage() {
                     const ticker = /\[(.*?)\]/.exec(symbolStr)?.[1] || symbolStr;
                     const name = symbolStr.replace(/\[.*?\]-/, "").trim();
 
-                    // For cash: parse "Category > Subcategory" format
                     const nameParts = isCash ? name.split(" > ") : [];
                     const category = nameParts[0] || name;
                     const subcategory = nameParts[1];
 
                     return (
-                      <div key={index} className="flex items-center justify-between">
+                      <div
+                        key={index}
+                        className={`flex items-center justify-between rounded-md p-1 transition-colors ${isCash ? "cursor-pointer hover:bg-muted/50" : ""}`}
+                        onClick={isCash ? () => handleCashIncomeClick(category, subcategory) : undefined}
+                      >
                         <div className="flex items-center gap-2">
                           {isCash ? (
                             <>

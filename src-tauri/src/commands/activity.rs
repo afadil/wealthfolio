@@ -34,6 +34,8 @@ pub async fn search_activities(
     has_event_filter: Option<bool>,
     amount_min_filter: Option<f64>,
     amount_max_filter: Option<f64>,
+    start_date_filter: Option<String>,
+    end_date_filter: Option<String>,
     sort: Option<Sort>,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ActivitySearchResponse, String> {
@@ -55,6 +57,8 @@ pub async fn search_activities(
         has_event_filter,
         amount_min,
         amount_max,
+        start_date_filter,
+        end_date_filter,
         sort,
     )?)
 }

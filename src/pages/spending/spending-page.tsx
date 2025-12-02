@@ -6,8 +6,10 @@ import { Icons } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { QueryKeys } from "@/lib/query-keys";
+import { buildCashflowUrl, periodToDateRange, type SpendingPeriod } from "@/lib/navigation/cashflow-navigation";
 import type { SpendingSummary, SubcategorySpending } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import {
   AmountDisplay,
   AnimatedToggleGroup,
@@ -17,7 +19,7 @@ import {
   PageHeader,
   PrivacyAmount,
 } from "@wealthfolio/ui";
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { Cell, Pie, PieChart } from "recharts";
 import { SpendingHistoryChart } from "./spending-history-chart";
 
@@ -69,8 +71,27 @@ const SpendingPeriodSelector: React.FC<{
 );
 
 export default function SpendingPage() {
+  const navigate = useNavigate();
   const [selectedPeriod, setSelectedPeriod] = useState<"TOTAL" | "YTD" | "LAST_YEAR">("TOTAL");
   const { isBalanceHidden } = useBalancePrivacy();
+
+  const handleCategoryClick = useCallback(
+    (categoryId: string | null | undefined) => {
+      if (!categoryId) return;
+      const dateRange = periodToDateRange(selectedPeriod as SpendingPeriod);
+      navigate(buildCashflowUrl({ categoryId, ...dateRange }));
+    },
+    [navigate, selectedPeriod]
+  );
+
+  const handleSubcategoryClick = useCallback(
+    (subcategoryId: string | null | undefined) => {
+      if (!subcategoryId) return;
+      const dateRange = periodToDateRange(selectedPeriod as SpendingPeriod);
+      navigate(buildCashflowUrl({ subcategoryId, ...dateRange }));
+    },
+    [navigate, selectedPeriod]
+  );
 
   const {
     data: spendingData,
@@ -118,7 +139,6 @@ export default function SpendingPage() {
 
   const { totalSpending, currency, monthlyAverage, byCategory, bySubcategory } = periodSummary;
 
-  // Get top categories sorted by amount
   const topCategories = Object.entries(byCategory)
     .filter(([, cat]) => cat.amount > 0)
     .sort(([, a], [, b]) => b.amount - a.amount)
@@ -168,14 +188,12 @@ export default function SpendingPage() {
       ? (currentMonthlyAverageNumber - previousMonthlyAverage) / previousMonthlyAverage
       : 0;
 
-  // Prepare category data for pie chart
   const categoryData = topCategories.slice(0, 6).map(([, cat]) => ({
     category: cat.categoryName,
     amount: Number(cat.amount) || 0,
     color: cat.color,
   }));
 
-  // Get top subcategories sorted by amount
   const topSubcategories: [string, SubcategorySpending][] = Object.entries(bySubcategory || {})
     .filter(([, sub]) => sub.amount > 0)
     .sort(([, a], [, b]) => b.amount - a.amount)
@@ -315,7 +333,7 @@ export default function SpendingPage() {
                   description="There are no categorized expenses for the selected period. Try selecting a different time range or categorize your transactions."
                 />
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   <div className="flex w-full space-x-0.5">
                     {(() => {
                       const top5Categories = topCategories.slice(0, 5);
@@ -381,7 +399,11 @@ export default function SpendingPage() {
                     const percentage = totalSpending > 0 ? (cat.amount / totalSpending) * 100 : 0;
 
                     return (
-                      <div key={key} className="flex items-center justify-between">
+                      <div
+                        key={key}
+                        className="flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 transition-colors hover:bg-muted/50"
+                        onClick={() => handleCategoryClick(cat.categoryId)}
+                      >
                         <div className="flex items-center">
                           <div
                             className="mr-2 h-3 w-3 rounded-full"
@@ -421,7 +443,8 @@ export default function SpendingPage() {
                   return (
                     <div
                       key={key}
-                      className="bg-muted/30 flex flex-col gap-1 rounded-lg border p-3"
+                      className="bg-muted/30 flex cursor-pointer flex-col gap-1 rounded-lg border p-3 transition-colors hover:bg-muted/50"
+                      onClick={() => handleSubcategoryClick(sub.subcategoryId)}
                     >
                       <div className="flex items-center gap-2">
                         <div

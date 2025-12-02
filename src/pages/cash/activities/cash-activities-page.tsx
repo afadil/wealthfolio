@@ -1,7 +1,8 @@
 import { getAccounts } from "@/commands/account";
 import { CashActivityType } from "@/commands/cash-activity";
+import { getCategoriesHierarchical } from "@/commands/category";
 import { QueryKeys } from "@/lib/query-keys";
-import { Account, ActivityDetails } from "@/lib/types";
+import { Account, ActivityDetails, CategoryWithChildren } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import type { SortingState } from "@tanstack/react-table";
 import {
@@ -16,7 +17,7 @@ import {
   PageContent,
   PageHeader,
 } from "@wealthfolio/ui";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CashActivityFilters, CashActivityViewMode, CategorizationStatus } from "./components/cash-activity-filters";
 import { CashActivityForm } from "./components/cash-activity-form";
 import { CashActivityTable } from "./components/cash-activity-table";
@@ -25,9 +26,17 @@ import { useCashActivities } from "./hooks/use-cash-activities";
 import { useCashActivityMutations } from "./hooks/use-cash-activity-mutations";
 import { ActivityDeleteModal } from "@/pages/activity/components/activity-delete-modal";
 import { ActivityPagination } from "@/pages/activity/components/activity-pagination";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 function CashActivitiesPage() {
+  const [searchParams] = useSearchParams();
+
+  const urlCategoryId = searchParams.get("category");
+  const urlSubcategoryId = searchParams.get("subcategory");
+  const urlEventId = searchParams.get("event");
+  const urlStartDate = searchParams.get("startDate");
+  const urlEndDate = searchParams.get("endDate");
+
   const [showForm, setShowForm] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Partial<ActivityDetails> | undefined>();
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
@@ -35,13 +44,60 @@ function CashActivitiesPage() {
 
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [selectedActivityTypes, setSelectedActivityTypes] = useState<CashActivityType[]>([]);
-  const [selectedParentCategoryIds, setSelectedParentCategoryIds] = useState<string[]>([]);
-  const [selectedSubCategoryIds, setSelectedSubCategoryIds] = useState<string[]>([]);
-  const [selectedEventIds, setSelectedEventIds] = useState<string[]>([]);
+  const [selectedParentCategoryIds, setSelectedParentCategoryIds] = useState<string[]>(
+    urlCategoryId ? [urlCategoryId] : []
+  );
+  const [selectedSubCategoryIds, setSelectedSubCategoryIds] = useState<string[]>(
+    urlSubcategoryId ? [urlSubcategoryId] : []
+  );
+  const [selectedEventIds, setSelectedEventIds] = useState<string[]>(
+    urlEventId ? [urlEventId] : []
+  );
   const [selectedCategorizationStatuses, setSelectedCategorizationStatuses] = useState<CategorizationStatus[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({ min: "", max: "" });
+  const [dateRange, setDateRange] = useState<{ startDate?: string; endDate?: string }>({
+    startDate: urlStartDate ?? undefined,
+    endDate: urlEndDate ?? undefined,
+  });
   const [sorting, setSorting] = useState<SortingState>([{ id: "date", desc: true }]);
+
+  const { data: categoriesData } = useQuery<CategoryWithChildren[], Error>({
+    queryKey: [QueryKeys.CATEGORIES],
+    queryFn: getCategoriesHierarchical,
+  });
+  const categories = categoriesData ?? [];
+
+  useEffect(() => {
+    const categoryId = searchParams.get("category");
+    const subcategoryId = searchParams.get("subcategory");
+    const eventId = searchParams.get("event");
+    const startDate = searchParams.get("startDate");
+    const endDate = searchParams.get("endDate");
+    const search = searchParams.get("search");
+
+    let parentCategoryId = categoryId;
+    if (subcategoryId && !categoryId && categories.length > 0) {
+      for (const parent of categories) {
+        const foundChild = parent.children?.find((child) => child.id === subcategoryId);
+        if (foundChild) {
+          parentCategoryId = parent.id;
+          break;
+        }
+      }
+    }
+
+    setSelectedParentCategoryIds(parentCategoryId ? [parentCategoryId] : []);
+    setSelectedSubCategoryIds(subcategoryId ? [subcategoryId] : []);
+    setSelectedEventIds(eventId ? [eventId] : []);
+    setDateRange({
+      startDate: startDate ?? undefined,
+      endDate: endDate ?? undefined,
+    });
+    if (search !== null) {
+      setSearchQuery(search);
+    }
+  }, [searchParams, categories]);
 
   const { data: accountsData } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
@@ -85,13 +141,17 @@ function CashActivitiesPage() {
     filters: {
       accountIds: selectedAccounts,
       activityTypes: selectedActivityTypes,
-      categoryIds: [...selectedParentCategoryIds, ...selectedSubCategoryIds],
+      categoryIds: selectedSubCategoryIds.length > 0
+        ? selectedSubCategoryIds
+        : selectedParentCategoryIds,
       eventIds: selectedEventIds,
       search: searchQuery,
       isCategorized,
       hasEvent,
       amountMin: amountRange.min ? parseFloat(amountRange.min) : undefined,
       amountMax: amountRange.max ? parseFloat(amountRange.max) : undefined,
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate,
     },
     sorting,
   });
@@ -203,6 +263,8 @@ function CashActivitiesPage() {
             onCategorizationStatusesChange={setSelectedCategorizationStatuses}
             amountRange={amountRange}
             onAmountRangeChange={setAmountRange}
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
             totalFetched={totalFetched}

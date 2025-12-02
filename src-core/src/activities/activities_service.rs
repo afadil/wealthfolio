@@ -191,6 +191,8 @@ impl ActivityServiceTrait for ActivityService {
         has_event_filter: Option<bool>,
         amount_min_filter: Option<Decimal>,
         amount_max_filter: Option<Decimal>,
+        start_date_filter: Option<String>,
+        end_date_filter: Option<String>,
         sort: Option<Sort>,
     ) -> Result<ActivitySearchResponse> {
         self.activity_repository.search_activities(
@@ -206,6 +208,8 @@ impl ActivityServiceTrait for ActivityService {
             has_event_filter,
             amount_min_filter,
             amount_max_filter,
+            start_date_filter,
+            end_date_filter,
             sort,
         )
     }

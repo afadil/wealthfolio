@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button, Icons, Badge, AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@wealthfolio/ui";
 import { toast } from "@/components/ui/use-toast";
 import type { Category } from "@/lib/types";
+import { buildCashflowUrl } from "@/lib/navigation/cashflow-navigation";
 
 interface CategoryItemProps {
   category: Category;
@@ -22,10 +24,18 @@ export function CategoryItem({
   isSubcategory = false,
   activityCounts,
 }: CategoryItemProps) {
+  const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(false);
   const hasChildren = children && children.length > 0;
   const activityCount = activityCounts?.[category.id] ?? 0;
   const hasTransactions = activityCount > 0;
+
+  const handleViewTransactions = () => {
+    navigate(buildCashflowUrl({
+      categoryId: isSubcategory ? undefined : category.id,
+      subcategoryId: isSubcategory ? category.id : undefined,
+    }));
+  };
 
   const handleDeleteClick = () => {
     if (hasTransactions) {
@@ -96,6 +106,14 @@ export function CategoryItem({
               <Icons.Plus className="h-4 w-4" />
             </Button>
           )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleViewTransactions}
+            title="View transactions"
+          >
+            <Icons.ExternalLink className="h-4 w-4" />
+          </Button>
           <Button
             variant="ghost"
             size="sm"

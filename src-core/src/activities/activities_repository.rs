@@ -103,6 +103,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
         has_event_filter: Option<bool>,
         amount_min_filter: Option<Decimal>,
         amount_max_filter: Option<Decimal>,
+        start_date_filter: Option<String>,
+        end_date_filter: Option<String>,
         sort: Option<Sort>,
     ) -> Result<ActivitySearchResponse> {
         use diesel::sql_query;
@@ -203,6 +205,16 @@ impl ActivityRepositoryTrait for ActivityRepository {
 
         if let Some(max) = amount_max_filter {
             conditions.push(format!("ABS(a.amount) <= {}", max));
+        }
+
+        if let Some(ref start_date) = start_date_filter {
+            let escaped = start_date.replace("'", "''");
+            conditions.push(format!("a.activity_date >= '{}'", escaped));
+        }
+
+        if let Some(ref end_date) = end_date_filter {
+            let escaped = end_date.replace("'", "''");
+            conditions.push(format!("a.activity_date <= '{}'", escaped));
         }
 
         let where_clause = conditions.join(" AND ");

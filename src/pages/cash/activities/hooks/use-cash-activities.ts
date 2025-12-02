@@ -15,6 +15,8 @@ export interface CashActivitySearchFilters {
   hasEvent?: boolean;
   amountMin?: number;
   amountMax?: number;
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface UseCashActivitiesOptions {
@@ -53,6 +55,8 @@ export function useCashActivities({
       hasEvent: filters.hasEvent,
       amountMin: filters.amountMin,
       amountMax: filters.amountMax,
+      startDate: filters.startDate,
+      endDate: filters.endDate,
     };
   }, [
     filters.accountIds,
@@ -64,6 +68,8 @@ export function useCashActivities({
     filters.hasEvent,
     filters.amountMin,
     filters.amountMax,
+    filters.startDate,
+    filters.endDate,
   ]);
 
   const primarySort =

@@ -38,6 +38,8 @@ pub trait ActivityRepositoryTrait: Send + Sync {
         has_event_filter: Option<bool>,
         amount_min_filter: Option<Decimal>,
         amount_max_filter: Option<Decimal>,
+        start_date_filter: Option<String>,
+        end_date_filter: Option<String>,
         sort: Option<Sort>,
     ) -> Result<ActivitySearchResponse>;
     async fn create_activity(&self, new_activity: NewActivity) -> Result<Activity>;
@@ -88,6 +90,8 @@ pub trait ActivityServiceTrait: Send + Sync {
         has_event_filter: Option<bool>,
         amount_min_filter: Option<Decimal>,
         amount_max_filter: Option<Decimal>,
+        start_date_filter: Option<String>,
+        end_date_filter: Option<String>,
         sort: Option<Sort>,
     ) -> Result<ActivitySearchResponse>;
     fn get_first_activity_date(

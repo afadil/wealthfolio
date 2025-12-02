@@ -55,6 +55,10 @@ struct ActivitySearchBody {
     amount_min_filter: Option<f64>,
     #[serde(rename = "amountMaxFilter")]
     amount_max_filter: Option<f64>,
+    #[serde(rename = "startDateFilter")]
+    start_date_filter: Option<String>,
+    #[serde(rename = "endDateFilter")]
+    end_date_filter: Option<String>,
     sort: Option<SortWrapper>,
 }
 
@@ -109,6 +113,8 @@ async fn search_activities(
         body.has_event_filter,
         amount_min,
         amount_max,
+        body.start_date_filter,
+        body.end_date_filter,
         sort_normalized,
     )?;
     Ok(Json(resp))

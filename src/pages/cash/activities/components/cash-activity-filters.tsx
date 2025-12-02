@@ -1,5 +1,7 @@
 import { debounce } from "lodash";
+import { format, parseISO } from "date-fns";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { DateRange as DayPickerDateRange } from "react-day-picker";
 
 import { CashActivityType, CASH_ACTIVITY_TYPES } from "@/commands/cash-activity";
 import { getCategoriesHierarchical } from "@/commands/category";
@@ -10,6 +12,7 @@ import { QueryKeys } from "@/lib/query-keys";
 import {
   AnimatedToggleGroup,
   Button,
+  Calendar,
   Icons,
   Input,
   Popover,
@@ -25,6 +28,11 @@ export type CategorizationStatus = "uncategorized" | "categorized" | "with_event
 interface AmountRange {
   min: string;
   max: string;
+}
+
+interface DateRangeFilter {
+  startDate?: string;
+  endDate?: string;
 }
 
 interface CashActivityFiltersProps {
@@ -45,6 +53,8 @@ interface CashActivityFiltersProps {
   onCategorizationStatusesChange: (statuses: CategorizationStatus[]) => void;
   amountRange?: AmountRange;
   onAmountRangeChange?: (range: AmountRange) => void;
+  dateRange?: DateRangeFilter;
+  onDateRangeChange?: (range: DateRangeFilter) => void;
   viewMode: CashActivityViewMode;
   onViewModeChange: (mode: CashActivityViewMode) => void;
   totalFetched: number;
@@ -90,6 +100,8 @@ export function CashActivityFilters({
   onCategorizationStatusesChange,
   amountRange,
   onAmountRangeChange,
+  dateRange,
+  onDateRangeChange,
   viewMode,
   onViewModeChange,
   totalFetched,
@@ -200,6 +212,26 @@ export function CashActivityFilters({
   }, [events]);
 
   const hasAmountFilter = amountRange && (amountRange.min !== "" || amountRange.max !== "");
+  const hasDateFilter = dateRange && (dateRange.startDate || dateRange.endDate);
+
+  // Convert ISO date strings to Date objects for the calendar
+  const calendarDateRange = useMemo(() => {
+    if (!dateRange?.startDate && !dateRange?.endDate) return undefined;
+    return {
+      from: dateRange.startDate ? parseISO(dateRange.startDate) : undefined,
+      to: dateRange.endDate ? parseISO(dateRange.endDate) : undefined,
+    };
+  }, [dateRange]);
+
+  const formatDateRangeDisplay = () => {
+    if (!dateRange) return "";
+    const start = dateRange.startDate ? format(parseISO(dateRange.startDate), "MMM d, yyyy") : "";
+    const end = dateRange.endDate ? format(parseISO(dateRange.endDate), "MMM d, yyyy") : "";
+    if (start && end) return `${start} - ${end}`;
+    if (start) return `From ${start}`;
+    if (end) return `Until ${end}`;
+    return "";
+  };
 
   const hasActiveFilters =
     searchQuery.trim().length > 0 ||
@@ -209,7 +241,8 @@ export function CashActivityFilters({
     selectedSubCategoryIds.length > 0 ||
     selectedEventIds.length > 0 ||
     selectedCategorizationStatuses.length > 0 ||
-    hasAmountFilter;
+    hasAmountFilter ||
+    hasDateFilter;
 
   return (
     <div className="mb-4 flex flex-col gap-3">
@@ -290,6 +323,50 @@ export function CashActivityFilters({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        {onDateRangeChange && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={`h-8 border-dashed ${hasDateFilter ? "border-primary" : ""}`}
+              >
+                <Icons.Calendar className="mr-2 h-4 w-4" />
+                Date
+                {hasDateFilter && (
+                  <span className="ml-2 text-xs">{formatDateRangeDisplay()}</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="range"
+                defaultMonth={calendarDateRange?.from}
+                selected={calendarDateRange as DayPickerDateRange | undefined}
+                onSelect={(selectedRange: DayPickerDateRange | undefined) => {
+                  onDateRangeChange({
+                    startDate: selectedRange?.from ? format(selectedRange.from, "yyyy-MM-dd") : undefined,
+                    endDate: selectedRange?.to ? format(selectedRange.to, "yyyy-MM-dd") : undefined,
+                  });
+                }}
+                numberOfMonths={2}
+              />
+              {hasDateFilter && (
+                <div className="border-t p-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-full text-xs"
+                    onClick={() => onDateRangeChange({ startDate: undefined, endDate: undefined })}
+                  >
+                    Clear
+                  </Button>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
+        )}
+
         <DataTableFacetedFilter
           title="Account"
           options={accountOptions}
@@ -464,6 +541,7 @@ export function CashActivityFilters({
               onEventIdsChange([]);
               onCategorizationStatusesChange([]);
               onAmountRangeChange?.({ min: "", max: "" });
+              onDateRangeChange?.({ startDate: undefined, endDate: undefined });
             }}
           >
             Reset

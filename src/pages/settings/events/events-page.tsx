@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { QueryKeys } from '@/lib/query-keys';
 import { getEventsWithNames, getEventActivityCounts } from '@/commands/event';
@@ -28,8 +29,10 @@ import { EventTypeFormDialog } from './components/event-type-form-dialog';
 import { useEventTypeMutations } from './use-event-type-mutations';
 import { useEventMutations } from './use-event-mutations';
 import type { EventType, EventWithTypeName } from '@/lib/types';
+import { buildCashflowUrl } from '@/lib/navigation/cashflow-navigation';
 
 export const EventsPage = () => {
+  const navigate = useNavigate();
   const [isEventDialogOpen, setIsEventDialogOpen] = useState(false);
   const [isEventTypeDialogOpen, setIsEventTypeDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<EventWithTypeName | undefined>();
@@ -288,6 +291,14 @@ export const EventsPage = () => {
                             </div>
                           </div>
                           <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => navigate(buildCashflowUrl({ eventId: event.id }))}
+                              title="View transactions"
+                            >
+                              <Icons.ExternalLink className="h-4 w-4" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"

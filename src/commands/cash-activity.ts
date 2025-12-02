@@ -26,6 +26,8 @@ interface CashActivityFilters {
   hasEvent?: boolean;
   amountMin?: number;
   amountMax?: number;
+  startDate?: string;
+  endDate?: string;
 }
 
 interface Sort {
@@ -60,6 +62,8 @@ export const searchCashActivities = async (
           hasEventFilter: filters.hasEvent,
           amountMinFilter: filters.amountMin,
           amountMaxFilter: filters.amountMax,
+          startDateFilter: filters.startDate,
+          endDateFilter: filters.endDate,
           sort,
         });
       case RUN_ENV.WEB:
@@ -75,6 +79,8 @@ export const searchCashActivities = async (
           hasEventFilter: filters.hasEvent,
           amountMinFilter: filters.amountMin,
           amountMaxFilter: filters.amountMax,
+          startDateFilter: filters.startDate,
+          endDateFilter: filters.endDate,
           sort,
         });
       default:
