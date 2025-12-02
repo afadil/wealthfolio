@@ -34,6 +34,10 @@ pub trait ActivityRepositoryTrait: Send + Sync {
         event_id_filter: Option<Vec<String>>,
         asset_id_keyword: Option<String>,
         account_type_filter: Option<Vec<String>>,
+        is_categorized_filter: Option<bool>,
+        has_event_filter: Option<bool>,
+        amount_min_filter: Option<Decimal>,
+        amount_max_filter: Option<Decimal>,
         sort: Option<Sort>,
     ) -> Result<ActivitySearchResponse>;
     async fn create_activity(&self, new_activity: NewActivity) -> Result<Activity>;
@@ -80,6 +84,10 @@ pub trait ActivityServiceTrait: Send + Sync {
         event_id_filter: Option<Vec<String>>,
         asset_id_keyword: Option<String>,
         account_type_filter: Option<Vec<String>>,
+        is_categorized_filter: Option<bool>,
+        has_event_filter: Option<bool>,
+        amount_min_filter: Option<Decimal>,
+        amount_max_filter: Option<Decimal>,
         sort: Option<Sort>,
     ) -> Result<ActivitySearchResponse>;
     fn get_first_activity_date(

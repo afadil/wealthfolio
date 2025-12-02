@@ -91,15 +91,19 @@ impl ActivityRepositoryTrait for ActivityRepository {
 
     fn search_activities(
         &self,
-        page: i64,                                 // Page number, 0-based
-        page_size: i64,                            // Number of items per page
-        account_id_filter: Option<Vec<String>>,    // Optional account_id filter
-        activity_type_filter: Option<Vec<String>>, // Optional activity_type filter
-        category_id_filter: Option<Vec<String>>,   // Optional category_id filter
-        event_id_filter: Option<Vec<String>>,      // Optional event_id filter
-        asset_id_keyword: Option<String>,          // Optional asset_id keyword for search
-        account_type_filter: Option<Vec<String>>,  // Optional account_type filter (e.g., SECURITIES, CASH)
-        sort: Option<Sort>,                        // Optional sort
+        page: i64,
+        page_size: i64,
+        account_id_filter: Option<Vec<String>>,
+        activity_type_filter: Option<Vec<String>>,
+        category_id_filter: Option<Vec<String>>,
+        event_id_filter: Option<Vec<String>>,
+        asset_id_keyword: Option<String>,
+        account_type_filter: Option<Vec<String>>,
+        is_categorized_filter: Option<bool>,
+        has_event_filter: Option<bool>,
+        amount_min_filter: Option<Decimal>,
+        amount_max_filter: Option<Decimal>,
+        sort: Option<Sort>,
     ) -> Result<ActivitySearchResponse> {
         use diesel::sql_query;
 
@@ -175,6 +179,30 @@ impl ActivityRepositoryTrait for ActivityRepository {
                     .join(", ");
                 conditions.push(format!("acc.account_type IN ({})", types));
             }
+        }
+
+        if let Some(is_categorized) = is_categorized_filter {
+            if is_categorized {
+                conditions.push("a.category_id IS NOT NULL".to_string());
+            } else {
+                conditions.push("a.category_id IS NULL".to_string());
+            }
+        }
+
+        if let Some(has_event) = has_event_filter {
+            if has_event {
+                conditions.push("a.event_id IS NOT NULL".to_string());
+            } else {
+                conditions.push("a.event_id IS NULL".to_string());
+            }
+        }
+
+        if let Some(min) = amount_min_filter {
+            conditions.push(format!("ABS(a.amount) >= {}", min));
+        }
+
+        if let Some(max) = amount_max_filter {
+            conditions.push(format!("ABS(a.amount) <= {}", max));
         }
 
         let where_clause = conditions.join(" AND ");
@@ -693,9 +721,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
         let mut conn = get_connection(&self.pool)?;
 
         // Query spending activities from CASH accounts
-        // Spending = WITHDRAWAL activities with expense categories or uncategorized
-        //          + FEE/TAX activities (always expense)
-        // Excludes: TRANSFER_IN, TRANSFER_OUT, DEPOSIT (income, not spending)
+        // Spending = All WITHDRAWAL activities (with expense category, income category, or uncategorized)
+        //          + DEPOSIT activities with expense categories only
         let query = r#"
             SELECT
                 strftime('%Y-%m', a.activity_date) as date,
@@ -716,14 +743,11 @@ impl ActivityRepositoryTrait for ActivityRepository {
             LEFT JOIN categories subcat ON a.sub_category_id = subcat.id
             WHERE acc.is_active = 1
               AND acc.account_type = 'CASH'
-              AND a.activity_type NOT IN ('TRANSFER_IN', 'TRANSFER_OUT', 'DEPOSIT')
               AND (
-                  -- Expense category explicitly assigned (for WITHDRAWAL)
-                  cat.is_income = 0
-                  -- Or WITHDRAWAL without category (default expense behavior)
-                  OR (a.activity_type = 'WITHDRAWAL' AND a.category_id IS NULL)
-                  -- Or FEE/TAX (always expense, regardless of category)
-                  OR a.activity_type IN ('FEE', 'TAX')
+                  -- All withdrawals (categorized or uncategorized)
+                  a.activity_type = 'WITHDRAWAL'
+                  -- Deposits with expense category only
+                  OR (a.activity_type = 'DEPOSIT' AND cat.is_income = 0)
               )
             ORDER BY a.activity_date
         "#;

@@ -11,6 +11,10 @@ export interface CashActivitySearchFilters {
   categoryIds?: string[];
   eventIds?: string[];
   search?: string;
+  isCategorized?: boolean;
+  hasEvent?: boolean;
+  amountMin?: number;
+  amountMax?: number;
 }
 
 export interface UseCashActivitiesOptions {
@@ -45,8 +49,22 @@ export function useCashActivities({
       categoryIds: filters.categoryIds && filters.categoryIds.length > 0 ? filters.categoryIds : undefined,
       eventIds: filters.eventIds && filters.eventIds.length > 0 ? filters.eventIds : undefined,
       search: filters.search,
+      isCategorized: filters.isCategorized,
+      hasEvent: filters.hasEvent,
+      amountMin: filters.amountMin,
+      amountMax: filters.amountMax,
     };
-  }, [filters.accountIds, filters.activityTypes, filters.categoryIds, filters.eventIds, filters.search]);
+  }, [
+    filters.accountIds,
+    filters.activityTypes,
+    filters.categoryIds,
+    filters.eventIds,
+    filters.search,
+    filters.isCategorized,
+    filters.hasEvent,
+    filters.amountMin,
+    filters.amountMax,
+  ]);
 
   const primarySort =
     sorting.length > 0 && sorting[0]?.id

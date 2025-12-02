@@ -10,6 +10,7 @@ use axum::{
     routing::{delete, get, post},
     Json, Router,
 };
+use rust_decimal::prelude::FromPrimitive;
 use wealthfolio_core::activities::{
     Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityImport,
     ActivitySearchResponse, ActivityUpdate, ImportMappingData, NewActivity,
@@ -46,7 +47,14 @@ struct ActivitySearchBody {
     asset_id_keyword: Option<String>,
     #[serde(rename = "accountTypeFilter")]
     account_type_filter: Option<StringOrVec>,
-    // Allow addons to pass either a single sort or an array (we pick the first)
+    #[serde(rename = "isCategorizedFilter")]
+    is_categorized_filter: Option<bool>,
+    #[serde(rename = "hasEventFilter")]
+    has_event_filter: Option<bool>,
+    #[serde(rename = "amountMinFilter")]
+    amount_min_filter: Option<f64>,
+    #[serde(rename = "amountMaxFilter")]
+    amount_max_filter: Option<f64>,
     sort: Option<SortWrapper>,
 }
 
@@ -54,7 +62,6 @@ async fn search_activities(
     State(state): State<Arc<AppState>>,
     Json(body): Json<ActivitySearchBody>,
 ) -> ApiResult<Json<ActivitySearchResponse>> {
-    // Normalize sort to a single value if provided
     let sort_normalized: Option<wealthfolio_core::activities::Sort> = match body.sort {
         Some(SortWrapper::One(s)) => Some(s),
         Some(SortWrapper::Many(v)) => v.into_iter().next(),
@@ -85,6 +92,10 @@ async fn search_activities(
         Some(StringOrVec::Many(v)) => Some(v),
         None => None,
     };
+
+    let amount_min = body.amount_min_filter.and_then(rust_decimal::Decimal::from_f64);
+    let amount_max = body.amount_max_filter.and_then(rust_decimal::Decimal::from_f64);
+
     let resp = state.activity_service.search_activities(
         body.page,
         body.page_size,
@@ -94,6 +105,10 @@ async fn search_activities(
         event_ids,
         body.asset_id_keyword,
         account_types,
+        body.is_categorized_filter,
+        body.has_event_filter,
+        amount_min,
+        amount_max,
         sort_normalized,
     )?;
     Ok(Json(resp))

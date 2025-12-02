@@ -24,6 +24,8 @@ interface Filters {
   activityTypes?: string | string[];
   symbol?: string;
   accountType?: string[];
+  amountMin?: number;
+  amountMax?: number;
 }
 
 interface Sort {
@@ -75,6 +77,8 @@ export const searchActivities = async (
           activityTypeFilter,
           accountTypeFilter: filters?.accountType,
           assetIdKeyword,
+          amountMinFilter: filters?.amountMin,
+          amountMaxFilter: filters?.amountMax,
           sort: sortOption,
         });
       case RUN_ENV.WEB:
@@ -85,6 +89,8 @@ export const searchActivities = async (
           activityTypeFilter: filters?.activityTypes,
           accountTypeFilter: filters?.accountType,
           assetIdKeyword,
+          amountMinFilter: filters?.amountMin,
+          amountMaxFilter: filters?.amountMax,
           sort: sortOption,
         });
       default:

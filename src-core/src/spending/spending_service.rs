@@ -96,7 +96,7 @@ impl SpendingServiceTrait for SpendingService {
         let mut last_year_summary = SpendingSummary::new("LAST_YEAR", base_currency.clone());
         let mut two_years_ago_summary = SpendingSummary::new("TWO_YEARS_AGO", base_currency.clone());
 
-        for activity in activities {
+        for activity in &activities {
             let date = match NaiveDate::parse_from_str(&format!("{}-01", activity.date), "%Y-%m-%d")
             {
                 Ok(d) => d,

@@ -105,28 +105,14 @@ const ActivityPage = () => {
       accountIds: selectedAccounts,
       activityTypes: selectedActivityTypes,
       accountTypes: [AccountType.SECURITIES, AccountType.CRYPTOCURRENCY],
+      amountMin: amountRange.min ? parseFloat(amountRange.min) : undefined,
+      amountMax: amountRange.max ? parseFloat(amountRange.max) : undefined,
     },
     searchQuery,
     sorting,
   });
 
-  const filteredData = useMemo(() => {
-    const minAmount = amountRange.min ? parseFloat(amountRange.min) : null;
-    const maxAmount = amountRange.max ? parseFloat(amountRange.max) : null;
-
-    if (minAmount === null && maxAmount === null) {
-      return flatData;
-    }
-
-    return flatData.filter((activity) => {
-      const amount = Math.abs(activity.amount || 0);
-      if (minAmount !== null && amount < minAmount) return false;
-      if (maxAmount !== null && amount > maxAmount) return false;
-      return true;
-    });
-  }, [flatData, amountRange]);
-
-  const totalFetched = filteredData.length;
+  const totalFetched = flatData.length;
 
   const isDatagridView = viewMode === "datagrid";
 
@@ -247,7 +233,7 @@ const ActivityPage = () => {
 
           {isMobileViewport ? (
             <ActivityTableMobile
-              activities={filteredData}
+              activities={flatData}
               isCompactView={isCompactView}
               handleEdit={handleEdit}
               handleDelete={handleDelete}
@@ -256,7 +242,7 @@ const ActivityPage = () => {
           ) : isDatagridView ? (
             <ActivityDatagrid
               accounts={accounts}
-              activities={filteredData}
+              activities={flatData}
               onRefetch={refetch}
               onEditActivity={handleEdit}
               sorting={sorting}
@@ -264,7 +250,7 @@ const ActivityPage = () => {
             />
           ) : (
             <ActivityTable
-              activities={filteredData}
+              activities={flatData}
               isLoading={isLoading}
               sorting={sorting}
               onSortingChange={setSorting}

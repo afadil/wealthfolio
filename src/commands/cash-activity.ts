@@ -22,6 +22,10 @@ interface CashActivityFilters {
   categoryIds?: string[];
   eventIds?: string[];
   search?: string;
+  isCategorized?: boolean;
+  hasEvent?: boolean;
+  amountMin?: number;
+  amountMax?: number;
 }
 
 interface Sort {
@@ -52,6 +56,10 @@ export const searchCashActivities = async (
           categoryIdFilter: filters.categoryIds,
           eventIdFilter: filters.eventIds,
           assetIdKeyword: filters.search,
+          isCategorizedFilter: filters.isCategorized,
+          hasEventFilter: filters.hasEvent,
+          amountMinFilter: filters.amountMin,
+          amountMaxFilter: filters.amountMax,
           sort,
         });
       case RUN_ENV.WEB:
@@ -63,6 +71,10 @@ export const searchCashActivities = async (
           categoryIdFilter: filters.categoryIds,
           eventIdFilter: filters.eventIds,
           assetIdKeyword: filters.search,
+          isCategorizedFilter: filters.isCategorized,
+          hasEventFilter: filters.hasEvent,
+          amountMinFilter: filters.amountMin,
+          amountMaxFilter: filters.amountMax,
           sort,
         });
       default:

@@ -1,5 +1,6 @@
 use chrono::Utc;
 use log::debug;
+use rust_decimal::Decimal;
 use std::sync::Arc;
 
 use crate::accounts::{Account, AccountServiceTrait};
@@ -186,6 +187,10 @@ impl ActivityServiceTrait for ActivityService {
         event_id_filter: Option<Vec<String>>,
         asset_id_keyword: Option<String>,
         account_type_filter: Option<Vec<String>>,
+        is_categorized_filter: Option<bool>,
+        has_event_filter: Option<bool>,
+        amount_min_filter: Option<Decimal>,
+        amount_max_filter: Option<Decimal>,
         sort: Option<Sort>,
     ) -> Result<ActivitySearchResponse> {
         self.activity_repository.search_activities(
@@ -197,6 +202,10 @@ impl ActivityServiceTrait for ActivityService {
             event_id_filter,
             asset_id_keyword,
             account_type_filter,
+            is_categorized_filter,
+            has_event_filter,
+            amount_min_filter,
+            amount_max_filter,
             sort,
         )
     }

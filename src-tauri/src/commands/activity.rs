@@ -3,6 +3,7 @@ use std::sync::Arc;
 use crate::context::ServiceContext;
 use crate::events::{emit_resource_changed, ResourceEventPayload};
 use log::debug;
+use rust_decimal::prelude::FromPrimitive;
 use tauri::{AppHandle, State};
 use wealthfolio_core::activities::{
     Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityImport,
@@ -21,18 +22,26 @@ pub async fn get_activities(
 
 #[tauri::command]
 pub async fn search_activities(
-    page: i64,                                 // Page number, 0-based
-    page_size: i64,                            // Number of items per page
-    account_id_filter: Option<Vec<String>>,    // Optional account_id filter
-    activity_type_filter: Option<Vec<String>>, // Optional activity_type filter
-    category_id_filter: Option<Vec<String>>,   // Optional category_id filter
-    event_id_filter: Option<Vec<String>>,      // Optional event_id filter
-    asset_id_keyword: Option<String>,          // Optional asset_id keyword for search
-    account_type_filter: Option<Vec<String>>,  // Optional account_type filter (e.g., SECURITIES, CASH)
+    page: i64,
+    page_size: i64,
+    account_id_filter: Option<Vec<String>>,
+    activity_type_filter: Option<Vec<String>>,
+    category_id_filter: Option<Vec<String>>,
+    event_id_filter: Option<Vec<String>>,
+    asset_id_keyword: Option<String>,
+    account_type_filter: Option<Vec<String>>,
+    is_categorized_filter: Option<bool>,
+    has_event_filter: Option<bool>,
+    amount_min_filter: Option<f64>,
+    amount_max_filter: Option<f64>,
     sort: Option<Sort>,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ActivitySearchResponse, String> {
     debug!("Search activities... {}, {}", page, page_size);
+
+    let amount_min = amount_min_filter.and_then(rust_decimal::Decimal::from_f64);
+    let amount_max = amount_max_filter.and_then(rust_decimal::Decimal::from_f64);
+
     Ok(state.activity_service().search_activities(
         page,
         page_size,
@@ -42,6 +51,10 @@ pub async fn search_activities(
         event_id_filter,
         asset_id_keyword,
         account_type_filter,
+        is_categorized_filter,
+        has_event_filter,
+        amount_min,
+        amount_max,
         sort,
     )?)
 }
@@ -231,7 +244,7 @@ pub async fn import_activities(
 
     let result = state
         .activity_service()
-        .import_activities(account_id.clone(), activities) // activities is moved here
+        .import_activities(account_id.clone(), activities)
         .await?;
     emit_resource_changed(
         &handle,

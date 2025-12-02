@@ -52,6 +52,26 @@ function CashActivitiesPage() {
   const cashAccounts = accounts.filter((acc) => acc.accountType === "CASH" && acc.isActive);
 
   const { deleteCashActivityMutation, duplicateCashActivityMutation } = useCashActivityMutations();
+
+  const { isCategorized, hasEvent } = useMemo(() => {
+    let isCategorized: boolean | undefined;
+    let hasEvent: boolean | undefined;
+
+    if (selectedCategorizationStatuses.includes("uncategorized")) {
+      isCategorized = false;
+    } else if (selectedCategorizationStatuses.includes("categorized")) {
+      isCategorized = true;
+    }
+
+    if (selectedCategorizationStatuses.includes("without_events")) {
+      hasEvent = false;
+    } else if (selectedCategorizationStatuses.includes("with_events")) {
+      hasEvent = true;
+    }
+
+    return { isCategorized, hasEvent };
+  }, [selectedCategorizationStatuses]);
+
   const {
     flatData,
     totalRowCount,
@@ -68,47 +88,15 @@ function CashActivitiesPage() {
       categoryIds: [...selectedParentCategoryIds, ...selectedSubCategoryIds],
       eventIds: selectedEventIds,
       search: searchQuery,
+      isCategorized,
+      hasEvent,
+      amountMin: amountRange.min ? parseFloat(amountRange.min) : undefined,
+      amountMax: amountRange.max ? parseFloat(amountRange.max) : undefined,
     },
     sorting,
   });
 
-  // Client-side filtering (amount and categorization status)
-  const filteredData = useMemo(() => {
-    const minAmount = amountRange.min ? parseFloat(amountRange.min) : null;
-    const maxAmount = amountRange.max ? parseFloat(amountRange.max) : null;
-
-    return flatData.filter((activity) => {
-      // Amount filtering
-      if (minAmount !== null || maxAmount !== null) {
-        const amount = Math.abs(activity.amount || 0);
-        if (minAmount !== null && amount < minAmount) return false;
-        if (maxAmount !== null && amount > maxAmount) return false;
-      }
-
-      // Categorization status filtering
-      if (selectedCategorizationStatuses.length > 0) {
-        const hasCategoryMatch = selectedCategorizationStatuses.some((status) => {
-          switch (status) {
-            case "uncategorized":
-              return !activity.categoryId;
-            case "categorized":
-              return !!activity.categoryId;
-            case "with_events":
-              return !!activity.eventId;
-            case "without_events":
-              return !activity.eventId;
-            default:
-              return true;
-          }
-        });
-        if (!hasCategoryMatch) return false;
-      }
-
-      return true;
-    });
-  }, [flatData, amountRange, selectedCategorizationStatuses]);
-
-  const totalFetched = filteredData.length;
+  const totalFetched = flatData.length;
 
   const handleEdit = useCallback((activity?: ActivityDetails) => {
     if (activity?.activityType === "TRANSFER_IN" || activity?.activityType === "TRANSFER_OUT") {
@@ -225,13 +213,13 @@ function CashActivitiesPage() {
           {viewMode === "edit" ? (
             <CashActivityDatagrid
               accounts={cashAccounts}
-              activities={filteredData}
+              activities={flatData}
               onRefetch={refetch}
               onEditActivity={handleEdit}
             />
           ) : (
             <CashActivityTable
-              activities={filteredData}
+              activities={flatData}
               isLoading={isLoading}
               sorting={sorting}
               onSortingChange={setSorting}

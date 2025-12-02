@@ -35,6 +35,7 @@ semver = "1"
 wealthfolio_core = { path = "../src-core", package = "wealthfolio_core" }
 
 hyper = { version = "0.14", features = ["full"] }
+rust_decimal = "1.39.0"
 
 [features]
 default = []
