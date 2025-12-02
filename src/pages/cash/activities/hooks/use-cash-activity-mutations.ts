@@ -73,26 +73,22 @@ export function useCashActivityMutations(onSuccess?: (activity: { accountId?: st
   });
 
   const duplicateCashActivity = async (activityToDuplicate: ActivityDetails) => {
-    const {
-      id: _id,
-      createdAt: _createdAt,
-      updatedAt: _updatedAt,
-      comment: _comment,
-      date,
-      ...restOfActivityData
-    } = activityToDuplicate;
-
     const newActivityData: ActivityCreate = {
-      accountId: restOfActivityData.accountId,
-      activityType: restOfActivityData.activityType,
-      activityDate: new Date(date).toISOString(),
-      amount: restOfActivityData.amount,
-      quantity: restOfActivityData.quantity,
-      unitPrice: restOfActivityData.unitPrice,
-      currency: restOfActivityData.currency,
-      fee: restOfActivityData.fee,
-      isDraft: restOfActivityData.isDraft,
+      accountId: activityToDuplicate.accountId,
+      activityType: activityToDuplicate.activityType,
+      activityDate: new Date(activityToDuplicate.date).toISOString(),
+      assetId: activityToDuplicate.assetId,
+      amount: activityToDuplicate.amount,
+      quantity: activityToDuplicate.quantity,
+      unitPrice: activityToDuplicate.unitPrice,
+      currency: activityToDuplicate.currency,
+      fee: activityToDuplicate.fee,
+      isDraft: activityToDuplicate.isDraft,
       comment: "Duplicated",
+      name: activityToDuplicate.name,
+      categoryId: activityToDuplicate.categoryId,
+      subCategoryId: activityToDuplicate.subCategoryId,
+      eventId: activityToDuplicate.eventId,
     };
 
     return await createCashActivity(newActivityData);
