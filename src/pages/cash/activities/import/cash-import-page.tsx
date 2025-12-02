@@ -213,7 +213,6 @@ function CashImportPage() {
         return (
           <CashPreviewStep
             data={data}
-            headers={headers}
             activities={getActivitiesFromRows()}
             onNext={handlePreviewComplete}
             onBack={goToPreviousStep}

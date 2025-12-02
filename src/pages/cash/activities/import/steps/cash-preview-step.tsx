@@ -2,11 +2,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Icons } from "@/components/ui/icons";
 import { ProgressIndicator } from "@/components/ui/progress-indicator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Account, ActivityImport, Category, CategoryWithChildren, CsvRowData, Event } from "@/lib/types";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
-import { CSVFileViewer } from "@/pages/activity/import/components/csv-file-viewer";
 import { ImportAlert } from "@/pages/activity/import/components/import-alert";
 import { useCashImportMutations } from "../hooks/use-cash-import-mutations";
 import { CashImportPreviewTable } from "../components/cash-import-preview-table";
@@ -18,7 +16,6 @@ import { getEvents } from "@/commands/event";
 
 interface CashPreviewStepProps {
   data: CsvRowData[] | null;
-  headers: string[];
   activities?: ActivityImport[];
   onNext: (processedActivities: ActivityImport[]) => void;
   onBack: () => void;
@@ -26,7 +23,6 @@ interface CashPreviewStepProps {
 }
 
 export const CashPreviewStep = ({
-  headers,
   data,
   activities = [],
   onNext,
@@ -147,36 +143,6 @@ export const CashPreviewStep = ({
   const validActivitiesCount = activities.filter((activity) => activity.isValid).length;
   const hasErrors = validActivitiesCount < activities.length;
 
-  // Extract error information from activities with validation issues
-  const csvErrors: Record<number, string[]> = Object.fromEntries(
-    activities
-      .filter((activity) => !activity.isValid)
-      .map((activity) => {
-        const rowIndex = activity.lineNumber;
-        const errorMessages = Object.values(activity.errors!)
-          .flat()
-          .filter((message) => message);
-
-        return [rowIndex, errorMessages] as [number, string[]];
-      })
-      .filter(([_, messages]) => messages.length > 0),
-  );
-
-  // Prepare CSV data for CSVFileViewer
-  const csvLines = [
-    {
-      id: 0,
-      content: headers.join(","),
-      isValid: true,
-      errors: undefined,
-    },
-    ...data.map((row, index) => ({
-      id: index + 1,
-      content: headers.map((header) => row[header] || "").join(","),
-      isValid: !csvErrors[index + 2],
-      errors: csvErrors[index + 2],
-    })),
-  ];
 
   const handleInitialClick = () => {
     setConfirmationState("confirm");
@@ -241,41 +207,16 @@ export const CashPreviewStep = ({
         </div>
 
         <Card className="border-none shadow-none">
-          <Tabs defaultValue="preview" className="w-full">
-            <div className="relative mb-2">
-              <TabsList className="bg-secondary absolute -top-5 right-0 z-50 flex space-x-1 rounded-full p-1 md:top-3">
-                <TabsTrigger
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
-                  value="preview"
-                >
-                  Activity Preview
-                </TabsTrigger>
-                <TabsTrigger
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
-                  value="raw"
-                >
-                  File Preview
-                </TabsTrigger>
-              </TabsList>
-            </div>
-            <CardContent className="overflow-hidden p-0 pt-5">
-              <TabsContent value="preview" className="m-0 overflow-x-auto">
-                <CashImportPreviewTable
-                  activities={activities}
-                  accounts={accounts}
-                  categories={categories}
-                  categoryMap={categoryMap}
-                  events={events}
-                  eventMap={eventMap}
-                />
-              </TabsContent>
-              <TabsContent value="raw" className="m-0 overflow-x-auto">
-                <div className="space-y-2">
-                  <CSVFileViewer data={csvLines} className="w-full" maxHeight="40vh" />
-                </div>
-              </TabsContent>
-            </CardContent>
-          </Tabs>
+          <CardContent className="overflow-hidden p-0">
+            <CashImportPreviewTable
+              activities={activities}
+              accounts={accounts}
+              categories={categories}
+              categoryMap={categoryMap}
+              events={events}
+              eventMap={eventMap}
+            />
+          </CardContent>
         </Card>
 
         {/* Dialog for import progress */}

@@ -32,6 +32,10 @@ pub trait EventRepositoryTrait: Send + Sync {
     /// Get the min/max activity dates for a given event
     /// Returns (min_date, max_date) or None if no activities
     fn get_activity_date_range(&self, event_id: &str) -> Result<Option<(String, String)>>;
+
+    /// Get activity counts grouped by event ID
+    /// Returns a HashMap where keys are event IDs and values are activity counts
+    fn get_activity_counts(&self) -> Result<std::collections::HashMap<String, i64>>;
 }
 
 /// Trait for event service operations
@@ -81,4 +85,7 @@ pub trait EventServiceTrait: Send + Sync {
     /// Recalculate dates for a dynamic event based on linked activities
     /// If the event is not dynamic, this is a no-op
     async fn recalculate_dynamic_event_dates(&self, event_id: &str) -> Result<Option<Event>>;
+
+    /// Get activity counts grouped by event ID
+    fn get_activity_counts(&self) -> Result<std::collections::HashMap<String, i64>>;
 }

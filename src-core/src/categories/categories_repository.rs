@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use diesel::prelude::*;
 use diesel::r2d2::{self, Pool};
 use diesel::SqliteConnection;
+use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -152,5 +153,37 @@ impl CategoryRepositoryTrait for CategoryRepository {
             .filter(categories::is_income.eq(1))
             .order(categories::sort_order.asc())
             .load::<Category>(&mut conn)?)
+    }
+
+    fn get_activity_counts(&self) -> Result<HashMap<String, i64>> {
+        use diesel::dsl::sql;
+        use diesel::sql_types::BigInt;
+
+        let mut conn = get_connection(&self.pool)?;
+
+        let category_counts: Vec<(String, i64)> = activities::table
+            .filter(activities::category_id.is_not_null())
+            .select((
+                activities::category_id.assume_not_null(),
+                sql::<BigInt>("COUNT(*)"),
+            ))
+            .group_by(activities::category_id)
+            .load::<(String, i64)>(&mut conn)?;
+
+        let sub_category_counts: Vec<(String, i64)> = activities::table
+            .filter(activities::sub_category_id.is_not_null())
+            .select((
+                activities::sub_category_id.assume_not_null(),
+                sql::<BigInt>("COUNT(*)"),
+            ))
+            .group_by(activities::sub_category_id)
+            .load::<(String, i64)>(&mut conn)?;
+
+        let mut counts: HashMap<String, i64> = category_counts.into_iter().collect();
+        for (id, count) in sub_category_counts {
+            *counts.entry(id).or_insert(0) += count;
+        }
+
+        Ok(counts)
     }
 }

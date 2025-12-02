@@ -276,6 +276,7 @@ pub fn run() {
             commands::category::create_category,
             commands::category::update_category,
             commands::category::delete_category,
+            commands::category::get_category_activity_counts,
             // Activity rule commands
             commands::activity_rule::get_activity_rules,
             commands::activity_rule::get_activity_rules_with_names,
@@ -299,6 +300,7 @@ pub fn run() {
             commands::event::update_event,
             commands::event::delete_event,
             commands::event::validate_transaction_date,
+            commands::event::get_event_activity_counts,
         ])
         .build(tauri::generate_context!())
         .expect("Failed to build Wealthfolio application")

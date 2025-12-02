@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { QueryKeys } from '@/lib/query-keys';
-import { getEventsWithNames } from '@/commands/event';
+import { getEventsWithNames, getEventActivityCounts } from '@/commands/event';
 import { getEventTypes } from '@/commands/event-type';
+import { toast } from '@/components/ui/use-toast';
 import { SettingsHeader } from '../settings-header';
 import {
   Button,
@@ -17,6 +18,10 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
   Separator,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
 } from '@wealthfolio/ui';
 import { EventFormDialog } from './components/event-form-dialog';
 import { EventTypeFormDialog } from './components/event-type-form-dialog';
@@ -42,12 +47,16 @@ export const EventsPage = () => {
     queryFn: getEventTypes,
   });
 
+  const { data: activityCounts } = useQuery<Record<string, number>, Error>({
+    queryKey: [QueryKeys.EVENT_ACTIVITY_COUNTS],
+    queryFn: getEventActivityCounts,
+  });
+
   const { deleteMutation: deleteEventTypeMutation } = useEventTypeMutations();
   const { deleteMutation: deleteEventMutation } = useEventMutations();
 
   const isLoading = eventsLoading || typesLoading;
 
-  // Group events by event type
   const eventsByType = (events || []).reduce((acc, event) => {
     if (!acc[event.eventTypeId]) {
       acc[event.eventTypeId] = [];
@@ -98,6 +107,33 @@ export const EventsPage = () => {
     deleteEventMutation.mutate(event.id);
   };
 
+  const getEventTypeTransactionCount = (typeId: string) => {
+    const typeEvents = eventsByType[typeId] || [];
+    return typeEvents.reduce((sum, event) => sum + (activityCounts?.[event.id] ?? 0), 0);
+  };
+
+  const handleDeleteEventClick = (event: EventWithTypeName) => {
+    const count = activityCounts?.[event.id] ?? 0;
+    if (count > 0) {
+      toast({
+        title: 'Cannot delete event',
+        description: `This event has ${count} transaction${count !== 1 ? 's' : ''} associated with it. Please reassign or remove the transactions first.`,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteEventTypeClick = (eventType: EventType) => {
+    const count = getEventTypeTransactionCount(eventType.id);
+    if (count > 0) {
+      toast({
+        title: 'Cannot delete event type',
+        description: `This event type has ${count} transaction${count !== 1 ? 's' : ''} associated with its events. Please reassign or remove the transactions first.`,
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <SettingsHeader
@@ -121,6 +157,8 @@ export const EventsPage = () => {
             const typeEvents = eventsByType[type.id] || [];
             const hasEvents = typeEvents.length > 0;
             const isExpanded = expandedTypes.has(type.id);
+            const typeTransactionCount = getEventTypeTransactionCount(type.id);
+            const hasTypeTransactions = typeTransactionCount > 0;
 
             return (
               <div key={type.id}>
@@ -172,36 +210,47 @@ export const EventsPage = () => {
                     >
                       <Icons.Pencil className="h-4 w-4" />
                     </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="sm" title="Delete event type">
-                          <Icons.Trash className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Event Type</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to delete &quot;{type.name}&quot;?
-                            {hasEvents && (
-                              <span className="mt-2 block font-medium text-destructive">
-                                This will also delete all {typeEvents.length} event(s) under this type.
-                              </span>
-                            )}
-                            This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleDeleteEventType(type)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    {hasTypeTransactions ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Delete event type"
+                        onClick={() => handleDeleteEventTypeClick(type)}
+                      >
+                        <Icons.Trash className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="sm" title="Delete event type">
+                            <Icons.Trash className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Event Type</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete &quot;{type.name}&quot;?
+                              {hasEvents && (
+                                <span className="mt-2 block font-medium text-destructive">
+                                  This will also delete all {typeEvents.length} event(s) under this type.
+                                </span>
+                              )}
+                              This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeleteEventType(type)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                   </div>
                 </div>
                 {hasEvents && isExpanded && (
@@ -212,7 +261,23 @@ export const EventsPage = () => {
                           <div className="flex items-center gap-3">
                             <div className="w-6" />
                             <div>
-                              <span className="text-sm">{event.name}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">{event.name}</span>
+                                {(activityCounts?.[event.id] ?? 0) > 0 && (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="text-xs text-muted-foreground cursor-default">
+                                          ({activityCounts?.[event.id]})
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>{activityCounts?.[event.id]} transaction{activityCounts?.[event.id] !== 1 ? 's' : ''}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
+                              </div>
                               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                 {event.isDynamicRange ? (
                                   <span className="italic">Dynamic dates</span>
@@ -231,31 +296,42 @@ export const EventsPage = () => {
                             >
                               <Icons.Pencil className="h-4 w-4" />
                             </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="sm" title="Delete event">
-                                  <Icons.Trash className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Event</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete &quot;{event.name}&quot;?
-                                    This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleDeleteEvent(event)}
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                  >
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                            {(activityCounts?.[event.id] ?? 0) > 0 ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                title="Delete event"
+                                onClick={() => handleDeleteEventClick(event)}
+                              >
+                                <Icons.Trash className="h-4 w-4" />
+                              </Button>
+                            ) : (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="sm" title="Delete event">
+                                    <Icons.Trash className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Event</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete &quot;{event.name}&quot;?
+                                      This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDeleteEvent(event)}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
                           </div>
                         </div>
                       </div>

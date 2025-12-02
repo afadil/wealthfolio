@@ -75,6 +75,7 @@ export const QueryKeys = {
   CATEGORIES_HIERARCHICAL: "categories_hierarchical",
   EXPENSE_CATEGORIES: "expense_categories",
   INCOME_CATEGORIES: "income_categories",
+  CATEGORY_ACTIVITY_COUNTS: "category_activity_counts",
 
   // Activity Rules
   ACTIVITY_RULES: "activity_rules",
@@ -89,6 +90,7 @@ export const QueryKeys = {
   // Events
   EVENTS: "events",
   EVENTS_WITH_NAMES: "events_with_names",
+  EVENT_ACTIVITY_COUNTS: "event_activity_counts",
 
   // Cash Activities
   CASH_ACTIVITIES: "cash_activities",

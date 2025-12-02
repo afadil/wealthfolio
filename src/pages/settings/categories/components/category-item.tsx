@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Button, Icons, Badge, AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@wealthfolio/ui";
+import { Button, Icons, Badge, AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@wealthfolio/ui";
+import { toast } from "@/components/ui/use-toast";
 import type { Category } from "@/lib/types";
 
 interface CategoryItemProps {
@@ -9,6 +10,7 @@ interface CategoryItemProps {
   onDelete: (category: Category) => void;
   onAddSubcategory: (parentCategory: Category) => void;
   isSubcategory?: boolean;
+  activityCounts?: Record<string, number>;
 }
 
 export function CategoryItem({
@@ -18,9 +20,22 @@ export function CategoryItem({
   onDelete,
   onAddSubcategory,
   isSubcategory = false,
+  activityCounts,
 }: CategoryItemProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const hasChildren = children && children.length > 0;
+  const activityCount = activityCounts?.[category.id] ?? 0;
+  const hasTransactions = activityCount > 0;
+
+  const handleDeleteClick = () => {
+    if (hasTransactions) {
+      toast({
+        title: "Cannot delete category",
+        description: `This category has ${activityCount} transaction${activityCount !== 1 ? 's' : ''} associated with it. Please reassign or remove the transactions first.`,
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <div className={isSubcategory ? "ml-6 border-l pl-4" : ""}>
@@ -55,6 +70,20 @@ export function CategoryItem({
               Income
             </Badge>
           )}
+          {activityCount > 0 && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-xs text-muted-foreground cursor-default">
+                    ({activityCount})
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{activityCount} transaction{activityCount !== 1 ? 's' : ''}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
         <div className="flex items-center gap-1">
           {!isSubcategory && (
@@ -75,36 +104,47 @@ export function CategoryItem({
           >
             <Icons.Pencil className="h-4 w-4" />
           </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="sm" title="Delete category">
-                <Icons.Trash className="h-4 w-4" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Category</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete &quot;{category.name}&quot;?
-                  {hasChildren && (
-                    <span className="mt-2 block font-medium text-destructive">
-                      This will also delete all subcategories.
-                    </span>
-                  )}
-                  This action cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => onDelete(category)}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          {hasTransactions ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              title="Delete category"
+              onClick={handleDeleteClick}
+            >
+              <Icons.Trash className="h-4 w-4" />
+            </Button>
+          ) : (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="sm" title="Delete category">
+                  <Icons.Trash className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Category</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete &quot;{category.name}&quot;?
+                    {hasChildren && (
+                      <span className="mt-2 block font-medium text-destructive">
+                        This will also delete all subcategories.
+                      </span>
+                    )}
+                    This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => onDelete(category)}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
       </div>
       {hasChildren && isExpanded && (
@@ -117,6 +157,7 @@ export function CategoryItem({
               onDelete={onDelete}
               onAddSubcategory={onAddSubcategory}
               isSubcategory
+              activityCounts={activityCounts}
             />
           ))}
         </div>

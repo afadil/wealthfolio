@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use diesel::prelude::*;
 use diesel::r2d2::{self, Pool};
 use diesel::SqliteConnection;
+use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -87,7 +88,6 @@ impl EventRepositoryTrait for EventRepository {
         let id_owned = id.to_string();
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
-                // Check if any activities reference this event
                 let activity_count: i64 = activities::table
                     .filter(activities::event_id.eq(&id_owned))
                     .count()
@@ -157,5 +157,23 @@ impl EventRepositoryTrait for EventRepository {
             (Some(min_date), Some(max_date)) => Ok(Some((min_date, max_date))),
             _ => Ok(None),
         }
+    }
+
+    fn get_activity_counts(&self) -> Result<HashMap<String, i64>> {
+        use diesel::dsl::sql;
+        use diesel::sql_types::BigInt;
+
+        let mut conn = get_connection(&self.pool)?;
+
+        let counts: Vec<(String, i64)> = activities::table
+            .filter(activities::event_id.is_not_null())
+            .select((
+                activities::event_id.assume_not_null(),
+                sql::<BigInt>("COUNT(*)"),
+            ))
+            .group_by(activities::event_id)
+            .load::<(String, i64)>(&mut conn)?;
+
+        Ok(counts.into_iter().collect())
     }
 }

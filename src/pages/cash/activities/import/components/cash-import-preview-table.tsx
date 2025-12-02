@@ -22,9 +22,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
-import { DataTableFacetedFilterProps } from "@/components/ui/data-table/data-table-faceted-filter";
+import { DataTableFacetedFilter } from "@/pages/activity/components/activity-datagrid/data-table-faceted-filter";
 import { DataTablePagination } from "@/components/ui/data-table/data-table-pagination";
-import { DataTableToolbar } from "@/components/ui/data-table/data-table-toolbar";
 import { Icons } from "@/components/ui/icons";
 import {
   Select,
@@ -169,7 +168,6 @@ export const CashImportPreviewTable = ({
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     lineNumber: false,
     validationErrors: false,
-    subCategoryId: false,
   });
 
   const [pagination, setPagination] = useState<PaginationState>({
@@ -178,23 +176,97 @@ export const CashImportPreviewTable = ({
   });
 
   const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({ min: "", max: "" });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedStatusValues, setSelectedStatusValues] = useState<Set<string>>(new Set());
+  const [selectedActivityTypes, setSelectedActivityTypes] = useState<Set<string>>(new Set());
+  const [selectedAccountIds, setSelectedAccountIds] = useState<Set<string>>(new Set());
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<string>>(new Set());
+  const [selectedSubCategoryIds, setSelectedSubCategoryIds] = useState<Set<string>>(new Set());
+  const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
+  const [selectedCategorizationStatuses, setSelectedCategorizationStatuses] = useState<Set<string>>(new Set());
 
-  // Client-side amount filtering
+  // Status values for category and event filters (like Step 3)
+  const CATEGORY_STATUS_VALUES = ["uncategorized", "categorized"] as const;
+  const EVENT_STATUS_VALUES = ["with-events", "without-events"] as const;
+  type CategorizationStatus = "categorized" | "uncategorized" | "with-events" | "without-events";
+
+  // Client-side filtering (search, amount, and all filter states) - matching Step 3 logic
   const filteredActivities = useMemo(() => {
     const minAmount = amountRange.min ? parseFloat(amountRange.min) : null;
     const maxAmount = amountRange.max ? parseFloat(amountRange.max) : null;
-
-    if (minAmount === null && maxAmount === null) {
-      return activities;
-    }
+    const searchLower = searchQuery.toLowerCase().trim();
 
     return activities.filter((activity) => {
-      const amount = Math.abs(activity.amount || 0);
-      if (minAmount !== null && amount < minAmount) return false;
-      if (maxAmount !== null && amount > maxAmount) return false;
+      // Search filter
+      if (searchLower) {
+        const name = (activity.name || "").toLowerCase();
+        const comment = (activity.comment || "").toLowerCase();
+        if (!name.includes(searchLower) && !comment.includes(searchLower)) return false;
+      }
+
+      // Amount filter
+      if (minAmount !== null || maxAmount !== null) {
+        const amount = Math.abs(activity.amount || 0);
+        if (minAmount !== null && amount < minAmount) return false;
+        if (maxAmount !== null && amount > maxAmount) return false;
+      }
+
+      // Status filter (valid/error)
+      if (selectedStatusValues.size > 0) {
+        const isError = !activity.isValid;
+        const matchesStatus =
+          (selectedStatusValues.has("error") && isError) ||
+          (selectedStatusValues.has("valid") && !isError);
+        if (!matchesStatus) return false;
+      }
+
+      // Activity type filter
+      if (selectedActivityTypes.size > 0) {
+        if (!activity.activityType || !selectedActivityTypes.has(activity.activityType)) return false;
+      }
+
+      // Account filter
+      if (selectedAccountIds.size > 0) {
+        if (!activity.accountId || !selectedAccountIds.has(activity.accountId)) return false;
+      }
+
+      // Category filter (only actual category IDs, not statuses)
+      if (selectedCategoryIds.size > 0) {
+        if (!activity.categoryId || !selectedCategoryIds.has(activity.categoryId)) return false;
+      }
+
+      // Subcategory filter
+      if (selectedSubCategoryIds.size > 0) {
+        if (!activity.subCategoryId || !selectedSubCategoryIds.has(activity.subCategoryId)) return false;
+      }
+
+      // Event filter (only actual event IDs, not statuses)
+      if (selectedEventIds.size > 0) {
+        if (!activity.eventId || !selectedEventIds.has(activity.eventId)) return false;
+      }
+
+      // Categorization status filter (like Step 3)
+      if (selectedCategorizationStatuses.size > 0) {
+        const matchesStatus = Array.from(selectedCategorizationStatuses).some((status) => {
+          switch (status) {
+            case "categorized":
+              return !!activity.categoryId;
+            case "uncategorized":
+              return !activity.categoryId;
+            case "with-events":
+              return !!activity.eventId;
+            case "without-events":
+              return !activity.eventId;
+            default:
+              return true;
+          }
+        });
+        if (!matchesStatus) return false;
+      }
+
       return true;
     });
-  }, [activities, amountRange]);
+  }, [activities, amountRange, searchQuery, selectedStatusValues, selectedActivityTypes, selectedAccountIds, selectedCategoryIds, selectedSubCategoryIds, selectedEventIds, selectedCategorizationStatuses]);
 
   const hasAmountFilter = amountRange.min !== "" || amountRange.max !== "";
 
@@ -241,119 +313,184 @@ export const CashImportPreviewTable = ({
     }
   };
 
-  const activitiesType = useMemo(() => {
-    const uniqueTypesSet = new Set();
-    return activities.reduce(
-      (result, activity) => {
-        const type = activity?.activityType;
-        if (type && !uniqueTypesSet.has(type)) {
-          uniqueTypesSet.add(type);
-          result.push({ label: toPascalCase(type), value: type });
-        }
-        return result;
-      },
-      [] as { label: string; value: string }[],
-    );
+  // Count valid/error and categorized/uncategorized/with-events/without-events
+  const errorCount = activities.filter((a) => !a.isValid).length;
+  const validCount = activities.filter((a) => a.isValid).length;
+  const categorizedCount = activities.filter((a) => a.categoryId).length;
+  const uncategorizedCount = activities.filter((a) => !a.categoryId).length;
+  const withEventsCount = activities.filter((a) => a.eventId).length;
+  const withoutEventsCount = activities.filter((a) => !a.eventId).length;
+
+  // Status filter options (valid/error)
+  const filterStatusOptions = useMemo(() => {
+    const options: { value: string; label: string }[] = [];
+    if (errorCount > 0) {
+      options.push({ value: "error", label: `Error (${errorCount})` });
+    }
+    if (validCount > 0) {
+      options.push({ value: "valid", label: `Valid (${validCount})` });
+    }
+    return options;
+  }, [errorCount, validCount]);
+
+  // Filter options - only show options that have at least one activity (like Step 3 but filtered to present activities)
+  const filterActivityTypeOptions = useMemo(() => {
+    const typeCounts = new Map<string, number>();
+    activities.forEach((activity) => {
+      const type = activity?.activityType;
+      if (type) {
+        typeCounts.set(type, (typeCounts.get(type) || 0) + 1);
+      }
+    });
+    // Only show activity types that have at least one activity
+    return Array.from(typeCounts.entries()).map(([type, count]) => ({
+      label: `${toPascalCase(type)} (${count})`,
+      value: type,
+    }));
   }, [activities]);
 
-  const accountOptions = useMemo(() => {
-    const uniqueAccountIds = new Set<string>();
-    return activities.reduce(
-      (result, activity) => {
-        const accountId = activity?.accountId;
-        if (accountId && !uniqueAccountIds.has(accountId)) {
-          uniqueAccountIds.add(accountId);
-          const account = accounts.find((acc) => acc.id === accountId);
-          if (account) {
-            result.push({ label: `${account.name} (${account.currency})`, value: accountId });
-          }
+  const filterAccountOptions = useMemo(() => {
+    const accountCounts = new Map<string, number>();
+    activities.forEach((activity) => {
+      const accountId = activity?.accountId;
+      if (accountId) {
+        accountCounts.set(accountId, (accountCounts.get(accountId) || 0) + 1);
+      }
+    });
+    // Only show accounts that have at least one activity
+    return Array.from(accountCounts.entries())
+      .map(([accountId, count]) => {
+        const account = accounts.find((acc) => acc.id === accountId);
+        if (account) {
+          return { label: `${account.name} (${account.currency}) (${count})`, value: accountId };
         }
-        return result;
-      },
-      [] as { label: string; value: string }[],
-    );
+        return null;
+      })
+      .filter((opt): opt is { label: string; value: string } => opt !== null);
   }, [activities, accounts]);
 
-  const categoryOptions = useMemo(() => {
-    return categories.map((category) => ({
-      value: category.id,
-      label: category.name,
-    }));
-  }, [categories]);
+  // Category filter options - like Step 3: include status options + categories with activities
+  const filterCategoryOptions = useMemo(() => {
+    const options: { value: string; label: string; color?: string }[] = [];
 
-  const subCategoryOptions = useMemo(() => {
-    const options: { value: string; label: string }[] = [];
+    // Add status options only if there are activities matching them
+    if (uncategorizedCount > 0) {
+      options.push({ value: "uncategorized", label: `Uncategorized (${uncategorizedCount})` });
+    }
+    if (categorizedCount > 0) {
+      options.push({ value: "categorized", label: `Categorized (${categorizedCount})` });
+    }
+
+    // Add categories that have at least one activity assigned
+    const categoryCounts = new Map<string, number>();
+    activities.forEach((activity) => {
+      const categoryId = activity?.categoryId;
+      if (categoryId) {
+        categoryCounts.set(categoryId, (categoryCounts.get(categoryId) || 0) + 1);
+      }
+    });
+
     categories.forEach((category) => {
-      if (category.children && category.children.length > 0) {
-        category.children.forEach((sub) => {
-          options.push({
-            value: sub.id,
-            label: `${category.name} / ${sub.name}`,
-          });
+      const count = categoryCounts.get(category.id);
+      if (count && count > 0) {
+        options.push({
+          value: category.id,
+          label: `${category.name} (${count})`,
+          color: category.color,
         });
       }
     });
+
     return options;
-  }, [categories]);
+  }, [activities, categories, categorizedCount, uncategorizedCount]);
 
-  const eventOptions = useMemo(() => {
-    return events.map((event) => ({
-      value: event.id,
-      label: event.name,
-    }));
-  }, [events]);
+  // Subcategory filter options - like Step 3: only show when categories are selected
+  const filterSubCategoryOptions = useMemo(() => {
+    if (selectedCategoryIds.size === 0) return [];
 
-  const filters = useMemo(() => {
-    const baseFilters: DataTableFacetedFilterProps<ActivityImport, string>[] = [
-      {
-        id: "isValid",
-        title: "Status",
-        options: [
-          { label: "Error", value: "false" },
-          { label: "Valid", value: "true" },
-        ],
-      },
-      {
-        id: "activityType",
-        title: "Type",
-        options: activitiesType,
-      },
-    ];
+    const subCategoryCounts = new Map<string, number>();
+    activities.forEach((activity) => {
+      const subCategoryId = activity?.subCategoryId;
+      if (subCategoryId) {
+        subCategoryCounts.set(subCategoryId, (subCategoryCounts.get(subCategoryId) || 0) + 1);
+      }
+    });
 
-    if (accountOptions.length > 0) {
-      baseFilters.push({
-        id: "accountId",
-        title: "Account",
-        options: accountOptions,
+    const options: { value: string; label: string; color?: string }[] = [];
+    categories
+      .filter((cat) => selectedCategoryIds.has(cat.id))
+      .forEach((category) => {
+        if (category.children && category.children.length > 0) {
+          category.children.forEach((sub) => {
+            const count = subCategoryCounts.get(sub.id);
+            if (count && count > 0) {
+              options.push({
+                value: sub.id,
+                label: `${sub.name} (${count})`,
+                color: category.color,
+              });
+            }
+          });
+        }
       });
+    return options;
+  }, [categories, selectedCategoryIds, activities]);
+
+  // Event filter options - like Step 3: include status options + events with activities
+  const filterEventOptions = useMemo(() => {
+    const options: { value: string; label: string }[] = [];
+
+    // Add status options only if there are activities matching them
+    if (withEventsCount > 0) {
+      options.push({ value: "with-events", label: `With Events (${withEventsCount})` });
+    }
+    if (withoutEventsCount > 0) {
+      options.push({ value: "without-events", label: `Without Events (${withoutEventsCount})` });
     }
 
-    if (categoryOptions.length > 0) {
-      baseFilters.push({
-        id: "categoryId",
-        title: "Category",
-        options: categoryOptions,
-      });
-    }
+    // Add events that have at least one activity assigned
+    const eventCounts = new Map<string, number>();
+    activities.forEach((activity) => {
+      const eventId = activity?.eventId;
+      if (eventId) {
+        eventCounts.set(eventId, (eventCounts.get(eventId) || 0) + 1);
+      }
+    });
 
-    if (subCategoryOptions.length > 0) {
-      baseFilters.push({
-        id: "subCategoryId",
-        title: "Subcategory",
-        options: subCategoryOptions,
-      });
-    }
+    events.forEach((event) => {
+      const count = eventCounts.get(event.id);
+      if (count && count > 0) {
+        options.push({
+          value: event.id,
+          label: `${event.name} (${count})`,
+        });
+      }
+    });
 
-    if (eventOptions.length > 0) {
-      baseFilters.push({
-        id: "eventId",
-        title: "Event",
-        options: eventOptions,
-      });
-    }
+    return options;
+  }, [activities, events, withEventsCount, withoutEventsCount]);
 
-    return baseFilters;
-  }, [activitiesType, accountOptions, categoryOptions, subCategoryOptions, eventOptions]);
+  const hasActiveFilters = searchQuery.trim().length > 0 ||
+    hasAmountFilter ||
+    selectedStatusValues.size > 0 ||
+    selectedActivityTypes.size > 0 ||
+    selectedAccountIds.size > 0 ||
+    selectedCategoryIds.size > 0 ||
+    selectedSubCategoryIds.size > 0 ||
+    selectedEventIds.size > 0 ||
+    selectedCategorizationStatuses.size > 0;
+
+  const handleResetFilters = useCallback(() => {
+    setSearchQuery("");
+    setAmountRange({ min: "", max: "" });
+    setSelectedStatusValues(new Set());
+    setSelectedActivityTypes(new Set());
+    setSelectedAccountIds(new Set());
+    setSelectedCategoryIds(new Set());
+    setSelectedSubCategoryIds(new Set());
+    setSelectedEventIds(new Set());
+    setSelectedCategorizationStatuses(new Set());
+  }, []);
 
   const columns = useMemo<ColumnDef<ActivityImport>[]>(
     () => {
@@ -584,16 +721,27 @@ export const CashImportPreviewTable = ({
         },
       });
 
-      // Subcategory column (for filtering)
+      // Subcategory column
       cols.push({
         id: "subCategoryId",
         accessorKey: "subCategoryId",
-        header: () => null,
-        cell: () => null,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Subcategory" />,
+        cell: ({ row }) => {
+          const subCategoryId = row.original.subCategoryId;
+          const subCategory = subCategoryId && categoryMap ? categoryMap.get(subCategoryId) : null;
+          return (
+            <div className="text-sm">
+              {subCategory ? (
+                <span>{subCategory.name}</span>
+              ) : (
+                <span className="text-muted-foreground">-</span>
+              )}
+            </div>
+          );
+        },
         filterFn: (row, id, value: string) => {
           return value.includes(row.getValue(id));
         },
-        enableHiding: true,
       });
 
       // Event column (always shown)
@@ -712,70 +860,214 @@ export const CashImportPreviewTable = ({
   return (
     <div className="pt-0">
       <div className="space-y-2">
-        <DataTableToolbar
-          table={table}
-          searchBy="name"
-          filters={filters}
-          actions={
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`h-8 border-dashed ${hasAmountFilter ? "border-primary" : ""}`}
-                >
-                  <Icons.DollarSign className="mr-2 h-4 w-4" />
-                  Amount
-                  {hasAmountFilter && (
-                    <span className="ml-2 text-xs">
-                      {amountRange.min && amountRange.max
-                        ? `${amountRange.min} - ${amountRange.max}`
-                        : amountRange.min
-                          ? `≥ ${amountRange.min}`
-                          : `≤ ${amountRange.max}`}
-                    </span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-60" align="start">
-                <div className="space-y-3">
-                  <p className="text-sm font-medium">Filter by Amount</p>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      placeholder="Min"
-                      value={amountRange.min}
-                      onChange={(e) =>
-                        setAmountRange((prev) => ({ ...prev, min: e.target.value }))
+        {/* Search row */}
+        <div className="flex items-center justify-between">
+          <div className="relative">
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search..."
+              className="bg-muted/40 border-border/50 h-8 w-[150px] shadow-[inset_0_0.5px_0.5px_rgba(0,0,0,0.06)] lg:w-[250px]"
+            />
+            {searchQuery && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute top-0 right-0 h-8 w-8 p-0 hover:bg-transparent"
+                onClick={() => setSearchQuery("")}
+              >
+                <Icons.Close className="h-4 w-4" />
+                <span className="sr-only">Clear search</span>
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Filters row - matching Step 3 behavior */}
+        <div className="flex flex-wrap items-center gap-2">
+          <DataTableFacetedFilter
+            title="Status"
+            options={filterStatusOptions}
+            selectedValues={selectedStatusValues}
+            onFilterChange={setSelectedStatusValues}
+          />
+
+          {filterAccountOptions.length > 0 && (
+            <DataTableFacetedFilter
+              title="Account"
+              options={filterAccountOptions}
+              selectedValues={selectedAccountIds}
+              onFilterChange={setSelectedAccountIds}
+            />
+          )}
+
+          {filterActivityTypeOptions.length > 0 && (
+            <DataTableFacetedFilter
+              title="Type"
+              options={filterActivityTypeOptions}
+              selectedValues={selectedActivityTypes}
+              onFilterChange={setSelectedActivityTypes}
+            />
+          )}
+
+          {filterCategoryOptions.length > 0 && (
+            <DataTableFacetedFilter
+              title="Category"
+              options={filterCategoryOptions}
+              selectedValues={new Set([
+                ...selectedCategoryIds,
+                ...Array.from(selectedCategorizationStatuses).filter((s) =>
+                  CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number])
+                ),
+              ])}
+              onFilterChange={(values) => {
+                const allValues = Array.from(values);
+                const statusValues = allValues.filter((v) =>
+                  CATEGORY_STATUS_VALUES.includes(v as (typeof CATEGORY_STATUS_VALUES)[number])
+                ) as CategorizationStatus[];
+                const newCategoryIds = allValues.filter(
+                  (v) => !CATEGORY_STATUS_VALUES.includes(v as (typeof CATEGORY_STATUS_VALUES)[number])
+                );
+
+                setSelectedCategoryIds(new Set(newCategoryIds));
+
+                const eventStatuses = Array.from(selectedCategorizationStatuses).filter((s) =>
+                  EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number])
+                );
+                setSelectedCategorizationStatuses(new Set([...statusValues, ...eventStatuses]));
+
+                // Clear subcategory selection if no categories are selected (like Step 3)
+                if (newCategoryIds.length === 0) {
+                  setSelectedSubCategoryIds(new Set());
+                } else {
+                  // Keep only subcategories that belong to still-selected categories
+                  const validSubCategories = new Set<string>();
+                  selectedSubCategoryIds.forEach((subId) => {
+                    categories.some((cat) => {
+                      if (newCategoryIds.includes(cat.id) && cat.children?.some((child) => child.id === subId)) {
+                        validSubCategories.add(subId);
+                        return true;
                       }
-                      className="h-8"
-                    />
-                    <span className="text-muted-foreground text-sm">to</span>
-                    <Input
-                      type="number"
-                      placeholder="Max"
-                      value={amountRange.max}
-                      onChange={(e) =>
-                        setAmountRange((prev) => ({ ...prev, max: e.target.value }))
-                      }
-                      className="h-8"
-                    />
-                  </div>
-                  {hasAmountFilter && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-full text-xs"
-                      onClick={handleClearAmountFilter}
-                    >
-                      Clear
-                    </Button>
-                  )}
+                      return false;
+                    });
+                  });
+                  if (validSubCategories.size !== selectedSubCategoryIds.size) {
+                    setSelectedSubCategoryIds(validSubCategories);
+                  }
+                }
+              }}
+            />
+          )}
+
+          <DataTableFacetedFilter
+            title="Subcategory"
+            options={filterSubCategoryOptions}
+            selectedValues={selectedSubCategoryIds}
+            onFilterChange={setSelectedSubCategoryIds}
+            disabled={selectedCategoryIds.size === 0}
+          />
+
+          {filterEventOptions.length > 0 && (
+            <DataTableFacetedFilter
+              title="Event"
+              options={filterEventOptions}
+              selectedValues={new Set([
+                ...selectedEventIds,
+                ...Array.from(selectedCategorizationStatuses).filter((s) =>
+                  EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number])
+                ),
+              ])}
+              onFilterChange={(values) => {
+                const allValues = Array.from(values);
+                const statusValues = allValues.filter((v) =>
+                  EVENT_STATUS_VALUES.includes(v as (typeof EVENT_STATUS_VALUES)[number])
+                ) as CategorizationStatus[];
+                const newEventIds = allValues.filter(
+                  (v) => !EVENT_STATUS_VALUES.includes(v as (typeof EVENT_STATUS_VALUES)[number])
+                );
+
+                setSelectedEventIds(new Set(newEventIds));
+
+                const categoryStatuses = Array.from(selectedCategorizationStatuses).filter((s) =>
+                  CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number])
+                );
+                setSelectedCategorizationStatuses(new Set([...categoryStatuses, ...statusValues]));
+              }}
+            />
+          )}
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={`h-8 border-dashed ${hasAmountFilter ? "border-primary" : ""}`}
+              >
+                <Icons.DollarSign className="mr-2 h-4 w-4" />
+                Amount
+                {hasAmountFilter && (
+                  <span className="ml-2 text-xs">
+                    {amountRange.min && amountRange.max
+                      ? `${amountRange.min} - ${amountRange.max}`
+                      : amountRange.min
+                        ? `≥ ${amountRange.min}`
+                        : `≤ ${amountRange.max}`}
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-60" align="start">
+              <div className="space-y-3">
+                <p className="text-sm font-medium">Filter by Amount</p>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    placeholder="Min"
+                    value={amountRange.min}
+                    onChange={(e) =>
+                      setAmountRange((prev) => ({ ...prev, min: e.target.value }))
+                    }
+                    className="h-8"
+                  />
+                  <span className="text-muted-foreground text-sm">to</span>
+                  <Input
+                    type="number"
+                    placeholder="Max"
+                    value={amountRange.max}
+                    onChange={(e) =>
+                      setAmountRange((prev) => ({ ...prev, max: e.target.value }))
+                    }
+                    className="h-8"
+                  />
                 </div>
-              </PopoverContent>
-            </Popover>
-          }
-        />
+                {hasAmountFilter && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-full text-xs"
+                    onClick={handleClearAmountFilter}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-xs"
+              onClick={handleResetFilters}
+            >
+              Reset
+              <Icons.Close className="ml-2 h-4 w-4" />
+            </Button>
+          )}
+        </div>
+
         <div className="rounded-md border">
           <Table>
             <TableHeader className="bg-muted/40">

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::context::ServiceContext;
@@ -149,5 +150,19 @@ pub async fn validate_transaction_date(
         .map_err(|e| {
             error!("Failed to validate transaction date: {}", e);
             format!("Failed to validate transaction date: {}", e)
+        })
+}
+
+#[tauri::command]
+pub async fn get_event_activity_counts(
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<HashMap<String, i64>, String> {
+    debug!("Fetching event activity counts...");
+    state
+        .event_service()
+        .get_activity_counts()
+        .map_err(|e| {
+            error!("Failed to fetch event activity counts: {}", e);
+            format!("Failed to fetch event activity counts: {}", e)
         })
 }

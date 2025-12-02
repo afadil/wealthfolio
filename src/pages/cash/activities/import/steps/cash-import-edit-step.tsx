@@ -99,6 +99,9 @@ const editableFields: EditableField[] = [
 
 type CategorizationStatus = "categorized" | "uncategorized" | "with-events" | "without-events";
 
+const CATEGORY_STATUS_VALUES = ["uncategorized", "categorized"] as const;
+const EVENT_STATUS_VALUES = ["with-events", "without-events"] as const;
+
 const setsEqual = <T,>(a: Set<T>, b: Set<T>): boolean => {
   if (a.size !== b.size) return false;
   for (const item of a) {
@@ -254,7 +257,11 @@ export function CashImportEditStep({
   );
 
   const allCategoryOptions = useMemo(
-    () => [...expenseCategoryOptions, ...incomeCategoryOptions],
+    () => [
+      { value: "", label: "No Category", searchValue: "None Clear Remove" },
+      ...expenseCategoryOptions,
+      ...incomeCategoryOptions,
+    ],
     [expenseCategoryOptions, incomeCategoryOptions]
   );
 
@@ -277,22 +284,29 @@ export function CashImportEditStep({
     (categoryId: string | undefined) => {
       if (!categoryId) return [];
       const category = categoryLookup.get(categoryId);
-      return (category?.children ?? []).map((sub) => ({
+      const subcategories = (category?.children ?? []).map((sub) => ({
         value: sub.id,
         label: sub.name,
         searchValue: sub.name,
       }));
+      if (subcategories.length === 0) return [];
+      return [
+        { value: "", label: "No Subcategory", searchValue: "None Clear Remove" },
+        ...subcategories,
+      ];
     },
     [categoryLookup],
   );
 
   const eventOptions = useMemo(
-    () =>
-      events.map((event) => ({
+    () => [
+      { value: "", label: "No Event", searchValue: "None Clear Remove" },
+      ...events.map((event) => ({
         value: event.id,
         label: event.name,
         searchValue: event.name,
       })),
+    ],
     [events],
   );
 
@@ -330,12 +344,15 @@ export function CashImportEditStep({
   );
 
   const filterCategoryOptions = useMemo(
-    () =>
-      categories.map((cat) => ({
+    () => [
+      { value: "uncategorized", label: "Uncategorized" },
+      { value: "categorized", label: "Categorized" },
+      ...categories.map((cat) => ({
         value: cat.id,
         label: cat.name,
         color: cat.color,
       })),
+    ],
     [categories],
   );
 
@@ -359,22 +376,15 @@ export function CashImportEditStep({
   }, [categories, selectedCategoryIds]);
 
   const filterEventOptions = useMemo(
-    () =>
-      events.map((event) => ({
+    () => [
+      { value: "with-events", label: "With Events" },
+      { value: "without-events", label: "Without Events" },
+      ...events.map((event) => ({
         value: event.id,
         label: event.name,
       })),
-    [events],
-  );
-
-  const categorizationStatusOptions = useMemo(
-    () => [
-      { value: "uncategorized" as CategorizationStatus, label: "Uncategorized" },
-      { value: "categorized" as CategorizationStatus, label: "Categorized" },
-      { value: "with-events" as CategorizationStatus, label: "With Events" },
-      { value: "without-events" as CategorizationStatus, label: "Without Events" },
     ],
-    [],
+    [events],
   );
 
   const categorizedCount = localTransactions.filter((t) => t.categoryId).length;
@@ -550,33 +560,32 @@ export function CashImportEditStep({
   ]);
 
   useEffect(() => {
+    const hasActiveFilters =
+      lastAppliedFilter.searchQuery.trim().length > 0 ||
+      lastAppliedFilter.accountIds.size > 0 ||
+      lastAppliedFilter.activityTypes.size > 0 ||
+      lastAppliedFilter.categoryIds.size > 0 ||
+      lastAppliedFilter.subCategoryIds.size > 0 ||
+      lastAppliedFilter.eventIds.size > 0 ||
+      lastAppliedFilter.categorizationStatuses.size > 0 ||
+      lastAppliedFilter.amountMin !== "" ||
+      lastAppliedFilter.amountMax !== "";
+
+    if (!hasActiveFilters) {
+      setPendingFilterChanges(0);
+      return;
+    }
+
     const wouldBeFilteredOut = displayedTransactions.filter((displayed) => {
       const current = localTransactions.find((t) => t.lineNumber === displayed.lineNumber);
-      if (!current) return true; // Deleted
+      if (!current) return true;
 
-      if (lastAppliedFilter.categorizationStatuses.size > 0) {
-        const matchesStatus = Array.from(lastAppliedFilter.categorizationStatuses).some((status) => {
-          switch (status) {
-            case "categorized":
-              return !!current.categoryId;
-            case "uncategorized":
-              return !current.categoryId;
-            case "with-events":
-              return !!current.eventId;
-            case "without-events":
-              return !current.eventId;
-            default:
-              return true;
-          }
-        });
-        if (!matchesStatus) return true;
-      }
-
-      return false;
+      const matchesFilter = computeFilteredTransactions([current], lastAppliedFilter).length > 0;
+      return !matchesFilter;
     }).length;
 
     setPendingFilterChanges(wouldBeFilteredOut);
-  }, [localTransactions, displayedTransactions, lastAppliedFilter.categorizationStatuses]);
+  }, [localTransactions, displayedTransactions, lastAppliedFilter, computeFilteredTransactions]);
 
   useEffect(() => {
     setDisplayedTransactions((prev) =>
@@ -654,6 +663,8 @@ export function CashImportEditStep({
             updated.amount = Number.isFinite(parsed) ? Math.abs(parsed) : 0;
           } else if (field === "activityType") {
             updated.activityType = value as ActivityType;
+          } else if (field === "accountId") {
+            updated.accountId = value || undefined;
           } else if (field === "categoryId") {
             updated.categoryId = value || undefined;
             updated.subCategoryId = undefined;
@@ -778,14 +789,14 @@ export function CashImportEditStep({
   }, [localTransactions, accountId]);
 
   const bulkAssignCategory = useCallback(
-    (categoryId: string, subCategoryId?: string) => {
+    (categoryId: string | undefined, subCategoryId?: string) => {
       setLocalTransactions((prev) =>
         prev.map((t) =>
           selectedIds.has(t.lineNumber)
             ? {
                 ...t,
-                categoryId,
-                subCategoryId,
+                categoryId: categoryId || undefined,
+                subCategoryId: categoryId ? subCategoryId : undefined,
                 matchedRuleId: undefined,
                 matchedRuleName: undefined,
                 isManualOverride: true,
@@ -795,7 +806,10 @@ export function CashImportEditStep({
       );
       setSelectedIds(new Set());
       setBulkCategoryModalOpen(false);
-      toast.success(`Category assigned to ${selectedIds.size} transaction(s)`);
+      const message = categoryId
+        ? `Category assigned to ${selectedIds.size} transaction(s)`
+        : `Category cleared from ${selectedIds.size} transaction(s)`;
+      toast.success(message);
     },
     [selectedIds],
   );
@@ -1041,16 +1055,35 @@ export function CashImportEditStep({
         <DataTableFacetedFilter
           title="Category"
           options={filterCategoryOptions}
-          selectedValues={selectedCategoryIds}
+          selectedValues={new Set([
+            ...selectedCategoryIds,
+            ...Array.from(selectedCategorizationStatuses).filter((s) =>
+              CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number])
+            ),
+          ])}
           onFilterChange={(values) => {
-            setSelectedCategoryIds(values);
-            if (values.size === 0) {
+            const allValues = Array.from(values);
+            const statusValues = allValues.filter((v) =>
+              CATEGORY_STATUS_VALUES.includes(v as (typeof CATEGORY_STATUS_VALUES)[number])
+            ) as CategorizationStatus[];
+            const newCategoryIds = allValues.filter(
+              (v) => !CATEGORY_STATUS_VALUES.includes(v as (typeof CATEGORY_STATUS_VALUES)[number])
+            );
+
+            setSelectedCategoryIds(new Set(newCategoryIds));
+
+            const eventStatuses = Array.from(selectedCategorizationStatuses).filter((s) =>
+              EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number])
+            );
+            setSelectedCategorizationStatuses(new Set([...statusValues, ...eventStatuses] as CategorizationStatus[]));
+
+            if (newCategoryIds.length === 0) {
               setSelectedSubCategoryIds(new Set());
             } else {
               const validSubCategories = new Set<string>();
               selectedSubCategoryIds.forEach((subId) => {
                 categories.some((cat) => {
-                  if (values.has(cat.id) && cat.children?.some((child) => child.id === subId)) {
+                  if (newCategoryIds.includes(cat.id) && cat.children?.some((child) => child.id === subId)) {
                     validSubCategories.add(subId);
                     return true;
                   }
@@ -1075,15 +1108,28 @@ export function CashImportEditStep({
         <DataTableFacetedFilter
           title="Event"
           options={filterEventOptions}
-          selectedValues={selectedEventIds}
-          onFilterChange={setSelectedEventIds}
-        />
+          selectedValues={new Set([
+            ...selectedEventIds,
+            ...Array.from(selectedCategorizationStatuses).filter((s) =>
+              EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number])
+            ),
+          ])}
+          onFilterChange={(values) => {
+            const allValues = Array.from(values);
+            const statusValues = allValues.filter((v) =>
+              EVENT_STATUS_VALUES.includes(v as (typeof EVENT_STATUS_VALUES)[number])
+            ) as CategorizationStatus[];
+            const newEventIds = allValues.filter(
+              (v) => !EVENT_STATUS_VALUES.includes(v as (typeof EVENT_STATUS_VALUES)[number])
+            );
 
-        <DataTableFacetedFilter
-          title="Status"
-          options={categorizationStatusOptions}
-          selectedValues={selectedCategorizationStatuses as Set<string>}
-          onFilterChange={(values) => setSelectedCategorizationStatuses(values as Set<CategorizationStatus>)}
+            setSelectedEventIds(new Set(newEventIds));
+
+            const categoryStatuses = Array.from(selectedCategorizationStatuses).filter((s) =>
+              CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number])
+            );
+            setSelectedCategorizationStatuses(new Set([...categoryStatuses, ...statusValues] as CategorizationStatus[]));
+          }}
         />
 
         <Popover>
@@ -1238,10 +1284,10 @@ export function CashImportEditStep({
               <TableHead className="bg-muted/30 h-9 min-w-[150px] border-r px-2 py-1.5 text-xs font-semibold whitespace-nowrap">
                 Subcategory
               </TableHead>
-              <TableHead className="bg-muted/30 h-9 w-[100px] border-r px-2 py-1.5 text-xs font-semibold">
+              <TableHead className="bg-muted/30 h-9 min-w-[150px] border-r px-2 py-1.5 text-xs font-semibold whitespace-nowrap">
                 Applied Rule
               </TableHead>
-              <TableHead className="bg-muted/30 h-9 w-[120px] border-r px-2 py-1.5 text-xs font-semibold">
+              <TableHead className="bg-muted/30 h-9 min-w-[150px] border-r px-2 py-1.5 text-xs font-semibold whitespace-nowrap">
                 Event
               </TableHead>
               <TableHead className="bg-muted/30 h-9 min-w-[120px] border-r px-2 py-1.5 text-xs font-semibold">
@@ -1692,9 +1738,11 @@ interface BulkCategoryAssignModalProps {
   open: boolean;
   onClose: () => void;
   categories: CategoryWithChildren[];
-  onAssign: (categoryId: string, subCategoryId?: string) => void;
+  onAssign: (categoryId: string | undefined, subCategoryId?: string) => void;
   selectedCount: number;
 }
+
+const NONE_CATEGORY_VALUE = "__none__";
 
 function BulkCategoryAssignModal({
   open,
@@ -1706,15 +1754,18 @@ function BulkCategoryAssignModal({
   const [selectedCat, setSelectedCat] = useState("");
   const [selectedSub, setSelectedSub] = useState("");
 
-  const selectedCategory = categories.find((c) => c.id === selectedCat);
+  const isNoneSelected = selectedCat === NONE_CATEGORY_VALUE;
+  const selectedCategory = !isNoneSelected ? categories.find((c) => c.id === selectedCat) : undefined;
   const subCategories = selectedCategory?.children || [];
 
   const handleAssign = () => {
-    if (selectedCat) {
+    if (selectedCat === NONE_CATEGORY_VALUE) {
+      onAssign(undefined, undefined);
+    } else if (selectedCat) {
       onAssign(selectedCat, selectedSub || undefined);
-      setSelectedCat("");
-      setSelectedSub("");
     }
+    setSelectedCat("");
+    setSelectedSub("");
   };
 
   if (!open) return null;
@@ -1727,7 +1778,7 @@ function BulkCategoryAssignModal({
             Assign Category to {selectedCount} Transaction{selectedCount !== 1 ? "s" : ""}
           </DialogTitle>
           <DialogDescription>
-            Select a category and optionally a subcategory to assign.
+            Select a category and optionally a subcategory to assign, or clear existing categories.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
@@ -1744,6 +1795,7 @@ function BulkCategoryAssignModal({
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value={NONE_CATEGORY_VALUE}>None (Clear category)</SelectItem>
                 {categories.map((cat) => (
                   <SelectItem key={cat.id} value={cat.id}>
                     <span className="flex items-center gap-2">
@@ -1760,7 +1812,7 @@ function BulkCategoryAssignModal({
               </SelectContent>
             </Select>
           </div>
-          {subCategories.length > 0 && (
+          {subCategories.length > 0 && !isNoneSelected && (
             <div>
               <label className="mb-1 block text-sm font-medium">Subcategory (optional)</label>
               <Select value={selectedSub} onValueChange={setSelectedSub}>

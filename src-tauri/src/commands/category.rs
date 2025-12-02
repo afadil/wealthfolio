@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::context::ServiceContext;
@@ -141,4 +142,18 @@ pub async fn delete_category(
             format!("Failed to delete category: {}", e)
         })?;
     Ok(())
+}
+
+#[tauri::command]
+pub async fn get_category_activity_counts(
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<HashMap<String, i64>, String> {
+    debug!("Fetching category activity counts...");
+    state
+        .category_service()
+        .get_activity_counts()
+        .map_err(|e| {
+            error!("Failed to fetch category activity counts: {}", e);
+            format!("Failed to fetch category activity counts: {}", e)
+        })
 }

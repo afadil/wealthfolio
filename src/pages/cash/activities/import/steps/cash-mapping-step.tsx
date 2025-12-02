@@ -21,14 +21,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge, SearchableSelect } from "@wealthfolio/ui";
 import type { CashImportFormat, CashImportMappingData, CsvRowData, CategoryWithChildren, Event, Account } from "@/lib/types";
 import { ActivityType, AccountType } from "@/lib/types";
 import { cn, tryParseDate } from "@/lib/utils";
 import { motion } from "motion/react";
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
-import { CSVFileViewer } from "@/pages/activity/import/components/csv-file-viewer";
 import { ImportAlert } from "@/pages/activity/import/components/import-alert";
 import { useQuery } from "@tanstack/react-query";
 import { QueryKeys } from "@/lib/query-keys";
@@ -377,22 +375,6 @@ export const CashMappingStep = ({
     return null;
   }
 
-  // Prepare CSV data for preview
-  const csvData = useMemo(() => {
-    return [
-      {
-        id: 0,
-        content: headers.join(","),
-        isValid: true,
-      },
-      ...data.map((rowData, index) => ({
-        id: index + 1,
-        content: headers.map((header) => rowData[header] || "").join(","),
-        isValid: true,
-      })),
-    ];
-  }, [data, headers]);
-
   // Mapped fields count
   const requiredFieldsCount = CASH_IMPORT_REQUIRED_FIELDS.length;
   const mappedRequiredCount = CASH_IMPORT_REQUIRED_FIELDS.filter((f) => isFieldMapped(f)).length;
@@ -481,61 +463,37 @@ export const CashMappingStep = ({
         )}
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="preview" className="flex flex-1 flex-col">
+      {/* Activity Preview */}
+      <div className="flex flex-1 flex-col">
         <div className="py-2">
-          <div className="flex items-center justify-between">
-            <div className="text-muted-foreground hidden px-3 text-sm md:block">
-              <span className="font-medium">{data.length} </span>total row
-              {data.length !== 1 ? "s" : ""}
-            </div>
-            <TabsList className="bg-secondary flex space-x-1 rounded-full p-1">
-              <TabsTrigger
-                className="data-[state=active]:bg-primary data-[state=active]:text-primary data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-3 text-sm"
-                value="preview"
-              >
-                Activity Preview
-              </TabsTrigger>
-              <TabsTrigger
-                className="data-[state=active]:bg-primary data-[state=active]:text-primary data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-3 text-sm"
-                value="raw"
-              >
-                File Preview
-              </TabsTrigger>
-            </TabsList>
+          <div className="text-muted-foreground text-sm">
+            <span className="font-medium">{data.length} </span>total row
+            {data.length !== 1 ? "s" : ""}
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-0">
-          {/* Mapping Table Tab */}
-          <TabsContent value="preview" className="m-0 flex flex-col border-0 p-0">
-            <CashMappingTable
-              fieldMappings={fieldMappings}
-              headers={headers}
-              data={data}
-              handleColumnMapping={handleColumnMapping}
-              getMappedValue={getMappedValue}
-              isFieldMapped={isFieldMapped}
-              activityTypeMappings={activityTypeMappings}
-              categoryMappings={categoryMappings}
-              eventMappings={eventMappings}
-              accountMappings={accountMappings}
-              handleActivityTypeMapping={handleActivityTypeMapping}
-              handleCategoryMapping={handleCategoryMapping}
-              handleEventMapping={handleEventMapping}
-              handleAccountMapping={handleAccountMapping}
-              categories={categories}
-              events={events}
-              cashAccounts={cashAccounts}
-            />
-          </TabsContent>
-
-          {/* Raw File Preview Tab */}
-          <TabsContent value="raw" className="m-0 flex-1 border-0 p-0">
-            <CSVFileViewer data={csvData} className="w-full" maxHeight="50vh" />
-          </TabsContent>
+          <CashMappingTable
+            fieldMappings={fieldMappings}
+            headers={headers}
+            data={data}
+            handleColumnMapping={handleColumnMapping}
+            getMappedValue={getMappedValue}
+            isFieldMapped={isFieldMapped}
+            activityTypeMappings={activityTypeMappings}
+            categoryMappings={categoryMappings}
+            eventMappings={eventMappings}
+            accountMappings={accountMappings}
+            handleActivityTypeMapping={handleActivityTypeMapping}
+            handleCategoryMapping={handleCategoryMapping}
+            handleEventMapping={handleEventMapping}
+            handleAccountMapping={handleAccountMapping}
+            categories={categories}
+            events={events}
+            cashAccounts={cashAccounts}
+          />
         </div>
-      </Tabs>
+      </div>
 
       {/* Amount sign toggle */}
       <div className="border-t pt-4">

@@ -69,6 +69,7 @@ const COMMANDS: CommandMap = {
   get_categories_hierarchical: { method: "GET", path: "/categories/hierarchical" },
   get_expense_categories: { method: "GET", path: "/categories/expense" },
   get_income_categories: { method: "GET", path: "/categories/income" },
+  get_category_activity_counts: { method: "GET", path: "/categories/activity-counts" },
   create_category: { method: "POST", path: "/categories" },
   update_category: { method: "PUT", path: "/categories" },
   delete_category: { method: "DELETE", path: "/categories" },
@@ -90,6 +91,7 @@ const COMMANDS: CommandMap = {
   // Events
   get_events: { method: "GET", path: "/events" },
   get_events_with_names: { method: "GET", path: "/events/with-names" },
+  get_event_activity_counts: { method: "GET", path: "/events/activity-counts" },
   get_event: { method: "GET", path: "/events" },
   create_event: { method: "POST", path: "/events" },
   update_event: { method: "PUT", path: "/events" },
@@ -631,6 +633,7 @@ export const invokeWeb = async <T>(
     }
     case "get_categories":
     case "get_categories_hierarchical":
+    case "get_category_activity_counts":
     case "get_activity_rules":
     case "get_activity_rules_with_names":
       break;
@@ -645,6 +648,7 @@ export const invokeWeb = async <T>(
     case "get_event_types":
     case "get_events":
     case "get_events_with_names":
+    case "get_event_activity_counts":
     case "generate_pairing_payload":
     case "get_sync_status":
     case "initialize_sync_for_existing_data":

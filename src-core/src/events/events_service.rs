@@ -4,6 +4,7 @@ use crate::events::events_traits::{EventRepositoryTrait, EventServiceTrait};
 use crate::errors::{Error, Result, ValidationError};
 use async_trait::async_trait;
 use chrono::Utc;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 pub struct EventService<R: EventRepositoryTrait, T: EventTypeRepositoryTrait> {
@@ -166,5 +167,9 @@ impl<R: EventRepositoryTrait + Send + Sync, T: EventTypeRepositoryTrait + Send +
 
         let updated_event = self.event_repo.update_event(event_id, update).await?;
         Ok(Some(updated_event))
+    }
+
+    fn get_activity_counts(&self) -> Result<HashMap<String, i64>> {
+        self.event_repo.get_activity_counts()
     }
 }

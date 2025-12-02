@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::{error::ApiResult, main_lib::AppState};
@@ -141,10 +142,19 @@ async fn validate_transaction_date(
     Ok(Json(is_valid))
 }
 
+/// Get activity counts for all events
+async fn get_activity_counts(
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<HashMap<String, i64>>> {
+    let counts = state.event_service.get_activity_counts()?;
+    Ok(Json(counts))
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/events", get(get_all_events).post(create_event))
         .route("/events/with-names", get(get_events_with_type_names))
+        .route("/events/activity-counts", get(get_activity_counts))
         .route(
             "/events/{id}",
             get(get_event).put(update_event).delete(delete_event),

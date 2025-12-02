@@ -1,4 +1,4 @@
-import { getCategoriesHierarchical } from "@/commands/category";
+import { getCategoriesHierarchical, getCategoryActivityCounts } from "@/commands/category";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Category, CategoryWithChildren, NewCategory, UpdateCategory } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
@@ -23,6 +23,11 @@ function SettingsCategoriesPage() {
   const { data: categories, isLoading } = useQuery<CategoryWithChildren[], Error>({
     queryKey: [QueryKeys.CATEGORIES_HIERARCHICAL],
     queryFn: getCategoriesHierarchical,
+  });
+
+  const { data: activityCounts } = useQuery<Record<string, number>, Error>({
+    queryKey: [QueryKeys.CATEGORY_ACTIVITY_COUNTS],
+    queryFn: getCategoryActivityCounts,
   });
 
   const [visibleModal, setVisibleModal] = useState(false);
@@ -103,6 +108,7 @@ function SettingsCategoriesPage() {
             onEdit={handleEditCategory}
             onDelete={handleDeleteCategory}
             onAddSubcategory={handleAddSubcategory}
+            activityCounts={activityCounts}
           />
         ))}
       </div>

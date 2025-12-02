@@ -121,3 +121,19 @@ export const deleteCategory = async (categoryId: string): Promise<void> => {
     throw error;
   }
 };
+
+export const getCategoryActivityCounts = async (): Promise<Record<string, number>> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri("get_category_activity_counts");
+      case RUN_ENV.WEB:
+        return invokeWeb("get_category_activity_counts");
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error("Error fetching category activity counts.");
+    throw error;
+  }
+};

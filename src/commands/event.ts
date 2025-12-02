@@ -118,3 +118,19 @@ export const validateTransactionDate = async (
     throw error;
   }
 };
+
+export const getEventActivityCounts = async (): Promise<Record<string, number>> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri("get_event_activity_counts");
+      case RUN_ENV.WEB:
+        return invokeWeb("get_event_activity_counts");
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error("Error fetching event activity counts.");
+    throw error;
+  }
+};

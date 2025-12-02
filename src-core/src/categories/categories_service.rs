@@ -3,6 +3,7 @@ use crate::categories::categories_traits::{CategoryRepositoryTrait, CategoryServ
 use crate::errors::Result;
 use async_trait::async_trait;
 use chrono::Utc;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 pub struct CategoryService<T: CategoryRepositoryTrait> {
@@ -120,5 +121,9 @@ impl<T: CategoryRepositoryTrait + Send + Sync> CategoryServiceTrait for Category
     fn get_income_categories(&self) -> Result<Vec<CategoryWithChildren>> {
         let income_cats = self.category_repo.get_income_categories()?;
         Ok(self.organize_hierarchically(income_cats))
+    }
+
+    fn get_activity_counts(&self) -> Result<HashMap<String, i64>> {
+        self.category_repo.get_activity_counts()
     }
 }

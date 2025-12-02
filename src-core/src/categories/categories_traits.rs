@@ -34,6 +34,10 @@ pub trait CategoryRepositoryTrait: Send + Sync {
 
     /// Get income categories (is_income = 1)
     fn get_income_categories(&self) -> Result<Vec<Category>>;
+
+    /// Get activity counts grouped by category ID
+    /// Returns a HashMap where keys are category IDs and values are activity counts
+    fn get_activity_counts(&self) -> Result<std::collections::HashMap<String, i64>>;
 }
 
 /// Trait for category service operations
@@ -62,4 +66,7 @@ pub trait CategoryServiceTrait: Send + Sync {
 
     /// Get income categories with their children
     fn get_income_categories(&self) -> Result<Vec<CategoryWithChildren>>;
+
+    /// Get activity counts grouped by category ID
+    fn get_activity_counts(&self) -> Result<std::collections::HashMap<String, i64>>;
 }

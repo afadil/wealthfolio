@@ -59,9 +59,15 @@ const CASH_ACTIVITY_TYPE_NAMES: Record<CashActivityType, string> = {
   TRANSFER_OUT: "Transfer Out",
 };
 
-const CATEGORIZATION_STATUS_OPTIONS: { value: CategorizationStatus; label: string }[] = [
+const CATEGORY_STATUS_VALUES = ["uncategorized", "categorized"] as const;
+const EVENT_STATUS_VALUES = ["with_events", "without_events"] as const;
+
+const CATEGORY_STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "uncategorized", label: "Uncategorized" },
   { value: "categorized", label: "Categorized" },
+];
+
+const EVENT_STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "with_events", label: "With Events" },
   { value: "without_events", label: "Without Events" },
 ];
@@ -156,11 +162,12 @@ export function CashActivityFilters({
   );
 
   const parentCategoryOptions = useMemo(() => {
-    return categories.map((category) => ({
+    const categoryOptions = categories.map((category) => ({
       value: category.id,
       label: category.name,
       color: category.color,
     }));
+    return [...CATEGORY_STATUS_OPTIONS, ...categoryOptions];
   }, [categories]);
 
   const subCategoryOptions = useMemo(() => {
@@ -185,10 +192,11 @@ export function CashActivityFilters({
   }, [categories, selectedParentCategoryIds]);
 
   const eventOptions = useMemo(() => {
-    return events.map((event) => ({
+    const eventsAsOptions = events.map((event) => ({
       value: event.id,
       label: event.name,
     }));
+    return [...EVENT_STATUS_OPTIONS, ...eventsAsOptions];
   }, [events]);
 
   const hasAmountFilter = amountRange && (amountRange.min !== "" || amountRange.max !== "");
@@ -301,15 +309,31 @@ export function CashActivityFilters({
         <DataTableFacetedFilter
           title="Category"
           options={parentCategoryOptions}
-          selectedValues={new Set(selectedParentCategoryIds)}
+          selectedValues={new Set([
+            ...selectedParentCategoryIds,
+            ...selectedCategorizationStatuses.filter((s) =>
+              CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number])
+            ),
+          ])}
           onFilterChange={(values: Set<string>) => {
-            const newParentIds = Array.from(values);
+            const allValues = Array.from(values);
+            const statusValues = allValues.filter((v) =>
+              CATEGORY_STATUS_VALUES.includes(v as (typeof CATEGORY_STATUS_VALUES)[number])
+            ) as CategorizationStatus[];
+            const newParentIds = allValues.filter(
+              (v) => !CATEGORY_STATUS_VALUES.includes(v as (typeof CATEGORY_STATUS_VALUES)[number])
+            );
+
             onParentCategoryIdsChange(newParentIds);
-            // Clear subcategory selection if parent category is deselected
+
+            const eventStatuses = selectedCategorizationStatuses.filter((s) =>
+              EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number])
+            );
+            onCategorizationStatusesChange([...statusValues, ...eventStatuses]);
+
             if (newParentIds.length === 0) {
               onSubCategoryIdsChange([]);
             } else {
-              // Remove subcategories that no longer belong to selected parents
               const validSubCategories = selectedSubCategoryIds.filter((subId) => {
                 return categories.some(
                   (cat) =>
@@ -335,17 +359,28 @@ export function CashActivityFilters({
         <DataTableFacetedFilter
           title="Event"
           options={eventOptions}
-          selectedValues={new Set(selectedEventIds)}
-          onFilterChange={(values: Set<string>) => onEventIdsChange(Array.from(values))}
-        />
+          selectedValues={new Set([
+            ...selectedEventIds,
+            ...selectedCategorizationStatuses.filter((s) =>
+              EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number])
+            ),
+          ])}
+          onFilterChange={(values: Set<string>) => {
+            const allValues = Array.from(values);
+            const statusValues = allValues.filter((v) =>
+              EVENT_STATUS_VALUES.includes(v as (typeof EVENT_STATUS_VALUES)[number])
+            ) as CategorizationStatus[];
+            const newEventIds = allValues.filter(
+              (v) => !EVENT_STATUS_VALUES.includes(v as (typeof EVENT_STATUS_VALUES)[number])
+            );
 
-        <DataTableFacetedFilter
-          title="Status"
-          options={CATEGORIZATION_STATUS_OPTIONS}
-          selectedValues={new Set(selectedCategorizationStatuses)}
-          onFilterChange={(values: Set<string>) =>
-            onCategorizationStatusesChange(Array.from(values) as CategorizationStatus[])
-          }
+            onEventIdsChange(newEventIds);
+
+            const categoryStatuses = selectedCategorizationStatuses.filter((s) =>
+              CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number])
+            );
+            onCategorizationStatusesChange([...categoryStatuses, ...statusValues]);
+          }}
         />
 
         {onAmountRangeChange && (

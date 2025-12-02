@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::{error::ApiResult, main_lib::AppState};
@@ -102,12 +103,21 @@ async fn delete_category(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Get activity counts for all categories
+async fn get_activity_counts(
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<HashMap<String, i64>>> {
+    let counts = state.category_service.get_activity_counts()?;
+    Ok(Json(counts))
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/categories", get(get_all_categories).post(create_category))
         .route("/categories/hierarchical", get(get_categories_hierarchical))
         .route("/categories/expense", get(get_expense_categories))
         .route("/categories/income", get(get_income_categories))
+        .route("/categories/activity-counts", get(get_activity_counts))
         .route(
             "/categories/{id}",
             get(get_category).put(update_category).delete(delete_category),
