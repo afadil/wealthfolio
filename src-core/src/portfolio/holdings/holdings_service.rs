@@ -197,6 +197,7 @@ impl HoldingsServiceTrait for HoldingsService {
                                     })
                                     .collect()
                             }),
+                            risk: asset.risk,
                         };
                         (asset.id, instrument)
                     })
@@ -461,6 +462,7 @@ impl HoldingsServiceTrait for HoldingsService {
                     })
                     .collect()
             }),
+            risk: asset_details.risk,
         };
 
         let holding_view = Holding {

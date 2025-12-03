@@ -108,6 +108,7 @@ impl AssetRepositoryTrait for AssetRepository {
                         assets::notes.eq(&payload_owned.notes),
                         assets::asset_sub_class.eq(&payload_owned.asset_sub_class),
                         assets::asset_class.eq(&payload_owned.asset_class),
+                        assets::risk.eq(&payload_owned.risk),
                     ))
                     .get_result::<AssetDB>(conn)?;
                 Ok(result_db.into())

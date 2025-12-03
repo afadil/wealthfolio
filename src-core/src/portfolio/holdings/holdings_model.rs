@@ -45,6 +45,7 @@ pub struct Instrument {
     // Display categorization
     pub countries: Option<Vec<Country>>,
     pub sectors: Option<Vec<Sector>>,
+    pub risk: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
