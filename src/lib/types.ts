@@ -450,6 +450,8 @@ export interface IncomeSummary {
   byType: Record<string, number>;
   bySymbol: Record<string, number>;
   byCurrency: Record<string, number>;
+  byMonthBySourceType: Record<string, Record<string, number>>; // Month -> SourceType -> Amount (for stacked bar charts)
+  byMonthBySymbol: Record<string, Record<string, number>>; // Month -> Symbol -> Amount (for filtering chart by symbol)
   totalIncome: number;
   investmentIncome: number;
   cashIncome: number;
@@ -484,6 +486,8 @@ export interface SpendingSummary {
   byCategory: Record<string, CategorySpending>;
   bySubcategory: Record<string, SubcategorySpending>;
   byAccount: Record<string, number>;
+  byMonthByCategory: Record<string, Record<string, number>>; // Month -> CategoryId -> Amount (for stacked bar charts)
+  byMonthBySubcategory: Record<string, Record<string, number>>; // Month -> SubcategoryId -> Amount (for filtering chart by subcategory)
   totalSpending: number;
   currency: string;
   monthlyAverage: number;

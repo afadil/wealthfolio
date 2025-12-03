@@ -1,6 +1,5 @@
 import { getCategoriesHierarchical } from "@/commands/category";
 import { getIncomeSummary } from "@/commands/portfolio";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
@@ -12,10 +11,28 @@ import { buildCashflowUrl, periodToDateRange, type SpendingPeriod } from "@/lib/
 import type { CategoryWithChildren, IncomeSummary } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { AmountDisplay, AnimatedToggleGroup, GainPercent, PrivacyAmount } from "@wealthfolio/ui";
-import React, { useState, useCallback } from "react";
+import {
+  AmountDisplay,
+  AnimatedToggleGroup,
+  GainPercent,
+  Page,
+  PageContent,
+  PageHeader,
+  PrivacyAmount,
+} from "@wealthfolio/ui";
+import React, { useState, useCallback, useMemo } from "react";
 import { Cell, Pie, PieChart } from "recharts";
+import { Eye, EyeOff } from "lucide-react";
 import { IncomeHistoryChart } from "./income-history-chart";
+
+const DEFAULT_CHART_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-6)",
+];
 
 const periods = [
   { value: "YTD" as const, label: "Year to Date" },
@@ -57,7 +74,34 @@ const IncomePeriodSelector: React.FC<{
 
 export default function IncomePage() {
   const [selectedPeriod, setSelectedPeriod] = useState<"TOTAL" | "YTD" | "LAST_YEAR">("TOTAL");
+  const [hiddenSourceTypes, setHiddenSourceTypes] = useState<Set<string>>(new Set());
+  const [hiddenSymbols, setHiddenSymbols] = useState<Set<string>>(new Set());
   const { isBalanceHidden } = useBalancePrivacy();
+
+  const toggleSourceTypeVisibility = useCallback((sourceType: string) => {
+    setHiddenSourceTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(sourceType)) {
+        next.delete(sourceType);
+      } else {
+        next.add(sourceType);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleSymbolVisibility = useCallback((symbol: string) => {
+    setHiddenSymbols((prev) => {
+      const next = new Set(prev);
+      if (next.has(symbol)) {
+        next.delete(symbol);
+      } else {
+        next.add(symbol);
+      }
+      return next;
+    });
+  }, []);
+
   const navigate = useNavigate();
 
   const {
@@ -97,6 +141,40 @@ export default function IncomePage() {
     [navigate, selectedPeriod, categoriesData]
   );
 
+  const periodSummary = incomeData?.find((summary) => summary.period === selectedPeriod);
+  const totalSummary = incomeData?.find((summary) => summary.period === "TOTAL");
+
+  // Calculate filtered totals based on hidden symbols (top 10 list) AND hidden source types - must be called before any returns
+  const filteredTotals = useMemo(() => {
+    if (!periodSummary) {
+      return { totalIncome: 0, monthlyAverage: 0 };
+    }
+
+    const numMonths = Object.keys(periodSummary.byMonth).length;
+    let filteredIncome = 0;
+
+    // If source types are hidden, use source type filtering (broader filter)
+    if (hiddenSourceTypes.size > 0) {
+      periodSummary.bySourceType.forEach((source) => {
+        if (!hiddenSourceTypes.has(source.sourceType)) {
+          filteredIncome += Number(source.amount) || 0;
+        }
+      });
+    } else if (hiddenSymbols.size > 0) {
+      // If only symbols are hidden (top 10 toggles), use symbol filtering
+      Object.entries(periodSummary.bySymbol).forEach(([symbol, amount]) => {
+        if (!hiddenSymbols.has(symbol)) {
+          filteredIncome += Number(amount) || 0;
+        }
+      });
+    }
+
+    return {
+      totalIncome: filteredIncome,
+      monthlyAverage: numMonths > 0 ? filteredIncome / numMonths : 0,
+    };
+  }, [periodSummary, hiddenSourceTypes, hiddenSymbols]);
+
   if (isLoading) {
     return <IncomeDashboardSkeleton />;
   }
@@ -104,9 +182,6 @@ export default function IncomePage() {
   if (error || !incomeData) {
     return <div>Failed to load income summary: {error?.message || "Unknown error"}</div>;
   }
-
-  const periodSummary = incomeData.find((summary) => summary.period === selectedPeriod);
-  const totalSummary = incomeData.find((summary) => summary.period === "TOTAL");
 
   if (!periodSummary || !totalSummary) {
     return (
@@ -127,7 +202,11 @@ export default function IncomePage() {
     );
   }
 
-  const { totalIncome, currency, monthlyAverage, byCurrency, bySourceType } = periodSummary;
+  const { currency, byCurrency, bySourceType } = periodSummary;
+
+  const { totalIncome, monthlyAverage } = (hiddenSourceTypes.size > 0 || hiddenSymbols.size > 0)
+    ? filteredTotals
+    : { totalIncome: periodSummary.totalIncome, monthlyAverage: periodSummary.monthlyAverage };
 
   const topIncomeSources = Object.entries(periodSummary.bySymbol)
     .filter(([, income]) => income > 0)
@@ -293,9 +372,25 @@ export default function IncomePage() {
             <CardContent>
               <div className="space-y-2">
                 {bySourceType.map((source, index) => {
-                  const chartColor = `var(--chart-${index + 1})`;
+                  const chartColor = `var(--chart-${index + 2})`;
+                  const isHidden = hiddenSourceTypes.has(source.sourceType);
                   return (
-                    <div key={index} className="flex items-center">
+                    <div
+                      key={index}
+                      className="flex items-center gap-2"
+                      style={{ opacity: isHidden ? 0.4 : 1 }}
+                    >
+                      <button
+                        onClick={() => toggleSourceTypeVisibility(source.sourceType)}
+                        className="text-muted-foreground hover:text-foreground flex-shrink-0 p-0.5"
+                        title={isHidden ? "Show in chart" : "Hide from chart"}
+                      >
+                        {isHidden ? (
+                          <EyeOff className="h-3.5 w-3.5" />
+                        ) : (
+                          <Eye className="h-3.5 w-3.5" />
+                        )}
+                      </button>
                       <div className="w-full">
                         <div className="mb-0 flex justify-between">
                           <span className="text-xs">{source.sourceType}</span>
@@ -335,6 +430,11 @@ export default function IncomePage() {
           <IncomeHistoryChart
             monthlyIncomeData={monthlyIncomeData}
             previousMonthlyIncomeData={previousMonthlyIncomeData}
+            byMonthBySourceType={periodSummary.byMonthBySourceType}
+            byMonthBySymbol={periodSummary.byMonthBySymbol}
+            bySymbol={periodSummary.bySymbol}
+            hiddenSourceTypes={hiddenSourceTypes}
+            hiddenSymbols={hiddenSymbols}
             selectedPeriod={selectedPeriod}
             currency={currency}
             isBalanceHidden={isBalanceHidden}
@@ -394,7 +494,7 @@ export default function IncomePage() {
 
                       return chartItems.map((item, index) => {
                         const percentage =
-                          totalIncome > 0 ? (item.income / totalIncome) * 100 : 0;
+                          periodSummary.totalIncome > 0 ? (item.income / periodSummary.totalIncome) * 100 : 0;
 
                         return (
                           <div
@@ -435,38 +535,59 @@ export default function IncomePage() {
                     const category = nameParts[0] || name;
                     const subcategory = nameParts[1];
 
+                    const percentage = periodSummary.totalIncome > 0 ? (income / periodSummary.totalIncome) * 100 : 0;
+                    const color = DEFAULT_CHART_COLORS[index % DEFAULT_CHART_COLORS.length];
+                    const isHidden = hiddenSymbols.has(symbolStr);
+
                     return (
                       <div
                         key={index}
-                        className={`flex items-center justify-between rounded-md p-1 transition-colors ${isCash ? "cursor-pointer hover:bg-muted/50" : ""}`}
-                        onClick={isCash ? () => handleCashIncomeClick(category, subcategory) : undefined}
+                        className={`flex items-center justify-between rounded-md px-2 py-1.5 transition-colors hover:bg-muted/50 ${isHidden ? "opacity-50" : ""}`}
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleSymbolVisibility(symbolStr);
+                            }}
+                            className="mr-2 text-muted-foreground hover:text-foreground transition-colors"
+                            title={isHidden ? "Show in chart" : "Hide from chart"}
+                          >
+                            {isHidden ? (
+                              <EyeOff className="h-3.5 w-3.5" />
+                            ) : (
+                              <Eye className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                          <div
+                            className="mr-2 h-3 w-3 rounded-full cursor-pointer"
+                            style={{ backgroundColor: color }}
+                            onClick={isCash ? () => handleCashIncomeClick(category, subcategory) : undefined}
+                          />
                           {isCash ? (
-                            <>
-                              <div className="bg-success/20 flex h-8 w-8 items-center justify-center rounded-full">
-                                <Icons.Wallet className="text-success h-4 w-4" />
-                              </div>
-                              <div className="flex flex-col">
-                                <span className="text-sm font-medium">{category}</span>
-                                {subcategory && (
-                                  <span className="text-muted-foreground text-xs">{subcategory}</span>
-                                )}
-                              </div>
-                            </>
+                            <div
+                              className="flex flex-col cursor-pointer"
+                              onClick={() => handleCashIncomeClick(category, subcategory)}
+                            >
+                              <span className="text-muted-foreground text-xs">{category}</span>
+                              {subcategory && (
+                                <span className="text-muted-foreground text-xs opacity-70">{subcategory}</span>
+                              )}
+                            </div>
                           ) : (
-                            <>
-                              <Badge className="bg-primary flex min-w-[50px] items-center justify-center rounded-sm text-xs">
-                                {ticker}
-                              </Badge>
-                              <div className="flex flex-col">
-                                <span className="text-muted-foreground text-xs">{name}</span>
-                              </div>
-                            </>
+                            <span className="text-muted-foreground text-xs">{ticker} - {name}</span>
                           )}
                         </div>
-                        <div className="text-success text-sm font-medium">
-                          <PrivacyAmount value={income} currency={currency} />
+                        <div
+                          className="flex items-center gap-2 cursor-pointer"
+                          onClick={isCash ? () => handleCashIncomeClick(category, subcategory) : undefined}
+                        >
+                          <span className="text-muted-foreground text-xs">
+                            {percentage.toFixed(1)}%
+                          </span>
+                          <div className="text-success text-sm font-medium">
+                            <PrivacyAmount value={income} currency={currency} />
+                          </div>
                         </div>
                       </div>
                     );

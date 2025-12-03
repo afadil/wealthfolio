@@ -19,8 +19,9 @@ import {
   PageHeader,
   PrivacyAmount,
 } from "@wealthfolio/ui";
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { Cell, Pie, PieChart } from "recharts";
+import { Eye, EyeOff } from "lucide-react";
 import { SpendingHistoryChart } from "./spending-history-chart";
 
 const DEFAULT_CHART_COLORS = [
@@ -73,7 +74,33 @@ const SpendingPeriodSelector: React.FC<{
 export default function SpendingPage() {
   const navigate = useNavigate();
   const [selectedPeriod, setSelectedPeriod] = useState<"TOTAL" | "YTD" | "LAST_YEAR">("TOTAL");
+  const [hiddenCategories, setHiddenCategories] = useState<Set<string>>(new Set());
+  const [hiddenSubcategories, setHiddenSubcategories] = useState<Set<string>>(new Set());
   const { isBalanceHidden } = useBalancePrivacy();
+
+  const toggleCategoryVisibility = useCallback((categoryId: string) => {
+    setHiddenCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(categoryId)) {
+        next.delete(categoryId);
+      } else {
+        next.add(categoryId);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleSubcategoryVisibility = useCallback((subcategoryId: string) => {
+    setHiddenSubcategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(subcategoryId)) {
+        next.delete(subcategoryId);
+      } else {
+        next.add(subcategoryId);
+      }
+      return next;
+    });
+  }, []);
 
   const handleCategoryClick = useCallback(
     (categoryId: string | null | undefined) => {
@@ -102,6 +129,42 @@ export default function SpendingPage() {
     queryFn: getSpendingSummary,
   });
 
+  const periodSummary = spendingData?.find((summary) => summary.period === selectedPeriod);
+  const totalSummary = spendingData?.find((summary) => summary.period === "TOTAL");
+
+  // Calculate filtered totals based on hidden categories AND hidden subcategories - must be called before any returns
+  const filteredTotals = useMemo(() => {
+    if (!periodSummary) {
+      return { totalSpending: 0, monthlyAverage: 0 };
+    }
+
+    const numMonths = Object.keys(periodSummary.byMonth).length;
+    let filteredSpending = 0;
+
+    // Start with category-level filtering
+    Object.entries(periodSummary.byCategory).forEach(([categoryId, cat]) => {
+      if (!hiddenCategories.has(categoryId)) {
+        filteredSpending += cat.amount;
+      }
+    });
+
+    // Also subtract hidden subcategories (if their parent category is visible)
+    if (hiddenSubcategories.size > 0 && periodSummary.bySubcategory) {
+      Object.entries(periodSummary.bySubcategory).forEach(([subcategoryId, sub]) => {
+        const parentCategoryId = sub.categoryId || "uncategorized";
+        // Only subtract if the parent category is visible but the subcategory is hidden
+        if (!hiddenCategories.has(parentCategoryId) && hiddenSubcategories.has(subcategoryId)) {
+          filteredSpending -= sub.amount;
+        }
+      });
+    }
+
+    return {
+      totalSpending: filteredSpending,
+      monthlyAverage: numMonths > 0 ? filteredSpending / numMonths : 0,
+    };
+  }, [periodSummary, hiddenCategories, hiddenSubcategories]);
+
   if (isLoading) {
     return <SpendingDashboardSkeleton />;
   }
@@ -109,9 +172,6 @@ export default function SpendingPage() {
   if (error || !spendingData) {
     return <div>Failed to load spending summary: {error?.message || "Unknown error"}</div>;
   }
-
-  const periodSummary = spendingData.find((summary) => summary.period === selectedPeriod);
-  const totalSummary = spendingData.find((summary) => summary.period === "TOTAL");
 
   if (!periodSummary || !totalSummary) {
     return (
@@ -137,7 +197,11 @@ export default function SpendingPage() {
     );
   }
 
-  const { totalSpending, currency, monthlyAverage, byCategory, bySubcategory } = periodSummary;
+  const { currency, byCategory, bySubcategory } = periodSummary;
+
+  const { totalSpending, monthlyAverage } = (hiddenCategories.size > 0 || hiddenSubcategories.size > 0)
+    ? filteredTotals
+    : { totalSpending: periodSummary.totalSpending, monthlyAverage: periodSummary.monthlyAverage };
 
   const topCategories = Object.entries(byCategory)
     .filter(([, cat]) => cat.amount > 0)
@@ -316,6 +380,12 @@ export default function SpendingPage() {
           <SpendingHistoryChart
             monthlySpendingData={monthlySpendingData}
             previousMonthlySpendingData={previousMonthlySpendingData}
+            byMonthByCategory={periodSummary.byMonthByCategory}
+            byMonthBySubcategory={periodSummary.byMonthBySubcategory}
+            byCategory={byCategory}
+            bySubcategory={bySubcategory}
+            hiddenCategories={hiddenCategories}
+            hiddenSubcategories={hiddenSubcategories}
             selectedPeriod={selectedPeriod}
             currency={currency}
             isBalanceHidden={isBalanceHidden}
@@ -366,7 +436,7 @@ export default function SpendingPage() {
 
                       return chartItems.map((item, index) => {
                         const percentage =
-                          totalSpending > 0 ? (item.amount / totalSpending) * 100 : 0;
+                          periodSummary.totalSpending > 0 ? (item.amount / periodSummary.totalSpending) * 100 : 0;
 
                         return (
                           <div
@@ -396,24 +466,48 @@ export default function SpendingPage() {
                   </div>
 
                   {topCategories.map(([key, cat], index) => {
-                    const percentage = totalSpending > 0 ? (cat.amount / totalSpending) * 100 : 0;
+                    const percentage = periodSummary.totalSpending > 0 ? (cat.amount / periodSummary.totalSpending) * 100 : 0;
+                    const categoryId = cat.categoryId || "uncategorized";
+                    const isHidden = hiddenCategories.has(categoryId);
 
                     return (
                       <div
                         key={key}
-                        className="flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 transition-colors hover:bg-muted/50"
-                        onClick={() => handleCategoryClick(cat.categoryId)}
+                        className={`flex items-center justify-between rounded-md px-2 py-1.5 transition-colors hover:bg-muted/50 ${isHidden ? "opacity-50" : ""}`}
                       >
                         <div className="flex items-center">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleCategoryVisibility(categoryId);
+                            }}
+                            className="mr-2 text-muted-foreground hover:text-foreground transition-colors"
+                            title={isHidden ? "Show in chart" : "Hide from chart"}
+                          >
+                            {isHidden ? (
+                              <EyeOff className="h-3.5 w-3.5" />
+                            ) : (
+                              <Eye className="h-3.5 w-3.5" />
+                            )}
+                          </button>
                           <div
-                            className="mr-2 h-3 w-3 rounded-full"
+                            className="mr-2 h-3 w-3 rounded-full cursor-pointer"
                             style={{
                               backgroundColor: cat.color || DEFAULT_CHART_COLORS[index % DEFAULT_CHART_COLORS.length],
                             }}
+                            onClick={() => handleCategoryClick(cat.categoryId)}
                           />
-                          <span className="text-muted-foreground text-xs">{cat.categoryName}</span>
+                          <span
+                            className="text-muted-foreground text-xs cursor-pointer"
+                            onClick={() => handleCategoryClick(cat.categoryId)}
+                          >
+                            {cat.categoryName}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div
+                          className="flex items-center gap-2 cursor-pointer"
+                          onClick={() => handleCategoryClick(cat.categoryId)}
+                        >
                           <span className="text-muted-foreground text-xs">
                             {percentage.toFixed(1)}%
                           </span>
@@ -437,26 +531,55 @@ export default function SpendingPage() {
             <CardContent>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                 {topSubcategories.map(([key, sub], index) => {
-                  const percentage = totalSpending > 0 ? (sub.amount / totalSpending) * 100 : 0;
+                  const percentage = periodSummary.totalSpending > 0 ? (sub.amount / periodSummary.totalSpending) * 100 : 0;
                   const color = sub.color || DEFAULT_CHART_COLORS[index % DEFAULT_CHART_COLORS.length];
+                  const subcategoryId = sub.subcategoryId || key;
+                  const isHidden = hiddenSubcategories.has(subcategoryId);
+                  const parentCategoryId = sub.categoryId || "uncategorized";
+                  const isParentHidden = hiddenCategories.has(parentCategoryId);
 
                   return (
                     <div
                       key={key}
-                      className="bg-muted/30 flex cursor-pointer flex-col gap-1 rounded-lg border p-3 transition-colors hover:bg-muted/50"
-                      onClick={() => handleSubcategoryClick(sub.subcategoryId)}
+                      className={`bg-muted/30 flex flex-col gap-1 rounded-lg border p-3 transition-colors hover:bg-muted/50 ${isHidden || isParentHidden ? "opacity-50" : ""}`}
                     >
                       <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleSubcategoryVisibility(subcategoryId);
+                          }}
+                          className="text-muted-foreground hover:text-foreground transition-colors"
+                          title={isHidden ? "Show in chart" : "Hide from chart"}
+                        >
+                          {isHidden ? (
+                            <EyeOff className="h-3.5 w-3.5" />
+                          ) : (
+                            <Eye className="h-3.5 w-3.5" />
+                          )}
+                        </button>
                         <div
-                          className="h-2.5 w-2.5 shrink-0 rounded-full"
+                          className="h-2.5 w-2.5 shrink-0 rounded-full cursor-pointer"
                           style={{ backgroundColor: color }}
+                          onClick={() => handleSubcategoryClick(sub.subcategoryId)}
                         />
-                        <span className="text-sm font-medium truncate">{sub.subcategoryName}</span>
+                        <span
+                          className="text-sm font-medium truncate cursor-pointer"
+                          onClick={() => handleSubcategoryClick(sub.subcategoryId)}
+                        >
+                          {sub.subcategoryName}
+                        </span>
                       </div>
-                      <span className="text-muted-foreground text-xs truncate pl-[18px]">
+                      <span
+                        className="text-muted-foreground text-xs truncate pl-[26px] cursor-pointer"
+                        onClick={() => handleSubcategoryClick(sub.subcategoryId)}
+                      >
                         {sub.categoryName}
                       </span>
-                      <div className="mt-1 flex items-center justify-between pl-[18px]">
+                      <div
+                        className="mt-1 flex items-center justify-between pl-[26px] cursor-pointer"
+                        onClick={() => handleSubcategoryClick(sub.subcategoryId)}
+                      >
                         <span className="text-muted-foreground text-xs">
                           {percentage.toFixed(1)}%
                         </span>

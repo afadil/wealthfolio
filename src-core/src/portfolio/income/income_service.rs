@@ -188,6 +188,20 @@ impl IncomeServiceTrait for IncomeService {
                     source.percentage = source.percentage.round_dp(DISPLAY_DECIMAL_PRECISION);
                 }
 
+                // Round by_month_by_source_type values
+                for month_map in summary.by_month_by_source_type.values_mut() {
+                    for val in month_map.values_mut() {
+                        *val = val.round_dp(DISPLAY_DECIMAL_PRECISION);
+                    }
+                }
+
+                // Round by_month_by_symbol values
+                for month_map in summary.by_month_by_symbol.values_mut() {
+                    for val in month_map.values_mut() {
+                        *val = val.round_dp(DISPLAY_DECIMAL_PRECISION);
+                    }
+                }
+
                 summary
             })
             .collect();

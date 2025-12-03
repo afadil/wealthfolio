@@ -28,6 +28,8 @@ pub struct SpendingSummary {
     pub by_category: HashMap<String, CategorySpending>,    // CategoryId -> CategorySpending
     pub by_subcategory: HashMap<String, SubcategorySpending>, // SubcategoryId -> SubcategorySpending
     pub by_account: HashMap<String, Decimal>,              // AccountId -> Amount
+    pub by_month_by_category: HashMap<String, HashMap<String, Decimal>>, // Month -> CategoryId -> Amount (for stacked bar charts)
+    pub by_month_by_subcategory: HashMap<String, HashMap<String, Decimal>>, // Month -> SubcategoryId -> Amount (for filtering chart by subcategory)
     pub total_spending: Decimal,
     pub currency: String,
     pub monthly_average: Decimal,
@@ -67,6 +69,8 @@ impl SpendingSummary {
             by_category: HashMap::new(),
             by_subcategory: HashMap::new(),
             by_account: HashMap::new(),
+            by_month_by_category: HashMap::new(),
+            by_month_by_subcategory: HashMap::new(),
             total_spending: Decimal::ZERO,
             currency,
             monthly_average: Decimal::ZERO,
@@ -87,6 +91,15 @@ impl SpendingSummary {
             .category_id
             .clone()
             .unwrap_or_else(|| "uncategorized".to_string());
+
+        // Aggregate by month and category (for stacked bar charts)
+        let month_categories = self
+            .by_month_by_category
+            .entry(data.date.clone())
+            .or_insert_with(HashMap::new);
+        *month_categories
+            .entry(category_key.clone())
+            .or_insert(Decimal::ZERO) += converted_amount;
         let category_entry = self
             .by_category
             .entry(category_key.clone())
@@ -105,6 +118,15 @@ impl SpendingSummary {
 
         // Aggregate by subcategory (only if subcategory exists)
         if let Some(ref subcategory_id) = data.sub_category_id {
+            // Aggregate by month and subcategory (for filtering chart by subcategory)
+            let month_subcategories = self
+                .by_month_by_subcategory
+                .entry(data.date.clone())
+                .or_insert_with(HashMap::new);
+            *month_subcategories
+                .entry(subcategory_id.clone())
+                .or_insert(Decimal::ZERO) += converted_amount;
+
             let subcategory_entry = self
                 .by_subcategory
                 .entry(subcategory_id.clone())

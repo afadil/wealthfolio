@@ -191,6 +191,16 @@ impl SpendingServiceTrait for SpendingService {
                 for val in summary.by_account.values_mut() {
                     *val = val.round_dp(DISPLAY_DECIMAL_PRECISION);
                 }
+                for month_map in summary.by_month_by_category.values_mut() {
+                    for val in month_map.values_mut() {
+                        *val = val.round_dp(DISPLAY_DECIMAL_PRECISION);
+                    }
+                }
+                for month_map in summary.by_month_by_subcategory.values_mut() {
+                    for val in month_map.values_mut() {
+                        *val = val.round_dp(DISPLAY_DECIMAL_PRECISION);
+                    }
+                }
                 summary
             })
             .collect();

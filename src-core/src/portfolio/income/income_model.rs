@@ -51,6 +51,8 @@ pub struct IncomeSummary {
     pub by_type: HashMap<String, Decimal>,
     pub by_symbol: HashMap<String, Decimal>,
     pub by_currency: HashMap<String, Decimal>,
+    pub by_month_by_source_type: HashMap<String, HashMap<String, Decimal>>, // Month -> SourceType -> Amount (for stacked bar charts)
+    pub by_month_by_symbol: HashMap<String, HashMap<String, Decimal>>, // Month -> Symbol -> Amount (for filtering chart by symbol)
     pub total_income: Decimal,
     pub investment_income: Decimal,
     pub cash_income: Decimal,
@@ -69,6 +71,8 @@ impl IncomeSummary {
             by_type: HashMap::new(),
             by_symbol: HashMap::new(),
             by_currency: HashMap::new(),
+            by_month_by_source_type: HashMap::new(),
+            by_month_by_symbol: HashMap::new(),
             total_income: Decimal::ZERO,
             investment_income: Decimal::ZERO,
             cash_income: Decimal::ZERO,
@@ -86,13 +90,33 @@ impl IncomeSummary {
             .by_month
             .entry(data.date.to_string())
             .or_insert_with(|| Decimal::ZERO) += &converted_amount;
+
+        // Aggregate by month and source type (for stacked bar charts)
+        let month_sources = self
+            .by_month_by_source_type
+            .entry(data.date.to_string())
+            .or_insert_with(HashMap::new);
+        *month_sources
+            .entry("Investment Income".to_string())
+            .or_insert(Decimal::ZERO) += &converted_amount;
+
+        // Aggregate by month and symbol (for filtering chart by symbol)
+        let symbol_key = format!("[{}]-{}", data.symbol, data.symbol_name);
+        let month_symbols = self
+            .by_month_by_symbol
+            .entry(data.date.to_string())
+            .or_insert_with(HashMap::new);
+        *month_symbols
+            .entry(symbol_key.clone())
+            .or_insert(Decimal::ZERO) += &converted_amount;
+
         *self
             .by_type
             .entry(data.income_type.clone())
             .or_insert_with(|| Decimal::ZERO) += &converted_amount;
         *self
             .by_symbol
-            .entry(format!("[{}]-{}", data.symbol, data.symbol_name))
+            .entry(symbol_key)
             .or_insert_with(|| Decimal::ZERO) += &converted_amount;
         *self
             .by_currency
@@ -109,6 +133,15 @@ impl IncomeSummary {
             .entry(data.date.to_string())
             .or_insert_with(|| Decimal::ZERO) += &converted_amount;
 
+        // Aggregate by month and source type (for stacked bar charts)
+        let month_sources = self
+            .by_month_by_source_type
+            .entry(data.date.to_string())
+            .or_insert_with(HashMap::new);
+        *month_sources
+            .entry("Cash Income".to_string())
+            .or_insert(Decimal::ZERO) += &converted_amount;
+
         // Use category name for type if available, otherwise use activity type
         let income_type = data.category_name.clone()
             .unwrap_or_else(|| data.activity_type.clone());
@@ -123,9 +156,20 @@ impl IncomeSummary {
             (Some(cat), None) => cat.clone(),
             _ => data.account_name.clone(),
         };
+        let symbol_key = format!("[$CASH]-{}", display_name);
+
+        // Aggregate by month and symbol (for filtering chart by symbol)
+        let month_symbols = self
+            .by_month_by_symbol
+            .entry(data.date.to_string())
+            .or_insert_with(HashMap::new);
+        *month_symbols
+            .entry(symbol_key.clone())
+            .or_insert(Decimal::ZERO) += &converted_amount;
+
         *self
             .by_symbol
-            .entry(format!("[$CASH]-{}", display_name))
+            .entry(symbol_key)
             .or_insert_with(|| Decimal::ZERO) += &converted_amount;
         *self
             .by_currency
@@ -143,13 +187,33 @@ impl IncomeSummary {
                 .by_month
                 .entry(data.date.to_string())
                 .or_insert_with(|| Decimal::ZERO) += &converted_gain;
+
+            // Aggregate by month and source type (for stacked bar charts)
+            let month_sources = self
+                .by_month_by_source_type
+                .entry(data.date.to_string())
+                .or_insert_with(HashMap::new);
+            *month_sources
+                .entry("Capital Gains".to_string())
+                .or_insert(Decimal::ZERO) += &converted_gain;
+
+            // Aggregate by month and symbol (for filtering chart by symbol)
+            let symbol_key = format!("[{}]-{}", data.symbol, data.symbol_name);
+            let month_symbols = self
+                .by_month_by_symbol
+                .entry(data.date.to_string())
+                .or_insert_with(HashMap::new);
+            *month_symbols
+                .entry(symbol_key.clone())
+                .or_insert(Decimal::ZERO) += &converted_gain;
+
             *self
                 .by_type
                 .entry("Capital Gains".to_string())
                 .or_insert_with(|| Decimal::ZERO) += &converted_gain;
             *self
                 .by_symbol
-                .entry(format!("[{}]-{}", data.symbol, data.symbol_name))
+                .entry(symbol_key)
                 .or_insert_with(|| Decimal::ZERO) += &converted_gain;
             *self
                 .by_currency

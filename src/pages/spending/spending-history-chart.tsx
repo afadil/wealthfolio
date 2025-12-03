@@ -1,22 +1,27 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
 import { Icons } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
+import type { CategorySpending, SubcategorySpending } from "@/lib/types";
 import { formatAmount } from "@wealthfolio/ui";
 import { format, parseISO } from "date-fns";
-import React from "react";
+import React, { useMemo } from "react";
 import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
 
 interface SpendingHistoryChartProps {
   monthlySpendingData: [string, number][];
   previousMonthlySpendingData: [string, number][];
+  byMonthByCategory: Record<string, Record<string, number>>;
+  byMonthBySubcategory: Record<string, Record<string, number>>;
+  byCategory: Record<string, CategorySpending>;
+  bySubcategory: Record<string, SubcategorySpending>;
+  hiddenCategories: Set<string>;
+  hiddenSubcategories: Set<string>;
   selectedPeriod: "TOTAL" | "YTD" | "LAST_YEAR";
   currency: string;
   isBalanceHidden: boolean;
@@ -25,6 +30,12 @@ interface SpendingHistoryChartProps {
 export function SpendingHistoryChart({
   monthlySpendingData,
   previousMonthlySpendingData,
+  byMonthByCategory,
+  byMonthBySubcategory,
+  byCategory,
+  bySubcategory,
+  hiddenCategories,
+  hiddenSubcategories,
   selectedPeriod,
   currency,
   isBalanceHidden,
@@ -40,21 +51,56 @@ export function SpendingHistoryChart({
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  const chartData = monthlySpendingData.map(([month, spending], index) => {
-    const cumulative = monthlySpendingData.slice(0, index + 1).reduce((sum, [, value]) => {
-      const numericValue = Number(value) || 0;
-      return sum + numericValue;
-    }, 0);
+  // Get all category IDs for filtering
+  const allCategoryIds = useMemo(() => {
+    return Object.keys(byCategory || {});
+  }, [byCategory]);
 
-    const dataPoint = {
-      month,
-      spending: Number(spending) || 0,
-      cumulative: cumulative,
-      previousSpending: Number(previousMonthlySpendingData[index]?.[1]) || 0,
-    };
+  // Get all subcategory IDs for filtering
+  const allSubcategoryIds = useMemo(() => {
+    return Object.keys(bySubcategory || {});
+  }, [bySubcategory]);
 
-    return dataPoint;
-  });
+  // Transform data for bar chart, filtering out hidden categories OR hidden subcategories
+  const chartData = useMemo(() => {
+    let cumulativeTotal = 0;
+
+    return monthlySpendingData.map(([month], index) => {
+      let filteredSpending = 0;
+
+      // If categories are hidden, use category filtering
+      if (hiddenCategories.size > 0) {
+        const monthCategories = byMonthByCategory?.[month] || {};
+        for (const categoryId of allCategoryIds) {
+          if (!hiddenCategories.has(categoryId)) {
+            filteredSpending += Number(monthCategories[categoryId]) || 0;
+          }
+        }
+      }
+      // If subcategories are hidden (subcategory toggles), use subcategory filtering
+      else if (hiddenSubcategories.size > 0) {
+        const monthSubcategories = byMonthBySubcategory?.[month] || {};
+        for (const subcategoryId of allSubcategoryIds) {
+          if (!hiddenSubcategories.has(subcategoryId)) {
+            filteredSpending += Number(monthSubcategories[subcategoryId]) || 0;
+          }
+        }
+      }
+      // No filters - use original monthly data
+      else {
+        filteredSpending = Number(monthlySpendingData.find(([m]) => m === month)?.[1]) || 0;
+      }
+
+      cumulativeTotal += filteredSpending;
+
+      return {
+        month,
+        spending: filteredSpending,
+        cumulative: cumulativeTotal,
+        previousSpending: Number(previousMonthlySpendingData[index]?.[1]) || 0,
+      };
+    });
+  }, [monthlySpendingData, previousMonthlySpendingData, byMonthByCategory, byMonthBySubcategory, allCategoryIds, allSubcategoryIds, hiddenCategories, hiddenSubcategories]);
 
   const periodDescription =
     selectedPeriod === "TOTAL"
@@ -81,7 +127,7 @@ export function SpendingHistoryChart({
           <ChartContainer
             config={{
               spending: {
-                label: "Monthly Spending",
+                label: "Spending",
                 color: "var(--chart-1)",
               },
               cumulative: {
@@ -137,9 +183,19 @@ export function SpendingHistoryChart({
                   <ChartTooltipContent
                     className="min-w-[150px] md:min-w-[180px]"
                     formatter={(value, name, entry) => {
+                      // Skip zero values in tooltip
+                      if (Number(value) === 0) return null;
                       const formattedValue = isBalanceHidden
                         ? "••••"
                         : formatAmount(Number(value), currency);
+                      const displayName =
+                        name === "previousSpending"
+                          ? "Previous"
+                          : name === "cumulative"
+                            ? "Cumulative"
+                            : name === "spending"
+                              ? "Spending"
+                              : String(name);
                       return (
                         <>
                           <div
@@ -152,16 +208,8 @@ export function SpendingHistoryChart({
                             }
                           />
                           <div className="flex flex-1 items-center justify-between gap-2">
-                            <span className="text-muted-foreground text-xs md:text-sm">
-                              {name === "spending"
-                                ? isMobile
-                                  ? "Monthly"
-                                  : "Monthly Spending"
-                                : name === "previousSpending"
-                                  ? "Previous"
-                                  : name === "cumulative"
-                                    ? "Cumulative"
-                                    : name}
+                            <span className="text-muted-foreground text-xs md:text-sm truncate max-w-[120px]">
+                              {displayName}
                             </span>
                             <span className="text-foreground font-mono text-xs font-medium tabular-nums md:text-sm">
                               {formattedValue}
@@ -176,7 +224,6 @@ export function SpendingHistoryChart({
                   />
                 }
               />
-              {!isMobile && <ChartLegend content={<ChartLegendContent payload={[]} />} />}
               <Bar
                 yAxisId="left"
                 dataKey="spending"
