@@ -78,11 +78,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
       ? (() => {
           return new Date(activity.date);
         })()
-      : (() => {
-          const date = new Date();
-          date.setHours(16, 0, 0, 0); // Set to 4:00 PM which is market close time
-          return date;
-        })(),
+      : new Date(),
 
     currency: activity?.currency || "",
     assetDataSource: activity?.assetDataSource || DataSource.YAHOO,
