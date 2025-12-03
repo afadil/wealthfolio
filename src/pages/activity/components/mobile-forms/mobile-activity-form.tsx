@@ -66,11 +66,7 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
     assetId: activity?.assetId,
     activityDate: activity?.date
       ? new Date(activity.date)
-      : (() => {
-          const date = new Date();
-          date.setHours(16, 0, 0, 0);
-          return date;
-        })(),
+      : new Date(),
     currency: activity?.currency ?? "",
     assetDataSource: activity?.assetDataSource ?? DataSource.YAHOO,
     showCurrencySelect: false,
