@@ -15,7 +15,6 @@ import HoldingsPage from "@/pages/holdings/holdings-page";
 import IncomePage from "@/pages/income/income-page";
 import PortfolioInsightsPage from "@/pages/insights/portfolio-insights";
 import SpendingPage from "@/pages/spending/spending-page";
-import PerformancePage from "@/pages/performance/performance-page";
 import SettingsAccountsPage from "@/pages/settings/accounts/accounts-page";
 import SettingsAppearancePage from "@/pages/settings/appearance/appearance-page";
 import CategoriesPage from "@/pages/settings/categories/categories-page";
@@ -88,7 +87,6 @@ export function AppRoutes() {
             <Route path="accounts/:id" element={<AccountPage />} />
             <Route path="income" element={<IncomePage />} />
             <Route path="spending" element={<SpendingPage />} />
-            <Route path="performance" element={<PerformancePage />} />
             <Route path="insights" element={<PortfolioInsightsPage />} />
             <Route path="cashflow" element={<CashActivitiesPage />} />
             <Route path="cashflow/import" element={<CashImportPage />} />

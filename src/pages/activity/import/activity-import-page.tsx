@@ -87,11 +87,6 @@ function ActivityImportPage() {
     resetParserStates();
   };
 
-  // Cancel import and navigate to activities page
-  const cancelImport = () => {
-    navigate("/trades");
-  };
-
   // Handle file selection
   const handleFileChange = (file: File | null) => {
     if (file) {

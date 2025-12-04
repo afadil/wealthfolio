@@ -15,9 +15,6 @@ import {
   AmountDisplay,
   AnimatedToggleGroup,
   GainPercent,
-  Page,
-  PageContent,
-  PageHeader,
   PrivacyAmount,
 } from "@wealthfolio/ui";
 import React, { useState, useCallback, useMemo } from "react";

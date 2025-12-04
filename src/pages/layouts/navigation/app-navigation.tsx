@@ -29,15 +29,8 @@ const staticNavigation: NavigationProps = {
       icon: <Icons.Insight className="size-6" />,
       title: "Insights",
       href: "/insights",
-      keywords: ["portfolio", "assets", "positions", "stocks"],
-      label: "View Holdings",
-    },
-    {
-      icon: <Icons.Performance className="size-6" />,
-      title: "Performance",
-      href: "/performance",
-      keywords: ["returns", "metrics", "gains", "losses"],
-      label: "View Performance",
+      keywords: ["portfolio", "assets", "positions", "stocks", "performance", "returns", "metrics", "gains", "losses"],
+      label: "View Insights",
     },
     {
       icon: <Icons.Income className="size-6" />,
