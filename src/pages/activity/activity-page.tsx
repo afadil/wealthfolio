@@ -14,9 +14,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   Icons,
-  Page,
-  PageContent,
-  PageHeader,
 } from "@wealthfolio/ui";
 import { debounce } from "lodash";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -34,7 +31,11 @@ import { MobileActivityForm } from "./components/mobile-forms/mobile-activity-fo
 import { useActivityMutations } from "./hooks/use-activity-mutations";
 import { useActivitySearch } from "./hooks/use-activity-search";
 
-const ActivityPage = () => {
+interface ActivityPageProps {
+  renderActions?: (actions: React.ReactNode) => void;
+}
+
+const ActivityPage = ({ renderActions }: ActivityPageProps) => {
   const [showForm, setShowForm] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Partial<ActivityDetails> | undefined>();
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
@@ -145,61 +146,62 @@ const ActivityPage = () => {
     setSelectedActivity(undefined);
   }, []);
 
-  const headerActions = (
-    <div className="flex flex-wrap items-center gap-2">
-      {/* Desktop dropdown menu */}
-      <div className="hidden sm:flex">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="sm">
-              <Icons.Plus className="mr-2 h-4 w-4" />
-              Add Activities
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem asChild>
-              <Link to={"/trades/import"} className="flex cursor-pointer items-center py-2.5">
-                <Icons.Import className="mr-2 h-4 w-4" />
-                Import from CSV
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setShowBulkHoldingsForm(true)} className="py-2.5">
-              <Icons.Holdings className="mr-2 h-4 w-4" />
-              Add Holdings
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => handleEdit(undefined)} className="py-2.5">
-              <Icons.Activity className="mr-2 h-4 w-4" />
-              Add Transaction
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+  const headerActions = useMemo(
+    () => (
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Desktop dropdown menu */}
+        <div className="hidden sm:flex">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm">
+                <Icons.Plus className="mr-2 h-4 w-4" />
+                Add Activities
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem asChild>
+                <Link to={"/activity/import"} className="flex cursor-pointer items-center py-2.5">
+                  <Icons.Import className="mr-2 h-4 w-4" />
+                  Import from CSV
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setShowBulkHoldingsForm(true)} className="py-2.5">
+                <Icons.Holdings className="mr-2 h-4 w-4" />
+                Add Holdings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleEdit(undefined)} className="py-2.5">
+                <Icons.Activity className="mr-2 h-4 w-4" />
+                Add Transaction
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
 
-      {/* Mobile add button */}
-      <div className="flex items-center gap-2 sm:hidden">
-        <Button size="icon" title="Import" variant="outline" asChild>
-          <Link to={"/trades/import"}>
-            <Icons.Import className="size-4" />
-          </Link>
-        </Button>
-        <Button size="icon" title="Add" onClick={() => handleEdit(undefined)}>
-          <Icons.Plus className="size-4" />
-        </Button>
+        {/* Mobile add button */}
+        <div className="flex items-center gap-2 sm:hidden">
+          <Button size="icon" title="Import" variant="outline" asChild>
+            <Link to={"/activity/import"}>
+              <Icons.Import className="size-4" />
+            </Link>
+          </Button>
+          <Button size="icon" title="Add" onClick={() => handleEdit(undefined)}>
+            <Icons.Plus className="size-4" />
+          </Button>
+        </div>
       </div>
-    </div>
+    ),
+    [handleEdit],
   );
 
+  // Pass actions to parent component
+  useEffect(() => {
+    renderActions?.(headerActions);
+  }, [renderActions, headerActions]);
+
   return (
-    <Page>
-      <PageHeader
-        heading="Trades"
-        text="Track trades, dividends, and other investment transactions"
-        actions={headerActions}
-      />
-      <PageContent className="pb-2 md:pb-4 lg:pb-5">
-        <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-hidden px-2 pt-2 pb-2 md:pb-4 lg:px-4 lg:pb-5">
           {isMobileViewport ? (
             <ActivityMobileControls
               accounts={accounts}
@@ -266,7 +268,7 @@ const ActivityPage = () => {
             totalFetched={totalFetched}
             totalCount={totalRowCount}
           />
-        </div>
+
         {isMobileViewport ? (
           <MobileActivityForm
             key={selectedActivity?.id ?? "new"}
@@ -299,6 +301,7 @@ const ActivityPage = () => {
             onClose={handleFormClose}
           />
         )}
+
         <ActivityDeleteModal
           isOpen={showDeleteAlert}
           isDeleting={deleteActivityMutation.isPending}
@@ -308,6 +311,7 @@ const ActivityPage = () => {
             setSelectedActivity(undefined);
           }}
         />
+
         <BulkHoldingsModal
           open={showBulkHoldingsForm}
           onClose={() => setShowBulkHoldingsForm(false)}
@@ -315,8 +319,7 @@ const ActivityPage = () => {
             setShowBulkHoldingsForm(false);
           }}
         />
-      </PageContent>
-    </Page>
+    </div>
   );
 };
 

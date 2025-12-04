@@ -7,20 +7,18 @@ import { OnboardingLayout } from "@/pages/layouts/onboarding-layout";
 import SettingsLayout from "@/pages/settings/settings-layout";
 
 import ActivityManagerPage from "@/pages/activity/activity-manager-page";
-import ActivityPage from "@/pages/activity/activity-page";
+import CombinedActivityPage from "@/pages/activity/combined-activity-page";
 import ActivityImportPage from "@/pages/activity/import/activity-import-page";
 import AssetsPage from "@/pages/asset/assets-page";
 import DashboardPage from "@/pages/dashboard/dashboard-page";
 import HoldingsPage from "@/pages/holdings/holdings-page";
-import IncomePage from "@/pages/income/income-page";
 import PortfolioInsightsPage from "@/pages/insights/portfolio-insights";
-import SpendingPage from "@/pages/spending/spending-page";
+import CashflowPage from "@/pages/cashflow/cashflow-page";
 import SettingsAccountsPage from "@/pages/settings/accounts/accounts-page";
 import SettingsAppearancePage from "@/pages/settings/appearance/appearance-page";
 import CategoriesPage from "@/pages/settings/categories/categories-page";
 import ActivityRulesPage from "@/pages/settings/activity-rules/activity-rules-page";
 import { EventsPage } from "@/pages/settings/events/events-page";
-import CashActivitiesPage from "@/pages/cash/activities";
 import CashImportPage from "@/pages/cash/activities/import/cash-import-page";
 import AccountPage from "./pages/account/account-page";
 import AssetProfilePage from "./pages/asset/asset-profile-page";
@@ -33,7 +31,6 @@ import SettingsGoalsPage from "./pages/settings/goals/goals-page";
 import MarketDataImportPage from "./pages/settings/market-data/market-data-import-page";
 import MarketDataSettingsPage from "./pages/settings/market-data/market-data-settings";
 import useGlobalEventListener from "./use-global-event-listener";
-// import QRScannerPage from './pages/qr-scanner/qr-scanner-page'; // File not found
 import { getDynamicRoutes, subscribeToNavigationUpdates } from "@/addons/addons-runtime-context";
 import NotFoundPage from "@/pages/not-found";
 import HoldingsInsightsPage from "./pages/holdings/holdings-insights-page";
@@ -66,9 +63,6 @@ export function AppRoutes() {
     <BrowserRouter>
       <UnsavedChangesProvider>
         <Routes>
-          {/* QR Scanner - No layout for fullscreen camera access */}
-          {/* <Route path="/qr-scanner" element={<QRScannerPage />} /> */}
-
           {/* Onboarding with dedicated layout */}
           <Route path="/onboarding" element={<OnboardingLayout />}>
             <Route index element={<OnboardingPage />} />
@@ -78,18 +72,16 @@ export function AppRoutes() {
           <Route path="/" element={<AppLayout />}>
             <Route index element={<DashboardPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
-            <Route path="trades" element={<ActivityPage />} />
-            <Route path="trades/manage" element={<ActivityManagerPage />} />
-            <Route path="trades/import" element={<ActivityImportPage />} />
+            <Route path="activity" element={<CombinedActivityPage />} />
+            <Route path="activity/manage" element={<ActivityManagerPage />} />
+            <Route path="activity/import" element={<ActivityImportPage />} />
+            <Route path="activity/cash-import" element={<CashImportPage />} />
             <Route path="holdings" element={<HoldingsPage />} />
             <Route path="holdings-insights" element={<HoldingsInsightsPage />} />
             <Route path="holdings/:symbol" element={<AssetProfilePage />} />
             <Route path="accounts/:id" element={<AccountPage />} />
-            <Route path="income" element={<IncomePage />} />
-            <Route path="spending" element={<SpendingPage />} />
+            <Route path="cashflow" element={<CashflowPage />} />
             <Route path="insights" element={<PortfolioInsightsPage />} />
-            <Route path="cashflow" element={<CashActivitiesPage />} />
-            <Route path="cashflow/import" element={<CashImportPage />} />
             {/* Dynamic addon routes */}
             {dynamicRoutes.map(({ path, component: Component }) => (
               <Route

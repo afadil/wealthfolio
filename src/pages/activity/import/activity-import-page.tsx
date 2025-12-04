@@ -198,7 +198,7 @@ function ActivityImportPage() {
       <UnsavedChangesDialog />
       <PageHeader
         heading="Import Trades"
-        onBack={isMobile ? () => navigate("/trades") : undefined}
+        onBack={isMobile ? () => navigate("/activity") : undefined}
         actions={<ImportHelpPopover />}
       />
       <PageContent withPadding={false}>

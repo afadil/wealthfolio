@@ -13,9 +13,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   Icons,
-  Page,
-  PageContent,
-  PageHeader,
 } from "@wealthfolio/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CashActivityFilters, CashActivityViewMode, CategorizationStatus } from "./components/cash-activity-filters";
@@ -28,7 +25,11 @@ import { ActivityDeleteModal } from "@/pages/activity/components/activity-delete
 import { ActivityPagination } from "@/pages/activity/components/activity-pagination";
 import { Link, useSearchParams } from "react-router-dom";
 
-function CashActivitiesPage() {
+interface CashActivitiesPageProps {
+  renderActions?: (actions: React.ReactNode) => void;
+}
+
+function CashActivitiesPage({ renderActions }: CashActivitiesPageProps) {
   const [searchParams] = useSearchParams();
 
   const urlCategoryId = searchParams.get("category");
@@ -197,54 +198,55 @@ function CashActivitiesPage() {
     setShowForm(true);
   }, []);
 
-  const headerActions = (
-    <div className="flex flex-wrap items-center gap-2">
-      <div className="hidden sm:flex">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="sm">
-              <Icons.Plus className="mr-2 h-4 w-4" />
-              Add Activities
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem asChild className="py-2.5">
-              <Link to="/cashflow/import">
-                <Icons.Import className="mr-2 h-4 w-4" />
-                Import from CSV
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleAddTransaction} className="py-2.5">
-              <Icons.Clock className="mr-2 h-4 w-4" />
-              Add Transaction
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+  const headerActions = useMemo(
+    () => (
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="hidden sm:flex">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm">
+                <Icons.Plus className="mr-2 h-4 w-4" />
+                Add Activities
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem asChild className="py-2.5">
+                <Link to="/activity/cash-import">
+                  <Icons.Import className="mr-2 h-4 w-4" />
+                  Import from CSV
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleAddTransaction} className="py-2.5">
+                <Icons.Clock className="mr-2 h-4 w-4" />
+                Add Transaction
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
 
-      <div className="flex items-center gap-2 sm:hidden">
-        <Button size="icon" variant="outline" title="Import" asChild>
-          <Link to="/cashflow/import">
-            <Icons.Import className="size-4" />
-          </Link>
-        </Button>
-        <Button size="icon" title="Add" onClick={handleAddTransaction}>
-          <Icons.Plus className="size-4" />
-        </Button>
+        <div className="flex items-center gap-2 sm:hidden">
+          <Button size="icon" variant="outline" title="Import" asChild>
+            <Link to="/activity/cash-import">
+              <Icons.Import className="size-4" />
+            </Link>
+          </Button>
+          <Button size="icon" title="Add" onClick={handleAddTransaction}>
+            <Icons.Plus className="size-4" />
+          </Button>
+        </div>
       </div>
-    </div>
+    ),
+    [handleAddTransaction],
   );
 
+  // Pass actions to parent component
+  useEffect(() => {
+    renderActions?.(headerActions);
+  }, [renderActions, headerActions]);
+
   return (
-    <Page>
-      <PageHeader
-        heading="Cashflow"
-        text="Track deposits, withdrawals, and transfers for your cash accounts"
-        actions={headerActions}
-      />
-      <PageContent>
-        <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-hidden px-2 pt-2 pb-2 lg:px-4 lg:pb-4">
           <CashActivityFilters
             accounts={accounts}
             searchQuery={searchQuery}
@@ -298,7 +300,6 @@ function CashActivitiesPage() {
             totalFetched={totalFetched}
             totalCount={totalRowCount}
           />
-        </div>
 
         <CashActivityForm
           key={selectedActivity?.id ?? "new"}
@@ -321,8 +322,7 @@ function CashActivitiesPage() {
             setSelectedActivity(undefined);
           }}
         />
-      </PageContent>
-    </Page>
+    </div>
   );
 };
 

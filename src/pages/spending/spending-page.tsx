@@ -14,12 +14,9 @@ import {
   AmountDisplay,
   AnimatedToggleGroup,
   GainPercent,
-  Page,
-  PageContent,
-  PageHeader,
   PrivacyAmount,
 } from "@wealthfolio/ui";
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { Cell, Pie, PieChart } from "recharts";
 import { Eye, EyeOff } from "lucide-react";
 import { SpendingHistoryChart } from "./spending-history-chart";
@@ -71,7 +68,11 @@ const SpendingPeriodSelector: React.FC<{
   </>
 );
 
-export default function SpendingPage() {
+interface SpendingPageProps {
+  renderActions?: (actions: React.ReactNode) => void;
+}
+
+export default function SpendingPage({ renderActions }: SpendingPageProps) {
   const navigate = useNavigate();
   const [selectedPeriod, setSelectedPeriod] = useState<"TOTAL" | "YTD" | "LAST_YEAR">("TOTAL");
   const [hiddenCategories, setHiddenCategories] = useState<Set<string>>(new Set());
@@ -129,6 +130,22 @@ export default function SpendingPage() {
     queryFn: getSpendingSummary,
   });
 
+  // Memoized period selector to pass to parent
+  const periodActions = useMemo(
+    () => (
+      <SpendingPeriodSelector
+        selectedPeriod={selectedPeriod}
+        onPeriodSelect={setSelectedPeriod}
+      />
+    ),
+    [selectedPeriod],
+  );
+
+  // Pass actions to parent component
+  useEffect(() => {
+    renderActions?.(periodActions);
+  }, [renderActions, periodActions]);
+
   const periodSummary = spendingData?.find((summary) => summary.period === selectedPeriod);
   const totalSummary = spendingData?.find((summary) => summary.period === "TOTAL");
 
@@ -175,25 +192,14 @@ export default function SpendingPage() {
 
   if (!periodSummary || !totalSummary) {
     return (
-      <Page>
-        <PageHeader
-          heading="Spending"
-          actions={
-            <SpendingPeriodSelector
-              selectedPeriod={selectedPeriod}
-              onPeriodSelect={setSelectedPeriod}
-            />
-          }
+      <div className="flex min-h-0 flex-1 flex-col space-y-6 px-2 pt-2 pb-2 lg:px-4 lg:pb-4">
+        <EmptyPlaceholder
+          className="mx-auto flex max-w-[420px] items-center justify-center pt-12"
+          icon={<Icons.CreditCard className="h-10 w-10" />}
+          title="No spending data available"
+          description="There is no spending data for the selected period. Try selecting a different time range or check back later."
         />
-        <PageContent>
-          <EmptyPlaceholder
-            className="mx-auto flex max-w-[420px] items-center justify-center"
-            icon={<Icons.CreditCard className="h-10 w-10" />}
-            title="No spending data available"
-            description="There is no spending data for the selected period. Try selecting a different time range or check back later."
-          />
-        </PageContent>
-      </Page>
+      </div>
     );
   }
 
@@ -264,17 +270,7 @@ export default function SpendingPage() {
     .slice(0, 10);
 
   return (
-    <Page>
-      <PageHeader
-        heading="Spending"
-        actions={
-          <SpendingPeriodSelector
-            selectedPeriod={selectedPeriod}
-            onPeriodSelect={setSelectedPeriod}
-          />
-        }
-      />
-      <PageContent>
+    <div className="flex min-h-0 flex-1 flex-col space-y-6 px-2 pt-2 pb-2 lg:px-4 lg:pb-4">
         <div className="grid gap-6 md:grid-cols-3">
           <Card className="border-red-500/10 bg-red-500/10">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -594,8 +590,7 @@ export default function SpendingPage() {
             </CardContent>
           </Card>
         )}
-      </PageContent>
-    </Page>
+    </div>
   );
 }
 

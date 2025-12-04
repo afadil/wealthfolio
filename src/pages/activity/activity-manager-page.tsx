@@ -72,7 +72,7 @@ const ActivityManagerPage = () => {
     if (redirectTo) {
       navigate(redirectTo);
     } else {
-      navigate("/trades");
+      navigate("/activity");
     }
     navigate(-1);
   };

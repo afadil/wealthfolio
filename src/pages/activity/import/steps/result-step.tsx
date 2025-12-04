@@ -37,7 +37,7 @@ export const ResultStep = ({ activities, accounts, onBack, onReset }: ResultStep
   }, [activities]);
 
   const goToActivities = () => {
-    navigate("/trades");
+    navigate("/activity");
   };
 
   const startNewImport = () => {

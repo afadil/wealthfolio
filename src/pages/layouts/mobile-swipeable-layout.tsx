@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 // Main app routes for swipeable navigation
-const routes = ["/dashboard", "/holdings", "/performance", "/income", "/trades"];
+const routes = ["/dashboard", "/holdings", "/insights", "/activity", "/cashflow"];
 
 interface SwipeableLayoutProps {
   children: React.ReactNode;

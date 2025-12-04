@@ -17,7 +17,7 @@ import {
   GainPercent,
   PrivacyAmount,
 } from "@wealthfolio/ui";
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { Cell, Pie, PieChart } from "recharts";
 import { Eye, EyeOff } from "lucide-react";
 import { IncomeHistoryChart } from "./income-history-chart";
@@ -69,7 +69,11 @@ const IncomePeriodSelector: React.FC<{
   </>
 );
 
-export default function IncomePage() {
+interface IncomePageProps {
+  renderActions?: (actions: React.ReactNode) => void;
+}
+
+export default function IncomePage({ renderActions }: IncomePageProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<"TOTAL" | "YTD" | "LAST_YEAR">("TOTAL");
   const [hiddenSourceTypes, setHiddenSourceTypes] = useState<Set<string>>(new Set());
   const [hiddenSymbols, setHiddenSymbols] = useState<Set<string>>(new Set());
@@ -172,6 +176,22 @@ export default function IncomePage() {
     };
   }, [periodSummary, hiddenSourceTypes, hiddenSymbols]);
 
+  // Memoized period selector to pass to parent
+  const periodActions = useMemo(
+    () => (
+      <IncomePeriodSelector
+        selectedPeriod={selectedPeriod}
+        onPeriodSelect={setSelectedPeriod}
+      />
+    ),
+    [selectedPeriod],
+  );
+
+  // Pass actions to parent component
+  useEffect(() => {
+    renderActions?.(periodActions);
+  }, [renderActions, periodActions]);
+
   if (isLoading) {
     return <IncomeDashboardSkeleton />;
   }
@@ -182,20 +202,14 @@ export default function IncomePage() {
 
   if (!periodSummary || !totalSummary) {
     return (
-      <>
-        <div className="pointer-events-auto fixed top-4 right-2 z-20 lg:right-4">
-          <IncomePeriodSelector
-            selectedPeriod={selectedPeriod}
-            onPeriodSelect={setSelectedPeriod}
-          />
-        </div>
+      <div className="flex min-h-0 flex-1 flex-col space-y-6 px-2 pt-2 pb-2 lg:px-4 lg:pb-4">
         <EmptyPlaceholder
           className="mx-auto flex max-w-[420px] items-center justify-center pt-12"
           icon={<Icons.DollarSign className="h-10 w-10" />}
           title="No income data available"
           description="There is no income data for the selected period. Try selecting a different time range or check back later."
         />
-      </>
+      </div>
     );
   }
 
@@ -261,19 +275,7 @@ export default function IncomePage() {
   }));
 
   return (
-    <>
-      {/* Period selector - fixed position in header area */}
-      <div className="pointer-events-auto fixed top-4 right-2 z-20 hidden md:block lg:right-4">
-        <IncomePeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
-      </div>
-
-      <div className="space-y-6">
-        <div className="flex justify-end md:hidden">
-          <IncomePeriodSelector
-            selectedPeriod={selectedPeriod}
-            onPeriodSelect={setSelectedPeriod}
-          />
-        </div>
+    <div className="flex min-h-0 flex-1 flex-col space-y-6 px-2 pt-2 pb-2 lg:px-4 lg:pb-4">
         <div className="grid gap-6 md:grid-cols-3">
           <Card className="border-yellow-500/10 bg-yellow-500/10">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -594,16 +596,14 @@ export default function IncomePage() {
             </CardContent>
           </Card>
         </div>
-      </div>
-    </>
+    </div>
   );
 }
 
 function IncomeDashboardSkeleton() {
   return (
-    <div className="bg-background flex h-full flex-col">
-      <main className="flex-1 space-y-6 px-4 py-6 md:px-6">
-        <div className="grid gap-6 md:grid-cols-3">
+    <div className="flex min-h-0 flex-1 flex-col space-y-6 px-2 pt-2 pb-2 lg:px-4 lg:pb-4">
+          <div className="grid gap-6 md:grid-cols-3">
           {[...Array(3)].map((_, index) => (
             <Card key={index}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -643,7 +643,6 @@ function IncomeDashboardSkeleton() {
             </CardContent>
           </Card>
         </div>
-      </main>
     </div>
   );
 }
