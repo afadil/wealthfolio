@@ -422,10 +422,17 @@ impl YahooProvider {
             symbol: symbol.to_string(),
             symbol_mapping: Some(symbol.to_string()),
             currency: asset_profile
-                .price
-                .as_ref()
-                .and_then(|p| p.currency.clone())
-                .unwrap_or_default(),
+		 .price
+   		 .as_ref()
+   		 .and_then(|p| p.currency.clone())
+   		 .or_else(|| {
+       			 if symbol.to_uppercase().ends_with(".CA") {
+           			 Some("EGP".to_string())
+       			 } else {
+        			    None // keep the normal default
+       			 }
+    		})
+   		 .unwrap_or_default(),
             data_source: DataSource::Yahoo.as_str().to_string(),
             asset_class: Some(asset_class.to_string()), // Convert enum to String
             asset_sub_class: Some(asset_sub_class.to_string()), // Convert enum to String

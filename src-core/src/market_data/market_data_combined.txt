@@ -1,0 +1,4507 @@
+=================================================================================
+FILE: ./extract_directory.sh
+=================================================================================
+
+#!/bin/bash
+
+# Usage: ./extract_directory.sh /path/to/wealthfolio/src-core/src/market_data
+
+DIRECTORY="${1:-.}"
+OUTPUT_FILE="market_data_combined.txt"
+
+# Clear the output file
+> "$OUTPUT_FILE"
+
+echo "Extracting files from: $DIRECTORY"
+echo "Output will be saved to: $OUTPUT_FILE"
+echo ""
+
+# Find all files recursively and process them
+find "$DIRECTORY" -type f | sort | while read -r file; do
+    echo "Processing: $file"
+    
+    # Add file separator
+    echo "=================================================================================" >> "$OUTPUT_FILE"
+    echo "FILE: $file" >> "$OUTPUT_FILE"
+    echo "=================================================================================" >> "$OUTPUT_FILE"
+    echo "" >> "$OUTPUT_FILE"
+    
+    # Add file contents
+    cat "$file" >> "$OUTPUT_FILE"
+    
+    # Add spacing between files
+    echo "" >> "$OUTPUT_FILE"
+    echo "" >> "$OUTPUT_FILE"
+done
+
+echo ""
+echo "Done! All files have been combined into $OUTPUT_FILE"
+
+
+=================================================================================
+FILE: ./market_data_combined.txt
+=================================================================================
+
+
+
+=================================================================================
+FILE: ./market_data_constants.rs
+=================================================================================
+
+/// Data source identifiers
+pub const DATA_SOURCE_YAHOO: &str = "YAHOO";
+pub const DATA_SOURCE_MANUAL: &str = "MANUAL";
+pub const DATA_SOURCE_MARKET_DATA_APP: &str = "MARKETDATA_APP";
+pub const DATA_SOURCE_CALCULATED: &str = "CALCULATED";
+pub const DATA_SOURCE_ALPHA_VANTAGE: &str = "ALPHA_VANTAGE";
+pub const DATA_SOURCE_METAL_PRICE_API: &str = "METAL_PRICE_API";
+
+/// Default values
+pub const DEFAULT_QUOTE_BATCH_SIZE: usize = 1000;
+pub const DEFAULT_HISTORY_DAYS: i64 = 3650; // 10 years
+
+/// Time constants
+pub const MARKET_DATA_QUOTE_TIME: (u32, u32, u32) = (16, 0, 0); // 4:00 PM
+
+
+=================================================================================
+FILE: ./market_data_errors.rs
+=================================================================================
+
+use thiserror::Error;
+
+use crate::errors::DatabaseError;
+use yahoo_finance_api::YahooError;
+
+#[derive(Error, Debug)]
+pub enum MarketDataError {
+    #[error("Database error: {0}")]
+    DatabaseError(#[from] diesel::result::Error),
+
+    #[error("Database error: {0}")]
+    DatabaseConnectionError(#[from] DatabaseError),
+
+    #[error("Provider error: {0}")]
+    ProviderError(String),
+
+    #[error("Network error: {0}")]
+    NetworkError(#[from] reqwest::Error),
+
+    #[error("Parsing error: {0}")]
+    ParsingError(String),
+
+    #[error("Not found: {0}")]
+    NotFound(String),
+
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
+
+    #[error("Rate limit exceeded")]
+    RateLimitExceeded,
+
+    #[error("Invalid data: {0}")]
+    InvalidData(String),
+
+    #[error("Provider exhausted: {0}")]
+    ProviderExhausted(String),
+
+    #[error("No data found")]
+    NoData,
+
+    #[error("Unknown error: {0}")]
+    Unknown(String),
+}
+
+impl From<YahooError> for MarketDataError {
+    fn from(error: YahooError) -> Self {
+        match error {
+            YahooError::FetchFailed(e) => MarketDataError::ProviderError(e),
+            YahooError::NoQuotes => MarketDataError::NotFound("No quotes found".to_string()),
+            YahooError::NoResult => MarketDataError::NotFound("No data found".to_string()),
+            _ => MarketDataError::Unknown(error.to_string()),
+        }
+    }
+}
+
+
+=================================================================================
+FILE: ./market_data_model.rs
+=================================================================================
+
+use crate::market_data::market_data_constants::{
+    DATA_SOURCE_ALPHA_VANTAGE, DATA_SOURCE_MANUAL, DATA_SOURCE_MARKET_DATA_APP,
+    DATA_SOURCE_METAL_PRICE_API, DATA_SOURCE_YAHOO,
+};
+use crate::schema::quotes;
+use chrono::{DateTime, Utc};
+use diesel::prelude::*;
+use diesel::{expression::AsExpression, sql_types::Text};
+use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
+use std::str::FromStr;
+
+#[derive(
+    Queryable, Identifiable, Selectable, Debug, Clone, Serialize, Deserialize, PartialEq, Default,
+)]
+#[serde(rename_all = "camelCase")]
+pub struct Quote {
+    pub id: String,
+    pub symbol: String,
+    pub timestamp: DateTime<Utc>,
+    pub open: Decimal,
+    pub high: Decimal,
+    pub low: Decimal,
+    pub close: Decimal,
+    pub adjclose: Decimal,
+    pub volume: Decimal,
+    pub currency: String,
+    pub data_source: DataSource,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(
+    Queryable,
+    Identifiable,
+    Selectable,
+    Insertable,
+    AsChangeset,
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    QueryableByName,
+)]
+#[diesel(table_name = quotes)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[serde(rename_all = "camelCase")]
+pub struct QuoteDb {
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub id: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub symbol: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub timestamp: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub open: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub high: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub low: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub close: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub adjclose: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub volume: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub currency: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub data_source: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub created_at: String,
+}
+
+// Conversion implementations
+impl From<QuoteDb> for Quote {
+    fn from(db: QuoteDb) -> Self {
+        let parse_datetime = |s: &str| -> DateTime<Utc> {
+            DateTime::parse_from_rfc3339(s)
+                .map(|dt| dt.with_timezone(&Utc))
+                .unwrap_or_else(|_| Utc::now())
+        };
+
+        Quote {
+            id: db.id,
+            symbol: db.symbol,
+            timestamp: parse_datetime(&db.timestamp),
+            open: Decimal::from_str(&db.open).unwrap_or_default(),
+            high: Decimal::from_str(&db.high).unwrap_or_default(),
+            low: Decimal::from_str(&db.low).unwrap_or_default(),
+            close: Decimal::from_str(&db.close).unwrap_or_default(),
+            adjclose: Decimal::from_str(&db.adjclose).unwrap_or_default(),
+            volume: Decimal::from_str(&db.volume).unwrap_or_default(),
+            data_source: DataSource::from(db.data_source.as_ref()),
+            created_at: parse_datetime(&db.created_at),
+            currency: db.currency,
+        }
+    }
+}
+
+impl From<&Quote> for QuoteDb {
+    fn from(quote: &Quote) -> Self {
+        QuoteDb {
+            id: quote.id.clone(),
+            symbol: quote.symbol.clone(),
+            timestamp: quote.timestamp.to_rfc3339(),
+            open: quote.open.to_string(),
+            high: quote.high.to_string(),
+            low: quote.low.to_string(),
+            close: quote.close.to_string(),
+            adjclose: quote.adjclose.to_string(),
+            volume: quote.volume.to_string(),
+            currency: quote.currency.clone(),
+            data_source: quote.data_source.as_str().to_string(),
+            created_at: quote.created_at.to_rfc3339(),
+        }
+    }
+}
+
+/// Summary model for quote search results
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct QuoteSummary {
+    pub exchange: String,
+    pub short_name: String,
+    pub quote_type: String,
+    pub symbol: String,
+    pub index: String,
+    pub score: f64,
+    pub type_display: String,
+    pub long_name: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct QuoteRequest {
+    pub symbol: String,
+    pub data_source: DataSource,
+    pub currency: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, AsExpression, Default)]
+#[diesel(sql_type = Text)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum DataSource {
+    Yahoo,
+    MarketDataApp,
+    AlphaVantage,
+    MetalPriceApi,
+    #[default]
+    Manual,
+}
+
+impl DataSource {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            DataSource::Yahoo => DATA_SOURCE_YAHOO,
+            DataSource::MarketDataApp => DATA_SOURCE_MARKET_DATA_APP,
+            DataSource::AlphaVantage => DATA_SOURCE_ALPHA_VANTAGE,
+            DataSource::MetalPriceApi => DATA_SOURCE_METAL_PRICE_API,
+            DataSource::Manual => DATA_SOURCE_MANUAL,
+        }
+    }
+}
+
+impl From<DataSource> for String {
+    fn from(source: DataSource) -> Self {
+        source.as_str().to_string()
+    }
+}
+
+impl From<&str> for DataSource {
+    fn from(s: &str) -> Self {
+        match s.to_uppercase().as_str() {
+            DATA_SOURCE_YAHOO => DataSource::Yahoo,
+            DATA_SOURCE_MARKET_DATA_APP => DataSource::MarketDataApp,
+            DATA_SOURCE_ALPHA_VANTAGE => DataSource::AlphaVantage,
+            DATA_SOURCE_METAL_PRICE_API => DataSource::MetalPriceApi,
+            _ => DataSource::Manual,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct LatestQuotePair {
+    pub latest: Quote,
+    pub previous: Option<Quote>,
+}
+
+#[derive(serde::Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct MarketDataProviderInfo {
+    pub id: String,
+    pub name: String,
+    pub logo_filename: String,
+    pub last_synced_date: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+// --- Added for MarketDataProviderSetting ---
+
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    Queryable,
+    Identifiable,
+    Selectable,
+    Insertable,
+    AsChangeset,
+)]
+#[diesel(table_name = crate::schema::market_data_providers)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[serde(rename_all = "camelCase")]
+pub struct MarketDataProviderSetting {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub url: Option<String>,
+    pub priority: i32,
+    pub enabled: bool,
+    pub logo_filename: Option<String>,
+    pub last_synced_at: Option<String>,
+    pub last_sync_status: Option<String>,
+    pub last_sync_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Insertable, AsChangeset)]
+#[diesel(table_name = crate::schema::market_data_providers)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct UpdateMarketDataProviderSetting {
+    pub priority: Option<i32>,
+    pub enabled: Option<bool>,
+}
+
+// --- Quote Import Models ---
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct QuoteImport {
+    pub symbol: String,
+    pub date: String, // ISO format YYYY-MM-DD
+    pub open: Option<Decimal>,
+    pub high: Option<Decimal>,
+    pub low: Option<Decimal>,
+    pub close: Decimal, // Required field
+    pub volume: Option<Decimal>,
+    pub currency: String,
+    pub validation_status: ImportValidationStatus,
+    pub error_message: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub enum ImportValidationStatus {
+    Valid,
+    Warning(String),
+    Error(String),
+}
+
+
+=================================================================================
+FILE: ./market_data_repository.rs
+=================================================================================
+
+use async_trait::async_trait;
+use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
+use diesel::prelude::*;
+use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::sqlite::SqliteConnection;
+use log::{debug, error};
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+
+use super::market_data_errors::MarketDataError;
+use super::market_data_model::{
+    LatestQuotePair, MarketDataProviderSetting, Quote, QuoteDb, UpdateMarketDataProviderSetting,
+};
+use super::market_data_traits::MarketDataRepositoryTrait;
+use crate::db::{get_connection, WriteHandle};
+use crate::errors::Result;
+use crate::schema::quotes::dsl::{quotes, symbol, timestamp};
+use diesel::sql_query;
+use diesel::sql_types::Text;
+use diesel::sqlite::Sqlite;
+
+// Import for daily_account_valuation table
+use super::market_data_constants::{DATA_SOURCE_MANUAL, DATA_SOURCE_YAHOO};
+use crate::schema::daily_account_valuation::dsl as dav_dsl;
+use crate::schema::market_data_providers::dsl as market_data_providers_dsl;
+
+pub struct MarketDataRepository {
+    pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
+    writer: WriteHandle,
+}
+
+impl MarketDataRepository {
+    pub fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>, writer: WriteHandle) -> Self {
+        Self { pool, writer }
+    }
+}
+
+#[async_trait]
+impl MarketDataRepositoryTrait for MarketDataRepository {
+    fn get_all_historical_quotes(&self) -> Result<Vec<Quote>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        Ok(quotes
+            .order(timestamp.desc())
+            .load::<QuoteDb>(&mut conn)
+            .map_err(MarketDataError::DatabaseError)?
+            .into_iter()
+            .map(Quote::from)
+            .collect())
+    }
+
+    fn get_historical_quotes_for_symbol(&self, input_symbol: &str) -> Result<Vec<Quote>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        Ok(quotes
+            .filter(symbol.eq(input_symbol))
+            .order(timestamp.desc())
+            .load::<QuoteDb>(&mut conn)
+            .map_err(MarketDataError::DatabaseError)?
+            .into_iter()
+            .map(Quote::from)
+            .collect())
+    }
+
+    async fn save_quotes(&self, input_quotes: &[Quote]) -> Result<()> {
+        if input_quotes.is_empty() {
+            return Ok(());
+        }
+        let quotes_owned: Vec<Quote> = input_quotes.to_vec();
+        let db_rows: Vec<QuoteDb> = quotes_owned.iter().map(QuoteDb::from).collect();
+
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                for chunk in db_rows.chunks(1_000) {
+                    diesel::replace_into(quotes)
+                        .values(chunk)
+                        .execute(conn)
+                        .map_err(MarketDataError::DatabaseError)?;
+                }
+                Ok(())
+            })
+            .await
+    }
+
+    async fn save_quote(&self, quote: &Quote) -> Result<Quote> {
+        let quote_cloned = quote.clone();
+        let save_result = self.save_quotes(&[quote_cloned.clone()]).await;
+        save_result?;
+        Ok(quote_cloned)
+    }
+
+    async fn delete_quote(&self, quote_id: &str) -> Result<()> {
+        let id_to_delete = quote_id.to_string();
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                diesel::delete(quotes.filter(crate::schema::quotes::dsl::id.eq(id_to_delete)))
+                    .execute(conn)
+                    .map_err(MarketDataError::DatabaseError)?;
+                Ok(())
+            })
+            .await
+    }
+
+    async fn delete_quotes_for_symbols(&self, symbols_to_delete: &[String]) -> Result<()> {
+        let symbols_owned = symbols_to_delete.to_vec();
+
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                diesel::delete(quotes.filter(symbol.eq_any(symbols_owned)))
+                    .execute(conn)
+                    .map_err(MarketDataError::DatabaseError)?;
+                Ok(())
+            })
+            .await
+    }
+
+    fn get_quotes_by_source(&self, input_symbol: &str, source: &str) -> Result<Vec<Quote>> {
+        let mut conn = get_connection(&self.pool)?;
+        use crate::schema::quotes::dsl::symbol as symbol_col;
+
+        Ok(quotes
+            .filter(symbol_col.eq(input_symbol))
+            .filter(crate::schema::quotes::dsl::data_source.eq(source))
+            .order(timestamp.asc())
+            .load::<QuoteDb>(&mut conn)
+            .map_err(MarketDataError::DatabaseError)?
+            .into_iter()
+            .map(Quote::from)
+            .collect())
+    }
+
+    fn get_latest_quote_for_symbol(&self, input_symbol: &str) -> Result<Quote> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let query_result = quotes
+            .filter(symbol.eq(input_symbol))
+            .order(timestamp.desc())
+            .first::<QuoteDb>(&mut conn)
+            .optional();
+
+        match query_result {
+            Ok(Some(quote_db)) => Ok(Quote::from(quote_db)),
+            Ok(None) => Err(MarketDataError::NotFound(format!(
+                "No quote found in database for symbol: {}",
+                input_symbol
+            ))
+            .into()),
+            Err(diesel_err) => Err(MarketDataError::DatabaseError(diesel_err).into()),
+        }
+    }
+
+    fn get_latest_quotes_for_symbols(
+        &self,
+        input_symbols: &[String],
+    ) -> Result<HashMap<String, Quote>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let filtered_quotes = quotes
+            .filter(symbol.eq_any(input_symbols))
+            .load::<QuoteDb>(&mut conn)
+            .map_err(MarketDataError::DatabaseError)?;
+
+        let mut latest_quotes_map: HashMap<String, QuoteDb> = HashMap::new();
+        for q in filtered_quotes {
+            latest_quotes_map
+                .entry(q.symbol.clone())
+                .and_modify(|existing_quote| {
+                    if q.timestamp > existing_quote.timestamp {
+                        *existing_quote = q.clone();
+                    }
+                })
+                .or_insert(q);
+        }
+
+        let result: HashMap<String, Quote> = latest_quotes_map
+            .into_iter()
+            .map(|(s, q_db)| (s, q_db.into()))
+            .collect();
+
+        Ok(result)
+    }
+
+    fn get_latest_quotes_pair_for_symbols(
+        &self,
+        input_symbols: &[String],
+    ) -> Result<HashMap<String, LatestQuotePair>> {
+        if input_symbols.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let mut conn = get_connection(&self.pool)?;
+
+        let placeholders = input_symbols
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(", ");
+        let sql = format!(
+            "WITH RankedQuotes AS ( \
+                SELECT \
+                    q.*, \
+                    ROW_NUMBER() OVER (PARTITION BY q.symbol ORDER BY q.timestamp DESC) as rn \
+                FROM quotes q  WHERE q.symbol IN ({}) \
+            ) \
+            SELECT * \
+            FROM RankedQuotes \
+            WHERE rn <= 2 \
+            ORDER BY symbol, rn",
+            placeholders
+        );
+
+        let mut query_builder = Box::new(sql_query(sql)).into_boxed::<Sqlite>();
+
+        for symbol_val in input_symbols {
+            query_builder = query_builder.bind::<Text, _>(symbol_val);
+        }
+
+        let ranked_quotes_db: Vec<QuoteDb> = query_builder
+            .load::<QuoteDb>(&mut conn)
+            .map_err(MarketDataError::DatabaseError)?;
+
+        let mut result_map: HashMap<String, LatestQuotePair> = HashMap::new();
+        let mut current_symbol_quotes: Vec<Quote> = Vec::new();
+
+        for quote_db in ranked_quotes_db {
+            let quote = Quote::from(quote_db);
+
+            if current_symbol_quotes.is_empty() || quote.symbol == current_symbol_quotes[0].symbol {
+                current_symbol_quotes.push(quote);
+            } else {
+                if !current_symbol_quotes.is_empty() {
+                    let latest_quote = current_symbol_quotes.remove(0);
+                    let previous_quote = if !current_symbol_quotes.is_empty() {
+                        Some(current_symbol_quotes.remove(0))
+                    } else {
+                        None
+                    };
+                    result_map.insert(
+                        latest_quote.symbol.clone(),
+                        LatestQuotePair {
+                            latest: latest_quote,
+                            previous: previous_quote,
+                        },
+                    );
+                }
+                current_symbol_quotes.clear();
+                current_symbol_quotes.push(quote);
+            }
+        }
+
+        if !current_symbol_quotes.is_empty() {
+            let latest_quote = current_symbol_quotes.remove(0);
+            let previous_quote = if !current_symbol_quotes.is_empty() {
+                Some(current_symbol_quotes.remove(0))
+            } else {
+                None
+            };
+            result_map.insert(
+                latest_quote.symbol.clone(),
+                LatestQuotePair {
+                    latest: latest_quote,
+                    previous: previous_quote,
+                },
+            );
+        }
+
+        Ok(result_map)
+    }
+
+    fn get_historical_quotes_for_symbols_in_range(
+        &self,
+        input_symbols: &HashSet<String>,
+        start_date_naive: NaiveDate,
+        end_date_naive: NaiveDate,
+    ) -> Result<Vec<Quote>> {
+        if input_symbols.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut conn = get_connection(&self.pool)?;
+
+        let start_datetime_utc: DateTime<Utc> =
+            Utc.from_utc_datetime(&start_date_naive.and_hms_opt(0, 0, 0).unwrap());
+        let end_datetime_utc: DateTime<Utc> =
+            Utc.from_utc_datetime(&end_date_naive.and_hms_opt(23, 59, 59).unwrap());
+
+        let start_str = start_datetime_utc.to_rfc3339();
+        let end_str = end_datetime_utc.to_rfc3339();
+
+        let symbols_vec: Vec<String> = input_symbols.iter().cloned().collect();
+
+        Ok(quotes
+            .filter(symbol.eq_any(symbols_vec))
+            .filter(timestamp.ge(start_str))
+            .filter(timestamp.le(end_str))
+            .order(timestamp.asc())
+            .load::<QuoteDb>(&mut conn)
+            .map_err(MarketDataError::DatabaseError)?
+            .into_iter()
+            .map(Quote::from)
+            .collect())
+    }
+
+    fn get_all_historical_quotes_for_symbols(
+        &self,
+        symbols: &HashSet<String>,
+    ) -> Result<Vec<Quote>> {
+        if symbols.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut conn = get_connection(&self.pool)?;
+        let symbols_vec: Vec<String> = symbols.iter().cloned().collect();
+
+        Ok(quotes
+            .filter(symbol.eq_any(symbols_vec))
+            .order(timestamp.asc())
+            .load::<QuoteDb>(&mut conn)
+            .map_err(MarketDataError::DatabaseError)?
+            .into_iter()
+            .map(Quote::from)
+            .collect())
+    }
+
+    fn get_all_historical_quotes_for_symbols_by_source(
+        &self,
+        symbols: &HashSet<String>,
+        source: &str,
+    ) -> Result<Vec<Quote>> {
+        if symbols.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut conn = get_connection(&self.pool)?;
+        let symbols_vec: Vec<String> = symbols.iter().cloned().collect();
+
+        Ok(quotes
+            .filter(symbol.eq_any(symbols_vec))
+            .filter(crate::schema::quotes::dsl::data_source.eq(source))
+            .order(timestamp.asc())
+            .load::<QuoteDb>(&mut conn)
+            .map_err(MarketDataError::DatabaseError)?
+            .into_iter()
+            .map(Quote::from)
+            .collect())
+    }
+
+    fn get_latest_sync_dates_by_source(&self) -> Result<HashMap<String, Option<NaiveDateTime>>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let latest_calculated_at_str: Option<String> = dav_dsl::daily_account_valuation
+            .select(diesel::dsl::max(dav_dsl::calculated_at))
+            .first::<Option<String>>(&mut conn)
+            .optional()?
+            .flatten();
+
+        let latest_sync_naive_datetime: Option<NaiveDateTime> =
+            latest_calculated_at_str.and_then(|s| {
+                DateTime::parse_from_rfc3339(&s)
+                    .ok()
+                    .map(|dt_utc| dt_utc.naive_utc())
+            });
+
+        let mut sync_dates_map: HashMap<String, Option<NaiveDateTime>> = HashMap::new();
+
+        sync_dates_map.insert(DATA_SOURCE_YAHOO.to_string(), latest_sync_naive_datetime);
+        sync_dates_map.insert(DATA_SOURCE_MANUAL.to_string(), latest_sync_naive_datetime);
+
+        Ok(sync_dates_map)
+    }
+
+    fn get_all_providers(&self) -> Result<Vec<MarketDataProviderSetting>> {
+        let mut conn = get_connection(&self.pool)?;
+        market_data_providers_dsl::market_data_providers
+            .order(market_data_providers_dsl::priority.desc())
+            .select(MarketDataProviderSetting::as_select())
+            .load::<MarketDataProviderSetting>(&mut conn)
+            .map_err(|e| MarketDataError::DatabaseError(e).into())
+    }
+
+    fn get_provider_by_id(&self, provider_id_input: &str) -> Result<MarketDataProviderSetting> {
+        let mut conn = get_connection(&self.pool)?;
+        market_data_providers_dsl::market_data_providers
+            .find(provider_id_input)
+            .select(MarketDataProviderSetting::as_select())
+            .first::<MarketDataProviderSetting>(&mut conn)
+            .map_err(|e| MarketDataError::DatabaseError(e).into())
+    }
+
+    async fn update_provider_settings(
+        &self,
+        provider_id_input: String,
+        changes: UpdateMarketDataProviderSetting,
+    ) -> Result<MarketDataProviderSetting> {
+        self.writer
+            .exec(
+                move |conn: &mut SqliteConnection| -> Result<MarketDataProviderSetting> {
+                    diesel::update(
+                        market_data_providers_dsl::market_data_providers.find(&provider_id_input),
+                    )
+                    .set(&changes)
+                    .get_result(conn)
+                    .map_err(|e| MarketDataError::DatabaseError(e).into())
+                },
+            )
+            .await
+    }
+
+    // --- Quote Import Methods ---
+
+    async fn bulk_insert_quotes(&self, quote_records: Vec<QuoteDb>) -> Result<usize> {
+        if quote_records.is_empty() {
+            return Ok(0);
+        }
+
+        let quotes_owned = quote_records.clone();
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
+                let mut total_inserted = 0;
+                for chunk in quotes_owned.chunks(1000) {
+                    total_inserted += diesel::insert_into(quotes)
+                        .values(chunk)
+                        .execute(conn)
+                        .map_err(MarketDataError::DatabaseError)?;
+                }
+                Ok(total_inserted)
+            })
+            .await
+    }
+
+    async fn bulk_update_quotes(&self, quote_records: Vec<QuoteDb>) -> Result<usize> {
+        if quote_records.is_empty() {
+            return Ok(0);
+        }
+
+        let quotes_owned = quote_records.clone();
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
+                let mut total_updated = 0;
+                for chunk in quotes_owned.chunks(1000) {
+                    total_updated += diesel::replace_into(quotes)
+                        .values(chunk)
+                        .execute(conn)
+                        .map_err(MarketDataError::DatabaseError)?;
+                }
+                Ok(total_updated)
+            })
+            .await
+    }
+
+    async fn bulk_upsert_quotes(&self, quote_records: Vec<Quote>) -> Result<usize> {
+        debug!(
+            "🚀 REPOSITORY: bulk_upsert_quotes called with {} quotes",
+            quote_records.len()
+        );
+
+        if quote_records.is_empty() {
+            debug!("⚠️ No quotes to insert, returning 0");
+            return Ok(0);
+        }
+
+        debug!(
+            "🔄 Converting {} Quote structs to QuoteDb structs",
+            quote_records.len()
+        );
+        let quotes_owned = quote_records.clone();
+        let db_rows: Vec<QuoteDb> = quotes_owned.iter().map(QuoteDb::from).collect();
+        debug!("✅ Converted to {} QuoteDb records", db_rows.len());
+        debug!(
+            "🎯 Sample QuoteDb: id={}, symbol={}, timestamp={}, data_source={}",
+            db_rows[0].id, db_rows[0].symbol, db_rows[0].timestamp, db_rows[0].data_source
+        );
+
+        debug!("💾 Executing database transaction...");
+        let result = self
+            .writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
+                debug!("🔄 Inside database transaction");
+                let mut total_upserted = 0;
+                let chunk_size = 1000;
+                let total_chunks = (db_rows.len() + chunk_size - 1) / chunk_size;
+
+                debug!(
+                    "📦 Processing {} quotes in {} chunks of {}",
+                    db_rows.len(),
+                    total_chunks,
+                    chunk_size
+                );
+
+                for (chunk_index, chunk) in db_rows.chunks(chunk_size).enumerate() {
+                    debug!(
+                        "💾 Processing chunk {}/{} with {} quotes",
+                        chunk_index + 1,
+                        total_chunks,
+                        chunk.len()
+                    );
+
+                    let count = diesel::replace_into(quotes)
+                        .values(chunk)
+                        .execute(conn)
+                        .map_err(|e| {
+                            error!(
+                                "❌ Database error in chunk {}/{}: {}",
+                                chunk_index + 1,
+                                total_chunks,
+                                e
+                            );
+                            MarketDataError::DatabaseError(e)
+                        })?;
+
+                    debug!(
+                        "✅ Chunk {}/{} inserted {} records",
+                        chunk_index + 1,
+                        total_chunks,
+                        count
+                    );
+                    total_upserted += count;
+                }
+
+                debug!(
+                    "✅ Transaction completed successfully, total upserted: {}",
+                    total_upserted
+                );
+                Ok(total_upserted)
+            })
+            .await;
+
+        match result {
+            Ok(count) => {
+                debug!(
+                    "✅ REPOSITORY: bulk_upsert_quotes completed successfully, upserted {} quotes",
+                    count
+                );
+                Ok(count)
+            }
+            Err(e) => {
+                error!("❌ REPOSITORY: bulk_upsert_quotes failed: {}", e);
+                Err(e)
+            }
+        }
+    }
+
+    fn quote_exists(&self, symbol_param: &str, date: &str) -> Result<bool> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let count: i64 = quotes
+            .filter(crate::schema::quotes::dsl::symbol.eq(symbol_param))
+            .filter(crate::schema::quotes::dsl::timestamp.like(format!("{}%", date)))
+            .count()
+            .get_result(&mut conn)
+            .map_err(MarketDataError::DatabaseError)?;
+
+        Ok(count > 0)
+    }
+
+    fn get_existing_quotes_for_period(
+        &self,
+        symbol_param: &str,
+        start_date: &str,
+        end_date: &str,
+    ) -> Result<Vec<Quote>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        Ok(quotes
+            .filter(crate::schema::quotes::dsl::symbol.eq(symbol_param))
+            .filter(crate::schema::quotes::dsl::timestamp.ge(start_date))
+            .filter(crate::schema::quotes::dsl::timestamp.le(end_date))
+            .order(timestamp.asc())
+            .load::<QuoteDb>(&mut conn)
+            .map_err(MarketDataError::DatabaseError)?
+            .into_iter()
+            .map(Quote::from)
+            .collect())
+    }
+}
+
+
+=================================================================================
+FILE: ./market_data_service.rs
+=================================================================================
+
+use async_trait::async_trait;
+use chrono::{DateTime, Duration, NaiveDate, NaiveDateTime, TimeZone, Utc};
+use log::{debug, error};
+use rust_decimal::Decimal;
+use std::collections::btree_map::Entry as BTreeEntry;
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::sync::Arc;
+use std::time::SystemTime;
+use tokio::sync::RwLock;
+
+use super::market_data_constants::*;
+use super::market_data_model::{
+    ImportValidationStatus, LatestQuotePair, MarketDataProviderInfo, MarketDataProviderSetting,
+    Quote, QuoteImport, QuoteRequest, QuoteSummary, UpdateMarketDataProviderSetting,
+};
+use super::market_data_traits::{MarketDataRepositoryTrait, MarketDataServiceTrait};
+use super::providers::models::AssetProfile;
+use crate::assets::assets_constants::CASH_ASSET_TYPE;
+use crate::assets::assets_traits::AssetRepositoryTrait;
+use crate::errors::Result;
+use crate::market_data::providers::ProviderRegistry;
+use crate::secrets::SecretStore;
+use crate::utils::time_utils;
+
+const QUOTE_LOOKBACK_DAYS: i64 = 7;
+
+#[derive(Debug)]
+struct SymbolSyncPlanItem {
+    symbol: String,
+    currency: String,
+    start: SystemTime,
+}
+
+pub struct MarketDataService {
+    provider_registry: Arc<RwLock<ProviderRegistry>>,
+    repository: Arc<dyn MarketDataRepositoryTrait + Send + Sync>,
+    asset_repository: Arc<dyn AssetRepositoryTrait + Send + Sync>,
+    secret_store: Arc<dyn SecretStore>,
+}
+
+#[async_trait]
+impl MarketDataServiceTrait for MarketDataService {
+    async fn search_symbol(&self, query: &str) -> Result<Vec<QuoteSummary>> {
+        self.provider_registry
+            .read()
+            .await
+            .search_ticker(query)
+            .await
+            .map_err(|e| e.into())
+    }
+
+    fn get_latest_quote_for_symbol(&self, symbol: &str) -> Result<Quote> {
+        self.repository.get_latest_quote_for_symbol(symbol)
+    }
+
+    fn get_latest_quotes_for_symbols(&self, symbols: &[String]) -> Result<HashMap<String, Quote>> {
+        self.repository.get_latest_quotes_for_symbols(symbols)
+    }
+
+    fn get_latest_quotes_pair_for_symbols(
+        &self,
+        symbols: &[String],
+    ) -> Result<HashMap<String, LatestQuotePair>> {
+        self.repository.get_latest_quotes_pair_for_symbols(symbols)
+    }
+
+    fn get_all_historical_quotes(&self) -> Result<HashMap<String, Vec<(NaiveDate, Quote)>>> {
+        let quotes = self.repository.get_all_historical_quotes()?;
+        let mut quotes_map: HashMap<String, Vec<(NaiveDate, Quote)>> = HashMap::new();
+
+        for quote in quotes {
+            let quote_date = quote.timestamp.date_naive();
+            quotes_map
+                .entry(quote.symbol.clone())
+                .or_default()
+                .push((quote_date, quote));
+        }
+
+        for (_symbol, symbol_quotes_tuples) in quotes_map.iter_mut() {
+            symbol_quotes_tuples.sort_by(|a, b| b.0.cmp(&a.0));
+        }
+
+        Ok(quotes_map)
+    }
+
+    async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile> {
+        self.provider_registry
+            .read()
+            .await
+            .get_asset_profile(symbol)
+            .await
+            .map_err(|e| e.into())
+    }
+
+    fn get_historical_quotes_for_symbol(&self, symbol: &str) -> Result<Vec<Quote>> {
+        let mut quotes = self.repository.get_historical_quotes_for_symbol(symbol)?;
+        quotes.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        Ok(quotes)
+    }
+
+    async fn add_quote(&self, quote: &Quote) -> Result<Quote> {
+        self.repository.save_quote(quote).await
+    }
+
+    async fn update_quote(&self, quote: Quote) -> Result<Quote> {
+        self.repository.save_quote(&quote).await
+    }
+
+    async fn delete_quote(&self, quote_id: &str) -> Result<()> {
+        self.repository.delete_quote(quote_id).await
+    }
+
+    async fn get_historical_quotes_from_provider(
+        &self,
+        symbol: &str,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> Result<Vec<Quote>> {
+        debug!(
+            "Getting symbol history for {} from {} to {}",
+            symbol, start_date, end_date
+        );
+        let start_time: SystemTime = Utc
+            .from_utc_datetime(&start_date.and_hms_opt(0, 0, 0).unwrap())
+            .into();
+        let end_time: SystemTime = Utc
+            .from_utc_datetime(&end_date.and_hms_opt(23, 59, 59).unwrap())
+            .into();
+
+        self.provider_registry
+            .read()
+            .await
+            .historical_quotes(symbol, start_time, end_time, "USD".to_string())
+            .await
+            .map_err(|e| e.into())
+    }
+
+    async fn sync_market_data(&self) -> Result<((), Vec<(String, String)>)> {
+        debug!("Syncing market data.");
+        let assets = self.asset_repository.list()?;
+        let quote_requests: Vec<_> = assets
+            .iter()
+            .filter(|asset| {
+                asset.asset_type.as_deref() != Some(CASH_ASSET_TYPE)
+                    && asset.data_source != DATA_SOURCE_MANUAL
+            })
+            .map(|asset| QuoteRequest {
+                symbol: asset.symbol.clone(),
+                data_source: asset.data_source.as_str().into(),
+                currency: asset.currency.clone(),
+            })
+            .collect();
+
+        self.process_market_data_sync(quote_requests, false).await
+    }
+
+    async fn resync_market_data(
+        &self,
+        symbols: Option<Vec<String>>,
+    ) -> Result<((), Vec<(String, String)>)> {
+        debug!("Resyncing market data. Symbols: {:?}", symbols);
+        let assets = match symbols {
+            Some(syms) if !syms.is_empty() => self.asset_repository.list_by_symbols(&syms)?,
+            _ => {
+                debug!("No symbols provided or empty list. Fetching all assets.");
+                self.asset_repository.list()?
+            }
+        };
+
+        let quote_requests: Vec<_> = assets
+            .iter()
+            .filter(|asset| {
+                asset.asset_type.as_deref() != Some(CASH_ASSET_TYPE)
+                    && asset.data_source != DATA_SOURCE_MANUAL
+            })
+            .map(|asset| QuoteRequest {
+                symbol: asset.symbol.clone(),
+                data_source: asset.data_source.as_str().into(),
+                currency: asset.currency.clone(),
+            })
+            .collect();
+
+        self.process_market_data_sync(quote_requests, true).await
+    }
+
+    fn get_historical_quotes_for_symbols_in_range(
+        &self,
+        symbols: &HashSet<String>,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> Result<Vec<Quote>> {
+        debug!(
+            "Fetching historical quotes for {} symbols between {} and {}.",
+            symbols.len(),
+            start_date,
+            end_date
+        );
+
+        if symbols.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let manual_quotes = self
+            .repository
+            .get_all_historical_quotes_for_symbols_by_source(symbols, DATA_SOURCE_MANUAL)?;
+        let manual_symbols: HashSet<String> =
+            manual_quotes.iter().map(|q| q.symbol.clone()).collect();
+        let mut all_fetched_quotes = manual_quotes;
+        let other_symbols: HashSet<String> = symbols.difference(&manual_symbols).cloned().collect();
+
+        if !other_symbols.is_empty() {
+            let lookback_start_date = start_date - Duration::days(QUOTE_LOOKBACK_DAYS);
+            let quotes = self.repository.get_historical_quotes_for_symbols_in_range(
+                &other_symbols,
+                lookback_start_date,
+                end_date,
+            )?;
+            all_fetched_quotes.extend(quotes);
+        }
+
+        let filled_quotes =
+            self.fill_missing_quotes(&all_fetched_quotes, symbols, start_date, end_date);
+
+        Ok(filled_quotes)
+    }
+
+    async fn get_daily_quotes(
+        &self,
+        asset_ids: &HashSet<String>,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> Result<HashMap<NaiveDate, HashMap<String, Quote>>> {
+        if asset_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let quotes_vec = self
+            .repository
+            .get_historical_quotes_for_symbols_in_range(asset_ids, start_date, end_date)?;
+
+        let mut quotes_by_date: HashMap<NaiveDate, HashMap<String, Quote>> = HashMap::new();
+        for quote in quotes_vec {
+            let date_key = quote.timestamp.date_naive();
+            quotes_by_date
+                .entry(date_key)
+                .or_default()
+                .insert(quote.symbol.clone(), quote);
+        }
+
+        Ok(quotes_by_date)
+    }
+
+    async fn get_market_data_providers_info(&self) -> Result<Vec<MarketDataProviderInfo>> {
+        debug!("Fetching market data providers info");
+        let latest_sync_dates_by_source = self.repository.get_latest_sync_dates_by_source()?;
+
+        let mut providers_info = Vec::new();
+        let known_providers = vec![(DATA_SOURCE_YAHOO, "Yahoo Finance", "yahoo-finance.png")];
+
+        for (id, name, logo_filename) in known_providers {
+            let last_synced_naive: Option<NaiveDateTime> = latest_sync_dates_by_source
+                .get(id)
+                .and_then(|opt_dt| *opt_dt);
+
+            let last_synced_utc: Option<DateTime<Utc>> =
+                last_synced_naive.map(|naive_dt| Utc.from_utc_datetime(&naive_dt));
+
+            providers_info.push(MarketDataProviderInfo {
+                id: id.to_string(),
+                name: name.to_string(),
+                logo_filename: logo_filename.to_string(),
+                last_synced_date: last_synced_utc,
+            });
+        }
+
+        debug!("Market data providers info: {:?}", providers_info);
+        Ok(providers_info)
+    }
+
+    async fn get_market_data_providers_settings(&self) -> Result<Vec<MarketDataProviderSetting>> {
+        debug!("Fetching market data providers settings");
+        self.repository.get_all_providers()
+    }
+
+    async fn update_market_data_provider_settings(
+        &self,
+        provider_id: String,
+        priority: i32,
+        enabled: bool,
+    ) -> Result<MarketDataProviderSetting> {
+        debug!(
+            "Updating market data provider settings for provider id: {}",
+            provider_id
+        );
+        let changes = UpdateMarketDataProviderSetting {
+            priority: Some(priority),
+            enabled: Some(enabled),
+        };
+        let updated_setting = self
+            .repository
+            .update_provider_settings(provider_id, changes)
+            .await?;
+
+        // Refresh the provider registry with the updated settings
+        debug!("Refreshing provider registry after settings update");
+        self.refresh_provider_registry().await?;
+
+        Ok(updated_setting)
+    }
+
+    async fn import_quotes_from_csv(
+        &self,
+        quotes: Vec<QuoteImport>,
+        overwrite: bool,
+    ) -> Result<Vec<QuoteImport>> {
+        debug!("🚀 SERVICE: import_quotes_from_csv called");
+        debug!(
+            "📊 Processing {} quotes, overwrite: {}",
+            quotes.len(),
+            overwrite
+        );
+
+        let mut results = Vec::new();
+        let mut quotes_to_import = Vec::new();
+
+        debug!("🔍 Starting quote validation and duplicate checking...");
+        for (index, mut quote) in quotes.into_iter().enumerate() {
+            debug!(
+                "📋 Processing quote {}/{}: symbol={}, date={}",
+                index + 1,
+                results.len() + quotes_to_import.len() + 1,
+                quote.symbol,
+                quote.date
+            );
+
+            // Check if quote already exists
+            let exists = self.repository.quote_exists(&quote.symbol, &quote.date)?;
+            debug!("🔍 Quote exists check: {}", exists);
+
+            if exists {
+                if overwrite {
+                    debug!("🔄 Quote exists but overwrite=true, will import");
+                    quote.validation_status = ImportValidationStatus::Valid;
+                    quotes_to_import.push(quote.clone());
+                } else {
+                    debug!("⚠️ Quote exists and overwrite=false, skipping");
+                    quote.validation_status = ImportValidationStatus::Warning(
+                        "Quote already exists, skipping".to_string(),
+                    );
+                }
+            } else {
+                debug!("✨ New quote, validating...");
+                quote.validation_status = self.validate_quote_data(&quote);
+                debug!("📋 Validation result: {:?}", quote.validation_status);
+                if matches!(quote.validation_status, ImportValidationStatus::Valid) {
+                    quotes_to_import.push(quote.clone());
+                }
+            }
+            results.push(quote);
+        }
+
+        debug!(
+            "📊 Validation complete: {} total, {} to import",
+            results.len(),
+            quotes_to_import.len()
+        );
+
+        // Convert to Quote structs and import
+        debug!("🔄 Converting import quotes to database quotes...");
+        let quotes_for_db: Vec<Quote> = quotes_to_import
+            .iter()
+            .enumerate()
+            .filter_map(|(index, import_quote)| {
+                match self.convert_import_quote_to_quote(import_quote) {
+                    Ok(quote) => {
+                        debug!("✅ Converted quote {}: {}", index + 1, quote.symbol);
+                        Some(quote)
+                    }
+                    Err(e) => {
+                        error!("❌ Failed to convert quote {}: {}", index + 1, e);
+                        None
+                    }
+                }
+            })
+            .collect();
+
+        debug!(
+            "📦 Successfully converted {} quotes for database insertion",
+            quotes_for_db.len()
+        );
+
+        if !quotes_for_db.is_empty() {
+            debug!(
+                "💾 Calling repository.bulk_upsert_quotes with {} quotes",
+                quotes_for_db.len()
+            );
+            debug!(
+                "🎯 Sample quote for DB: id={}, symbol={}, timestamp={}, data_source={:?}",
+                quotes_for_db[0].id,
+                quotes_for_db[0].symbol,
+                quotes_for_db[0].timestamp,
+                quotes_for_db[0].data_source
+            );
+
+            match self.repository.bulk_upsert_quotes(quotes_for_db).await {
+                Ok(count) => {
+                    debug!(
+                        "✅ Successfully inserted/updated {} quotes in database",
+                        count
+                    );
+                }
+                Err(e) => {
+                    error!("❌ Database insertion failed: {}", e);
+                    return Err(e);
+                }
+            }
+        } else {
+            debug!("⚠️ No quotes to import after conversion");
+        }
+
+        debug!("✅ SERVICE: import_quotes_from_csv completed successfully");
+        Ok(results)
+    }
+
+    async fn bulk_upsert_quotes(&self, quotes: Vec<Quote>) -> Result<usize> {
+        self.repository.bulk_upsert_quotes(quotes).await
+    }
+}
+
+impl MarketDataService {
+    pub async fn new(
+        repository: Arc<dyn MarketDataRepositoryTrait + Send + Sync>,
+        asset_repository: Arc<dyn AssetRepositoryTrait + Send + Sync>,
+        secret_store: Arc<dyn SecretStore>,
+    ) -> Result<Self> {
+        let provider_settings = repository.get_all_providers()?;
+        // Be resilient on platforms where certain providers cannot initialize (e.g., mobile TLS differences).
+        // Fall back to an empty registry (Manual provider only) instead of aborting app initialization.
+        let registry = match ProviderRegistry::new(provider_settings, secret_store.clone()).await {
+            Ok(reg) => reg,
+            Err(e) => {
+                log::warn!(
+                    "Provider registry initialization failed: {}. Falling back to empty registry.",
+                    e
+                );
+                // Safe fallback: no external providers enabled
+                ProviderRegistry::new(Vec::new(), secret_store.clone()).await?
+            }
+        };
+        let provider_registry = Arc::new(RwLock::new(registry));
+
+        Ok(Self {
+            provider_registry,
+            repository,
+            asset_repository,
+            secret_store,
+        })
+    }
+
+    /// Refreshes the provider registry with the latest settings from the database
+    async fn refresh_provider_registry(&self) -> Result<()> {
+        debug!("Refreshing provider registry with latest settings");
+        let provider_settings = self.repository.get_all_providers()?;
+        let new_registry =
+            ProviderRegistry::new(provider_settings, self.secret_store.clone()).await?;
+
+        // Replace the registry with the new one
+        *self.provider_registry.write().await = new_registry;
+
+        debug!("Provider registry refreshed successfully");
+        Ok(())
+    }
+
+    fn fill_missing_quotes(
+        &self,
+        quotes: &[Quote],
+        required_symbols: &HashSet<String>,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> Vec<Quote> {
+        if required_symbols.is_empty() {
+            return Vec::new();
+        }
+
+        let mut quotes_by_date: HashMap<NaiveDate, HashMap<String, Quote>> = HashMap::new();
+        for quote in quotes {
+            quotes_by_date
+                .entry(quote.timestamp.date_naive())
+                .or_default()
+                .insert(quote.symbol.clone(), quote.clone());
+        }
+
+        let mut all_filled_quotes = Vec::new();
+        let mut last_known_quotes: HashMap<String, Quote> = HashMap::new();
+        let mut current_date = start_date.pred_opt().unwrap_or(start_date);
+        let mut initial_lookback = 0;
+        while initial_lookback < 365 * 10 {
+            if let Some(daily_quotes) = quotes_by_date.get(&current_date) {
+                for (symbol, quote) in daily_quotes {
+                    if required_symbols.contains(symbol) && !last_known_quotes.contains_key(symbol)
+                    {
+                        last_known_quotes.insert(symbol.clone(), quote.clone());
+                    }
+                }
+            }
+            if last_known_quotes.len() == required_symbols.len() {
+                break;
+            }
+            current_date = current_date.pred_opt().unwrap_or(current_date);
+            if current_date == start_date.pred_opt().unwrap_or(start_date) {
+                break;
+            }
+            initial_lookback += 1;
+        }
+
+        for current_date in time_utils::get_days_between(start_date, end_date) {
+            if let Some(daily_quotes) = quotes_by_date.get(&current_date) {
+                for (symbol, quote) in daily_quotes {
+                    if required_symbols.contains(symbol) {
+                        last_known_quotes.insert(symbol.clone(), quote.clone());
+                    }
+                }
+            }
+
+            for symbol in required_symbols {
+                if let Some(last_quote) = last_known_quotes.get(symbol) {
+                    let mut quote_for_today = last_quote.clone();
+                    quote_for_today.timestamp =
+                        Utc.from_utc_datetime(&current_date.and_hms_opt(12, 0, 0).unwrap());
+                    all_filled_quotes.push(quote_for_today);
+                } else {
+                    debug!(
+                        "No quote available for symbol '{}' on or before date {}",
+                        symbol, current_date
+                    );
+                }
+            }
+        }
+
+        all_filled_quotes
+    }
+
+    async fn process_market_data_sync(
+        &self,
+        quote_requests: Vec<QuoteRequest>,
+        refetch_all: bool,
+    ) -> Result<((), Vec<(String, String)>)> {
+        if quote_requests.is_empty() {
+            debug!("No syncable assets found matching the criteria. Skipping sync.");
+            return Ok(((), Vec::new()));
+        }
+
+        let current_utc_naive_date = Utc::now().date_naive();
+        let end_date_naive_utc = current_utc_naive_date
+            .and_hms_opt(23, 59, 59)
+            .expect("valid end-of-day time");
+        let end_date: SystemTime = Utc.from_utc_datetime(&end_date_naive_utc).into();
+
+        let public_requests = quote_requests;
+        let mut all_quotes = Vec::new();
+        let mut failed_syncs = Vec::new();
+        let symbols_with_currencies: Vec<(String, String)> = public_requests
+            .iter()
+            .map(|req| (req.symbol.clone(), req.currency.clone()))
+            .collect();
+
+        let sync_plan =
+            self.calculate_sync_plan(refetch_all, &symbols_with_currencies, end_date)?;
+
+        if sync_plan.is_empty() {
+            debug!("All tracked symbols are already up to date; nothing to fetch from providers.");
+        } else {
+            let mut grouped_requests: BTreeMap<NaiveDateTime, (SystemTime, Vec<(String, String)>)> =
+                BTreeMap::new();
+
+            for plan in sync_plan {
+                let SymbolSyncPlanItem {
+                    symbol,
+                    currency,
+                    start,
+                } = plan;
+                let start_key = DateTime::<Utc>::from(start).naive_utc();
+                match grouped_requests.entry(start_key) {
+                    BTreeEntry::Occupied(mut entry) => entry.get_mut().1.push((symbol, currency)),
+                    BTreeEntry::Vacant(entry) => {
+                        entry.insert((start, vec![(symbol, currency)]));
+                    }
+                }
+            }
+
+            for (_, (start_time, group_symbols)) in grouped_requests.into_iter() {
+                if group_symbols.is_empty() {
+                    continue;
+                }
+
+                if start_time >= end_date {
+                    debug!(
+                        "Skipping sync for symbols {:?} because start time {:?} >= end time {:?}.",
+                        group_symbols
+                            .iter()
+                            .map(|(symbol, _)| symbol.clone())
+                            .collect::<Vec<_>>(),
+                        DateTime::<Utc>::from(start_time),
+                        DateTime::<Utc>::from(end_date),
+                    );
+                    continue;
+                }
+
+                let symbol_names: Vec<String> = group_symbols
+                    .iter()
+                    .map(|(symbol, _)| symbol.clone())
+                    .collect();
+
+                match self
+                    .provider_registry
+                    .read()
+                    .await
+                    .historical_quotes_bulk(&group_symbols, start_time, end_date)
+                    .await
+                {
+                    Ok((quotes, provider_failures)) => {
+                        debug!(
+                            "Fetched {} quotes for symbols {:?} (start {}).",
+                            quotes.len(),
+                            symbol_names,
+                            DateTime::<Utc>::from(start_time).format("%Y-%m-%d")
+                        );
+                        all_quotes.extend(quotes);
+                        failed_syncs.extend(provider_failures);
+                    }
+                    Err(e) => {
+                        error!(
+                            "Failed to sync quotes for symbols {:?} starting {}: {}",
+                            symbol_names,
+                            DateTime::<Utc>::from(start_time).format("%Y-%m-%d"),
+                            e
+                        );
+                        failed_syncs.extend(
+                            symbol_names
+                                .into_iter()
+                                .map(|symbol| (symbol, e.to_string())),
+                        );
+                    }
+                }
+            }
+        }
+
+        if !all_quotes.is_empty() {
+            debug!(
+                "Attempting to save {} filled quotes to the repository.",
+                all_quotes.len()
+            );
+            all_quotes.sort_by(|a, b| {
+                a.symbol
+                    .cmp(&b.symbol)
+                    .then_with(|| a.timestamp.cmp(&b.timestamp))
+                    .then_with(|| a.data_source.as_str().cmp(b.data_source.as_str()))
+            });
+            if let Err(e) = self.repository.save_quotes(&all_quotes).await {
+                error!("Failed to save synced quotes to repository: {}", e);
+                failed_syncs.push(("repository_save".to_string(), e.to_string()));
+            } else {
+                debug!("Successfully saved {} filled quotes.", all_quotes.len());
+            }
+        }
+
+        Ok(((), failed_syncs))
+    }
+
+    fn calculate_sync_plan(
+        &self,
+        refetch_all: bool,
+        symbols_with_currencies: &[(String, String)],
+        end_time: SystemTime,
+    ) -> Result<Vec<SymbolSyncPlanItem>> {
+        if symbols_with_currencies.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let end_date = DateTime::<Utc>::from(end_time).naive_utc().date();
+        let default_history_days = DEFAULT_HISTORY_DAYS;
+        let default_start_date = end_date - Duration::days(default_history_days);
+
+        if refetch_all {
+            let default_start_time: SystemTime = Utc
+                .from_utc_datetime(&default_start_date.and_hms_opt(0, 0, 0).unwrap())
+                .into();
+
+            let plan = symbols_with_currencies
+                .iter()
+                .map(|(symbol, currency)| SymbolSyncPlanItem {
+                    symbol: symbol.clone(),
+                    currency: currency.clone(),
+                    start: default_start_time,
+                })
+                .collect();
+            return Ok(plan);
+        }
+
+        let symbols_for_latest: Vec<String> = symbols_with_currencies
+            .iter()
+            .map(|(sym, _)| sym.clone())
+            .collect();
+
+        let quotes_map = match self
+            .repository
+            .get_latest_quotes_for_symbols(&symbols_for_latest)
+        {
+            Ok(map) => map,
+            Err(e) => {
+                error!(
+                    "Failed to get latest quotes for symbols {:?}: {}. Falling back to default history window.",
+                    symbols_for_latest, e
+                );
+                HashMap::new()
+            }
+        };
+
+        let mut plan = Vec::new();
+
+        for (symbol, currency) in symbols_with_currencies {
+            let start_date = match quotes_map.get(symbol) {
+                Some(latest_quote) => {
+                    let last_date = latest_quote.timestamp.date_naive();
+
+                    if last_date >= end_date {
+                        // Re-fetch the latest day to pick up intraday adjustments Yahoo publishes.
+                        end_date
+                    } else {
+                        last_date.succ_opt().unwrap_or(last_date)
+                    }
+                }
+                None => default_start_date,
+            };
+
+            if start_date > end_date {
+                debug!(
+                    "Symbol '{}' is already synced through {} (end {}). Skipping fetch.",
+                    symbol, start_date, end_date
+                );
+                continue;
+            }
+
+            let start_time: SystemTime = Utc
+                .from_utc_datetime(&start_date.and_hms_opt(0, 0, 0).unwrap())
+                .into();
+
+            plan.push(SymbolSyncPlanItem {
+                symbol: symbol.clone(),
+                currency: currency.clone(),
+                start: start_time,
+            });
+        }
+
+        Ok(plan)
+    }
+
+    fn validate_quote_data(&self, quote: &QuoteImport) -> ImportValidationStatus {
+        // Validate symbol
+        if quote.symbol.trim().is_empty() {
+            return ImportValidationStatus::Error("Symbol is required".to_string());
+        }
+
+        // Validate date format
+        if let Err(_) = chrono::NaiveDate::parse_from_str(&quote.date, "%Y-%m-%d") {
+            return ImportValidationStatus::Error(
+                "Invalid date format. Expected YYYY-MM-DD".to_string(),
+            );
+        }
+
+        // Validate close price (required)
+        if quote.close <= Decimal::ZERO {
+            return ImportValidationStatus::Error("Close price must be greater than 0".to_string());
+        }
+
+        // Validate OHLC logic
+        if let (Some(open), Some(high), Some(low)) = (quote.open, quote.high, quote.low) {
+            if high < low {
+                return ImportValidationStatus::Error(
+                    "High price cannot be less than low price".to_string(),
+                );
+            }
+            if open > high || open < low {
+                return ImportValidationStatus::Warning(
+                    "Open price is outside high-low range".to_string(),
+                );
+            }
+            if quote.close > high || quote.close < low {
+                return ImportValidationStatus::Warning(
+                    "Close price is outside high-low range".to_string(),
+                );
+            }
+        }
+
+        ImportValidationStatus::Valid
+    }
+
+    fn convert_import_quote_to_quote(&self, import_quote: &QuoteImport) -> Result<Quote> {
+        use super::market_data_model::DataSource;
+
+        let timestamp = chrono::NaiveDate::parse_from_str(&import_quote.date, "%Y-%m-%d")?
+            .and_hms_opt(12, 0, 0)
+            .unwrap()
+            .and_local_timezone(Utc)
+            .unwrap();
+
+        Ok(Quote {
+            id: format!("{}_{}", import_quote.symbol, import_quote.date),
+            symbol: import_quote.symbol.clone(),
+            timestamp,
+            open: import_quote.open.unwrap_or(import_quote.close),
+            high: import_quote.high.unwrap_or(import_quote.close),
+            low: import_quote.low.unwrap_or(import_quote.close),
+            close: import_quote.close,
+            adjclose: import_quote.close, // Assume no adjustment for imported data
+            volume: import_quote.volume.unwrap_or(Decimal::ZERO),
+            currency: import_quote.currency.clone(),
+            data_source: DataSource::Manual,
+            created_at: Utc::now(),
+        })
+    }
+}
+
+
+=================================================================================
+FILE: ./market_data_traits.rs
+=================================================================================
+
+use async_trait::async_trait;
+use chrono::{NaiveDate, NaiveDateTime};
+use std::collections::{HashMap, HashSet};
+
+use super::market_data_model::{
+    LatestQuotePair, MarketDataProviderInfo, Quote, QuoteDb, QuoteImport, QuoteSummary,
+};
+use super::providers::models::AssetProfile;
+use crate::errors::Result;
+use crate::market_data::market_data_model::{
+    MarketDataProviderSetting, UpdateMarketDataProviderSetting,
+};
+
+#[async_trait]
+pub trait MarketDataServiceTrait: Send + Sync {
+    async fn search_symbol(&self, query: &str) -> Result<Vec<QuoteSummary>>;
+    fn get_latest_quote_for_symbol(&self, symbol: &str) -> Result<Quote>;
+    fn get_latest_quotes_for_symbols(&self, symbols: &[String]) -> Result<HashMap<String, Quote>>;
+    fn get_all_historical_quotes(&self) -> Result<HashMap<String, Vec<(NaiveDate, Quote)>>>;
+    async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile>;
+    fn get_historical_quotes_for_symbol(&self, symbol: &str) -> Result<Vec<Quote>>;
+    async fn add_quote(&self, quote: &Quote) -> Result<Quote>;
+    async fn update_quote(&self, quote: Quote) -> Result<Quote>;
+    async fn delete_quote(&self, quote_id: &str) -> Result<()>;
+    async fn get_historical_quotes_from_provider(
+        &self,
+        symbol: &str,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> Result<Vec<Quote>>;
+    async fn sync_market_data(&self) -> Result<((), Vec<(String, String)>)>;
+    async fn resync_market_data(
+        &self,
+        symbols: Option<Vec<String>>,
+    ) -> Result<((), Vec<(String, String)>)>;
+    fn get_latest_quotes_pair_for_symbols(
+        &self,
+        symbols: &[String],
+    ) -> Result<HashMap<String, LatestQuotePair>>;
+    fn get_historical_quotes_for_symbols_in_range(
+        &self,
+        symbols: &HashSet<String>,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> Result<Vec<Quote>>;
+    /// Fetches historical quotes for the needed symbols and date range, grouped by date.
+    async fn get_daily_quotes(
+        &self,
+        asset_ids: &HashSet<String>,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> Result<HashMap<NaiveDate, HashMap<String, Quote>>>;
+    async fn get_market_data_providers_info(&self) -> Result<Vec<MarketDataProviderInfo>>;
+    async fn get_market_data_providers_settings(&self) -> Result<Vec<MarketDataProviderSetting>>;
+    async fn update_market_data_provider_settings(
+        &self,
+        provider_id: String,
+        priority: i32,
+        enabled: bool,
+    ) -> Result<MarketDataProviderSetting>;
+
+    // --- Quote Import Methods ---
+    async fn import_quotes_from_csv(
+        &self,
+        quotes: Vec<QuoteImport>,
+        overwrite: bool,
+    ) -> Result<Vec<QuoteImport>>;
+    async fn bulk_upsert_quotes(&self, quotes: Vec<Quote>) -> Result<usize>;
+}
+
+#[async_trait]
+pub trait MarketDataRepositoryTrait {
+    fn get_all_historical_quotes(&self) -> Result<Vec<Quote>>;
+    fn get_historical_quotes_for_symbol(&self, symbol: &str) -> Result<Vec<Quote>>;
+    async fn save_quotes(&self, quotes: &[Quote]) -> Result<()>;
+    async fn save_quote(&self, quote: &Quote) -> Result<Quote>;
+    async fn delete_quote(&self, quote_id: &str) -> Result<()>;
+    async fn delete_quotes_for_symbols(&self, symbols: &[String]) -> Result<()>;
+    fn get_quotes_by_source(&self, symbol: &str, source: &str) -> Result<Vec<Quote>>;
+    fn get_latest_quote_for_symbol(&self, symbol: &str) -> Result<Quote>;
+    fn get_latest_quotes_for_symbols(&self, symbols: &[String]) -> Result<HashMap<String, Quote>>;
+    fn get_latest_quotes_pair_for_symbols(
+        &self,
+        symbols: &[String],
+    ) -> Result<HashMap<String, LatestQuotePair>>;
+    fn get_historical_quotes_for_symbols_in_range(
+        &self,
+        symbols: &HashSet<String>,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> Result<Vec<Quote>>;
+    fn get_all_historical_quotes_for_symbols(
+        &self,
+        symbols: &HashSet<String>,
+    ) -> Result<Vec<Quote>>;
+    fn get_all_historical_quotes_for_symbols_by_source(
+        &self,
+        symbols: &HashSet<String>,
+        source: &str,
+    ) -> Result<Vec<Quote>>;
+    fn get_latest_sync_dates_by_source(&self) -> Result<HashMap<String, Option<NaiveDateTime>>>;
+    fn get_all_providers(&self) -> Result<Vec<MarketDataProviderSetting>>;
+    fn get_provider_by_id(&self, provider_id: &str) -> Result<MarketDataProviderSetting>;
+    async fn update_provider_settings(
+        &self,
+        provider_id: String,
+        changes: UpdateMarketDataProviderSetting,
+    ) -> Result<MarketDataProviderSetting>;
+
+    // --- Quote Import Methods ---
+    async fn bulk_insert_quotes(&self, quote_records: Vec<QuoteDb>) -> Result<usize>;
+    async fn bulk_update_quotes(&self, quote_records: Vec<QuoteDb>) -> Result<usize>;
+    async fn bulk_upsert_quotes(&self, quote_records: Vec<Quote>) -> Result<usize>;
+    fn quote_exists(&self, symbol_param: &str, date: &str) -> Result<bool>;
+    fn get_existing_quotes_for_period(
+        &self,
+        symbol_param: &str,
+        start_date: &str,
+        end_date: &str,
+    ) -> Result<Vec<Quote>>;
+}
+
+
+=================================================================================
+FILE: ./mod.rs
+=================================================================================
+
+pub(crate) mod market_data_constants;
+pub(crate) mod market_data_errors;
+pub mod market_data_model;
+pub(crate) mod market_data_repository;
+pub(crate) mod market_data_service;
+pub(crate) mod market_data_traits;
+pub(crate) mod providers;
+
+// Re-export the public interface
+pub use market_data_constants::*;
+pub use market_data_model::{
+    DataSource, ImportValidationStatus, MarketDataProviderInfo, MarketDataProviderSetting, Quote,
+    QuoteImport, QuoteRequest, QuoteSummary,
+};
+pub use market_data_repository::MarketDataRepository;
+pub use market_data_service::MarketDataService;
+pub use market_data_traits::MarketDataServiceTrait;
+
+// Re-export provider types
+pub use providers::market_data_provider::{AssetProfiler, MarketDataProvider};
+
+// Re-export error types for convenience
+pub use market_data_errors::MarketDataError;
+
+
+=================================================================================
+FILE: ./providers/alpha_vantage_provider.rs
+=================================================================================
+
+use crate::market_data::market_data_model::DataSource;
+use crate::market_data::providers::market_data_provider::MarketDataProvider;
+use crate::market_data::providers::models::AssetProfile;
+use crate::market_data::{AssetProfiler, MarketDataError, Quote as ModelQuote, QuoteSummary};
+use async_trait::async_trait;
+use chrono::{NaiveDate, Utc};
+use futures;
+use reqwest::Client;
+use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
+use serde_json;
+use std::collections::HashMap;
+use std::time::SystemTime;
+
+const BASE_URL: &str = "https://www.alphavantage.co/query";
+
+pub struct AlphaVantageProvider {
+    client: Client,
+    token: String,
+}
+
+impl AlphaVantageProvider {
+    pub fn new(token: String) -> Self {
+        let client = Client::new();
+        AlphaVantageProvider { client, token }
+    }
+
+    async fn fetch_data(
+        &self,
+        function: &str,
+        params: Vec<(&str, &str)>,
+    ) -> Result<String, MarketDataError> {
+        let mut query_params = params;
+        query_params.push(("function", function));
+        query_params.push(("apikey", &self.token));
+
+        let url = reqwest::Url::parse_with_params(BASE_URL, &query_params)
+            .map_err(|e| MarketDataError::ProviderError(format!("Failed to build URL: {}", e)))?;
+
+        let response = self
+            .client
+            .get(url)
+            .send()
+            .await
+            .map_err(|e| MarketDataError::ProviderError(e.to_string()))?;
+
+        if !response.status().is_success() {
+            let error_body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(MarketDataError::ProviderError(format!(
+                "AlphaVantage API error: {}",
+                error_body
+            )));
+        }
+
+        let text = response
+            .text()
+            .await
+            .map_err(|e| MarketDataError::ProviderError(e.to_string()))?;
+        Ok(text)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct AlphaVantageQuote {
+    #[serde(rename = "1. open")]
+    open: String,
+    #[serde(rename = "2. high")]
+    high: String,
+    #[serde(rename = "3. low")]
+    low: String,
+    #[serde(rename = "4. close")]
+    close: String,
+    #[serde(rename = "5. volume")]
+    volume: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct TimeSeriesDaily {
+    #[serde(rename = "Time Series (Daily)")]
+    time_series: HashMap<String, AlphaVantageQuote>,
+}
+
+#[async_trait]
+impl MarketDataProvider for AlphaVantageProvider {
+    fn name(&self) -> &'static str {
+        "ALPHA_VANTAGE"
+    }
+
+    fn priority(&self) -> u8 {
+        3
+    }
+
+    async fn get_latest_quote(
+        &self,
+        symbol: &str,
+        fallback_currency: String,
+    ) -> Result<ModelQuote, MarketDataError> {
+        let params = vec![("symbol", symbol), ("outputsize", "compact")];
+        let response_text = self.fetch_data("TIME_SERIES_DAILY", params).await?;
+        let response_json: TimeSeriesDaily = serde_json::from_str(&response_text).map_err(|e| {
+            MarketDataError::ProviderError(format!("Failed to parse latest quote: {}", e))
+        })?;
+
+        let (date, quote) = response_json.time_series.iter().next().ok_or_else(|| {
+            MarketDataError::ProviderError("No time series data found".to_string())
+        })?;
+
+        let quote_timestamp = NaiveDate::parse_from_str(date, "%Y-%m-%d")
+            .map_err(|_| MarketDataError::ProviderError("Invalid date format".to_string()))?
+            .and_hms_opt(0, 0, 0)
+            .unwrap()
+            .and_local_timezone(Utc)
+            .unwrap();
+
+        let model_quote = ModelQuote {
+            id: format!("{}_{}", quote_timestamp.format("%Y%m%d"), symbol),
+            created_at: Utc::now(),
+            data_source: DataSource::AlphaVantage,
+            timestamp: quote_timestamp,
+            symbol: symbol.to_string(),
+            open: quote.open.parse::<Decimal>().unwrap_or_default(),
+            high: quote.high.parse::<Decimal>().unwrap_or_default(),
+            low: quote.low.parse::<Decimal>().unwrap_or_default(),
+            volume: quote.volume.parse::<Decimal>().unwrap_or_default(),
+            close: quote.close.parse::<Decimal>().unwrap_or_default(),
+            adjclose: quote.close.parse::<Decimal>().unwrap_or_default(),
+            currency: fallback_currency,
+        };
+        Ok(model_quote)
+    }
+
+    async fn get_historical_quotes(
+        &self,
+        symbol: &str,
+        _start: SystemTime,
+        _end: SystemTime,
+        fallback_currency: String,
+    ) -> Result<Vec<ModelQuote>, MarketDataError> {
+        let params = vec![("symbol", symbol), ("outputsize", "full")];
+        let response_text = self.fetch_data("TIME_SERIES_DAILY", params).await?;
+        let response_json: TimeSeriesDaily = serde_json::from_str(&response_text).map_err(|e| {
+            MarketDataError::ProviderError(format!("Failed to parse historical quotes: {}", e))
+        })?;
+
+        let quotes = response_json
+            .time_series
+            .into_iter()
+            .map(|(date, quote)| {
+                let quote_timestamp = NaiveDate::parse_from_str(&date, "%Y-%m-%d")
+                    .unwrap()
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap()
+                    .and_local_timezone(Utc)
+                    .unwrap();
+
+                ModelQuote {
+                    id: format!("{}_{}", quote_timestamp.format("%Y%m%d"), symbol),
+                    created_at: Utc::now(),
+                    data_source: DataSource::AlphaVantage,
+                    timestamp: quote_timestamp,
+                    symbol: symbol.to_string(),
+                    open: quote.open.parse::<Decimal>().unwrap_or_default(),
+                    high: quote.high.parse::<Decimal>().unwrap_or_default(),
+                    low: quote.low.parse::<Decimal>().unwrap_or_default(),
+                    volume: quote.volume.parse::<Decimal>().unwrap_or_default(),
+                    close: quote.close.parse::<Decimal>().unwrap_or_default(),
+                    adjclose: quote.close.parse::<Decimal>().unwrap_or_default(),
+                    currency: fallback_currency.clone(),
+                }
+            })
+            .collect();
+
+        Ok(quotes)
+    }
+
+    async fn get_historical_quotes_bulk(
+        &self,
+        symbols_with_currencies: &[(String, String)],
+        start: SystemTime,
+        end: SystemTime,
+    ) -> Result<(Vec<ModelQuote>, Vec<(String, String)>), MarketDataError> {
+        const BATCH_SIZE: usize = 5; // Alpha Vantage has a low rate limit on the free tier
+        let mut all_quotes = Vec::new();
+        let mut failed_symbols: Vec<(String, String)> = Vec::new();
+        let mut errors_for_logging: Vec<(String, String)> = Vec::new();
+
+        for chunk in symbols_with_currencies.chunks(BATCH_SIZE) {
+            let futures: Vec<_> = chunk
+                .iter()
+                .map(|(symbol, currency)| {
+                    let symbol_clone = symbol.clone();
+                    let currency_clone = currency.clone();
+                    async move {
+                        match self
+                            .get_historical_quotes(
+                                &symbol_clone,
+                                start,
+                                end,
+                                currency_clone.clone(),
+                            )
+                            .await
+                        {
+                            Ok(quotes) => Ok(quotes),
+                            Err(e) => Err((symbol_clone, currency_clone, e.to_string())),
+                        }
+                    }
+                })
+                .collect();
+
+            let results = futures::future::join_all(futures).await;
+
+            for result in results {
+                match result {
+                    Ok(quotes) => all_quotes.extend(quotes),
+                    Err((symbol, currency, error)) => {
+                        failed_symbols.push((symbol.clone(), currency));
+                        errors_for_logging.push((symbol, error));
+                    }
+                }
+            }
+
+            // Add delay between chunks to respect rate limits
+            if chunk.len() == BATCH_SIZE {
+                tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
+            }
+        }
+
+        if !errors_for_logging.is_empty() {
+            log::warn!(
+                "Failed to fetch history for {} symbols from AlphaVantage: {:?}",
+                errors_for_logging.len(),
+                errors_for_logging
+            );
+        }
+
+        Ok((all_quotes, failed_symbols))
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct SymbolSearchResponse {
+    #[serde(rename = "bestMatches")]
+    best_matches: Vec<SearchMatch>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SearchMatch {
+    #[serde(rename = "1. symbol")]
+    symbol: String,
+    #[serde(rename = "2. name")]
+    name: String,
+    #[serde(rename = "3. type")]
+    asset_type: String,
+    #[serde(rename = "4. region")]
+    region: String,
+    #[serde(rename = "9. matchScore")]
+    match_score: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct CompanyOverview {
+    pub symbol: String,
+    pub asset_type: String,
+    pub name: String,
+    pub description: String,
+    pub cik: String,
+    pub exchange: String,
+    pub currency: String,
+    pub country: String,
+    pub sector: String,
+    pub industry: String,
+    pub address: String,
+    #[serde(rename = "FiscalYearEnd")]
+    pub fiscal_year_end: String,
+    #[serde(rename = "LatestQuarter")]
+    pub latest_quarter: String,
+    #[serde(rename = "MarketCapitalization")]
+    pub market_capitalization: String,
+    #[serde(rename = "EBITDA")]
+    pub ebitda: String,
+    #[serde(rename = "PERatio")]
+    pub pe_ratio: String,
+    #[serde(rename = "PEGRatio")]
+    pub peg_ratio: String,
+    #[serde(rename = "BookValue")]
+    pub book_value: String,
+    #[serde(rename = "DividendPerShare")]
+    pub dividend_per_share: String,
+    #[serde(rename = "DividendYield")]
+    pub dividend_yield: String,
+    #[serde(rename = "EPS")]
+    pub eps: String,
+    #[serde(rename = "RevenuePerShareTTM")]
+    pub revenue_per_share_ttm: String,
+    #[serde(rename = "ProfitMargin")]
+    pub profit_margin: String,
+    #[serde(rename = "OperatingMarginTTM")]
+    pub operating_margin_ttm: String,
+    #[serde(rename = "ReturnOnAssetsTTM")]
+    pub return_on_assets_ttm: String,
+    #[serde(rename = "ReturnOnEquityTTM")]
+    pub return_on_equity_ttm: String,
+    #[serde(rename = "RevenueTTM")]
+    pub revenue_ttm: String,
+    #[serde(rename = "GrossProfitTTM")]
+    pub gross_profit_ttm: String,
+    #[serde(rename = "DilutedEPSTTM")]
+    pub diluted_eps_ttm: String,
+    #[serde(rename = "QuarterlyEarningsGrowthYOY")]
+    pub quarterly_earnings_growth_yoy: String,
+    #[serde(rename = "QuarterlyRevenueGrowthYOY")]
+    pub quarterly_revenue_growth_yoy: String,
+    #[serde(rename = "AnalystTargetPrice")]
+    pub analyst_target_price: String,
+    #[serde(rename = "TrailingPE")]
+    pub trailing_pe: String,
+    #[serde(rename = "ForwardPE")]
+    pub forward_pe: String,
+    #[serde(rename = "PriceToSalesRatioTTM")]
+    pub price_to_sales_ratio_ttm: String,
+    #[serde(rename = "PriceToBookRatio")]
+    pub price_to_book_ratio: String,
+    #[serde(rename = "EVToRevenue")]
+    pub ev_to_revenue: String,
+    #[serde(rename = "EVToEBITDA")]
+    pub ev_to_ebitda: String,
+    #[serde(rename = "Beta")]
+    pub beta: String,
+    #[serde(rename = "52WeekHigh")]
+    pub week_52_high: String,
+    #[serde(rename = "52WeekLow")]
+    pub week_52_low: String,
+    #[serde(rename = "50DayMovingAverage")]
+    pub day_50_moving_average: String,
+    #[serde(rename = "200DayMovingAverage")]
+    pub day_200_moving_average: String,
+    #[serde(rename = "SharesOutstanding")]
+    pub shares_outstanding: String,
+    #[serde(rename = "DividendDate")]
+    pub dividend_date: String,
+    #[serde(rename = "ExDividendDate")]
+    pub ex_dividend_date: String,
+}
+
+#[async_trait]
+impl AssetProfiler for AlphaVantageProvider {
+    async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile, MarketDataError> {
+        let params = vec![("symbol", symbol)];
+        let response_text = self.fetch_data("OVERVIEW", params).await?;
+        let overview: CompanyOverview = serde_json::from_str(&response_text).map_err(|e| {
+            MarketDataError::ProviderError(format!("Failed to parse asset profile: {}", e))
+        })?;
+
+        let profile = AssetProfile {
+            id: Some(overview.symbol.clone()),
+            name: Some(overview.name),
+            asset_type: Some(overview.asset_type),
+            symbol: overview.symbol,
+            data_source: DataSource::AlphaVantage.as_str().to_string(),
+            currency: overview.currency,
+            notes: Some(overview.description),
+            ..Default::default()
+        };
+
+        Ok(profile)
+    }
+
+    async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, MarketDataError> {
+        log::debug!("Searching AlphaVantage for ticker with query: {}", query);
+        let params = vec![("keywords", query)];
+        let response_text = self.fetch_data("SYMBOL_SEARCH", params).await?;
+        let search_response: SymbolSearchResponse =
+            serde_json::from_str(&response_text).map_err(|e| {
+                MarketDataError::ProviderError(format!("Failed to parse search results: {}", e))
+            })?;
+
+        let summaries = search_response
+            .best_matches
+            .into_iter()
+            .map(|m| QuoteSummary {
+                symbol: m.symbol,
+                long_name: m.name.clone(),
+                short_name: m.name,
+                quote_type: m.asset_type,
+                exchange: m.region,
+                score: m.match_score.parse::<f64>().unwrap_or(0.0),
+                type_display: "".to_string(),
+                index: "".to_string(),
+            })
+            .collect();
+
+        Ok(summaries)
+    }
+}
+
+
+=================================================================================
+FILE: ./providers/manual_provider.rs
+=================================================================================
+
+use crate::market_data::market_data_errors::MarketDataError;
+use crate::market_data::market_data_model::DataSource;
+use crate::market_data::providers::market_data_provider::AssetProfiler;
+use crate::market_data::QuoteSummary;
+
+use super::models::AssetProfile;
+pub struct ManualProvider;
+
+impl ManualProvider {
+    pub fn new() -> Result<Self, MarketDataError> {
+        Ok(ManualProvider)
+    }
+}
+
+#[async_trait::async_trait]
+impl AssetProfiler for ManualProvider {
+    async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile, MarketDataError> {
+        if symbol.starts_with("$CASH-") {
+            Ok(AssetProfile {
+                id: Some(symbol.to_string()),
+                isin: None,
+                name: Some(symbol.to_string()),
+                asset_type: Some("CASH".to_string()),
+                asset_class: Some("CASH".to_string()),
+                asset_sub_class: Some("CASH".to_string()),
+                symbol: symbol.to_string(),
+                data_source: DataSource::Manual.as_str().to_string(),
+                currency: symbol[6..].to_string(),
+                ..Default::default()
+            })
+        } else {
+            Ok(AssetProfile {
+                id: Some(symbol.to_string()),
+                isin: None,
+                name: Some(symbol.to_string()),
+                asset_type: Some("EQUITY".to_string()),
+                symbol: symbol.to_string(),
+                data_source: DataSource::Manual.as_str().to_string(),
+                ..Default::default()
+            })
+        }
+    }
+
+    async fn search_ticker(&self, _query: &str) -> Result<Vec<QuoteSummary>, MarketDataError> {
+        Ok(vec![])
+    }
+}
+
+
+=================================================================================
+FILE: ./providers/market_data_provider.rs
+=================================================================================
+
+use crate::market_data::{MarketDataError, Quote as ModelQuote, QuoteSummary};
+use async_trait::async_trait;
+use std::time::SystemTime;
+
+use super::models::AssetProfile;
+
+#[async_trait]
+pub trait MarketDataProvider: Send + Sync {
+    fn name(&self) -> &'static str;
+    fn priority(&self) -> u8 {
+        10
+    }
+
+    async fn get_latest_quote(
+        &self,
+        symbol: &str,
+        fallback_currency: String,
+    ) -> Result<ModelQuote, MarketDataError>;
+    async fn get_historical_quotes(
+        &self,
+        symbol: &str,
+        start: SystemTime,
+        end: SystemTime,
+        fallback_currency: String,
+    ) -> Result<Vec<ModelQuote>, MarketDataError>;
+
+    /// Fetch historical quotes for multiple symbols in parallel
+    async fn get_historical_quotes_bulk(
+        &self,
+        symbols_with_currencies: &[(String, String)],
+        start: SystemTime,
+        end: SystemTime,
+    ) -> Result<(Vec<ModelQuote>, Vec<(String, String)>), MarketDataError>;
+}
+
+#[async_trait]
+pub trait AssetProfiler: Send + Sync {
+    async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, MarketDataError>;
+    async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile, MarketDataError>;
+}
+
+
+=================================================================================
+FILE: ./providers/marketdata_app_provider.rs
+=================================================================================
+
+use crate::market_data::market_data_model::DataSource;
+use crate::market_data::providers::market_data_provider::MarketDataProvider;
+use crate::market_data::{MarketDataError, Quote as ModelQuote};
+use async_trait::async_trait;
+use chrono::{DateTime, TimeZone, Utc};
+use futures;
+use reqwest::Client;
+use rust_decimal::Decimal;
+use serde_json;
+use std::time::SystemTime;
+
+const BASE_URL: &str = "https://api.marketdata.app/v1";
+
+pub struct MarketDataAppProvider {
+    client: Client,
+    token: String,
+}
+
+impl MarketDataAppProvider {
+    pub async fn new(token: String) -> Result<Self, MarketDataError> {
+        let client = Client::new();
+        Ok(MarketDataAppProvider { client, token })
+    }
+
+    async fn fetch_data(&self, url: &str) -> Result<String, MarketDataError> {
+        let response = self
+            .client
+            .get(url)
+            .header("Authorization", format!("Bearer {}", self.token))
+            .send()
+            .await
+            .map_err(|e| MarketDataError::ProviderError(e.to_string()))?;
+        let text = response
+            .text()
+            .await
+            .map_err(|e| MarketDataError::ProviderError(e.to_string()))?;
+        Ok(text)
+    }
+}
+
+#[async_trait]
+impl MarketDataProvider for MarketDataAppProvider {
+    fn name(&self) -> &'static str {
+        "MARKETDATA_APP"
+    }
+
+    fn priority(&self) -> u8 {
+        2
+    }
+
+    async fn get_latest_quote(
+        &self,
+        symbol: &str,
+        fallback_currency: String,
+    ) -> Result<ModelQuote, MarketDataError> {
+        let url = format!("{}/stocks/prices/{}/", BASE_URL, symbol);
+        let response_text = self.fetch_data(&url).await?;
+        let response_json: serde_json::Value = serde_json::from_str(&response_text)
+            .map_err(|e| MarketDataError::ProviderError(e.to_string()))?;
+
+        if response_json["s"] == "ok" {
+            let mid_price = response_json["mid"]
+                .as_array()
+                .and_then(|arr| arr.get(0))
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
+            let timestamp = response_json["updated"]
+                .as_array()
+                .and_then(|arr| arr.get(0))
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0);
+            let quote_timestamp: DateTime<Utc> =
+                Utc.timestamp_opt(timestamp, 0).single().unwrap_or_default();
+
+            let model_quote = ModelQuote {
+                id: format!("{}_{}", quote_timestamp.format("%Y%m%d"), symbol),
+                created_at: Utc::now(),
+                data_source: DataSource::MarketDataApp,
+                timestamp: quote_timestamp,
+                symbol: symbol.to_string(),
+                open: Decimal::from_f64_retain(mid_price).unwrap_or_default(),
+                high: Decimal::from_f64_retain(mid_price).unwrap_or_default(),
+                low: Decimal::from_f64_retain(mid_price).unwrap_or_default(),
+                volume: Decimal::from_f64_retain(0.0).unwrap_or_default(),
+                close: Decimal::from_f64_retain(mid_price).unwrap_or_default(),
+                adjclose: Decimal::from_f64_retain(mid_price).unwrap_or_default(),
+                currency: fallback_currency,
+            };
+            Ok(model_quote)
+        } else {
+            Err(MarketDataError::ProviderError("No data found".to_string()))
+        }
+    }
+
+    async fn get_historical_quotes(
+        &self,
+        symbol: &str,
+        start: SystemTime,
+        end: SystemTime,
+        fallback_currency: String,
+    ) -> Result<Vec<ModelQuote>, MarketDataError> {
+        let start_date = DateTime::<Utc>::from(start).format("%Y-%m-%d").to_string();
+        let end_date = DateTime::<Utc>::from(end).format("%Y-%m-%d").to_string();
+        let url = format!(
+            "{}/stocks/candles/D/{symbol}?from={start_date}&to={end_date}",
+            BASE_URL,
+            symbol = symbol,
+            start_date = start_date,
+            end_date = end_date
+        );
+
+        let response_text = self.fetch_data(&url).await?;
+        let response_json: serde_json::Value = serde_json::from_str(&response_text)
+            .map_err(|e| MarketDataError::ProviderError(e.to_string()))?;
+
+        if response_json["s"] == "ok" {
+            let quotes = response_json["c"]
+                .as_array()
+                .unwrap_or(&vec![])
+                .iter()
+                .enumerate()
+                .map(|(i, close)| {
+                    let open = response_json["o"][i].as_f64().unwrap_or(0.0);
+                    let high = response_json["h"][i].as_f64().unwrap_or(0.0);
+                    let low = response_json["l"][i].as_f64().unwrap_or(0.0);
+                    let volume = response_json["v"][i].as_f64().unwrap_or(0.0);
+                    let timestamp = response_json["t"][i].as_i64().unwrap_or(0);
+                    let quote_timestamp: DateTime<Utc> =
+                        Utc.timestamp_opt(timestamp, 0).single().unwrap_or_default();
+
+                    ModelQuote {
+                        id: format!("{}_{}", quote_timestamp.format("%Y%m%d"), symbol),
+                        created_at: Utc::now(),
+                        data_source: DataSource::MarketDataApp,
+                        timestamp: quote_timestamp,
+                        symbol: symbol.to_string(),
+                        open: Decimal::from_f64_retain(open).unwrap_or_default(),
+                        high: Decimal::from_f64_retain(high).unwrap_or_default(),
+                        low: Decimal::from_f64_retain(low).unwrap_or_default(),
+                        volume: Decimal::from_f64_retain(volume).unwrap_or_default(),
+                        close: Decimal::from_f64_retain(close.as_f64().unwrap_or(0.0))
+                            .unwrap_or_default(),
+                        adjclose: Decimal::from_f64_retain(close.as_f64().unwrap_or(0.0))
+                            .unwrap_or_default(),
+                        currency: fallback_currency.clone(),
+                    }
+                })
+                .collect();
+            Ok(quotes)
+        } else {
+            Err(MarketDataError::ProviderError("No data found".to_string()))
+        }
+    }
+
+    async fn get_historical_quotes_bulk(
+        &self,
+        symbols_with_currencies: &[(String, String)],
+        start: SystemTime,
+        end: SystemTime,
+    ) -> Result<(Vec<ModelQuote>, Vec<(String, String)>), MarketDataError> {
+        const BATCH_SIZE: usize = 10;
+        let mut all_quotes = Vec::new();
+        let mut failed_symbols: Vec<(String, String)> = Vec::new();
+        let mut errors_for_logging: Vec<(String, String)> = Vec::new();
+
+        for chunk in symbols_with_currencies.chunks(BATCH_SIZE) {
+            let futures: Vec<_> = chunk
+                .iter()
+                .map(|(symbol, currency)| {
+                    let symbol_clone = symbol.clone();
+                    let currency_clone = currency.clone();
+                    async move {
+                        match self
+                            .get_historical_quotes(
+                                &symbol_clone,
+                                start,
+                                end,
+                                currency_clone.clone(),
+                            )
+                            .await
+                        {
+                            Ok(quotes) => Ok(quotes),
+                            Err(e) => Err((symbol_clone, currency_clone, e.to_string())),
+                        }
+                    }
+                })
+                .collect();
+
+            let results = futures::future::join_all(futures).await;
+
+            for result in results {
+                match result {
+                    Ok(quotes) => all_quotes.extend(quotes),
+                    Err((symbol, currency, error)) => {
+                        failed_symbols.push((symbol.clone(), currency));
+                        errors_for_logging.push((symbol, error));
+                    }
+                }
+            }
+        }
+
+        if !errors_for_logging.is_empty() {
+            log::warn!(
+                "Failed to fetch history for {} symbols: {:?}",
+                errors_for_logging.len(),
+                errors_for_logging
+            );
+        }
+
+        Ok((all_quotes, failed_symbols))
+    }
+}
+
+
+=================================================================================
+FILE: ./providers/metal_price_api_provider.rs
+=================================================================================
+
+use crate::market_data::market_data_errors::MarketDataError;
+use crate::market_data::providers::models::AssetProfile;
+use crate::market_data::{
+    market_data_model::DataSource, AssetProfiler, MarketDataProvider, Quote as ModelQuote,
+    QuoteSummary,
+};
+use chrono::{DateTime, Utc};
+use num_traits::FromPrimitive;
+use rust_decimal::Decimal;
+use serde::Deserialize;
+use std::time::SystemTime;
+
+#[derive(Deserialize, Debug)]
+struct MetalPriceApiResponse {
+    success: bool,
+    #[allow(dead_code)]
+    base: String,
+    #[allow(dead_code)]
+    timestamp: i64,
+    rates: std::collections::HashMap<String, f64>,
+}
+
+pub struct MetalPriceApiProvider {
+    api_key: String,
+}
+
+impl MetalPriceApiProvider {
+    pub fn new(api_key: String) -> Self {
+        MetalPriceApiProvider { api_key }
+    }
+}
+
+#[async_trait::async_trait]
+impl AssetProfiler for MetalPriceApiProvider {
+    async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile, MarketDataError> {
+        let (name, asset_type, description, categories, attributes) = match symbol {
+            "XAU" => (
+                "Gold",
+                "Commodity",
+                "Gold is a precious metal and one of the most sought-after commodities in the world. It has been used as a store of value and medium of exchange for thousands of years.",
+                "Precious Metals,Physical Commodities",
+                "Safe Haven,Inflation Hedge,Store of Value"
+            ),
+            "XAG" => (
+                "Silver",
+                "Commodity",
+                "Silver is a precious metal with both industrial and investment applications. It is widely used in electronics, solar panels, and jewelry.",
+                "Precious Metals,Industrial Metals,Physical Commodities",
+                "Industrial Use,Safe Haven,Inflation Hedge"
+            ),
+            "XPT" => (
+                "Platinum",
+                "Commodity",
+                "Platinum is a rare precious metal primarily used in automotive catalysts, jewelry, and industrial applications. It is rarer than gold.",
+                "Precious Metals,Industrial Metals,Physical Commodities",
+                "Industrial Use,Automotive Industry,Rare Metal"
+            ),
+            "XPD" => (
+                "Palladium",
+                "Commodity",
+                "Palladium is a precious metal primarily used in automotive catalytic converters and electronics. It has significant industrial demand.",
+                "Precious Metals,Industrial Metals,Physical Commodities",
+                "Automotive Industry,Industrial Use,Electronics"
+            ),
+            "XRH" => (
+                "Rhodium",
+                "Commodity",
+                "Rhodium is one of the rarest and most expensive precious metals. It is primarily used in automotive catalytic converters.",
+                "Precious Metals,Industrial Metals,Physical Commodities",
+                "Automotive Industry,Rare Metal,Industrial Use"
+            ),
+            "XRU" => (
+                "Ruthenium",
+                "Commodity",
+                "Ruthenium is a rare precious metal of the platinum group, used in electronics and chemical applications.",
+                "Precious Metals,Industrial Metals,Physical Commodities",
+                "Electronics,Chemical Industry,Rare Metal"
+            ),
+            "XIR" => (
+                "Iridium",
+                "Commodity",
+                "Iridium is one of the rarest elements on Earth and is highly resistant to corrosion. It is used in specialized industrial applications.",
+                "Precious Metals,Industrial Metals,Physical Commodities",
+                "Industrial Use,Rare Metal,Corrosion Resistant"
+            ),
+            "XOS" => (
+                "Osmium",
+                "Commodity",
+                "Osmium is the densest naturally occurring element and is used in specialized applications requiring extreme hardness.",
+                "Precious Metals,Industrial Metals,Physical Commodities",
+                "Industrial Use,Rare Metal,Specialized Applications"
+            ),
+            _ => return Err(MarketDataError::NotFound(symbol.to_string())),
+        };
+
+        Ok(AssetProfile {
+            id: Some(symbol.to_string()),
+            isin: None, // Precious metals typically don't have ISIN codes
+            name: Some(name.to_string()),
+            asset_type: Some(asset_type.to_string()),
+            symbol: symbol.to_string(),
+            symbol_mapping: None,
+            asset_class: Some("Commodity".to_string()),
+            asset_sub_class: Some("Precious Metal".to_string()),
+            notes: Some(description.to_string()),
+            countries: Some("Global".to_string()), // Precious metals are global commodities
+            categories: Some(categories.to_string()),
+            classes: Some("Physical Commodity".to_string()),
+            attributes: Some(attributes.to_string()),
+            currency: "USD".to_string(),
+            data_source: "METAL_PRICE_API".to_string(),
+            sectors: Some("Materials,Commodities".to_string()),
+            url: Some(format!(
+                "https://api.metalpriceapi.com/metals/{}",
+                symbol.to_lowercase()
+            )),
+        })
+    }
+
+    async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, MarketDataError> {
+        let query = query.to_lowercase();
+        let mut results = Vec::new();
+
+        // Helper function to calculate search score
+        let calculate_score = |name: &str, symbol: &str, query: &str| -> f64 {
+            let name_lower = name.to_lowercase();
+            let symbol_lower = symbol.to_lowercase();
+
+            if query == symbol_lower {
+                return 1.0;
+            } // Exact symbol match
+            if query == name_lower {
+                return 0.9;
+            } // Exact name match
+            if symbol_lower.starts_with(query) {
+                return 0.8;
+            } // Symbol starts with query
+            if name_lower.starts_with(query) {
+                return 0.7;
+            } // Name starts with query
+            if symbol_lower.contains(query) {
+                return 0.6;
+            } // Symbol contains query
+            if name_lower.contains(query) {
+                return 0.5;
+            } // Name contains query
+            0.0 // No match
+        };
+
+        // Gold - check if "gold" or "xau" contains the query
+        if "gold".contains(&query) || "xau".contains(&query) {
+            results.push(QuoteSummary {
+                symbol: "XAU".to_string(),
+                long_name: "Gold".to_string(),
+                short_name: "Gold".to_string(),
+                quote_type: "Commodity".to_string(),
+                exchange: "Metal Price Api".to_string(),
+                index: "".to_string(),
+                score: calculate_score("gold", "xau", &query),
+                type_display: "".to_string(),
+            });
+        }
+
+        // Silver - check if "silver" or "xag" contains the query
+        if "silver".contains(&query) || "xag".contains(&query) {
+            results.push(QuoteSummary {
+                symbol: "XAG".to_string(),
+                long_name: "Silver".to_string(),
+                short_name: "Silver".to_string(),
+                quote_type: "Commodity".to_string(),
+                exchange: "Metal Price Api".to_string(),
+                index: "".to_string(),
+                score: calculate_score("silver", "xag", &query),
+                type_display: "".to_string(),
+            });
+        }
+
+        // Platinum - check if "platinum" or "xpt" contains the query
+        if "platinum".contains(&query) || "xpt".contains(&query) {
+            results.push(QuoteSummary {
+                symbol: "XPT".to_string(),
+                long_name: "Platinum".to_string(),
+                short_name: "Platinum".to_string(),
+                quote_type: "Commodity".to_string(),
+                exchange: "Metal Price Api".to_string(),
+                index: "".to_string(),
+                score: calculate_score("platinum", "xpt", &query),
+                type_display: "".to_string(),
+            });
+        }
+
+        // Palladium - check if "palladium" or "xpd" contains the query
+        if "palladium".contains(&query) || "xpd".contains(&query) {
+            results.push(QuoteSummary {
+                symbol: "XPD".to_string(),
+                long_name: "Palladium".to_string(),
+                short_name: "Palladium".to_string(),
+                quote_type: "Commodity".to_string(),
+                exchange: "Metal Price Api".to_string(),
+                index: "".to_string(),
+                score: calculate_score("palladium", "xpd", &query),
+                type_display: "".to_string(),
+            });
+        }
+
+        // Rhodium - check if "rhodium" or "xrh" contains the query
+        if "rhodium".contains(&query) || "xrh".contains(&query) {
+            results.push(QuoteSummary {
+                symbol: "XRH".to_string(),
+                long_name: "Rhodium".to_string(),
+                short_name: "Rhodium".to_string(),
+                quote_type: "Commodity".to_string(),
+                exchange: "Metal Price Api".to_string(),
+                index: "".to_string(),
+                score: calculate_score("rhodium", "xrh", &query),
+                type_display: "".to_string(),
+            });
+        }
+
+        // Sort results by score (highest first)
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        Ok(results)
+    }
+}
+
+#[async_trait::async_trait]
+impl MarketDataProvider for MetalPriceApiProvider {
+    fn name(&self) -> &'static str {
+        "METAL_PRICE_API"
+    }
+
+    fn priority(&self) -> u8 {
+        4
+    }
+
+    async fn get_latest_quote(
+        &self,
+        symbol: &str,
+        _fallback_currency: String,
+    ) -> Result<ModelQuote, MarketDataError> {
+        // Validate that this provider supports the requested symbol
+        match symbol {
+            "XAU" | "XAG" | "XPT" | "XPD" | "XRH" | "XRU" | "XIR" | "XOS" => {}
+            _ => return Err(MarketDataError::NotFound(symbol.to_string())),
+        }
+
+        let url = format!(
+            "https://api.metalpriceapi.com/v1/latest?api_key={}&base=USD&currencies={}",
+            self.api_key, symbol
+        );
+
+        let response = reqwest::get(&url)
+            .await
+            .map_err(|e| MarketDataError::ProviderError(e.to_string()))?
+            .json::<MetalPriceApiResponse>()
+            .await
+            .map_err(|e| MarketDataError::ProviderError(e.to_string()))?;
+
+        if !response.success {
+            return Err(MarketDataError::ProviderError(
+                "API request failed".to_string(),
+            ));
+        }
+
+        let rate = response
+            .rates
+            .get(symbol)
+            .ok_or_else(|| MarketDataError::NotFound(symbol.to_string()))?;
+
+        // API returns the rate as: 1 USD = rate troy ounces of metal
+        // So to get price per troy ounce in USD: price = 1 / rate
+        if *rate == 0.0 {
+            return Err(MarketDataError::ProviderError(format!(
+                "Invalid rate (zero) for symbol: {}",
+                symbol
+            )));
+        }
+
+        let price = Decimal::from_f64(1.0 / *rate).ok_or_else(|| {
+            MarketDataError::ProviderError(format!(
+                "Failed to convert rate to decimal for symbol: {}",
+                symbol
+            ))
+        })?;
+
+        let now_utc: DateTime<Utc> = Utc::now();
+
+        Ok(ModelQuote {
+            id: format!("{}_{}", now_utc.format("%Y%m%d"), symbol),
+            created_at: now_utc,
+            data_source: DataSource::MetalPriceApi,
+            timestamp: now_utc,
+            symbol: symbol.to_string(),
+            close: price,
+            currency: "USD".to_string(),
+            open: Default::default(),
+            high: Default::default(),
+            low: Default::default(),
+            adjclose: Default::default(),
+            volume: Default::default(),
+        })
+    }
+
+    async fn get_historical_quotes(
+        &self,
+        _symbol: &str,
+        _start: SystemTime,
+        _end: SystemTime,
+        _fallback_currency: String,
+    ) -> Result<Vec<ModelQuote>, MarketDataError> {
+        // The free plan of Metal Price API does not support historical data
+        Ok(vec![])
+    }
+
+    async fn get_historical_quotes_bulk(
+        &self,
+        symbols_with_currencies: &[(String, String)],
+        _start: SystemTime,
+        _end: SystemTime,
+    ) -> Result<(Vec<ModelQuote>, Vec<(String, String)>), MarketDataError> {
+        // The free plan of Metal Price API does not support historical data
+        Ok((vec![], symbols_with_currencies.to_vec()))
+    }
+}
+
+
+=================================================================================
+FILE: ./providers/metal_price_api_provider_test.rs
+=================================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::super::metal_price_api_provider::MetalPriceApiProvider;
+    use crate::market_data::{market_data_errors::MarketDataError, AssetProfiler};
+
+    #[tokio::test]
+    async fn test_get_asset_profile_gold() {
+        let provider = MetalPriceApiProvider::new("test_api_key".to_string());
+        let result = provider.get_asset_profile("XAU").await;
+
+        assert!(result.is_ok());
+        let profile = result.unwrap();
+
+        // Check all required fields are populated
+        assert_eq!(profile.symbol, "XAU");
+        assert_eq!(profile.id, Some("XAU".to_string()));
+        assert_eq!(profile.name, Some("Gold".to_string()));
+        assert_eq!(profile.asset_type, Some("Commodity".to_string()));
+        assert_eq!(profile.asset_class, Some("Commodity".to_string()));
+        assert_eq!(profile.asset_sub_class, Some("Precious Metal".to_string()));
+        assert_eq!(profile.currency, "USD");
+        assert_eq!(profile.data_source, "METAL_PRICE_API");
+        assert_eq!(profile.countries, Some("Global".to_string()));
+        assert_eq!(
+            profile.categories,
+            Some("Precious Metals,Physical Commodities".to_string())
+        );
+        assert_eq!(profile.classes, Some("Physical Commodity".to_string()));
+        assert_eq!(
+            profile.attributes,
+            Some("Safe Haven,Inflation Hedge,Store of Value".to_string())
+        );
+        assert_eq!(profile.sectors, Some("Materials,Commodities".to_string()));
+        assert!(profile.notes.is_some());
+        assert!(profile
+            .notes
+            .as_ref()
+            .unwrap()
+            .contains("Gold is a precious metal"));
+        assert!(profile.url.is_some());
+        assert!(profile.url.as_ref().unwrap().contains("metalpriceapi.com"));
+        assert_eq!(profile.isin, None); // Precious metals don't have ISIN codes
+        assert_eq!(profile.symbol_mapping, None);
+    }
+
+    #[tokio::test]
+    async fn test_get_asset_profile_silver() {
+        let provider = MetalPriceApiProvider::new("test_api_key".to_string());
+        let result = provider.get_asset_profile("XAG").await;
+
+        assert!(result.is_ok());
+        let profile = result.unwrap();
+
+        assert_eq!(profile.symbol, "XAG");
+        assert_eq!(profile.name, Some("Silver".to_string()));
+        assert!(profile
+            .categories
+            .as_ref()
+            .unwrap()
+            .contains("Industrial Metals"));
+        assert!(profile
+            .attributes
+            .as_ref()
+            .unwrap()
+            .contains("Industrial Use"));
+    }
+
+    #[tokio::test]
+    async fn test_get_asset_profile_platinum() {
+        let provider = MetalPriceApiProvider::new("test_api_key".to_string());
+        let result = provider.get_asset_profile("XPT").await;
+
+        assert!(result.is_ok());
+        let profile = result.unwrap();
+
+        assert_eq!(profile.symbol, "XPT");
+        assert_eq!(profile.name, Some("Platinum".to_string()));
+        assert!(profile
+            .attributes
+            .as_ref()
+            .unwrap()
+            .contains("Automotive Industry"));
+    }
+
+    #[tokio::test]
+    async fn test_get_asset_profile_palladium() {
+        let provider = MetalPriceApiProvider::new("test_api_key".to_string());
+        let result = provider.get_asset_profile("XPD").await;
+
+        assert!(result.is_ok());
+        let profile = result.unwrap();
+
+        assert_eq!(profile.symbol, "XPD");
+        assert_eq!(profile.name, Some("Palladium".to_string()));
+        assert!(profile
+            .notes
+            .as_ref()
+            .unwrap()
+            .contains("catalytic converters"));
+    }
+
+    #[tokio::test]
+    async fn test_get_asset_profile_rhodium() {
+        let provider = MetalPriceApiProvider::new("test_api_key".to_string());
+        let result = provider.get_asset_profile("XRH").await;
+
+        assert!(result.is_ok());
+        let profile = result.unwrap();
+
+        assert_eq!(profile.symbol, "XRH");
+        assert_eq!(profile.name, Some("Rhodium".to_string()));
+        assert!(profile.attributes.as_ref().unwrap().contains("Rare Metal"));
+    }
+
+    #[tokio::test]
+    async fn test_get_asset_profile_unsupported_symbol() {
+        let provider = MetalPriceApiProvider::new("test_api_key".to_string());
+        let result = provider.get_asset_profile("INVALID").await;
+
+        assert!(result.is_err());
+        match result {
+            Err(MarketDataError::NotFound(symbol)) => assert_eq!(symbol, "INVALID"),
+            _ => panic!("Expected NotFound error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_all_supported_metals_have_complete_profiles() {
+        let provider = MetalPriceApiProvider::new("test_api_key".to_string());
+        let metals = vec!["XAU", "XAG", "XPT", "XPD", "XRH", "XRU", "XIR", "XOS"];
+
+        for metal in metals {
+            let result = provider.get_asset_profile(metal).await;
+            assert!(result.is_ok(), "Failed to get profile for {}", metal);
+
+            let profile = result.unwrap();
+
+            // Ensure all required fields are populated
+            assert!(profile.id.is_some(), "Missing id for {}", metal);
+            assert!(profile.name.is_some(), "Missing name for {}", metal);
+            assert!(
+                profile.asset_type.is_some(),
+                "Missing asset_type for {}",
+                metal
+            );
+            assert!(
+                profile.asset_class.is_some(),
+                "Missing asset_class for {}",
+                metal
+            );
+            assert!(
+                profile.asset_sub_class.is_some(),
+                "Missing asset_sub_class for {}",
+                metal
+            );
+            assert!(profile.notes.is_some(), "Missing notes for {}", metal);
+            assert!(
+                profile.countries.is_some(),
+                "Missing countries for {}",
+                metal
+            );
+            assert!(
+                profile.categories.is_some(),
+                "Missing categories for {}",
+                metal
+            );
+            assert!(profile.classes.is_some(), "Missing classes for {}", metal);
+            assert!(
+                profile.attributes.is_some(),
+                "Missing attributes for {}",
+                metal
+            );
+            assert!(profile.sectors.is_some(), "Missing sectors for {}", metal);
+            assert!(profile.url.is_some(), "Missing url for {}", metal);
+            assert!(
+                !profile.currency.is_empty(),
+                "Missing currency for {}",
+                metal
+            );
+            assert!(
+                !profile.data_source.is_empty(),
+                "Missing data_source for {}",
+                metal
+            );
+            assert_eq!(profile.symbol, metal, "Symbol mismatch for {}", metal);
+        }
+    }
+}
+
+
+=================================================================================
+FILE: ./providers/mod.rs
+=================================================================================
+
+pub mod alpha_vantage_provider;
+pub mod manual_provider;
+pub mod market_data_provider;
+pub mod marketdata_app_provider;
+pub mod metal_price_api_provider;
+pub mod models;
+pub mod provider_registry;
+pub mod yahoo_provider;
+
+#[cfg(test)]
+pub mod metal_price_api_provider_test;
+
+pub use provider_registry::ProviderRegistry;
+
+
+=================================================================================
+FILE: ./providers/models.rs
+=================================================================================
+
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, fmt};
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct YahooResult {
+    pub quote_summary: QuoteSummary,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuoteSummary {
+    pub result: Vec<QuoteSummaryResult>,
+    pub error: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuoteSummaryResult {
+    pub price: Option<Price>,
+    pub summary_profile: Option<SummaryProfile>,
+    pub top_holdings: Option<TopHoldings>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Price {
+    pub regular_market_change_percent: Option<Change>,
+    pub regular_market_change: Option<Change>,
+    pub regular_market_time: Option<i64>,
+    pub regular_market_price: Option<PriceDetail>,
+    pub regular_market_day_high: Option<PriceDetail>,
+    pub regular_market_day_low: Option<PriceDetail>,
+    pub regular_market_volume: Option<Volume>,
+    pub average_daily_volume_10_day: Option<Volume>,
+    pub average_daily_volume_3_month: Option<Volume>,
+    pub regular_market_previous_close: Option<PriceDetail>,
+    pub regular_market_source: Option<String>,
+    pub regular_market_open: Option<PriceDetail>,
+    pub strike_price: Option<PriceDetail>,
+    pub open_interest: Option<PriceDetail>,
+    pub exchange: Option<String>,
+    pub exchange_name: Option<String>,
+    pub exchange_data_delayed_by: Option<i32>,
+    pub market_state: Option<String>,
+    pub quote_type: String,
+    pub symbol: String,
+    pub underlying_symbol: Option<String>,
+    pub short_name: Option<String>,
+    pub long_name: Option<String>,
+    pub currency: Option<String>,
+    pub quote_source_name: Option<String>,
+    pub currency_symbol: Option<String>,
+    pub from_currency: Option<String>,
+    pub to_currency: Option<String>,
+    pub last_market: Option<String>,
+
+    #[serde(flatten)]
+    pub other: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Change {
+    pub raw: Option<f64>,
+    pub fmt: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PriceDetail {
+    pub raw: Option<f64>,
+    pub fmt: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Volume {
+    pub raw: Option<f64>,
+    pub fmt: Option<String>,
+    pub long_fmt: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MarketCap {
+    pub raw: Option<f64>,
+    pub fmt: Option<String>,
+    pub long_fmt: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SummaryProfile {
+    pub address1: Option<String>,
+    pub city: Option<String>,
+    pub state: Option<String>,
+    pub zip: Option<String>,
+    pub country: Option<String>,
+    pub phone: Option<String>,
+    pub website: Option<String>,
+    pub industry: Option<String>,
+    pub industry_key: Option<String>,
+    pub industry_disp: Option<String>,
+    pub sector: Option<String>,
+    pub sector_key: Option<String>,
+    pub sector_disp: Option<String>,
+    pub long_business_summary: Option<String>,
+    pub full_time_employees: Option<i32>,
+    pub company_officers: Option<Vec<serde_json::Value>>,
+    pub max_age: Option<i32>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TopHoldings {
+    pub stock_position: Option<PriceDetail>,
+    pub bond_position: Option<PriceDetail>,
+    pub sector_weightings: Vec<TopHoldingsSectorWeighting>,
+    pub cash_position: Option<PriceDetail>,
+    pub other_position: Option<PriceDetail>,
+    pub preferred_position: Option<PriceDetail>,
+    pub convertible_position: Option<PriceDetail>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TopHoldingsSectorWeighting {
+    #[serde(flatten)]
+    pub other: HashMap<String, serde_json::Value>,
+    pub realestate: Option<PriceDetail>,
+    pub consumer_cyclical: Option<PriceDetail>,
+    pub basic_materials: Option<PriceDetail>,
+    pub consumer_defensive: Option<PriceDetail>,
+    pub technology: Option<PriceDetail>,
+    pub communication_services: Option<PriceDetail>,
+    pub financial_services: Option<PriceDetail>,
+    pub utilities: Option<PriceDetail>,
+    pub industrials: Option<PriceDetail>,
+    pub energy: Option<PriceDetail>,
+    pub healthcare: Option<PriceDetail>,
+}
+
+#[derive(Debug)]
+pub enum AssetClass {
+    Equity,
+    // FixedIncome,
+    // Cash,
+    // RealEstate,
+    Commodity,
+    Alternative,
+    Cryptocurrency,
+}
+impl fmt::Display for AssetClass {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let display_string = match self {
+            AssetClass::Alternative => "Alternative",
+            AssetClass::Cryptocurrency => "Cryptocurrency",
+            AssetClass::Equity => "Equity",
+            AssetClass::Commodity => "Commodity",
+            // AssetClass::FixedIncome => "Fixed Income",
+            // AssetClass::Cash => "Cash",
+            // AssetClass::RealEstate => "Real Estate",
+        };
+        write!(f, "{}", display_string)
+    }
+}
+
+#[derive(Debug)]
+pub enum AssetSubClass {
+    Alternative,
+    Cryptocurrency,
+    Stock,
+    Etf,
+    Commodity,
+    PreciousMetal,
+    MutualFund,
+}
+impl fmt::Display for AssetSubClass {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let display_string = match self {
+            AssetSubClass::Alternative => "Alternative",
+            AssetSubClass::Cryptocurrency => "Cryptocurrency",
+            AssetSubClass::Stock => "Stock",
+            AssetSubClass::Etf => "ETF",
+            AssetSubClass::Commodity => "Commodity",
+            AssetSubClass::PreciousMetal => "Precious Metal",
+            AssetSubClass::MutualFund => "Mutual Fund",
+        };
+        write!(f, "{}", display_string)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetProfile {
+    pub id: Option<String>,
+    pub isin: Option<String>,
+    pub name: Option<String>,
+    pub asset_type: Option<String>,
+    pub symbol: String,
+    pub symbol_mapping: Option<String>,
+    pub asset_class: Option<String>,
+    pub asset_sub_class: Option<String>,
+    pub notes: Option<String>,
+    pub countries: Option<String>,
+    pub categories: Option<String>,
+    pub classes: Option<String>,
+    pub attributes: Option<String>,
+    pub currency: String,
+    pub data_source: String,
+    pub sectors: Option<String>,
+    pub url: Option<String>,
+}
+
+
+=================================================================================
+FILE: ./providers/provider_registry.rs
+=================================================================================
+
+use crate::market_data::market_data_constants::{
+    DATA_SOURCE_ALPHA_VANTAGE, DATA_SOURCE_MANUAL, DATA_SOURCE_MARKET_DATA_APP,
+    DATA_SOURCE_METAL_PRICE_API, DATA_SOURCE_YAHOO,
+};
+use crate::market_data::market_data_errors::MarketDataError;
+use crate::market_data::market_data_model::{
+    MarketDataProviderSetting, Quote as ModelQuote, QuoteSummary,
+};
+use crate::market_data::providers::alpha_vantage_provider::AlphaVantageProvider;
+use crate::market_data::providers::manual_provider::ManualProvider;
+use crate::market_data::providers::market_data_provider::{AssetProfiler, MarketDataProvider};
+use crate::market_data::providers::marketdata_app_provider::MarketDataAppProvider;
+use crate::market_data::providers::metal_price_api_provider::MetalPriceApiProvider;
+use crate::market_data::providers::yahoo_provider::YahooProvider;
+use crate::secrets::SecretStore;
+use log::{debug, info, warn};
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::SystemTime;
+
+pub struct ProviderRegistry {
+    data_providers: HashMap<String, Arc<dyn MarketDataProvider + Send + Sync>>,
+    ordered_data_provider_ids: Vec<String>,
+    asset_profilers: HashMap<String, Arc<dyn AssetProfiler + Send + Sync>>,
+    ordered_profiler_ids: Vec<String>,
+}
+
+impl ProviderRegistry {
+    pub async fn new(
+        provider_settings: Vec<MarketDataProviderSetting>,
+        secret_store: Arc<dyn SecretStore>,
+    ) -> Result<Self, MarketDataError> {
+        let mut active_providers_with_priority: Vec<(
+            i32,
+            String,
+            Arc<dyn MarketDataProvider + Send + Sync>,
+            Option<Arc<dyn AssetProfiler + Send + Sync>>,
+        )> = Vec::new();
+
+        for setting in provider_settings {
+            if !setting.enabled {
+                info!(
+                    "Provider '{}' (ID: {}) is disabled, skipping.",
+                    setting.name, setting.id
+                );
+                continue;
+            }
+
+            let provider_id_str = &setting.id;
+
+            let api_key = if provider_id_str != DATA_SOURCE_YAHOO {
+                match secret_store.get_secret(provider_id_str) {
+                    Ok(key_opt) => key_opt,
+                    Err(e) => {
+                        warn!(
+                            "Failed to resolve API key for provider '{}' (ID: {}). Error: {}. Skipping.",
+                            setting.name, setting.id, e
+                        );
+                        continue;
+                    }
+                }
+            } else {
+                None
+            };
+
+            let (provider, profiler) = match provider_id_str.as_str() {
+                DATA_SOURCE_YAHOO => {
+                    let p = Arc::new(YahooProvider::new().await?);
+                    (
+                        Some(p.clone() as Arc<dyn MarketDataProvider + Send + Sync>),
+                        Some(p as Arc<dyn AssetProfiler + Send + Sync>),
+                    )
+                }
+                DATA_SOURCE_MARKET_DATA_APP => {
+                    if let Some(key) = api_key {
+                        if !key.is_empty() {
+                            let p = Arc::new(MarketDataAppProvider::new(key).await?);
+                            (
+                                Some(p.clone() as Arc<dyn MarketDataProvider + Send + Sync>),
+                                None,
+                            )
+                        } else {
+                            warn!("MarketData.app provider '{}' (ID: {}) is enabled but API key is empty. Skipping.", setting.name, setting.id);
+                            (None, None)
+                        }
+                    } else {
+                        warn!("MarketData.app provider '{}' (ID: {}) is enabled but requires an API key, which was not found or resolved. Skipping.", setting.name, setting.id);
+                        (None, None)
+                    }
+                }
+                DATA_SOURCE_ALPHA_VANTAGE => {
+                    if let Some(key) = api_key {
+                        if !key.is_empty() {
+                            let p = Arc::new(AlphaVantageProvider::new(key));
+                            (
+                                Some(p.clone() as Arc<dyn MarketDataProvider + Send + Sync>),
+                                Some(p as Arc<dyn AssetProfiler + Send + Sync>),
+                            )
+                        } else {
+                            warn!("AlphaVantage provider '{}' (ID: {}) is enabled but API key is empty. Skipping.", setting.name, setting.id);
+                            (None, None)
+                        }
+                    } else {
+                        warn!("AlphaVantage provider '{}' (ID: {}) is enabled but requires an API key, which was not found or resolved. Skipping.", setting.name, setting.id);
+                        (None, None)
+                    }
+                }
+                DATA_SOURCE_METAL_PRICE_API => {
+                    if let Some(key) = api_key {
+                        if !key.is_empty() {
+                            let p = Arc::new(MetalPriceApiProvider::new(key));
+                            (
+                                Some(p.clone() as Arc<dyn MarketDataProvider + Send + Sync>),
+                                Some(p as Arc<dyn AssetProfiler + Send + Sync>),
+                            )
+                        } else {
+                            warn!("MetalPriceApi provider '{}' (ID: {}) is enabled but API key is empty. Skipping.", setting.name, setting.id);
+                            (None, None)
+                        }
+                    } else {
+                        warn!("MetalPriceApi provider '{}' (ID: {}) is enabled but requires an API key, which was not found or resolved. Skipping.", setting.name, setting.id);
+                        (None, None)
+                    }
+                }
+                _ => {
+                    warn!("Unknown market data provider ID: {}. Skipping.", setting.id);
+                    (None, None)
+                }
+            };
+
+            if let Some(p_arc) = provider {
+                active_providers_with_priority.push((
+                    setting.priority,
+                    setting.id.clone(),
+                    p_arc,
+                    profiler,
+                ));
+                info!(
+                    "Successfully configured and activated provider: {} (ID: {}) with priority {}",
+                    setting.name, setting.id, setting.priority
+                );
+            }
+        }
+
+        active_providers_with_priority.sort_by_key(|k| k.0);
+
+        let mut data_providers_map = HashMap::new();
+        let mut ordered_data_provider_ids_vec = Vec::new();
+        let mut asset_profilers_map = HashMap::new();
+        let mut ordered_profiler_ids_vec = Vec::new();
+
+        for (_priority, id, provider, profiler_opt) in active_providers_with_priority {
+            data_providers_map.insert(id.clone(), provider);
+            ordered_data_provider_ids_vec.push(id.clone());
+            if let Some(profiler) = profiler_opt {
+                asset_profilers_map.insert(id.clone(), profiler);
+                if !ordered_profiler_ids_vec.contains(&id) {
+                    ordered_profiler_ids_vec.push(id);
+                }
+            }
+        }
+
+        if !asset_profilers_map.contains_key(DATA_SOURCE_MANUAL) {
+            let manual_profiler =
+                Arc::new(ManualProvider::new()?) as Arc<dyn AssetProfiler + Send + Sync>;
+            asset_profilers_map.insert(DATA_SOURCE_MANUAL.to_string(), manual_profiler);
+            if !ordered_profiler_ids_vec.contains(&DATA_SOURCE_MANUAL.to_string()) {
+                ordered_profiler_ids_vec.push(DATA_SOURCE_MANUAL.to_string());
+            }
+        }
+
+        if data_providers_map.is_empty() {
+            warn!("No market data providers were successfully configured and enabled. Market data functionality will be limited.");
+        }
+
+        Ok(Self {
+            data_providers: data_providers_map,
+            ordered_data_provider_ids: ordered_data_provider_ids_vec,
+            asset_profilers: asset_profilers_map,
+            ordered_profiler_ids: ordered_profiler_ids_vec,
+        })
+    }
+
+    pub fn get_enabled_providers(
+        &self,
+    ) -> Vec<(&String, &Arc<dyn MarketDataProvider + Send + Sync>)> {
+        self.ordered_data_provider_ids
+            .iter()
+            .filter_map(|id| self.data_providers.get(id).map(|p| (id, p)))
+            .collect()
+    }
+
+    pub fn get_enabled_profilers(&self) -> Vec<(&String, &Arc<dyn AssetProfiler + Send + Sync>)> {
+        self.ordered_profiler_ids
+            .iter()
+            .filter_map(|id| self.asset_profilers.get(id).map(|p| (id, p)))
+            .collect()
+    }
+
+    pub async fn historical_quotes(
+        &self,
+        symbol: &str,
+        start: SystemTime,
+        end: SystemTime,
+        fallback_currency: String,
+    ) -> Result<Vec<ModelQuote>, MarketDataError> {
+        for (provider_id, p) in self.get_enabled_providers() {
+            match p
+                .get_historical_quotes(symbol, start, end, fallback_currency.clone())
+                .await
+            {
+                Ok(q_vec) if !q_vec.is_empty() => return Ok(q_vec),
+                Ok(_) => info!(
+                    "Provider '{}' returned no historical quotes for symbol '{}'. Trying next.",
+                    provider_id, symbol
+                ),
+                Err(MarketDataError::NoData) => {
+                    info!(
+                        "Provider '{}' reported no data for symbol '{}'. Stopping.",
+                        provider_id, symbol
+                    );
+                    return Ok(vec![]);
+                }
+                Err(e) => warn!(
+                    "Provider '{}' failed to get historical quotes for symbol '{}': {:?}. Trying next.",
+                    provider_id, symbol, e
+                ),
+            }
+        }
+        Err(MarketDataError::NotFound(symbol.to_string()))
+    }
+
+    pub async fn historical_quotes_bulk(
+        &self,
+        symbols_with_currencies: &[(String, String)],
+        start: SystemTime,
+        end: SystemTime,
+    ) -> Result<(Vec<ModelQuote>, Vec<(String, String)>), MarketDataError> {
+        if self.ordered_data_provider_ids.is_empty() {
+            warn!("No data providers available for historical_quotes_bulk.");
+            return Ok((vec![], symbols_with_currencies.to_vec()));
+        }
+
+        let mut all_quotes = Vec::new();
+        let mut remaining_symbols = symbols_with_currencies.to_vec();
+
+        for (provider_id, provider) in self.get_enabled_providers() {
+            if remaining_symbols.is_empty() {
+                break;
+            }
+
+            info!(
+                "Using provider '{}' to fetch bulk historical quotes for {} symbols.",
+                provider_id,
+                remaining_symbols.len()
+            );
+            match provider
+                .get_historical_quotes_bulk(&remaining_symbols, start, end)
+                .await
+            {
+                Ok((quotes, failed)) => {
+                    all_quotes.extend(quotes);
+                    if !failed.is_empty() {
+                        warn!(
+                            "Provider '{}' failed to fetch data for {} symbols. Retrying with next provider.",
+                            provider_id,
+                            failed.len()
+                        );
+                    }
+                    remaining_symbols = failed;
+                }
+                Err(e) => {
+                    warn!(
+                        "Provider '{}' returned an error for bulk fetch: {:?}. Trying next provider.",
+                        provider_id, e
+                    );
+                }
+            }
+        }
+
+        if !remaining_symbols.is_empty() {
+            warn!(
+                "After trying all providers, failed to fetch data for {:?} symbols.",
+                remaining_symbols
+            );
+        }
+
+        Ok((all_quotes, remaining_symbols))
+    }
+
+    pub async fn get_asset_profile(
+        &self,
+        symbol: &str,
+    ) -> Result<super::models::AssetProfile, MarketDataError> {
+        for (profiler_id, profiler) in self.get_enabled_profilers() {
+            match profiler.get_asset_profile(symbol).await {
+                Ok(profile) => return Ok(profile),
+                Err(e) => warn!(
+                    "Profiler '{}' failed to get asset profile for symbol '{}': {:?}. Trying next.",
+                    profiler_id, symbol, e
+                ),
+            }
+        }
+        if symbol.starts_with("$CASH") {
+            if let Some(manual_profiler) = self.asset_profilers.get(DATA_SOURCE_MANUAL) {
+                return manual_profiler.get_asset_profile(symbol).await;
+            }
+        }
+        Err(MarketDataError::NotFound(symbol.to_string()))
+    }
+
+    pub async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, MarketDataError> {
+        for (profiler_id, profiler) in self.get_enabled_profilers() {
+            match profiler.search_ticker(query).await {
+                Ok(results) if !results.is_empty() => {
+                    return Ok(results);
+                }
+                Ok(_) => {
+                    info!(
+                        "Profiler '{}' found no results for query '{}'. Trying next.",
+                        profiler_id, query
+                    );
+                }
+                Err(e) => {
+                    debug!(
+                        "Profiler '{}' failed to search for query '{}': {:?}. Trying next.",
+                        profiler_id, query, e
+                    );
+                }
+            }
+        }
+
+        Err(MarketDataError::ProviderError(
+            "Search ticker is not supported by any active provider".to_string(),
+        ))
+    }
+}
+
+
+=================================================================================
+FILE: ./providers/yahoo_provider.rs
+=================================================================================
+
+use std::{sync::RwLock, time::SystemTime};
+
+use super::models::{AssetClass, AssetProfile, AssetSubClass, PriceDetail, YahooResult};
+use crate::market_data::market_data_errors::MarketDataError;
+use crate::market_data::market_data_model::DataSource;
+use crate::market_data::{AssetProfiler, MarketDataProvider, Quote as ModelQuote, QuoteSummary};
+use chrono::{DateTime, TimeZone, Utc};
+use lazy_static::lazy_static;
+use log::{debug, warn};
+use num_traits::FromPrimitive;
+use reqwest::{header, Client};
+use rust_decimal::Decimal;
+use serde_json::json;
+use urlencoding::encode;
+use yahoo::{YQuoteItem, YahooError};
+use yahoo_finance_api as yahoo;
+
+#[derive(Debug, Clone)]
+pub struct CrumbData {
+    pub cookie: String,
+    pub crumb: String,
+}
+
+impl From<&YQuoteItem> for QuoteSummary {
+    fn from(item: &YQuoteItem) -> Self {
+        QuoteSummary {
+            exchange: item.exchange.clone(),
+            short_name: item.short_name.clone(),
+            quote_type: item.quote_type.clone(),
+            symbol: item.symbol.clone(),
+            index: item.index.clone(),
+            score: item.score,
+            type_display: item.type_display.clone(),
+            long_name: item.long_name.clone(),
+        }
+    }
+}
+
+impl From<&YQuoteItem> for AssetProfile {
+    fn from(item: &YQuoteItem) -> Self {
+        AssetProfile {
+            id: Some(item.symbol.clone()),
+            isin: None, // TODO: Implement isin
+            name: Some(item.long_name.clone()),
+            asset_type: Some(item.quote_type.clone()),
+            symbol: item.symbol.clone(),
+            data_source: DataSource::Yahoo.as_str().to_string(),
+            ..Default::default()
+        }
+    }
+}
+
+lazy_static! {
+    pub static ref YAHOO_CRUMB: RwLock<Option<CrumbData>> = RwLock::default();
+}
+
+pub struct YahooProvider {
+    provider: yahoo::YahooConnector,
+}
+
+impl YahooProvider {
+    pub async fn new() -> Result<Self, yahoo::YahooError> {
+        let provider = yahoo::YahooConnector::new()?;
+        let yahoo_provider = YahooProvider { provider };
+
+        Ok(yahoo_provider)
+    }
+
+    pub async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, yahoo::YahooError> {
+        let encoded_query = encode(query);
+        let result = self.provider.search_ticker(&encoded_query).await?;
+
+        let asset_profiles = result.quotes.iter().map(QuoteSummary::from).collect();
+
+        Ok(asset_profiles)
+    }
+
+    pub async fn get_symbol_profile(
+        &self,
+        symbol: &str,
+    ) -> Result<AssetProfile, yahoo::YahooError> {
+        match self.get_symbol_full_profile(symbol).await {
+            Ok(asset) => Ok(asset),
+            Err(err) => {
+                debug!(
+                    "Failed to get full profile for {}: {}, trying short profile",
+                    symbol, err
+                );
+                // If full profile fails, try to get short profile
+                match self.get_symbol_short_profile(symbol).await? {
+                    Some(asset) => Ok(asset),
+                    None => Err(yahoo::YahooError::NoResult),
+                }
+            }
+        }
+    }
+
+    pub async fn get_latest_quote(
+        &self,
+        symbol: &str,
+        fallback_currency: String,
+    ) -> Result<ModelQuote, yahoo::YahooError> {
+        match self.provider.get_latest_quotes(symbol, "1d").await {
+            Ok(response) => {
+                let yahoo_quote = response
+                    .last_quote()
+                    .map_err(|_| yahoo::YahooError::NoQuotes)?;
+                let model_quote = self.yahoo_quote_to_model_quote(
+                    symbol.to_string(),
+                    yahoo_quote,
+                    fallback_currency.clone(),
+                );
+                Ok(model_quote)
+            }
+            Err(_) => {
+                // If the primary method fails, try the backup method
+                self.get_latest_quote_backup(symbol, fallback_currency)
+                    .await
+            }
+        }
+    }
+
+    /// Fetch historic quotes between start and end date
+    pub async fn get_historical_quotes(
+        &self,
+        symbol: &str,
+        start: SystemTime,
+        end: SystemTime,
+        fallback_currency: String,
+    ) -> Result<Vec<ModelQuote>, MarketDataError> {
+        if symbol.starts_with("$CASH-") {
+            return Ok(vec![]);
+        }
+
+        let start_offset = start.into();
+        let end_offset = end.into();
+
+        let response = self
+            .provider
+            .get_quote_history(symbol, start_offset, end_offset)
+            .await?;
+
+        match response.quotes() {
+            Ok(yahoo_api_quotes) => {
+                let quotes = yahoo_api_quotes
+                    .into_iter()
+                    .map(|q| {
+                        self.yahoo_quote_to_model_quote(
+                            symbol.to_string(),
+                            q,
+                            fallback_currency.clone(),
+                        )
+                    })
+                    .collect();
+                Ok(quotes)
+            }
+            Err(yahoo::YahooError::NoQuotes) => {
+                warn!(
+                    "No historical quotes returned by Yahoo API for symbol '{}' between {} and {}.",
+                    symbol,
+                    DateTime::<Utc>::from(start).format("%Y-%m-%d"),
+                    DateTime::<Utc>::from(end).format("%Y-%m-%d")
+                );
+                Err(MarketDataError::NoData)
+            }
+            Err(e) => {
+                // e is any other yahoo::YahooError
+                Err(MarketDataError::from(e))
+            }
+        }
+    }
+
+    async fn get_latest_quote_backup(
+        &self,
+        symbol: &str,
+        fallback_currency: String,
+    ) -> Result<ModelQuote, yahoo::YahooError> {
+        let asset_profile = self.fetch_asset_profile(symbol).await?;
+
+        let price = asset_profile
+            .quote_summary
+            .result
+            .first()
+            .and_then(|result| result.price.as_ref())
+            .ok_or(yahoo::YahooError::NoResult)?;
+
+        let regular_market_price = price
+            .regular_market_price
+            .as_ref()
+            .ok_or(yahoo::YahooError::NoResult)?;
+        let now_utc: DateTime<Utc> = Utc::now();
+
+        Ok(ModelQuote {
+            id: format!("{}_{}", now_utc.format("%Y%m%d"), symbol),
+            created_at: now_utc,
+            data_source: DataSource::Yahoo,
+            timestamp: now_utc,
+            symbol: symbol.to_string(),
+            open: Decimal::from_f64_retain(
+                price
+                    .regular_market_open
+                    .as_ref()
+                    .and_then(|p| p.raw)
+                    .unwrap_or(0.0),
+            )
+            .unwrap_or_default(),
+            high: Decimal::from_f64_retain(
+                price
+                    .regular_market_day_high
+                    .as_ref()
+                    .and_then(|p| p.raw)
+                    .unwrap_or(0.0),
+            )
+            .unwrap_or_default(),
+            low: Decimal::from_f64_retain(
+                price
+                    .regular_market_day_low
+                    .as_ref()
+                    .and_then(|p| p.raw)
+                    .unwrap_or(0.0),
+            )
+            .unwrap_or_default(),
+            volume: Decimal::from_f64_retain(
+                price
+                    .regular_market_volume
+                    .as_ref()
+                    .and_then(|p| p.raw)
+                    .unwrap_or(0.0),
+            )
+            .unwrap_or_default(),
+            close: Decimal::from_f64_retain(regular_market_price.raw.unwrap_or(0.0))
+                .unwrap_or_default(),
+            adjclose: Decimal::from_f64_retain(regular_market_price.raw.unwrap_or(0.0))
+                .unwrap_or_default(),
+            currency: price.currency.clone().unwrap_or(fallback_currency),
+        })
+    }
+
+    fn yahoo_quote_to_model_quote(
+        &self,
+        symbol: String,
+        yahoo_quote: yahoo::Quote,
+        fallback_currency: String,
+    ) -> ModelQuote {
+        let quote_timestamp: DateTime<Utc> = Utc
+            .timestamp_opt(yahoo_quote.timestamp as i64, 0)
+            .single()
+            .unwrap_or_default();
+        let now_utc: DateTime<Utc> = Utc::now();
+
+        ModelQuote {
+            id: format!("{}_{}", quote_timestamp.format("%Y%m%d"), symbol),
+            created_at: now_utc,
+            data_source: DataSource::Yahoo,
+            timestamp: quote_timestamp,
+            symbol,
+            open: Decimal::from_f64_retain(yahoo_quote.open).unwrap_or_default(),
+            high: Decimal::from_f64_retain(yahoo_quote.high).unwrap_or_default(),
+            low: Decimal::from_f64_retain(yahoo_quote.low).unwrap_or_default(),
+            volume: Decimal::from_u64(yahoo_quote.volume).unwrap_or_default(),
+            close: Decimal::from_f64_retain(yahoo_quote.close).unwrap_or_default(),
+            adjclose: Decimal::from_f64_retain(yahoo_quote.adjclose).unwrap_or_default(),
+            currency: fallback_currency,
+        }
+    }
+
+    async fn get_symbol_short_profile(
+        &self,
+        symbol: &str,
+    ) -> Result<Option<AssetProfile>, yahoo::YahooError> {
+        let search_results = self.search_ticker(symbol).await?;
+
+        for result in search_results {
+            if result.symbol == symbol {
+                return Ok(Some(AssetProfile {
+                    id: Some(result.symbol.clone()),
+                    isin: None,
+                    name: Some(self.format_name(
+                        Some(&result.long_name),
+                        &result.quote_type,
+                        Some(&result.short_name),
+                        &result.symbol,
+                    )),
+                    asset_type: Some(result.quote_type.clone()),
+                    asset_class: Some(result.quote_type),
+                    asset_sub_class: Some(result.type_display),
+                    symbol: result.symbol.clone(),
+                    symbol_mapping: Some(result.symbol),
+                    data_source: DataSource::Yahoo.as_str().to_string(),
+                    // exchange: Some(result.exchange),
+                    ..Default::default()
+                }));
+            }
+        }
+
+        Ok(None)
+    }
+
+    async fn set_crumb(&self) -> Result<(), yahoo::YahooError> {
+        let client = Client::new();
+
+        // Make the first call to extract the Crumb cookie
+        let response = client
+            .get("https://fc.yahoo.com")
+            .send()
+            .await
+            .map_err(|e| YahooError::FetchFailed(e.to_string()))?;
+
+        let cookie = response
+            .headers()
+            .get(header::SET_COOKIE)
+            .and_then(|header| header.to_str().ok())
+            .and_then(|s| s.split_once(';').map(|(value, _)| value))
+            .ok_or_else(|| {
+                YahooError::FetchFailed("Error parsing Yahoo Crumb Cookie".to_string())
+            })?;
+        // Replace the URL with the appropriate one for fetching the crumb
+        let crumb_url = "https://query1.finance.yahoo.com/v1/test/getcrumb"; // Update this URL as needed
+        let request = client
+            .get(crumb_url)
+            .header(header::USER_AGENT, "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36")
+            .header(header::COOKIE, cookie)
+            .send()
+            .await
+            .map_err(|e| YahooError::FetchFailed(e.to_string()))?;
+
+        let crumb = request
+            .text()
+            .await
+            .map_err(|e| YahooError::FetchFailed(e.to_string()))?;
+
+        let crumb_data = CrumbData {
+            cookie: cookie.to_string(),
+            crumb,
+        };
+
+        let mut yahoo_crumb = YAHOO_CRUMB.write().unwrap();
+        *yahoo_crumb = Some(crumb_data);
+
+        Ok(())
+    }
+
+    async fn get_symbol_full_profile(
+        &self,
+        symbol: &str,
+    ) -> Result<AssetProfile, yahoo::YahooError> {
+        self.set_crumb().await?;
+
+        let response = self.fetch_asset_profile(symbol).await?;
+
+        let asset_profile =
+            response
+                .quote_summary
+                .result
+                .first()
+                .ok_or(YahooError::FetchFailed(
+                    "No asset profile found".to_string(),
+                ))?;
+
+        let (asset_class, asset_sub_class) = self.parse_asset_class(
+            asset_profile.price.as_ref().map_or("", |p| &p.quote_type),
+            asset_profile
+                .price
+                .as_ref()
+                .and_then(|p| p.short_name.as_deref())
+                .unwrap_or(""),
+        );
+
+        let formatted_name = asset_profile.price.as_ref().map_or_else(
+            || symbol.to_string(),
+            |price| {
+                self.format_name(
+                    price.long_name.as_deref(),
+                    &price.quote_type,
+                    price.short_name.as_deref(),
+                    &price.symbol,
+                )
+            },
+        );
+
+        let mut sectors = None;
+        let mut countries = None;
+        match asset_sub_class {
+            AssetSubClass::MutualFund | AssetSubClass::Etf => {
+                let mut sector_data = Vec::new();
+                if let Some(top_holdings) = &asset_profile.top_holdings {
+                    for sector_weighting in &top_holdings.sector_weightings {
+                        for (sector, weight_value) in &sector_weighting.other {
+                            if let Ok(weight) =
+                                serde_json::from_value::<PriceDetail>(weight_value.clone())
+                            {
+                                sector_data.push(json!({"name": self.format_sector(sector), "weight": weight.raw }));
+                            }
+                        }
+                    }
+                }
+                sectors = serde_json::to_string(&sector_data).ok();
+            }
+            AssetSubClass::Stock => {
+                if let Some(summary_profile) = &asset_profile.summary_profile {
+                    let country = &summary_profile.country;
+                    countries =
+                        serde_json::to_string(&[json!({ "name": country, "weight": 1 })]).ok();
+
+                    if let Some(sector) = &summary_profile.sector {
+                        sectors = serde_json::to_string(&[
+                            json!({ "name": self.format_sector(sector), "weight": 1 }),
+                        ])
+                        .ok();
+                    }
+                }
+            }
+            // Handle other asset sub-classes
+            _ => { /* ... */ }
+        }
+
+        let new_asset = AssetProfile {
+            id: Some(symbol.to_string()),
+            isin: None,
+            name: Some(formatted_name),
+            asset_type: Some(asset_class.to_string()), // Convert enum to String
+            symbol: symbol.to_string(),
+            symbol_mapping: Some(symbol.to_string()),
+            currency: asset_profile
+                .price
+                .as_ref()
+                .and_then(|p| p.currency.clone())
+                .unwrap_or_default(),
+            data_source: DataSource::Yahoo.as_str().to_string(),
+            asset_class: Some(asset_class.to_string()), // Convert enum to String
+            asset_sub_class: Some(asset_sub_class.to_string()), // Convert enum to String
+            notes: asset_profile
+                .summary_profile
+                .as_ref()
+                .and_then(|sp| sp.long_business_summary.clone().or(sp.description.clone())),
+
+            countries,
+            sectors,
+            categories: None,
+            classes: None,
+            attributes: None,
+            url: asset_profile
+                .summary_profile
+                .as_ref()
+                .and_then(|sp| sp.website.clone()),
+        };
+
+        Ok(new_asset)
+    }
+
+    async fn fetch_asset_profile(&self, symbol: &str) -> Result<YahooResult, yahoo::YahooError> {
+        let crumb_data = {
+            let guard = YAHOO_CRUMB.read().unwrap();
+            guard
+                .as_ref()
+                .ok_or_else(|| {
+                    YahooError::FetchFailed("Yahoo authentication crumb not initialized".into())
+                })?
+                .clone()
+        };
+
+        let url = format!(
+            "https://query1.finance.yahoo.com/v10/finance/quoteSummary/{}?modules=price,summaryProfile,topHoldings&crumb={}",
+            symbol,
+            crumb_data.crumb
+        );
+
+        let client = Client::new();
+        // Streamlining the HTTP GET request and error handling
+        let response = client
+            .get(&url)
+            .header(
+                "user-agent",
+                "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.2; .NET CLR 1.0.3705;)",
+            )
+            .header("COOKIE", &crumb_data.cookie)
+            .header("Crumb", &crumb_data.crumb)
+            .send()
+            .await
+            .map_err(|err| YahooError::FetchFailed(err.to_string()))?;
+
+        // Get the response text
+        let response_text = response
+            .text()
+            .await
+            .map_err(|err| YahooError::FetchFailed(err.to_string()))?;
+
+        // Deserialize the JSON response into your struct
+        let deserialized: YahooResult = serde_json::from_str(&response_text)
+            .map_err(|err| YahooError::FetchFailed(err.to_string()))?;
+
+        Ok(deserialized)
+    }
+
+    fn parse_asset_class(&self, quote_type: &str, short_name: &str) -> (AssetClass, AssetSubClass) {
+        let quote_type = quote_type.to_lowercase();
+        let short_name = short_name.to_lowercase();
+
+        match quote_type.as_str() {
+            "cryptocurrency" => (AssetClass::Cryptocurrency, AssetSubClass::Cryptocurrency),
+            "equity" => (AssetClass::Equity, AssetSubClass::Stock),
+            "etf" => (AssetClass::Equity, AssetSubClass::Etf),
+            "future" => {
+                let asset_sub_class = if short_name.starts_with("gold")
+                    || short_name.starts_with("palladium")
+                    || short_name.starts_with("platinum")
+                    || short_name.starts_with("silver")
+                {
+                    AssetSubClass::PreciousMetal
+                } else {
+                    AssetSubClass::Commodity
+                };
+                (AssetClass::Commodity, asset_sub_class)
+            }
+            "mutualfund" => (AssetClass::Equity, AssetSubClass::MutualFund),
+            _ => (AssetClass::Alternative, AssetSubClass::Alternative),
+        }
+    }
+
+    fn format_name(
+        &self,
+        long_name: Option<&str>,
+        quote_type: &str,
+        short_name: Option<&str>,
+        symbol: &str,
+    ) -> String {
+        let mut name = long_name.unwrap_or("").to_string();
+
+        if !name.is_empty() {
+            let replacements = [
+                ("&amp;", "&"),
+                ("Amundi Index Solutions - ", ""),
+                ("iShares ETF (CH) - ", ""),
+                ("iShares III Public Limited Company - ", ""),
+                ("iShares V PLC - ", ""),
+                ("iShares VI Public Limited Company - ", ""),
+                ("iShares VII PLC - ", ""),
+                ("Multi Units Luxembourg - ", ""),
+                ("VanEck ETFs N.V. - ", ""),
+                ("Vaneck Vectors Ucits Etfs Plc - ", ""),
+                ("Vanguard Funds Public Limited Company - ", ""),
+                ("Vanguard Index Funds - ", ""),
+                ("Xtrackers (IE) Plc - ", ""),
+            ];
+
+            for (from, to) in replacements.iter() {
+                name = name.replace(from, to);
+            }
+        }
+
+        if quote_type == "FUTURE" && short_name.is_some() {
+            name = short_name.unwrap()[..short_name.unwrap().len() - 7].to_string();
+        }
+
+        if name.is_empty() {
+            return short_name.unwrap_or(symbol).to_string();
+        }
+
+        name
+    }
+
+    /// Converts an underscore-separated sector string into a properly capitalized format
+    ///
+    /// # Arguments
+    /// * `sector` - The sector string in snake_case format (e.g., "basic_materials")
+    ///
+    /// # Returns
+    /// A String with each word capitalized and separated by spaces (e.g., "Basic Materials")
+    ///
+    /// ```
+    fn format_sector(&self, sector: &str) -> String {
+        sector
+            .split('_')
+            .map(|word| {
+                let mut chars = word.chars();
+                match chars.next() {
+                    None => String::new(),
+                    Some(first) => first.to_uppercase().chain(chars).collect(),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    async fn get_historical_quotes_bulk(
+        &self,
+        symbols_with_currencies: &[(String, String)],
+        start: SystemTime,
+        end: SystemTime,
+    ) -> Result<(Vec<ModelQuote>, Vec<(String, String)>), MarketDataError> {
+        // If start time is after or equal to end time, no data needs fetching.
+        if start >= end {
+            warn!(
+                "Start time ({:?}) is after or equal to end time ({:?}). Skipping fetch.",
+                DateTime::<Utc>::from(start),
+                DateTime::<Utc>::from(end)
+            );
+            return Ok((Vec::new(), Vec::new()));
+        }
+
+        if symbols_with_currencies.is_empty() {
+            return Ok((Vec::new(), Vec::new()));
+        }
+
+        const BATCH_SIZE: usize = 2;
+
+        let mut all_quotes = Vec::new();
+        let mut failed_symbols: Vec<(String, String)> = Vec::new();
+        let mut errors_for_logging: Vec<(String, String)> = Vec::new();
+
+        for chunk in symbols_with_currencies.chunks(BATCH_SIZE) {
+            let futures: Vec<_> = chunk
+                .iter()
+                .map(|(symbol, currency)| {
+                    let symbol_clone = symbol.clone();
+                    let currency_clone = currency.clone();
+                    async move {
+                        match self
+                            .get_historical_quotes(
+                                &symbol_clone,
+                                start,
+                                end,
+                                currency_clone.clone(),
+                            )
+                            .await
+                        {
+                            Ok(quotes) => Ok(quotes),
+                            Err(e) => Err((symbol_clone, currency_clone, e.to_string())),
+                        }
+                    }
+                })
+                .collect();
+
+            let results = futures::future::join_all(futures).await;
+
+            for result in results {
+                match result {
+                    Ok(quotes) => all_quotes.extend(quotes),
+                    Err((symbol, currency, error)) => {
+                        failed_symbols.push((symbol.clone(), currency));
+                        errors_for_logging.push((symbol, error));
+                    }
+                }
+            }
+        }
+
+        // Log errors but don't fail the entire operation
+        if !errors_for_logging.is_empty() {
+            log::warn!(
+                "Failed to fetch history for {} symbols: {:?}",
+                errors_for_logging.len(),
+                errors_for_logging
+            );
+        }
+
+        Ok((all_quotes, failed_symbols))
+    }
+}
+
+#[async_trait::async_trait]
+impl AssetProfiler for YahooProvider {
+    async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile, MarketDataError> {
+        self.get_symbol_profile(symbol)
+            .await
+            .map_err(|e| MarketDataError::ProviderError(e.to_string()))
+    }
+
+    async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, MarketDataError> {
+        self.search_ticker(query)
+            .await
+            .map_err(|e| MarketDataError::ProviderError(e.to_string()))
+    }
+}
+
+#[async_trait::async_trait]
+impl MarketDataProvider for YahooProvider {
+    fn name(&self) -> &'static str {
+        "YAHOO"
+    }
+
+    fn priority(&self) -> u8 {
+        1
+    }
+
+    async fn get_latest_quote(
+        &self,
+        symbol: &str,
+        fallback_currency: String,
+    ) -> Result<ModelQuote, MarketDataError> {
+        self.get_latest_quote(symbol, fallback_currency)
+            .await
+            .map_err(|e| MarketDataError::ProviderError(e.to_string()))
+    }
+
+    async fn get_historical_quotes(
+        &self,
+        symbol: &str,
+        start: SystemTime,
+        end: SystemTime,
+        fallback_currency: String,
+    ) -> Result<Vec<ModelQuote>, MarketDataError> {
+        self.get_historical_quotes(symbol, start, end, fallback_currency)
+            .await
+    }
+
+    async fn get_historical_quotes_bulk(
+        &self,
+        symbols_with_currencies: &[(String, String)],
+        start: SystemTime,
+        end: SystemTime,
+    ) -> Result<(Vec<ModelQuote>, Vec<(String, String)>), MarketDataError> {
+        self.get_historical_quotes_bulk(symbols_with_currencies, start, end)
+            .await
+    }
+}
+
+
