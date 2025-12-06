@@ -35,6 +35,7 @@ interface AssetProfileFormData {
   assetSubClass: string;
   notes: string;
   dataSource: DataSource;
+  risk: string;
 }
 
 interface AssetDetailData {
@@ -81,6 +82,7 @@ export const AssetProfilePage = () => {
     assetSubClass: "",
     notes: "",
     dataSource: DataSource.MANUAL,
+    risk: "",
   });
 
   const {
@@ -157,6 +159,7 @@ export const AssetProfilePage = () => {
       assetClass: instrument?.assetClass ?? asset?.assetClass ?? "",
       notes: instrument?.notes ?? asset?.notes ?? "",
       dataSource: (instrument?.dataSource ?? asset?.dataSource ?? DataSource.YAHOO) as DataSource,
+      risk: instrument?.risk ?? asset?.risk ?? "",
     });
   }, [holding, assetProfile]);
 
@@ -251,6 +254,7 @@ export const AssetProfilePage = () => {
       notes: formData.notes,
       assetSubClass: formData.assetSubClass,
       assetClass: formData.assetClass,
+      risk: formData.risk || undefined,
     });
     setIsEditing(false);
   }, [profile, symbol, formData, updateAssetProfileMutation]);
@@ -265,6 +269,7 @@ export const AssetProfilePage = () => {
       notes: formData.notes,
       assetSubClass: formData.assetSubClass,
       assetClass: formData.assetClass,
+      risk: formData.risk || undefined,
     });
   }, [profile, symbol, formData, updateAssetProfileMutation]);
 
@@ -306,6 +311,7 @@ export const AssetProfilePage = () => {
       assetClass: instrument?.assetClass ?? asset?.assetClass ?? "",
       notes: instrument?.notes ?? asset?.notes ?? "",
       dataSource: (instrument?.dataSource ?? asset?.dataSource ?? DataSource.YAHOO) as DataSource,
+      risk: instrument?.risk ?? asset?.risk ?? "",
     });
   }, [holding, assetProfile]);
 
@@ -397,7 +403,34 @@ export const AssetProfilePage = () => {
                     </Badge>
                   )
                 )}
-                {(formData.assetClass || formData.assetSubClass) && formData.sectors.length > 0 && (
+                {isEditing ? (
+                  <Input
+                    value={formData.risk}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, risk: e.target.value }))
+                    }
+                    placeholder="Risk (Low/Medium/High)"
+                    className="w-[180px]"
+                  />
+                ) : (
+                  formData.risk && (
+                    <Badge
+                      variant="secondary"
+                      className={`flex-none uppercase ${
+                        formData.risk.toLowerCase() === "low"
+                          ? "bg-success text-success-foreground"
+                          : formData.risk.toLowerCase() === "medium"
+                            ? "bg-warning text-warning-foreground"
+                            : formData.risk.toLowerCase() === "high"
+                              ? "bg-destructive text-destructive-foreground"
+                              : ""
+                      }`}
+                    >
+                      {formData.risk}
+                    </Badge>
+                  )
+                )}
+                {(formData.assetClass || formData.assetSubClass || formData.risk) && formData.sectors.length > 0 && (
                   <Separator orientation="vertical" />
                 )}
                 {isEditing ? (
@@ -874,7 +907,34 @@ export const AssetProfilePage = () => {
                         </Badge>
                       )
                     )}
-                    {(formData.assetClass || formData.assetSubClass) &&
+                    {isEditing ? (
+                      <Input
+                        value={formData.risk}
+                        onChange={(e) =>
+                          setFormData((prev) => ({ ...prev, risk: e.target.value }))
+                        }
+                        placeholder="Risk (Low/Medium/High)"
+                        className="w-[180px]"
+                      />
+                    ) : (
+                      formData.risk && (
+                        <Badge
+                          variant="secondary"
+                          className={`flex-none uppercase ${
+                            formData.risk.toLowerCase() === "low"
+                              ? "bg-success text-success-foreground"
+                              : formData.risk.toLowerCase() === "medium"
+                                ? "bg-warning text-warning-foreground"
+                                : formData.risk.toLowerCase() === "high"
+                                  ? "bg-destructive text-destructive-foreground"
+                                  : ""
+                          }`}
+                        >
+                          {formData.risk}
+                        </Badge>
+                      )
+                    )}
+                    {(formData.assetClass || formData.assetSubClass || formData.risk) &&
                       formData.sectors.length > 0 && <Separator orientation="vertical" />}
                     {isEditing ? (
                       <InputTags

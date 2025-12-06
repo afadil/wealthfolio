@@ -74,6 +74,7 @@ diesel::table! {
         data_source -> Text,
         sectors -> Nullable<Text>,
         url -> Nullable<Text>,
+        risk -> Nullable<Text>,
     }
 }
 

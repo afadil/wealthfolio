@@ -11,6 +11,7 @@ import { PerformanceChartMobile } from "@/components/performance-chart-mobile";
 
 import { PERFORMANCE_CHART_COLORS } from "@/components/performance-chart-colors";
 import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
+import { useHoldings } from "@/hooks/use-holdings";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
@@ -43,6 +44,7 @@ import { useMemo, useState } from "react";
 import { AccountSelector } from "../../components/account-selector";
 import { AccountSelectorMobile } from "../../components/account-selector-mobile";
 import { BenchmarkSymbolSelectorMobile } from "../../components/benchmark-symbol-selector-mobile";
+import { RiskCategoriesCard } from "./components/risk-categories-card";
 import { useCalculatePerformanceHistory } from "./hooks/use-performance-data";
 
 const PORTFOLIO_TOTAL: TrackedItem = {
@@ -249,6 +251,9 @@ export default function PerformancePage() {
     selectedItems,
     dateRange,
   });
+
+  // Fetch holdings for risk categories display
+  const { holdings, isLoading: isLoadingHoldings } = useHoldings(PORTFOLIO_ACCOUNT_ID);
 
   // Calculate derived chart data
   const chartData = useMemo(() => {
@@ -478,21 +483,22 @@ export default function PerformancePage() {
           className="hidden"
         />
 
-        <div className="flex h-[calc(100vh-19rem)] flex-col md:h-[calc(100vh-12rem)]">
-          <Card className="flex min-h-0 flex-1 flex-col">
-            <CardHeader className={cn("pb-2", isMobile ? "px-3 py-3" : "pb-1")}>
-              <div className={cn("space-y-3", isMobile ? "space-y-2" : "sm:space-y-4")}>
-                <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-                  <div>
-                    <CardTitle className={cn("text-lg sm:text-xl", isMobile && "text-sm")}>
-                      Performance
-                    </CardTitle>
-                    <CardDescription
-                      className={cn("text-xs sm:text-sm", isMobile && "text-[10px]")}
-                    >
-                      {displayDateRange}
-                    </CardDescription>
-                  </div>
+        <div className="flex flex-col gap-4">
+          <div className="flex h-[calc(100vh-23rem)] flex-col md:h-[calc(100vh-16rem)]">
+            <Card className="flex min-h-0 flex-1 flex-col">
+              <CardHeader className={cn("pb-2", isMobile ? "px-3 py-3" : "pb-1")}>
+                <div className={cn("space-y-3", isMobile ? "space-y-2" : "sm:space-y-4")}>
+                  <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+                    <div>
+                      <CardTitle className={cn("text-lg sm:text-xl", isMobile && "text-sm")}>
+                        Performance
+                      </CardTitle>
+                      <CardDescription
+                        className={cn("text-xs sm:text-sm", isMobile && "text-[10px]")}
+                      >
+                        {displayDateRange}
+                      </CardDescription>
+                    </div>
                   {performanceData && performanceData.length > 0 && (
                     <>
                       {/* Mobile compact metrics - horizontal scroll */}
@@ -679,6 +685,10 @@ export default function PerformancePage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Risk Categories Section */}
+        <RiskCategoriesCard holdings={holdings} isLoading={isLoadingHoldings} />
+      </div>
       </div>
     </>
   );
