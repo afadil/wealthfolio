@@ -422,17 +422,11 @@ impl YahooProvider {
             symbol: symbol.to_string(),
             symbol_mapping: Some(symbol.to_string()),
             currency: asset_profile
-		 .price
-   		 .as_ref()
-   		 .and_then(|p| p.currency.clone())
-   		 .or_else(|| {
-       			 if symbol.to_uppercase().ends_with(".CA") {
-           			 Some("EGP".to_string())
-       			 } else {
-        			    None // keep the normal default
-       			 }
-    		})
-   		 .unwrap_or_default(),
+                .price
+                .as_ref()
+                .and_then(|p| p.currency.clone())
+                .or_else(|| get_currency_for_suffix(symbol).map(|s| s.to_string()))
+                .unwrap_or_default(),
             data_source: DataSource::Yahoo.as_str().to_string(),
             asset_class: Some(asset_class.to_string()), // Convert enum to String
             asset_sub_class: Some(asset_sub_class.to_string()), // Convert enum to String
@@ -723,4 +717,43 @@ impl MarketDataProvider for YahooProvider {
         self.get_historical_quotes_bulk(symbols_with_currencies, start, end)
             .await
     }
+}
+
+fn get_currency_for_suffix(symbol: &str) -> Option<&'static str> {
+    // Mapping of Yahoo Finance suffixes → currencies
+    let mapping = [
+        (".CA", "EGP"),    // Cairo Stock Exchange
+        (".SA", "SAR"),    // Saudi Tadawul
+        (".AD", "AED"),    // Abu Dhabi
+        (".AE", "AED"),    // UAE (Dubai/Abu Dhabi)
+        (".DX", "USD"),    // Forex USD pairs (example)
+        (".L",  "GBP"),    // London Stock Exchange
+        (".DE", "EUR"),    // XETRA Germany
+        (".TO", "CAD"),    // Toronto
+        (".V",  "CAD"),    // TSX Venture
+        (".HK", "HKD"),    // Hong Kong
+        (".SS", "CNY"),    // Shanghai
+        (".SZ", "CNY"),    // Shenzhen
+        (".F",  "EUR"),    // Frankfurt (ETR)
+        (".MI", "EUR"),    // Milan (Borsa Italiana)
+        (".PA", "EUR"),    // Paris (Euronext)
+        (".AS", "EUR"),    // Amsterdam (Euronext)
+        (".BR", "BRL"),    // Brazil B3
+        (".MX", "MXN"),    // Mexico Bolsa
+        (".KL", "MYR"),    // Kuala Lumpur
+        (".NS", "INR"),    // NSE India
+        (".BO", "INR"),    // BSE India
+        (".TW", "TWD"),    // Taiwan
+        (".SG", "SGD"),    // Singapore
+        (".JP", "JPY"),    // Japan (Tokyo)
+        (".AX", "AUD"),    // Australia (ASX)
+        (".NZ", "NZD"),    // New Zealand
+    ];
+
+    let symbol_upper = symbol.to_uppercase();
+
+    mapping
+        .iter()
+        .find(|(suffix, _)| symbol_upper.ends_with(suffix))
+        .map(|(_, currency)| *currency)
 }
