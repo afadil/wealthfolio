@@ -1,5 +1,7 @@
-use crate::events::events_model::{Event, EventWithTypeName, NewEvent, UpdateEvent};
 use crate::errors::Result;
+use crate::events::events_model::{
+    Event, EventSpendingData, EventSpendingSummary, EventWithTypeName, NewEvent, UpdateEvent,
+};
 use async_trait::async_trait;
 
 /// Trait for event repository operations
@@ -36,6 +38,13 @@ pub trait EventRepositoryTrait: Send + Sync {
     /// Get activity counts grouped by event ID
     /// Returns a HashMap where keys are event IDs and values are activity counts
     fn get_activity_counts(&self) -> Result<std::collections::HashMap<String, i64>>;
+
+    /// Get event spending data with optional date range filter
+    fn get_event_spending_data(
+        &self,
+        start_date: Option<&str>,
+        end_date: Option<&str>,
+    ) -> Result<Vec<EventSpendingData>>;
 }
 
 /// Trait for event service operations
@@ -61,7 +70,6 @@ pub trait EventServiceTrait: Send + Sync {
         event_type_id: String,
         start_date: String,
         end_date: String,
-        is_dynamic_range: bool,
     ) -> Result<Event>;
 
     /// Update an event
@@ -73,19 +81,19 @@ pub trait EventServiceTrait: Send + Sync {
         event_type_id: Option<String>,
         start_date: Option<String>,
         end_date: Option<String>,
-        is_dynamic_range: Option<bool>,
     ) -> Result<Event>;
 
     /// Delete an event (fails if activities are assigned)
     async fn delete_event(&self, id: &str) -> Result<usize>;
 
-    /// Validate transaction date against event date range
-    fn validate_transaction_date(&self, event_id: &str, transaction_date: &str) -> Result<bool>;
-
-    /// Recalculate dates for a dynamic event based on linked activities
-    /// If the event is not dynamic, this is a no-op
-    async fn recalculate_dynamic_event_dates(&self, event_id: &str) -> Result<Option<Event>>;
-
     /// Get activity counts grouped by event ID
     fn get_activity_counts(&self) -> Result<std::collections::HashMap<String, i64>>;
+
+    /// Get event spending summaries with optional date range filter
+    fn get_event_spending_summaries(
+        &self,
+        start_date: Option<&str>,
+        end_date: Option<&str>,
+        base_currency: &str,
+    ) -> Result<Vec<EventSpendingSummary>>;
 }

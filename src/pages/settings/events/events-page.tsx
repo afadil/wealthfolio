@@ -282,11 +282,7 @@ export const EventsPage = () => {
                                 )}
                               </div>
                               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                {event.isDynamicRange ? (
-                                  <span className="italic">Dynamic dates</span>
-                                ) : (
-                                  <span>{event.startDate} - {event.endDate}</span>
-                                )}
+                                <span>{event.startDate} - {event.endDate}</span>
                               </div>
                             </div>
                           </div>

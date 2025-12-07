@@ -58,15 +58,6 @@ impl ActivityService {
 }
 
 impl ActivityService {
-    /// Recalculates the dates for a dynamic event if event_id is provided
-    async fn recalculate_event_dates_if_needed(&self, event_id: Option<&str>) {
-        if let (Some(event_svc), Some(eid)) = (&self.event_service, event_id) {
-            // Fire and forget - we don't want to fail the activity operation
-            // if the event date recalculation fails
-            let _ = event_svc.recalculate_dynamic_event_dates(eid).await;
-        }
-    }
-
     async fn prepare_new_activity(&self, mut activity: NewActivity) -> Result<NewActivity> {
         let account: Account = self.account_service.get_account(&activity.account_id)?;
 
@@ -216,55 +207,19 @@ impl ActivityServiceTrait for ActivityService {
 
     /// Creates a new activity
     async fn create_activity(&self, activity: NewActivity) -> Result<Activity> {
-        let event_id = activity.event_id.clone();
         let prepared = self.prepare_new_activity(activity).await?;
-        let result = self.activity_repository.create_activity(prepared).await?;
-
-        // Recalculate event dates if activity is linked to an event
-        self.recalculate_event_dates_if_needed(event_id.as_deref()).await;
-
-        Ok(result)
+        self.activity_repository.create_activity(prepared).await
     }
 
     /// Updates an existing activity
     async fn update_activity(&self, activity: ActivityUpdate) -> Result<Activity> {
-        // Get old event_id before update to handle event changes
-        let old_event_id = self
-            .activity_repository
-            .get_activity(&activity.id)
-            .ok()
-            .map(|a| a.event_id)
-            .flatten();
-
-        let new_event_id = activity.event_id.clone();
         let prepared = self.prepare_update_activity(activity).await?;
-        let result = self.activity_repository.update_activity(prepared).await?;
-
-        // Recalculate dates for both old and new events (if different)
-        self.recalculate_event_dates_if_needed(new_event_id.as_deref()).await;
-        if old_event_id != new_event_id {
-            self.recalculate_event_dates_if_needed(old_event_id.as_deref()).await;
-        }
-
-        Ok(result)
+        self.activity_repository.update_activity(prepared).await
     }
 
     /// Deletes an activity
     async fn delete_activity(&self, activity_id: String) -> Result<Activity> {
-        // Get event_id before deletion to recalculate its dates
-        let event_id = self
-            .activity_repository
-            .get_activity(&activity_id)
-            .ok()
-            .map(|a| a.event_id)
-            .flatten();
-
-        let result = self.activity_repository.delete_activity(activity_id).await?;
-
-        // Recalculate event dates if activity was linked to an event
-        self.recalculate_event_dates_if_needed(event_id.as_deref()).await;
-
-        Ok(result)
+        self.activity_repository.delete_activity(activity_id).await
     }
 
     async fn bulk_mutate_activities(

@@ -783,7 +783,6 @@ export interface Event {
   eventTypeId: string;
   startDate: string;
   endDate: string;
-  isDynamicRange: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -798,7 +797,6 @@ export interface NewEvent {
   eventTypeId: string;
   startDate: string;
   endDate: string;
-  isDynamicRange?: boolean;
 }
 
 export interface UpdateEvent {
@@ -807,5 +805,27 @@ export interface UpdateEvent {
   eventTypeId?: string;
   startDate?: string;
   endDate?: string;
-  isDynamicRange?: boolean;
+}
+
+export interface EventCategorySpending {
+  categoryId: string | null;
+  categoryName: string;
+  color: string | null;
+  amount: number;
+  transactionCount: number;
+}
+
+export interface EventSpendingSummary {
+  eventId: string;
+  eventName: string;
+  eventTypeId: string;
+  eventTypeName: string;
+  eventTypeColor: string | null;
+  startDate: string;
+  endDate: string;
+  totalSpending: number;
+  transactionCount: number;
+  currency: string;
+  byCategory: Record<string, EventCategorySpending>;
+  dailySpending: Record<string, number>;
 }

@@ -130,7 +130,6 @@ diesel::table! {
         event_type_id -> Text,
         start_date -> Text,
         end_date -> Text,
-        is_dynamic_range -> Integer,
         created_at -> Text,
         updated_at -> Text,
     }

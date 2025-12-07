@@ -299,8 +299,8 @@ pub fn run() {
             commands::event::create_event,
             commands::event::update_event,
             commands::event::delete_event,
-            commands::event::validate_transaction_date,
             commands::event::get_event_activity_counts,
+            commands::event::get_event_spending_summaries,
         ])
         .build(tauri::generate_context!())
         .expect("Failed to build Wealthfolio application")

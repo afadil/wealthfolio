@@ -241,13 +241,9 @@ export function ManageEventsDialog({ open, onClose }: ManageEventsDialogProps) {
                                     <div>
                                       <span className="text-sm">{event.name}</span>
                                       <div className="text-muted-foreground flex items-center gap-2 text-xs">
-                                        {event.isDynamicRange ? (
-                                          <span className="italic">Dynamic dates</span>
-                                        ) : (
-                                          <span>
-                                            {event.startDate} - {event.endDate}
-                                          </span>
-                                        )}
+                                        <span>
+                                          {event.startDate} - {event.endDate}
+                                        </span>
                                       </div>
                                     </div>
                                   </div>

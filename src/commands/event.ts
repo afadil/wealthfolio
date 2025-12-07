@@ -1,4 +1,4 @@
-import type { Event, EventWithTypeName, NewEvent, UpdateEvent } from "@/lib/types";
+import type { Event, EventWithTypeName, NewEvent, UpdateEvent, EventSpendingSummary } from "@/lib/types";
 import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb } from "@/adapters";
 import { logger } from "@/adapters";
 
@@ -100,25 +100,6 @@ export const deleteEvent = async (eventId: string): Promise<void> => {
   }
 };
 
-export const validateTransactionDate = async (
-  eventId: string,
-  transactionDate: string
-): Promise<boolean> => {
-  try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("validate_transaction_date", { eventId, transactionDate });
-      case RUN_ENV.WEB:
-        return invokeWeb("validate_transaction_date", { eventId, transactionDate });
-      default:
-        throw new Error(`Unsupported`);
-    }
-  } catch (error) {
-    logger.error("Error validating transaction date.");
-    throw error;
-  }
-};
-
 export const getEventActivityCounts = async (): Promise<Record<string, number>> => {
   try {
     switch (getRunEnv()) {
@@ -131,6 +112,26 @@ export const getEventActivityCounts = async (): Promise<Record<string, number>> 
     }
   } catch (error) {
     logger.error("Error fetching event activity counts.");
+    throw error;
+  }
+};
+
+export const getEventSpendingSummaries = async (
+  startDate: string | null,
+  endDate: string | null,
+  baseCurrency: string
+): Promise<EventSpendingSummary[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri("get_event_spending_summaries", { startDate, endDate, baseCurrency });
+      case RUN_ENV.WEB:
+        return invokeWeb("get_event_spending_summaries", { startDate, endDate, baseCurrency });
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error("Error fetching event spending summaries.");
     throw error;
   }
 };

@@ -92,11 +92,11 @@ const COMMANDS: CommandMap = {
   get_events: { method: "GET", path: "/events" },
   get_events_with_names: { method: "GET", path: "/events/with-names" },
   get_event_activity_counts: { method: "GET", path: "/events/activity-counts" },
+  get_event_spending_summaries: { method: "GET", path: "/events/spending-summaries" },
   get_event: { method: "GET", path: "/events" },
   create_event: { method: "POST", path: "/events" },
   update_event: { method: "PUT", path: "/events" },
   delete_event: { method: "DELETE", path: "/events" },
-  validate_transaction_date: { method: "POST", path: "/events" },
   // Asset profile
   get_assets: { method: "GET", path: "/assets" },
   delete_asset: { method: "DELETE", path: "/assets" },
@@ -625,12 +625,6 @@ export const invokeWeb = async <T>(
       url += `/${encodeURIComponent(eventId)}`;
       break;
     }
-    case "validate_transaction_date": {
-      const { eventId, transactionDate } = payload as { eventId: string; transactionDate: string };
-      url += `/${encodeURIComponent(eventId)}/validate-transaction-date`;
-      body = JSON.stringify({ transactionDate });
-      break;
-    }
     case "get_categories":
     case "get_categories_hierarchical":
     case "get_category_activity_counts":
@@ -653,6 +647,19 @@ export const invokeWeb = async <T>(
     case "get_sync_status":
     case "initialize_sync_for_existing_data":
       break;
+    case "get_event_spending_summaries": {
+      const { startDate, endDate, baseCurrency } = payload as {
+        startDate: string | null;
+        endDate: string | null;
+        baseCurrency: string;
+      };
+      const params = new URLSearchParams();
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
+      params.set("baseCurrency", baseCurrency);
+      url += `?${params.toString()}`;
+      break;
+    }
   }
 
   const headers: HeadersInit = {};

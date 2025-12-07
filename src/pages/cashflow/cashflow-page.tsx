@@ -5,6 +5,7 @@ import React, { Suspense, useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import SpendingPage from "@/pages/spending/spending-page";
 import IncomePage from "@/pages/income/income-page";
+import EventsPage from "@/pages/events/events-page";
 
 const CashflowLoader = () => (
   <div className="flex h-full w-full flex-col space-y-4 p-4">
@@ -28,16 +29,17 @@ const CashflowLoader = () => (
   </div>
 );
 
-type CashflowTab = "spending" | "income";
+type CashflowTab = "spending" | "income" | "events";
 
 export default function CashflowPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get("tab") as CashflowTab | null;
-  const currentTab: CashflowTab = tabFromUrl === "income" ? "income" : "spending";
+  const currentTab: CashflowTab = tabFromUrl === "income" ? "income" : tabFromUrl === "events" ? "events" : "spending";
 
   // State to capture actions from child pages
   const [spendingActions, setSpendingActions] = useState<React.ReactNode>(null);
   const [incomeActions, setIncomeActions] = useState<React.ReactNode>(null);
+  const [eventsActions, setEventsActions] = useState<React.ReactNode>(null);
 
   // Callbacks to capture actions from child pages
   const handleSpendingActions = useCallback((actions: React.ReactNode) => {
@@ -46,6 +48,10 @@ export default function CashflowPage() {
 
   const handleIncomeActions = useCallback((actions: React.ReactNode) => {
     setIncomeActions(actions);
+  }, []);
+
+  const handleEventsActions = useCallback((actions: React.ReactNode) => {
+    setEventsActions(actions);
   }, []);
 
   const handleTabChange = useCallback(
@@ -57,8 +63,17 @@ export default function CashflowPage() {
 
   // Get actions for current tab
   const currentActions = useMemo(() => {
-    return currentTab === "spending" ? spendingActions : incomeActions;
-  }, [currentTab, spendingActions, incomeActions]);
+    switch (currentTab) {
+      case "spending":
+        return spendingActions;
+      case "income":
+        return incomeActions;
+      case "events":
+        return eventsActions;
+      default:
+        return spendingActions;
+    }
+  }, [currentTab, spendingActions, incomeActions, eventsActions]);
 
   return (
     <Page>
@@ -73,6 +88,10 @@ export default function CashflowPage() {
               <Icons.Income className="mr-2 size-4" />
               Income
             </TabsTrigger>
+            <TabsTrigger value="events">
+              <Icons.Calendar className="mr-2 size-4" />
+              Events
+            </TabsTrigger>
           </TabsList>
         </PageHeader>
         <PageContent withPadding={false}>
@@ -84,6 +103,11 @@ export default function CashflowPage() {
           <TabsContent value="income" className="mt-0">
             <Suspense fallback={<CashflowLoader />}>
               <IncomePage renderActions={handleIncomeActions} />
+            </Suspense>
+          </TabsContent>
+          <TabsContent value="events" className="mt-0">
+            <Suspense fallback={<CashflowLoader />}>
+              <EventsPage renderActions={handleEventsActions} />
             </Suspense>
           </TabsContent>
         </PageContent>

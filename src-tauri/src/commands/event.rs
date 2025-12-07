@@ -5,7 +5,7 @@ use crate::context::ServiceContext;
 use log::{debug, error};
 use tauri::State;
 
-use wealthfolio_core::events::{Event, EventWithTypeName};
+use wealthfolio_core::events::{Event, EventSpendingSummary, EventWithTypeName};
 
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct CreateEventInput {
     pub event_type_id: String,
     pub start_date: String,
     pub end_date: String,
-    pub is_dynamic_range: Option<bool>,
 }
 
 #[derive(serde::Deserialize)]
@@ -26,7 +25,6 @@ pub struct UpdateEventInput {
     pub event_type_id: Option<String>,
     pub start_date: Option<String>,
     pub end_date: Option<String>,
-    pub is_dynamic_range: Option<bool>,
 }
 
 #[tauri::command]
@@ -86,7 +84,6 @@ pub async fn create_event(
             event.event_type_id,
             event.start_date,
             event.end_date,
-            event.is_dynamic_range.unwrap_or(false),
         )
         .await
         .map_err(|e| {
@@ -111,7 +108,6 @@ pub async fn update_event(
             update.event_type_id,
             update.start_date,
             update.end_date,
-            update.is_dynamic_range,
         )
         .await
         .map_err(|e| {
@@ -138,22 +134,6 @@ pub async fn delete_event(
 }
 
 #[tauri::command]
-pub async fn validate_transaction_date(
-    event_id: String,
-    transaction_date: String,
-    state: State<'_, Arc<ServiceContext>>,
-) -> Result<bool, String> {
-    debug!("Validating transaction date for event: {}", event_id);
-    state
-        .event_service()
-        .validate_transaction_date(&event_id, &transaction_date)
-        .map_err(|e| {
-            error!("Failed to validate transaction date: {}", e);
-            format!("Failed to validate transaction date: {}", e)
-        })
-}
-
-#[tauri::command]
 pub async fn get_event_activity_counts(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<HashMap<String, i64>, String> {
@@ -164,5 +144,29 @@ pub async fn get_event_activity_counts(
         .map_err(|e| {
             error!("Failed to fetch event activity counts: {}", e);
             format!("Failed to fetch event activity counts: {}", e)
+        })
+}
+
+#[tauri::command]
+pub async fn get_event_spending_summaries(
+    start_date: Option<String>,
+    end_date: Option<String>,
+    base_currency: String,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<EventSpendingSummary>, String> {
+    debug!(
+        "Fetching event spending summaries for period: {:?} to {:?}",
+        start_date, end_date
+    );
+    state
+        .event_service()
+        .get_event_spending_summaries(
+            start_date.as_deref(),
+            end_date.as_deref(),
+            &base_currency,
+        )
+        .map_err(|e| {
+            error!("Failed to fetch event spending summaries: {}", e);
+            format!("Failed to fetch event spending summaries: {}", e)
         })
 }

@@ -17,13 +17,11 @@ import {
   SelectTrigger,
   SelectValue,
   Textarea,
-  Switch,
   DatePickerInput,
 } from '@wealthfolio/ui';
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -39,13 +37,8 @@ const eventSchema = z.object({
   eventTypeId: z.string().min(1, 'Event type is required'),
   startDate: z.date({ required_error: 'Start date is required' }),
   endDate: z.date({ required_error: 'End date is required' }),
-  isDynamicRange: z.boolean(),
 }).refine((data) => {
-  // Only validate date order if not using dynamic range
-  if (!data.isDynamicRange) {
-    return data.startDate <= data.endDate;
-  }
-  return true;
+  return data.startDate <= data.endDate;
 }, {
   message: 'Start date must be before or equal to end date',
   path: ['endDate'],
@@ -74,12 +67,8 @@ export function EventFormDialog({ eventTypes, event, open, onOpenChange, default
       eventTypeId: '',
       startDate: new Date(),
       endDate: new Date(),
-      isDynamicRange: false,
     },
   });
-
-  // Watch the isDynamicRange field to conditionally show/hide date pickers
-  const isDynamicRange = form.watch('isDynamicRange');
 
   // Reset form when dialog opens with event data
   useEffect(() => {
@@ -91,7 +80,6 @@ export function EventFormDialog({ eventTypes, event, open, onOpenChange, default
           eventTypeId: event.eventTypeId,
           startDate: new Date(event.startDate),
           endDate: new Date(event.endDate),
-          isDynamicRange: event.isDynamicRange,
         });
       } else {
         form.reset({
@@ -100,7 +88,6 @@ export function EventFormDialog({ eventTypes, event, open, onOpenChange, default
           eventTypeId: defaultEventTypeId || '',
           startDate: new Date(),
           endDate: new Date(),
-          isDynamicRange: false,
         });
       }
     }
@@ -122,7 +109,6 @@ export function EventFormDialog({ eventTypes, event, open, onOpenChange, default
             eventTypeId: values.eventTypeId,
             startDate: startDateStr,
             endDate: endDateStr,
-            isDynamicRange: values.isDynamicRange,
           },
         });
       } else {
@@ -132,7 +118,6 @@ export function EventFormDialog({ eventTypes, event, open, onOpenChange, default
           eventTypeId: values.eventTypeId,
           startDate: startDateStr,
           endDate: endDateStr,
-          isDynamicRange: values.isDynamicRange,
         };
         await createMutation.mutateAsync(newEvent);
       }
@@ -216,64 +201,39 @@ export function EventFormDialog({ eventTypes, event, open, onOpenChange, default
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="isDynamicRange"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                  <div className="space-y-0.5">
-                    <FormLabel>Dynamic Date Range</FormLabel>
-                    <FormDescription className="text-xs">
-                      {field.value
-                        ? 'Dates will automatically adjust based on linked transactions'
-                        : 'Set fixed dates that won\'t change when transactions are added'}
-                    </FormDescription>
-                  </div>
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="startDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Event Start Date</FormLabel>
+                    <DatePickerInput
+                      onChange={(date: Date | undefined) => field.onChange(date)}
+                      value={field.value}
+                      disabled={field.disabled}
                     />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            {!isDynamicRange && (
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="startDate"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Start Date</FormLabel>
-                      <DatePickerInput
-                        onChange={(date: Date | undefined) => field.onChange(date)}
-                        value={field.value}
-                        disabled={field.disabled}
-                      />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="endDate"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>End Date</FormLabel>
-                      <DatePickerInput
-                        onChange={(date: Date | undefined) => field.onChange(date)}
-                        value={field.value}
-                        disabled={field.disabled}
-                      />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            )}
+              <FormField
+                control={form.control}
+                name="endDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Event End Date</FormLabel>
+                    <DatePickerInput
+                      onChange={(date: Date | undefined) => field.onChange(date)}
+                      value={field.value}
+                      disabled={field.disabled}
+                    />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <DialogFooter>
               <Button

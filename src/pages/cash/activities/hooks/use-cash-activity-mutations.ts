@@ -18,6 +18,7 @@ export function useCashActivityMutations(onSuccess?: (activity: { accountId?: st
     onSuccess: (activity: { accountId?: string | null }) => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.CASH_ACTIVITIES] });
       queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNTS] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.EVENT_SPENDING_SUMMARIES] });
       if (onSuccess) onSuccess(activity);
     },
     onError: (error: string) => {
@@ -56,6 +57,7 @@ export function useCashActivityMutations(onSuccess?: (activity: { accountId?: st
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.CASH_ACTIVITIES] });
       queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNTS] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.EVENT_SPENDING_SUMMARIES] });
       toast({
         title: "Transfer created successfully",
         variant: "success",

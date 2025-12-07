@@ -91,6 +91,7 @@ export const QueryKeys = {
   EVENTS: "events",
   EVENTS_WITH_NAMES: "events_with_names",
   EVENT_ACTIVITY_COUNTS: "event_activity_counts",
+  EVENT_SPENDING_SUMMARIES: "event_spending_summaries",
 
   // Cash Activities
   CASH_ACTIVITIES: "cash_activities",

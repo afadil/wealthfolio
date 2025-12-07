@@ -8,9 +8,9 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use chrono::Utc;
 use serde::Deserialize;
-use wealthfolio_core::events::{Event, EventWithTypeName, NewEvent};
+use axum::extract::Query;
+use wealthfolio_core::events::{Event, EventSpendingSummary, EventWithTypeName};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct CreateEventRequest {
     pub event_type_id: String,
     pub start_date: String,
     pub end_date: String,
-    pub is_dynamic_range: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -31,13 +30,14 @@ pub struct UpdateEventRequest {
     pub event_type_id: Option<String>,
     pub start_date: Option<String>,
     pub end_date: Option<String>,
-    pub is_dynamic_range: Option<bool>,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ValidateTransactionDateRequest {
-    pub transaction_date: String,
+pub struct SpendingSummaryParams {
+    pub start_date: Option<String>,
+    pub end_date: Option<String>,
+    pub base_currency: String,
 }
 
 /// Get all events
@@ -73,28 +73,14 @@ async fn create_event(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateEventRequest>,
 ) -> ApiResult<Json<Event>> {
-    let now = Utc::now().to_rfc3339();
-    let new_event = NewEvent {
-        id: None,
-        name: req.name,
-        description: req.description,
-        event_type_id: req.event_type_id,
-        start_date: req.start_date,
-        end_date: req.end_date,
-        is_dynamic_range: if req.is_dynamic_range.unwrap_or(false) { 1 } else { 0 },
-        created_at: now.clone(),
-        updated_at: now,
-    };
-
     let event = state
         .event_service
         .create_event(
-            new_event.name,
-            new_event.description,
-            new_event.event_type_id,
-            new_event.start_date,
-            new_event.end_date,
-            new_event.is_dynamic_range == 1,
+            req.name,
+            req.description,
+            req.event_type_id,
+            req.start_date,
+            req.end_date,
         )
         .await?;
     Ok(Json(event))
@@ -115,7 +101,6 @@ async fn update_event(
             req.event_type_id,
             req.start_date,
             req.end_date,
-            req.is_dynamic_range,
         )
         .await?;
     Ok(Json(event))
@@ -130,18 +115,6 @@ async fn delete_event(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// Validate transaction date against event date range
-async fn validate_transaction_date(
-    Path(id): Path<String>,
-    State(state): State<Arc<AppState>>,
-    Json(req): Json<ValidateTransactionDateRequest>,
-) -> ApiResult<Json<bool>> {
-    let is_valid = state
-        .event_service
-        .validate_transaction_date(&id, &req.transaction_date)?;
-    Ok(Json(is_valid))
-}
-
 /// Get activity counts for all events
 async fn get_activity_counts(
     State(state): State<Arc<AppState>>,
@@ -150,17 +123,27 @@ async fn get_activity_counts(
     Ok(Json(counts))
 }
 
+/// Get spending summaries for all events
+async fn get_spending_summaries(
+    State(state): State<Arc<AppState>>,
+    Query(params): Query<SpendingSummaryParams>,
+) -> ApiResult<Json<Vec<EventSpendingSummary>>> {
+    let summaries = state.event_service.get_event_spending_summaries(
+        params.start_date.as_deref(),
+        params.end_date.as_deref(),
+        &params.base_currency,
+    )?;
+    Ok(Json(summaries))
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/events", get(get_all_events).post(create_event))
         .route("/events/with-names", get(get_events_with_type_names))
         .route("/events/activity-counts", get(get_activity_counts))
+        .route("/events/spending-summaries", get(get_spending_summaries))
         .route(
             "/events/{id}",
             get(get_event).put(update_event).delete(delete_event),
-        )
-        .route(
-            "/events/{id}/validate-transaction-date",
-            axum::routing::post(validate_transaction_date),
         )
 }

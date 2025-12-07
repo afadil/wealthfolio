@@ -1,13 +1,15 @@
-use crate::events::events_model::{Event, EventWithTypeName, NewEvent, UpdateEvent};
-use crate::events::events_traits::EventRepositoryTrait;
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::{Result, ValidationError};
-use crate::schema::{activities, event_types, events};
+use crate::events::events_model::{Event, EventSpendingData, EventWithTypeName, NewEvent, UpdateEvent};
+use crate::events::events_traits::EventRepositoryTrait;
+use crate::schema::{activities, categories, event_types, events};
 use async_trait::async_trait;
 use diesel::prelude::*;
 use diesel::r2d2::{self, Pool};
 use diesel::SqliteConnection;
+use rust_decimal::Decimal;
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -175,5 +177,106 @@ impl EventRepositoryTrait for EventRepository {
             .load::<(String, i64)>(&mut conn)?;
 
         Ok(counts.into_iter().collect())
+    }
+
+    fn get_event_spending_data(
+        &self,
+        start_date: Option<&str>,
+        end_date: Option<&str>,
+    ) -> Result<Vec<EventSpendingData>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        // Query ALL activities linked to events
+        // For event spending, we include all activities the user has explicitly linked to an event
+        // since they want to track total spending/activity for that event regardless of activity type
+        let mut query = activities::table
+            .inner_join(events::table.on(activities::event_id.eq(events::id.nullable())))
+            .inner_join(event_types::table.on(events::event_type_id.eq(event_types::id)))
+            .left_join(categories::table.on(activities::category_id.eq(categories::id.nullable())))
+            .filter(activities::event_id.is_not_null())
+            .into_boxed();
+
+        // Filter events by their start_date falling within the period
+        // This includes all activities for events that started in the selected period
+        if let Some(start) = start_date {
+            query = query.filter(events::start_date.ge(start));
+        }
+        if let Some(end) = end_date {
+            query = query.filter(events::start_date.le(end));
+        }
+
+        let results: Vec<(
+            String,           // event_id
+            String,           // event_name
+            String,           // event_type_id
+            String,           // event_type_name
+            Option<String>,   // event_type_color
+            String,           // start_date
+            String,           // end_date
+            String,           // activity_date
+            Option<String>,   // category_id
+            Option<String>,   // category_name
+            Option<String>,   // category_color
+            String,           // currency
+            String,           // quantity
+            String,           // unit_price
+            Option<String>,   // amount (direct amount for cash activities)
+        )> = query
+            .select((
+                events::id,
+                events::name,
+                events::event_type_id,
+                event_types::name,
+                event_types::color,
+                events::start_date,
+                events::end_date,
+                activities::activity_date,
+                activities::category_id,
+                categories::name.nullable(),
+                categories::color.nullable(),
+                activities::currency,
+                activities::quantity,
+                activities::unit_price,
+                activities::amount,
+            ))
+            .order(activities::activity_date.desc())
+            .load(&mut conn)?;
+
+        Ok(results
+            .into_iter()
+            .map(|row| {
+                // For cash activities (DEPOSIT/WITHDRAWAL), the amount is stored directly
+                // For investment activities, we calculate from quantity * unit_price
+                let direct_amount = row.14.as_ref()
+                    .and_then(|a| Decimal::from_str(a).ok())
+                    .unwrap_or(Decimal::ZERO);
+                let quantity = Decimal::from_str(&row.12).unwrap_or(Decimal::ZERO);
+                let unit_price = Decimal::from_str(&row.13).unwrap_or(Decimal::ZERO);
+                let calculated_amount = quantity * unit_price;
+
+                // Use direct amount if it's non-zero, otherwise use calculated amount
+                let amount = if direct_amount != Decimal::ZERO {
+                    direct_amount.abs()
+                } else {
+                    calculated_amount.abs()
+                };
+
+                EventSpendingData {
+                    event_id: row.0,
+                    event_name: row.1,
+                    event_type_id: row.2,
+                    event_type_name: row.3,
+                    event_type_color: row.4,
+                    start_date: row.5,
+                    end_date: row.6,
+                    activity_date: row.7,
+                    category_id: row.8,
+                    category_name: row.9,
+                    category_color: row.10,
+                    currency: row.11,
+                    amount,
+                }
+            })
+            .collect())
     }
 }
