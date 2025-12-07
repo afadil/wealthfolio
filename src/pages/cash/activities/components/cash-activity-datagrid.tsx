@@ -251,37 +251,21 @@ export function CashActivityDatagrid({
     return new Map(accounts.map((account) => [account.id, account]));
   }, [accounts]);
 
-  const expenseCategoryOptions = useMemo(
-    () =>
-      expenseCategories.map((cat) => ({
+  const categoryOptions = useMemo(
+    () => [
+      { value: "", label: "No category", searchValue: "no category" },
+      ...categories.map((cat) => ({
         value: cat.id,
         label: cat.name,
         searchValue: cat.name,
       })),
-    [expenseCategories],
-  );
-
-  const incomeCategoryOptions = useMemo(
-    () =>
-      incomeCategories.map((cat) => ({
-        value: cat.id,
-        label: cat.name,
-        searchValue: cat.name,
-      })),
-    [incomeCategories],
+    ],
+    [categories],
   );
 
   const getCategoryOptionsForActivityType = useCallback(
-    (activityType: string | undefined) => {
-      if (activityType === "DEPOSIT" || activityType === "TRANSFER_IN") {
-        return incomeCategoryOptions;
-      }
-      if (activityType === "WITHDRAWAL" || activityType === "TRANSFER_OUT") {
-        return expenseCategoryOptions;
-      }
-      return [...expenseCategoryOptions, ...incomeCategoryOptions];
-    },
-    [expenseCategoryOptions, incomeCategoryOptions],
+    () => categoryOptions,
+    [categoryOptions],
   );
 
   const categoryLookup = useMemo(() => {
@@ -302,22 +286,29 @@ export function CashActivityDatagrid({
     (categoryId: string | undefined) => {
       if (!categoryId) return [];
       const category = categoryLookup.get(categoryId);
-      return (category?.children ?? []).map((sub) => ({
-        value: sub.id,
-        label: sub.name,
-        searchValue: sub.name,
-      }));
+      const children = category?.children ?? [];
+      if (children.length === 0) return [];
+      return [
+        { value: "", label: "No subcategory", searchValue: "no subcategory" },
+        ...children.map((sub) => ({
+          value: sub.id,
+          label: sub.name,
+          searchValue: sub.name,
+        })),
+      ];
     },
     [categoryLookup],
   );
 
   const eventOptions = useMemo(
-    () =>
-      events.map((event) => ({
+    () => [
+      { value: "", label: "No event", searchValue: "no event" },
+      ...events.map((event) => ({
         value: event.id,
         label: event.name,
         searchValue: event.name,
       })),
+    ],
     [events],
   );
 
