@@ -40,11 +40,11 @@ export function periodToDateRange(period: SpendingPeriod): { startDate?: string;
 
 export function buildCashflowUrl(params: CashflowNavigationParams): string {
   const searchParams = new URLSearchParams();
+  searchParams.set("tab", "transactions");
   if (params.categoryId) searchParams.set("category", params.categoryId);
   if (params.subcategoryId) searchParams.set("subcategory", params.subcategoryId);
   if (params.eventId) searchParams.set("event", params.eventId);
   if (params.startDate) searchParams.set("startDate", params.startDate);
   if (params.endDate) searchParams.set("endDate", params.endDate);
-  const query = searchParams.toString();
-  return query ? `/cashflow?${query}` : "/cashflow";
+  return `/activity?${searchParams.toString()}`;
 }
