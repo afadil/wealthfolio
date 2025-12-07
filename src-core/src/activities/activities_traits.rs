@@ -1,4 +1,9 @@
-use super::activities_model::*;
+use super::activities_model::{
+    Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityDetails,
+    ActivityImport, ActivitySearchResponse, ActivityUpdate, DailySpendingRow, ImportMapping,
+    ImportMappingData, IncomeData, MonthMetricsRequest, MonthMetricsResponse, NewActivity, Sort,
+    SpendingTrendsRequest, SpendingTrendsResponse,
+};
 use crate::portfolio::income::{CapitalGainsData, CashIncomeData};
 use crate::spending::SpendingData;
 use crate::Result;
@@ -65,6 +70,16 @@ pub trait ActivityRepositoryTrait: Send + Sync {
     fn get_spending_activities_data(&self) -> Result<Vec<SpendingData>>;
     fn get_cash_income_activities_data(&self) -> Result<Vec<CashIncomeData>>;
     fn get_capital_gains_data(&self) -> Result<Vec<CapitalGainsData>>;
+    fn get_top_spending_transactions(&self, month: &str, limit: i64) -> Result<Vec<ActivityDetails>>;
+    fn get_daily_spending_for_month(
+        &self,
+        month: &str,
+        category_ids: Option<&[String]>,
+        subcategory_ids: Option<&[String]>,
+        include_event_ids: Option<&[String]>,
+        include_all_events: bool,
+    ) -> Result<Vec<DailySpendingRow>>;
+    fn get_month_transaction_amounts(&self, month: &str) -> Result<Vec<f64>>;
 }
 
 /// Trait defining the contract for Activity service operations.
@@ -120,4 +135,7 @@ pub trait ActivityServiceTrait: Send + Sync {
         &self,
         mapping_data: ImportMappingData,
     ) -> Result<ImportMappingData>;
+    fn get_top_spending_transactions(&self, month: String, limit: i64) -> Result<Vec<ActivityDetails>>;
+    fn get_spending_trends(&self, request: SpendingTrendsRequest) -> Result<SpendingTrendsResponse>;
+    fn get_month_metrics(&self, request: MonthMetricsRequest) -> Result<MonthMetricsResponse>;
 }

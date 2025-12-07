@@ -33,6 +33,13 @@ const staticNavigation: NavigationProps = {
       label: "View Insights",
     },
     {
+      icon: <Icons.BarChart className="size-6" />,
+      title: "Reports",
+      href: "/reports",
+      keywords: ["reports", "analysis", "month", "budget", "trends", "savings", "rate", "breakdown"],
+      label: "View Reports",
+    },
+    {
       icon: <Icons.Wallet className="size-6" />,
       title: "Cashflow",
       href: "/cashflow",

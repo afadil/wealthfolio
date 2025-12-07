@@ -12,8 +12,10 @@ use axum::{
 };
 use rust_decimal::prelude::FromPrimitive;
 use wealthfolio_core::activities::{
-    Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityImport,
-    ActivitySearchResponse, ActivityUpdate, ImportMappingData, NewActivity,
+    Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityDetails,
+    ActivityImport, ActivitySearchResponse, ActivityUpdate, ImportMappingData,
+    MonthMetricsRequest, MonthMetricsResponse, NewActivity, SpendingTrendsRequest,
+    SpendingTrendsResponse,
 };
 
 #[derive(serde::Deserialize)]
@@ -248,9 +250,44 @@ async fn save_account_import_mapping(
     Ok(Json(res))
 }
 
+#[derive(serde::Deserialize)]
+struct TopSpendingTransactionsBody {
+    month: String,
+    limit: i64,
+}
+
+async fn get_top_spending_transactions(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<TopSpendingTransactionsBody>,
+) -> ApiResult<Json<Vec<ActivityDetails>>> {
+    let res = state
+        .activity_service
+        .get_top_spending_transactions(body.month, body.limit)?;
+    Ok(Json(res))
+}
+
+async fn get_spending_trends(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<SpendingTrendsRequest>,
+) -> ApiResult<Json<SpendingTrendsResponse>> {
+    let res = state.activity_service.get_spending_trends(body)?;
+    Ok(Json(res))
+}
+
+async fn get_month_metrics(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<MonthMetricsRequest>,
+) -> ApiResult<Json<MonthMetricsResponse>> {
+    let res = state.activity_service.get_month_metrics(body)?;
+    Ok(Json(res))
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/activities/search", post(search_activities))
+        .route("/activities/top-spending", post(get_top_spending_transactions))
+        .route("/activities/spending-trends", post(get_spending_trends))
+        .route("/activities/month-metrics", post(get_month_metrics))
         .route("/activities", post(create_activity).put(update_activity))
         .route("/activities/bulk", post(save_activities))
         .route("/activities/{id}", delete(delete_activity))

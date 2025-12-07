@@ -7,6 +7,8 @@ import {
   ActivityDetails,
   ActivitySearchResponse,
   ActivityUpdate,
+  MonthMetricsResponse,
+  SpendingTrendsResponse,
 } from "@/lib/types";
 
 function normalizeStringArray(input?: string | string[]): string[] | undefined {
@@ -169,6 +171,71 @@ export const deleteActivity = async (activityId: string): Promise<Activity> => {
     }
   } catch (error) {
     logger.error("Error deleting activity.");
+    throw error;
+  }
+};
+
+export const getTopSpendingTransactions = async (
+  month: string,
+  limit: number,
+): Promise<ActivityDetails[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri("get_top_spending_transactions", { month, limit });
+      case RUN_ENV.WEB:
+        return invokeWeb("get_top_spending_transactions", { month, limit });
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error("Error fetching top spending transactions.");
+    throw error;
+  }
+};
+
+export const getSpendingTrends = async (
+  month: string,
+  categoryIds?: string[],
+  subcategoryIds?: string[],
+  includeEventIds?: string[],
+  includeAllEvents?: boolean,
+): Promise<SpendingTrendsResponse> => {
+  try {
+    const request = {
+      month,
+      categoryIds,
+      subcategoryIds,
+      includeEventIds,
+      includeAllEvents: includeAllEvents ?? false,
+    };
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri("get_spending_trends", request);
+      case RUN_ENV.WEB:
+        return invokeWeb("get_spending_trends", request);
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error("Error fetching spending trends.");
+    throw error;
+  }
+};
+
+export const getMonthMetrics = async (month: string): Promise<MonthMetricsResponse> => {
+  try {
+    const request = { month };
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri("get_month_metrics", request);
+      case RUN_ENV.WEB:
+        return invokeWeb("get_month_metrics", request);
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error("Error fetching month metrics.");
     throw error;
   }
 };

@@ -829,3 +829,38 @@ export interface EventSpendingSummary {
   byCategory: Record<string, EventCategorySpending>;
   dailySpending: Record<string, number>;
 }
+
+// Spending Trends Types
+export interface SpendingTrendsRequest {
+  month: string;
+  categoryIds?: string[];
+  subcategoryIds?: string[];
+  excludeEventIds?: string[];
+  excludeAllEvents?: boolean;
+}
+
+export interface DailySpending {
+  month: string;
+  cumulative: number[];
+}
+
+export interface SpendingTrendsResponse {
+  currentMonth: DailySpending;
+  avg3Month: DailySpending;
+  avg6Month: DailySpending;
+  avg9Month: DailySpending;
+}
+
+export interface MonthMetricsPrev {
+  avgChangePercent: number | null;
+  countChangePercent: number | null;
+  totalChangePercent: number | null;
+}
+
+export interface MonthMetricsResponse {
+  avgTransactionSize: number;
+  transactionCount: number;
+  medianTransaction: number;
+  totalSpending: number;
+  prevMonth: MonthMetricsPrev | null;
+}

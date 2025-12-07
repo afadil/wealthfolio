@@ -820,3 +820,93 @@ pub struct IncomeData {
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub amount: Decimal,
 }
+
+/// Request for spending trends data
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpendingTrendsRequest {
+    /// Target month in YYYY-MM format
+    pub month: String,
+    /// Optional category IDs to filter
+    pub category_ids: Option<Vec<String>>,
+    /// Optional subcategory IDs to filter
+    pub subcategory_ids: Option<Vec<String>>,
+    /// Optional event IDs to include (default: all events excluded)
+    pub include_event_ids: Option<Vec<String>>,
+    /// Whether to include all transactions tagged with any event (default: false = exclude all)
+    #[serde(default)]
+    pub include_all_events: bool,
+}
+
+/// Daily spending amount from database
+#[derive(Debug, Clone, Serialize, QueryableByName)]
+#[serde(rename_all = "camelCase")]
+#[diesel(table_name = crate::schema::activities)]
+pub struct DailySpendingRow {
+    /// Day of month (1-31)
+    #[diesel(sql_type = diesel::sql_types::Integer)]
+    pub day: i32,
+    /// Total spending for that day
+    #[diesel(sql_type = diesel::sql_types::Double)]
+    pub amount: f64,
+}
+
+/// Cumulative daily spending for a month
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DailySpending {
+    /// Month identifier (YYYY-MM)
+    pub month: String,
+    /// Cumulative spending by day (index 0 = day 1, etc.)
+    pub cumulative: Vec<f64>,
+}
+
+/// Response for spending trends
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpendingTrendsResponse {
+    /// Current month's cumulative daily spending
+    pub current_month: DailySpending,
+    /// 3-month average cumulative daily spending
+    pub avg_3_month: DailySpending,
+    /// 6-month average cumulative daily spending
+    pub avg_6_month: DailySpending,
+    /// 9-month average cumulative daily spending
+    pub avg_9_month: DailySpending,
+}
+
+/// Request for month metrics data
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MonthMetricsRequest {
+    /// Target month in YYYY-MM format
+    pub month: String,
+}
+
+/// Response for month metrics
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MonthMetricsResponse {
+    /// Average transaction size for the month
+    pub avg_transaction_size: f64,
+    /// Number of transactions in the month
+    pub transaction_count: i64,
+    /// Median transaction size
+    pub median_transaction: f64,
+    /// Total spending for the month
+    pub total_spending: f64,
+    /// Previous month's data for comparison
+    pub prev_month: Option<MonthMetricsPrev>,
+}
+
+/// Previous month metrics for comparison
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MonthMetricsPrev {
+    /// Average transaction size change percentage
+    pub avg_change_percent: Option<f64>,
+    /// Transaction count change percentage
+    pub count_change_percent: Option<f64>,
+    /// Total spending change percentage
+    pub total_change_percent: Option<f64>,
+}

@@ -1000,4 +1000,177 @@ impl ActivityRepositoryTrait for ActivityRepository {
 
         Ok(results)
     }
+
+    fn get_top_spending_transactions(
+        &self,
+        month: &str,
+        limit: i64,
+    ) -> Result<Vec<ActivityDetails>> {
+        use diesel::sql_query;
+        let mut conn = get_connection(&self.pool)?;
+
+        // Get top spending transactions for a given month
+        // Spending = WITHDRAWAL activities + DEPOSIT activities with expense categories
+        let data_sql = format!(
+            r#"
+            SELECT
+                a.id,
+                a.account_id,
+                a.asset_id,
+                a.activity_type,
+                a.activity_date as date,
+                a.quantity,
+                a.unit_price,
+                a.currency,
+                a.fee,
+                a.amount,
+                a.is_draft,
+                a.comment,
+                a.created_at,
+                a.updated_at,
+                acc.name as account_name,
+                acc.currency as account_currency,
+                ast.symbol as asset_symbol,
+                ast.name as asset_name,
+                ast.data_source as asset_data_source,
+                a.name,
+                a.category_id,
+                a.sub_category_id,
+                a.event_id,
+                cat.name as category_name,
+                cat.color as category_color,
+                subcat.name as sub_category_name,
+                evt.name as event_name
+            FROM activities a
+            INNER JOIN accounts acc ON a.account_id = acc.id
+            INNER JOIN assets ast ON a.asset_id = ast.id
+            LEFT JOIN categories cat ON a.category_id = cat.id
+            LEFT JOIN categories subcat ON a.sub_category_id = subcat.id
+            LEFT JOIN events evt ON a.event_id = evt.id
+            WHERE acc.is_active = 1
+              AND acc.account_type = 'CASH'
+              AND strftime('%Y-%m', a.activity_date) = '{}'
+              AND (
+                  -- All withdrawals (categorized or uncategorized)
+                  a.activity_type = 'WITHDRAWAL'
+                  -- Deposits with expense category only
+                  OR (a.activity_type = 'DEPOSIT' AND cat.is_income = 0)
+              )
+            ORDER BY ABS(CAST(a.amount AS REAL)) DESC
+            LIMIT {}
+            "#,
+            month.replace("'", "''"),
+            limit
+        );
+
+        let results: Vec<ActivityDetails> = sql_query(&data_sql).load(&mut conn)?;
+        Ok(results)
+    }
+
+    fn get_daily_spending_for_month(
+        &self,
+        month: &str,
+        category_ids: Option<&[String]>,
+        subcategory_ids: Option<&[String]>,
+        include_event_ids: Option<&[String]>,
+        include_all_events: bool,
+    ) -> Result<Vec<DailySpendingRow>> {
+        use diesel::sql_query;
+        let mut conn = get_connection(&self.pool)?;
+
+        // Build optional filter clauses
+        let category_filter = match category_ids {
+            Some(ids) if !ids.is_empty() => {
+                let escaped: Vec<String> = ids.iter().map(|id| id.replace("'", "''")).collect();
+                format!("AND a.category_id IN ('{}')", escaped.join("','"))
+            }
+            _ => String::new(),
+        };
+
+        let subcategory_filter = match subcategory_ids {
+            Some(ids) if !ids.is_empty() => {
+                let escaped: Vec<String> = ids.iter().map(|id| id.replace("'", "''")).collect();
+                format!("AND a.sub_category_id IN ('{}')", escaped.join("','"))
+            }
+            _ => String::new(),
+        };
+
+        // Event inclusion filter: by default excludes all event transactions
+        let event_filter = if include_all_events {
+            String::new()
+        } else {
+            match include_event_ids {
+                Some(ids) if !ids.is_empty() => {
+                    let escaped: Vec<String> = ids.iter().map(|id| id.replace("'", "''")).collect();
+                    format!("AND (a.event_id IS NULL OR a.event_id IN ('{}'))", escaped.join("','"))
+                }
+                _ => "AND a.event_id IS NULL".to_string(),
+            }
+        };
+
+        // Get daily spending aggregated by day of month
+        let data_sql = format!(
+            r#"
+            SELECT
+                CAST(strftime('%d', a.activity_date) AS INTEGER) as day,
+                SUM(ABS(CAST(a.amount AS REAL))) as amount
+            FROM activities a
+            INNER JOIN accounts acc ON a.account_id = acc.id
+            LEFT JOIN categories cat ON a.category_id = cat.id
+            WHERE acc.is_active = 1
+              AND acc.account_type = 'CASH'
+              AND strftime('%Y-%m', a.activity_date) = '{}'
+              AND (
+                  a.activity_type = 'WITHDRAWAL'
+                  OR (a.activity_type = 'DEPOSIT' AND cat.is_income = 0)
+              )
+              {}
+              {}
+              {}
+            GROUP BY CAST(strftime('%d', a.activity_date) AS INTEGER)
+            ORDER BY day ASC
+            "#,
+            month.replace("'", "''"),
+            category_filter,
+            subcategory_filter,
+            event_filter
+        );
+
+        let results: Vec<DailySpendingRow> = sql_query(&data_sql).load(&mut conn)?;
+        Ok(results)
+    }
+
+    fn get_month_transaction_amounts(&self, month: &str) -> Result<Vec<f64>> {
+        use diesel::sql_query;
+        let mut conn = get_connection(&self.pool)?;
+
+        // Get all spending transaction amounts for the month
+        let data_sql = format!(
+            r#"
+            SELECT
+                ABS(CAST(a.amount AS REAL)) as amount
+            FROM activities a
+            INNER JOIN accounts acc ON a.account_id = acc.id
+            LEFT JOIN categories cat ON a.category_id = cat.id
+            WHERE acc.is_active = 1
+              AND acc.account_type = 'CASH'
+              AND strftime('%Y-%m', a.activity_date) = '{}'
+              AND (
+                  a.activity_type = 'WITHDRAWAL'
+                  OR (a.activity_type = 'DEPOSIT' AND cat.is_income = 0)
+              )
+            ORDER BY amount ASC
+            "#,
+            month.replace("'", "''")
+        );
+
+        #[derive(QueryableByName, Debug)]
+        struct AmountRow {
+            #[diesel(sql_type = diesel::sql_types::Double)]
+            pub amount: f64,
+        }
+
+        let results: Vec<AmountRow> = sql_query(&data_sql).load(&mut conn)?;
+        Ok(results.into_iter().map(|r| r.amount).collect())
+    }
 }

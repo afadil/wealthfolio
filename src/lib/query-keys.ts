@@ -95,4 +95,7 @@ export const QueryKeys = {
 
   // Cash Activities
   CASH_ACTIVITIES: "cash_activities",
+
+  // Month Metrics
+  MONTH_METRICS: "month_metrics",
 } as const;

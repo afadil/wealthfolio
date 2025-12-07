@@ -14,6 +14,7 @@ import DashboardPage from "@/pages/dashboard/dashboard-page";
 import HoldingsPage from "@/pages/holdings/holdings-page";
 import PortfolioInsightsPage from "@/pages/insights/portfolio-insights";
 import CashflowPage from "@/pages/cashflow/cashflow-page";
+import ReportsPage from "@/pages/reports/reports-page";
 import SettingsAccountsPage from "@/pages/settings/accounts/accounts-page";
 import SettingsAppearancePage from "@/pages/settings/appearance/appearance-page";
 import CategoriesPage from "@/pages/settings/categories/categories-page";
@@ -81,6 +82,7 @@ export function AppRoutes() {
             <Route path="holdings/:symbol" element={<AssetProfilePage />} />
             <Route path="accounts/:id" element={<AccountPage />} />
             <Route path="cashflow" element={<CashflowPage />} />
+            <Route path="reports" element={<ReportsPage />} />
             <Route path="insights" element={<PortfolioInsightsPage />} />
             {/* Dynamic addon routes */}
             {dynamicRoutes.map(({ path, component: Component }) => (

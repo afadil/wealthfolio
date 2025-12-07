@@ -54,6 +54,10 @@ const COMMANDS: CommandMap = {
   import_activities: { method: "POST", path: "/activities/import" },
   get_account_import_mapping: { method: "GET", path: "/activities/import/mapping" },
   save_account_import_mapping: { method: "POST", path: "/activities/import/mapping" },
+  // Activity reports
+  get_top_spending_transactions: { method: "POST", path: "/activities/top-spending" },
+  get_spending_trends: { method: "POST", path: "/activities/spending-trends" },
+  get_month_metrics: { method: "POST", path: "/activities/month-metrics" },
   // Market data providers
   get_market_data_providers: { method: "GET", path: "/providers" },
   get_market_data_providers_settings: { method: "GET", path: "/providers/settings" },
@@ -338,6 +342,19 @@ export const invokeWeb = async <T>(
     case "save_account_import_mapping": {
       const { mapping } = payload as { mapping: Record<string, unknown> };
       body = JSON.stringify({ mapping });
+      break;
+    }
+    case "get_top_spending_transactions": {
+      const { month, limit } = payload as { month: string; limit: number };
+      body = JSON.stringify({ month, limit });
+      break;
+    }
+    case "get_spending_trends": {
+      body = JSON.stringify(payload);
+      break;
+    }
+    case "get_month_metrics": {
+      body = JSON.stringify(payload);
       break;
     }
     case "update_market_data_provider_settings": {

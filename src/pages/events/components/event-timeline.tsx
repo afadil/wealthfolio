@@ -26,10 +26,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { ChevronDown, ExternalLink, Filter } from "lucide-react";
+import { ChevronDown, Filter } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ScrollArea } from "@wealthfolio/ui";
-import { useNavigate } from "react-router-dom";
+import { ViewTransactionsButton } from "@/components/view-transactions-button";
 import {
   Area,
   AreaChart,
@@ -120,7 +120,6 @@ export function EventTimeline({
   onToggleEventType,
   periodDateRange,
 }: EventTimelineProps) {
-  const navigate = useNavigate();
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [isMobileDetailsOpen, setIsMobileDetailsOpen] = useState(false);
@@ -346,10 +345,6 @@ export function EventTimeline({
     if (isMobile && newSelection) {
       setIsMobileDetailsOpen(true);
     }
-  };
-
-  const handleViewAllTransactions = (eventId: string) => {
-    navigate(`/activity?tab=transactions&event=${eventId}`);
   };
 
   const laneHeight = 44;
@@ -772,15 +767,10 @@ export function EventTimeline({
               </div>
             )}
 
-            <Button
-              variant="outline"
-              size="sm"
+            <ViewTransactionsButton
+              eventId={selectedEvent.eventId}
               className="w-full gap-2"
-              onClick={() => handleViewAllTransactions(selectedEvent.eventId)}
-            >
-              <ExternalLink className="h-4 w-4" />
-              View All Transactions
-            </Button>
+            />
           </div>
         )}
 
@@ -939,18 +929,11 @@ export function EventTimeline({
                       </div>
                     )}
 
-                    <Button
-                      variant="outline"
-                      size="sm"
+                    <ViewTransactionsButton
+                      eventId={selectedEvent.eventId}
                       className="w-full gap-2 mt-4"
-                      onClick={() => {
-                        setIsMobileDetailsOpen(false);
-                        handleViewAllTransactions(selectedEvent.eventId);
-                      }}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      View All Transactions
-                    </Button>
+                      onBeforeNavigate={() => setIsMobileDetailsOpen(false)}
+                    />
                   </div>
                 </ScrollArea>
               </>
