@@ -729,13 +729,35 @@ impl ActivityRepositoryTrait for ActivityRepository {
         }
     }
 
-    fn get_spending_activities_data(&self) -> Result<Vec<SpendingData>> {
+    fn get_spending_activities_data(
+        &self,
+        include_event_ids: Option<&[String]>,
+        include_all_events: bool,
+    ) -> Result<Vec<SpendingData>> {
         let mut conn = get_connection(&self.pool)?;
+
+        // Event filter: by default excludes all event transactions
+        let event_filter = if include_all_events {
+            String::new()
+        } else {
+            match include_event_ids {
+                Some(ids) if !ids.is_empty() => {
+                    let escaped: Vec<String> =
+                        ids.iter().map(|id| id.replace('\'', "''")).collect();
+                    format!(
+                        "AND (a.event_id IS NULL OR a.event_id IN ('{}'))",
+                        escaped.join("','")
+                    )
+                }
+                _ => "AND a.event_id IS NULL".to_string(),
+            }
+        };
 
         // Query spending activities from CASH accounts
         // Spending = All WITHDRAWAL activities (with expense category, income category, or uncategorized)
         //          + DEPOSIT activities with expense categories only
-        let query = r#"
+        let query = format!(
+            r#"
             SELECT
                 strftime('%Y-%m', a.activity_date) as date,
                 a.activity_type,
@@ -761,8 +783,11 @@ impl ActivityRepositoryTrait for ActivityRepository {
                   -- Deposits with expense category only
                   OR (a.activity_type = 'DEPOSIT' AND cat.is_income = 0)
               )
+              {}
             ORDER BY a.activity_date
-        "#;
+        "#,
+            event_filter
+        );
 
         #[derive(QueryableByName, Debug)]
         struct RawSpendingData {

@@ -14,7 +14,11 @@ use std::sync::{Arc, RwLock};
 
 /// Trait defining the contract for the spending service
 pub trait SpendingServiceTrait: Send + Sync {
-    fn get_spending_summary(&self) -> Result<Vec<SpendingSummary>>;
+    fn get_spending_summary(
+        &self,
+        include_event_ids: Option<Vec<String>>,
+        include_all_events: bool,
+    ) -> Result<Vec<SpendingSummary>>;
 }
 
 pub struct SpendingService {
@@ -46,10 +50,17 @@ impl SpendingService {
 }
 
 impl SpendingServiceTrait for SpendingService {
-    fn get_spending_summary(&self) -> Result<Vec<SpendingSummary>> {
+    fn get_spending_summary(
+        &self,
+        include_event_ids: Option<Vec<String>>,
+        include_all_events: bool,
+    ) -> Result<Vec<SpendingSummary>> {
         debug!("Getting spending summary...");
 
-        let activities = match self.activity_repository.get_spending_activities_data() {
+        let activities = match self.activity_repository.get_spending_activities_data(
+            include_event_ids.as_deref(),
+            include_all_events,
+        ) {
             Ok(activity) => activity,
             Err(e) => {
                 error!("Error getting aggregated spending data: {:?}", e);

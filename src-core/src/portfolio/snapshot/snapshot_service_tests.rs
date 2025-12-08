@@ -416,7 +416,11 @@ mod tests {
         fn get_first_activity_date_overall(&self) -> AppResult<DateTime<Utc>> {
             unimplemented!()
         }
-        fn get_spending_activities_data(&self) -> AppResult<Vec<SpendingData>> {
+        fn get_spending_activities_data(
+            &self,
+            _include_event_ids: Option<&[String]>,
+            _include_all_events: bool,
+        ) -> AppResult<Vec<SpendingData>> {
             unimplemented!()
         }
         fn get_cash_income_activities_data(&self) -> AppResult<Vec<CashIncomeData>> {
@@ -536,7 +540,11 @@ mod tests {
         fn get_first_activity_date_overall(&self) -> AppResult<DateTime<Utc>> {
             unimplemented!()
         }
-        fn get_spending_activities_data(&self) -> AppResult<Vec<SpendingData>> {
+        fn get_spending_activities_data(
+            &self,
+            _include_event_ids: Option<&[String]>,
+            _include_all_events: bool,
+        ) -> AppResult<Vec<SpendingData>> {
             unimplemented!()
         }
         fn get_cash_income_activities_data(&self) -> AppResult<Vec<CashIncomeData>> {

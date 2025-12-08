@@ -30,7 +30,7 @@ const COMMANDS: CommandMap = {
   calculate_performance_history: { method: "POST", path: "/performance/history" },
   calculate_performance_summary: { method: "POST", path: "/performance/summary" },
   get_income_summary: { method: "GET", path: "/income/summary" },
-  get_spending_summary: { method: "GET", path: "/spending/summary" },
+  get_spending_summary: { method: "POST", path: "/spending/summary" },
   // Goals
   get_goals: { method: "GET", path: "/goals" },
   create_goal: { method: "POST", path: "/goals" },
@@ -225,6 +225,14 @@ export const invokeWeb = async <T>(
     case "calculate_accounts_simple_performance": {
       const { accountIds } = (payload ?? {}) as { accountIds?: string[] };
       body = JSON.stringify({ accountIds });
+      break;
+    }
+    case "get_spending_summary": {
+      const { includeEventIds, includeAllEvents } = (payload ?? {}) as {
+        includeEventIds?: string[];
+        includeAllEvents?: boolean;
+      };
+      body = JSON.stringify({ includeEventIds, includeAllEvents });
       break;
     }
     case "get_accounts":

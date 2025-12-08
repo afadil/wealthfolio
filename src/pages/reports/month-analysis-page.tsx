@@ -29,7 +29,7 @@ export default function MonthAnalysisPage({ renderActions }: MonthAnalysisPagePr
 
   const { data: spendingData, isLoading: isSpendingLoading } = useQuery<SpendingSummary[]>({
     queryKey: [QueryKeys.SPENDING_SUMMARY],
-    queryFn: getSpendingSummary,
+    queryFn: () => getSpendingSummary(),
   });
 
   const { data: incomeData, isLoading: isIncomeLoading } = useQuery<IncomeSummary[]>({

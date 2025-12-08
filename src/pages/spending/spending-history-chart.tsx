@@ -12,6 +12,12 @@ import { formatAmount } from "@wealthfolio/ui";
 import { format, parseISO } from "date-fns";
 import React, { useMemo } from "react";
 import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
+import { DataTableFacetedFilter } from "@/pages/activity/components/activity-datagrid/data-table-faceted-filter";
+
+interface EventOption {
+  value: string;
+  label: string;
+}
 
 interface SpendingHistoryChartProps {
   monthlySpendingData: [string, number][];
@@ -25,6 +31,9 @@ interface SpendingHistoryChartProps {
   selectedPeriod: "TOTAL" | "YTD" | "LAST_YEAR";
   currency: string;
   isBalanceHidden: boolean;
+  eventOptions: EventOption[];
+  selectedEventValues: Set<string>;
+  onFilterChange: (values: Set<string>) => void;
 }
 
 export function SpendingHistoryChart({
@@ -39,6 +48,9 @@ export function SpendingHistoryChart({
   selectedPeriod,
   currency,
   isBalanceHidden,
+  eventOptions,
+  selectedEventValues,
+  onFilterChange,
 }: SpendingHistoryChartProps) {
   const [isMobile, setIsMobile] = React.useState(false);
 
@@ -51,17 +63,9 @@ export function SpendingHistoryChart({
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Get all category IDs for filtering
-  const allCategoryIds = useMemo(() => {
-    return Object.keys(byCategory || {});
-  }, [byCategory]);
+  const allCategoryIds = useMemo(() => Object.keys(byCategory || {}), [byCategory]);
+  const allSubcategoryIds = useMemo(() => Object.keys(bySubcategory || {}), [bySubcategory]);
 
-  // Get all subcategory IDs for filtering
-  const allSubcategoryIds = useMemo(() => {
-    return Object.keys(bySubcategory || {});
-  }, [bySubcategory]);
-
-  // Transform data for bar chart, filtering out hidden categories OR hidden subcategories
   const chartData = useMemo(() => {
     let cumulativeTotal = 0;
 
@@ -112,8 +116,18 @@ export function SpendingHistoryChart({
   return (
     <Card className="md:col-span-2">
       <CardHeader className="pb-4 md:pb-6">
-        <CardTitle className="text-sm font-medium">Spending History</CardTitle>
-        <CardDescription className="text-xs md:text-sm">{periodDescription}</CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-sm font-medium">Spending History</CardTitle>
+            <CardDescription className="text-xs md:text-sm">{periodDescription}</CardDescription>
+          </div>
+          <DataTableFacetedFilter
+            title="Events"
+            options={eventOptions}
+            selectedValues={selectedEventValues}
+            onFilterChange={onFilterChange}
+          />
+        </div>
       </CardHeader>
       <CardContent className="px-4 pt-0 md:px-6">
         {chartData.length === 0 ? (

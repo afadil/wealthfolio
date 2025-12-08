@@ -1,4 +1,5 @@
 import { getSpendingSummary } from "@/commands/portfolio";
+import { getEventsWithNames } from "@/commands/event";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
@@ -7,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { QueryKeys } from "@/lib/query-keys";
 import { buildCashflowUrl, periodToDateRange, type SpendingPeriod } from "@/lib/navigation/cashflow-navigation";
-import type { SpendingSummary, SubcategorySpending } from "@/lib/types";
+import type { SpendingSummary, SubcategorySpending, EventWithTypeName } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
@@ -20,6 +21,8 @@ import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { Cell, Pie, PieChart } from "recharts";
 import { Eye, EyeOff } from "lucide-react";
 import { SpendingHistoryChart } from "./spending-history-chart";
+
+const INCLUDE_ALL_EVENTS_VALUE = "__include_all_events__";
 
 const DEFAULT_CHART_COLORS = [
   "var(--chart-1)",
@@ -77,7 +80,35 @@ export default function SpendingPage({ renderActions }: SpendingPageProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<"TOTAL" | "YTD" | "LAST_YEAR">("TOTAL");
   const [hiddenCategories, setHiddenCategories] = useState<Set<string>>(new Set());
   const [hiddenSubcategories, setHiddenSubcategories] = useState<Set<string>>(new Set());
+  const [selectedEventValues, setSelectedEventValues] = useState<Set<string>>(new Set());
   const { isBalanceHidden } = useBalancePrivacy();
+
+  const { data: events = [] } = useQuery<EventWithTypeName[], Error>({
+    queryKey: [QueryKeys.EVENTS_WITH_NAMES],
+    queryFn: getEventsWithNames,
+  });
+
+  const eventOptions = useMemo(() => {
+    const eventsAsOptions = events.map((event) => ({
+      value: event.id,
+      label: event.name,
+    }));
+    return [
+      { value: INCLUDE_ALL_EVENTS_VALUE, label: "Include All Events" },
+      ...eventsAsOptions,
+    ];
+  }, [events]);
+
+  const includeAllEvents = selectedEventValues.has(INCLUDE_ALL_EVENTS_VALUE);
+  const includeEventIds = useMemo(() => {
+    const ids: string[] = [];
+    selectedEventValues.forEach((v) => {
+      if (v !== INCLUDE_ALL_EVENTS_VALUE) {
+        ids.push(v);
+      }
+    });
+    return ids.length > 0 ? ids : undefined;
+  }, [selectedEventValues]);
 
   const toggleCategoryVisibility = useCallback((categoryId: string) => {
     setHiddenCategories((prev) => {
@@ -126,8 +157,8 @@ export default function SpendingPage({ renderActions }: SpendingPageProps) {
     isLoading,
     error,
   } = useQuery<SpendingSummary[], Error>({
-    queryKey: [QueryKeys.SPENDING_SUMMARY],
-    queryFn: getSpendingSummary,
+    queryKey: [QueryKeys.SPENDING_SUMMARY, includeEventIds, includeAllEvents],
+    queryFn: () => getSpendingSummary(includeEventIds, includeAllEvents),
   });
 
   // Memoized period selector to pass to parent
@@ -385,6 +416,9 @@ export default function SpendingPage({ renderActions }: SpendingPageProps) {
             selectedPeriod={selectedPeriod}
             currency={currency}
             isBalanceHidden={isBalanceHidden}
+            eventOptions={eventOptions}
+            selectedEventValues={selectedEventValues}
+            onFilterChange={setSelectedEventValues}
           />
           <Card className="flex flex-col">
             <CardHeader>
