@@ -183,6 +183,13 @@ impl ActivityServiceTrait for ActivityService {
         self.activity_repository.delete_activity(activity_id).await
     }
 
+    /// Removes all activities for a given account ID
+    async fn delete_all_activities(&self, account_id: String) -> Result<usize> {
+        self.activity_repository
+            .delete_all_activities(account_id)
+            .await
+    }
+    
     async fn bulk_mutate_activities(
         &self,
         request: ActivityBulkMutationRequest,

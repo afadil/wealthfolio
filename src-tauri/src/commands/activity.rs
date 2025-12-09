@@ -170,6 +170,35 @@ pub async fn save_activities(
 }
 
 #[tauri::command]
+pub async fn delete_all_activities(
+    account_id: String,
+    state: State<'_, Arc<ServiceContext>>,
+    handle: AppHandle,
+) -> Result<usize, String> {
+    debug!("Deleting activities from account...");
+    let result = state
+        .activity_service()
+        .delete_all_activities(account_id.clone())
+        .await
+        .map_err(|e| e.to_string())?;
+
+    emit_resource_changed(
+        &handle,
+        ResourceEventPayload::new(
+            "activity",
+            "all_deleted",
+            json!({
+                "activity_id": account_id,
+                "removed_count": result,
+            }),
+        ),
+    );
+
+    Ok(result)
+}
+
+
+#[tauri::command]
 pub async fn get_account_import_mapping(
     account_id: String,
     state: State<'_, Arc<ServiceContext>>,

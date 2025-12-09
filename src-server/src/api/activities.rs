@@ -125,6 +125,21 @@ async fn delete_activity(
     Ok(Json(deleted))
 }
 
+async fn delete_all_activities(
+    Path(activity_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<usize>> {
+    let previous = state.activity_service.get_activity(&activity_id)?;
+    let number_of_deleted_activities = state.activity_service.delete_all_activities(activity_id).await?;
+    trigger_activity_portfolio_job(
+        state,
+        vec![
+            ActivityImpact::from_activity(&previous),
+        ],
+    );
+    Ok(Json(number_of_deleted_activities))
+}
+
 #[derive(serde::Deserialize)]
 struct ImportCheckBody {
     #[serde(rename = "accountId")]
@@ -215,4 +230,5 @@ pub fn router() -> Router<Arc<AppState>> {
             "/activities/import/mapping",
             get(get_account_import_mapping).post(save_account_import_mapping),
         )
+        .route("/activities/account/{id}", delete(delete_all_activities))
 }

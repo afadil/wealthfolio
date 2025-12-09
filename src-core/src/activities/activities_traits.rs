@@ -40,6 +40,7 @@ pub trait ActivityRepositoryTrait: Send + Sync {
         updates: Vec<ActivityUpdate>,
         delete_ids: Vec<String>,
     ) -> Result<ActivityBulkMutationResult>;
+    async fn delete_all_activities(&self, account_id: String) -> Result<usize>;
     async fn create_activities(&self, activities: Vec<NewActivity>) -> Result<usize>;
     fn get_first_activity_date(
         &self,
@@ -79,6 +80,7 @@ pub trait ActivityServiceTrait: Send + Sync {
     async fn create_activity(&self, activity: NewActivity) -> Result<Activity>;
     async fn update_activity(&self, activity: ActivityUpdate) -> Result<Activity>;
     async fn delete_activity(&self, activity_id: String) -> Result<Activity>;
+    async fn delete_all_activities(&self, account_id: String) -> Result<usize>;
     async fn bulk_mutate_activities(
         &self,
         request: ActivityBulkMutationRequest,
