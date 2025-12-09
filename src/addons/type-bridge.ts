@@ -170,7 +170,10 @@ type SdkHostAPIWithoutSecrets = Omit<SDKHostAPI, "secrets">;
  * Type bridge utility to convert between internal and SDK types
  * This handles the mapping between the actual implementation types and the public SDK types
  */
-export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: string): SdkHostAPIWithoutSecrets {
+export function createSDKHostAPIBridge(
+  internalAPI: InternalHostAPI,
+  addonId?: string,
+): SdkHostAPIWithoutSecrets {
   // Create logger with addon prefix
   const createAddonLogger = (prefix: string) => ({
     error: (message: string) => internalAPI.logError(`[${prefix}] ${message}`),
