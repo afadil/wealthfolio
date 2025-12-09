@@ -164,11 +164,16 @@ export interface InternalHostAPI {
   refetchQueries(queryKey: string | string[]): void;
 }
 
+type SdkHostAPIWithoutSecrets = Omit<SDKHostAPI, "secrets">;
+
 /**
  * Type bridge utility to convert between internal and SDK types
  * This handles the mapping between the actual implementation types and the public SDK types
  */
-export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: string): SDKHostAPI {
+export function createSDKHostAPIBridge(
+  internalAPI: InternalHostAPI,
+  addonId?: string,
+): SdkHostAPIWithoutSecrets {
   // Create logger with addon prefix
   const createAddonLogger = (prefix: string) => ({
     error: (message: string) => internalAPI.logError(`[${prefix}] ${message}`),
@@ -182,7 +187,6 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: s
     accounts: {
       getAll: internalAPI.getAccounts,
       create: internalAPI.createAccount,
-      update: internalAPI.updateAccount,
     },
     portfolio: {
       getHoldings: internalAPI.getHoldings,
@@ -284,7 +288,7 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: s
       invalidateQueries: internalAPI.invalidateQueries,
       refetchQueries: internalAPI.refetchQueries,
     },
-  } as unknown as SDKHostAPI;
+  };
 }
 
 /**
