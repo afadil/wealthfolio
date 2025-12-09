@@ -26,6 +26,7 @@
     "lint:root": "eslint .",
     "format": "prettier --write . && pnpm -r format",
     "format:check": "prettier --check . && pnpm -r format:check",
+    "format:rust": "cargo fmt --manifest-path src-core/Cargo.toml --all && cargo fmt --manifest-path src-tauri/Cargo.toml --all && cargo fmt --manifest-path src-server/Cargo.toml --all",
     "tsc": "tsc -b",
     "type-check": "tsc --noEmit && pnpm -r type-check",
     "type-check:root": "tsc --noEmit",

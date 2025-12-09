@@ -182,6 +182,7 @@ pub fn run() {
             commands::activity::update_activity,
             commands::activity::save_activities,
             commands::activity::delete_activity,
+            commands::activity::delete_all_activities,
             commands::activity::check_activities_import,
             commands::activity::import_activities,
             commands::activity::get_account_import_mapping,
