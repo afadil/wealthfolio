@@ -130,13 +130,11 @@ async fn delete_all_activities(
     State(state): State<Arc<AppState>>,
 ) -> ApiResult<Json<usize>> {
     let previous = state.activity_service.get_activity(&activity_id)?;
-    let number_of_deleted_activities = state.activity_service.delete_all_activities(activity_id).await?;
-    trigger_activity_portfolio_job(
-        state,
-        vec![
-            ActivityImpact::from_activity(&previous),
-        ],
-    );
+    let number_of_deleted_activities = state
+        .activity_service
+        .delete_all_activities(activity_id)
+        .await?;
+    trigger_activity_portfolio_job(state, vec![ActivityImpact::from_activity(&previous)]);
     Ok(Json(number_of_deleted_activities))
 }
 

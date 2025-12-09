@@ -189,7 +189,7 @@ impl ActivityServiceTrait for ActivityService {
             .delete_all_activities(account_id)
             .await
     }
-    
+
     async fn bulk_mutate_activities(
         &self,
         request: ActivityBulkMutationRequest,

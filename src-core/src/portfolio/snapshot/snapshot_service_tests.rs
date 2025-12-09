@@ -490,7 +490,7 @@ mod tests {
         async fn delete_activity(&self, _id: String) -> AppResult<Activity> {
             unimplemented!()
         }
-        
+
         async fn bulk_mutate_activities(
             &self,
             _creates: Vec<NewActivity>,

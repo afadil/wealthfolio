@@ -338,12 +338,10 @@ impl ActivityRepositoryTrait for ActivityRepository {
     async fn delete_all_activities(&self, account_id: String) -> Result<usize> {
         let query = activities::table.filter(activities::account_id.eq(account_id));
 
-        let number_of_rows_deleted = self.writer
-            .exec(move |conn| {
-                diesel::delete(query)
-                    .execute(conn)
-                    .map_err(Error::from)
-            }).await?;
+        let number_of_rows_deleted = self
+            .writer
+            .exec(move |conn| diesel::delete(query).execute(conn).map_err(Error::from))
+            .await?;
         Ok(number_of_rows_deleted)
     }
 

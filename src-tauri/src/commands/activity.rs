@@ -197,7 +197,6 @@ pub async fn delete_all_activities(
     Ok(result)
 }
 
-
 #[tauri::command]
 pub async fn get_account_import_mapping(
     account_id: String,
