@@ -6,10 +6,10 @@ import { Account, CsvRowError } from "@/lib/types";
 import { AccountSelector } from "../../../../components/account-selector";
 import { AccountSelectorMobile } from "../../../../components/account-selector-mobile";
 import { CSVFileViewer } from "../components/csv-file-viewer";
-import { FileDropzone } from "../components/file-dropzone";
 import { HelpTooltip } from "../components/help-tooltip";
 import { ImportAlert } from "../components/import-alert";
 import { useNavigate } from "react-router-dom";
+import {FileDropzone} from "@/components/ui/file-dropzone.tsx";
 
 interface AccountSelectionStepProps {
   selectedAccount: Account | null;
@@ -187,6 +187,7 @@ export const AccountSelectionStep = ({
               accept=".csv"
               isValid={fileValidationStatus === "valid"}
               error={hasErrors ? "File contains errors" : null}
+              subtitle="CSV only"
             />
           </div>
         </div>
