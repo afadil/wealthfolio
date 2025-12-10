@@ -10,6 +10,7 @@ interface FileDropzoneProps {
   accept?: string;
   isValid?: boolean;
   error?: string | null;
+  subtitle?: string | null;
 }
 
 export const FileDropzone = ({
@@ -19,6 +20,7 @@ export const FileDropzone = ({
   accept = "*",
   isValid = true,
   error = null,
+  subtitle = null,
 }: FileDropzoneProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -239,9 +241,7 @@ export const FileDropzone = ({
                 className="space-y-0"
               >
                 <p className="font-medium text-red-600 dark:text-red-400">{file.name}</p>
-                <p className="text-xs text-red-500 dark:text-red-400">
-                  {(file.size / 1024).toFixed(2)} KB
-                </p>
+                <p className="text-xs text-red-500 dark:text-red-400">{(file.size / 1024).toFixed(2)} KB</p>
               </motion.div>
             ) : file ? (
               <motion.div
@@ -266,7 +266,7 @@ export const FileDropzone = ({
                 <p className="text-xs font-medium">
                   <span className="text-primary">Click to upload</span> or drop
                 </p>
-                <p className="text-muted-foreground text-xs">CSV only</p>
+                {subtitle && <p className="text-muted-foreground text-xs">{subtitle}</p>}
               </motion.div>
             )}
           </AnimatePresence>
