@@ -9,7 +9,7 @@ import { CSVFileViewer } from "../components/csv-file-viewer";
 import { HelpTooltip } from "../components/help-tooltip";
 import { ImportAlert } from "../components/import-alert";
 import { useNavigate } from "react-router-dom";
-import {FileDropzone} from "@/components/ui/file-dropzone.tsx";
+import { FileDropzone } from "@/components/ui/file-dropzone.tsx";
 
 interface AccountSelectionStepProps {
   selectedAccount: Account | null;
