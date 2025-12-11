@@ -47,7 +47,7 @@
         "theme": "Light",
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "title": "",
+        "title": "Wealthfolio",
         "width": 1440,
         "height": 960,
         "center": true
