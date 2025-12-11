@@ -49,7 +49,6 @@ const Balance: React.FC<BalanceProps> = ({
     return <Skeleton className="h-9 w-48" />;
   }
 
-  // @ts-ignore
   return (
     <h1 className="font-heading text-3xl font-bold tracking-tight" data-testid="portfolio-balance">
       {isBalanceHidden ? (
