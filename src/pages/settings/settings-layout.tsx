@@ -48,6 +48,12 @@ const sidebarNavItems = [
     icon: <Icons.BarChart className="h-5 w-5" />,
   },
   {
+    title: "Wealthfolio Sync",
+    href: "wealthfolio-sync",
+    subtitle: "Connect broker accounts",
+    icon: <Icons.Cloud className="h-5 w-5" />,
+  },
+  {
     title: "Add-ons",
     href: "addons",
     subtitle: "Extend Wealthfolio with features",

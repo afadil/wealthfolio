@@ -41,6 +41,7 @@
     "@hookform/resolvers": "^5.2.2",
     "@internationalized/date": "^3.10.0",
     "@number-flow/react": "^0.5.10",
+    "@supabase/supabase-js": "^2.87.1",
     "@tailwindcss/vite": "^4.1.17",
     "@tanstack/react-query": "^5.90.9",
     "@tanstack/react-table": "^8.21.3",
