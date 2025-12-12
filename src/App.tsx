@@ -1,5 +1,6 @@
 import { RUN_ENV, getRunEnv } from "@/adapters";
 import { AuthGate, AuthProvider } from "@/context/auth-context";
+import { WealthfolioSyncProvider } from "@/context/wealthfolio-sync-context";
 import { SettingsProvider } from "@/lib/settings-provider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@wealthfolio/ui";
@@ -38,11 +39,13 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <PrivacyProvider>
-          <SettingsProvider>
-            <TooltipProvider>{routedContent}</TooltipProvider>
-          </SettingsProvider>
-        </PrivacyProvider>
+        <WealthfolioSyncProvider>
+          <PrivacyProvider>
+            <SettingsProvider>
+              <TooltipProvider>{routedContent}</TooltipProvider>
+            </SettingsProvider>
+          </PrivacyProvider>
+        </WealthfolioSyncProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
