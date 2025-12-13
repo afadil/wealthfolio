@@ -907,6 +907,30 @@ pub struct MonthMetricsResponse {
     pub total_spending: f64,
     /// Previous month's data for comparison
     pub prev_month: Option<MonthMetricsPrev>,
+    /// Breakdown of spending by recurrence type
+    pub recurrence_breakdown: RecurrenceBreakdown,
+}
+
+/// Breakdown of spending by recurrence type
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecurrenceBreakdown {
+    /// Percentage of spending on fixed recurring transactions
+    pub fixed_percent: f64,
+    /// Amount spent on fixed recurring transactions
+    pub fixed_amount: f64,
+    /// Percentage of spending on variable recurring transactions
+    pub variable_percent: f64,
+    /// Amount spent on variable recurring transactions
+    pub variable_amount: f64,
+    /// Percentage of spending on periodic transactions
+    pub periodic_percent: f64,
+    /// Amount spent on periodic transactions
+    pub periodic_amount: f64,
+    /// Percentage of spending on non-recurring transactions (no recurrence type)
+    pub non_recurring_percent: f64,
+    /// Amount spent on non-recurring transactions
+    pub non_recurring_amount: f64,
 }
 
 /// Previous month metrics for comparison

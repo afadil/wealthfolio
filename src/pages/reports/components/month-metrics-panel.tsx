@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getMonthMetrics } from "@/commands/activity";
 import { QueryKeys } from "@/lib/query-keys";
 import { ArrowUp, ArrowDown, Minus } from "lucide-react";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import type { ActivityDetails } from "@/lib/types";
 
 interface MonthMetricsPanelProps {
@@ -130,14 +130,43 @@ export function MonthMetricsPanel({
         </div>
 
         <div className="border-t pt-3">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">% Discretionary</p>
-              <p className="text-sm font-medium text-muted-foreground">Coming soon</p>
+          <p className="text-xs font-medium text-muted-foreground mb-3">Recurrence Breakdown</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-0.5">
+              <p className="text-xs text-muted-foreground">Fixed</p>
+              <p className="text-sm font-medium">
+                {formatPercent((metrics.recurrenceBreakdown?.fixedPercent ?? 0) / 100)}{" "}
+                <span className="text-muted-foreground">
+                  (<PrivacyAmount value={metrics.recurrenceBreakdown?.fixedAmount ?? 0} currency={currency} />)
+                </span>
+              </p>
             </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">% Essential</p>
-              <p className="text-sm font-medium text-muted-foreground">Coming soon</p>
+            <div className="space-y-0.5">
+              <p className="text-xs text-muted-foreground">Variable</p>
+              <p className="text-sm font-medium">
+                {formatPercent((metrics.recurrenceBreakdown?.variablePercent ?? 0) / 100)}{" "}
+                <span className="text-muted-foreground">
+                  (<PrivacyAmount value={metrics.recurrenceBreakdown?.variableAmount ?? 0} currency={currency} />)
+                </span>
+              </p>
+            </div>
+            <div className="space-y-0.5">
+              <p className="text-xs text-muted-foreground">Periodic</p>
+              <p className="text-sm font-medium">
+                {formatPercent((metrics.recurrenceBreakdown?.periodicPercent ?? 0) / 100)}{" "}
+                <span className="text-muted-foreground">
+                  (<PrivacyAmount value={metrics.recurrenceBreakdown?.periodicAmount ?? 0} currency={currency} />)
+                </span>
+              </p>
+            </div>
+            <div className="space-y-0.5">
+              <p className="text-xs text-muted-foreground">Non-recurring</p>
+              <p className="text-sm font-medium">
+                {formatPercent((metrics.recurrenceBreakdown?.nonRecurringPercent ?? 0) / 100)}{" "}
+                <span className="text-muted-foreground">
+                  (<PrivacyAmount value={metrics.recurrenceBreakdown?.nonRecurringAmount ?? 0} currency={currency} />)
+                </span>
+              </p>
             </div>
           </div>
         </div>
@@ -179,8 +208,8 @@ export function MonthMetricsPanel({
           )}
           <ViewTransactionsButton
             dateRange={{
-              startDate: format(startOfMonth(new Date(selectedMonth + "-01")), "yyyy-MM-dd"),
-              endDate: format(endOfMonth(new Date(selectedMonth + "-01")), "yyyy-MM-dd"),
+              startDate: format(startOfMonth(parseISO(selectedMonth + "-01")), "yyyy-MM-dd"),
+              endDate: format(endOfMonth(parseISO(selectedMonth + "-01")), "yyyy-MM-dd"),
             }}
             className="w-full gap-2 mt-3"
           />

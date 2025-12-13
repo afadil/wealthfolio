@@ -622,12 +622,15 @@ impl ActivityServiceTrait for ActivityService {
             None
         };
 
+        let recurrence_breakdown = self.activity_repository.get_month_recurrence_totals(&request.month)?;
+
         Ok(MonthMetricsResponse {
             avg_transaction_size: avg,
             transaction_count: count,
             median_transaction: median,
             total_spending: total,
             prev_month: prev_month_data,
+            recurrence_breakdown,
         })
     }
 }

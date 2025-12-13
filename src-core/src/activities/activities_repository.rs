@@ -1221,4 +1221,81 @@ impl ActivityRepositoryTrait for ActivityRepository {
         let results: Vec<AmountRow> = sql_query(&data_sql).load(&mut conn)?;
         Ok(results.into_iter().map(|r| r.amount).collect())
     }
+
+    fn get_month_recurrence_totals(&self, month: &str) -> Result<RecurrenceBreakdown> {
+        use diesel::sql_query;
+        let mut conn = get_connection(&self.pool)?;
+
+        let data_sql = format!(
+            r#"
+            SELECT
+                COALESCE(a.recurrence, 'none') as recurrence_type,
+                COALESCE(SUM(ABS(CAST(a.amount AS REAL))), 0.0) as total
+            FROM activities a
+            INNER JOIN accounts acc ON a.account_id = acc.id
+            LEFT JOIN categories cat ON a.category_id = cat.id
+            WHERE acc.is_active = 1
+              AND acc.account_type = 'CASH'
+              AND strftime('%Y-%m', a.activity_date) = '{}'
+              AND (
+                  a.activity_type = 'WITHDRAWAL'
+                  OR (a.activity_type = 'DEPOSIT' AND cat.is_income = 0)
+              )
+            GROUP BY COALESCE(a.recurrence, 'none')
+            "#,
+            month.replace("'", "''")
+        );
+
+        #[derive(QueryableByName, Debug)]
+        struct RecurrenceRow {
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub recurrence_type: String,
+            #[diesel(sql_type = diesel::sql_types::Double)]
+            pub total: f64,
+        }
+
+        let results: Vec<RecurrenceRow> = sql_query(&data_sql).load(&mut conn)?;
+
+        let mut fixed_total = 0.0;
+        let mut variable_total = 0.0;
+        let mut periodic_total = 0.0;
+        let mut non_recurring_total = 0.0;
+
+        for row in &results {
+            match row.recurrence_type.as_str() {
+                "fixed" => fixed_total = row.total,
+                "variable" => variable_total = row.total,
+                "periodic" => periodic_total = row.total,
+                _ => non_recurring_total = row.total,
+            }
+        }
+
+        let grand_total = fixed_total + variable_total + periodic_total + non_recurring_total;
+
+        let breakdown = if grand_total > 0.0 {
+            RecurrenceBreakdown {
+                fixed_percent: (fixed_total / grand_total) * 100.0,
+                fixed_amount: fixed_total,
+                variable_percent: (variable_total / grand_total) * 100.0,
+                variable_amount: variable_total,
+                periodic_percent: (periodic_total / grand_total) * 100.0,
+                periodic_amount: periodic_total,
+                non_recurring_percent: (non_recurring_total / grand_total) * 100.0,
+                non_recurring_amount: non_recurring_total,
+            }
+        } else {
+            RecurrenceBreakdown {
+                fixed_percent: 0.0,
+                fixed_amount: 0.0,
+                variable_percent: 0.0,
+                variable_amount: 0.0,
+                periodic_percent: 0.0,
+                periodic_amount: 0.0,
+                non_recurring_percent: 0.0,
+                non_recurring_amount: 0.0,
+            }
+        };
+
+        Ok(breakdown)
+    }
 }

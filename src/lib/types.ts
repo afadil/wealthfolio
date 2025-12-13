@@ -870,10 +870,22 @@ export interface MonthMetricsPrev {
   totalChangePercent: number | null;
 }
 
+export interface RecurrenceBreakdown {
+  fixedPercent: number;
+  fixedAmount: number;
+  variablePercent: number;
+  variableAmount: number;
+  periodicPercent: number;
+  periodicAmount: number;
+  nonRecurringPercent: number;
+  nonRecurringAmount: number;
+}
+
 export interface MonthMetricsResponse {
   avgTransactionSize: number;
   transactionCount: number;
   medianTransaction: number;
   totalSpending: number;
   prevMonth: MonthMetricsPrev | null;
+  recurrenceBreakdown: RecurrenceBreakdown;
 }

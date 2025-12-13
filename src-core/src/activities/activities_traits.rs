@@ -1,8 +1,8 @@
 use super::activities_model::{
     Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityDetails,
     ActivityImport, ActivitySearchResponse, ActivityUpdate, DailySpendingRow, ImportMapping,
-    ImportMappingData, IncomeData, MonthMetricsRequest, MonthMetricsResponse, NewActivity, Sort,
-    SpendingTrendsRequest, SpendingTrendsResponse,
+    ImportMappingData, IncomeData, MonthMetricsRequest, MonthMetricsResponse, NewActivity,
+    RecurrenceBreakdown, Sort, SpendingTrendsRequest, SpendingTrendsResponse,
 };
 use crate::portfolio::income::{CapitalGainsData, CashIncomeData};
 use crate::spending::SpendingData;
@@ -86,6 +86,7 @@ pub trait ActivityRepositoryTrait: Send + Sync {
         include_all_events: bool,
     ) -> Result<Vec<DailySpendingRow>>;
     fn get_month_transaction_amounts(&self, month: &str) -> Result<Vec<f64>>;
+    fn get_month_recurrence_totals(&self, month: &str) -> Result<RecurrenceBreakdown>;
 }
 
 /// Trait defining the contract for Activity service operations.
