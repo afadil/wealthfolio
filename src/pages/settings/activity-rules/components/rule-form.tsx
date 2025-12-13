@@ -23,6 +23,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import type { ActivityRule, CategoryWithChildren } from "@/lib/types";
+import { RECURRENCE_TYPES } from "@/lib/types";
 import { testActivityRulePattern } from "@/commands/activity-rule";
 import { ActivityType, ActivityTypeNames } from "@/lib/constants";
 
@@ -35,11 +36,12 @@ const ruleFormSchema = z.object({
   categoryId: z.string().optional(),
   subCategoryId: z.string().optional(),
   activityType: z.string().optional(),
+  recurrence: z.enum(["fixed", "variable", "periodic"]).optional(),
   priority: z.coerce.number().int().min(0),
   isGlobal: z.boolean(),
 }).refine(
-  (data) => data.categoryId || data.activityType,
-  { message: "At least a category or activity type is required", path: ["categoryId"] }
+  (data) => data.categoryId || data.activityType || data.recurrence,
+  { message: "At least a category, activity type, or recurrence is required", path: ["categoryId"] }
 );
 
 type RuleFormValues = z.infer<typeof ruleFormSchema>;
@@ -89,6 +91,7 @@ export function RuleForm({
       categoryId: rule?.categoryId ?? "",
       subCategoryId: rule?.subCategoryId ?? undefined,
       activityType: rule?.activityType ?? "",
+      recurrence: rule?.recurrence ?? undefined,
       priority: rule?.priority ?? 0,
       isGlobal: rule ? Boolean(rule.isGlobal) : true,
     },
@@ -208,30 +211,57 @@ export function RuleForm({
           )}
         </div>
 
-        <FormField
-          control={form.control as never}
-          name="activityType"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Activity Type</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value || ""}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select activity type" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {RULE_ACTIVITY_TYPE_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control as never}
+            name="activityType"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Activity Type</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value || ""}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select activity type" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {RULE_ACTIVITY_TYPE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control as never}
+            name="recurrence"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Recurrence</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value || ""}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select recurrence" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {RECURRENCE_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type.charAt(0).toUpperCase() + type.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
         <div className="grid grid-cols-2 gap-4">
           <FormField

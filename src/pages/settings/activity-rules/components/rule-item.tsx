@@ -52,6 +52,9 @@ export function RuleItem({ rule, onEdit, onDelete }: RuleItemProps) {
         : rule.categoryName
     );
   }
+  if (rule.recurrence) {
+    appliesTo.push(`${rule.recurrence.charAt(0).toUpperCase()}${rule.recurrence.slice(1)}`);
+  }
 
   return (
     <>

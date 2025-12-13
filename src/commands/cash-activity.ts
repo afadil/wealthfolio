@@ -21,9 +21,11 @@ interface CashActivityFilters {
   activityTypes?: CashActivityType[];
   categoryIds?: string[];
   eventIds?: string[];
+  recurrenceTypes?: string[];
   search?: string;
   isCategorized?: boolean;
   hasEvent?: boolean;
+  hasRecurrence?: boolean;
   amountMin?: number;
   amountMax?: number;
   startDate?: string;
@@ -57,9 +59,11 @@ export const searchCashActivities = async (
           activityTypeFilter,
           categoryIdFilter: filters.categoryIds,
           eventIdFilter: filters.eventIds,
+          recurrenceFilter: filters.recurrenceTypes,
           assetIdKeyword: filters.search,
           isCategorizedFilter: filters.isCategorized,
           hasEventFilter: filters.hasEvent,
+          hasRecurrenceFilter: filters.hasRecurrence,
           amountMinFilter: filters.amountMin,
           amountMaxFilter: filters.amountMax,
           startDateFilter: filters.startDate,
@@ -74,9 +78,11 @@ export const searchCashActivities = async (
           activityTypeFilter,
           categoryIdFilter: filters.categoryIds,
           eventIdFilter: filters.eventIds,
+          recurrenceFilter: filters.recurrenceTypes,
           assetIdKeyword: filters.search,
           isCategorizedFilter: filters.isCategorized,
           hasEventFilter: filters.hasEvent,
+          hasRecurrenceFilter: filters.hasRecurrence,
           amountMinFilter: filters.amountMin,
           amountMaxFilter: filters.amountMax,
           startDateFilter: filters.startDate,

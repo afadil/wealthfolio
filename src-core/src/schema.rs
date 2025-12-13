@@ -35,6 +35,7 @@ diesel::table! {
         category_id -> Nullable<Text>,
         sub_category_id -> Nullable<Text>,
         event_id -> Nullable<Text>,
+        recurrence -> Nullable<Text>,
     }
 }
 
@@ -109,6 +110,7 @@ diesel::table! {
         account_id -> Nullable<Text>,
         created_at -> Text,
         updated_at -> Text,
+        recurrence -> Nullable<Text>,
     }
 }
 

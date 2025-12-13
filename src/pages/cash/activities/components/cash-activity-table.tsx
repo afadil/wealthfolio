@@ -60,6 +60,7 @@ export const CashActivityTable = ({
       accountId: false,
       accountCurrency: false,
       event: false,
+      recurrence: false,
       currency: false,
       comment: false,
     }
@@ -239,7 +240,27 @@ export const CashActivityTable = ({
           );
         },
       },
-      // 8. Description (hidden by default)
+      // 8. Recurrence (hidden by default)
+      {
+        id: "recurrence",
+        accessorKey: "recurrence",
+        enableHiding: true,
+        enableSorting: false,
+        meta: {
+          label: "Recurrence",
+        },
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Recurrence" />,
+        cell: ({ row }) => {
+          const recurrence = row.original.recurrence;
+          if (!recurrence) {
+            return <span className="text-muted-foreground">-</span>;
+          }
+          return (
+            <span className="capitalize">{recurrence}</span>
+          );
+        },
+      },
+      // 9. Description (hidden by default)
       {
         id: "comment",
         accessorKey: "comment",
@@ -258,7 +279,7 @@ export const CashActivityTable = ({
           );
         },
       },
-      // 9. Currency (hidden by default)
+      // 10. Currency (hidden by default)
       {
         id: "currency",
         accessorKey: "currency",

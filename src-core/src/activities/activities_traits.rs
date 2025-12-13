@@ -46,6 +46,8 @@ pub trait ActivityRepositoryTrait: Send + Sync {
         start_date_filter: Option<String>,
         end_date_filter: Option<String>,
         sort: Option<Sort>,
+        recurrence_filter: Option<Vec<String>>,
+        has_recurrence_filter: Option<bool>,
     ) -> Result<ActivitySearchResponse>;
     async fn create_activity(&self, new_activity: NewActivity) -> Result<Activity>;
     async fn update_activity(&self, activity_update: ActivityUpdate) -> Result<Activity>;
@@ -112,6 +114,8 @@ pub trait ActivityServiceTrait: Send + Sync {
         start_date_filter: Option<String>,
         end_date_filter: Option<String>,
         sort: Option<Sort>,
+        recurrence_filter: Option<Vec<String>>,
+        has_recurrence_filter: Option<bool>,
     ) -> Result<ActivitySearchResponse>;
     fn get_first_activity_date(
         &self,

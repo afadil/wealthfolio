@@ -14,6 +14,10 @@ export {
 
 export type { ImportRequiredField } from "./constants";
 
+// Recurrence type for transactions
+export const RECURRENCE_TYPES = ["fixed", "variable", "periodic"] as const;
+export type RecurrenceType = (typeof RECURRENCE_TYPES)[number];
+
 export interface Account {
   id: string;
   name: string;
@@ -60,6 +64,7 @@ export interface ActivityDetails {
   categoryId?: string;
   subCategoryId?: string;
   eventId?: string;
+  recurrence?: RecurrenceType | null;
   categoryName?: string;
   categoryColor?: string;
   subCategoryName?: string;
@@ -101,6 +106,7 @@ export interface ActivityCreate {
   categoryId?: string | null;
   subCategoryId?: string | null;
   eventId?: string | null;
+  recurrence?: RecurrenceType | null;
 }
 
 export type ActivityUpdate = ActivityCreate & { id: string };
@@ -223,7 +229,8 @@ export type CashImportFormat =
   | "subcategory"
   | "description"
   | "event"
-  | "account";
+  | "account"
+  | "recurrence";
 
 export interface CashImportMappingData {
   accountId: string; // Default account ID (selected in step 1)
@@ -234,6 +241,7 @@ export interface CashImportMappingData {
   categoryMappings?: Record<string, { categoryId: string; subCategoryId?: string }>; // CSV value -> category
   eventMappings?: Record<string, string>; // CSV value -> event ID
   accountMappings?: Record<string, string>; // CSV account value -> account ID
+  recurrenceMappings?: Record<string, RecurrenceType>; // CSV value -> recurrence type
 }
 
 // Represents a row in the cash import process with rule matching info
@@ -248,6 +256,7 @@ export interface CashImportRow {
   categoryId?: string;
   subCategoryId?: string;
   eventId?: string;
+  recurrence?: RecurrenceType; // Can be mapped or assigned via rules
   description?: string;
   // Rule match tracking
   matchedRuleId?: string;
@@ -704,6 +713,7 @@ export interface ActivityRule {
   categoryId?: string;
   subCategoryId?: string;
   activityType?: string;
+  recurrence?: RecurrenceType;
   priority: number;
   isGlobal?: boolean;
   accountId?: string;
@@ -724,6 +734,7 @@ export interface NewActivityRule {
   categoryId?: string;
   subCategoryId?: string;
   activityType?: string;
+  recurrence?: RecurrenceType;
   priority?: number;
   isGlobal?: boolean;
   accountId?: string;
@@ -736,6 +747,7 @@ export interface UpdateActivityRule {
   categoryId?: string;
   subCategoryId?: string;
   activityType?: string;
+  recurrence?: RecurrenceType;
   priority?: number;
   isGlobal?: boolean;
   accountId?: string;
@@ -747,6 +759,7 @@ export interface ActivityRuleMatch {
   categoryId?: string | null;
   subCategoryId?: string | null;
   activityType?: string | null;
+  recurrence?: RecurrenceType | null;
   ruleName: string;
   ruleId: string;
 }

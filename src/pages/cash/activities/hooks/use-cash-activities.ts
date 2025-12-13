@@ -10,9 +10,11 @@ export interface CashActivitySearchFilters {
   activityTypes: CashActivityType[];
   categoryIds?: string[];
   eventIds?: string[];
+  recurrenceTypes?: string[];
   search?: string;
   isCategorized?: boolean;
   hasEvent?: boolean;
+  hasRecurrence?: boolean;
   amountMin?: number;
   amountMax?: number;
   startDate?: string;
@@ -50,9 +52,11 @@ export function useCashActivities({
       activityTypes: filters.activityTypes.length > 0 ? filters.activityTypes : undefined,
       categoryIds: filters.categoryIds && filters.categoryIds.length > 0 ? filters.categoryIds : undefined,
       eventIds: filters.eventIds && filters.eventIds.length > 0 ? filters.eventIds : undefined,
+      recurrenceTypes: filters.recurrenceTypes && filters.recurrenceTypes.length > 0 ? filters.recurrenceTypes : undefined,
       search: filters.search,
       isCategorized: filters.isCategorized,
       hasEvent: filters.hasEvent,
+      hasRecurrence: filters.hasRecurrence,
       amountMin: filters.amountMin,
       amountMax: filters.amountMax,
       startDate: filters.startDate,
@@ -63,9 +67,11 @@ export function useCashActivities({
     filters.activityTypes,
     filters.categoryIds,
     filters.eventIds,
+    filters.recurrenceTypes,
     filters.search,
     filters.isCategorized,
     filters.hasEvent,
+    filters.hasRecurrence,
     filters.amountMin,
     filters.amountMax,
     filters.startDate,

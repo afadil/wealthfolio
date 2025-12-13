@@ -29,6 +29,7 @@ pub struct ActivityRule {
     pub account_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    pub recurrence: Option<String>,
 }
 
 /// Model for creating a new activity rule
@@ -48,6 +49,7 @@ pub struct NewActivityRule {
     pub account_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    pub recurrence: Option<String>,
 }
 
 /// Model for updating an activity rule
@@ -65,6 +67,7 @@ pub struct UpdateActivityRule {
     pub is_global: Option<i32>,
     pub account_id: Option<String>,
     pub updated_at: String,
+    pub recurrence: Option<String>,
 }
 
 /// Result of an activity rule match
@@ -74,6 +77,7 @@ pub struct ActivityRuleMatch {
     pub category_id: Option<String>,
     pub sub_category_id: Option<String>,
     pub activity_type: Option<String>,
+    pub recurrence: Option<String>,
     pub rule_id: String,
     pub rule_name: String,
 }
@@ -138,6 +142,7 @@ impl ActivityRule {
             category_id: self.category_id.clone(),
             sub_category_id: self.sub_category_id.clone(),
             activity_type: self.activity_type.clone(),
+            recurrence: self.recurrence.clone(),
             rule_id: self.id.clone(),
             rule_name: self.name.clone(),
         }

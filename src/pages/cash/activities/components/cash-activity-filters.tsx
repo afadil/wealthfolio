@@ -7,7 +7,7 @@ import { CashActivityType, CASH_ACTIVITY_TYPES } from "@/commands/cash-activity"
 import { getCategoriesHierarchical } from "@/commands/category";
 import { getEventsWithNames } from "@/commands/event";
 import { useUnsavedChangesContext } from "@/context/unsaved-changes-context";
-import { Account, CategoryWithChildren, EventWithTypeName } from "@/lib/types";
+import { Account, CategoryWithChildren, EventWithTypeName, RECURRENCE_TYPES, RecurrenceType } from "@/lib/types";
 import { QueryKeys } from "@/lib/query-keys";
 import {
   AnimatedToggleGroup,
@@ -23,7 +23,7 @@ import { DataTableFacetedFilter } from "@/pages/activity/components/activity-dat
 import { useQuery } from "@tanstack/react-query";
 
 export type CashActivityViewMode = "view" | "edit";
-export type CategorizationStatus = "uncategorized" | "categorized" | "with_events" | "without_events";
+export type CategorizationStatus = "uncategorized" | "categorized" | "with_events" | "without_events" | "with_recurrence" | "without_recurrence";
 
 interface AmountRange {
   min: string;
@@ -49,6 +49,8 @@ interface CashActivityFiltersProps {
   onSubCategoryIdsChange: (ids: string[]) => void;
   selectedEventIds: string[];
   onEventIdsChange: (ids: string[]) => void;
+  selectedRecurrenceTypes: RecurrenceType[];
+  onRecurrenceTypesChange: (types: RecurrenceType[]) => void;
   selectedCategorizationStatuses: CategorizationStatus[];
   onCategorizationStatusesChange: (statuses: CategorizationStatus[]) => void;
   amountRange?: AmountRange;
@@ -82,6 +84,13 @@ const EVENT_STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "without_events", label: "Without Events" },
 ];
 
+const RECURRENCE_STATUS_VALUES = ["with_recurrence", "without_recurrence"] as const;
+
+const RECURRENCE_STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: "with_recurrence", label: "With Recurrence" },
+  { value: "without_recurrence", label: "Without Recurrence" },
+];
+
 export function CashActivityFilters({
   accounts,
   searchQuery,
@@ -96,6 +105,8 @@ export function CashActivityFilters({
   onSubCategoryIdsChange,
   selectedEventIds,
   onEventIdsChange,
+  selectedRecurrenceTypes,
+  onRecurrenceTypesChange,
   selectedCategorizationStatuses,
   onCategorizationStatusesChange,
   amountRange,
@@ -211,6 +222,14 @@ export function CashActivityFilters({
     return [...EVENT_STATUS_OPTIONS, ...eventsAsOptions];
   }, [events]);
 
+  const recurrenceOptions = useMemo(() => {
+    const recurrenceTypeOptions = RECURRENCE_TYPES.map((type) => ({
+      value: type,
+      label: type.charAt(0).toUpperCase() + type.slice(1),
+    }));
+    return [...RECURRENCE_STATUS_OPTIONS, ...recurrenceTypeOptions];
+  }, []);
+
   const hasAmountFilter = amountRange && (amountRange.min !== "" || amountRange.max !== "");
   const hasDateFilter = dateRange && (dateRange.startDate || dateRange.endDate);
 
@@ -240,6 +259,7 @@ export function CashActivityFilters({
     selectedParentCategoryIds.length > 0 ||
     selectedSubCategoryIds.length > 0 ||
     selectedEventIds.length > 0 ||
+    selectedRecurrenceTypes.length > 0 ||
     selectedCategorizationStatuses.length > 0 ||
     hasAmountFilter ||
     hasDateFilter;
@@ -456,7 +476,40 @@ export function CashActivityFilters({
             const categoryStatuses = selectedCategorizationStatuses.filter((s) =>
               CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number])
             );
-            onCategorizationStatusesChange([...categoryStatuses, ...statusValues]);
+            const recurrenceStatuses = selectedCategorizationStatuses.filter((s) =>
+              RECURRENCE_STATUS_VALUES.includes(s as (typeof RECURRENCE_STATUS_VALUES)[number])
+            );
+            onCategorizationStatusesChange([...categoryStatuses, ...statusValues, ...recurrenceStatuses]);
+          }}
+        />
+
+        <DataTableFacetedFilter
+          title="Recurrence"
+          options={recurrenceOptions}
+          selectedValues={new Set([
+            ...selectedRecurrenceTypes,
+            ...selectedCategorizationStatuses.filter((s) =>
+              RECURRENCE_STATUS_VALUES.includes(s as (typeof RECURRENCE_STATUS_VALUES)[number])
+            ),
+          ])}
+          onFilterChange={(values: Set<string>) => {
+            const allValues = Array.from(values);
+            const statusValues = allValues.filter((v) =>
+              RECURRENCE_STATUS_VALUES.includes(v as (typeof RECURRENCE_STATUS_VALUES)[number])
+            ) as CategorizationStatus[];
+            const newRecurrenceTypes = allValues.filter(
+              (v) => !RECURRENCE_STATUS_VALUES.includes(v as (typeof RECURRENCE_STATUS_VALUES)[number])
+            ) as RecurrenceType[];
+
+            onRecurrenceTypesChange(newRecurrenceTypes);
+
+            const categoryStatuses = selectedCategorizationStatuses.filter((s) =>
+              CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number])
+            );
+            const eventStatuses = selectedCategorizationStatuses.filter((s) =>
+              EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number])
+            );
+            onCategorizationStatusesChange([...categoryStatuses, ...eventStatuses, ...statusValues]);
           }}
         />
 
@@ -539,6 +592,7 @@ export function CashActivityFilters({
               onParentCategoryIdsChange([]);
               onSubCategoryIdsChange([]);
               onEventIdsChange([]);
+              onRecurrenceTypesChange([]);
               onCategorizationStatusesChange([]);
               onAmountRangeChange?.({ min: "", max: "" });
               onDateRangeChange?.({ startDate: undefined, endDate: undefined });

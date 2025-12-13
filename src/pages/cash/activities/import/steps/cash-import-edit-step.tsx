@@ -33,7 +33,9 @@ import type {
   NewActivityRule,
   UpdateCategory,
   UpdateActivityRule,
+  RecurrenceType,
 } from "@/lib/types";
+import { RECURRENCE_TYPES } from "@/lib/types";
 import { cn, formatDateTimeDisplay, formatDateTimeLocal } from "@/lib/utils";
 import { EditableCell } from "@/pages/activity/components/activity-datagrid/editable-cell";
 import { SelectCell } from "@/pages/activity/components/activity-datagrid/select-cell";
@@ -78,6 +80,7 @@ type EditableField =
   | "categoryId"
   | "subCategoryId"
   | "eventId"
+  | "recurrence"
   | "description";
 
 interface CellCoordinate {
@@ -94,13 +97,15 @@ const editableFields: EditableField[] = [
   "categoryId",
   "subCategoryId",
   "eventId",
+  "recurrence",
   "description",
 ];
 
-type CategorizationStatus = "categorized" | "uncategorized" | "with-events" | "without-events";
+type CategorizationStatus = "categorized" | "uncategorized" | "with-events" | "without-events" | "with-recurrence" | "without-recurrence";
 
 const CATEGORY_STATUS_VALUES = ["uncategorized", "categorized"] as const;
 const EVENT_STATUS_VALUES = ["with-events", "without-events"] as const;
+const RECURRENCE_STATUS_VALUES = ["with-recurrence", "without-recurrence"] as const;
 
 const setsEqual = <T,>(a: Set<T>, b: Set<T>): boolean => {
   if (a.size !== b.size) return false;
@@ -159,6 +164,7 @@ export function CashImportEditStep({
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<string>>(new Set());
   const [selectedSubCategoryIds, setSelectedSubCategoryIds] = useState<Set<string>>(new Set());
   const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
+  const [selectedRecurrenceTypes, setSelectedRecurrenceTypes] = useState<Set<string>>(new Set());
   const [selectedCategorizationStatuses, setSelectedCategorizationStatuses] = useState<Set<CategorizationStatus>>(new Set());
   const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({ min: "", max: "" });
   const [displayedTransactions, setDisplayedTransactions] = useState<CashImportRow[]>([]);
@@ -170,6 +176,7 @@ export function CashImportEditStep({
     categoryIds: Set<string>;
     subCategoryIds: Set<string>;
     eventIds: Set<string>;
+    recurrenceTypes: Set<string>;
     categorizationStatuses: Set<CategorizationStatus>;
     amountMin: string;
     amountMax: string;
@@ -180,6 +187,7 @@ export function CashImportEditStep({
     categoryIds: new Set(),
     subCategoryIds: new Set(),
     eventIds: new Set(),
+    recurrenceTypes: new Set(),
     categorizationStatuses: new Set(),
     amountMin: "",
     amountMax: "",
@@ -188,6 +196,7 @@ export function CashImportEditStep({
   const [bulkActivityTypeModalOpen, setBulkActivityTypeModalOpen] = useState(false);
   const [bulkCategoryModalOpen, setBulkCategoryModalOpen] = useState(false);
   const [bulkEventModalOpen, setBulkEventModalOpen] = useState(false);
+  const [bulkRecurrenceModalOpen, setBulkRecurrenceModalOpen] = useState(false);
   const [createCategoryOpen, setCreateCategoryOpen] = useState(false);
   const [selectParentCategoryOpen, setSelectParentCategoryOpen] = useState(false);
   const [createSubcategoryOpen, setCreateSubcategoryOpen] = useState(false);
@@ -312,6 +321,18 @@ export function CashImportEditStep({
 
   const eventLookup = useMemo(() => new Map(events.map((event) => [event.id, event])), [events]);
 
+  const recurrenceOptions = useMemo(
+    () => [
+      { value: "", label: "No Recurrence", searchValue: "None Clear Remove" },
+      ...RECURRENCE_TYPES.map((type) => ({
+        value: type,
+        label: type.charAt(0).toUpperCase() + type.slice(1),
+        searchValue: type,
+      })),
+    ],
+    [],
+  );
+
   const accountOptions = useMemo(
     () =>
       accounts.map((acc) => ({
@@ -387,10 +408,24 @@ export function CashImportEditStep({
     [events],
   );
 
+  const filterRecurrenceOptions = useMemo(
+    () => [
+      { value: "with-recurrence", label: "With Recurrence" },
+      { value: "without-recurrence", label: "Without Recurrence" },
+      ...RECURRENCE_TYPES.map((type) => ({
+        value: type,
+        label: type.charAt(0).toUpperCase() + type.slice(1),
+      })),
+    ],
+    [],
+  );
+
   const categorizedCount = localTransactions.filter((t) => t.categoryId).length;
   const uncategorizedCount = localTransactions.filter((t) => !t.categoryId).length;
   const withEventsCount = localTransactions.filter((t) => t.eventId).length;
   const withoutEventsCount = localTransactions.filter((t) => !t.eventId).length;
+  const withRecurrenceCount = localTransactions.filter((t) => t.recurrence).length;
+  const withoutRecurrenceCount = localTransactions.filter((t) => !t.recurrence).length;
 
   const hasAmountFilter = amountRange.min !== "" || amountRange.max !== "";
   const hasActiveFilters =
@@ -400,6 +435,7 @@ export function CashImportEditStep({
     selectedCategoryIds.size > 0 ||
     selectedSubCategoryIds.size > 0 ||
     selectedEventIds.size > 0 ||
+    selectedRecurrenceTypes.size > 0 ||
     selectedCategorizationStatuses.size > 0 ||
     hasAmountFilter;
 
@@ -410,6 +446,7 @@ export function CashImportEditStep({
     setSelectedCategoryIds(new Set());
     setSelectedSubCategoryIds(new Set());
     setSelectedEventIds(new Set());
+    setSelectedRecurrenceTypes(new Set());
     setSelectedCategorizationStatuses(new Set());
     setAmountRange({ min: "", max: "" });
   }, []);
@@ -424,6 +461,7 @@ export function CashImportEditStep({
         categoryIds: Set<string>;
         subCategoryIds: Set<string>;
         eventIds: Set<string>;
+        recurrenceTypes: Set<string>;
         categorizationStatuses: Set<CategorizationStatus>;
         amountMin: string;
         amountMax: string;
@@ -461,6 +499,10 @@ export function CashImportEditStep({
         result = result.filter((t) => t.eventId && filters.eventIds.has(t.eventId));
       }
 
+      if (filters.recurrenceTypes.size > 0) {
+        result = result.filter((t) => t.recurrence && filters.recurrenceTypes.has(t.recurrence));
+      }
+
       if (filters.categorizationStatuses.size > 0) {
         result = result.filter((t) => {
           return Array.from(filters.categorizationStatuses).some((status) => {
@@ -473,6 +515,10 @@ export function CashImportEditStep({
                 return !!t.eventId;
               case "without-events":
                 return !t.eventId;
+              case "with-recurrence":
+                return !!t.recurrence;
+              case "without-recurrence":
+                return !t.recurrence;
               default:
                 return true;
             }
@@ -504,6 +550,7 @@ export function CashImportEditStep({
       categoryIds: selectedCategoryIds,
       subCategoryIds: selectedSubCategoryIds,
       eventIds: selectedEventIds,
+      recurrenceTypes: selectedRecurrenceTypes,
       categorizationStatuses: selectedCategorizationStatuses,
       amountMin: amountRange.min,
       amountMax: amountRange.max,
@@ -520,6 +567,7 @@ export function CashImportEditStep({
     selectedCategoryIds,
     selectedSubCategoryIds,
     selectedEventIds,
+    selectedRecurrenceTypes,
     selectedCategorizationStatuses,
     amountRange,
     computeFilteredTransactions,
@@ -539,6 +587,7 @@ export function CashImportEditStep({
       !setsEqual(selectedCategoryIds, lastAppliedFilter.categoryIds) ||
       !setsEqual(selectedSubCategoryIds, lastAppliedFilter.subCategoryIds) ||
       !setsEqual(selectedEventIds, lastAppliedFilter.eventIds) ||
+      !setsEqual(selectedRecurrenceTypes, lastAppliedFilter.recurrenceTypes) ||
       !setsEqual(selectedCategorizationStatuses, lastAppliedFilter.categorizationStatuses) ||
       amountRange.min !== lastAppliedFilter.amountMin ||
       amountRange.max !== lastAppliedFilter.amountMax;
@@ -553,6 +602,7 @@ export function CashImportEditStep({
     selectedCategoryIds,
     selectedSubCategoryIds,
     selectedEventIds,
+    selectedRecurrenceTypes,
     selectedCategorizationStatuses,
     amountRange,
     lastAppliedFilter,
@@ -567,6 +617,7 @@ export function CashImportEditStep({
       lastAppliedFilter.categoryIds.size > 0 ||
       lastAppliedFilter.subCategoryIds.size > 0 ||
       lastAppliedFilter.eventIds.size > 0 ||
+      lastAppliedFilter.recurrenceTypes.size > 0 ||
       lastAppliedFilter.categorizationStatuses.size > 0 ||
       lastAppliedFilter.amountMin !== "" ||
       lastAppliedFilter.amountMax !== "";
@@ -676,6 +727,8 @@ export function CashImportEditStep({
             updated.isManualOverride = true;
           } else if (field === "eventId") {
             updated.eventId = value || undefined;
+          } else if (field === "recurrence") {
+            updated.recurrence = (value || undefined) as RecurrenceType | undefined;
           } else if (field === "description") {
             updated.description = value;
           }
@@ -763,7 +816,7 @@ export function CashImportEditStep({
           if (t.isManualOverride) return t;
 
           const result = resultMap.get(t.lineNumber);
-          if (result && (result.categoryId || result.activityType)) {
+          if (result && (result.categoryId || result.activityType || result.recurrence)) {
             appliedCount++;
             return {
               ...t,
@@ -771,6 +824,8 @@ export function CashImportEditStep({
               subCategoryId: result.subCategoryId || (result.categoryId ? undefined : t.subCategoryId),
               // Override activity type if the rule specifies one
               activityType: (result.activityType as ActivityType) || t.activityType,
+              // Override recurrence if the rule specifies one
+              recurrence: (result.recurrence as RecurrenceType) || t.recurrence,
               matchedRuleId: result.ruleId || undefined,
               matchedRuleName: result.ruleName || undefined,
               isManualOverride: false,
@@ -828,6 +883,20 @@ export function CashImportEditStep({
     [selectedIds],
   );
 
+  const bulkAssignRecurrence = useCallback(
+    (recurrence: RecurrenceType | undefined) => {
+      setLocalTransactions((prev) =>
+        prev.map((t) =>
+          selectedIds.has(t.lineNumber) ? { ...t, recurrence: recurrence || undefined } : t,
+        ),
+      );
+      setSelectedIds(new Set());
+      setBulkRecurrenceModalOpen(false);
+      toast.success(`Recurrence assigned to ${selectedIds.size} transaction(s)`);
+    },
+    [selectedIds],
+  );
+
   const bulkAssignActivityType = useCallback(
     (activityType: ActivityType) => {
       setLocalTransactions((prev) =>
@@ -867,6 +936,14 @@ export function CashImportEditStep({
     );
     setSelectedIds(new Set());
     toast.success(`Cleared events from ${selectedIds.size} transaction(s)`);
+  }, [selectedIds]);
+
+  const clearAllRecurrence = useCallback(() => {
+    setLocalTransactions((prev) =>
+      prev.map((t) => (selectedIds.has(t.lineNumber) ? { ...t, recurrence: undefined } : t)),
+    );
+    setSelectedIds(new Set());
+    toast.success(`Cleared recurrence from ${selectedIds.size} transaction(s)`);
   }, [selectedIds]);
 
   const handleCategorySave = useCallback(
@@ -922,7 +999,7 @@ export function CashImportEditStep({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         <div className="bg-muted/30 flex items-center justify-between rounded-md border px-3 py-2">
           <span className="text-muted-foreground text-xs">Categorized</span>
           <Badge variant="secondary" className="text-xs">
@@ -945,6 +1022,18 @@ export function CashImportEditStep({
           <span className="text-muted-foreground text-xs">Without Events</span>
           <Badge variant="secondary" className="text-xs">
             {withoutEventsCount}
+          </Badge>
+        </div>
+        <div className="bg-muted/30 flex items-center justify-between rounded-md border px-3 py-2">
+          <span className="text-muted-foreground text-xs">With Recurrence</span>
+          <Badge variant="secondary" className="text-xs">
+            {withRecurrenceCount}
+          </Badge>
+        </div>
+        <div className="bg-muted/30 flex items-center justify-between rounded-md border px-3 py-2">
+          <span className="text-muted-foreground text-xs">No Recurrence</span>
+          <Badge variant="secondary" className="text-xs">
+            {withoutRecurrenceCount}
           </Badge>
         </div>
       </div>
@@ -1132,6 +1221,35 @@ export function CashImportEditStep({
           }}
         />
 
+        <DataTableFacetedFilter
+          title="Recurrence"
+          options={filterRecurrenceOptions}
+          selectedValues={new Set([
+            ...selectedRecurrenceTypes,
+            ...Array.from(selectedCategorizationStatuses).filter((s) =>
+              RECURRENCE_STATUS_VALUES.includes(s as (typeof RECURRENCE_STATUS_VALUES)[number])
+            ),
+          ])}
+          onFilterChange={(values) => {
+            const allValues = Array.from(values);
+            const statusValues = allValues.filter((v) =>
+              RECURRENCE_STATUS_VALUES.includes(v as (typeof RECURRENCE_STATUS_VALUES)[number])
+            ) as CategorizationStatus[];
+            const newRecurrenceTypes = allValues.filter(
+              (v) => !RECURRENCE_STATUS_VALUES.includes(v as (typeof RECURRENCE_STATUS_VALUES)[number])
+            );
+
+            setSelectedRecurrenceTypes(new Set(newRecurrenceTypes));
+
+            const otherStatuses = Array.from(selectedCategorizationStatuses).filter(
+              (s) =>
+                CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number]) ||
+                EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number])
+            );
+            setSelectedCategorizationStatuses(new Set([...otherStatuses, ...statusValues] as CategorizationStatus[]));
+          }}
+        />
+
         <Popover>
           <PopoverTrigger asChild>
             <Button
@@ -1214,6 +1332,10 @@ export function CashImportEditStep({
             <Icons.Calendar className="mr-1 h-3.5 w-3.5" />
             Event
           </Button>
+          <Button onClick={() => setBulkRecurrenceModalOpen(true)} variant="outline" size="xs">
+            <Icons.Refresh className="mr-1 h-3.5 w-3.5" />
+            Recurrence
+          </Button>
 
           <div className="bg-border mx-1 h-4 w-px" />
 
@@ -1233,6 +1355,10 @@ export function CashImportEditStep({
               <DropdownMenuItem onClick={clearAllEvents}>
                 <Icons.Calendar className="mr-2 h-4 w-4" />
                 Clear Events
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={clearAllRecurrence}>
+                <Icons.Refresh className="mr-2 h-4 w-4" />
+                Clear Recurrence
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -1290,6 +1416,9 @@ export function CashImportEditStep({
               <TableHead className="bg-muted/30 h-9 min-w-[150px] border-r px-2 py-1.5 text-xs font-semibold whitespace-nowrap">
                 Event
               </TableHead>
+              <TableHead className="bg-muted/30 h-9 min-w-[100px] border-r px-2 py-1.5 text-xs font-semibold whitespace-nowrap">
+                Recurrence
+              </TableHead>
               <TableHead className="bg-muted/30 h-9 min-w-[120px] border-r px-2 py-1.5 text-xs font-semibold">
                 Description
               </TableHead>
@@ -1299,7 +1428,7 @@ export function CashImportEditStep({
           <TableBody>
             {displayedTransactions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-muted-foreground h-32 text-center">
+                <TableCell colSpan={13} className="text-muted-foreground h-32 text-center">
                   No transactions match your filters.
                 </TableCell>
               </TableRow>
@@ -1317,6 +1446,7 @@ export function CashImportEditStep({
                   getSubcategoryOptions={getSubcategoryOptions}
                   eventOptions={eventOptions}
                   eventLookup={eventLookup}
+                  recurrenceOptions={recurrenceOptions}
                   accountOptions={accountOptions}
                   accountLookup={accountLookup}
                   isSelected={selectedIds.has(transaction.lineNumber)}
@@ -1366,6 +1496,13 @@ export function CashImportEditStep({
         onClose={() => setBulkEventModalOpen(false)}
         events={events}
         onAssign={bulkAssignEvent}
+        selectedCount={selectedCount}
+      />
+
+      <BulkRecurrenceAssignModal
+        open={bulkRecurrenceModalOpen}
+        onClose={() => setBulkRecurrenceModalOpen(false)}
+        onAssign={bulkAssignRecurrence}
         selectedCount={selectedCount}
       />
 
@@ -1446,6 +1583,7 @@ interface ImportTransactionRowProps {
   ) => { value: string; label: string; searchValue?: string }[];
   eventOptions: { value: string; label: string; searchValue?: string }[];
   eventLookup: Map<string, Event>;
+  recurrenceOptions: { value: string; label: string; searchValue?: string }[];
   accountOptions: { value: string; label: string; searchValue?: string }[];
   accountLookup: Map<string, Account>;
   isSelected: boolean;
@@ -1469,6 +1607,7 @@ const ImportTransactionRow = memo(
     getSubcategoryOptions,
     eventOptions,
     eventLookup,
+    recurrenceOptions,
     accountOptions,
     accountLookup,
     isSelected,
@@ -1629,6 +1768,20 @@ const ImportTransactionRow = memo(
           />
         </TableCell>
         <TableCell className="h-9 border-r px-0 py-0">
+          <SelectCell
+            value={transaction.recurrence ?? ""}
+            options={recurrenceOptions}
+            onChange={(value) => onUpdateTransaction(transaction.lineNumber, "recurrence", value)}
+            onFocus={() => handleFocus("recurrence")}
+            onNavigate={onNavigate}
+            isFocused={focusedField === "recurrence"}
+            renderValue={(value) =>
+              value ? value.charAt(0).toUpperCase() + value.slice(1) : ""
+            }
+            className="text-xs"
+          />
+        </TableCell>
+        <TableCell className="h-9 border-r px-0 py-0">
           <EditableCell
             value={transaction.description || ""}
             onChange={(value) => onUpdateTransaction(transaction.lineNumber, "description", value)}
@@ -1666,7 +1819,8 @@ const ImportTransactionRow = memo(
       prev.subcategoryLookup === next.subcategoryLookup &&
       prev.getSubcategoryOptions === next.getSubcategoryOptions &&
       prev.eventOptions === next.eventOptions &&
-      prev.eventLookup === next.eventLookup
+      prev.eventLookup === next.eventLookup &&
+      prev.recurrenceOptions === next.recurrenceOptions
     );
   },
 );
@@ -1904,6 +2058,69 @@ function BulkEventAssignModal({
           </Button>
           <Button onClick={handleAssign} disabled={!selectedEvent}>
             Assign
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface BulkRecurrenceAssignModalProps {
+  open: boolean;
+  onClose: () => void;
+  onAssign: (recurrence: RecurrenceType | undefined) => void;
+  selectedCount: number;
+}
+
+const RECURRENCE_TYPE_OPTIONS = [
+  { value: "fixed" as const, label: "Fixed", icon: Icons.Hash },
+  { value: "variable" as const, label: "Variable", icon: Icons.TrendingUp },
+  { value: "periodic" as const, label: "Periodic", icon: Icons.Refresh },
+  { value: null, label: "None", icon: Icons.XCircle },
+] as const;
+
+function BulkRecurrenceAssignModal({
+  open,
+  onClose,
+  onAssign,
+  selectedCount,
+}: BulkRecurrenceAssignModalProps) {
+  const handleSelect = (type: RecurrenceType | null) => {
+    onAssign(type ?? undefined);
+  };
+
+  if (!open) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            Assign Recurrence to {selectedCount} Transaction{selectedCount !== 1 ? "s" : ""}
+          </DialogTitle>
+          <DialogDescription>
+            Select a recurrence type to assign.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-2 py-4">
+          {RECURRENCE_TYPE_OPTIONS.map((type) => {
+            const Icon = type.icon;
+            return (
+              <button
+                key={type.value ?? "none"}
+                type="button"
+                onClick={() => handleSelect(type.value)}
+                className="hover:bg-muted hover:border-primary flex flex-col items-center justify-center gap-2 rounded-lg border p-4 transition-colors"
+              >
+                <Icon className="h-5 w-5" />
+                <span className="text-sm font-medium">{type.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
           </Button>
         </DialogFooter>
       </DialogContent>

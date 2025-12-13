@@ -22,8 +22,8 @@ import {
 } from "@/components/ui/table";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Badge, SearchableSelect } from "@wealthfolio/ui";
-import type { CashImportFormat, CashImportMappingData, CsvRowData, CategoryWithChildren, Event, Account } from "@/lib/types";
-import { ActivityType, AccountType } from "@/lib/types";
+import type { CashImportFormat, CashImportMappingData, CsvRowData, CategoryWithChildren, Event, Account, RecurrenceType } from "@/lib/types";
+import { ActivityType, AccountType, RECURRENCE_TYPES } from "@/lib/types";
 import { cn, tryParseDate } from "@/lib/utils";
 import { motion } from "motion/react";
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
@@ -49,6 +49,7 @@ const CASH_IMPORT_FIELDS: { field: CashImportFormat; label: string; required: bo
   { field: "subcategory", label: "Subcategory", required: false },
   { field: "description", label: "Description", required: false },
   { field: "event", label: "Event", required: false },
+  { field: "recurrence", label: "Recurrence", required: false },
 ];
 
 const SKIP_FIELD_VALUE = "__skip__";
@@ -93,6 +94,9 @@ export const CashMappingStep = ({
   const [accountMappings, setAccountMappings] = useState<Record<string, string>>(
     initialMapping?.accountMappings ?? {}
   );
+  const [recurrenceMappings, setRecurrenceMappings] = useState<Record<string, RecurrenceType>>(
+    initialMapping?.recurrenceMappings ?? {}
+  );
 
   // Fetch categories and events for mapping
   const { data: categories = [] } = useQuery<CategoryWithChildren[]>({
@@ -128,8 +132,9 @@ export const CashMappingStep = ({
       categoryMappings: Object.keys(categoryMappings).length > 0 ? categoryMappings : undefined,
       eventMappings: Object.keys(eventMappings).length > 0 ? eventMappings : undefined,
       accountMappings: Object.keys(accountMappings).length > 0 ? accountMappings : undefined,
+      recurrenceMappings: Object.keys(recurrenceMappings).length > 0 ? recurrenceMappings : undefined,
     };
-  }, [accountId, fieldMappings, invertAmountSign, activityTypeMappings, categoryMappings, eventMappings, accountMappings]);
+  }, [accountId, fieldMappings, invertAmountSign, activityTypeMappings, categoryMappings, eventMappings, accountMappings, recurrenceMappings]);
 
   // Track if this is the initial render to avoid calling onChange on mount
   const isInitialMount = useRef(true);
@@ -242,6 +247,23 @@ export const CashMappingStep = ({
     }));
   }, [data, fieldMappings, accountMappings, getMappedValue]);
 
+  // Get distinct recurrences from CSV
+  const distinctRecurrences = useMemo(() => {
+    if (!isFieldMapped("recurrence")) return [];
+    const recs = new Map<string, number>();
+    data.forEach((row) => {
+      const rec = getMappedValue(row, "recurrence");
+      if (rec) {
+        recs.set(rec.trim(), (recs.get(rec.trim()) || 0) + 1);
+      }
+    });
+    return Array.from(recs.entries()).map(([csvRecurrence, count]) => ({
+      csvRecurrence,
+      count,
+      mappedRecurrence: recurrenceMappings[csvRecurrence],
+    }));
+  }, [data, fieldMappings, recurrenceMappings, getMappedValue]);
+
   // Handle activity type mapping
   const handleActivityTypeMapping = useCallback((csvType: string, appType: ActivityType | "") => {
     setActivityTypeMappings((prev) => {
@@ -309,11 +331,26 @@ export const CashMappingStep = ({
     });
   }, []);
 
+  // Handle recurrence mapping
+  const handleRecurrenceMapping = useCallback((csvRecurrence: string, recurrenceType: RecurrenceType | "") => {
+    setRecurrenceMappings((prev) => {
+      if (!recurrenceType) {
+        const { [csvRecurrence]: _, ...rest } = prev;
+        return rest;
+      }
+      return {
+        ...prev,
+        [csvRecurrence]: recurrenceType,
+      };
+    });
+  }, []);
+
   // Count unmapped values
   const unmappedActivityTypesCount = distinctActivityTypes.filter((t) => !t.appType).length;
   const unmappedCategoriesCount = distinctCategories.filter((c) => !c.mappedCategory).length;
   const unmappedEventsCount = distinctEvents.filter((e) => !e.mappedEventId).length;
   const unmappedAccountsCount = distinctAccounts.filter((a) => !a.mappedAccountId).length;
+  const unmappedRecurrencesCount = distinctRecurrences.filter((r) => !r.mappedRecurrence).length;
 
   // Count date parsing status
   const dateParsingStatus = useMemo(() => {
@@ -339,7 +376,8 @@ export const CashMappingStep = ({
     (unmappedActivityTypesCount === 0 || !isFieldMapped("activityType")) &&
     (unmappedCategoriesCount === 0 || !isFieldMapped("category")) &&
     (unmappedEventsCount === 0 || !isFieldMapped("event")) &&
-    (unmappedAccountsCount === 0 || !isFieldMapped("account"));
+    (unmappedAccountsCount === 0 || !isFieldMapped("account")) &&
+    (unmappedRecurrencesCount === 0 || !isFieldMapped("recurrence"));
 
   // All dates must parse successfully
   const allDatesParsed = !isFieldMapped("date") || dateParsingStatus.failed === 0;
@@ -356,6 +394,7 @@ export const CashMappingStep = ({
       categoryMappings: Object.keys(categoryMappings).length > 0 ? categoryMappings : undefined,
       eventMappings: Object.keys(eventMappings).length > 0 ? eventMappings : undefined,
       accountMappings: Object.keys(accountMappings).length > 0 ? accountMappings : undefined,
+      recurrenceMappings: Object.keys(recurrenceMappings).length > 0 ? recurrenceMappings : undefined,
     };
 
     onNext(mapping);
@@ -461,6 +500,19 @@ export const CashMappingStep = ({
             rightIcon={unmappedAccountsCount === 0 ? Icons.CheckCircle : Icons.AlertCircle}
           />
         )}
+
+        {/* Recurrence mapping status - only show if column is mapped */}
+        {isFieldMapped("recurrence") && (
+          <ImportAlert
+            variant={unmappedRecurrencesCount === 0 ? "success" : "destructive"}
+            size="sm"
+            title="Recurrence"
+            description={`${distinctRecurrences.length - unmappedRecurrencesCount} of ${distinctRecurrences.length} mapped`}
+            icon={Icons.RefreshCw}
+            className="mb-0"
+            rightIcon={unmappedRecurrencesCount === 0 ? Icons.CheckCircle : Icons.AlertCircle}
+          />
+        )}
       </div>
 
       {/* Activity Preview */}
@@ -484,10 +536,12 @@ export const CashMappingStep = ({
             categoryMappings={categoryMappings}
             eventMappings={eventMappings}
             accountMappings={accountMappings}
+            recurrenceMappings={recurrenceMappings}
             handleActivityTypeMapping={handleActivityTypeMapping}
             handleCategoryMapping={handleCategoryMapping}
             handleEventMapping={handleEventMapping}
             handleAccountMapping={handleAccountMapping}
+            handleRecurrenceMapping={handleRecurrenceMapping}
             categories={categories}
             events={events}
             cashAccounts={cashAccounts}
@@ -540,10 +594,12 @@ interface CashMappingTableProps {
   categoryMappings: Record<string, { categoryId: string; subCategoryId?: string }>;
   eventMappings: Record<string, string>;
   accountMappings: Record<string, string>;
+  recurrenceMappings: Record<string, RecurrenceType>;
   handleActivityTypeMapping: (csvType: string, appType: ActivityType | "") => void;
   handleCategoryMapping: (csvCategory: string, categoryId: string, subCategoryId?: string) => void;
   handleEventMapping: (csvEvent: string, eventId: string) => void;
   handleAccountMapping: (csvAccount: string, accountId: string) => void;
+  handleRecurrenceMapping: (csvRecurrence: string, recurrenceType: RecurrenceType | "") => void;
   categories: CategoryWithChildren[];
   events: Event[];
   cashAccounts: Account[];
@@ -560,10 +616,12 @@ function CashMappingTable({
   categoryMappings,
   eventMappings,
   accountMappings,
+  recurrenceMappings,
   handleActivityTypeMapping,
   handleCategoryMapping,
   handleEventMapping,
   handleAccountMapping,
+  handleRecurrenceMapping,
   categories,
   events,
   cashAccounts,
@@ -633,10 +691,12 @@ function CashMappingTable({
                         categoryMappings={categoryMappings}
                         eventMappings={eventMappings}
                         accountMappings={accountMappings}
+                        recurrenceMappings={recurrenceMappings}
                         handleActivityTypeMapping={handleActivityTypeMapping}
                         handleCategoryMapping={handleCategoryMapping}
                         handleEventMapping={handleEventMapping}
                         handleAccountMapping={handleAccountMapping}
+                        handleRecurrenceMapping={handleRecurrenceMapping}
                         categories={categories}
                         events={events}
                         cashAccounts={cashAccounts}
@@ -737,10 +797,12 @@ interface CashMappingCellProps {
   categoryMappings: Record<string, { categoryId: string; subCategoryId?: string }>;
   eventMappings: Record<string, string>;
   accountMappings: Record<string, string>;
+  recurrenceMappings: Record<string, RecurrenceType>;
   handleActivityTypeMapping: (csvType: string, appType: ActivityType | "") => void;
   handleCategoryMapping: (csvCategory: string, categoryId: string, subCategoryId?: string) => void;
   handleEventMapping: (csvEvent: string, eventId: string) => void;
   handleAccountMapping: (csvAccount: string, accountId: string) => void;
+  handleRecurrenceMapping: (csvRecurrence: string, recurrenceType: RecurrenceType | "") => void;
   categories: CategoryWithChildren[];
   events: Event[];
   cashAccounts: Account[];
@@ -754,10 +816,12 @@ function CashMappingCell({
   categoryMappings,
   eventMappings,
   accountMappings,
+  recurrenceMappings,
   handleActivityTypeMapping,
   handleCategoryMapping,
   handleEventMapping,
   handleAccountMapping,
+  handleRecurrenceMapping,
   categories,
   events,
   cashAccounts,
@@ -969,6 +1033,53 @@ function CashMappingCell({
         <SearchableSelect
           options={cashAccounts.map((acc) => ({ value: acc.id, label: acc.name }))}
           onValueChange={(v) => handleAccountMapping(normalizedValue, v)}
+          placeholder="Map to..."
+          value=""
+        />
+      </div>
+    );
+  }
+
+  // Recurrence - show mapping UI
+  if (field === "recurrence") {
+    const normalizedValue = value.trim();
+    const mappedRecurrence = recurrenceMappings[normalizedValue];
+
+    const recurrenceLabel = (type: RecurrenceType) => {
+      const labels: Record<RecurrenceType, string> = {
+        fixed: "Fixed",
+        variable: "Variable",
+        periodic: "Periodic",
+      };
+      return labels[type] || type;
+    };
+
+    if (mappedRecurrence) {
+      return (
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className="text-xs">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-auto p-0 text-xs"
+              onClick={() => handleRecurrenceMapping(normalizedValue, "")}
+            >
+              {recurrenceLabel(mappedRecurrence)}
+            </Button>
+          </Badge>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-2">
+        <Badge variant="destructive" className="text-xs">
+          {normalizedValue}
+        </Badge>
+        <SearchableSelect
+          options={RECURRENCE_TYPES.map((type) => ({ value: type, label: recurrenceLabel(type) }))}
+          onValueChange={(v) => handleRecurrenceMapping(normalizedValue, v as RecurrenceType)}
           placeholder="Map to..."
           value=""
         />

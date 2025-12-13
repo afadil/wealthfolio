@@ -28,6 +28,8 @@ interface Filters {
   accountType?: string[];
   amountMin?: number;
   amountMax?: number;
+  recurrence?: string[];
+  hasRecurrence?: boolean;
 }
 
 interface Sort {
@@ -81,6 +83,8 @@ export const searchActivities = async (
           assetIdKeyword,
           amountMinFilter: filters?.amountMin,
           amountMaxFilter: filters?.amountMax,
+          recurrenceFilter: filters?.recurrence,
+          hasRecurrenceFilter: filters?.hasRecurrence,
           sort: sortOption,
         });
       case RUN_ENV.WEB:
@@ -93,6 +97,8 @@ export const searchActivities = async (
           assetIdKeyword,
           amountMinFilter: filters?.amountMin,
           amountMaxFilter: filters?.amountMax,
+          recurrenceFilter: filters?.recurrence,
+          hasRecurrenceFilter: filters?.hasRecurrence,
           sort: sortOption,
         });
       default:

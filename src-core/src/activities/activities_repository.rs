@@ -106,6 +106,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
         start_date_filter: Option<String>,
         end_date_filter: Option<String>,
         sort: Option<Sort>,
+        recurrence_filter: Option<Vec<String>>,
+        has_recurrence_filter: Option<bool>,
     ) -> Result<ActivitySearchResponse> {
         use diesel::sql_query;
 
@@ -196,6 +198,25 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 conditions.push("a.event_id IS NOT NULL".to_string());
             } else {
                 conditions.push("a.event_id IS NULL".to_string());
+            }
+        }
+
+        if let Some(ref recurrence_values) = recurrence_filter {
+            if !recurrence_values.is_empty() {
+                let values = recurrence_values
+                    .iter()
+                    .map(|v| format!("'{}'", v.replace("'", "''")))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                conditions.push(format!("a.recurrence IN ({})", values));
+            }
+        }
+
+        if let Some(has_recurrence) = has_recurrence_filter {
+            if has_recurrence {
+                conditions.push("a.recurrence IS NOT NULL".to_string());
+            } else {
+                conditions.push("a.recurrence IS NULL".to_string());
             }
         }
 
@@ -307,7 +328,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 cat.name as category_name,
                 cat.color as category_color,
                 subcat.name as sub_category_name,
-                evt.name as event_name
+                evt.name as event_name,
+                a.recurrence
             FROM activities a
             INNER JOIN accounts acc ON a.account_id = acc.id
             INNER JOIN assets ast ON a.asset_id = ast.id
@@ -1065,7 +1087,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 cat.name as category_name,
                 cat.color as category_color,
                 subcat.name as sub_category_name,
-                evt.name as event_name
+                evt.name as event_name,
+                a.recurrence
             FROM activities a
             INNER JOIN accounts acc ON a.account_id = acc.id
             INNER JOIN assets ast ON a.asset_id = ast.id

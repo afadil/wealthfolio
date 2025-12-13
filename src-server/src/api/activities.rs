@@ -62,6 +62,10 @@ struct ActivitySearchBody {
     #[serde(rename = "endDateFilter")]
     end_date_filter: Option<String>,
     sort: Option<SortWrapper>,
+    #[serde(rename = "recurrenceFilter")]
+    recurrence_filter: Option<StringOrVec>,
+    #[serde(rename = "hasRecurrenceFilter")]
+    has_recurrence_filter: Option<bool>,
 }
 
 async fn search_activities(
@@ -98,6 +102,11 @@ async fn search_activities(
         Some(StringOrVec::Many(v)) => Some(v),
         None => None,
     };
+    let recurrence_values: Option<Vec<String>> = match body.recurrence_filter {
+        Some(StringOrVec::One(s)) => Some(vec![s]),
+        Some(StringOrVec::Many(v)) => Some(v),
+        None => None,
+    };
 
     let amount_min = body.amount_min_filter.and_then(rust_decimal::Decimal::from_f64);
     let amount_max = body.amount_max_filter.and_then(rust_decimal::Decimal::from_f64);
@@ -118,6 +127,8 @@ async fn search_activities(
         body.start_date_filter,
         body.end_date_filter,
         sort_normalized,
+        recurrence_values,
+        body.has_recurrence_filter,
     )?;
     Ok(Json(resp))
 }

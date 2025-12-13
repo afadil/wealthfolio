@@ -14,7 +14,8 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { ActivityCreate, ActivityDetails, ActivityUpdate, EventWithTypeName } from "@/lib/types";
+import type { ActivityCreate, ActivityDetails, ActivityUpdate, EventWithTypeName, RecurrenceType } from "@/lib/types";
+import { RECURRENCE_TYPES } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Card,
@@ -76,6 +77,7 @@ const cashActivityFormSchema = z.object({
   categoryId: z.string().optional().nullable(),
   subCategoryId: z.string().optional().nullable(),
   eventId: z.string().optional().nullable(),
+  recurrence: z.enum(["fixed", "variable", "periodic"]).optional().nullable(),
 });
 
 type CashActivityFormValues = z.infer<typeof cashActivityFormSchema>;
@@ -132,6 +134,7 @@ export function CashActivityForm({ accounts, activity, open, onClose }: CashActi
     categoryId: activity?.categoryId ?? null,
     subCategoryId: activity?.subCategoryId ?? null,
     eventId: activity?.eventId ?? null,
+    recurrence: activity?.recurrence ?? null,
     activityDate: activity?.date
       ? new Date(activity.date)
       : (() => {
@@ -167,6 +170,10 @@ export function CashActivityForm({ accounts, activity, open, onClose }: CashActi
       // Apply activity type if the rule specifies one and it's valid for cash activities
       if (match.activityType && isValidActivityType(match.activityType)) {
         form.setValue("activityType", match.activityType);
+      }
+      // Apply recurrence if the rule specifies one
+      if (match.recurrence) {
+        form.setValue("recurrence", match.recurrence as RecurrenceType);
       }
       setIsOverridden(true); // Mark as manually set so further typing doesn't re-suggest
       clearMatch();
@@ -228,6 +235,7 @@ export function CashActivityForm({ accounts, activity, open, onClose }: CashActi
           categoryId: data.categoryId,
           subCategoryId: data.subCategoryId,
           eventId: data.eventId,
+          recurrence: data.recurrence,
         };
         return await updateCashActivityMutation.mutateAsync(updateData);
       }
@@ -248,6 +256,7 @@ export function CashActivityForm({ accounts, activity, open, onClose }: CashActi
         categoryId: data.categoryId,
         subCategoryId: data.subCategoryId,
         eventId: data.eventId,
+        recurrence: data.recurrence,
       };
       return await addCashActivityMutation.mutateAsync(createData);
     } catch (error) {
@@ -428,12 +437,13 @@ export function CashActivityForm({ accounts, activity, open, onClose }: CashActi
                         <Icons.Close className="h-4 w-4" />
                       </Button>
                     </div>
-                    {(match.categoryId || match.activityType) && (
+                    {(match.categoryId || match.activityType || match.recurrence) && (
                       <div className="text-muted-foreground text-xs pl-6">
                         Will apply:{" "}
                         {[
                           match.activityType && `Type: ${ActivityTypeNames[match.activityType as keyof typeof ActivityTypeNames] || match.activityType}`,
                           match.categoryId && "Category",
+                          match.recurrence && `Recurrence: ${match.recurrence.charAt(0).toUpperCase() + match.recurrence.slice(1)}`,
                         ].filter(Boolean).join(", ")}
                       </div>
                     )}
@@ -475,6 +485,38 @@ export function CashActivityForm({ accounts, activity, open, onClose }: CashActi
                                     ({event.eventTypeName})
                                   </span>
                                 </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Recurrence */}
+                <FormField
+                  control={form.control}
+                  name="recurrence"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Recurrence (optional)</FormLabel>
+                      <FormControl>
+                        <Select
+                          onValueChange={(value) => field.onChange(value === "__none__" ? null : value)}
+                          value={field.value || "__none__"}
+                        >
+                          <SelectTrigger aria-label="Recurrence">
+                            <SelectValue placeholder="Select recurrence (optional)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">
+                              <span className="text-muted-foreground">No recurrence</span>
+                            </SelectItem>
+                            {RECURRENCE_TYPES.map((type) => (
+                              <SelectItem value={type} key={type}>
+                                {type.charAt(0).toUpperCase() + type.slice(1)}
                               </SelectItem>
                             ))}
                           </SelectContent>

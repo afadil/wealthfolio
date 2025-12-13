@@ -28,6 +28,8 @@ import {
   ActivityUpdate,
   CategoryWithChildren,
   Event,
+  RecurrenceType,
+  RECURRENCE_TYPES,
 } from "@/lib/types";
 import { cn, formatDateTimeDisplay, formatDateTimeLocal } from "@/lib/utils";
 import { EditableCell } from "@/pages/activity/components/activity-datagrid/editable-cell";
@@ -64,6 +66,7 @@ type EditableField =
   | "categoryId"
   | "subCategoryId"
   | "eventId"
+  | "recurrence"
   | "accountId"
   | "currency"
   | "comment";
@@ -93,6 +96,7 @@ const editableFields: EditableField[] = [
   "categoryId",
   "subCategoryId",
   "eventId",
+  "recurrence",
   "accountId",
   "currency",
   "comment",
@@ -193,6 +197,7 @@ export function CashActivityDatagrid({
   const [bulkActivityTypeModalOpen, setBulkActivityTypeModalOpen] = useState(false);
   const [bulkCategoryModalOpen, setBulkCategoryModalOpen] = useState(false);
   const [bulkEventModalOpen, setBulkEventModalOpen] = useState(false);
+  const [bulkRecurrenceModalOpen, setBulkRecurrenceModalOpen] = useState(false);
   const { saveActivitiesMutation } = useActivityMutations();
 
   const fallbackCurrency = useMemo(() => {
@@ -315,6 +320,24 @@ export function CashActivityDatagrid({
   const eventLookup = useMemo(() => {
     return new Map(events.map((event) => [event.id, event]));
   }, [events]);
+
+  const RECURRENCE_LABELS: Record<string, string> = {
+    fixed: "Fixed",
+    variable: "Variable",
+    periodic: "Periodic",
+  };
+
+  const recurrenceOptions = useMemo(
+    () => [
+      { value: "", label: "No recurrence", searchValue: "no recurrence" },
+      ...RECURRENCE_TYPES.map((type) => ({
+        value: type,
+        label: RECURRENCE_LABELS[type] || type,
+        searchValue: RECURRENCE_LABELS[type] || type,
+      })),
+    ],
+    [],
+  );
 
   const currencyOptions = useMemo(() => {
     const entries = new Map<string, string>();
@@ -493,6 +516,8 @@ export function CashActivityDatagrid({
             updated.eventId = value || undefined;
             const event = eventLookup.get(value);
             updated.eventName = event?.name;
+          } else if (field === "recurrence") {
+            updated.recurrence = (value || undefined) as RecurrenceType | undefined;
           } else if (field === "accountId") {
             updated.accountId = value;
             const account = accountLookup.get(value);
@@ -744,6 +769,52 @@ export function CashActivityDatagrid({
     });
   }, [selectedIds]);
 
+  const bulkAssignRecurrence = useCallback(
+    (recurrence: RecurrenceType | undefined) => {
+      setLocalTransactions((prev) =>
+        prev.map((t) => {
+          if (!selectedIds.has(t.id)) return t;
+          return {
+            ...t,
+            recurrence: recurrence || undefined,
+          };
+        }),
+      );
+      setDirtyTransactionIds((prev) => {
+        const next = new Set(prev);
+        selectedIds.forEach((id) => next.add(id));
+        return next;
+      });
+      setSelectedIds(new Set());
+      setBulkRecurrenceModalOpen(false);
+      toast({
+        title: recurrence ? "Recurrence assigned" : "Recurrence cleared",
+        description: `Recurrence ${recurrence ? "assigned to" : "cleared from"} ${selectedIds.size} transaction(s)`,
+        variant: "success",
+      });
+    },
+    [selectedIds],
+  );
+
+  const clearAllRecurrence = useCallback(() => {
+    setLocalTransactions((prev) =>
+      prev.map((t) =>
+        selectedIds.has(t.id) ? { ...t, recurrence: undefined } : t,
+      ),
+    );
+    setDirtyTransactionIds((prev) => {
+      const next = new Set(prev);
+      selectedIds.forEach((id) => next.add(id));
+      return next;
+    });
+    setSelectedIds(new Set());
+    toast({
+      title: "Recurrence cleared",
+      description: `Cleared recurrence from ${selectedIds.size} transaction(s)`,
+      variant: "success",
+    });
+  }, [selectedIds]);
+
   const handleEditTransaction = useCallback(
     (activity: ActivityDetails) => {
       onEditActivity(activity);
@@ -913,6 +984,15 @@ export function CashActivityDatagrid({
                   <Icons.Calendar className="mr-1 h-3.5 w-3.5" />
                   Event
                 </Button>
+                <Button
+                  onClick={() => setBulkRecurrenceModalOpen(true)}
+                  variant="outline"
+                  size="xs"
+                  className="shrink-0"
+                >
+                  <Icons.Refresh className="mr-1 h-3.5 w-3.5" />
+                  Recurrence
+                </Button>
 
                 <div className="bg-border mx-1 h-4 w-px" />
 
@@ -932,6 +1012,10 @@ export function CashActivityDatagrid({
                     <DropdownMenuItem onClick={clearAllEvents}>
                       <Icons.Calendar className="mr-2 h-4 w-4" />
                       Clear Events
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={clearAllRecurrence}>
+                      <Icons.Refresh className="mr-2 h-4 w-4" />
+                      Clear Recurrence
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -1047,6 +1131,9 @@ export function CashActivityDatagrid({
                   Event
                 </TableHead>
                 <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
+                  Recurrence
+                </TableHead>
+                <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
                   Account
                 </TableHead>
                 <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
@@ -1061,7 +1148,7 @@ export function CashActivityDatagrid({
             <TableBody>
               {localTransactions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={13} className="text-muted-foreground h-32 text-center">
+                  <TableCell colSpan={14} className="text-muted-foreground h-32 text-center">
                     No transactions yet. Add a deposit or import from your bank.
                   </TableCell>
                 </TableRow>
@@ -1076,6 +1163,7 @@ export function CashActivityDatagrid({
                     getCategoryOptionsForActivityType={getCategoryOptionsForActivityType}
                     getSubcategoryOptions={getSubcategoryOptions}
                     eventOptions={eventOptions}
+                    recurrenceOptions={recurrenceOptions}
                     accountLookup={accountLookup}
                     isSelected={selectedIds.has(transaction.id)}
                     isDirty={dirtyTransactionIds.has(transaction.id)}
@@ -1118,6 +1206,13 @@ export function CashActivityDatagrid({
         onAssign={bulkAssignEvent}
         selectedCount={selectedIds.size}
       />
+
+      <BulkRecurrenceAssignModal
+        open={bulkRecurrenceModalOpen}
+        onClose={() => setBulkRecurrenceModalOpen(false)}
+        onAssign={bulkAssignRecurrence}
+        selectedCount={selectedIds.size}
+      />
     </>
   );
 }
@@ -1129,19 +1224,21 @@ interface BulkActivityTypeAssignModalProps {
   selectedCount: number;
 }
 
+const ACTIVITY_TYPE_OPTIONS = [
+  { value: ActivityType.DEPOSIT, label: "Deposit", icon: Icons.ArrowDown },
+  { value: ActivityType.WITHDRAWAL, label: "Withdrawal", icon: Icons.ArrowUp },
+  { value: ActivityType.TRANSFER_IN, label: "Transfer In", icon: Icons.ArrowDown },
+  { value: ActivityType.TRANSFER_OUT, label: "Transfer Out", icon: Icons.ArrowUp },
+] as const;
+
 function BulkActivityTypeAssignModal({
   open,
   onClose,
   onAssign,
   selectedCount,
 }: BulkActivityTypeAssignModalProps) {
-  const [selectedType, setSelectedType] = useState<string>("");
-
-  const handleAssign = () => {
-    if (selectedType) {
-      onAssign(selectedType as CashActivityType);
-      setSelectedType("");
-    }
+  const handleSelect = (type: CashActivityType) => {
+    onAssign(type);
   };
 
   if (!open) return null;
@@ -1155,27 +1252,25 @@ function BulkActivityTypeAssignModal({
           </DialogTitle>
           <DialogDescription>Select an activity type to assign.</DialogDescription>
         </DialogHeader>
-        <div className="py-4">
-          <label className="mb-1 block text-sm font-medium">Activity Type</label>
-          <Select value={selectedType} onValueChange={setSelectedType}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select activity type" />
-            </SelectTrigger>
-            <SelectContent>
-              {CASH_ACTIVITY_TYPES.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {CASH_ACTIVITY_TYPE_NAMES[type]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="grid grid-cols-2 gap-2 py-4">
+          {ACTIVITY_TYPE_OPTIONS.map((type) => {
+            const Icon = type.icon;
+            return (
+              <button
+                key={type.value}
+                type="button"
+                onClick={() => handleSelect(type.value as CashActivityType)}
+                className="hover:bg-muted hover:border-primary flex flex-col items-center justify-center gap-2 rounded-lg border p-4 transition-colors"
+              >
+                <Icon className="h-5 w-5" />
+                <span className="text-sm font-medium">{type.label}</span>
+              </button>
+            );
+          })}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             Cancel
-          </Button>
-          <Button onClick={handleAssign} disabled={!selectedType}>
-            Assign
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1362,6 +1457,69 @@ function BulkEventAssignModal({
   );
 }
 
+interface BulkRecurrenceAssignModalProps {
+  open: boolean;
+  onClose: () => void;
+  onAssign: (recurrence: RecurrenceType | undefined) => void;
+  selectedCount: number;
+}
+
+const RECURRENCE_TYPE_OPTIONS = [
+  { value: "fixed" as const, label: "Fixed", icon: Icons.Hash },
+  { value: "variable" as const, label: "Variable", icon: Icons.TrendingUp },
+  { value: "periodic" as const, label: "Periodic", icon: Icons.Refresh },
+  { value: null, label: "None", icon: Icons.XCircle },
+] as const;
+
+function BulkRecurrenceAssignModal({
+  open,
+  onClose,
+  onAssign,
+  selectedCount,
+}: BulkRecurrenceAssignModalProps) {
+  const handleSelect = (type: RecurrenceType | null) => {
+    onAssign(type ?? undefined);
+  };
+
+  if (!open) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            Assign Recurrence to {selectedCount} Transaction{selectedCount !== 1 ? "s" : ""}
+          </DialogTitle>
+          <DialogDescription>
+            Select a recurrence type to assign.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-2 py-4">
+          {RECURRENCE_TYPE_OPTIONS.map((type) => {
+            const Icon = type.icon;
+            return (
+              <button
+                key={type.value ?? "none"}
+                type="button"
+                onClick={() => handleSelect(type.value)}
+                className="hover:bg-muted hover:border-primary flex flex-col items-center justify-center gap-2 rounded-lg border p-4 transition-colors"
+              >
+                <Icon className="h-5 w-5" />
+                <span className="text-sm font-medium">{type.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 interface TransactionRowProps {
   transaction: LocalTransaction;
   activityTypeOptions: { value: string; label: string; searchValue?: string }[];
@@ -1374,6 +1532,7 @@ interface TransactionRowProps {
     categoryId: string | undefined,
   ) => { value: string; label: string; searchValue?: string }[];
   eventOptions: { value: string; label: string; searchValue?: string }[];
+  recurrenceOptions: { value: string; label: string; searchValue?: string }[];
   accountLookup: Map<string, Account>;
   isSelected: boolean;
   isDirty: boolean;
@@ -1397,6 +1556,7 @@ const TransactionRow = memo(
     getCategoryOptionsForActivityType,
     getSubcategoryOptions,
     eventOptions,
+    recurrenceOptions,
     accountLookup,
     isSelected,
     isDirty,
@@ -1544,6 +1704,17 @@ const TransactionRow = memo(
         </TableCell>
         <TableCell className="h-9 border-r px-0 py-0">
           <SelectCell
+            value={transaction.recurrence ?? ""}
+            options={recurrenceOptions}
+            onChange={(value) => onUpdateTransaction(transaction.id, "recurrence", value)}
+            onFocus={() => handleFocus("recurrence")}
+            onNavigate={onNavigate}
+            isFocused={focusedField === "recurrence"}
+            className="text-xs"
+          />
+        </TableCell>
+        <TableCell className="h-9 border-r px-0 py-0">
+          <SelectCell
             value={transaction.accountId ?? ""}
             options={accountOptions}
             onChange={(value) => onUpdateTransaction(transaction.id, "accountId", value)}
@@ -1621,6 +1792,7 @@ const TransactionRow = memo(
       prev.getCategoryOptionsForActivityType === next.getCategoryOptionsForActivityType &&
       prev.getSubcategoryOptions === next.getSubcategoryOptions &&
       prev.eventOptions === next.eventOptions &&
+      prev.recurrenceOptions === next.recurrenceOptions &&
       prev.accountLookup === next.accountLookup &&
       prev.onToggleSelect === next.onToggleSelect &&
       prev.onUpdateTransaction === next.onUpdateTransaction &&

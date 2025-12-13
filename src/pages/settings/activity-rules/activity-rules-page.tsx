@@ -56,6 +56,7 @@ function SettingsActivityRulesPage() {
       categoryId: rule.categoryId,
       subCategoryId: rule.subCategoryId,
       activityType: rule.activityType,
+      recurrence: rule.recurrence,
       priority: rule.priority,
       isGlobal: rule.isGlobal,
       accountId: rule.accountId,

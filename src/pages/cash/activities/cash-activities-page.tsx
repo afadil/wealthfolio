@@ -16,6 +16,7 @@ import {
 } from "@wealthfolio/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CashActivityFilters, CashActivityViewMode, CategorizationStatus } from "./components/cash-activity-filters";
+import type { RecurrenceType } from "@/lib/types";
 import { CashActivityForm } from "./components/cash-activity-form";
 import { CashActivityTable } from "./components/cash-activity-table";
 import { CashActivityDatagrid } from "./components/cash-activity-datagrid";
@@ -54,6 +55,7 @@ function CashActivitiesPage({ renderActions }: CashActivitiesPageProps) {
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>(
     urlEventId ? [urlEventId] : []
   );
+  const [selectedRecurrenceTypes, setSelectedRecurrenceTypes] = useState<RecurrenceType[]>([]);
   const [selectedCategorizationStatuses, setSelectedCategorizationStatuses] = useState<CategorizationStatus[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({ min: "", max: "" });
@@ -110,9 +112,10 @@ function CashActivitiesPage({ renderActions }: CashActivitiesPageProps) {
 
   const { deleteCashActivityMutation, duplicateCashActivityMutation } = useCashActivityMutations();
 
-  const { isCategorized, hasEvent } = useMemo(() => {
+  const { isCategorized, hasEvent, hasRecurrence } = useMemo(() => {
     let isCategorized: boolean | undefined;
     let hasEvent: boolean | undefined;
+    let hasRecurrence: boolean | undefined;
 
     if (selectedCategorizationStatuses.includes("uncategorized")) {
       isCategorized = false;
@@ -126,7 +129,13 @@ function CashActivitiesPage({ renderActions }: CashActivitiesPageProps) {
       hasEvent = true;
     }
 
-    return { isCategorized, hasEvent };
+    if (selectedCategorizationStatuses.includes("without_recurrence")) {
+      hasRecurrence = false;
+    } else if (selectedCategorizationStatuses.includes("with_recurrence")) {
+      hasRecurrence = true;
+    }
+
+    return { isCategorized, hasEvent, hasRecurrence };
   }, [selectedCategorizationStatuses]);
 
   const {
@@ -146,9 +155,11 @@ function CashActivitiesPage({ renderActions }: CashActivitiesPageProps) {
         ? selectedSubCategoryIds
         : selectedParentCategoryIds,
       eventIds: selectedEventIds,
+      recurrenceTypes: selectedRecurrenceTypes,
       search: searchQuery,
       isCategorized,
       hasEvent,
+      hasRecurrence,
       amountMin: amountRange.min ? parseFloat(amountRange.min) : undefined,
       amountMax: amountRange.max ? parseFloat(amountRange.max) : undefined,
       startDate: dateRange.startDate,
@@ -261,6 +272,8 @@ function CashActivitiesPage({ renderActions }: CashActivitiesPageProps) {
             onSubCategoryIdsChange={setSelectedSubCategoryIds}
             selectedEventIds={selectedEventIds}
             onEventIdsChange={setSelectedEventIds}
+            selectedRecurrenceTypes={selectedRecurrenceTypes}
+            onRecurrenceTypesChange={setSelectedRecurrenceTypes}
             selectedCategorizationStatuses={selectedCategorizationStatuses}
             onCategorizationStatusesChange={setSelectedCategorizationStatuses}
             amountRange={amountRange}

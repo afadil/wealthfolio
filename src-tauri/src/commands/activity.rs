@@ -37,6 +37,8 @@ pub async fn search_activities(
     start_date_filter: Option<String>,
     end_date_filter: Option<String>,
     sort: Option<Sort>,
+    recurrence_filter: Option<Vec<String>>,
+    has_recurrence_filter: Option<bool>,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ActivitySearchResponse, String> {
     debug!("Search activities... {}, {}", page, page_size);
@@ -60,6 +62,8 @@ pub async fn search_activities(
         start_date_filter,
         end_date_filter,
         sort,
+        recurrence_filter,
+        has_recurrence_filter,
     )?)
 }
 

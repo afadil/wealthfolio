@@ -185,6 +185,8 @@ impl ActivityServiceTrait for ActivityService {
         start_date_filter: Option<String>,
         end_date_filter: Option<String>,
         sort: Option<Sort>,
+        recurrence_filter: Option<Vec<String>>,
+        has_recurrence_filter: Option<bool>,
     ) -> Result<ActivitySearchResponse> {
         self.activity_repository.search_activities(
             page,
@@ -202,6 +204,8 @@ impl ActivityServiceTrait for ActivityService {
             start_date_filter,
             end_date_filter,
             sort,
+            recurrence_filter,
+            has_recurrence_filter,
         )
     }
 
@@ -418,6 +422,7 @@ impl ActivityServiceTrait for ActivityService {
                 category_id: activity.category_id.clone(),
                 sub_category_id: activity.sub_category_id.clone(),
                 event_id: activity.event_id.clone(),
+                recurrence: activity.recurrence.clone(),
             })
             .collect();
 

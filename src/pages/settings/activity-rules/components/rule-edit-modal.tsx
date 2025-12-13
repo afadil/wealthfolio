@@ -34,6 +34,7 @@ export function RuleEditModal({
     categoryId?: string;
     subCategoryId?: string;
     activityType?: string;
+    recurrence?: string;
     priority: number;
     isGlobal: boolean;
   }) => {
@@ -47,6 +48,7 @@ export function RuleEditModal({
           categoryId: values.categoryId || undefined,
           subCategoryId: values.subCategoryId || undefined,
           activityType: values.activityType || undefined,
+          recurrence: values.recurrence || undefined,
           priority: values.priority,
           isGlobal: values.isGlobal,
         },
@@ -59,6 +61,7 @@ export function RuleEditModal({
         categoryId: values.categoryId || undefined,
         subCategoryId: values.subCategoryId || undefined,
         activityType: values.activityType || undefined,
+        recurrence: values.recurrence || undefined,
         priority: values.priority,
         isGlobal: values.isGlobal,
       });

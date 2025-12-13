@@ -185,10 +185,11 @@ export const CashImportPreviewTable = ({
   const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
   const [selectedCategorizationStatuses, setSelectedCategorizationStatuses] = useState<Set<string>>(new Set());
 
-  // Status values for category and event filters (like Step 3)
+  // Status values for category, event, and recurrence filters (like Step 3)
   const CATEGORY_STATUS_VALUES = ["uncategorized", "categorized"] as const;
   const EVENT_STATUS_VALUES = ["with-events", "without-events"] as const;
-  type CategorizationStatus = "categorized" | "uncategorized" | "with-events" | "without-events";
+  const RECURRENCE_STATUS_VALUES = ["with-recurrence", "without-recurrence"] as const;
+  type CategorizationStatus = "categorized" | "uncategorized" | "with-events" | "without-events" | "with-recurrence" | "without-recurrence";
 
   // Client-side filtering (search, amount, and all filter states) - matching Step 3 logic
   const filteredActivities = useMemo(() => {
@@ -257,6 +258,10 @@ export const CashImportPreviewTable = ({
               return !!activity.eventId;
             case "without-events":
               return !activity.eventId;
+            case "with-recurrence":
+              return !!activity.recurrence;
+            case "without-recurrence":
+              return !activity.recurrence;
             default:
               return true;
           }
@@ -320,6 +325,8 @@ export const CashImportPreviewTable = ({
   const uncategorizedCount = activities.filter((a) => !a.categoryId).length;
   const withEventsCount = activities.filter((a) => a.eventId).length;
   const withoutEventsCount = activities.filter((a) => !a.eventId).length;
+  const withRecurrenceCount = activities.filter((a) => a.recurrence).length;
+  const withoutRecurrenceCount = activities.filter((a) => !a.recurrence).length;
 
   // Status filter options (valid/error)
   const filterStatusOptions = useMemo(() => {
@@ -469,6 +476,40 @@ export const CashImportPreviewTable = ({
 
     return options;
   }, [activities, events, withEventsCount, withoutEventsCount]);
+
+  // Recurrence filter options - like event filter with status options
+  const filterRecurrenceOptions = useMemo(() => {
+    const options: { value: string; label: string }[] = [];
+
+    // Add status options only if there are activities matching them
+    if (withRecurrenceCount > 0) {
+      options.push({ value: "with-recurrence", label: `With Recurrence (${withRecurrenceCount})` });
+    }
+    if (withoutRecurrenceCount > 0) {
+      options.push({ value: "without-recurrence", label: `Without Recurrence (${withoutRecurrenceCount})` });
+    }
+
+    // Add recurrence types that have at least one activity
+    const recurrenceCounts = new Map<string, number>();
+    activities.forEach((activity) => {
+      const recurrence = activity?.recurrence;
+      if (recurrence) {
+        recurrenceCounts.set(recurrence, (recurrenceCounts.get(recurrence) || 0) + 1);
+      }
+    });
+
+    ["fixed", "variable", "periodic"].forEach((type) => {
+      const count = recurrenceCounts.get(type);
+      if (count && count > 0) {
+        options.push({
+          value: type,
+          label: `${type.charAt(0).toUpperCase() + type.slice(1)} (${count})`,
+        });
+      }
+    });
+
+    return options;
+  }, [activities, withRecurrenceCount, withoutRecurrenceCount]);
 
   const hasActiveFilters = searchQuery.trim().length > 0 ||
     hasAmountFilter ||
@@ -770,6 +811,31 @@ export const CashImportPreviewTable = ({
         },
       });
 
+      // Recurrence column
+      cols.push({
+        id: "recurrence",
+        accessorKey: "recurrence",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Recurrence" />,
+        cell: ({ row }) => {
+          const recurrence = row.original.recurrence;
+
+          return (
+            <div className="text-sm">
+              {recurrence ? (
+                <Badge variant="outline" className="text-xs">
+                  {recurrence.charAt(0).toUpperCase() + recurrence.slice(1)}
+                </Badge>
+              ) : (
+                <span className="text-muted-foreground">-</span>
+              )}
+            </div>
+          );
+        },
+        filterFn: (row, id, value: string) => {
+          return value.includes(row.getValue(id));
+        },
+      });
+
       // Description column
       cols.push({
         id: "description",
@@ -993,6 +1059,33 @@ export const CashImportPreviewTable = ({
                   CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number])
                 );
                 setSelectedCategorizationStatuses(new Set([...categoryStatuses, ...statusValues]));
+              }}
+            />
+          )}
+
+          {filterRecurrenceOptions.length > 0 && (
+            <DataTableFacetedFilter
+              title="Recurrence"
+              options={filterRecurrenceOptions}
+              selectedValues={new Set([
+                ...Array.from(selectedCategorizationStatuses).filter((s) =>
+                  RECURRENCE_STATUS_VALUES.includes(s as (typeof RECURRENCE_STATUS_VALUES)[number]) ||
+                  ["fixed", "variable", "periodic"].includes(s)
+                ),
+              ])}
+              onFilterChange={(values) => {
+                const allValues = Array.from(values);
+                const statusValues = allValues.filter((v) =>
+                  RECURRENCE_STATUS_VALUES.includes(v as (typeof RECURRENCE_STATUS_VALUES)[number]) ||
+                  ["fixed", "variable", "periodic"].includes(v)
+                ) as CategorizationStatus[];
+
+                // Keep category and event statuses, replace recurrence statuses
+                const otherStatuses = Array.from(selectedCategorizationStatuses).filter((s) =>
+                  CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number]) ||
+                  EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number])
+                );
+                setSelectedCategorizationStatuses(new Set([...otherStatuses, ...statusValues]));
               }}
             />
           )}
