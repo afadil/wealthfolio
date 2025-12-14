@@ -62,6 +62,11 @@ const Balance: React.FC<BalanceProps> = ({
             className="muted-fraction"
             value={targetValue}
             isolate={false}
+            style={{
+              // @ts-expect-error https://number-flow.barvian.me/ - but it's not in TS object
+              "--number-flow-mask-height": "0px",
+              "--number-flow-mask-width": "0px",
+            }}
             format={{
               currency: currency,
               style: displayCurrency ? "currency" : "decimal",
