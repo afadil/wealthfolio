@@ -1,5 +1,7 @@
-import { getRunEnv, listenDeepLinkTauri, openUrlInBrowser, RUN_ENV } from "@/adapters";
-import { deleteSecret, getSecret, setSecret } from "@/commands/secrets";
+import { getRunEnv, listenDeepLinkTauri, logger, openUrlInBrowser, RUN_ENV } from "@/adapters";
+import { getSecret } from "@/commands/secrets";
+import { clearSyncSession, storeSyncSession } from "@/commands/wealthfolio-sync";
+import { getPlatform } from "@/hooks/use-platform";
 import { createClient, Session, SupabaseClient, User } from "@supabase/supabase-js";
 import {
   createContext,
@@ -21,9 +23,11 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 const REFRESH_TOKEN_KEY = "wealthfolio_sync_refresh_token";
 const ACCESS_TOKEN_KEY = "wealthfolio_sync_access_token";
 
-// Deep link scheme for desktop OAuth callback (used for magic links on desktop)
-const DESKTOP_DEEP_LINK_SCHEME = "wealthfolio";
-const DESKTOP_DEEP_LINK_URL = `${DESKTOP_DEEP_LINK_SCHEME}://auth/callback`;
+// Deep-link URL for desktop callbacks (custom URL scheme)
+const DESKTOP_DEEP_LINK_URL = "wealthfolio://auth/callback";
+
+// Universal link callback URL for Tauri mobile (associated domain)
+const MOBILE_UNIVERSAL_LINK_CALLBACK_URL = "https://auth.wealthfolio.app/callback";
 
 // Custom event for SnapTrade deep link callbacks
 export const SNAPTRADE_CALLBACK_EVENT = "snaptrade-deep-link-callback";
@@ -57,7 +61,7 @@ function parseSnapTradeCallback(url: string): SnapTradeCallbackData | null {
     }
 
     return {
-      status: status as "SUCCESS" | "ERROR",
+      status: status,
       authorizationId: urlObj.searchParams.get("authorizationId") ?? undefined,
       errorCode: urlObj.searchParams.get("errorCode") ?? undefined,
       detail: urlObj.searchParams.get("detail") ?? undefined,
@@ -72,21 +76,46 @@ const getWebRedirectUrl = () => {
   return `${window.location.origin}/auth/callback`;
 };
 
-// For OAuth on desktop, we use a hosted callback page that redirects to deep link
+// For OAuth on desktop, we use a hosted callback page that redirects to the deep link
 // This is necessary because browsers block direct navigation to custom URL schemes
-const HOSTED_OAUTH_CALLBACK_URL = "https://wealthfolio.app/auth/callback";
+const HOSTED_OAUTH_CALLBACK_URL = "https://sync.wealthfolio.app/auth/callback";
 
-// Get the appropriate OAuth redirect URL based on environment
-const getOAuthRedirectUrl = () => {
-  const isDesktop = getRunEnv() === RUN_ENV.DESKTOP;
-  // For desktop: use hosted callback that will redirect to deep link
-  // For web: use local callback route
-  // In development, we fall back to local callback
-  if (isDesktop && import.meta.env.PROD) {
-    return HOSTED_OAUTH_CALLBACK_URL;
+type AuthCallbackPayload = { type: "code"; code: string } | { type: "error"; message: string };
+
+function parseAuthCallbackUrl(url: string): AuthCallbackPayload | null {
+  try {
+    const urlObj = new URL(url);
+    const hashParams = new URLSearchParams(urlObj.hash.substring(1));
+
+    const error =
+      urlObj.searchParams.get("error_description") ??
+      urlObj.searchParams.get("error") ??
+      hashParams.get("error_description") ??
+      hashParams.get("error");
+    if (error) {
+      return { type: "error", message: error };
+    }
+
+    const code = urlObj.searchParams.get("code");
+    if (code) {
+      return { type: "code", code };
+    }
+
+    const hasAccessToken =
+      hashParams.has("access_token") || urlObj.searchParams.has("access_token") || false;
+    if (hasAccessToken) {
+      return {
+        type: "error",
+        message:
+          "Unexpected token callback (access_token). This app expects Auth Code + PKCE; ensure Supabase is configured for PKCE and your hosted callback forwards the ?code=... parameter.",
+      };
+    }
+
+    return null;
+  } catch {
+    return null;
   }
-  return getWebRedirectUrl();
-};
+}
 
 interface WealthfolioSyncContextValue {
   isConnected: boolean;
@@ -104,49 +133,82 @@ interface WealthfolioSyncContextValue {
 
 const WealthfolioSyncContext = createContext<WealthfolioSyncContextValue | undefined>(undefined);
 
+function getAuthStorageKey(supabaseUrl: string): string {
+  try {
+    const hostname = new URL(supabaseUrl).hostname;
+    const projectRef = hostname.split(".")[0];
+    return `sb-${projectRef}-auth-token`;
+  } catch {
+    return "sb-auth-token";
+  }
+}
+
+function createHybridPkceStorage(storageKey: string) {
+  const inMemory = new Map<string, string>();
+  const pkceKey = `${storageKey}-code-verifier`;
+
+  const safeLocalStorageGet = (key: string) => {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  };
+
+  const safeLocalStorageSet = (key: string, value: string) => {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      // ignore - PKCE exchange will fail after a full redirect without persistence
+    }
+  };
+
+  const safeLocalStorageRemove = (key: string) => {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // ignore
+    }
+  };
+
+  return {
+    getItem: (key: string) => {
+      if (key === pkceKey) return safeLocalStorageGet(key);
+      return inMemory.get(key) ?? null;
+    },
+    setItem: (key: string, value: string) => {
+      if (key === pkceKey) {
+        safeLocalStorageSet(key, value);
+        return;
+      }
+      inMemory.set(key, value);
+    },
+    removeItem: (key: string) => {
+      if (key === pkceKey) {
+        safeLocalStorageRemove(key);
+        return;
+      }
+      inMemory.delete(key);
+    },
+  };
+}
+
 // Create a Supabase client with custom storage for persistent auth
 const createSupabaseClient = () => {
+  const storageKey = getAuthStorageKey(SUPABASE_URL);
   return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
+      storageKey,
+      storage: createHybridPkceStorage(storageKey),
+      flowType: "pkce",
       autoRefreshToken: true,
-      persistSession: false, // We handle persistence manually via keyring
+      // Must be true for auth-js to use the provided `storage` (PKCE code_verifier lives there).
+      // Our custom storage keeps sessions in-memory (non-persistent) while allowing PKCE to work
+      // across full-page redirects.
+      persistSession: true,
       detectSessionInUrl: false, // We handle URL parsing manually
     },
   });
-};
-
-// Parse auth tokens from URL (supports both hash fragments and query params)
-const parseAuthFromUrl = (url: string): { accessToken?: string; refreshToken?: string } | null => {
-  try {
-    const urlObj = new URL(url);
-
-    // First check hash fragment (OAuth typically uses this)
-    const hashParams = new URLSearchParams(urlObj.hash.substring(1));
-    let accessToken = hashParams.get("access_token");
-    let refreshToken = hashParams.get("refresh_token");
-
-    // Fall back to query params (magic link might use this)
-    if (!accessToken) {
-      accessToken = urlObj.searchParams.get("access_token");
-      refreshToken = urlObj.searchParams.get("refresh_token");
-    }
-
-    if (accessToken) {
-      return { accessToken, refreshToken: refreshToken ?? undefined };
-    }
-
-    // Check for error in the URL
-    const error = hashParams.get("error") || urlObj.searchParams.get("error");
-    if (error) {
-      console.error("Auth error from URL:", error);
-      return null;
-    }
-
-    return null;
-  } catch (err) {
-    console.error("Failed to parse auth URL:", err);
-    return null;
-  }
 };
 
 export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
@@ -166,8 +228,7 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
   const storeTokens = useCallback(async (session: Session | null) => {
     if (!session) {
       if (getRunEnv() === RUN_ENV.DESKTOP) {
-        await deleteSecret(REFRESH_TOKEN_KEY).catch(() => undefined);
-        await deleteSecret(ACCESS_TOKEN_KEY).catch(() => undefined);
+        await clearSyncSession().catch(() => undefined);
       } else {
         localStorage.removeItem(REFRESH_TOKEN_KEY);
         localStorage.removeItem(ACCESS_TOKEN_KEY);
@@ -176,12 +237,7 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
     }
 
     if (getRunEnv() === RUN_ENV.DESKTOP) {
-      if (session.refresh_token) {
-        await setSecret(REFRESH_TOKEN_KEY, session.refresh_token);
-      }
-      if (session.access_token) {
-        await setSecret(ACCESS_TOKEN_KEY, session.access_token);
-      }
+      await storeSyncSession(session.access_token, session.refresh_token ?? undefined);
     } else {
       if (session.refresh_token) {
         localStorage.setItem(REFRESH_TOKEN_KEY, session.refresh_token);
@@ -193,57 +249,48 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Retrieve tokens from keyring (desktop) or localStorage (web fallback)
-  const retrieveTokens = useCallback(async (): Promise<{
-    refreshToken: string | null;
-    accessToken: string | null;
-  }> => {
+  const retrieveRefreshToken = useCallback(async (): Promise<string | null> => {
     if (getRunEnv() === RUN_ENV.DESKTOP) {
-      const refreshToken = await getSecret(REFRESH_TOKEN_KEY).catch(() => null);
-      const accessToken = await getSecret(ACCESS_TOKEN_KEY).catch(() => null);
-      return { refreshToken, accessToken };
-    } else {
-      return {
-        refreshToken: localStorage.getItem(REFRESH_TOKEN_KEY),
-        accessToken: localStorage.getItem(ACCESS_TOKEN_KEY),
-      };
+      return getSecret(REFRESH_TOKEN_KEY).catch(() => null);
     }
+    return localStorage.getItem(REFRESH_TOKEN_KEY);
   }, []);
 
   // Handle auth callback from URL (deep link or web redirect)
   const handleAuthCallback = useCallback(
     async (url: string) => {
-      console.log("handleAuthCallback called with URL:", url);
-      const tokens = parseAuthFromUrl(url);
-      console.log("Parsed tokens:", tokens ? "found" : "not found");
+      const payload = parseAuthCallbackUrl(url);
 
-      if (!tokens?.accessToken) {
-        console.warn("No access token found in callback URL");
+      if (!payload) {
+        return;
+      }
+
+      if (payload.type === "error") {
+        setError(payload.message);
         return;
       }
 
       try {
-        console.log("Setting session with tokens...");
-        // Set the session using the tokens from the callback
-        const { data, error: sessionError } = await supabase.auth.setSession({
-          access_token: tokens.accessToken,
-          refresh_token: tokens.refreshToken ?? "",
-        });
+        const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(
+          payload.code,
+        );
 
-        if (sessionError) {
-          console.error("Failed to set session from callback:", sessionError);
-          setError(sessionError.message);
+        if (exchangeError) {
+          logger.error("Failed to exchange auth code for session.");
+          setError(exchangeError.message);
           return;
         }
 
-        if (data.session) {
-          console.log("Session set successfully, storing tokens...");
-          setSession(data.session);
-          setUser(data.session.user);
-          await storeTokens(data.session);
-          console.log("Tokens stored successfully");
+        if (!data.session) {
+          setError("No session returned after completing sign-in.");
+          return;
         }
+
+        setSession(data.session);
+        setUser(data.session.user);
+        await storeTokens(data.session);
       } catch (err) {
-        console.error("Error handling auth callback:", err);
+        logger.error("Error handling auth callback.");
         setError(err instanceof Error ? err.message : "Failed to complete sign in");
       }
     },
@@ -256,7 +303,7 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
 
     const restoreSession = async () => {
       try {
-        const { refreshToken } = await retrieveTokens();
+        const refreshToken = await retrieveRefreshToken();
 
         if (refreshToken) {
           // Use the refresh token to get a new session
@@ -265,7 +312,7 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
           });
 
           if (refreshError) {
-            console.warn("Failed to refresh session:", refreshError.message);
+            logger.warn("Failed to refresh session.");
             // Clear invalid tokens
             await storeTokens(null);
           } else if (data.session && !cancelled) {
@@ -276,7 +323,7 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
           }
         }
       } catch (err) {
-        console.error("Error restoring session:", err);
+        logger.error("Error restoring session.");
       } finally {
         if (!cancelled) {
           setIsLoading(false);
@@ -307,7 +354,7 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, [supabase, storeTokens, retrieveTokens]);
+  }, [supabase, storeTokens, retrieveRefreshToken]);
 
   // Listen for deep link events on desktop
   useEffect(() => {
@@ -319,12 +366,10 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
       try {
         unlistenFn = await listenDeepLinkTauri<string>((event) => {
           const url = event.payload;
-          console.log("Deep link received:", url);
 
           // First, check if this is a SnapTrade callback
           const snapTradeData = parseSnapTradeCallback(url);
           if (snapTradeData) {
-            console.log("SnapTrade callback detected:", snapTradeData);
             // Dispatch a custom event that the SnapTrade portal component can listen to
             window.dispatchEvent(
               new CustomEvent(SNAPTRADE_CALLBACK_EVENT, { detail: snapTradeData }),
@@ -332,13 +377,13 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
             return;
           }
 
-          // Check if this is an auth callback (Supabase)
-          if (url.includes("/auth/callback") || url.includes("access_token")) {
+          const authPayload = parseAuthCallbackUrl(url);
+          if (authPayload) {
             void handleAuthCallback(url);
           }
         });
       } catch (err) {
-        console.error("Failed to set up deep link listener:", err);
+        logger.error("Failed to set up deep link listener.");
       }
     };
 
@@ -349,13 +394,11 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
     };
   }, [handleAuthCallback]);
 
-  // Handle auth callback on mount (check URL for auth tokens)
+  // Handle auth callback on mount (webview redirect callback)
   // This works for both web and desktop (when OAuth happens in webview)
   useEffect(() => {
-    // Check if current URL has auth tokens (web redirect callback)
     const currentUrl = window.location.href;
-    if (currentUrl.includes("access_token") || currentUrl.includes("/auth/callback")) {
-      console.log("Auth callback detected in URL:", currentUrl);
+    if (parseAuthCallbackUrl(currentUrl)) {
       void handleAuthCallback(currentUrl);
       // Clean up URL after handling
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -434,18 +477,32 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
       setError(null);
 
       try {
-        const isDesktop = getRunEnv() === RUN_ENV.DESKTOP;
-        const redirectUrl = getOAuthRedirectUrl();
+        const isTauri = getRunEnv() === RUN_ENV.DESKTOP;
+        const platform = isTauri ? await getPlatform() : null;
+        const isMobile = platform?.is_mobile ?? false;
 
-        // For desktop in production: open system browser, use hosted callback -> deep link
-        // For desktop in dev or web: let OAuth happen in webview/browser with direct redirect
-        const useSystemBrowser = isDesktop && import.meta.env.PROD;
+        const redirectUrl =
+          isTauri && import.meta.env.PROD
+            ? isMobile
+              ? MOBILE_UNIVERSAL_LINK_CALLBACK_URL
+              : HOSTED_OAUTH_CALLBACK_URL
+            : getWebRedirectUrl();
+
+        const useSystemBrowser = isTauri && import.meta.env.PROD;
+        const queryParams =
+          provider === "google"
+            ? {
+                // Forces the account chooser instead of silently reusing the last Google session.
+                prompt: "select_account",
+              }
+            : undefined;
 
         const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
           provider,
           options: {
             skipBrowserRedirect: useSystemBrowser,
             redirectTo: redirectUrl,
+            queryParams,
           },
         });
 
@@ -453,7 +510,7 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
           throw oauthError;
         }
 
-        // On desktop production, open the OAuth URL in the system browser
+        // On Tauri production, open the OAuth URL in the system browser
         if (useSystemBrowser && data.url) {
           await openUrlInBrowser(data.url);
         }
@@ -474,12 +531,16 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
       setError(null);
 
       try {
-        const isDesktop = getRunEnv() === RUN_ENV.DESKTOP;
+        const isTauri = getRunEnv() === RUN_ENV.DESKTOP;
+        const platform = isTauri ? await getPlatform() : null;
+        const isMobile = platform?.is_mobile ?? false;
 
-        // For magic links on desktop in production: use deep link (email client opens app)
-        // For desktop in dev or web: use web callback
         const redirectUrl =
-          isDesktop && import.meta.env.PROD ? DESKTOP_DEEP_LINK_URL : getWebRedirectUrl();
+          isTauri && import.meta.env.PROD
+            ? isMobile
+              ? MOBILE_UNIVERSAL_LINK_CALLBACK_URL
+              : DESKTOP_DEEP_LINK_URL
+            : getWebRedirectUrl();
 
         const { error: otpError } = await supabase.auth.signInWithOtp({
           email,
