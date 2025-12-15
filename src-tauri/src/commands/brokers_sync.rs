@@ -2,6 +2,7 @@
 
 use log::{debug, info};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
@@ -71,6 +72,71 @@ struct TrpcResult<T> {
     data: T,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum TrpcEnvelope<T> {
+    Single(TrpcResponse<T>),
+    Batch(Vec<TrpcResponse<T>>),
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum TrpcData<T> {
+    Json { json: T },
+    Raw(T),
+}
+
+impl<T> TrpcData<T> {
+    fn into_inner(self) -> T {
+        match self {
+            Self::Raw(v) => v,
+            Self::Json { json } => json,
+        }
+    }
+}
+
+async fn parse_trpc_response<T: DeserializeOwned>(
+    response: reqwest::Response,
+) -> Result<T, String> {
+    let status = response.status();
+    let body = response
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read response body: {}", e))?;
+
+    parse_trpc_body(status, &body)
+}
+
+fn parse_trpc_body<T: DeserializeOwned>(status: reqwest::StatusCode, body: &str) -> Result<T, String> {
+    let envelope: TrpcEnvelope<TrpcData<T>> = serde_json::from_str(body).map_err(|e| {
+        // tRPC can return errors with HTTP 200 (especially for query procedures).
+        // Try to surface a clean error message without logging the full response body.
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
+            let message = v
+                .pointer("/error/message")
+                .and_then(|m| m.as_str())
+                .or_else(|| v.pointer("/0/error/message").and_then(|m| m.as_str()));
+            if let Some(message) = message {
+                return format!("tRPC error (status {}): {}", status, message);
+            }
+        }
+
+        format!("Failed to parse tRPC response (status {}): {}", status, e)
+    })?;
+
+    let data = match envelope {
+        TrpcEnvelope::Single(r) => r.result.data,
+        TrpcEnvelope::Batch(items) => items
+            .into_iter()
+            .next()
+            .ok_or_else(|| "Empty batched tRPC response".to_string())?
+            .result
+            .data,
+    };
+
+    Ok(data.into_inner())
+}
+
 /// HTTP client for the cloud broker API
 struct CloudApiClient {
     client: reqwest::Client,
@@ -104,8 +170,14 @@ impl CloudApiClient {
 
     /// Fetch broker connections via tRPC
     async fn list_connections(&self) -> Result<Vec<BrokerConnection>, String> {
-        let url = format!("{}/trpc/brokerage.listConnections", self.base_url);
-        debug!("Fetching connections from: {}", url);
+        let safe_url = format!("{}/trpc/brokerage.listConnections", self.base_url);
+        debug!("Fetching connections from: {}", safe_url);
+
+        // Use SuperJSON-style envelope (`{ json: ... }`) for compatibility.
+        let input = serde_json::json!({ "json": serde_json::json!({}) });
+        let input_str = input.to_string();
+        let encoded = urlencoding::encode(&input_str);
+        let url = format!("{}?input={}", safe_url, encoded);
 
         let response = self
             .client
@@ -124,12 +196,100 @@ impl CloudApiClient {
             ));
         }
 
-        let trpc_response: TrpcResponse<Vec<BrokerConnection>> = response
-            .json()
+        let status = response.status();
+        let body = response
+            .text()
             .await
-            .map_err(|e| format!("Failed to parse connections response: {}", e))?;
+            .map_err(|e| format!("Failed to read response body: {}", e))?;
 
-        Ok(trpc_response.result.data)
+        #[derive(Debug, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct ListConnectionsPayload {
+            #[serde(default)]
+            #[serde(
+                alias = "brokerageAuthorizations",
+                alias = "brokerage_authorizations",
+                alias = "authorizations"
+            )]
+            connections: Vec<BrokerConnection>,
+        }
+
+        #[derive(Debug, Deserialize)]
+        #[serde(untagged)]
+        enum ListConnectionsResult {
+            Connections(Vec<BrokerConnection>),
+            Payload(ListConnectionsPayload),
+        }
+
+        let raw_connections_count = serde_json::from_str::<serde_json::Value>(&body)
+            .ok()
+            .and_then(|v| {
+                let candidates = [
+                    "/result/data/json/connections",
+                    "/result/data/json/brokerageAuthorizations",
+                    "/result/data/json/authorizations",
+                    "/result/data/json",
+                    "/result/data/connections",
+                    "/result/data/brokerageAuthorizations",
+                    "/result/data/authorizations",
+                    "/result/data",
+                    "/0/result/data/json/connections",
+                    "/0/result/data/json/brokerageAuthorizations",
+                    "/0/result/data/json/authorizations",
+                    "/0/result/data/json",
+                    "/0/result/data/connections",
+                    "/0/result/data/brokerageAuthorizations",
+                    "/0/result/data/authorizations",
+                    "/0/result/data",
+                ];
+
+                for pointer in candidates {
+                    let node = v.pointer(pointer)?;
+                    if let Some(arr) = node.as_array() {
+                        return Some((pointer, arr.len()));
+                    }
+                }
+
+                None
+            });
+
+        let result = parse_trpc_body::<ListConnectionsResult>(status, &body)?;
+        let mut connections = match result {
+            ListConnectionsResult::Connections(connections) => connections,
+            ListConnectionsResult::Payload(payload) => payload.connections,
+        };
+
+        if connections.is_empty() {
+            if let Some((pointer, count)) = raw_connections_count {
+                if count > 0 {
+                    debug!(
+                        "Parsed 0 connections, but response contains {} at pointer {}",
+                        count, pointer
+                    );
+
+                    // Fallback: extract and deserialize the connections array directly from the body.
+                    // This avoids silently returning an empty list if our wrapper structs drift from API shape.
+                    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&body) {
+                        if let Some(node) = v.pointer(pointer) {
+                            match serde_json::from_value::<Vec<BrokerConnection>>(node.clone()) {
+                                Ok(recovered) if !recovered.is_empty() => {
+                                    connections = recovered;
+                                }
+                                Ok(_) => {}
+                                Err(e) => {
+                                    return Err(format!(
+                                        "Failed to parse connections at {}: {}",
+                                        pointer, e
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(connections)
     }
 
     /// Fetch broker accounts via tRPC
@@ -137,17 +297,20 @@ impl CloudApiClient {
         &self,
         authorization_ids: Option<Vec<String>>,
     ) -> Result<Vec<BrokerAccount>, String> {
-        let mut url = format!("{}/trpc/brokerage.listAccounts", self.base_url);
+        let safe_url = format!("{}/trpc/brokerage.listAccounts", self.base_url);
 
-        // Add query params if authorization_ids provided
-        if let Some(ids) = authorization_ids {
-            let input = serde_json::json!({ "authorizationIds": ids });
-            let input_str = input.to_string();
-            let encoded = urlencoding::encode(&input_str);
-            url = format!("{}?input={}", url, encoded);
-        }
+        // Hono/tRPC endpoint requires `input` even if all fields are optional.
+        // Use SuperJSON-style envelope (`{ json: ... }`) for compatibility.
+        let json_input = match authorization_ids {
+            Some(ids) if !ids.is_empty() => serde_json::json!({ "authorizationIds": ids }),
+            _ => serde_json::json!({}),
+        };
+        let input = serde_json::json!({ "json": json_input });
+        let input_str = input.to_string();
+        let encoded = urlencoding::encode(&input_str);
+        let url = format!("{}?input={}", safe_url, encoded);
 
-        debug!("Fetching accounts from: {}", url);
+        debug!("Fetching accounts from: {}", safe_url);
 
         let response = self
             .client
@@ -166,12 +329,29 @@ impl CloudApiClient {
             ));
         }
 
-        let trpc_response: TrpcResponse<Vec<BrokerAccount>> = response
-            .json()
-            .await
-            .map_err(|e| format!("Failed to parse accounts response: {}", e))?;
+        #[derive(Debug, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct ListAccountsPayload {
+            accounts: Option<Vec<BrokerAccount>>,
+            #[serde(alias = "brokerAccounts", alias = "broker_accounts")]
+            broker_accounts: Option<Vec<BrokerAccount>>,
+        }
 
-        Ok(trpc_response.result.data)
+        #[derive(Debug, Deserialize)]
+        #[serde(untagged)]
+        enum ListAccountsResult {
+            Accounts(Vec<BrokerAccount>),
+            Payload(ListAccountsPayload),
+        }
+
+        let result = parse_trpc_response::<ListAccountsResult>(response).await?;
+        Ok(match result {
+            ListAccountsResult::Accounts(accounts) => accounts,
+            ListAccountsResult::Payload(payload) => payload
+                .accounts
+                .or(payload.broker_accounts)
+                .unwrap_or_default(),
+        })
     }
 
     /// Remove a broker connection via tRPC
@@ -233,12 +413,7 @@ impl CloudApiClient {
             ));
         }
 
-        let trpc_response: TrpcResponse<ConnectPortalResponse> = response
-            .json()
-            .await
-            .map_err(|e| format!("Failed to parse connect portal response: {}", e))?;
-
-        Ok(trpc_response.result.data)
+        parse_trpc_response::<ConnectPortalResponse>(response).await
     }
 }
 
@@ -319,7 +494,14 @@ pub async fn sync_broker_data(state: State<'_, Arc<ServiceContext>>) -> Result<S
 
     // Step 2: Fetch and sync accounts
     info!("Fetching broker accounts...");
-    let accounts = client.list_accounts(None).await?;
+    let authorization_ids: Vec<String> = connections.iter().map(|c| c.id.clone()).collect();
+    let accounts = client
+        .list_accounts(if authorization_ids.is_empty() {
+            None
+        } else {
+            Some(authorization_ids)
+        })
+        .await?;
     info!("Found {} broker accounts", accounts.len());
 
     let accounts_result = state

@@ -280,15 +280,15 @@ pub fn run() {
             commands::addon::clear_addon_staging,
             commands::addon::submit_addon_rating,
             // Sync commands
-            commands::sync::set_sync_credentials,
-            commands::sync::get_sync_credentials,
-            commands::sync::clear_sync_credentials,
-            commands::sync::sync_broker_data,
-            commands::sync::get_synced_accounts,
-            commands::sync::get_platforms,
-            commands::sync::list_broker_connections,
-            commands::sync::remove_broker_connection,
-            commands::sync::get_connect_portal_url,
+            commands::brokers_sync::set_sync_credentials,
+            commands::brokers_sync::get_sync_credentials,
+            commands::brokers_sync::clear_sync_credentials,
+            commands::brokers_sync::sync_broker_data,
+            commands::brokers_sync::get_synced_accounts,
+            commands::brokers_sync::get_platforms,
+            commands::brokers_sync::list_broker_connections,
+            commands::brokers_sync::remove_broker_connection,
+            commands::brokers_sync::get_connect_portal_url,
         ])
         .build(tauri::generate_context!())
         .expect("Failed to build Wealthfolio application")
