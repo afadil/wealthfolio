@@ -18,6 +18,12 @@ pub struct Account {
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
     pub platform_id: Option<String>,
+    /// External ID from broker/cloud sync (e.g., SnapTrade account UUID)
+    pub external_id: Option<String>,
+    /// Account number from the broker
+    pub account_number: Option<String>,
+    /// Additional metadata as JSON string
+    pub meta: Option<String>,
 }
 
 /// Input model for creating a new account
@@ -33,6 +39,9 @@ pub struct NewAccount {
     pub is_default: bool,
     pub is_active: bool,
     pub platform_id: Option<String>,
+    pub external_id: Option<String>,
+    pub account_number: Option<String>,
+    pub meta: Option<String>,
 }
 
 impl NewAccount {
@@ -63,6 +72,9 @@ pub struct AccountUpdate {
     pub is_default: bool,
     pub is_active: bool,
     pub platform_id: Option<String>,
+    pub external_id: Option<String>,
+    pub account_number: Option<String>,
+    pub meta: Option<String>,
 }
 
 impl AccountUpdate {
@@ -111,6 +123,9 @@ pub struct AccountDB {
     #[diesel(skip_insertion)]
     pub updated_at: NaiveDateTime,
     pub platform_id: Option<String>,
+    pub external_id: Option<String>,
+    pub account_number: Option<String>,
+    pub meta: Option<String>,
 }
 
 // Conversion implementations
@@ -127,6 +142,9 @@ impl From<AccountDB> for Account {
             created_at: db.created_at,
             updated_at: db.updated_at,
             platform_id: db.platform_id,
+            external_id: db.external_id,
+            account_number: db.account_number,
+            meta: db.meta,
         }
     }
 }
@@ -145,6 +163,9 @@ impl From<NewAccount> for AccountDB {
             created_at: now,
             updated_at: now,
             platform_id: domain.platform_id,
+            external_id: domain.external_id,
+            account_number: domain.account_number,
+            meta: domain.meta,
         }
     }
 }
@@ -162,6 +183,9 @@ impl From<AccountUpdate> for AccountDB {
             created_at: NaiveDateTime::default(), // This will be filled from existing record
             updated_at: chrono::Utc::now().naive_utc(),
             platform_id: domain.platform_id,
+            external_id: domain.external_id,
+            account_number: domain.account_number,
+            meta: domain.meta,
         }
     }
 }

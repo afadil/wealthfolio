@@ -35,6 +35,14 @@
       "windows": {
         "installMode": "passive"
       }
+    },
+    "deep-link": {
+      "mobile": [
+        { "host": "auth.wealthfolio.app", "pathPrefix": ["/callback"] }
+      ],
+      "desktop": {
+        "schemes": ["wealthfolio"]
+      }
     }
   },
   "app": {

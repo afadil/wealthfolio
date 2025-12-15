@@ -208,3 +208,12 @@ export const logger = {
   trace,
   debug,
 };
+
+export const listenDeepLinkTauri = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
+  return listen<T>("deep-link-received", handler);
+};
+
+export const openUrlInBrowser = async (url: string): Promise<void> => {
+  const { open: openShell } = await import("@tauri-apps/plugin-shell");
+  await openShell(url);
+};

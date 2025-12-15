@@ -16,9 +16,10 @@ use std::sync::Arc;
 
 use dotenvy::dotenv;
 use log::error;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 use events::emit_app_ready;
+use tauri_plugin_deep_link::DeepLinkExt;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Desktop-only setup
@@ -140,6 +141,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_deep_link::init())
         .setup(|app| {
             let handle = app.handle().clone();
 
@@ -155,6 +157,16 @@ pub fn run() {
 
             // Setup event listeners (platform-agnostic)
             listeners::setup_event_listeners(handle.clone());
+
+            // Setup deep link handler
+            let deep_link_handle = handle.clone();
+            app.deep_link().on_open_url(move |event| {
+                let urls = event.urls();
+                log::info!("Deep link received: {:?}", urls);
+                for url in urls {
+                    let _ = deep_link_handle.emit("deep-link-received", url.to_string());
+                }
+            });
 
             // Platform-specific setup
             #[cfg(desktop)]
@@ -267,6 +279,16 @@ pub fn run() {
             commands::addon::install_addon_from_staging,
             commands::addon::clear_addon_staging,
             commands::addon::submit_addon_rating,
+            // Sync commands
+            commands::sync::set_sync_credentials,
+            commands::sync::get_sync_credentials,
+            commands::sync::clear_sync_credentials,
+            commands::sync::sync_broker_data,
+            commands::sync::get_synced_accounts,
+            commands::sync::get_platforms,
+            commands::sync::list_broker_connections,
+            commands::sync::remove_broker_connection,
+            commands::sync::get_connect_portal_url,
         ])
         .build(tauri::generate_context!())
         .expect("Failed to build Wealthfolio application")

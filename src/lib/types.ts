@@ -25,7 +25,10 @@ export interface Account {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
-  platformId?: string; // Optional
+  platformId?: string; // Optional - links to platform/broker
+  externalId?: string; // Optional - broker account UUID for sync tracking
+  accountNumber?: string; // Optional - account number from broker
+  meta?: string; // Optional - additional metadata as JSON string
 }
 
 export interface Activity {
@@ -560,4 +563,12 @@ export interface UpdateInfo {
   storeUrl?: string;
   changelogUrl?: string;
   screenshots?: string[];
+}
+
+// Platform/Broker type
+export interface Platform {
+  id: string;
+  name: string | null;
+  url: string;
+  externalId: string | null;
 }

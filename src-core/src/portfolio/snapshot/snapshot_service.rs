@@ -124,6 +124,9 @@ impl SnapshotService {
             created_at: now,
             updated_at: now,
             platform_id: None,
+            external_id: None,
+            account_number: None,
+            meta: None,
         }
     }
 
