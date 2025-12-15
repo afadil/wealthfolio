@@ -280,6 +280,8 @@ pub fn run() {
             commands::addon::clear_addon_staging,
             commands::addon::submit_addon_rating,
             // Sync commands
+            commands::wealthfolio_sync::store_sync_session,
+            commands::wealthfolio_sync::clear_sync_session,
             commands::brokers_sync::set_sync_credentials,
             commands::brokers_sync::get_sync_credentials,
             commands::brokers_sync::clear_sync_credentials,

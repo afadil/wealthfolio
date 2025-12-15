@@ -15,6 +15,7 @@ import { Icons } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/use-toast";
 import { useWealthfolioSync } from "@/context/wealthfolio-sync-context";
+import { getPlatform } from "@/hooks/use-platform";
 import { QueryKeys } from "@/lib/query-keys";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ActionConfirm } from "@wealthfolio/ui";
@@ -58,8 +59,8 @@ function useRemoveConnection() {
   });
 }
 
-// Deep link URL for SnapTrade callback on desktop
-const SNAPTRADE_DEEP_LINK_CALLBACK = "wealthfolio://callback";
+const SNAPTRADE_DESKTOP_CALLBACK_URL = "wealthfolio://callback";
+const SNAPTRADE_MOBILE_CALLBACK_URL = "https://auth.wealthfolio.app/callback";
 
 /**
  * Hook to manage the SnapTrade connect portal state.
@@ -74,8 +75,15 @@ function useSnapTradePortal() {
     try {
       // For desktop (Tauri), use deep link callback to redirect back to the app
       // For web, no redirect URL is passed (backend uses dashboard URL)
-      const isDesktop = getRunEnv() === RUN_ENV.DESKTOP;
-      const redirectUrl = isDesktop ? SNAPTRADE_DEEP_LINK_CALLBACK : undefined;
+      const isTauri = getRunEnv() === RUN_ENV.DESKTOP;
+      const platform = isTauri ? await getPlatform() : null;
+      const isMobile = platform?.is_mobile ?? false;
+
+      const redirectUrl = isTauri
+        ? isMobile
+          ? SNAPTRADE_MOBILE_CALLBACK_URL
+          : SNAPTRADE_DESKTOP_CALLBACK_URL
+        : undefined;
 
       const response = await getConnectPortalUrl(reconnectAuthorizationId, redirectUrl);
       if (response?.redirectUri) {

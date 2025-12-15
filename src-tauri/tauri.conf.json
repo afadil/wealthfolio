@@ -38,7 +38,7 @@
     },
     "deep-link": {
       "mobile": [
-        { "host": "auth.wealthfolio.app", "pathPrefix": ["/callback"] }
+        { "host": "auth.wealthfolio.app", "pathPrefix": ["/callback", "/auth/callback"] }
       ],
       "desktop": {
         "schemes": ["wealthfolio"]
