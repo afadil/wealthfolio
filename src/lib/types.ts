@@ -3,13 +3,13 @@ import * as z from "zod";
 import { AccountType, ActivityType, DataSource, HoldingType } from "./constants";
 
 export {
-  AccountType,
-  ActivityType,
-  DataSource,
-  ExportDataType,
-  ExportedFileFormat,
-  HoldingType,
-  ImportFormat,
+    AccountType,
+    ActivityType,
+    DataSource,
+    ExportDataType,
+    ExportedFileFormat,
+    HoldingType,
+    ImportFormat
 } from "./constants";
 
 export type { ImportRequiredField } from "./constants";
@@ -226,6 +226,7 @@ export interface Instrument {
   assetSubclass?: string | null;
   countries?: Country[] | null;
   sectors?: Sector[] | null;
+  risk?: string | null;
 }
 
 export interface MonetaryValue {
@@ -310,6 +311,7 @@ export interface Asset {
   dataSource: string;
   sectors?: string | null;
   url?: string | null;
+  risk?: string | null;
 }
 
 export interface Quote {
@@ -522,6 +524,7 @@ export interface UpdateAssetProfile {
   notes: string;
   assetClass: string;
   assetSubClass: string;
+  risk?: string;
 }
 
 // Rename ComparisonItem to TrackedItem

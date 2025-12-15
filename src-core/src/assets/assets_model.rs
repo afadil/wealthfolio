@@ -32,6 +32,7 @@ pub struct Asset {
     pub data_source: String,
     pub sectors: Option<String>,
     pub url: Option<String>,
+    pub risk: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -84,6 +85,7 @@ pub struct NewAsset {
     pub data_source: String,
     pub sectors: Option<String>,
     pub url: Option<String>,
+    pub risk: Option<String>,
 }
 
 impl NewAsset {
@@ -161,6 +163,7 @@ impl From<crate::market_data::providers::models::AssetProfile> for NewAsset {
             data_source: profile.data_source,
             sectors: profile.sectors,
             url: profile.url,
+            risk: None,
         }
     }
 }
@@ -176,6 +179,7 @@ pub struct UpdateAssetProfile {
     pub notes: String,
     pub asset_sub_class: Option<String>,
     pub asset_class: Option<String>,
+    pub risk: Option<String>,
 }
 
 impl UpdateAssetProfile {
@@ -226,6 +230,7 @@ pub struct AssetDB {
     pub data_source: String,
     pub sectors: Option<String>,
     pub url: Option<String>,
+    pub risk: Option<String>,
 }
 
 // Conversion implementations
@@ -251,6 +256,7 @@ impl From<AssetDB> for Asset {
             data_source: db.data_source,
             sectors: db.sectors,
             url: db.url,
+            risk: db.risk,
         }
     }
 }
@@ -278,6 +284,7 @@ impl From<NewAsset> for AssetDB {
             data_source: domain.data_source,
             sectors: domain.sectors,
             url: domain.url,
+            risk: domain.risk,
         }
     }
 }
