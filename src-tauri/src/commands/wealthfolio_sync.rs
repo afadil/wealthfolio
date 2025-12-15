@@ -21,13 +21,17 @@ pub async fn store_sync_session(
         .set_secret(SYNC_ACCESS_TOKEN_KEY, &access_token)
         .map_err(|e| e.to_string())?;
 
-    match refresh_token {
-        Some(token) if !token.trim().is_empty() => KeyringSecretStore
-            .set_secret(SYNC_REFRESH_TOKEN_KEY, &token)
-            .map_err(|e| e.to_string())?,
-        _ => KeyringSecretStore
-            .delete_secret(SYNC_REFRESH_TOKEN_KEY)
-            .map_err(|e| e.to_string())?,
+    match refresh_token.as_deref().map(str::trim) {
+        Some(token) if !token.is_empty() => {
+            KeyringSecretStore
+                .set_secret(SYNC_REFRESH_TOKEN_KEY, token)
+                .map_err(|e| e.to_string())?;
+        }
+        _ => {
+            KeyringSecretStore
+                .delete_secret(SYNC_REFRESH_TOKEN_KEY)
+                .map_err(|e| e.to_string())?;
+        }
     }
 
     Ok(())
@@ -46,4 +50,3 @@ pub async fn clear_sync_session(
 
     Ok(())
 }
-

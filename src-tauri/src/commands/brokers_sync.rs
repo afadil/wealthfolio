@@ -23,6 +23,7 @@ const CLOUD_ACCESS_TOKEN_KEY: &str = "wealthfolio_sync_access_token";
 /// Override with `WEALTHFOLIO_SYNC_API_URL` (preferred) or `API_URL` (legacy/dev).
 const DEFAULT_CLOUD_API_URL: &str = "https://api.wealthfolio.app";
 
+
 fn normalize_cloud_api_base_url(raw: &str) -> String {
     let mut url = raw.trim().trim_end_matches('/').to_string();
 
@@ -559,7 +560,6 @@ pub async fn get_platforms(state: State<'_, Arc<ServiceContext>>) -> Result<Vec<
 // Broker Connection Management Commands (secure backend-only API calls)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Helper function to create an API client from stored credentials
 fn create_api_client() -> Result<CloudApiClient, String> {
     let access_token = KeyringSecretStore
         .get_secret(CLOUD_ACCESS_TOKEN_KEY)
@@ -570,7 +570,6 @@ fn create_api_client() -> Result<CloudApiClient, String> {
 }
 
 /// List broker connections from the cloud API
-/// The access token is retrieved securely from the keyring - never exposed to frontend
 #[tauri::command]
 pub async fn list_broker_connections(
     _state: State<'_, Arc<ServiceContext>>,
@@ -585,7 +584,6 @@ pub async fn list_broker_connections(
 }
 
 /// Remove a broker connection via the cloud API
-/// The access token is retrieved securely from the keyring - never exposed to frontend
 #[tauri::command]
 pub async fn remove_broker_connection(
     authorization_id: String,
@@ -609,7 +607,6 @@ pub async fn remove_broker_connection(
 }
 
 /// Get the connect portal URL from the cloud API
-/// The access token is retrieved securely from the keyring - never exposed to frontend
 #[tauri::command]
 pub async fn get_connect_portal_url(
     reconnect_authorization_id: Option<String>,

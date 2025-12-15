@@ -316,7 +316,9 @@ export function SnapTradeConnectPortal({
         toast.info("No new connections detected yet. Please complete the connection in your browser.");
       }
     } catch (error) {
-      toast.error(`Failed to check connections: ${error instanceof Error ? error.message : "Unknown error"}`);
+      toast.error(
+        `Failed to check connections: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
     }
   }, [handleSuccess]);
 
