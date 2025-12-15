@@ -214,7 +214,7 @@ export interface QuoteSummary {
   longName: string;
   sector?: string;
   industry?: string;
-  dataSource?: boolean;
+  dataSource?: string;
 }
 
 export interface MarketDataProviderInfo {
