@@ -12,8 +12,8 @@ use crate::context::ServiceContext;
 use crate::secret_store::KeyringSecretStore;
 use wealthfolio_core::secrets::SecretStore;
 use wealthfolio_core::sync::{
-    BrokerAccount, BrokerConnection, ConnectPortalRequest, ConnectPortalResponse, Platform,
-    SyncAccountsResponse, SyncConnectionsResponse,
+    BrokerAccount, BrokerConnection, ConnectPortalResponse, Platform, SyncAccountsResponse,
+    SyncConnectionsResponse,
 };
 
 /// Secret key for storing the cloud API access token (same as frontend)
@@ -359,7 +359,9 @@ impl CloudApiClient {
         let url = format!("{}/trpc/brokerage.removeConnection", self.base_url);
         debug!("Removing connection: {}", authorization_id);
 
-        let body = serde_json::json!({ "authorizationId": authorization_id });
+        // Wrap in SuperJSON envelope for tRPC compatibility
+        let inner = serde_json::json!({ "authorizationId": authorization_id });
+        let body = serde_json::json!({ "json": inner });
 
         let response = self
             .client
@@ -391,9 +393,12 @@ impl CloudApiClient {
         let url = format!("{}/trpc/brokerage.getConnectionPortalUrl", self.base_url);
         debug!("Getting connect portal URL");
 
-        let body = ConnectPortalRequest {
-            reconnect_authorization_id,
+        // Wrap in SuperJSON envelope for tRPC compatibility
+        let inner = match reconnect_authorization_id {
+            Some(id) => serde_json::json!({ "reconnectAuthorizationId": id }),
+            None => serde_json::json!({}),
         };
+        let body = serde_json::json!({ "json": inner });
 
         let response = self
             .client
