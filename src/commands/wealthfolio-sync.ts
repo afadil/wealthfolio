@@ -31,4 +31,3 @@ export const clearSyncSession = async (): Promise<void> => {
     throw error;
   }
 };
-

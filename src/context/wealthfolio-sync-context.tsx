@@ -322,7 +322,7 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
             await storeTokens(data.session);
           }
         }
-      } catch (err) {
+      } catch (_err) {
         logger.error("Error restoring session.");
       } finally {
         if (!cancelled) {
@@ -382,7 +382,7 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
             void handleAuthCallback(url);
           }
         });
-      } catch (err) {
+      } catch (_err) {
         logger.error("Failed to set up deep link listener.");
       }
     };

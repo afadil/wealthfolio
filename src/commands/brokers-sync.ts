@@ -112,4 +112,3 @@ export const getConnectPortalUrl = async (
     throw error;
   }
 };
-
