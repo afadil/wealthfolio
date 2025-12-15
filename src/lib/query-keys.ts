@@ -65,6 +65,11 @@ export const QueryKeys = {
   ADDON_STORE_LISTINGS: "addonStoreListings",
   ADDON_AUTO_UPDATE_CHECK: "addonAutoUpdateCheck",
 
+  // Cloud Sync
+  BROKER_CONNECTIONS: "brokerConnections",
+  PLATFORMS: "platforms",
+  SYNCED_ACCOUNTS: "syncedAccounts",
+
   secrets: {
     apiKey: (providerId: string) => ["secrets", "apiKey", providerId],
   },

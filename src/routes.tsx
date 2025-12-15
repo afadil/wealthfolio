@@ -33,6 +33,7 @@ import { getDynamicRoutes, subscribeToNavigationUpdates } from "@/addons/addons-
 import NotFoundPage from "@/pages/not-found";
 import HoldingsInsightsPage from "./pages/holdings/holdings-insights-page";
 import AboutSettingsPage from "./pages/settings/about/about-page";
+import AuthCallbackPage from "./pages/auth/auth-callback-page";
 
 export function AppRoutes() {
   useGlobalEventListener();
@@ -62,6 +63,9 @@ export function AppRoutes() {
       <Routes>
         {/* QR Scanner - No layout for fullscreen camera access */}
         {/* <Route path="/qr-scanner" element={<QRScannerPage />} /> */}
+
+        {/* Auth callback - No layout needed */}
+        <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
         {/* Onboarding with dedicated layout */}
         <Route path="/onboarding" element={<OnboardingLayout />}>

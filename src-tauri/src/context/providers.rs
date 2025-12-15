@@ -16,6 +16,7 @@ use wealthfolio_core::{
     },
     settings::{settings_repository::SettingsRepository, SettingsService, SettingsServiceTrait},
     snapshot::{SnapshotRepository, SnapshotService},
+    sync::{PlatformRepository, SyncService},
     valuation::{ValuationRepository, ValuationService},
     AssetRepository, AssetService,
 };
@@ -46,6 +47,7 @@ pub async fn initialize_context(
     let fx_repository = Arc::new(FxRepository::new(pool.clone(), writer.clone()));
     let snapshot_repository = Arc::new(SnapshotRepository::new(pool.clone(), writer.clone()));
     let valuation_repository = Arc::new(ValuationRepository::new(pool.clone(), writer.clone()));
+    let platform_repository = Arc::new(PlatformRepository::new(pool.clone(), writer.clone()));
     // Instantiate Transaction Executor using the Arc<DbPool> directly
     let transaction_executor = pool.clone();
 
@@ -134,6 +136,12 @@ pub async fn initialize_context(
         holdings_valuation_service.clone(),
     ));
 
+    let sync_service = Arc::new(SyncService::new(
+        account_repository.clone(),
+        platform_repository.clone(),
+        transaction_executor.clone(),
+    ));
+
     Ok(ServiceContext {
         base_currency,
         instance_id,
@@ -150,5 +158,6 @@ pub async fn initialize_context(
         snapshot_service,
         holdings_service,
         valuation_service,
+        sync_service,
     })
 }

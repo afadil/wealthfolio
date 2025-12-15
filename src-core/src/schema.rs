@@ -12,6 +12,9 @@ diesel::table! {
         created_at -> Timestamp,
         updated_at -> Timestamp,
         platform_id -> Nullable<Text>,
+        external_id -> Nullable<Text>,
+        account_number -> Nullable<Text>,
+        meta -> Nullable<Text>,
     }
 }
 
@@ -162,6 +165,7 @@ diesel::table! {
         id -> Text,
         name -> Nullable<Text>,
         url -> Text,
+        external_id -> Nullable<Text>,
     }
 }
 

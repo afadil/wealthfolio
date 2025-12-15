@@ -32,6 +32,7 @@ export type { EventCallback, UnlistenFn } from "./tauri";
 
 export {
   listenDatabaseRestoredTauri,
+  listenDeepLinkTauri,
   listenFileDropCancelledTauri,
   listenFileDropHoverTauri,
   listenFileDropTauri,
@@ -45,6 +46,7 @@ export {
   openDatabaseFileDialogTauri,
   openFileSaveDialogTauri,
   openFolderDialogTauri,
+  openUrlInBrowser,
 } from "./tauri";
 
 export * from "./web";

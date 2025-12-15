@@ -1,8 +1,9 @@
-import { Link } from "react-router-dom";
-import { Skeleton } from "@/components/ui/skeleton";
-import { AccountOperations } from "./account-operations";
-import type { Account } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
+import { Icons } from "@/components/ui/icons";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { Account } from "@/lib/types";
+import { Link } from "react-router-dom";
+import { AccountOperations } from "./account-operations";
 
 export interface AccountItemProps {
   account: Account;
@@ -11,22 +12,38 @@ export interface AccountItemProps {
 }
 
 export function AccountItem({ account, onEdit, onDelete }: AccountItemProps) {
+  // Check if account is synced from broker
+  const isSynced = !!account.externalId;
+
   return (
     <div className="flex items-center justify-between p-4">
       <div className="grid gap-1">
-        <Link
-          to={`/accounts/${account.id}`}
-          className={`font-semibold hover:underline ${
-            !account.isActive ? "text-muted-foreground" : ""
-          }`}
-        >
-          {account.name}
-        </Link>
-        <div>
+        <div className="flex items-center gap-2">
+          <Link
+            to={`/accounts/${account.id}`}
+            className={`font-semibold hover:underline ${
+              !account.isActive ? "text-muted-foreground" : ""
+            }`}
+          >
+            {account.name}
+          </Link>
+          {isSynced && <Icons.Cloud className="text-muted-foreground h-3.5 w-3.5" />}
+        </div>
+        <div className="flex items-center gap-2">
           <p className="text-muted-foreground text-sm">
             {account.currency}
-            {account.group && <span className="text-muted-foreground"> - {account.group}</span>}
+            {account.group && <span> - {account.group}</span>}
           </p>
+          {account.platformId && (
+            <Badge variant="outline" className="text-xs font-normal">
+              {account.platformId}
+            </Badge>
+          )}
+          {account.accountNumber && (
+            <span className="text-muted-foreground font-mono text-xs">
+              #{account.accountNumber}
+            </span>
+          )}
         </div>
       </div>
       <div className="flex items-center space-x-4">

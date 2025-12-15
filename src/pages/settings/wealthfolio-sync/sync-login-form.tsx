@@ -1,66 +1,118 @@
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Icons } from "@/components/ui/icons";
-import { useWealthfolioSync } from "@/context/wealthfolio-sync-context";
-import { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Icons } from '@/components/ui/icons';
+import { Separator } from '@/components/ui/separator';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { useWealthfolioSync } from '@/context/wealthfolio-sync-context';
+import { useState, useEffect } from 'react';
+import { ProviderButton } from './provider-button';
+import { getPreferredProvider, savePreferredProvider } from '@/lib/cookie-utils';
+import { isAppleDevice } from '@/lib/device-utils';
+
+type Provider = 'google' | 'apple' | 'email';
 
 export function SyncLoginForm() {
-  const { signInWithEmail, signUpWithEmail, error, clearError, isLoading } = useWealthfolioSync();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const { signInWithOAuth, signInWithMagicLink, error, clearError, isLoading } =
+    useWealthfolioSync();
+
+  // State management
+  const [email, setEmail] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"signin" | "signup">("signin");
+  const [loadingProvider, setLoadingProvider] = useState<Provider | null>(null);
+  const [preferredProvider, setPreferredProvider] = useState<Provider | null>(null);
+  const [isMoreOptionsOpen, setIsMoreOptionsOpen] = useState(false);
 
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Load preferred provider from cookie on mount
+  useEffect(() => {
+    const savedProvider = getPreferredProvider();
+    setPreferredProvider(savedProvider);
+  }, []);
+
+  // Determine which providers to show at the top
+  const getTopProviders = (): Provider[] => {
+    // If user has a preference, show it first
+    if (preferredProvider) {
+      return [preferredProvider];
+    }
+
+    // If on Apple device, show both Google and Apple
+    if (isAppleDevice()) {
+      return ['google', 'apple'];
+    }
+
+    // Default: show Google only
+    return ['google'];
+  };
+
+  // Determine which providers to show in "More options"
+  const getMoreOptionsProviders = (): Provider[] => {
+    const topProviders = getTopProviders();
+    const allProviders: Provider[] = ['google', 'apple', 'email'];
+    return allProviders.filter((p) => !topProviders.includes(p));
+  };
+
+  const topProviders = getTopProviders();
+  const moreOptionsProviders = getMoreOptionsProviders();
+
+  const handleOAuthSignIn = async (provider: 'google' | 'apple') => {
     setLocalError(null);
     setSuccessMessage(null);
     clearError();
-
-    if (!email || !password) {
-      setLocalError("Please fill in all fields");
-      return;
-    }
+    setLoadingProvider(provider);
 
     try {
-      await signInWithEmail(email, password);
-    } catch {
+      await signInWithOAuth(provider);
+      // Save provider preference
+      savePreferredProvider(provider);
+    } catch (err) {
       // Error is handled by context
+      console.error('OAuth sign-in error:', err);
+    } finally {
+      setLoadingProvider(null);
     }
   };
 
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleMagicLinkSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
     setSuccessMessage(null);
     clearError();
 
-    if (!email || !password || !confirmPassword) {
-      setLocalError("Please fill in all fields");
+    if (!email) {
+      setLocalError('Please enter your email address');
       return;
     }
 
-    if (password !== confirmPassword) {
-      setLocalError("Passwords do not match");
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setLocalError('Please enter a valid email address');
       return;
     }
 
-    if (password.length < 6) {
-      setLocalError("Password must be at least 6 characters");
-      return;
-    }
+    setLoadingProvider('email');
 
     try {
-      await signUpWithEmail(email, password);
-      setSuccessMessage("Please check your email to confirm your account.");
-    } catch {
+      await signInWithMagicLink(email);
+      // Save provider preference
+      savePreferredProvider('email');
+      setSuccessMessage(
+        "Check your email! We've sent you a magic link to sign in. The link will expire in 24 hours.",
+      );
+      setEmail(''); // Clear email input
+    } catch (err) {
       // Error is handled by context
+      console.error('Magic link error:', err);
+    } finally {
+      setLoadingProvider(null);
     }
   };
 
@@ -75,41 +127,54 @@ export function SyncLoginForm() {
               <Icons.Globe className="text-primary h-6 w-6" />
             </div>
             <div>
-              <CardTitle className="text-lg font-semibold">Connect to Wealthfolio Sync</CardTitle>
+              <CardTitle className="text-lg font-semibold">Sign in to Wealthfolio Sync</CardTitle>
               <CardDescription>
-                Link your broker accounts and access your portfolio from anywhere.
+                Connect your broker accounts and access your portfolio from anywhere.
               </CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <Tabs
-            value={activeTab}
-            onValueChange={(v) => {
-              setActiveTab(v as "signin" | "signup");
-              setLocalError(null);
-              setSuccessMessage(null);
-              clearError();
-            }}
-          >
-            <TabsList className="mb-6 grid w-full grid-cols-2">
-              <TabsTrigger value="signin">Sign In</TabsTrigger>
-              <TabsTrigger value="signup">Create Account</TabsTrigger>
-            </TabsList>
+        <CardContent className="space-y-4">
+          {/* Error Alert */}
+          {displayError && (
+            <Alert variant="destructive">
+              <Icons.AlertCircle className="h-4 w-4" />
+              <AlertDescription>{displayError}</AlertDescription>
+            </Alert>
+          )}
 
-            <TabsContent value="signin">
-              <form onSubmit={handleSignIn} className="space-y-4">
-                {displayError && (
-                  <Alert variant="destructive">
-                    <Icons.AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{displayError}</AlertDescription>
-                  </Alert>
-                )}
+          {/* Success Alert */}
+          {successMessage && (
+            <Alert>
+              <Icons.CheckCircle className="h-4 w-4" />
+              <AlertDescription>{successMessage}</AlertDescription>
+            </Alert>
+          )}
 
+          {/* Top Provider Buttons */}
+          <div className="flex flex-col items-center space-y-3">
+            {topProviders.includes('google') && (
+              <ProviderButton
+                provider="google"
+                onClick={() => handleOAuthSignIn('google')}
+                isLoading={loadingProvider === 'google'}
+                isLastUsed={preferredProvider === 'google'}
+              />
+            )}
+            {topProviders.includes('apple') && (
+              <ProviderButton
+                provider="apple"
+                onClick={() => handleOAuthSignIn('apple')}
+                isLoading={loadingProvider === 'apple'}
+                isLastUsed={preferredProvider === 'apple'}
+              />
+            )}
+            {topProviders.includes('email') && (
+              <form onSubmit={handleMagicLinkSignIn} className="w-full max-w-sm space-y-3">
                 <div className="space-y-2">
-                  <Label htmlFor="signin-email">Email</Label>
+                  <Label htmlFor="email">Email</Label>
                   <Input
-                    id="signin-email"
+                    id="email"
                     type="email"
                     placeholder="you@example.com"
                     value={email}
@@ -117,100 +182,115 @@ export function SyncLoginForm() {
                     autoComplete="email"
                   />
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="signin-password">Password</Label>
-                  <Input
-                    id="signin-password"
-                    type="password"
-                    placeholder="Your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="current-password"
-                  />
-                </div>
-
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? (
-                    <>
-                      <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                      Signing in...
-                    </>
-                  ) : (
-                    "Sign In"
-                  )}
-                </Button>
+                <ProviderButton
+                  provider="email"
+                  onClick={() => {}} // Form submission handles this
+                  isLoading={loadingProvider === 'email'}
+                  isLastUsed={preferredProvider === 'email'}
+                />
               </form>
-            </TabsContent>
+            )}
+          </div>
 
-            <TabsContent value="signup">
-              <form onSubmit={handleSignUp} className="space-y-4">
-                {displayError && (
-                  <Alert variant="destructive">
-                    <Icons.AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{displayError}</AlertDescription>
-                  </Alert>
+          {/* Divider */}
+          {moreOptionsProviders.length > 0 && (
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <Separator className="mx-auto max-w-sm" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background text-muted-foreground px-2">or</span>
+              </div>
+            </div>
+          )}
+
+          {/* More Sign-in Options (Collapsible) */}
+          {moreOptionsProviders.length > 0 && (
+            <Collapsible open={isMoreOptionsOpen} onOpenChange={setIsMoreOptionsOpen}>
+              <div className="flex justify-center">
+                <CollapsibleTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="w-full max-w-sm justify-between"
+                    disabled={isLoading}
+                  >
+                    <span className="text-muted-foreground text-sm">More sign-in options</span>
+                    <Icons.ChevronDown
+                      className={`h-4 w-4 transition-transform ${
+                        isMoreOptionsOpen ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </Button>
+                </CollapsibleTrigger>
+              </div>
+              <CollapsibleContent className="flex flex-col items-center space-y-3 pt-3">
+                {moreOptionsProviders.includes('google') && (
+                  <ProviderButton
+                    provider="google"
+                    onClick={() => handleOAuthSignIn('google')}
+                    isLoading={loadingProvider === 'google'}
+                  />
                 )}
-
-                {successMessage && (
-                  <Alert>
-                    <Icons.CheckCircle className="h-4 w-4" />
-                    <AlertDescription>{successMessage}</AlertDescription>
-                  </Alert>
+                {moreOptionsProviders.includes('apple') && (
+                  <ProviderButton
+                    provider="apple"
+                    onClick={() => handleOAuthSignIn('apple')}
+                    isLoading={loadingProvider === 'apple'}
+                  />
                 )}
+                {moreOptionsProviders.includes('email') && (
+                  <form onSubmit={handleMagicLinkSignIn} className="w-full max-w-sm space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="more-email">Email</Label>
+                      <Input
+                        id="more-email"
+                        type="email"
+                        placeholder="you@example.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        autoComplete="email"
+                      />
+                    </div>
+                    <ProviderButton
+                      provider="email"
+                      onClick={() => {}} // Form submission handles this
+                      isLoading={loadingProvider === 'email'}
+                    />
+                  </form>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email</Label>
-                  <Input
-                    id="signup-email"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    autoComplete="email"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="signup-password">Password</Label>
-                  <Input
-                    id="signup-password"
-                    type="password"
-                    placeholder="Create a password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="new-password"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="signup-confirm-password">Confirm Password</Label>
-                  <Input
-                    id="signup-confirm-password"
-                    type="password"
-                    placeholder="Confirm your password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    autoComplete="new-password"
-                  />
-                </div>
-
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? (
-                    <>
-                      <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                      Creating account...
-                    </>
-                  ) : (
-                    "Create Account"
-                  )}
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
+          {/* Terms and Privacy Footer */}
+          <div className="pt-4">
+            <p className="text-muted-foreground text-center text-xs">
+              By continuing, you agree to our{' '}
+              <a
+                href="https://wealthfolio.app/legal/terms-of-use"
+                target="_blank"
+                rel="noreferrer noopener"
+                className="hover:text-foreground underline underline-offset-4"
+              >
+                Terms of Use
+              </a>{' '}
+              and{' '}
+              <a
+                href="https://wealthfolio.app/legal/privacy-policy"
+                target="_blank"
+                rel="noreferrer noopener"
+                className="hover:text-foreground underline underline-offset-4"
+              >
+                Privacy Policy
+              </a>
+              .
+            </p>
+          </div>
         </CardContent>
       </Card>
 
+      {/* Security Information Card */}
       <Card className="border-dashed">
         <CardContent className="pt-6">
           <div className="space-y-4">
@@ -219,8 +299,8 @@ export function SyncLoginForm() {
               <div>
                 <p className="text-sm font-medium">Secure Authentication</p>
                 <p className="text-muted-foreground text-sm">
-                  Your credentials are securely stored in your system&apos;s keychain. You&apos;ll stay signed
-                  in until you explicitly sign out.
+                  Your credentials are securely stored in your system&apos;s keychain. You&apos;ll
+                  stay signed in until you explicitly sign out.
                 </p>
               </div>
             </div>

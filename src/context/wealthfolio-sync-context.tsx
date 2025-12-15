@@ -1,4 +1,4 @@
-import { getRunEnv, RUN_ENV } from "@/adapters";
+import { getRunEnv, listenDeepLinkTauri, openUrlInBrowser, RUN_ENV } from "@/adapters";
 import { deleteSecret, getSecret, setSecret } from "@/commands/secrets";
 import { createClient, Session, SupabaseClient, User } from "@supabase/supabase-js";
 import {
@@ -21,6 +21,31 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 const REFRESH_TOKEN_KEY = "wealthfolio_sync_refresh_token";
 const ACCESS_TOKEN_KEY = "wealthfolio_sync_access_token";
 
+// Deep link scheme for desktop OAuth callback (used for magic links on desktop)
+const DESKTOP_DEEP_LINK_SCHEME = "wealthfolio";
+const DESKTOP_DEEP_LINK_URL = `${DESKTOP_DEEP_LINK_SCHEME}://auth/callback`;
+
+// Web redirect URL for OAuth and magic link
+const getWebRedirectUrl = () => {
+  return `${window.location.origin}/auth/callback`;
+};
+
+// For OAuth on desktop, we use a hosted callback page that redirects to deep link
+// This is necessary because browsers block direct navigation to custom URL schemes
+const HOSTED_OAUTH_CALLBACK_URL = "https://wealthfolio.app/auth/callback";
+
+// Get the appropriate OAuth redirect URL based on environment
+const getOAuthRedirectUrl = () => {
+  const isDesktop = getRunEnv() === RUN_ENV.DESKTOP;
+  // For desktop: use hosted callback that will redirect to deep link
+  // For web: use local callback route
+  // In development, we fall back to local callback
+  if (isDesktop && import.meta.env.PROD) {
+    return HOSTED_OAUTH_CALLBACK_URL;
+  }
+  return getWebRedirectUrl();
+};
+
 interface WealthfolioSyncContextValue {
   isConnected: boolean;
   isLoading: boolean;
@@ -30,6 +55,7 @@ interface WealthfolioSyncContextValue {
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   signInWithOAuth: (provider: "google" | "apple" | "github") => Promise<void>;
+  signInWithMagicLink: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
 }
@@ -42,9 +68,43 @@ const createSupabaseClient = () => {
     auth: {
       autoRefreshToken: true,
       persistSession: false, // We handle persistence manually via keyring
-      detectSessionInUrl: false,
+      detectSessionInUrl: false, // We handle URL parsing manually
     },
   });
+};
+
+// Parse auth tokens from URL (supports both hash fragments and query params)
+const parseAuthFromUrl = (url: string): { accessToken?: string; refreshToken?: string } | null => {
+  try {
+    const urlObj = new URL(url);
+
+    // First check hash fragment (OAuth typically uses this)
+    const hashParams = new URLSearchParams(urlObj.hash.substring(1));
+    let accessToken = hashParams.get("access_token");
+    let refreshToken = hashParams.get("refresh_token");
+
+    // Fall back to query params (magic link might use this)
+    if (!accessToken) {
+      accessToken = urlObj.searchParams.get("access_token");
+      refreshToken = urlObj.searchParams.get("refresh_token");
+    }
+
+    if (accessToken) {
+      return { accessToken, refreshToken: refreshToken ?? undefined };
+    }
+
+    // Check for error in the URL
+    const error = hashParams.get("error") || urlObj.searchParams.get("error");
+    if (error) {
+      console.error("Auth error from URL:", error);
+      return null;
+    }
+
+    return null;
+  } catch (err) {
+    console.error("Failed to parse auth URL:", err);
+    return null;
+  }
 };
 
 export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
@@ -107,6 +167,47 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Handle auth callback from URL (deep link or web redirect)
+  const handleAuthCallback = useCallback(
+    async (url: string) => {
+      console.log("handleAuthCallback called with URL:", url);
+      const tokens = parseAuthFromUrl(url);
+      console.log("Parsed tokens:", tokens ? "found" : "not found");
+
+      if (!tokens?.accessToken) {
+        console.warn("No access token found in callback URL");
+        return;
+      }
+
+      try {
+        console.log("Setting session with tokens...");
+        // Set the session using the tokens from the callback
+        const { data, error: sessionError } = await supabase.auth.setSession({
+          access_token: tokens.accessToken,
+          refresh_token: tokens.refreshToken ?? "",
+        });
+
+        if (sessionError) {
+          console.error("Failed to set session from callback:", sessionError);
+          setError(sessionError.message);
+          return;
+        }
+
+        if (data.session) {
+          console.log("Session set successfully, storing tokens...");
+          setSession(data.session);
+          setUser(data.session.user);
+          await storeTokens(data.session);
+          console.log("Tokens stored successfully");
+        }
+      } catch (err) {
+        console.error("Error handling auth callback:", err);
+        setError(err instanceof Error ? err.message : "Failed to complete sign in");
+      }
+    },
+    [supabase, storeTokens],
+  );
+
   // Restore session from stored tokens on mount
   useEffect(() => {
     let cancelled = false;
@@ -165,6 +266,48 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
       subscription.unsubscribe();
     };
   }, [supabase, storeTokens, retrieveTokens]);
+
+  // Listen for deep link events on desktop
+  useEffect(() => {
+    if (getRunEnv() !== RUN_ENV.DESKTOP) return;
+
+    let unlistenFn: (() => void) | undefined;
+
+    const setupDeepLinkListener = async () => {
+      try {
+        unlistenFn = await listenDeepLinkTauri<string>((event) => {
+          const url = event.payload;
+          console.log("Deep link received:", url);
+
+          // Check if this is an auth callback
+          if (url.includes("/auth/callback") || url.includes("access_token")) {
+            void handleAuthCallback(url);
+          }
+        });
+      } catch (err) {
+        console.error("Failed to set up deep link listener:", err);
+      }
+    };
+
+    void setupDeepLinkListener();
+
+    return () => {
+      unlistenFn?.();
+    };
+  }, [handleAuthCallback]);
+
+  // Handle auth callback on mount (check URL for auth tokens)
+  // This works for both web and desktop (when OAuth happens in webview)
+  useEffect(() => {
+    // Check if current URL has auth tokens (web redirect callback)
+    const currentUrl = window.location.href;
+    if (currentUrl.includes("access_token") || currentUrl.includes("/auth/callback")) {
+      console.log("Auth callback detected in URL:", currentUrl);
+      void handleAuthCallback(currentUrl);
+      // Clean up URL after handling
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [handleAuthCallback]);
 
   const signInWithEmail = useCallback(
     async (email: string, password: string) => {
@@ -238,18 +381,69 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
       setError(null);
 
       try {
-        const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        const isDesktop = getRunEnv() === RUN_ENV.DESKTOP;
+        const redirectUrl = getOAuthRedirectUrl();
+
+        // For desktop in production: open system browser, use hosted callback -> deep link
+        // For desktop in dev or web: let OAuth happen in webview/browser with direct redirect
+        const useSystemBrowser = isDesktop && import.meta.env.PROD;
+
+        const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
           provider,
           options: {
-            skipBrowserRedirect: getRunEnv() === RUN_ENV.DESKTOP,
+            skipBrowserRedirect: useSystemBrowser,
+            redirectTo: redirectUrl,
           },
         });
 
         if (oauthError) {
           throw oauthError;
         }
+
+        // On desktop production, open the OAuth URL in the system browser
+        if (useSystemBrowser && data.url) {
+          await openUrlInBrowser(data.url);
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : "OAuth sign in failed";
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [supabase],
+  );
+
+  const signInWithMagicLink = useCallback(
+    async (email: string) => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const isDesktop = getRunEnv() === RUN_ENV.DESKTOP;
+
+        // For magic links on desktop in production: use deep link (email client opens app)
+        // For desktop in dev or web: use web callback
+        const redirectUrl =
+          isDesktop && import.meta.env.PROD ? DESKTOP_DEEP_LINK_URL : getWebRedirectUrl();
+
+        const { error: otpError } = await supabase.auth.signInWithOtp({
+          email,
+          options: {
+            // Redirect URL for when user clicks the magic link
+            emailRedirectTo: redirectUrl,
+          },
+        });
+
+        if (otpError) {
+          throw otpError;
+        }
+
+        // Don't throw error - magic link sent successfully
+        // The UI will handle showing success message
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to send magic link";
         setError(message);
         throw err;
       } finally {
@@ -294,6 +488,7 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
       signInWithEmail,
       signUpWithEmail,
       signInWithOAuth,
+      signInWithMagicLink,
       signOut,
       clearError,
     }),
@@ -305,6 +500,7 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
       signInWithEmail,
       signUpWithEmail,
       signInWithOAuth,
+      signInWithMagicLink,
       signOut,
       clearError,
     ],
