@@ -112,9 +112,11 @@ pub struct BrokerConnection {
     pub disabled: bool,
 
     /// When the connection was disabled
+    #[serde(alias = "disabled_date")]
     pub disabled_date: Option<String>,
 
     /// When the connection was last updated
+    #[serde(alias = "updated_date", alias = "updated_at")]
     pub updated_at: Option<String>,
 }
 
@@ -124,8 +126,11 @@ pub struct BrokerConnectionBrokerage {
     pub id: Option<String>,
     pub slug: Option<String>,
     pub name: Option<String>,
+    #[serde(alias = "display_name")]
     pub display_name: Option<String>,
+    #[serde(alias = "aws_s3_logo_url")]
     pub aws_s3_logo_url: Option<String>,
+    #[serde(alias = "aws_s3_square_logo_url")]
     pub aws_s3_square_logo_url: Option<String>,
 }
 
