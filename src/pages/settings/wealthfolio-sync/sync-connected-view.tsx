@@ -18,28 +18,33 @@ import { QueryKeys } from "@/lib/query-keys";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ActionConfirm } from "@wealthfolio/ui";
 import { formatDistanceToNow } from "date-fns";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { SnapTradeConnectPortal } from "./snaptrade-connect-portal";
 
-// Use broker connections via secure backend command (no direct API access)
-const useBrokerConnections = (isConnected: boolean) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// Custom Hooks
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Hook to fetch broker connections from the backend.
+ */
+function useBrokerConnections(isConnected: boolean) {
   return useQuery({
     queryKey: [QueryKeys.BROKER_CONNECTIONS],
-    queryFn: async (): Promise<BrokerConnection[]> => {
-      if (!isConnected) return [];
-      return listBrokerConnections();
-    },
+    queryFn: listBrokerConnections,
     enabled: isConnected,
-    staleTime: 30000, // 30 seconds
+    staleTime: 30000,
   });
-};
+}
 
-const useRemoveConnection = () => {
+/**
+ * Hook to remove a broker connection.
+ */
+function useRemoveConnection() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (authorizationId: string) => {
-      return removeBrokerConnection(authorizationId);
-    },
+    mutationFn: removeBrokerConnection,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.BROKER_CONNECTIONS] });
       toast.success("Connection removed successfully");
@@ -50,23 +55,51 @@ const useRemoveConnection = () => {
       );
     },
   });
-};
+}
 
-const useConnectPortal = () => {
-  return useMutation({
-    mutationFn: async (reconnectAuthorizationId?: string) => {
-      return getConnectPortalUrl(reconnectAuthorizationId);
-    },
-    onSuccess: (data) => {
-      if (data?.redirectUri) {
-        window.location.href = data.redirectUri;
+/**
+ * Hook to manage the SnapTrade connect portal state.
+ */
+function useSnapTradePortal() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [loginLink, setLoginLink] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const openPortal = useCallback(async (reconnectAuthorizationId?: string) => {
+    setIsLoading(true);
+    try {
+      const response = await getConnectPortalUrl(reconnectAuthorizationId);
+      if (response?.redirectUri) {
+        setLoginLink(response.redirectUri);
+        setIsOpen(true);
+      } else {
+        toast.error("Failed to get connection portal URL");
       }
-    },
-    onError: (error) => {
+    } catch (error) {
       toast.error(`Failed to connect: ${error instanceof Error ? error.message : "Unknown error"}`);
-    },
-  });
-};
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const closePortal = useCallback(() => {
+    setIsOpen(false);
+    // Clear the login link after a short delay to allow for animation
+    setTimeout(() => setLoginLink(null), 300);
+  }, []);
+
+  return {
+    isOpen,
+    loginLink,
+    isLoading,
+    openPortal,
+    closePortal,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub-Components
+// ─────────────────────────────────────────────────────────────────────────────
 
 function BrokerConnectionSkeleton() {
   return (
@@ -80,19 +113,21 @@ function BrokerConnectionSkeleton() {
   );
 }
 
+interface ConnectionCardProps {
+  connection: BrokerConnection;
+  onReconnect: () => void;
+  onRemove: () => void;
+  isReconnecting: boolean;
+  isRemoving: boolean;
+}
+
 function ConnectionCard({
   connection,
   onReconnect,
   onRemove,
   isReconnecting,
   isRemoving,
-}: {
-  connection: BrokerConnection;
-  onReconnect: () => void;
-  onRemove: () => void;
-  isReconnecting: boolean;
-  isRemoving: boolean;
-}) {
+}: ConnectionCardProps) {
   const logoUrl = connection.brokerage?.awsS3SquareLogoUrl ?? connection.brokerage?.awsS3LogoUrl;
   const name = connection.brokerage?.displayName ?? connection.brokerage?.name ?? "Brokerage";
   const isDisabled = connection.disabled;
@@ -140,17 +175,17 @@ function ConnectionCard({
             handleConfirm={onRemove}
             isPending={isRemoving}
             confirmTitle="Remove broker connection?"
-            confirmMessage="This will remove the connection. You can reconnect it later."
+            confirmMessage="This removes the broker connection. Your local data remains safe, but you will need to re-configure a new connection to sync again."
             confirmButtonText="Remove"
             pendingText="Removing..."
             cancelButtonText="Cancel"
             confirmButtonVariant="destructive"
             button={
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 disabled={isRemoving}
-                className="text-muted-foreground hover:text-destructive"
+                className="hover:text-destructive text-destructive/90"
               >
                 {isRemoving ? "Removing..." : "Remove"}
               </Button>
@@ -162,6 +197,10 @@ function ConnectionCard({
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Main Component
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function SyncConnectedView() {
   const { user, session, signOut, isLoading, error, clearError } = useWealthfolioSync();
   const queryClient = useQueryClient();
@@ -171,10 +210,10 @@ export function SyncConnectedView() {
   // Check if user is connected (has a valid session)
   const isConnected = !!session;
 
-  // Use secure backend commands - no accessToken passed to frontend hooks
+  // Hooks
   const connectionsQuery = useBrokerConnections(isConnected);
-  const portalMutation = useConnectPortal();
   const removeMutation = useRemoveConnection();
+  const snapTradePortal = useSnapTradePortal();
 
   // Sync accounts to local database
   const syncToLocalMutation = useMutation({
@@ -194,7 +233,7 @@ export function SyncConnectedView() {
     },
   });
 
-  // Auto-sync on return from SnapTrade
+  // Auto-sync on return from SnapTrade (legacy redirect flow)
   const shouldAutoSync = useMemo(() => {
     if (typeof window === "undefined") return false;
     const params = new URLSearchParams(window.location.search);
@@ -211,9 +250,10 @@ export function SyncConnectedView() {
       connectionsQuery.refetch();
       window.history.replaceState({}, "", window.location.pathname);
     }
-  }, [shouldAutoSync]);
+  }, [shouldAutoSync, connectionsQuery]);
 
-  const handleSignOut = async () => {
+  // Handlers
+  const handleSignOut = useCallback(async () => {
     setIsSigningOut(true);
     clearError();
     try {
@@ -223,11 +263,11 @@ export function SyncConnectedView() {
     } finally {
       setIsSigningOut(false);
     }
-  };
+  }, [clearError, signOut]);
 
-  const handleConnect = () => {
-    portalMutation.mutate(undefined);
-  };
+  const handlePortalSuccess = useCallback(() => {
+    connectionsQuery.refetch();
+  }, [connectionsQuery]);
 
   const formatDate = (dateString: string | undefined) => {
     if (!dateString) return "N/A";
@@ -238,6 +278,7 @@ export function SyncConnectedView() {
     });
   };
 
+  // Derived state
   const connections = connectionsQuery.data ?? [];
   const isLoadingConnections = connectionsQuery.isLoading;
   const isSyncing = syncToLocalMutation.isPending;
@@ -251,6 +292,7 @@ export function SyncConnectedView() {
         </Alert>
       )}
 
+      {/* Account Status Card */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -366,10 +408,10 @@ export function SyncConnectedView() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleConnect}
-                  disabled={portalMutation.isPending}
+                  onClick={() => snapTradePortal.openPortal()}
+                  disabled={snapTradePortal.isLoading}
                 >
-                  {portalMutation.isPending ? (
+                  {snapTradePortal.isLoading ? (
                     <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
                     <Icons.Plus className="mr-2 h-4 w-4" />
@@ -396,10 +438,10 @@ export function SyncConnectedView() {
               <Button
                 variant="outline"
                 className="mt-4"
-                onClick={handleConnect}
-                disabled={portalMutation.isPending}
+                onClick={() => snapTradePortal.openPortal()}
+                disabled={snapTradePortal.isLoading}
               >
-                {portalMutation.isPending ? (
+                {snapTradePortal.isLoading ? (
                   <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <Icons.Plus className="mr-2 h-4 w-4" />
@@ -413,9 +455,9 @@ export function SyncConnectedView() {
                 <ConnectionCard
                   key={connection.id}
                   connection={connection}
-                  onReconnect={() => portalMutation.mutate(connection.id)}
+                  onReconnect={() => snapTradePortal.openPortal(connection.id)}
                   onRemove={() => removeMutation.mutate(connection.id)}
-                  isReconnecting={portalMutation.isPending}
+                  isReconnecting={snapTradePortal.isLoading}
                   isRemoving={removeMutation.isPending}
                 />
               ))}
@@ -437,6 +479,7 @@ export function SyncConnectedView() {
         </CardContent>
       </Card>
 
+      {/* Security Info Card */}
       <Card className="border-dashed">
         <CardContent className="pt-6">
           <div className="space-y-4">
@@ -464,6 +507,14 @@ export function SyncConnectedView() {
           </div>
         </CardContent>
       </Card>
+
+      {/* SnapTrade Connect Portal */}
+      <SnapTradeConnectPortal
+        loginLink={snapTradePortal.loginLink}
+        isOpen={snapTradePortal.isOpen}
+        onClose={snapTradePortal.closePortal}
+        onSuccess={handlePortalSuccess}
+      />
     </div>
   );
 }
