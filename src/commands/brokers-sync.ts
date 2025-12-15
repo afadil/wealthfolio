@@ -103,9 +103,10 @@ export const removeBrokerConnection = async (authorizationId: string): Promise<v
 
 export const getConnectPortalUrl = async (
   reconnectAuthorizationId?: string,
+  redirectUrl?: string,
 ): Promise<ConnectPortalResponse> => {
   try {
-    return await invokeDesktop("get_connect_portal_url", { reconnectAuthorizationId });
+    return await invokeDesktop("get_connect_portal_url", { reconnectAuthorizationId, redirectUrl });
   } catch (error) {
     logger.error("Error getting connect portal URL.");
     throw error;

@@ -1,7 +1,7 @@
-import { ReactNode, useState } from "react";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { Button, type ButtonProps } from "../ui/button";
 import { Icons } from "../ui/icons";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
 interface ActionConfirmProps {
   confirmMessage: string | ReactNode;
@@ -29,6 +29,15 @@ export const ActionConfirm = ({
   pendingText = "In progress...",
 }: ActionConfirmProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  const wasConfirming = useRef(false);
+
+  // Close popover when action completes (isPending goes from true to false)
+  useEffect(() => {
+    if (wasConfirming.current && !isPending) {
+      setIsOpen(false);
+    }
+    wasConfirming.current = isPending;
+  }, [isPending]);
 
   return (
     <Popover open={isOpen} onOpenChange={(open) => setIsOpen(open)}>

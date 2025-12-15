@@ -389,16 +389,20 @@ impl CloudApiClient {
     async fn get_connect_portal_url(
         &self,
         reconnect_authorization_id: Option<String>,
+        redirect_url: Option<String>,
     ) -> Result<ConnectPortalResponse, String> {
         let url = format!("{}/trpc/brokerage.getConnectionPortalUrl", self.base_url);
         debug!("Getting connect portal URL");
 
-        // Wrap in SuperJSON envelope for tRPC compatibility
-        let inner = match reconnect_authorization_id {
-            Some(id) => serde_json::json!({ "reconnectAuthorizationId": id }),
-            None => serde_json::json!({}),
-        };
-        let body = serde_json::json!({ "json": inner });
+        // Build inner JSON with optional fields
+        let mut inner = serde_json::Map::new();
+        if let Some(id) = reconnect_authorization_id {
+            inner.insert("reconnectAuthorizationId".to_string(), serde_json::json!(id));
+        }
+        if let Some(url) = redirect_url {
+            inner.insert("redirectUrl".to_string(), serde_json::json!(url));
+        }
+        let body = serde_json::json!({ "json": serde_json::Value::Object(inner) });
 
         let response = self
             .client
@@ -609,13 +613,14 @@ pub async fn remove_broker_connection(
 #[tauri::command]
 pub async fn get_connect_portal_url(
     reconnect_authorization_id: Option<String>,
+    redirect_url: Option<String>,
     _state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ConnectPortalResponse, String> {
     info!("Getting connect portal URL from cloud API...");
 
     let client = create_api_client()?;
     let response = client
-        .get_connect_portal_url(reconnect_authorization_id)
+        .get_connect_portal_url(reconnect_authorization_id, redirect_url)
         .await?;
 
     info!("Connect portal URL retrieved successfully");

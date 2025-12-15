@@ -1,3 +1,4 @@
+import { getRunEnv, RUN_ENV } from "@/adapters";
 import {
   getConnectPortalUrl,
   listBrokerConnections,
@@ -57,6 +58,9 @@ function useRemoveConnection() {
   });
 }
 
+// Deep link URL for SnapTrade callback on desktop
+const SNAPTRADE_DEEP_LINK_CALLBACK = "wealthfolio://callback";
+
 /**
  * Hook to manage the SnapTrade connect portal state.
  */
@@ -68,7 +72,12 @@ function useSnapTradePortal() {
   const openPortal = useCallback(async (reconnectAuthorizationId?: string) => {
     setIsLoading(true);
     try {
-      const response = await getConnectPortalUrl(reconnectAuthorizationId);
+      // For desktop (Tauri), use deep link callback to redirect back to the app
+      // For web, no redirect URL is passed (backend uses dashboard URL)
+      const isDesktop = getRunEnv() === RUN_ENV.DESKTOP;
+      const redirectUrl = isDesktop ? SNAPTRADE_DEEP_LINK_CALLBACK : undefined;
+
+      const response = await getConnectPortalUrl(reconnectAuthorizationId, redirectUrl);
       if (response?.redirectUri) {
         setLoginLink(response.redirectUri);
         setIsOpen(true);
@@ -385,41 +394,56 @@ export function SyncConnectedView() {
                 Manage your linked broker accounts through Wealthfolio Sync.
               </CardDescription>
             </div>
-            {connections.length > 0 && (
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => syncToLocalMutation.mutate()}
-                  disabled={isSyncing}
-                >
-                  {isSyncing ? (
-                    <>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => connectionsQuery.refetch()}
+                disabled={connectionsQuery.isFetching}
+                title="Refresh connections"
+              >
+                {connectionsQuery.isFetching ? (
+                  <Icons.Spinner className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Icons.Refresh className="h-4 w-4" />
+                )}
+              </Button>
+              {connections.length > 0 && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => syncToLocalMutation.mutate()}
+                    disabled={isSyncing}
+                  >
+                    {isSyncing ? (
+                      <>
+                        <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                        Syncing...
+                      </>
+                    ) : (
+                      <>
+                        <Icons.Download className="mr-2 h-4 w-4" />
+                        Sync to Local
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => snapTradePortal.openPortal()}
+                    disabled={snapTradePortal.isLoading}
+                  >
+                    {snapTradePortal.isLoading ? (
                       <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                      Syncing...
-                    </>
-                  ) : (
-                    <>
-                      <Icons.Download className="mr-2 h-4 w-4" />
-                      Sync to Local
-                    </>
-                  )}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => snapTradePortal.openPortal()}
-                  disabled={snapTradePortal.isLoading}
-                >
-                  {snapTradePortal.isLoading ? (
-                    <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Icons.Plus className="mr-2 h-4 w-4" />
-                  )}
-                  Add Broker
-                </Button>
-              </div>
-            )}
+                    ) : (
+                      <Icons.Plus className="mr-2 h-4 w-4" />
+                    )}
+                    Add Broker
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -436,7 +460,6 @@ export function SyncConnectedView() {
                 Connect your first broker account to start syncing your portfolio automatically.
               </p>
               <Button
-                variant="outline"
                 className="mt-4"
                 onClick={() => snapTradePortal.openPortal()}
                 disabled={snapTradePortal.isLoading}
@@ -514,6 +537,7 @@ export function SyncConnectedView() {
         isOpen={snapTradePortal.isOpen}
         onClose={snapTradePortal.closePortal}
         onSuccess={handlePortalSuccess}
+        initialConnectionIds={connections.map((c) => c.id)}
       />
     </div>
   );
