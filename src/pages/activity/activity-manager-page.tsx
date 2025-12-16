@@ -126,13 +126,7 @@ const ActivityManagerPage = () => {
     isDraft: initialActivity?.isDraft ?? false,
     comment: initialActivity?.comment ?? null,
     assetId: initialActivity?.assetId,
-    activityDate: initialActivity?.date
-      ? new Date(initialActivity.date)
-      : (() => {
-          const date = new Date();
-          date.setHours(16, 0, 0, 0);
-          return date;
-        })(),
+    activityDate: initialActivity?.date ? new Date(initialActivity.date) : new Date(),
     currency: initialActivity?.currency ?? "",
     assetDataSource: initialActivity?.assetDataSource ?? DataSource.YAHOO,
     showCurrencySelect: false,
