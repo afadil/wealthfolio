@@ -21,8 +21,8 @@ import {
 import { debounce } from "lodash";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ActivityDatagrid } from "./components/activity-datagrid/activity-datagrid";
 import { ActivityDeleteModal } from "./components/activity-delete-modal";
+import { ActivityDataGrid } from "./components/activity-data-grid/activity-data-grid";
 import { ActivityForm } from "./components/activity-form";
 import { ActivityMobileControls } from "./components/activity-mobile-controls";
 import { ActivityPagination } from "./components/activity-pagination";
@@ -226,7 +226,7 @@ const ActivityPage = () => {
               onDuplicate={handleDuplicate}
             />
           ) : isDatagridView ? (
-            <ActivityDatagrid
+            <ActivityDataGrid
               accounts={accounts}
               activities={flatData}
               onRefetch={refetch}
