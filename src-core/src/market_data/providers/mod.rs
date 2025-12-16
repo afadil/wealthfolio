@@ -4,6 +4,7 @@ pub mod market_data_provider;
 pub mod marketdata_app_provider;
 pub mod metal_price_api_provider;
 pub mod models;
+pub mod openfigi_provider;
 pub mod provider_registry;
 pub mod yahoo_provider;
 
