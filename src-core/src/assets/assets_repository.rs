@@ -100,6 +100,12 @@ impl AssetRepositoryTrait for AssetRepository {
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<Asset> {
+                let normalized_symbol_mapping = payload_owned
+                    .symbol_mapping
+                    .as_ref()
+                    .map(|value| value.trim().to_string())
+                    .filter(|value| !value.is_empty());
+
                 let result_db = diesel::update(assets::table.filter(assets::id.eq(asset_id_owned)))
                     .set((
                         assets::name.eq(&payload_owned.name),
@@ -108,6 +114,7 @@ impl AssetRepositoryTrait for AssetRepository {
                         assets::notes.eq(&payload_owned.notes),
                         assets::asset_sub_class.eq(&payload_owned.asset_sub_class),
                         assets::asset_class.eq(&payload_owned.asset_class),
+                        assets::symbol_mapping.eq(normalized_symbol_mapping),
                     ))
                     .get_result::<AssetDB>(conn)?;
                 Ok(result_db.into())

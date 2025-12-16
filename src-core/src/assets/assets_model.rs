@@ -170,6 +170,7 @@ impl From<crate::market_data::providers::models::AssetProfile> for NewAsset {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateAssetProfile {
     pub symbol: String,
+    pub symbol_mapping: Option<String>,
     pub name: Option<String>,
     pub sectors: Option<String>,
     pub countries: Option<String>,

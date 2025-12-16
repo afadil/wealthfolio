@@ -564,6 +564,7 @@ export interface PerformanceMetrics {
 
 export interface UpdateAssetProfile {
   symbol: string;
+  symbolMapping?: string | null;
   name?: string;
   sectors: string;
   countries: string;

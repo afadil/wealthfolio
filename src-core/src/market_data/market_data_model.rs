@@ -134,6 +134,7 @@ pub struct QuoteSummary {
 #[derive(Debug, Clone)]
 pub struct QuoteRequest {
     pub symbol: String,
+    pub symbol_mapping: Option<String>,
     pub data_source: DataSource,
     pub currency: String,
 }
