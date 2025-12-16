@@ -446,21 +446,30 @@ export function ActivityDatagrid({
 
   const filteredTransactionsRef = useRef(sortedTransactions);
 
-  useEffect(() => {
-    filteredTransactionsRef.current = sortedTransactions;
-  }, [sortedTransactions]);
+  filteredTransactionsRef.current = sortedTransactions;
 
   const transactionIndexLookup = useMemo(() => {
     return new Map(sortedTransactions.map((transaction, index) => [transaction.id, index]));
   }, [sortedTransactions]);
 
-  const rowVirtualizer = useVirtualizer({
-    count: sortedTransactions.length,
-    getItemKey: (index) => sortedTransactions[index].id,
-    getScrollElement: () => scrollContainerRef.current,
-    estimateSize: () => 44,
-    overscan: 8,
-  });
+  const getScrollElement = useCallback(() => scrollContainerRef.current, []);
+  const estimateRowSize = useCallback(() => 44, []);
+  const getRowKey = useCallback((index: number) => {
+    return filteredTransactionsRef.current[index]?.id ?? index;
+  }, []);
+
+  const virtualizerOptions = useMemo(
+    () => ({
+      count: sortedTransactions.length,
+      getItemKey: getRowKey,
+      getScrollElement,
+      estimateSize: estimateRowSize,
+      overscan: 8,
+    }),
+    [estimateRowSize, getRowKey, getScrollElement, sortedTransactions.length],
+  );
+
+  const rowVirtualizer = useVirtualizer(virtualizerOptions);
 
   const virtualRows = rowVirtualizer.getVirtualItems();
   const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;

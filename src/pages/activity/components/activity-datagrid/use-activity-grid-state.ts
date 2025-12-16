@@ -16,10 +16,13 @@ export const generateTempActivityId = () => {
 export const useActivityGridState = (activities: ActivityDetails[]) => {
   const serverTransactions = useMemo(
     () =>
-      activities.map((activity) => ({
-        ...activity,
-        id: activity.id ?? generateTempActivityId(),
-      })),
+      activities.map((activity) => {
+        const trimmedId = typeof activity.id === "string" ? activity.id.trim() : "";
+        if (trimmedId.length > 0) {
+          return activity;
+        }
+        return { ...activity, id: generateTempActivityId() };
+      }),
     [activities],
   );
 
