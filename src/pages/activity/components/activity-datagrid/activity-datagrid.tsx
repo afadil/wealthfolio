@@ -451,6 +451,8 @@ export function ActivityDatagrid({
   const transactionIndexLookup = useMemo(() => {
     return new Map(sortedTransactions.map((transaction, index) => [transaction.id, index]));
   }, [sortedTransactions]);
+  const transactionIndexLookupRef = useRef(transactionIndexLookup);
+  transactionIndexLookupRef.current = transactionIndexLookup;
 
   const getScrollElement = useCallback(() => scrollContainerRef.current, []);
   const estimateRowSize = useCallback(() => 44, []);
@@ -486,7 +488,7 @@ export function ActivityDatagrid({
         const transactions = filteredTransactionsRef.current;
         if (!transactions || transactions.length === 0) return current;
 
-        const currentRowIndex = transactionIndexLookup.get(current.rowId) ?? -1;
+        const currentRowIndex = transactionIndexLookupRef.current.get(current.rowId) ?? -1;
         if (currentRowIndex === -1) return current;
 
         const currentFieldIndex = editableFields.indexOf(current.field);
@@ -524,7 +526,7 @@ export function ActivityDatagrid({
         return { rowId: nextRow.id, field: nextField };
       });
     },
-    [transactionIndexLookup],
+    [],
   );
 
   const addNewRow = useCallback(() => {
