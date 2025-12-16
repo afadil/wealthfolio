@@ -18,7 +18,7 @@ pub struct Account {
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
     pub platform_id: Option<String>,
-    /// External ID from broker/cloud sync (e.g., SnapTrade account UUID)
+    /// External ID from broker/cloud sync (provider account UUID)
     pub external_id: Option<String>,
     /// Account number from the broker
     pub account_number: Option<String>,

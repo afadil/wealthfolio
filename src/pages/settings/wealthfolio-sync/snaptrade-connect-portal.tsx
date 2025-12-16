@@ -161,6 +161,9 @@ export function SnapTradeConnectPortal({
         await syncBrokerData();
         queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNTS] });
         queryClient.invalidateQueries({ queryKey: [QueryKeys.PLATFORMS] });
+        queryClient.invalidateQueries({ queryKey: [QueryKeys.ACTIVITIES] });
+        queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSETS] });
+        queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS] });
       } catch (syncError) {
         logger.error(`Failed to sync broker data after connection: ${String(syncError)}`);
       }

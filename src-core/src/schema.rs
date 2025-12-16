@@ -19,6 +19,19 @@ diesel::table! {
 }
 
 diesel::table! {
+    brokers_sync_state (account_id) {
+        account_id -> Text,
+        provider -> Text,
+        last_synced_date -> Nullable<Text>,
+        last_attempted_at -> Nullable<Text>,
+        last_successful_at -> Nullable<Text>,
+        last_error -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
     activities (id) {
         id -> Text,
         account_id -> Text,
@@ -187,12 +200,14 @@ diesel::table! {
 }
 
 diesel::joinable!(accounts -> platforms (platform_id));
+diesel::joinable!(brokers_sync_state -> accounts (account_id));
 diesel::joinable!(goals_allocation -> accounts (account_id));
 diesel::joinable!(goals_allocation -> goals (goal_id));
 diesel::joinable!(quotes -> assets (symbol));
 
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
+    brokers_sync_state,
     activities,
     activity_import_profiles,
     app_settings,

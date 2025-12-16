@@ -4,7 +4,7 @@ This module handles synchronization of broker account data from the Wealthfolio 
 
 ## Overview
 
-The sync feature allows users to connect their brokerage accounts via the cloud API (which integrates with SnapTrade) and sync the account data to their local Wealthfolio database.
+The sync feature allows users to connect their brokerage accounts via the cloud API (which integrates with a brokerage data provider) and sync the account data to their local Wealthfolio database.
 
 ## Architecture
 
@@ -67,7 +67,7 @@ The cloud API returns `BrokerConnection` objects that contain brokerage informat
 | `brokerage.slug`              | `id` (PK)            | Unique identifier (e.g., "QUESTRADE")|
 | `brokerage.display_name`      | `name`               | Human-readable name                  |
 | `brokerage.url`               | `url`                | Brokerage website URL                |
-| `brokerage.id`                | `external_id`        | UUID from SnapTrade API              |
+| `brokerage.id`                | `external_id`        | UUID from the provider API           |
 
 **Platform ID Convention**: The platform `id` uses the broker's **slug** (e.g., "QUESTRADE", "INTERACTIVE_BROKERS") rather than the UUID. This makes the data more readable and stable across syncs.
 

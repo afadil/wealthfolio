@@ -239,6 +239,9 @@ export function SyncConnectedView() {
       setSyncResult(result);
       queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNTS] });
       queryClient.invalidateQueries({ queryKey: [QueryKeys.PLATFORMS] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.ACTIVITIES] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSETS] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS] });
       if (result.success) {
         toast.success(result.message);
       } else {

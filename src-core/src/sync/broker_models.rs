@@ -1,5 +1,5 @@
 //! Models representing broker data from the cloud API.
-//! These models mirror the SnapTrade API response structures.
+//! These models mirror the provider API response structures.
 
 use serde::{Deserialize, Serialize};
 
@@ -28,7 +28,7 @@ pub struct BrokerSyncStatusDetail {
     pub last_successful_sync: Option<String>,
 }
 
-/// A broker account from the cloud API (mirrors SnapTrade Account)
+/// A broker account from the cloud API (mirrors the provider account payload)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrokerAccount {
     /// Unique identifier for the connected brokerage account (UUID)
@@ -171,6 +171,85 @@ pub struct SyncConnectionsResponse {
     pub synced: usize,
     pub platforms_created: usize,
     pub platforms_updated: usize,
+}
+
+/// Pagination details from the broker API.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PaginationDetails {
+    #[serde(default)]
+    pub offset: Option<i64>,
+    #[serde(default)]
+    pub limit: Option<i64>,
+    #[serde(default)]
+    pub total: Option<i64>,
+}
+
+/// A paginated list of universal activity objects.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PaginatedUniversalActivity {
+    #[serde(default)]
+    #[serde(alias = "activities", alias = "universalActivities", alias = "universal_activities")]
+    pub data: Vec<AccountUniversalActivity>,
+    #[serde(default)]
+    #[serde(alias = "paginationDetails", alias = "page")]
+    pub pagination: Option<PaginationDetails>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AccountUniversalActivityCurrency {
+    pub id: Option<String>,
+    pub code: Option<String>,
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AccountUniversalActivitySymbol {
+    pub id: Option<String>,
+    pub symbol: Option<String>,
+    pub raw_symbol: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AccountUniversalActivityOptionSymbol {
+    pub id: Option<String>,
+    pub ticker: Option<String>,
+}
+
+/// A transaction or activity from an institution.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AccountUniversalActivity {
+    pub id: Option<String>,
+    pub symbol: Option<AccountUniversalActivitySymbol>,
+    #[serde(rename = "option_symbol")]
+    pub option_symbol: Option<AccountUniversalActivityOptionSymbol>,
+    pub price: Option<f64>,
+    pub units: Option<f64>,
+    pub amount: Option<f64>,
+    pub currency: Option<AccountUniversalActivityCurrency>,
+    #[serde(rename = "type")]
+    pub activity_type: Option<String>,
+    #[serde(rename = "option_type")]
+    pub option_type: Option<String>,
+    pub description: Option<String>,
+    #[serde(rename = "trade_date")]
+    pub trade_date: Option<String>,
+    #[serde(rename = "settlement_date")]
+    pub settlement_date: Option<String>,
+    pub fee: Option<f64>,
+    pub fx_rate: Option<f64>,
+    pub institution: Option<String>,
+    #[serde(rename = "external_reference_id")]
+    pub external_reference_id: Option<String>,
+}
+
+/// Response from syncing activities.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SyncActivitiesResponse {
+    pub accounts_synced: usize,
+    pub activities_upserted: usize,
+    pub assets_inserted: usize,
+    pub accounts_failed: usize,
 }
 
 impl BrokerAccount {
