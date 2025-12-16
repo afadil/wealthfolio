@@ -50,6 +50,10 @@ export * from "./components/ui/toggle";
 export * from "./components/ui/toggle-group";
 export * from "./components/ui/tooltip";
 
+// Export data grid components
+export * from "./components/data-grid/data-grid";
+export * from "./components/data-grid/use-data-grid";
+
 // Export utilities
 export * from "./lib/utils";
 
