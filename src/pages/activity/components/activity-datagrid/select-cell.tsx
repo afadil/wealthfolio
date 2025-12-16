@@ -53,6 +53,9 @@ export function SelectCell({
 
   useEffect(() => {
     if (isFocused && !open && cellRef.current) {
+      if (typeof document !== "undefined" && document.activeElement === cellRef.current) {
+        return;
+      }
       cellRef.current.focus();
     }
   }, [isFocused, open]);
@@ -161,40 +164,42 @@ export function SelectCell({
           <Icons.ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
         </div>
       </PopoverTrigger>
-      <PopoverContent
-        className="w-[200px] p-0 text-xs"
-        align="start"
-        onOpenAutoFocus={(e) => e.preventDefault()}
-      >
-        <Command>
-          <CommandInput
-            placeholder="Search..."
-            value={search}
-            onValueChange={setSearch}
-            autoFocus
-          />
-          <CommandList>
-            <CommandEmpty>No results found.</CommandEmpty>
-            <CommandGroup>
-              {options.map((option) => (
-                <CommandItem
-                  key={option.value}
-                  value={`${option.value} ${option.searchValue ?? option.label ?? option.value}`}
-                  onSelect={() => handleSelect(option)}
-                >
-                  <Icons.Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value === option.value ? "opacity-100" : "opacity-0",
-                    )}
-                  />
-                  <span className="text-xs">{option.label}</span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
+      {open ? (
+        <PopoverContent
+          className="w-[200px] p-0 text-xs"
+          align="start"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          <Command>
+            <CommandInput
+              placeholder="Search..."
+              value={search}
+              onValueChange={setSearch}
+              autoFocus
+            />
+            <CommandList>
+              <CommandEmpty>No results found.</CommandEmpty>
+              <CommandGroup>
+                {options.map((option) => (
+                  <CommandItem
+                    key={option.value}
+                    value={`${option.value} ${option.searchValue ?? option.label ?? option.value}`}
+                    onSelect={() => handleSelect(option)}
+                  >
+                    <Icons.Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        value === option.value ? "opacity-100" : "opacity-0",
+                      )}
+                    />
+                    <span className="text-xs">{option.label}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      ) : null}
     </Popover>
   );
 }
