@@ -297,6 +297,10 @@ mod tests {
             amount: None,
             is_draft: false,
             comment: None,
+            fx_rate: None,
+            provider_type: None,
+            external_provider_id: None,
+            external_broker_id: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }
@@ -328,6 +332,10 @@ mod tests {
             amount: Some(amount),
             is_draft: false,
             comment: None,
+            fx_rate: None,
+            provider_type: None,
+            external_provider_id: None,
+            external_broker_id: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }

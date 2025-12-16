@@ -292,6 +292,12 @@ impl SyncServiceTrait for SyncService {
                     db.updated_at = now_naive;
                     db
                 } else {
+                    let symbol_type_label = activity
+                        .symbol
+                        .as_ref()
+                        .and_then(|s| s.symbol_type.as_ref())
+                        .and_then(|t| broker_symbol_type_label(t.code.as_deref(), t.description.as_deref()));
+
                     AssetDB {
                         id: asset_id.clone(),
                         symbol: asset_id.clone(),
@@ -300,6 +306,8 @@ impl SyncServiceTrait for SyncService {
                             .as_ref()
                             .and_then(|s| s.description.clone())
                             .filter(|d| !d.trim().is_empty()),
+                        asset_type: symbol_type_label.clone(),
+                        asset_class: symbol_type_label,
                         currency: currency_code.clone(),
                         data_source: crate::market_data::market_data_model::DataSource::Yahoo
                             .as_str()
@@ -334,6 +342,7 @@ impl SyncServiceTrait for SyncService {
                 .map(|d| d.abs())
                 .unwrap_or(Decimal::ZERO);
             let amount = activity.amount.and_then(Decimal::from_f64).map(|d| d.abs());
+            let fx_rate = activity.fx_rate.and_then(Decimal::from_f64);
 
             let new_activity = NewActivity {
                 id: Some(activity_id),
@@ -353,6 +362,17 @@ impl SyncServiceTrait for SyncService {
                     .clone()
                     .filter(|d| !d.trim().is_empty())
                     .or(activity.external_reference_id.clone()),
+                fx_rate,
+                provider_type: activity
+                    .provider_type
+                    .clone()
+                    .filter(|t| !t.trim().is_empty()),
+                external_provider_id: Some(activity.id.clone().unwrap_or_default())
+                    .filter(|id| !id.trim().is_empty()),
+                external_broker_id: activity
+                    .external_reference_id
+                    .clone()
+                    .filter(|id| !id.trim().is_empty()),
             };
 
             activity_rows.push(new_activity.into());
@@ -368,11 +388,34 @@ impl SyncServiceTrait for SyncService {
 
                 let mut assets_inserted: usize = 0;
                 for asset_db in asset_rows {
+                    let asset_id = asset_db.id.clone();
+                    let asset_type = asset_db.asset_type.clone();
+                    let asset_class = asset_db.asset_class.clone();
+
                     assets_inserted += diesel::insert_into(schema::assets::table)
                         .values(&asset_db)
                         .on_conflict(schema::assets::id)
                         .do_nothing()
                         .execute(conn)?;
+
+                    if let Some(asset_type) = asset_type {
+                        diesel::update(
+                            schema::assets::table
+                                .filter(schema::assets::id.eq(&asset_id))
+                                .filter(schema::assets::asset_type.is_null()),
+                        )
+                        .set(schema::assets::asset_type.eq(asset_type))
+                        .execute(conn)?;
+                    }
+                    if let Some(asset_class) = asset_class {
+                        diesel::update(
+                            schema::assets::table
+                                .filter(schema::assets::id.eq(&asset_id))
+                                .filter(schema::assets::asset_class.is_null()),
+                        )
+                        .set(schema::assets::asset_class.eq(asset_class))
+                        .execute(conn)?;
+                    }
                 }
 
                 let mut activities_upserted: usize = 0;
@@ -394,6 +437,13 @@ impl SyncServiceTrait for SyncService {
                             schema::activities::amount.eq(excluded(schema::activities::amount)),
                             schema::activities::is_draft.eq(excluded(schema::activities::is_draft)),
                             schema::activities::comment.eq(excluded(schema::activities::comment)),
+                            schema::activities::fx_rate.eq(excluded(schema::activities::fx_rate)),
+                            schema::activities::provider_type
+                                .eq(excluded(schema::activities::provider_type)),
+                            schema::activities::external_provider_id
+                                .eq(excluded(schema::activities::external_provider_id)),
+                            schema::activities::external_broker_id
+                                .eq(excluded(schema::activities::external_broker_id)),
                             schema::activities::updated_at.eq(now_update),
                         ))
                         .execute(conn)?;
@@ -572,4 +622,39 @@ fn map_broker_activity_type(
         },
         _ => None,
     }
+}
+
+fn broker_symbol_type_label(code: Option<&str>, description: Option<&str>) -> Option<String> {
+    let label = description
+        .map(str::trim)
+        .filter(|d| !d.is_empty())
+        .map(str::to_string);
+    if label.is_some() {
+        return label;
+    }
+
+    let code = code.map(str::trim).filter(|c| !c.is_empty())?;
+    let words = code
+        .split(|c: char| c == '_' || c == '-' || c.is_whitespace())
+        .filter(|w| !w.is_empty());
+
+    let mut out = String::new();
+    for (idx, word) in words.enumerate() {
+        if idx > 0 {
+            out.push(' ');
+        }
+        out.push_str(&capitalize_word(word));
+    }
+    if out.is_empty() { None } else { Some(out) }
+}
+
+fn capitalize_word(word: &str) -> String {
+    let mut chars = word.chars();
+    let Some(first) = chars.next() else {
+        return String::new();
+    };
+    let mut out = String::new();
+    out.extend(first.to_uppercase());
+    out.push_str(&chars.as_str().to_lowercase());
+    out
 }

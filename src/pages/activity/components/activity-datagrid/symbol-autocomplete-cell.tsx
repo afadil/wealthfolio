@@ -18,7 +18,6 @@ import type { QuoteSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { Icons } from "@wealthfolio/ui";
-import { Check } from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 interface SymbolAutocompleteCellProps {
@@ -262,7 +261,7 @@ export function SymbolAutocompleteCell({
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground text-xs">{option.exchange}</span>
-                      {value === option.symbol && <Check className="h-4 w-4" />}
+                      {value === option.symbol && <Icons.Check className="h-4 w-4" />}
                     </div>
                   </CommandItem>
                 ))}

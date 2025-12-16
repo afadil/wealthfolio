@@ -239,7 +239,28 @@ impl ActivityRepositoryTrait for ActivityRepository {
                     .find(&activity_id_owned)
                     .first::<ActivityDB>(conn)?;
 
-                activity_to_update.created_at = existing.created_at;
+                let ActivityDB {
+                    created_at,
+                    fx_rate,
+                    provider_type,
+                    external_provider_id,
+                    external_broker_id,
+                    ..
+                } = existing;
+
+                activity_to_update.created_at = created_at;
+                if activity_to_update.fx_rate.is_none() {
+                    activity_to_update.fx_rate = fx_rate;
+                }
+                if activity_to_update.provider_type.is_none() {
+                    activity_to_update.provider_type = provider_type;
+                }
+                if activity_to_update.external_provider_id.is_none() {
+                    activity_to_update.external_provider_id = external_provider_id;
+                }
+                if activity_to_update.external_broker_id.is_none() {
+                    activity_to_update.external_broker_id = external_broker_id;
+                }
                 activity_to_update.updated_at = chrono::Utc::now().to_rfc3339();
 
                 let updated_activity =
@@ -294,7 +315,28 @@ impl ActivityRepositoryTrait for ActivityRepository {
                             .find(&activity_db.id)
                             .first::<ActivityDB>(conn)?;
 
-                        activity_db.created_at = existing.created_at;
+                        let ActivityDB {
+                            created_at,
+                            fx_rate,
+                            provider_type,
+                            external_provider_id,
+                            external_broker_id,
+                            ..
+                        } = existing;
+
+                        activity_db.created_at = created_at;
+                        if activity_db.fx_rate.is_none() {
+                            activity_db.fx_rate = fx_rate;
+                        }
+                        if activity_db.provider_type.is_none() {
+                            activity_db.provider_type = provider_type;
+                        }
+                        if activity_db.external_provider_id.is_none() {
+                            activity_db.external_provider_id = external_provider_id;
+                        }
+                        if activity_db.external_broker_id.is_none() {
+                            activity_db.external_broker_id = external_broker_id;
+                        }
                         activity_db.updated_at = chrono::Utc::now().to_rfc3339();
 
                         let updated_activity =

@@ -1,13 +1,7 @@
 import { useIsMobileViewport } from "@/hooks";
 import { useSettingsContext } from "@/lib/settings-provider";
-import {
-  CircleCheckIcon,
-  InfoIcon,
-  Loader2Icon,
-  OctagonXIcon,
-  TriangleAlertIcon,
-  XIcon,
-} from "lucide-react";
+import { Icons } from "@wealthfolio/ui";
+
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 
 const Toaster = ({ ...props }: ToasterProps) => {
@@ -32,12 +26,12 @@ const Toaster = ({ ...props }: ToasterProps) => {
       expand={true}
       richColors
       icons={{
-        success: <CircleCheckIcon className="size-4" />,
-        info: <InfoIcon className="size-4" />,
-        warning: <TriangleAlertIcon className="size-4" />,
-        error: <OctagonXIcon className="size-4" />,
-        loading: <Loader2Icon className="size-4 animate-spin" />,
-        close: <XIcon className="size-4" />,
+        success: <Icons.CheckCircle className="size-4" />,
+        info: <Icons.Info className="size-4" />,
+        warning: <Icons.AlertTriangle className="size-4" />,
+        error: <Icons.OctagonX className="size-4" />,
+        loading: <Icons.Spinner className="size-4 animate-spin" />,
+        close: <Icons.Close className="size-4" />,
       }}
       toastOptions={{
         classNames: {

@@ -375,6 +375,10 @@ impl ActivityServiceTrait for ActivityService {
                 amount: activity.amount,
                 is_draft: activity.is_draft,
                 comment: activity.comment.clone(),
+                fx_rate: None,
+                provider_type: None,
+                external_provider_id: None,
+                external_broker_id: None,
             })
             .collect();
 

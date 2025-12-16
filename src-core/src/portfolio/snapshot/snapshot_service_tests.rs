@@ -758,6 +758,9 @@ mod tests {
             created_at: Utc::now().naive_utc(),
             updated_at: Utc::now().naive_utc(),
             platform_id: None,
+            external_id: None,
+            account_number: None,
+            meta: None,
         }
     }
 
@@ -1128,6 +1131,10 @@ mod tests {
             amount: Some(dec!(5000)),
             is_draft: false,
             comment: None,
+            fx_rate: None,
+            provider_type: None,
+            external_provider_id: None,
+            external_broker_id: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
@@ -1188,6 +1195,10 @@ mod tests {
             amount: Some(amt),
             is_draft: false,
             comment: None,
+            fx_rate: None,
+            provider_type: None,
+            external_provider_id: None,
+            external_broker_id: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };

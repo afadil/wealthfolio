@@ -12,7 +12,7 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { useCheckUpdateOnStartup, useClearUpdate, useInstallUpdate } from "@/hooks/use-updater";
 import { open } from "@tauri-apps/plugin-shell";
-import { Download, ExternalLink, Sparkles, X } from "lucide-react";
+import { Icons } from "@wealthfolio/ui";
 
 function formatReleaseDate(pubDate?: string) {
   if (!pubDate) {
@@ -132,13 +132,13 @@ export function UpdateDialog() {
               className="bg-secondary/50 text-muted-foreground hover:bg-secondary hover:text-foreground absolute top-4 right-4 rounded-full p-2 transition-all duration-200 hover:scale-105"
               aria-label="Close dialog"
             >
-              <X className="h-4 w-4" />
+              <Icons.Close className="h-4 w-4" />
             </button>
 
             {/* Version badge */}
             <div className="mb-4 flex items-center gap-3">
               <span className="bg-primary/10 text-primary inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-mono text-sm font-medium">
-                <Sparkles className="h-3.5 w-3.5" />v{updateInfo.latestVersion}
+                <Icons.Sparkles className="h-3.5 w-3.5" />v{updateInfo.latestVersion}
               </span>
               {releaseDate && <span className="text-muted-foreground text-sm">{releaseDate}</span>}
             </div>
@@ -205,14 +205,14 @@ export function UpdateDialog() {
                 </Button>
               ) : (
                 <Button onClick={handleInstall}>
-                  <Download className="mr-2 h-4 w-4" />
+                  <Icons.Download className="mr-2 h-4 w-4" />
                   Update Now
                 </Button>
               )
             ) : (
               // Web: Show download link (opens GitHub releases or Docker instructions)
               <Button onClick={handleOpenStore} disabled={!updateInfo.storeUrl}>
-                <ExternalLink className="mr-2 h-4 w-4" />
+                <Icons.ExternalLink className="mr-2 h-4 w-4" />
                 View Release
               </Button>
             )}

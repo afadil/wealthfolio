@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { Check, ChevronDown } from "lucide-react";
+import { Icons } from "@wealthfolio/ui";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 
@@ -158,7 +158,7 @@ export function SelectCell({
           <span className="flex-1">
             {renderValue ? renderValue(value) : (selectedOption?.label ?? value)}
           </span>
-          <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+          <Icons.ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
         </div>
       </PopoverTrigger>
       <PopoverContent
@@ -182,7 +182,7 @@ export function SelectCell({
                   value={`${option.value} ${option.searchValue ?? option.label ?? option.value}`}
                   onSelect={() => handleSelect(option)}
                 >
-                  <Check
+                  <Icons.Check
                     className={cn(
                       "mr-2 h-4 w-4",
                       value === option.value ? "opacity-100" : "opacity-0",
