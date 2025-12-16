@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -24,6 +25,7 @@ import { ParsedAsset, formatBreakdownTags, tagsToBreakdown } from "./asset-utils
 
 const assetFormSchema = z.object({
   symbol: z.string().min(1),
+  symbolMapping: z.string().optional(),
   name: z.string().optional(),
   assetClass: z.string().optional(),
   assetSubClass: z.string().optional(),
@@ -51,6 +53,7 @@ interface AssetFormProps {
 export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProps) {
   const defaultValues: AssetFormValues = {
     symbol: asset.id,
+    symbolMapping: asset.symbolMapping ?? "",
     name: asset.name ?? "",
     assetClass: asset.assetClass ?? "",
     assetSubClass: asset.assetSubClass ?? "",
@@ -113,6 +116,26 @@ export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProp
                 <FormControl>
                   <Input placeholder="Asset display name" {...field} />
                 </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="symbolMapping"
+            render={({ field }) => (
+              <FormItem className="md:col-span-2">
+                <FormLabel>Symbol mapping</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Override provider symbol (optional)"
+                    {...field}
+                    value={field.value ?? ""}
+                  />
+                </FormControl>
+                <FormDescription>
+                  If set, this symbol is used to fetch quotes from your market data provider.
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -238,6 +261,7 @@ export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProp
 
 export const buildAssetUpdatePayload = (values: AssetFormValues): UpdateAssetProfile => ({
   symbol: values.symbol,
+  symbolMapping: values.symbolMapping?.trim() ? values.symbolMapping.trim() : null,
   name: values.name || "",
   sectors: values.sectors.length ? JSON.stringify(tagsToBreakdown(values.sectors)) : "",
   countries: values.countries.length ? JSON.stringify(tagsToBreakdown(values.countries)) : "",

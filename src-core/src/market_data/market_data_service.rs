@@ -116,9 +116,18 @@ impl MarketDataServiceTrait for MarketDataService {
         start_date: NaiveDate,
         end_date: NaiveDate,
     ) -> Result<Vec<Quote>> {
+        let provider_symbol = self
+            .asset_repository
+            .get_by_id(symbol)
+            .ok()
+            .and_then(|asset| asset.symbol_mapping)
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| symbol.to_string());
+
         debug!(
             "Getting symbol history for {} from {} to {}",
-            symbol, start_date, end_date
+            provider_symbol, start_date, end_date
         );
         let start_time: SystemTime = Utc
             .from_utc_datetime(&start_date.and_hms_opt(0, 0, 0).unwrap())
@@ -127,12 +136,22 @@ impl MarketDataServiceTrait for MarketDataService {
             .from_utc_datetime(&end_date.and_hms_opt(23, 59, 59).unwrap())
             .into();
 
-        self.provider_registry
+        let mut quotes = self
+            .provider_registry
             .read()
             .await
-            .historical_quotes(symbol, start_time, end_time, "USD".to_string())
+            .historical_quotes(&provider_symbol, start_time, end_time, "USD".to_string())
             .await
-            .map_err(|e| e.into())
+            ?;
+
+        if provider_symbol != symbol {
+            for quote in quotes.iter_mut() {
+                quote.symbol = symbol.to_string();
+                quote.id = format!("{}_{}", quote.timestamp.format("%Y%m%d"), symbol);
+            }
+        }
+
+        Ok(quotes)
     }
 
     async fn sync_market_data(&self) -> Result<((), Vec<(String, String)>)> {
@@ -146,6 +165,7 @@ impl MarketDataServiceTrait for MarketDataService {
             })
             .map(|asset| QuoteRequest {
                 symbol: asset.symbol.clone(),
+                symbol_mapping: asset.symbol_mapping.clone(),
                 data_source: asset.data_source.as_str().into(),
                 currency: asset.currency.clone(),
             })
@@ -175,6 +195,7 @@ impl MarketDataServiceTrait for MarketDataService {
             })
             .map(|asset| QuoteRequest {
                 symbol: asset.symbol.clone(),
+                symbol_mapping: asset.symbol_mapping.clone(),
                 data_source: asset.data_source.as_str().into(),
                 currency: asset.currency.clone(),
             })
@@ -563,6 +584,19 @@ impl MarketDataService {
             .iter()
             .map(|req| (req.symbol.clone(), req.currency.clone()))
             .collect();
+        let symbol_to_fetch_symbol: HashMap<String, String> = public_requests
+            .iter()
+            .map(|req| {
+                let fetch_symbol = req
+                    .symbol_mapping
+                    .as_ref()
+                    .map(|value| value.trim())
+                    .filter(|value| !value.is_empty())
+                    .unwrap_or(req.symbol.as_str())
+                    .to_string();
+                (req.symbol.clone(), fetch_symbol)
+            })
+            .collect();
 
         let sync_plan =
             self.calculate_sync_plan(refetch_all, &symbols_with_currencies, end_date)?;
@@ -611,22 +645,92 @@ impl MarketDataService {
                     .map(|(symbol, _)| symbol.clone())
                     .collect();
 
+                let mut fetch_symbols: Vec<(String, String)> = Vec::new();
+                let mut fetch_key_to_symbols: HashMap<(String, String), Vec<String>> =
+                    HashMap::new();
+                let mut fetch_symbol_to_symbols: HashMap<String, Vec<String>> = HashMap::new();
+                let mut seen_fetch_keys: HashSet<(String, String)> = HashSet::new();
+
+                for (symbol, currency) in &group_symbols {
+                    let fetch_symbol = symbol_to_fetch_symbol
+                        .get(symbol)
+                        .cloned()
+                        .unwrap_or_else(|| symbol.clone());
+                    fetch_key_to_symbols
+                        .entry((fetch_symbol.clone(), currency.clone()))
+                        .or_default()
+                        .push(symbol.clone());
+                    fetch_symbol_to_symbols
+                        .entry(fetch_symbol.clone())
+                        .or_default()
+                        .push(symbol.clone());
+
+                    if seen_fetch_keys.insert((fetch_symbol.clone(), currency.clone())) {
+                        fetch_symbols.push((fetch_symbol, currency.clone()));
+                    }
+                }
+
                 match self
                     .provider_registry
                     .read()
                     .await
-                    .historical_quotes_bulk(&group_symbols, start_time, end_date)
+                    .historical_quotes_bulk(&fetch_symbols, start_time, end_date)
                     .await
                 {
                     Ok((quotes, provider_failures)) => {
+                        let mut remapped_quotes: Vec<Quote> = Vec::with_capacity(quotes.len());
+
+                        for quote in quotes {
+                            match fetch_symbol_to_symbols.get(&quote.symbol) {
+                                Some(target_symbols) if !target_symbols.is_empty() => {
+                                    if target_symbols.len() == 1
+                                        && target_symbols[0] == quote.symbol
+                                    {
+                                        remapped_quotes.push(quote);
+                                        continue;
+                                    }
+
+                                    for target_symbol in target_symbols {
+                                        let mut remapped = quote.clone();
+                                        if remapped.symbol != *target_symbol {
+                                            remapped.symbol = target_symbol.clone();
+                                        }
+                                        remapped.id = format!(
+                                            "{}_{}",
+                                            remapped.timestamp.format("%Y%m%d"),
+                                            remapped.symbol
+                                        );
+                                        remapped_quotes.push(remapped);
+                                    }
+                                }
+                                _ => remapped_quotes.push(quote),
+                            }
+                        }
+
+                        let remapped_failures: Vec<(String, String)> = provider_failures
+                            .into_iter()
+                            .flat_map(|(failed_symbol, currency)| {
+                                fetch_key_to_symbols
+                                    .get(&(failed_symbol.clone(), currency.clone()))
+                                    .map(|targets| {
+                                        targets
+                                            .iter()
+                                            .cloned()
+                                            .map(|target| (target, currency.clone()))
+                                            .collect::<Vec<_>>()
+                                    })
+                                    .unwrap_or_else(|| vec![(failed_symbol, currency)])
+                            })
+                            .collect();
+
                         debug!(
                             "Fetched {} quotes for symbols {:?} (start {}).",
-                            quotes.len(),
+                            remapped_quotes.len(),
                             symbol_names,
                             DateTime::<Utc>::from(start_time).format("%Y-%m-%d")
                         );
-                        all_quotes.extend(quotes);
-                        failed_syncs.extend(provider_failures);
+                        all_quotes.extend(remapped_quotes);
+                        failed_syncs.extend(remapped_failures);
                     }
                     Err(e) => {
                         error!(
