@@ -31,9 +31,9 @@ import useGlobalEventListener from "./use-global-event-listener";
 // import QRScannerPage from './pages/qr-scanner/qr-scanner-page'; // File not found
 import { getDynamicRoutes, subscribeToNavigationUpdates } from "@/addons/addons-runtime-context";
 import NotFoundPage from "@/pages/not-found";
+import AuthCallbackPage from "./pages/auth/auth-callback-page";
 import HoldingsInsightsPage from "./pages/holdings/holdings-insights-page";
 import AboutSettingsPage from "./pages/settings/about/about-page";
-import AuthCallbackPage from "./pages/auth/auth-callback-page";
 
 export function AppRoutes() {
   useGlobalEventListener();
@@ -112,7 +112,7 @@ export function AppRoutes() {
             <Route path="market-data" element={<MarketDataSettingsPage />} />
             <Route path="market-data/import" element={<MarketDataImportPage />} />
             <Route path="securities" element={<AssetsPage />} />
-            <Route path="wealthfolio-sync" element={<WealthfolioSyncPage />} />
+            <Route path="wealthfolio-connect" element={<WealthfolioSyncPage />} />
             <Route path="addons" element={<AddonSettingsPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />

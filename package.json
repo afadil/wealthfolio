@@ -59,7 +59,6 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "lodash": "^4.17.21",
-    "lucide-react": "^0.553.0",
     "motion": "^12.23.24",
     "papaparse": "^5.5.3",
     "react": "^19.1.1",

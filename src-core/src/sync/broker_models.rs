@@ -208,6 +208,17 @@ pub struct AccountUniversalActivitySymbol {
     pub symbol: Option<String>,
     pub raw_symbol: Option<String>,
     pub description: Option<String>,
+    #[serde(rename = "type")]
+    pub symbol_type: Option<AccountUniversalActivitySymbolType>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AccountUniversalActivitySymbolType {
+    pub id: Option<String>,
+    pub code: Option<String>,
+    pub description: Option<String>,
+    #[serde(default)]
+    pub is_supported: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -241,6 +252,8 @@ pub struct AccountUniversalActivity {
     pub institution: Option<String>,
     #[serde(rename = "external_reference_id")]
     pub external_reference_id: Option<String>,
+    #[serde(rename = "provider_type")]
+    pub provider_type: Option<String>,
 }
 
 /// Response from syncing activities.

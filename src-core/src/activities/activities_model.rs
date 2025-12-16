@@ -59,6 +59,10 @@ pub struct Activity {
     pub amount: Option<Decimal>,
     pub is_draft: bool,
     pub comment: Option<String>,
+    pub fx_rate: Option<Decimal>,
+    pub provider_type: Option<String>,
+    pub external_provider_id: Option<String>,
+    pub external_broker_id: Option<String>,
     #[serde(with = "timestamp_format")]
     pub created_at: DateTime<Utc>,
     #[serde(with = "timestamp_format")]
@@ -96,6 +100,10 @@ pub struct ActivityDB {
     pub amount: Option<String>,
     pub is_draft: bool,
     pub comment: Option<String>,
+    pub fx_rate: Option<String>,
+    pub provider_type: Option<String>,
+    pub external_provider_id: Option<String>,
+    pub external_broker_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -117,6 +125,10 @@ pub struct NewActivity {
     pub amount: Option<Decimal>,
     pub is_draft: bool,
     pub comment: Option<String>,
+    pub fx_rate: Option<Decimal>,
+    pub provider_type: Option<String>,
+    pub external_provider_id: Option<String>,
+    pub external_broker_id: Option<String>,
 }
 
 impl NewActivity {
@@ -168,6 +180,10 @@ pub struct ActivityUpdate {
     pub amount: Option<Decimal>,
     pub is_draft: bool,
     pub comment: Option<String>,
+    pub fx_rate: Option<Decimal>,
+    pub provider_type: Option<String>,
+    pub external_provider_id: Option<String>,
+    pub external_broker_id: Option<String>,
 }
 
 impl ActivityUpdate {
@@ -593,6 +609,13 @@ impl From<ActivityDB> for Activity {
                 .map(|s| parse_decimal_string_tolerant(&s, "amount")),
             is_draft: db.is_draft,
             comment: db.comment,
+            fx_rate: db
+                .fx_rate
+                .as_deref()
+                .map(|s| parse_decimal_string_tolerant(s, "fx_rate")),
+            provider_type: db.provider_type,
+            external_provider_id: db.external_provider_id,
+            external_broker_id: db.external_broker_id,
             created_at: DateTime::parse_from_rfc3339(&db.created_at)
                 .map(|dt| dt.with_timezone(&Utc))
                 .unwrap_or_else(|e| {
@@ -687,6 +710,10 @@ impl From<NewActivity> for ActivityDB {
             amount,
             is_draft: domain.is_draft,
             comment: domain.comment,
+            fx_rate: domain.fx_rate.map(|d| d.to_string()),
+            provider_type: domain.provider_type,
+            external_provider_id: domain.external_provider_id,
+            external_broker_id: domain.external_broker_id,
             created_at: now.to_rfc3339(),
             updated_at: now.to_rfc3339(),
         }
@@ -759,6 +786,10 @@ impl From<ActivityUpdate> for ActivityDB {
             amount,
             is_draft: domain.is_draft,
             comment: domain.comment,
+            fx_rate: domain.fx_rate.map(|d| d.to_string()),
+            provider_type: domain.provider_type,
+            external_provider_id: domain.external_provider_id,
+            external_broker_id: domain.external_broker_id,
             created_at: now.to_rfc3339(), // This should ideally preserve original created_at. Need to fetch before update.
             updated_at: now.to_rfc3339(),
         }

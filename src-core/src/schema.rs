@@ -45,6 +45,10 @@ diesel::table! {
         amount -> Nullable<Text>,
         is_draft -> Bool,
         comment -> Nullable<Text>,
+        fx_rate -> Nullable<Text>,
+        provider_type -> Nullable<Text>,
+        external_provider_id -> Nullable<Text>,
+        external_broker_id -> Nullable<Text>,
         created_at -> Text,
         updated_at -> Text,
     }

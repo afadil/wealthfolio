@@ -16,6 +16,9 @@ pub struct Account {
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
     pub platform_id: Option<String>,
+    pub external_id: Option<String>,
+    pub account_number: Option<String>,
+    pub meta: Option<String>,
 }
 
 impl From<core_accounts::Account> for Account {
@@ -31,6 +34,9 @@ impl From<core_accounts::Account> for Account {
             created_at: a.created_at,
             updated_at: a.updated_at,
             platform_id: a.platform_id,
+            external_id: a.external_id,
+            account_number: a.account_number,
+            meta: a.meta,
         }
     }
 }
@@ -47,6 +53,9 @@ pub struct NewAccount {
     pub is_default: bool,
     pub is_active: bool,
     pub platform_id: Option<String>,
+    pub external_id: Option<String>,
+    pub account_number: Option<String>,
+    pub meta: Option<String>,
 }
 
 impl From<NewAccount> for core_accounts::NewAccount {
@@ -60,6 +69,9 @@ impl From<NewAccount> for core_accounts::NewAccount {
             is_default: a.is_default,
             is_active: a.is_active,
             platform_id: a.platform_id,
+            external_id: a.external_id,
+            account_number: a.account_number,
+            meta: a.meta,
         }
     }
 }
@@ -74,6 +86,9 @@ pub struct AccountUpdate {
     pub is_default: bool,
     pub is_active: bool,
     pub platform_id: Option<String>,
+    pub external_id: Option<String>,
+    pub account_number: Option<String>,
+    pub meta: Option<String>,
 }
 
 impl From<AccountUpdate> for core_accounts::AccountUpdate {
@@ -86,6 +101,9 @@ impl From<AccountUpdate> for core_accounts::AccountUpdate {
             is_default: a.is_default,
             is_active: a.is_active,
             platform_id: a.platform_id,
+            external_id: a.external_id,
+            account_number: a.account_number,
+            meta: a.meta,
         }
     }
 }
