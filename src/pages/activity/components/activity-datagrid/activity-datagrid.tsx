@@ -1148,35 +1148,32 @@ export function ActivityDatagrid({
                 }
 
                 return (
-                  <Fragment key={virtualRow.key}>
-                    <TransactionRow
-                      transaction={transaction}
-                      activityTypeOptions={activityTypeOptions}
-                      accountOptions={accountOptions}
-                      currencyOptions={currencyOptions}
-                      accountLookup={accountLookup}
-                      isSelected={selectedIds.has(transaction.id)}
-                      isDirty={dirtyTransactionIds.has(transaction.id)}
-                      focusedField={
-                        focusedCell?.rowId === transaction.id ? focusedCell.field : null
-                      }
-                      onToggleSelect={toggleSelect}
-                      onUpdateTransaction={updateTransaction}
-                      onEditTransaction={handleEditTransaction}
-                      onDuplicate={duplicateRow}
-                      onDelete={deleteRow}
-                      onNavigate={handleCellNavigation}
-                      setFocusedCell={setFocusedCell}
-                      resolvedCurrency={
-                        dirtyCurrencyLookup.get(transaction.id) ??
-                        transaction.currency ??
-                        transaction.accountCurrency ??
-                        fallbackCurrency
-                      }
-                      fallbackCurrency={fallbackCurrency}
-                      rowRef={rowVirtualizer.measureElement}
-                    />
-                  </Fragment>
+                  <TransactionRow
+                    key={virtualRow.key}
+                    transaction={transaction}
+                    activityTypeOptions={activityTypeOptions}
+                    accountOptions={accountOptions}
+                    currencyOptions={currencyOptions}
+                    accountLookup={accountLookup}
+                    isSelected={selectedIds.has(transaction.id)}
+                    isDirty={dirtyTransactionIds.has(transaction.id)}
+                    focusedField={focusedCell?.rowId === transaction.id ? focusedCell.field : null}
+                    onToggleSelect={toggleSelect}
+                    onUpdateTransaction={updateTransaction}
+                    onEditTransaction={handleEditTransaction}
+                    onDuplicate={duplicateRow}
+                    onDelete={deleteRow}
+                    onNavigate={handleCellNavigation}
+                    setFocusedCell={setFocusedCell}
+                    resolvedCurrency={
+                      dirtyCurrencyLookup.get(transaction.id) ??
+                      transaction.currency ??
+                      transaction.accountCurrency ??
+                      fallbackCurrency
+                    }
+                    fallbackCurrency={fallbackCurrency}
+                    rowRef={rowVirtualizer.measureElement}
+                  />
                 );
               })}
 
@@ -1243,7 +1240,12 @@ const TransactionRow = memo(function TransactionRow({
   const isSplit = transaction.activityType === ActivityType.SPLIT;
   const handleFocus = useCallback(
     (field: EditableField) => {
-      setFocusedCell({ rowId: transaction.id, field });
+      setFocusedCell((current) => {
+        if (current?.rowId === transaction.id && current.field === field) {
+          return current;
+        }
+        return { rowId: transaction.id, field };
+      });
     },
     [setFocusedCell, transaction.id],
   );

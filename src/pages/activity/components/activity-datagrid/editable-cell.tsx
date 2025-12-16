@@ -52,6 +52,9 @@ export function EditableCell({
 
   useEffect(() => {
     if (isFocused && !isEditing && cellRef.current) {
+      if (typeof document !== "undefined" && document.activeElement === cellRef.current) {
+        return;
+      }
       cellRef.current.focus();
     }
   }, [isFocused, isEditing]);

@@ -62,6 +62,9 @@ export function SymbolAutocompleteCell({
 
   useEffect(() => {
     if (isFocused && !isEditing && cellRef.current) {
+      if (typeof document !== "undefined" && document.activeElement === cellRef.current) {
+        return;
+      }
       cellRef.current.focus();
     }
   }, [disabled, isFocused, isEditing]);
@@ -195,81 +198,83 @@ export function SymbolAutocompleteCell({
           {value || "TICKER"}
         </div>
       </PopoverTrigger>
-      <PopoverContent className="w-[280px] p-0 text-xs" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput
-            ref={inputRef}
-            placeholder="Search symbol or company..."
-            value={searchQuery}
-            onValueChange={setSearchQuery}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                setIsEditing(false);
-                setSearchQuery("");
-              } else if (e.key === "Tab") {
-                e.preventDefault();
-                setIsEditing(false);
-                onNavigate?.(e.shiftKey ? "left" : "right");
-              } else if (e.key === "Enter" && trimmedQuery && options.length === 0) {
-                e.preventDefault();
-                handleCustomSymbol();
-              }
-            }}
-          />
-          <CommandList>
-            {isLoading ? <CommandEmpty>Loading...</CommandEmpty> : null}
-            {!isLoading && (isError || options.length === 0) && trimmedQuery.length > 1 ? (
-              <CommandGroup>
-                <CommandItem
-                  value={trimmedQuery}
-                  onSelect={handleCustomSymbol}
-                  className="flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-3">
-                    <Icons.PlusCircle className="text-muted-foreground h-4 w-4" />
-                    <div className="flex flex-col">
-                      <span className="font-mono text-xs font-semibold uppercase">
-                        {trimmedQuery.toUpperCase()}
-                      </span>
-                      <span className="text-muted-foreground text-xs font-light">
-                        Create custom (manual)
-                      </span>
-                    </div>
-                  </div>
-                </CommandItem>
-              </CommandGroup>
-            ) : null}
-            {!isLoading && !isError && options.length > 0 ? (
-              <CommandGroup>
-                {options.map((option) => (
+      {isEditing ? (
+        <PopoverContent className="w-[280px] p-0 text-xs" align="start">
+          <Command shouldFilter={false}>
+            <CommandInput
+              ref={inputRef}
+              placeholder="Search symbol or company..."
+              value={searchQuery}
+              onValueChange={setSearchQuery}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setIsEditing(false);
+                  setSearchQuery("");
+                } else if (e.key === "Tab") {
+                  e.preventDefault();
+                  setIsEditing(false);
+                  onNavigate?.(e.shiftKey ? "left" : "right");
+                } else if (e.key === "Enter" && trimmedQuery && options.length === 0) {
+                  e.preventDefault();
+                  handleCustomSymbol();
+                }
+              }}
+            />
+            <CommandList>
+              {isLoading ? <CommandEmpty>Loading...</CommandEmpty> : null}
+              {!isLoading && (isError || options.length === 0) && trimmedQuery.length > 1 ? (
+                <CommandGroup>
                   <CommandItem
-                    key={option.symbol}
-                    value={option.symbol}
-                    onSelect={() =>
-                      handleSelectWithDataSource(
-                        option.symbol,
-                        resolveDataSource(option.dataSource),
-                      )
-                    }
+                    value={trimmedQuery}
+                    onSelect={handleCustomSymbol}
                     className="flex items-center justify-between"
                   >
-                    <div className="flex flex-col">
-                      <span className="font-mono text-xs font-semibold uppercase">
-                        {option.symbol}
-                      </span>
-                      <span className="text-muted-foreground text-xs">{displayName(option)}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground text-xs">{option.exchange}</span>
-                      {value === option.symbol && <Icons.Check className="h-4 w-4" />}
+                    <div className="flex items-center gap-3">
+                      <Icons.PlusCircle className="text-muted-foreground h-4 w-4" />
+                      <div className="flex flex-col">
+                        <span className="font-mono text-xs font-semibold uppercase">
+                          {trimmedQuery.toUpperCase()}
+                        </span>
+                        <span className="text-muted-foreground text-xs font-light">
+                          Create custom (manual)
+                        </span>
+                      </div>
                     </div>
                   </CommandItem>
-                ))}
-              </CommandGroup>
-            ) : null}
-          </CommandList>
-        </Command>
-      </PopoverContent>
+                </CommandGroup>
+              ) : null}
+              {!isLoading && !isError && options.length > 0 ? (
+                <CommandGroup>
+                  {options.map((option) => (
+                    <CommandItem
+                      key={option.symbol}
+                      value={option.symbol}
+                      onSelect={() =>
+                        handleSelectWithDataSource(
+                          option.symbol,
+                          resolveDataSource(option.dataSource),
+                        )
+                      }
+                      className="flex items-center justify-between"
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-mono text-xs font-semibold uppercase">
+                          {option.symbol}
+                        </span>
+                        <span className="text-muted-foreground text-xs">{displayName(option)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground text-xs">{option.exchange}</span>
+                        {value === option.symbol && <Icons.Check className="h-4 w-4" />}
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              ) : null}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      ) : null}
     </Popover>
   );
 }
