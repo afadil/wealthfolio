@@ -14,11 +14,19 @@ export interface SyncAccountsResponse {
   skipped: number;
 }
 
+export interface SyncActivitiesResponse {
+  accounts_synced: number;
+  activities_upserted: number;
+  assets_inserted: number;
+  accounts_failed: number;
+}
+
 export interface SyncResult {
   success: boolean;
   message: string;
   connectionsSynced: SyncConnectionsResponse | null;
   accountsSynced: SyncAccountsResponse | null;
+  activitiesSynced: SyncActivitiesResponse | null;
 }
 
 export interface BrokerConnectionBrokerage {

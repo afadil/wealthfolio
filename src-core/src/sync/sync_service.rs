@@ -4,36 +4,48 @@ use async_trait::async_trait;
 use log::{debug, info, warn};
 use std::sync::Arc;
 
-use super::broker_models::{BrokerAccount, BrokerConnection, SyncAccountsResponse, SyncConnectionsResponse};
+use super::brokers_sync_state_repository::BrokersSyncStateRepository;
+use super::broker_models::{AccountUniversalActivity, BrokerAccount, BrokerConnection, SyncAccountsResponse, SyncConnectionsResponse};
 use super::platform_repository::{Platform, PlatformRepository};
 use super::sync_traits::SyncServiceTrait;
 use crate::accounts::{Account, AccountRepositoryTrait, NewAccount};
-use crate::db::DbTransactionExecutor;
 use crate::errors::Result;
+use crate::{activities::activities_model::NewActivity, assets::assets_model::AssetDB, db::WriteHandle, schema};
+use rust_decimal::prelude::FromPrimitive;
+use rust_decimal::Decimal;
+use std::collections::HashSet;
+
+const DEFAULT_BROKERAGE_PROVIDER: &str = "snaptrade";
 
 /// Service for syncing broker data to the local database
-pub struct SyncService<E: DbTransactionExecutor + Send + Sync + Clone> {
+pub struct SyncService {
     account_repository: Arc<dyn AccountRepositoryTrait>,
     platform_repository: Arc<PlatformRepository>,
-    transaction_executor: E,
+    brokers_sync_state_repository: Arc<BrokersSyncStateRepository>,
+    writer: WriteHandle,
 }
 
-impl<E: DbTransactionExecutor + Send + Sync + Clone> SyncService<E> {
+impl SyncService {
     pub fn new(
         account_repository: Arc<dyn AccountRepositoryTrait>,
         platform_repository: Arc<PlatformRepository>,
-        transaction_executor: E,
+        pool: std::sync::Arc<crate::db::DbPool>,
+        writer: WriteHandle,
     ) -> Self {
         Self {
             account_repository,
             platform_repository,
-            transaction_executor,
+            brokers_sync_state_repository: Arc::new(BrokersSyncStateRepository::new(
+                pool,
+                writer.clone(),
+            )),
+            writer,
         }
     }
 }
 
 #[async_trait]
-impl<E: DbTransactionExecutor + Send + Sync + Clone + 'static> SyncServiceTrait for SyncService<E> {
+impl SyncServiceTrait for SyncService {
     /// Sync connections from the broker API to local platforms table
     async fn sync_connections(
         &self,
@@ -142,8 +154,9 @@ impl<E: DbTransactionExecutor + Send + Sync + Clone + 'static> SyncServiceTrait 
 
             // Create the account in a transaction
             let repo = self.account_repository.clone();
-            let executor = self.transaction_executor.clone();
-            executor.execute(move |conn| repo.create_in_transaction(new_account, conn))?;
+            self.writer
+                .exec(move |conn| repo.create_in_transaction(new_account, conn))
+                .await?;
 
             created += 1;
             info!(
@@ -175,9 +188,247 @@ impl<E: DbTransactionExecutor + Send + Sync + Clone + 'static> SyncServiceTrait 
     fn get_platforms(&self) -> Result<Vec<Platform>> {
         self.platform_repository.list()
     }
+
+    fn get_activity_sync_state(
+        &self,
+        account_id: &str,
+    ) -> Result<Option<super::BrokersSyncState>> {
+        self.brokers_sync_state_repository.get_by_account_id(account_id)
+    }
+
+    async fn mark_activity_sync_attempt(&self, account_id: String) -> Result<()> {
+        self.brokers_sync_state_repository
+            .upsert_attempt(account_id, DEFAULT_BROKERAGE_PROVIDER.to_string())
+            .await
+    }
+
+    async fn upsert_account_activities(
+        &self,
+        account_id: String,
+        activities: Vec<AccountUniversalActivity>,
+    ) -> Result<(usize, usize)> {
+        use diesel::prelude::*;
+
+        if activities.is_empty() {
+            return Ok((0, 0));
+        }
+
+        let now_rfc3339 = chrono::Utc::now().to_rfc3339();
+        let now_naive = chrono::Utc::now().naive_utc();
+
+        let mut asset_rows: Vec<AssetDB> = Vec::new();
+        let mut seen_assets: HashSet<String> = HashSet::new();
+
+        let mut activity_rows: Vec<crate::activities::activities_model::ActivityDB> = Vec::new();
+        let mut seen_activity_ids: HashSet<String> = HashSet::new();
+
+        for activity in activities {
+            let activity_id = match activity.id.clone().filter(|v| !v.trim().is_empty()) {
+                Some(v) => v,
+                None => continue,
+            };
+            if !seen_activity_ids.insert(activity_id.clone()) {
+                continue;
+            }
+
+            let currency_code = activity
+                .currency
+                .as_ref()
+                .and_then(|c| c.code.clone())
+                .filter(|c| !c.trim().is_empty())
+                .unwrap_or_else(|| "USD".to_string());
+
+            let raw_type = activity
+                .activity_type
+                .clone()
+                .unwrap_or_else(|| "UNKNOWN".to_string());
+            let Some(mapped_type) = map_broker_activity_type(&raw_type, activity.amount, activity.units) else {
+                warn!(
+                    "Skipping unmapped broker activity {} (type='{}') for account {}",
+                    activity_id, raw_type, account_id
+                );
+                continue;
+            };
+
+            let is_cash_like = matches!(
+                mapped_type.as_str(),
+                crate::activities::ACTIVITY_TYPE_DEPOSIT
+                    | crate::activities::ACTIVITY_TYPE_WITHDRAWAL
+                    | crate::activities::ACTIVITY_TYPE_DIVIDEND
+                    | crate::activities::ACTIVITY_TYPE_INTEREST
+                    | crate::activities::ACTIVITY_TYPE_FEE
+                    | crate::activities::ACTIVITY_TYPE_TAX
+                    | crate::activities::ACTIVITY_TYPE_TRANSFER_IN
+                    | crate::activities::ACTIVITY_TYPE_TRANSFER_OUT
+            );
+
+            let asset_id = activity
+                .option_symbol
+                .as_ref()
+                .and_then(|s| s.ticker.clone())
+                .or_else(|| activity.symbol.as_ref().and_then(|s| s.symbol.clone()))
+                .filter(|s| !s.trim().is_empty())
+                .or_else(|| {
+                    if is_cash_like {
+                        Some(format!("$CASH-{}", currency_code))
+                    } else {
+                        None
+                    }
+                });
+
+            let Some(asset_id) = asset_id else {
+                warn!(
+                    "Skipping broker activity {} (type='{}'): missing symbol/option symbol",
+                    activity_id, mapped_type
+                );
+                continue;
+            };
+
+            if seen_assets.insert(asset_id.clone()) {
+                let asset_db = if asset_id.starts_with("$CASH-") {
+                    let new_asset = crate::assets::NewAsset::new_cash_asset(&currency_code);
+                    let mut db: AssetDB = new_asset.into();
+                    db.created_at = now_naive;
+                    db.updated_at = now_naive;
+                    db
+                } else {
+                    AssetDB {
+                        id: asset_id.clone(),
+                        symbol: asset_id.clone(),
+                        name: activity
+                            .symbol
+                            .as_ref()
+                            .and_then(|s| s.description.clone())
+                            .filter(|d| !d.trim().is_empty()),
+                        currency: currency_code.clone(),
+                        data_source: crate::market_data::market_data_model::DataSource::Yahoo
+                            .as_str()
+                            .to_string(),
+                        created_at: now_naive,
+                        updated_at: now_naive,
+                        ..Default::default()
+                    }
+                };
+                asset_rows.push(asset_db);
+            }
+
+            let activity_date = activity
+                .trade_date
+                .clone()
+                .or(activity.settlement_date.clone())
+                .unwrap_or_else(|| now_rfc3339.clone());
+
+            let quantity = activity
+                .units
+                .and_then(Decimal::from_f64)
+                .map(|d| d.abs())
+                .unwrap_or(Decimal::ZERO);
+            let unit_price = activity
+                .price
+                .and_then(Decimal::from_f64)
+                .map(|d| d.abs())
+                .unwrap_or(Decimal::ZERO);
+            let fee = activity
+                .fee
+                .and_then(Decimal::from_f64)
+                .map(|d| d.abs())
+                .unwrap_or(Decimal::ZERO);
+            let amount = activity.amount.and_then(Decimal::from_f64).map(|d| d.abs());
+
+            let new_activity = NewActivity {
+                id: Some(activity_id),
+                account_id: account_id.clone(),
+                asset_id,
+                asset_data_source: None,
+                activity_type: mapped_type,
+                activity_date,
+                quantity: Some(quantity),
+                unit_price: Some(unit_price),
+                currency: currency_code,
+                fee: Some(fee),
+                amount,
+                is_draft: false,
+                comment: activity
+                    .description
+                    .clone()
+                    .filter(|d| !d.trim().is_empty())
+                    .or(activity.external_reference_id.clone()),
+            };
+
+            activity_rows.push(new_activity.into());
+        }
+
+        let writer = self.writer.clone();
+        let account_id_for_log = account_id.clone();
+        let activities_count = activity_rows.len();
+
+        let (activities_upserted, assets_inserted) = writer
+            .exec(move |conn| {
+                use diesel::upsert::excluded;
+
+                let mut assets_inserted: usize = 0;
+                for asset_db in asset_rows {
+                    assets_inserted += diesel::insert_into(schema::assets::table)
+                        .values(&asset_db)
+                        .on_conflict(schema::assets::id)
+                        .do_nothing()
+                        .execute(conn)?;
+                }
+
+                let mut activities_upserted: usize = 0;
+                for activity_db in activity_rows {
+                    let now_update = chrono::Utc::now().to_rfc3339();
+                    activities_upserted += diesel::insert_into(schema::activities::table)
+                        .values(&activity_db)
+                        .on_conflict(schema::activities::id)
+                        .do_update()
+                        .set((
+                            schema::activities::account_id.eq(excluded(schema::activities::account_id)),
+                            schema::activities::asset_id.eq(excluded(schema::activities::asset_id)),
+                            schema::activities::activity_type.eq(excluded(schema::activities::activity_type)),
+                            schema::activities::activity_date.eq(excluded(schema::activities::activity_date)),
+                            schema::activities::quantity.eq(excluded(schema::activities::quantity)),
+                            schema::activities::unit_price.eq(excluded(schema::activities::unit_price)),
+                            schema::activities::currency.eq(excluded(schema::activities::currency)),
+                            schema::activities::fee.eq(excluded(schema::activities::fee)),
+                            schema::activities::amount.eq(excluded(schema::activities::amount)),
+                            schema::activities::is_draft.eq(excluded(schema::activities::is_draft)),
+                            schema::activities::comment.eq(excluded(schema::activities::comment)),
+                            schema::activities::updated_at.eq(now_update),
+                        ))
+                        .execute(conn)?;
+                }
+
+                Ok((activities_upserted, assets_inserted))
+            })
+            .await?;
+
+        debug!(
+            "Upserted {} activities for account {} ({} assets inserted)",
+            activities_count, account_id_for_log, assets_inserted
+        );
+
+        Ok((activities_upserted, assets_inserted))
+    }
+
+    async fn finalize_activity_sync_success(
+        &self,
+        account_id: String,
+        last_synced_date: String,
+    ) -> Result<()> {
+        self.brokers_sync_state_repository
+            .upsert_success(account_id, DEFAULT_BROKERAGE_PROVIDER.to_string(), last_synced_date)
+            .await
+    }
+
+    async fn finalize_activity_sync_failure(&self, account_id: String, error: String) -> Result<()> {
+        self.brokers_sync_state_repository
+            .upsert_failure(account_id, DEFAULT_BROKERAGE_PROVIDER.to_string(), error)
+            .await
+    }
 }
 
-impl<E: DbTransactionExecutor + Send + Sync + Clone> SyncService<E> {
+impl SyncService {
     /// Find the platform ID for a broker account based on its institution name
     fn find_platform_for_account(&self, broker_account: &BrokerAccount) -> Result<Option<String>> {
         // First, try to find platform by matching institution name
@@ -227,5 +478,98 @@ impl<E: DbTransactionExecutor + Send + Sync + Clone> SyncService<E> {
             broker_account.institution_name
         );
         Ok(None)
+    }
+}
+
+fn map_broker_activity_type(
+    raw_type: &str,
+    amount: Option<f64>,
+    units: Option<f64>,
+) -> Option<String> {
+    let t = raw_type.trim().to_uppercase();
+    if t.is_empty() {
+        return None;
+    }
+
+    let is_finite = |v: f64| v.is_finite();
+    let is_nonzero = |v: f64| is_finite(v) && v != 0.0;
+
+    let infer_direction = || {
+        if let Some(a) = amount.filter(|a| is_nonzero(*a)) {
+            return Some(if a > 0.0 { "IN" } else { "OUT" });
+        }
+        if let Some(u) = units.filter(|u| is_nonzero(*u)) {
+            return Some(if u > 0.0 { "IN" } else { "OUT" });
+        }
+        None
+    };
+
+    let wealthfolio_passthrough = matches!(
+        t.as_str(),
+        crate::activities::ACTIVITY_TYPE_BUY
+            | crate::activities::ACTIVITY_TYPE_SELL
+            | crate::activities::ACTIVITY_TYPE_DIVIDEND
+            | crate::activities::ACTIVITY_TYPE_INTEREST
+            | crate::activities::ACTIVITY_TYPE_DEPOSIT
+            | crate::activities::ACTIVITY_TYPE_WITHDRAWAL
+            | crate::activities::ACTIVITY_TYPE_ADD_HOLDING
+            | crate::activities::ACTIVITY_TYPE_REMOVE_HOLDING
+            | crate::activities::ACTIVITY_TYPE_TRANSFER_IN
+            | crate::activities::ACTIVITY_TYPE_TRANSFER_OUT
+            | crate::activities::ACTIVITY_TYPE_FEE
+            | crate::activities::ACTIVITY_TYPE_TAX
+            | crate::activities::ACTIVITY_TYPE_SPLIT
+    );
+    if wealthfolio_passthrough {
+        return Some(t);
+    }
+
+    match t.as_str() {
+        "BUY" => Some(crate::activities::ACTIVITY_TYPE_BUY.to_string()),
+        "SELL" => Some(crate::activities::ACTIVITY_TYPE_SELL.to_string()),
+        "DIVIDEND" => Some(crate::activities::ACTIVITY_TYPE_DIVIDEND.to_string()),
+        "INTEREST" | "CRYPTO_STAKING_REWARD" => Some(crate::activities::ACTIVITY_TYPE_INTEREST.to_string()),
+        "CONTRIBUTION" | "DEPOSIT" => Some(crate::activities::ACTIVITY_TYPE_DEPOSIT.to_string()),
+        "WITHDRAWAL" => Some(crate::activities::ACTIVITY_TYPE_WITHDRAWAL.to_string()),
+        "REI" => Some(crate::activities::ACTIVITY_TYPE_BUY.to_string()),
+        "STOCK_DIVIDEND" => Some(crate::activities::ACTIVITY_TYPE_ADD_HOLDING.to_string()),
+        "FEE" => Some(crate::activities::ACTIVITY_TYPE_FEE.to_string()),
+        "TAX" => Some(crate::activities::ACTIVITY_TYPE_TAX.to_string()),
+        "SPLIT" => Some(crate::activities::ACTIVITY_TYPE_SPLIT.to_string()),
+        "EXTERNAL_ASSET_TRANSFER_IN" => Some(crate::activities::ACTIVITY_TYPE_ADD_HOLDING.to_string()),
+        "EXTERNAL_ASSET_TRANSFER_OUT" => Some(crate::activities::ACTIVITY_TYPE_REMOVE_HOLDING.to_string()),
+        "TRANSFER" => match infer_direction() {
+            Some("IN") => Some(crate::activities::ACTIVITY_TYPE_TRANSFER_IN.to_string()),
+            Some("OUT") => Some(crate::activities::ACTIVITY_TYPE_TRANSFER_OUT.to_string()),
+            _ => None,
+        },
+        "ADJUSTMENT" => match infer_direction() {
+            Some("IN") => match amount.filter(|a| is_nonzero(*a)) {
+                Some(_) => Some(crate::activities::ACTIVITY_TYPE_DEPOSIT.to_string()),
+                None => Some(crate::activities::ACTIVITY_TYPE_ADD_HOLDING.to_string()),
+            },
+            Some("OUT") => match amount.filter(|a| is_nonzero(*a)) {
+                Some(_) => Some(crate::activities::ACTIVITY_TYPE_WITHDRAWAL.to_string()),
+                None => Some(crate::activities::ACTIVITY_TYPE_REMOVE_HOLDING.to_string()),
+            },
+            _ => None,
+        },
+        "OPTIONEXERCISE" | "OPTIONASSIGNMENT" => match infer_direction() {
+            Some("IN") => match amount.filter(|a| is_nonzero(*a)) {
+                Some(_) => Some(crate::activities::ACTIVITY_TYPE_SELL.to_string()),
+                None => Some(crate::activities::ACTIVITY_TYPE_BUY.to_string()),
+            },
+            Some("OUT") => match amount.filter(|a| is_nonzero(*a)) {
+                Some(_) => Some(crate::activities::ACTIVITY_TYPE_BUY.to_string()),
+                None => Some(crate::activities::ACTIVITY_TYPE_SELL.to_string()),
+            },
+            _ => None,
+        },
+        "OPTIONEXPIRATION" => match units.filter(|u| is_nonzero(*u)) {
+            Some(u) if u < 0.0 => Some(crate::activities::ACTIVITY_TYPE_REMOVE_HOLDING.to_string()),
+            Some(_) => Some(crate::activities::ACTIVITY_TYPE_ADD_HOLDING.to_string()),
+            None => Some(crate::activities::ACTIVITY_TYPE_REMOVE_HOLDING.to_string()),
+        },
+        _ => None,
     }
 }

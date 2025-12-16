@@ -12,8 +12,8 @@ use crate::context::ServiceContext;
 use crate::secret_store::KeyringSecretStore;
 use wealthfolio_core::secrets::SecretStore;
 use wealthfolio_core::sync::{
-    BrokerAccount, BrokerConnection, ConnectPortalResponse, Platform, SyncAccountsResponse,
-    SyncConnectionsResponse,
+    BrokerAccount, BrokerConnection, ConnectPortalResponse, PaginatedUniversalActivity, Platform,
+    SyncAccountsResponse, SyncActivitiesResponse, SyncConnectionsResponse,
 };
 
 /// Secret key for storing the cloud API access token (same as frontend)
@@ -60,6 +60,7 @@ pub struct SyncResult {
     pub message: String,
     pub connections_synced: Option<SyncConnectionsResponse>,
     pub accounts_synced: Option<SyncAccountsResponse>,
+    pub activities_synced: Option<SyncActivitiesResponse>,
 }
 
 /// Response wrapper for tRPC calls
@@ -425,6 +426,77 @@ impl CloudApiClient {
 
         parse_trpc_response::<ConnectPortalResponse>(response).await
     }
+
+    /// Fetch broker account activities via tRPC (paginated).
+    async fn get_account_activities(
+        &self,
+        account_id: &str,
+        start_date: Option<String>,
+        end_date: Option<String>,
+        offset: Option<i64>,
+        limit: Option<i64>,
+    ) -> Result<PaginatedUniversalActivity, String> {
+        let safe_url = format!("{}/trpc/brokerage.getAccountActivities", self.base_url);
+
+        let mut inner = serde_json::Map::new();
+        inner.insert("accountId".to_string(), serde_json::json!(account_id));
+        if let Some(v) = start_date {
+            inner.insert("startDate".to_string(), serde_json::json!(v));
+        }
+        if let Some(v) = end_date {
+            inner.insert("endDate".to_string(), serde_json::json!(v));
+        }
+        if let Some(v) = offset {
+            inner.insert("offset".to_string(), serde_json::json!(v));
+        }
+        if let Some(v) = limit {
+            inner.insert("limit".to_string(), serde_json::json!(v));
+        }
+
+        let input = serde_json::json!({ "json": serde_json::Value::Object(inner) });
+        let input_str = input.to_string();
+        let encoded = urlencoding::encode(&input_str);
+        let url = format!("{}?input={}", safe_url, encoded);
+
+        debug!("Fetching activities from: {}", safe_url);
+
+        let mut attempt: usize = 0;
+        let max_attempts: usize = 3;
+        loop {
+            attempt += 1;
+            let response = self
+                .client
+                .get(&url)
+                .headers(self.headers())
+                .send()
+                .await
+                .map_err(|e| format!("Failed to fetch activities: {}", e))?;
+
+            if response.status().is_success() {
+                return parse_trpc_response::<PaginatedUniversalActivity>(response).await;
+            }
+
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            let is_retryable = status.as_u16() == 429 || status.is_server_error();
+
+            if attempt >= max_attempts || !is_retryable {
+                return Err(format!(
+                    "API error fetching activities: {} - {}",
+                    status, body
+                ));
+            }
+
+            let backoff_ms = 500_u64.saturating_mul(2_u64.saturating_pow((attempt - 1) as u32));
+            info!(
+                "Retrying getAccountActivities (attempt {}/{}), status {}",
+                attempt + 1,
+                max_attempts,
+                status
+            );
+            tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
+        }
+    }
 }
 
 /// Set the cloud API credentials
@@ -525,15 +597,230 @@ pub async fn sync_broker_data(state: State<'_, Arc<ServiceContext>>) -> Result<S
         accounts_result.created, accounts_result.updated, accounts_result.skipped
     );
 
+    // Step 3: Fetch and sync activities for all synced accounts (incremental per account)
+    // If there is no stored sync state for an account, we omit start/end dates to fetch all
+    // available activities from the provider.
+    let end_date = chrono::Utc::now().date_naive();
+
+    let synced_accounts = state
+        .sync_service()
+        .get_synced_accounts()
+        .map_err(|e| format!("Failed to get synced accounts: {}", e))?;
+
+    let mut activities_summary = SyncActivitiesResponse::default();
+    let mut activity_errors: Vec<String> = Vec::new();
+
+    for account in synced_accounts {
+        let Some(broker_account_id) = account.external_id.clone() else {
+            continue;
+        };
+
+        let account_id = account.id.clone();
+        let account_name = account.name.clone();
+        if let Err(err) = state
+            .sync_service()
+            .mark_activity_sync_attempt(account_id.clone())
+            .await
+            .map_err(|e| format!("Failed to mark activity sync attempt: {}", e))
+        {
+            activity_errors.push(format!("{}: {}", account_name, err));
+            continue;
+        }
+
+        let (start_date, end_date_filter) = compute_activity_query_window(&state, &account, end_date)
+            .map_err(|e| format!("Failed to compute activity sync window: {}", e))?;
+
+        let window_label = match (&start_date, &end_date_filter) {
+            (Some(s), Some(e)) => format!("{} -> {}", s, e),
+            _ => "ALL".to_string(),
+        };
+        info!(
+            "Syncing activities for account '{}' ({}): {}",
+            account_name, broker_account_id, window_label
+        );
+
+        let mut offset: i64 = 0;
+        let limit: i64 = 1000;
+        let mut pages_fetched: usize = 0;
+        let mut last_page_first_id: Option<String> = None;
+        let max_pages: usize = 10000;
+        let mut account_failed = false;
+
+        loop {
+            if pages_fetched >= max_pages {
+                let msg = format!("Pagination exceeded max pages ({}). Aborting.", max_pages);
+                let _ = state
+                    .sync_service()
+                    .finalize_activity_sync_failure(account_id.clone(), msg.clone())
+                    .await;
+                activity_errors.push(format!("{}: {}", account_name, msg));
+                account_failed = true;
+                break;
+            }
+
+            let page = match client
+                .get_account_activities(
+                    &broker_account_id,
+                    start_date.clone(),
+                    end_date_filter.clone(),
+                    Some(offset),
+                    Some(limit),
+                )
+                .await
+            {
+                Ok(p) => p,
+                Err(e) => {
+                    let _ = state
+                        .sync_service()
+                        .finalize_activity_sync_failure(account_id.clone(), e.clone())
+                        .await;
+                    activity_errors.push(format!("{}: {}", account_name, e));
+                    account_failed = true;
+                    break;
+                }
+            };
+
+            let data = page.data.clone();
+            pages_fetched += 1;
+
+            let page_total = page.pagination.as_ref().and_then(|p| p.total);
+            info!(
+                "Fetched {} activities for '{}' (offset {}, total {:?})",
+                data.len(),
+                account_name,
+                offset,
+                page_total
+            );
+
+            if !data.is_empty() {
+                if let Some(first_id) = data.first().and_then(|a| a.id.clone()) {
+                    if offset > 0 {
+                        if let Some(prev) = &last_page_first_id {
+                            if prev == &first_id {
+                                let msg = "Pagination appears stuck (same first activity id returned for multiple pages).".to_string();
+                                let _ = state
+                                    .sync_service()
+                                    .finalize_activity_sync_failure(account_id.clone(), msg.clone())
+                                    .await;
+                                activity_errors.push(format!("{}: {}", account_name, msg));
+                                account_failed = true;
+                                break;
+                            }
+                        }
+                    }
+                    last_page_first_id = Some(first_id);
+                }
+
+                match state
+                    .sync_service()
+                    .upsert_account_activities(account_id.clone(), data.clone())
+                    .await
+                {
+                    Ok((activities_upserted, assets_inserted)) => {
+                        activities_summary.activities_upserted += activities_upserted;
+                        activities_summary.assets_inserted += assets_inserted;
+                    }
+                    Err(e) => {
+                        let e = format!("Failed to upsert activities: {}", e);
+                        let _ = state
+                            .sync_service()
+                            .finalize_activity_sync_failure(account_id.clone(), e.clone())
+                            .await;
+                        activity_errors.push(format!("{}: {}", account_name, e));
+                        account_failed = true;
+                        break;
+                    }
+                }
+            }
+
+            let (page_total, page_limit) = page
+                .pagination
+                .as_ref()
+                .map(|p| (p.total.unwrap_or(0), p.limit.unwrap_or(limit)))
+                .unwrap_or((0, limit));
+
+            offset += page_limit;
+
+            if page_total > 0 {
+                if offset >= page_total {
+                    break;
+                }
+            } else if data.len() < limit as usize {
+                break;
+            }
+        }
+
+        if !account_failed {
+            let last_synced_date = end_date;
+            if let Err(e) = state
+                .sync_service()
+                .finalize_activity_sync_success(
+                    account_id.clone(),
+                    last_synced_date.format("%Y-%m-%d").to_string(),
+                )
+                .await
+                .map_err(|e| format!("Failed to persist sync state: {}", e))
+            {
+                activity_errors.push(format!("{}: {}", account_name, e));
+                activities_summary.accounts_failed += 1;
+                continue;
+            }
+
+            activities_summary.accounts_synced += 1;
+        } else {
+            activities_summary.accounts_failed += 1;
+        }
+    }
+
     Ok(SyncResult {
-        success: true,
+        success: activity_errors.is_empty(),
         message: format!(
-            "Sync completed. {} platforms, {} accounts created.",
-            connections_result.platforms_created, accounts_result.created
+            "Sync completed. {} platforms, {} accounts created, {} accounts activity-synced, {} activities upserted{}",
+            connections_result.platforms_created,
+            accounts_result.created,
+            activities_summary.accounts_synced,
+            activities_summary.activities_upserted,
+            if activity_errors.is_empty() {
+                ".".to_string()
+            } else {
+                format!(" ({} failed).", activity_errors.len())
+            }
         ),
         connections_synced: Some(connections_result),
         accounts_synced: Some(accounts_result),
+        activities_synced: Some(activities_summary),
     })
+}
+
+fn parse_naive_date(input: &str) -> Option<chrono::NaiveDate> {
+    if let Ok(d) = chrono::NaiveDate::parse_from_str(input, "%Y-%m-%d") {
+        return Some(d);
+    }
+    chrono::DateTime::parse_from_rfc3339(input)
+        .ok()
+        .map(|dt| dt.date_naive())
+}
+
+fn compute_activity_query_window(
+    state: &State<'_, Arc<ServiceContext>>,
+    account: &wealthfolio_core::accounts::Account,
+    end_date: chrono::NaiveDate,
+) -> Result<(Option<String>, Option<String>), String> {
+    let sync_state = state
+        .sync_service()
+        .get_activity_sync_state(&account.id)
+        .map_err(|e| format!("Failed to read activity sync state: {}", e))?;
+
+    let from_state = sync_state
+        .and_then(|s| s.last_synced_date)
+        .and_then(|d| parse_naive_date(&d))
+        .map(|d| (d - chrono::Days::new(1)).min(end_date));
+
+    if let Some(d) = from_state {
+        return Ok((Some(d.format("%Y-%m-%d").to_string()), Some(end_date.format("%Y-%m-%d").to_string())));
+    }
+
+    Ok((None, None))
 }
 
 /// Get all synced accounts

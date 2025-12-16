@@ -3,8 +3,10 @@
 use async_trait::async_trait;
 
 use super::broker_models::{
-    BrokerAccount, BrokerBrokerage, BrokerConnection, SyncAccountsResponse, SyncConnectionsResponse,
+    AccountUniversalActivity, BrokerAccount, BrokerBrokerage, BrokerConnection, SyncAccountsResponse,
+    SyncConnectionsResponse,
 };
+use super::brokers_sync_state_repository::BrokersSyncState;
 use super::platform_repository::Platform;
 use crate::accounts::Account;
 use crate::errors::Result;
@@ -46,4 +48,27 @@ pub trait SyncServiceTrait: Send + Sync {
 
     /// Get all platforms
     fn get_platforms(&self) -> Result<Vec<Platform>>;
+
+    /// Get the stored activity sync state for an account, if any.
+    fn get_activity_sync_state(&self, account_id: &str) -> Result<Option<BrokersSyncState>>;
+
+    /// Record an activity sync attempt for an account.
+    async fn mark_activity_sync_attempt(&self, account_id: String) -> Result<()>;
+
+    /// Upsert a batch/page of broker activities for a local account.
+    async fn upsert_account_activities(
+        &self,
+        account_id: String,
+        activities: Vec<AccountUniversalActivity>,
+    ) -> Result<(usize, usize)>;
+
+    /// Finalize an activity sync as successful for an account.
+    async fn finalize_activity_sync_success(
+        &self,
+        account_id: String,
+        last_synced_date: String,
+    ) -> Result<()>;
+
+    /// Finalize an activity sync as failed for an account.
+    async fn finalize_activity_sync_failure(&self, account_id: String, error: String) -> Result<()>;
 }

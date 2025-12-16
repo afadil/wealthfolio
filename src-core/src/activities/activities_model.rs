@@ -638,14 +638,17 @@ impl From<NewActivity> for ActivityDB {
 
         // Handle cash activities and splits
         let activity_type = domain.activity_type.as_str();
+        let is_transfer = activity_type == "TRANSFER_IN" || activity_type == "TRANSFER_OUT";
+        let is_cash_asset = domain
+            .asset_id
+            .starts_with(crate::constants::CASH_ASSET_PREFIX);
         let is_cash_or_split = activity_type == "DEPOSIT"
             || activity_type == "WITHDRAWAL"
             || activity_type == "FEE"
             || activity_type == "INTEREST"
             || activity_type == "DIVIDEND"
             || activity_type == "SPLIT"
-            || activity_type == "TRANSFER_IN"
-            || activity_type == "TRANSFER_OUT";
+            || (is_transfer && is_cash_asset);
 
         let (quantity, unit_price, amount) = if is_cash_or_split {
             // For cash activities and splits, set quantity and unit_price to 0
@@ -655,6 +658,13 @@ impl From<NewActivity> for ActivityDB {
                 None => domain.quantity.unwrap_or(Decimal::ZERO).to_string(),
             };
             ("0".to_string(), "0".to_string(), Some(amount_str))
+        } else if is_transfer && !is_cash_asset {
+            // For asset transfers, preserve quantity/unit_price for holdings calculations.
+            (
+                domain.quantity.unwrap_or(Decimal::ZERO).to_string(),
+                domain.unit_price.unwrap_or(Decimal::ZERO).to_string(),
+                domain.amount.as_ref().map(|a| a.to_string()),
+            )
         } else {
             // For other activities, use the provided values
             (
