@@ -1,42 +1,22 @@
 import { toast } from "@/components/ui/use-toast";
-import {
-  calculateActivityValue,
-  isCashActivity,
-  isIncomeActivity,
-} from "@/lib/activity-utils";
-import { ActivityType, ActivityTypeNames } from "@/lib/constants";
-import type {
-  Account,
-  ActivityBulkMutationRequest,
-  ActivityCreate,
-  ActivityDetails,
-  ActivityUpdate,
-} from "@/lib/types";
-import {
-  formatDateTimeLocal,
-  parseDecimalInput,
-  parseLocalDateTime,
-  roundDecimal,
-  toPayloadNumber,
-} from "@/lib/utils";
+import type { Account, ActivityBulkMutationRequest, ActivityDetails } from "@/lib/types";
 import { useAssets } from "@/pages/asset/hooks/use-assets";
-import type { ColumnDef, SortingState } from "@tanstack/react-table";
-import {
-  Button,
-  Checkbox,
-  DataGrid,
-  Icons,
-  useDataGrid,
-  worldCurrencies,
-} from "@wealthfolio/ui";
+import type { SortingState, Updater } from "@tanstack/react-table";
+import { DataGrid, useDataGrid } from "@wealthfolio/ui";
 import { useCallback, useMemo } from "react";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
+import { ActivityDataGridToolbar } from "./activity-data-grid-toolbar";
 import {
-  generateTempActivityId,
-  useActivityGridState,
-  type LocalTransaction,
-} from "../activity-datagrid/use-activity-grid-state";
-import { ActivityOperations } from "../activity-operations";
+  applyTransactionUpdate,
+  buildSavePayload,
+  createCurrencyResolver,
+  createDraftTransaction,
+  TRACKED_FIELDS,
+  valuesAreEqual,
+} from "./activity-utils";
+import type { LocalTransaction } from "./types";
+import { useActivityColumns } from "./use-activity-columns";
+import { generateTempActivityId, useActivityGridState } from "./use-activity-grid-state";
 
 interface ActivityDataGridProps {
   accounts: Account[];
@@ -44,173 +24,12 @@ interface ActivityDataGridProps {
   onRefetch: () => Promise<unknown>;
   onEditActivity: (activity: ActivityDetails) => void;
   sorting: SortingState;
-  onSortingChange: (sorting: SortingState) => void;
+  onSortingChange: (updater: Updater<SortingState>) => void;
 }
 
-const resolveAssetIdForTransaction = (
-  transaction: LocalTransaction,
-  fallbackCurrency: string,
-): string | undefined => {
-  const existingAssetId = transaction.assetId?.trim() || transaction.assetSymbol?.trim();
-  if (existingAssetId) {
-    return existingAssetId;
-  }
-
-  if (isCashActivity(transaction.activityType)) {
-    const currency = (transaction.currency || transaction.accountCurrency || fallbackCurrency)
-      .toUpperCase()
-      .trim();
-    if (currency.length > 0) {
-      return `$CASH-${currency}`;
-    }
-  }
-
-  return undefined;
-};
-
-const createDraftTransaction = (
-  accounts: Account[],
-  fallbackCurrency: string,
-): LocalTransaction => {
-  const defaultAccount = accounts.find((account) => account.isActive) ?? accounts[0];
-  const now = new Date();
-
-  return {
-    id: generateTempActivityId(),
-    activityType: ActivityType.BUY,
-    date: now,
-    quantity: 0,
-    unitPrice: 0,
-    amount: 0,
-    fee: 0,
-    currency: defaultAccount?.currency ?? fallbackCurrency,
-    isDraft: true,
-    comment: "",
-    createdAt: now,
-    assetId: "",
-    updatedAt: now,
-    accountId: defaultAccount?.id ?? "",
-    accountName: defaultAccount?.name ?? "",
-    accountCurrency: defaultAccount?.currency ?? fallbackCurrency,
-    assetSymbol: "",
-    assetName: "",
-    assetDataSource: undefined,
-    subRows: undefined,
-    isNew: true,
-  };
-};
-
-const NUMERIC_FIELDS = new Set(["quantity", "unitPrice", "amount", "fee"]);
-
-function valuesAreEqual(field: string, prevValue: unknown, nextValue: unknown): boolean {
-  // For numeric fields, compare as numbers to handle string/number type differences
-  if (NUMERIC_FIELDS.has(field)) {
-    const prevNum = typeof prevValue === "number" ? prevValue : parseFloat(String(prevValue ?? "0"));
-    const nextNum = typeof nextValue === "number" ? nextValue : parseFloat(String(nextValue ?? "0"));
-    // Handle NaN cases
-    if (Number.isNaN(prevNum) && Number.isNaN(nextNum)) return true;
-    return prevNum === nextNum;
-  }
-  return Object.is(prevValue, nextValue);
-}
-
-function applyTransactionUpdate(params: {
-  transaction: LocalTransaction;
-  field: keyof LocalTransaction;
-  value: unknown;
-  accountLookup: Map<string, Account>;
-  assetCurrencyLookup: Map<string, string>;
-  fallbackCurrency: string;
-  resolveTransactionCurrency: (transaction: LocalTransaction, options?: { includeFallback?: boolean }) => string | undefined;
-}): LocalTransaction {
-  const {
-    transaction,
-    field,
-    value,
-    accountLookup,
-    assetCurrencyLookup,
-    fallbackCurrency,
-    resolveTransactionCurrency,
-  } = params;
-
-  const updated: LocalTransaction = { ...transaction };
-
-  const applyCashDefaults = () => {
-    if (!isCashActivity(updated.activityType)) {
-      return;
-    }
-    const derivedCurrency = resolveTransactionCurrency(updated) ?? fallbackCurrency;
-    const cashSymbol = `$CASH-${derivedCurrency.toUpperCase()}`;
-    updated.assetSymbol = cashSymbol;
-    updated.assetId = cashSymbol;
-    updated.quantity = 0;
-    updated.unitPrice = 0;
-  };
-
-  const applySplitDefaults = () => {
-    if (updated.activityType !== ActivityType.SPLIT) {
-      return;
-    }
-    updated.quantity = 0;
-    updated.unitPrice = 0;
-  };
-
-  if (field === "date") {
-    if (typeof value === "string") {
-      updated.date = parseLocalDateTime(value);
-    } else if (value instanceof Date) {
-      updated.date = value;
-    }
-  } else if (field === "quantity") {
-    updated.quantity = parseDecimalInput(value as string | number);
-    applySplitDefaults();
-  } else if (field === "unitPrice") {
-    updated.unitPrice = parseDecimalInput(value as string | number);
-    if (isCashActivity(updated.activityType) || isIncomeActivity(updated.activityType)) {
-      updated.amount = updated.unitPrice;
-    }
-    applySplitDefaults();
-  } else if (field === "amount") {
-    updated.amount = parseDecimalInput(value as string | number);
-  } else if (field === "fee") {
-    updated.fee = parseDecimalInput(value as string | number);
-  } else if (field === "assetSymbol") {
-    const upper = (typeof value === "string" ? value : "").trim().toUpperCase();
-    updated.assetSymbol = upper;
-    updated.assetId = upper;
-
-    const assetKey = (updated.assetId ?? updated.assetSymbol ?? "").trim().toUpperCase();
-    const assetCurrency = assetCurrencyLookup.get(assetKey);
-    if (assetCurrency) {
-      updated.currency = assetCurrency;
-    }
-  } else if (field === "activityType") {
-    updated.activityType = value as ActivityType;
-    applyCashDefaults();
-    applySplitDefaults();
-  } else if (field === "accountId") {
-    updated.accountId = typeof value === "string" ? value : "";
-    const account = accountLookup.get(updated.accountId);
-    if (account) {
-      updated.accountName = account.name;
-      updated.accountCurrency = account.currency;
-      updated.currency = account.currency;
-    }
-    applyCashDefaults();
-    applySplitDefaults();
-  } else if (field === "currency") {
-    updated.currency = typeof value === "string" ? value : updated.currency;
-    applyCashDefaults();
-    applySplitDefaults();
-  } else if (field === "comment") {
-    updated.comment = typeof value === "string" ? value : "";
-  }
-
-  updated.updatedAt = new Date();
-
-  return updated;
-}
-
+/**
+ * Activity data grid component with inline editing, bulk operations, and optimistic updates
+ */
 export function ActivityDataGrid({
   accounts,
   activities,
@@ -219,19 +38,24 @@ export function ActivityDataGrid({
   sorting,
   onSortingChange,
 }: ActivityDataGridProps) {
+  // State management
   const {
     localTransactions,
     setLocalTransactions,
     dirtyTransactionIds,
-    setDirtyTransactionIds,
     pendingDeleteIds,
-    setPendingDeleteIds,
     hasUnsavedChanges,
-  } = useActivityGridState(activities);
+    changesSummary,
+    markDirtyBatch,
+    markForDeletion,
+    markForDeletionBatch,
+    resetChangeState,
+  } = useActivityGridState({ activities });
 
   const { saveActivitiesMutation } = useActivityMutations();
   const { assets } = useAssets();
 
+  // Derived values
   const fallbackCurrency = useMemo(() => {
     const defaultAccount = accounts.find((account) => account.isDefault);
     if (defaultAccount?.currency) {
@@ -244,61 +68,31 @@ export function ActivityDataGrid({
     return accounts[0]?.currency ?? "USD";
   }, [accounts]);
 
-  const accountLookup = useMemo(() => {
-    return new Map(accounts.map((account) => [account.id, account]));
-  }, [accounts]);
+  const accountLookup = useMemo(
+    () => new Map(accounts.map((account) => [account.id, account])),
+    [accounts],
+  );
 
   const assetCurrencyLookup = useMemo(() => {
     const entries = new Map<string, string>();
-
     assets.forEach((asset) => {
-      if (!asset.currency) {
-        return;
-      }
+      if (!asset.currency) return;
       const symbolKey = asset.symbol?.trim().toUpperCase();
       const idKey = asset.id?.trim().toUpperCase();
-
-      if (symbolKey) {
-        entries.set(symbolKey, asset.currency);
-      }
-      if (idKey) {
-        entries.set(idKey, asset.currency);
-      }
+      if (symbolKey) entries.set(symbolKey, asset.currency);
+      if (idKey) entries.set(idKey, asset.currency);
     });
-
     return entries;
   }, [assets]);
 
-  const resolveTransactionCurrency = useCallback(
-    (
-      transaction: LocalTransaction,
-      options: { includeFallback?: boolean } = { includeFallback: true },
-    ): string | undefined => {
-      const assetKey = (transaction.assetId ?? transaction.assetSymbol ?? "").trim().toUpperCase();
-      const isCashAsset = assetKey.startsWith("$CASH-");
-      const cashCurrency = isCashAsset ? assetKey.replace("$CASH-", "") : undefined;
-      const assetCurrency = cashCurrency ?? assetCurrencyLookup.get(assetKey);
-
-      if (transaction.currency) {
-        return transaction.currency;
-      }
-
-      if (assetCurrency) {
-        return assetCurrency;
-      }
-
-      if (options.includeFallback !== false) {
-        return transaction.accountCurrency ?? fallbackCurrency;
-      }
-
-      return undefined;
-    },
+  const resolveTransactionCurrency = useMemo(
+    () => createCurrencyResolver(assetCurrencyLookup, fallbackCurrency),
     [assetCurrencyLookup, fallbackCurrency],
   );
 
+  // Currency lookup for dirty transactions
   const dirtyCurrencyLookup = useMemo(() => {
     const idsToResolve = new Set<string>();
-
     localTransactions.forEach((transaction) => {
       if (dirtyTransactionIds.has(transaction.id) || transaction.isNew) {
         idsToResolve.add(transaction.id);
@@ -311,9 +105,7 @@ export function ActivityDataGrid({
 
     const lookup = new Map<string, string>();
     localTransactions.forEach((transaction) => {
-      if (!idsToResolve.has(transaction.id)) {
-        return;
-      }
+      if (!idsToResolve.has(transaction.id)) return;
       const resolved =
         transaction.currency ??
         resolveTransactionCurrency(transaction) ??
@@ -323,49 +115,10 @@ export function ActivityDataGrid({
         lookup.set(transaction.id, resolved);
       }
     });
-
     return lookup;
   }, [dirtyTransactionIds, fallbackCurrency, localTransactions, resolveTransactionCurrency]);
 
-  const activityTypeOptions = useMemo(
-    () =>
-      (Object.values(ActivityType) as ActivityType[]).map((type) => ({
-        value: type,
-        label: ActivityTypeNames[type],
-      })),
-    [],
-  );
-
-  const accountOptions = useMemo(
-    () =>
-      accounts.map((account) => ({
-        value: account.id,
-        label: account.name,
-      })),
-    [accounts],
-  );
-
-  const currencyOptions = useMemo(() => {
-    const entries = new Set<string>();
-
-    // Add all world currencies
-    worldCurrencies.forEach(({ value }) => entries.add(value));
-
-    // Add account currencies
-    accounts.forEach((account) => {
-      if (account.currency) entries.add(account.currency);
-    });
-
-    // Add currencies from local transactions
-    localTransactions.forEach((transaction) => {
-      if (transaction.currency) entries.add(transaction.currency);
-    });
-
-    return Array.from(entries)
-      .sort()
-      .map((value) => ({ value, label: value }));
-  }, [accounts, localTransactions]);
-
+  // Row operations
   const handleDuplicate = useCallback(
     (activity: ActivityDetails) => {
       const now = new Date();
@@ -379,135 +132,31 @@ export function ActivityDataGrid({
         isNew: true,
       };
       setLocalTransactions((prev) => [duplicated, ...prev]);
-      setDirtyTransactionIds((prev) => new Set(prev).add(duplicated.id));
+      markDirtyBatch([duplicated.id]);
     },
-    [setDirtyTransactionIds, setLocalTransactions],
+    [markDirtyBatch, setLocalTransactions],
   );
 
   const handleDelete = useCallback(
     (activity: ActivityDetails) => {
-      const { id } = activity;
       const source = activity as LocalTransaction;
-      setLocalTransactions((prev) => prev.filter((t) => t.id !== id));
-      setDirtyTransactionIds((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-      if (!source.isNew) {
-        setPendingDeleteIds((prev) => new Set(prev).add(id));
-      }
+      markForDeletion(activity.id, !!source.isNew);
     },
-    [setDirtyTransactionIds, setLocalTransactions, setPendingDeleteIds],
+    [markForDeletion],
   );
 
-  const columns = useMemo<ColumnDef<LocalTransaction>[]>(
-    () => [
-      {
-        id: "select",
-        header: ({ table }) => (
-          <Checkbox
-            checked={table.getIsAllRowsSelected() || (table.getIsSomeRowsSelected() && "indeterminate")}
-            onCheckedChange={(checked) => table.toggleAllRowsSelected(Boolean(checked))}
-            aria-label="Select all rows"
-          />
-        ),
-        cell: ({ row }) => (
-          <Checkbox
-            checked={row.getIsSelected()}
-            onCheckedChange={(checked) => row.toggleSelected(Boolean(checked))}
-            aria-label="Select row"
-          />
-        ),
-        size: 44,
-        enableSorting: false,
-        enableResizing: false,
-        enableHiding: false,
-      },
-      {
-        accessorKey: "activityType",
-        header: "Type",
-        size: 170,
-        meta: { cell: { variant: "select", options: activityTypeOptions } },
-      },
-      {
-        id: "date",
-        header: "Date & Time",
-        size: 180,
-        accessorFn: (row) => formatDateTimeLocal(row.date),
-        meta: { cell: { variant: "short-text" } },
-      },
-      {
-        accessorKey: "assetSymbol",
-        header: "Symbol",
-        size: 140,
-        meta: { cell: { variant: "short-text" } },
-      },
-      {
-        accessorKey: "quantity",
-        header: "Quantity",
-        size: 120,
-        meta: { cell: { variant: "number", step: 0.000001 } },
-      },
-      {
-        accessorKey: "unitPrice",
-        header: "Unit Price",
-        size: 120,
-        meta: { cell: { variant: "number", step: 0.000001 } },
-      },
-      {
-        accessorKey: "amount",
-        header: "Amount",
-        size: 120,
-        meta: { cell: { variant: "number", step: 0.000001 } },
-      },
-      {
-        accessorKey: "fee",
-        header: "Fee",
-        size: 100,
-        meta: { cell: { variant: "number", step: 0.000001 } },
-      },
-      {
-        accessorKey: "accountId",
-        header: "Account",
-        size: 180,
-        meta: { cell: { variant: "select", options: accountOptions } },
-      },
-      {
-        accessorKey: "currency",
-        header: "Currency",
-        size: 110,
-        meta: { cell: { variant: "select", options: currencyOptions } },
-      },
-      {
-        accessorKey: "comment",
-        header: "Comment",
-        size: 260,
-        meta: { cell: { variant: "long-text" } },
-      },
-      {
-        id: "actions",
-        size: 64,
-        enableSorting: false,
-        enableResizing: false,
-        enableHiding: false,
-        cell: ({ row }) => (
-          <ActivityOperations
-            activity={row.original}
-            onEdit={onEditActivity}
-            onDuplicate={handleDuplicate}
-            onDelete={handleDelete}
-          />
-        ),
-      },
-    ],
-    [accountOptions, activityTypeOptions, currencyOptions, handleDelete, handleDuplicate, onEditActivity],
-  );
+  // Column definitions
+  const columns = useActivityColumns({
+    accounts,
+    localTransactions,
+    onEditActivity,
+    onDuplicate: handleDuplicate,
+    onDelete: handleDelete,
+  });
 
+  // Data change handler - processes changes from the data grid
   const onDataChange = useCallback(
     (nextData: LocalTransaction[]) => {
-      console.log('[ActivityDataGrid] onDataChange called, nextData.length:', nextData.length);
-      console.trace('[ActivityDataGrid] onDataChange stacktrace');
       setLocalTransactions((prev) => {
         const prevById = new Map(prev.map((t) => [t.id, t]));
         const changedIds: string[] = [];
@@ -522,22 +171,9 @@ export function ActivityDataGrid({
           let updated = previous;
           let changed = false;
 
-          const fields: (keyof LocalTransaction)[] = [
-            "activityType",
-            "date",
-            "assetSymbol",
-            "quantity",
-            "unitPrice",
-            "amount",
-            "fee",
-            "accountId",
-            "currency",
-            "comment",
-          ];
-
-          for (const field of fields) {
-            const prevValue = (previous as Record<string, unknown>)[field];
-            const nextValue = (nextRow as Record<string, unknown>)[field];
+          for (const field of TRACKED_FIELDS) {
+            const prevValue = previous[field];
+            const nextValue = nextRow[field];
             if (!valuesAreEqual(field, prevValue, nextValue)) {
               updated = applyTransactionUpdate({
                 transaction: updated,
@@ -552,20 +188,13 @@ export function ActivityDataGrid({
             }
           }
 
-          if (!changed) {
-            return previous;
-          }
-
+          if (!changed) return previous;
           changedIds.push(nextRow.id);
           return updated;
         });
 
         if (changedIds.length > 0) {
-          setDirtyTransactionIds((current) => {
-            const next = new Set(current);
-            changedIds.forEach((id) => next.add(id));
-            return next;
-          });
+          markDirtyBatch(changedIds);
         }
 
         return normalized;
@@ -575,61 +204,43 @@ export function ActivityDataGrid({
       accountLookup,
       assetCurrencyLookup,
       fallbackCurrency,
+      markDirtyBatch,
       resolveTransactionCurrency,
-      setDirtyTransactionIds,
       setLocalTransactions,
     ],
   );
 
+  // Add single row
   const onRowAdd = useCallback(() => {
     const draft = createDraftTransaction(accounts, fallbackCurrency);
     setLocalTransactions((prev) => [...prev, draft]);
-    setDirtyTransactionIds((prev) => new Set(prev).add(draft.id));
+    markDirtyBatch([draft.id]);
     return { columnId: "activityType" };
-  }, [accounts, fallbackCurrency, setDirtyTransactionIds, setLocalTransactions]);
+  }, [accounts, fallbackCurrency, markDirtyBatch, setLocalTransactions]);
 
+  // Add multiple rows
   const onRowsAdd = useCallback(
     (count: number) => {
       if (count <= 0) return;
       const drafts = Array.from({ length: count }, () =>
         createDraftTransaction(accounts, fallbackCurrency),
       );
-
       setLocalTransactions((prev) => [...prev, ...drafts]);
-      setDirtyTransactionIds((prev) => {
-        const next = new Set(prev);
-        drafts.forEach((draft) => next.add(draft.id));
-        return next;
-      });
+      markDirtyBatch(drafts.map((d) => d.id));
     },
-    [accounts, fallbackCurrency, setDirtyTransactionIds, setLocalTransactions],
+    [accounts, fallbackCurrency, markDirtyBatch, setLocalTransactions],
   );
 
+  // Delete multiple rows
   const onRowsDelete = useCallback(
     (rowsToDelete: LocalTransaction[]) => {
-      console.log('[ActivityDataGrid] onRowsDelete called, rowsToDelete.length:', rowsToDelete.length);
       if (rowsToDelete.length === 0) return;
-
-      const idsToDelete = new Set(rowsToDelete.map((row) => row.id));
-      const existingRowsToDelete = rowsToDelete.filter((row) => !row.isNew);
-
-      setLocalTransactions((prev) => prev.filter((t) => !idsToDelete.has(t.id)));
-      setDirtyTransactionIds((prev) => {
-        const next = new Set(prev);
-        idsToDelete.forEach((id) => next.delete(id));
-        return next;
-      });
-      if (existingRowsToDelete.length > 0) {
-        setPendingDeleteIds((prev) => {
-          const next = new Set(prev);
-          existingRowsToDelete.forEach((row) => next.add(row.id));
-          return next;
-        });
-      }
+      markForDeletionBatch(rowsToDelete.map((row) => ({ id: row.id, isNew: !!row.isNew })));
     },
-    [setDirtyTransactionIds, setLocalTransactions, setPendingDeleteIds],
+    [markForDeletionBatch],
   );
 
+  // Initialize data grid
   const dataGrid = useDataGrid<LocalTransaction>({
     data: localTransactions,
     columns,
@@ -652,92 +263,48 @@ export function ActivityDataGrid({
   });
 
   const selectedRowCount = dataGrid.table.getSelectedRowModel().rows.length;
-  console.log("[ActivityDataGrid] render, selectedRowCount:", selectedRowCount);
 
+  // Delete selected rows handler
   const deleteSelectedRows = useCallback(() => {
-    console.log("[deleteSelectedRows] called, selectedRowCount:", dataGrid.table.getSelectedRowModel().rows.length);
     const selected = dataGrid.table.getSelectedRowModel().rows;
-    if (selected.length === 0) {
-      console.log("[deleteSelectedRows] no rows selected, returning");
-      return;
-    }
+    if (selected.length === 0) return;
 
     const selectedTransactions = selected.map((row) => row.original);
-    console.log("[deleteSelectedRows] deleting:", selectedTransactions.map(t => t.id));
     onRowsDelete(selectedTransactions);
     dataGrid.table.resetRowSelection();
   }, [dataGrid.table, onRowsDelete]);
 
+  // Save changes handler
   const handleSaveChanges = useCallback(async () => {
     if (!hasUnsavedChanges) return;
 
-    const deleteIds = Array.from(pendingDeleteIds);
-    const dirtyTransactions = localTransactions.filter((transaction) =>
-      dirtyTransactionIds.has(transaction.id),
+    const payload = buildSavePayload(
+      localTransactions,
+      dirtyTransactionIds,
+      pendingDeleteIds,
+      resolveTransactionCurrency,
+      dirtyCurrencyLookup,
+      assetCurrencyLookup,
+      fallbackCurrency,
     );
 
-    const creates: ActivityCreate[] = [];
-    const updates: ActivityUpdate[] = [];
-
-    dirtyTransactions.forEach((transaction) => {
-      const resolvedCurrency =
-        resolveTransactionCurrency(transaction, { includeFallback: false }) ??
-        dirtyCurrencyLookup.get(transaction.id);
-      const currencyFallback = transaction.accountCurrency ?? fallbackCurrency;
-      const assetKey = (transaction.assetId ?? transaction.assetSymbol ?? "").toUpperCase();
-      const currencyForPayload =
-        resolvedCurrency ?? (!assetCurrencyLookup.has(assetKey) ? currencyFallback : undefined);
-
-      const payload: ActivityCreate = {
-        id: transaction.id,
-        accountId: transaction.accountId,
-        activityType: transaction.activityType,
-        activityDate:
-          transaction.date instanceof Date
-            ? transaction.date.toISOString()
-            : new Date(transaction.date).toISOString(),
-        assetId: resolveAssetIdForTransaction(transaction, fallbackCurrency),
-        assetDataSource: transaction.assetDataSource,
-        quantity: toPayloadNumber(transaction.quantity),
-        unitPrice: toPayloadNumber(transaction.unitPrice),
-        amount: toPayloadNumber(transaction.amount),
-        currency: currencyForPayload,
-        fee: toPayloadNumber(transaction.fee),
-        isDraft: false,
-        comment: transaction.comment ?? undefined,
-      };
-
-      if (!payload.assetId && isCashActivity(payload.activityType as ActivityType)) {
-        const cashCurrency = (resolvedCurrency ?? currencyFallback).toUpperCase().trim();
-        payload.assetId = `$CASH-${cashCurrency}`;
-      }
-
-      if (payload.activityType === ActivityType.SPLIT) {
-        delete payload.quantity;
-        delete payload.unitPrice;
-      }
-
-      if (transaction.isNew) {
-        creates.push(payload);
-      } else {
-        updates.push(payload as ActivityUpdate);
-      }
-    });
-
     const request: ActivityBulkMutationRequest = {
-      creates,
-      updates,
-      deleteIds,
+      creates: payload.creates,
+      updates: payload.updates,
+      deleteIds: payload.deleteIds,
     };
 
     try {
       const result = await saveActivitiesMutation.mutateAsync(request);
+
+      // Map temporary IDs to persisted IDs
       const createdMappings = new Map(
         (result.createdMappings ?? [])
           .filter((mapping) => mapping.tempId && mapping.activityId)
           .map((mapping) => [mapping.tempId!, mapping.activityId]),
       );
 
+      // Update local state with persisted IDs
       setLocalTransactions((prev) =>
         prev
           .filter((transaction) => !pendingDeleteIds.has(transaction.id))
@@ -752,8 +319,7 @@ export function ActivityDataGrid({
           }),
       );
 
-      setDirtyTransactionIds(new Set());
-      setPendingDeleteIds(new Set());
+      resetChangeState();
       dataGrid.table.resetRowSelection();
 
       toast({
@@ -764,28 +330,27 @@ export function ActivityDataGrid({
 
       await onRefetch();
     } catch {
-      // Error surface handled by the mutation hook.
+      // Error handling is done by the mutation hook
     }
   }, [
+    assetCurrencyLookup,
+    dataGrid.table,
+    dirtyCurrencyLookup,
     dirtyTransactionIds,
+    fallbackCurrency,
     hasUnsavedChanges,
     localTransactions,
-    pendingDeleteIds,
-    assetCurrencyLookup,
-    fallbackCurrency,
     onRefetch,
-    saveActivitiesMutation,
+    pendingDeleteIds,
+    resetChangeState,
     resolveTransactionCurrency,
-    dirtyCurrencyLookup,
-    setDirtyTransactionIds,
+    saveActivitiesMutation,
     setLocalTransactions,
-    setPendingDeleteIds,
-    dataGrid.table,
   ]);
 
+  // Cancel changes handler
   const handleCancelChanges = useCallback(() => {
-    setDirtyTransactionIds(new Set());
-    setPendingDeleteIds(new Set());
+    resetChangeState();
     dataGrid.table.resetRowSelection();
     setLocalTransactions((prev) => prev.filter((transaction) => !transaction.isNew));
     onRefetch();
@@ -794,143 +359,22 @@ export function ActivityDataGrid({
       description: "Unsaved edits and drafts have been cleared.",
       variant: "default",
     });
-  }, [onRefetch, setDirtyTransactionIds, setLocalTransactions, setPendingDeleteIds, dataGrid.table]);
-
-  const changesCounts = useMemo(() => {
-    const newCount = localTransactions.filter(
-      (t) => t.isNew && dirtyTransactionIds.has(t.id),
-    ).length;
-    const updatedCount = localTransactions.filter(
-      (t) => !t.isNew && dirtyTransactionIds.has(t.id),
-    ).length;
-    const deletedCount = pendingDeleteIds.size;
-
-    return { newCount, updatedCount, deletedCount };
-  }, [localTransactions, dirtyTransactionIds, pendingDeleteIds]);
-
-  const toolbarTotalValue = useMemo(() => {
-    const totalValue = localTransactions.reduce((sum, transaction) => {
-      const currency = resolveTransactionCurrency(transaction) ?? fallbackCurrency;
-      return sum + calculateActivityValue(transaction, currency);
-    }, 0);
-
-    return roundDecimal(totalValue, 6);
-  }, [fallbackCurrency, localTransactions, resolveTransactionCurrency]);
+  }, [dataGrid.table, onRefetch, resetChangeState, setLocalTransactions]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 px-2.5 py-1.5">
-        <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
-          {selectedRowCount > 0 && (
-            <span className="font-medium">
-              {selectedRowCount} row{selectedRowCount === 1 ? "" : "s"} selected
-            </span>
-          )}
-          {hasUnsavedChanges && (
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-primary">
-                {dirtyTransactionIds.size + pendingDeleteIds.size} pending change
-                {dirtyTransactionIds.size + pendingDeleteIds.size === 1 ? "" : "s"}
-              </span>
-              <div className="h-3.5 w-px bg-border" />
-              <div className="flex items-center gap-4">
-                {changesCounts.newCount > 0 && (
-                  <span className="flex items-center gap-1 text-success">
-                    <Icons.PlusCircle className="h-3 w-3" />
-                    <span className="font-medium">{changesCounts.newCount}</span>
-                  </span>
-                )}
-                {changesCounts.updatedCount > 0 && (
-                  <span className="flex items-center gap-1 text-blue-500 dark:text-blue-400">
-                    <Icons.Pencil className="h-3 w-3" />
-                    <span className="font-medium">{changesCounts.updatedCount}</span>
-                  </span>
-                )}
-                {changesCounts.deletedCount > 0 && (
-                  <span className="flex items-center gap-1 text-destructive">
-                    <Icons.Trash className="h-3 w-3" />
-                    <span className="font-medium">{changesCounts.deletedCount}</span>
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-          <div className="hidden items-center gap-1.5 md:flex">
-            <div className="h-3.5 w-px bg-border" />
-            <span>Total:</span>
-            <span className="font-medium">{toolbarTotalValue}</span>
-          </div>
-        </div>
+      <ActivityDataGridToolbar
+        selectedRowCount={selectedRowCount}
+        hasUnsavedChanges={hasUnsavedChanges}
+        changesSummary={changesSummary}
+        isSaving={saveActivitiesMutation.isPending}
+        onAddRow={() => dataGrid.onRowAdd?.()}
+        onDeleteSelected={deleteSelectedRows}
+        onSave={handleSaveChanges}
+        onCancel={handleCancelChanges}
+      />
 
-        <div className="flex items-center gap-1">
-          <Button
-            onClick={() => dataGrid.onRowAdd?.()}
-            variant="outline"
-            size="xs"
-            className="shrink-0 rounded-md"
-            title="Add transaction"
-            aria-label="Add transaction"
-          >
-            <Icons.Plus className="h-3.5 w-3.5" />
-            <span>Add</span>
-          </Button>
-
-          {selectedRowCount > 0 && (
-            <>
-              <div className="mx-1 h-4 w-px bg-border" />
-              <Button
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={deleteSelectedRows}
-                size="xs"
-                variant="destructive"
-                className="shrink-0 rounded-md text-xs"
-                title="Delete selected"
-                aria-label="Delete selected"
-                disabled={saveActivitiesMutation.isPending}
-              >
-                <Icons.Trash className="h-3.5 w-3.5" />
-                <span>Delete</span>
-              </Button>
-            </>
-          )}
-
-          {hasUnsavedChanges && (
-            <>
-              <div className="mx-1 h-4 w-px bg-border" />
-              <Button
-                onClick={handleSaveChanges}
-                size="xs"
-                className="shrink-0 rounded-md text-xs"
-                title="Save changes"
-                aria-label="Save changes"
-                disabled={saveActivitiesMutation.isPending}
-              >
-                {saveActivitiesMutation.isPending ? (
-                  <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Icons.Save className="h-3.5 w-3.5" />
-                )}
-                <span>Save</span>
-              </Button>
-
-              <Button
-                onClick={handleCancelChanges}
-                size="xs"
-                variant="outline"
-                className="shrink-0 rounded-md text-xs"
-                title="Discard changes"
-                aria-label="Discard changes"
-                disabled={saveActivitiesMutation.isPending}
-              >
-                <Icons.Undo className="h-3.5 w-3.5" />
-                <span>Cancel</span>
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="min-h-[320px] flex-1 overflow-hidden rounded-lg border bg-background">
+      <div className="bg-background min-h-80 flex-1 overflow-hidden rounded-lg border">
         <DataGrid {...dataGrid} height={600} stretchColumns />
       </div>
     </div>
