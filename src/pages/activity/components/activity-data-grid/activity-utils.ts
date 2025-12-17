@@ -281,7 +281,7 @@ export function buildSavePayload(
       currency: currencyForPayload,
       fee: toPayloadNumber(transaction.fee),
       fxRate: transaction.fxRate != null ? toPayloadNumber(transaction.fxRate) : null,
-      isDraft: false,
+      isDraft: transaction.isDraft,
       comment: transaction.comment ?? undefined,
     };
 

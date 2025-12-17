@@ -2,9 +2,17 @@ import { ActivityType, ActivityTypeNames } from "@/lib/constants";
 import type { Account, ActivityDetails } from "@/lib/types";
 import { formatDateTimeLocal } from "@/lib/utils";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Checkbox, worldCurrencies } from "@wealthfolio/ui";
+import {
+  Checkbox,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+  worldCurrencies,
+} from "@wealthfolio/ui";
 import { useMemo } from "react";
 import { ActivityOperations } from "../activity-operations";
+import { ActivityTypeBadge } from "../activity-type-badge";
 import type { LocalTransaction } from "./types";
 
 interface UseActivityColumnsOptions {
@@ -71,8 +79,7 @@ export function useActivityColumns({
         header: ({ table }) => (
           <Checkbox
             checked={
-              table.getIsAllRowsSelected() ||
-              (table.getIsSomeRowsSelected() && "indeterminate")
+              table.getIsAllRowsSelected() || (table.getIsSomeRowsSelected() && "indeterminate")
             }
             onCheckedChange={(checked) => table.toggleAllRowsSelected(Boolean(checked))}
             aria-label="Select all rows"
@@ -85,15 +92,63 @@ export function useActivityColumns({
             aria-label="Select row"
           />
         ),
-        size: 44,
+        size: 40,
+        minSize: 40,
+        maxSize: 40,
         enableSorting: false,
         enableResizing: false,
         enableHiding: false,
+        enablePinning: false,
+      },
+      {
+        id: "status",
+        header: () => (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="text-destructive w-full cursor-help text-center">●</div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>Newly imported &</p>
+                <p>Pending verification</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ),
+        size: 32,
+        minSize: 32,
+        maxSize: 32,
+        enableResizing: false,
+        enableSorting: false,
+        enableHiding: false,
+        enablePinning: false,
+        cell: ({ row }) => {
+          const isDraft = row.original.isDraft;
+          const isNew = row.original.isNew;
+
+          // Show indicator for synced activities that need review (isDraft=true and not a locally created new row)
+          const needsReview = isDraft === true && isNew !== true;
+
+          if (!needsReview) {
+            return null;
+          }
+
+          return (
+            <div className="flex h-full w-full items-center justify-center">
+              <div className="text-destructive w-full cursor-help text-center">●</div>
+            </div>
+          );
+        },
       },
       {
         accessorKey: "activityType",
         header: "Type",
-        size: 170,
+        size: 150,
+        enablePinning: false,
+        cell: ({ row }) => {
+          const type = row.original.activityType as ActivityType;
+          return <ActivityTypeBadge type={type} className="text-xs font-normal" />;
+        },
         meta: { cell: { variant: "select", options: activityTypeOptions } },
       },
       {
@@ -182,14 +237,7 @@ export function useActivityColumns({
         ),
       },
     ],
-    [
-      accountOptions,
-      activityTypeOptions,
-      currencyOptions,
-      onDelete,
-      onDuplicate,
-      onEditActivity,
-    ],
+    [accountOptions, activityTypeOptions, currencyOptions, onDelete, onDuplicate, onEditActivity],
   );
 
   return columns;

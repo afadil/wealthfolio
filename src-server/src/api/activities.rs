@@ -42,6 +42,8 @@ struct ActivitySearchBody {
     asset_id_keyword: Option<String>,
     // Allow addons to pass either a single sort or an array (we pick the first)
     sort: Option<SortWrapper>,
+    #[serde(rename = "isDraftFilter")]
+    is_draft_filter: Option<bool>,
 }
 
 async fn search_activities(
@@ -71,6 +73,7 @@ async fn search_activities(
         types,
         body.asset_id_keyword,
         sort_normalized,
+        body.is_draft_filter,
     )?;
     Ok(Json(resp))
 }

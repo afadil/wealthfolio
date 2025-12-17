@@ -23,6 +23,7 @@ interface Filters {
   accountIds?: string | string[];
   activityTypes?: string | string[];
   symbol?: string;
+  isDraft?: boolean;
 }
 
 interface Sort {
@@ -63,6 +64,7 @@ export const searchActivities = async (
   const sortOption = sort?.id
     ? { id: sort.id, desc: sort.desc ?? false }
     : { id: "date", desc: true };
+  const isDraftFilter = filters?.isDraft;
 
   try {
     switch (getRunEnv()) {
@@ -74,6 +76,7 @@ export const searchActivities = async (
           activityTypeFilter,
           assetIdKeyword,
           sort: sortOption,
+          isDraftFilter,
         });
       case RUN_ENV.WEB:
         return invokeWeb("search_activities", {
@@ -83,6 +86,7 @@ export const searchActivities = async (
           activityTypeFilter,
           assetIdKeyword,
           sort: sortOption,
+          isDraftFilter,
         });
       default:
         throw new Error(`Unsupported`);

@@ -32,7 +32,7 @@ import { ActivityViewControls, type ActivityViewMode } from "./components/activi
 import { BulkHoldingsModal } from "./components/forms/bulk-holdings-modal";
 import { MobileActivityForm } from "./components/mobile-forms/mobile-activity-form";
 import { useActivityMutations } from "./hooks/use-activity-mutations";
-import { useActivitySearch } from "./hooks/use-activity-search";
+import { useActivitySearch, type ActivityStatusFilter } from "./hooks/use-activity-search";
 
 const ActivityPage = () => {
   const [showForm, setShowForm] = useState(false);
@@ -43,6 +43,7 @@ const ActivityPage = () => {
   // Filter and search state
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [selectedActivityTypes, setSelectedActivityTypes] = useState<ActivityType[]>([]);
+  const [statusFilter, setStatusFilter] = useState<ActivityStatusFilter>("all");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = usePersistentState<ActivityViewMode>(
@@ -98,7 +99,7 @@ const ActivityPage = () => {
   // Infinite scroll search for table view
   const infiniteSearch = useActivitySearch({
     mode: "infinite",
-    filters: { accountIds: selectedAccounts, activityTypes: selectedActivityTypes },
+    filters: { accountIds: selectedAccounts, activityTypes: selectedActivityTypes, status: statusFilter },
     searchQuery,
     sorting,
   });
@@ -106,7 +107,7 @@ const ActivityPage = () => {
   // Paginated search for datagrid view
   const paginatedSearch = useActivitySearch({
     mode: "paginated",
-    filters: { accountIds: selectedAccounts, activityTypes: selectedActivityTypes },
+    filters: { accountIds: selectedAccounts, activityTypes: selectedActivityTypes, status: statusFilter },
     searchQuery,
     sorting,
     pageIndex,
@@ -119,7 +120,7 @@ const ActivityPage = () => {
       setPageIndex(0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAccounts, selectedActivityTypes, searchQuery, sorting]);
+  }, [selectedAccounts, selectedActivityTypes, statusFilter, searchQuery, sorting]);
 
   // Use appropriate data based on view mode
   const tableActivities = infiniteSearch.data;
@@ -229,6 +230,8 @@ const ActivityPage = () => {
               onAccountIdsChange={setSelectedAccounts}
               selectedActivityTypes={selectedActivityTypes}
               onActivityTypesChange={setSelectedActivityTypes}
+              statusFilter={statusFilter}
+              onStatusFilterChange={setStatusFilter}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
               totalFetched={isDatagridView ? undefined : totalFetched}

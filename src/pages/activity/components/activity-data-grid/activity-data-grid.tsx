@@ -274,11 +274,18 @@ export function ActivityDataGrid({
     onSortingChange,
     initialState: {
       sorting,
-      columnPinning: { left: ["select"], right: ["actions"] },
+      columnPinning: { left: ["select", "status", "activityType"], right: ["actions"] },
     },
   });
 
-  const selectedRowCount = dataGrid.table.getSelectedRowModel().rows.length;
+  const selectedRows = dataGrid.table.getSelectedRowModel().rows;
+  const selectedRowCount = selectedRows.length;
+
+  // Count selected rows that are pending (isDraft=true and not new)
+  const selectedPendingCount = useMemo(
+    () => selectedRows.filter((row) => row.original.isDraft && !row.original.isNew).length,
+    [selectedRows],
+  );
 
   // Delete selected rows handler
   const deleteSelectedRows = useCallback(() => {
@@ -289,6 +296,31 @@ export function ActivityDataGrid({
     onRowsDelete(selectedTransactions);
     dataGrid.table.resetRowSelection();
   }, [dataGrid.table, onRowsDelete]);
+
+  // Approve selected synced activities (mark isDraft=false)
+  const approveSelectedRows = useCallback(() => {
+    const selected = dataGrid.table.getSelectedRowModel().rows;
+    const pendingToApprove = selected
+      .filter((row) => row.original.isDraft && !row.original.isNew)
+      .map((row) => row.original);
+
+    if (pendingToApprove.length === 0) return;
+
+    // Mark all pending activities as approved (isDraft=false) and mark them as dirty
+    setLocalTransactions((prev) =>
+      prev.map((transaction) => {
+        const shouldApprove = pendingToApprove.some((p) => p.id === transaction.id);
+        if (shouldApprove) {
+          return { ...transaction, isDraft: false };
+        }
+        return transaction;
+      }),
+    );
+
+    // Mark them as dirty so they will be saved
+    markDirtyBatch(pendingToApprove.map((t) => t.id));
+    dataGrid.table.resetRowSelection();
+  }, [dataGrid.table, markDirtyBatch, setLocalTransactions]);
 
   // Save changes handler
   const handleSaveChanges = useCallback(async () => {
@@ -381,11 +413,13 @@ export function ActivityDataGrid({
     <div className="flex min-h-0 flex-1 flex-col space-y-3">
       <ActivityDataGridToolbar
         selectedRowCount={selectedRowCount}
+        selectedPendingCount={selectedPendingCount}
         hasUnsavedChanges={hasUnsavedChanges}
         changesSummary={changesSummary}
         isSaving={saveActivitiesMutation.isPending}
         onAddRow={() => dataGrid.onRowAdd?.()}
         onDeleteSelected={deleteSelectedRows}
+        onApproveSelected={approveSelectedRows}
         onSave={handleSaveChanges}
         onCancel={handleCancelChanges}
       />

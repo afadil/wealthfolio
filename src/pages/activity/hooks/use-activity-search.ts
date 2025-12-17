@@ -6,9 +6,12 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type { SortingState } from "@tanstack/react-table";
 import { useMemo } from "react";
 
+export type ActivityStatusFilter = "all" | "pending" | "validated";
+
 export interface ActivitySearchFilters {
   accountIds: string[];
   activityTypes: ActivityType[];
+  status?: ActivityStatusFilter;
 }
 
 interface BaseOptions {
@@ -74,11 +77,21 @@ export function useActivitySearch(options: UseActivitySearchOptions): UseActivit
   const pageIndex = "pageIndex" in options ? options.pageIndex : 0;
 
   const normalizedFilters = useMemo(() => {
+    // Convert status filter to isDraft boolean
+    let isDraft: boolean | undefined;
+    if (filters.status === "pending") {
+      isDraft = true;
+    } else if (filters.status === "validated") {
+      isDraft = false;
+    }
+    // "all" or undefined means no filter
+
     return {
       accountIds: filters.accountIds.length > 0 ? filters.accountIds : undefined,
       activityTypes: filters.activityTypes.length > 0 ? filters.activityTypes : undefined,
+      isDraft,
     } as Record<string, unknown>;
-  }, [filters.accountIds, filters.activityTypes]);
+  }, [filters.accountIds, filters.activityTypes, filters.status]);
 
   const primarySort =
     sorting.length > 0 && sorting[0]?.id

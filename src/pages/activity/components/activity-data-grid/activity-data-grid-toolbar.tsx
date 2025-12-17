@@ -4,6 +4,8 @@ import type { ChangesSummary } from "./types";
 interface ActivityDataGridToolbarProps {
   /** Number of rows currently selected */
   selectedRowCount: number;
+  /** Number of selected rows that are pending review (synced/draft) */
+  selectedPendingCount: number;
   /** Whether there are unsaved changes */
   hasUnsavedChanges: boolean;
   /** Summary of pending changes */
@@ -14,6 +16,8 @@ interface ActivityDataGridToolbarProps {
   onAddRow: () => void;
   /** Handler for deleting selected rows */
   onDeleteSelected: () => void;
+  /** Handler for approving selected synced activities */
+  onApproveSelected: () => void;
   /** Handler for saving changes */
   onSave: () => void;
   /** Handler for canceling/discarding changes */
@@ -26,11 +30,13 @@ interface ActivityDataGridToolbarProps {
  */
 export function ActivityDataGridToolbar({
   selectedRowCount,
+  selectedPendingCount,
   hasUnsavedChanges,
   changesSummary,
   isSaving,
   onAddRow,
   onDeleteSelected,
+  onApproveSelected,
   onSave,
   onCancel,
 }: ActivityDataGridToolbarProps) {
@@ -101,6 +107,20 @@ export function ActivityDataGridToolbar({
         {selectedRowCount > 0 && (
           <>
             <div className="bg-border mx-1 h-4 w-px" />
+            {selectedPendingCount > 0 && (
+              <Button
+                onClick={onApproveSelected}
+                size="xs"
+                variant="outline"
+                className="shrink-0 rounded-md border-green-200 bg-green-50 text-xs text-green-700 hover:bg-green-100 hover:text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/40"
+                title="Approve selected synced activities"
+                aria-label="Approve selected synced activities"
+                disabled={isSaving}
+              >
+                <Icons.CheckCircle className="h-3.5 w-3.5" />
+                <span>Approve {selectedPendingCount}</span>
+              </Button>
+            )}
             <Button
               onClick={onDeleteSelected}
               size="xs"

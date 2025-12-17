@@ -29,15 +29,14 @@ export default function AuthCallbackPage() {
 
     // If connected, redirect to sync settings
     if (isConnected) {
-      console.log("Auth successful, redirecting to settings...");
-      navigate("/settings/wealthfolio-sync", { replace: true });
+      navigate("/settings/wealthfolio-connect", { replace: true });
       return;
     }
 
     // If there's an error, still redirect but show error on the settings page
     if (error) {
       console.error("Auth error:", error);
-      navigate("/settings/wealthfolio-sync", { replace: true });
+      navigate("/settings/wealthfolio-connect", { replace: true });
       return;
     }
 
@@ -45,7 +44,7 @@ export default function AuthCallbackPage() {
     // (the context might still be processing)
     const timer = setTimeout(() => {
       console.log("Timeout reached, redirecting to settings...");
-      navigate("/settings/wealthfolio-sync", { replace: true });
+      navigate("/settings/wealthfolio-connect", { replace: true });
     }, 5000);
 
     return () => clearTimeout(timer);
@@ -60,9 +59,7 @@ export default function AuthCallbackPage() {
             ? "Processing authentication..."
             : "Completing sign in..."}
         </p>
-        {error && (
-          <p className="text-destructive text-sm">{error}</p>
-        )}
+        {error && <p className="text-destructive text-sm">{error}</p>}
       </div>
     </div>
   );

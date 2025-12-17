@@ -95,6 +95,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
         activity_type_filter: Option<Vec<String>>, // Optional activity_type filter
         asset_id_keyword: Option<String>,          // Optional asset_id keyword for search
         sort: Option<Sort>,                        // Optional sort
+        is_draft_filter: Option<bool>,             // Optional is_draft filter
     ) -> Result<ActivitySearchResponse> {
         let mut conn = get_connection(&self.pool)?;
 
@@ -116,6 +117,9 @@ impl ActivityRepositoryTrait for ActivityRepository {
             }
             if let Some(ref keyword) = asset_id_keyword {
                 query = query.filter(assets::id.like(format!("%{}%", keyword)));
+            }
+            if let Some(is_draft) = is_draft_filter {
+                query = query.filter(activities::is_draft.eq(is_draft));
             }
 
             // Apply sorting
