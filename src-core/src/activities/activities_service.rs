@@ -155,6 +155,7 @@ impl ActivityServiceTrait for ActivityService {
         activity_type_filter: Option<Vec<String>>,
         asset_id_keyword: Option<String>,
         sort: Option<Sort>,
+        is_draft_filter: Option<bool>,
     ) -> Result<ActivitySearchResponse> {
         self.activity_repository.search_activities(
             page,
@@ -163,6 +164,7 @@ impl ActivityServiceTrait for ActivityService {
             activity_type_filter,
             asset_id_keyword,
             sort,
+            is_draft_filter,
         )
     }
 

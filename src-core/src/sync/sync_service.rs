@@ -356,7 +356,7 @@ impl SyncServiceTrait for SyncService {
                 currency: currency_code,
                 fee: Some(fee),
                 amount,
-                is_draft: false,
+                is_draft: true, // Synced activities need user review
                 comment: activity
                     .description
                     .clone()

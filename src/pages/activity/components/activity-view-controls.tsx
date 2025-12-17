@@ -6,6 +6,7 @@ import { Account } from "@/lib/types";
 import { AnimatedToggleGroup, Button, Icons, Input } from "@wealthfolio/ui";
 
 import { DataTableFacetedFilter } from "./activity-datagrid/data-table-faceted-filter";
+import type { ActivityStatusFilter } from "../hooks/use-activity-search";
 
 export type ActivityViewMode = "table" | "datagrid";
 
@@ -17,6 +18,8 @@ interface ActivityViewControlsProps {
   onAccountIdsChange: (ids: string[]) => void;
   selectedActivityTypes: ActivityType[];
   onActivityTypesChange: (types: ActivityType[]) => void;
+  statusFilter: ActivityStatusFilter;
+  onStatusFilterChange: (status: ActivityStatusFilter) => void;
   viewMode: ActivityViewMode;
   onViewModeChange: (mode: ActivityViewMode) => void;
   /** Shown only in table view - number of activities fetched so far */
@@ -34,6 +37,8 @@ export function ActivityViewControls({
   onAccountIdsChange,
   selectedActivityTypes,
   onActivityTypesChange,
+  statusFilter,
+  onStatusFilterChange,
   viewMode,
   onViewModeChange,
   totalFetched,
@@ -78,10 +83,20 @@ export function ActivityViewControls({
     [],
   );
 
+  const statusOptions = useMemo(
+    () => [
+      { value: "all", label: "All Activities" },
+      { value: "pending", label: "Pending Review" },
+      { value: "validated", label: "Validated" },
+    ],
+    [],
+  );
+
   const hasActiveFilters =
     searchQuery.trim().length > 0 ||
     selectedAccountIds.length > 0 ||
-    selectedActivityTypes.length > 0;
+    selectedActivityTypes.length > 0 ||
+    statusFilter !== "all";
 
   return (
     <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -130,6 +145,16 @@ export function ActivityViewControls({
           }
         />
 
+        <DataTableFacetedFilter
+          title="Status"
+          options={statusOptions}
+          selectedValues={new Set(statusFilter === "all" ? [] : [statusFilter])}
+          onFilterChange={(values: Set<string>) => {
+            const selected = Array.from(values);
+            onStatusFilterChange(selected.length === 0 ? "all" : (selected[0] as ActivityStatusFilter));
+          }}
+        />
+
         {hasActiveFilters ? (
           <Button
             variant="ghost"
@@ -140,6 +165,7 @@ export function ActivityViewControls({
               onSearchQueryChange("");
               onAccountIdsChange([]);
               onActivityTypesChange([]);
+              onStatusFilterChange("all");
             }}
           >
             Reset
