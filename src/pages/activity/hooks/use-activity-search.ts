@@ -2,7 +2,7 @@ import { searchActivities } from "@/commands/activity";
 import { QueryKeys } from "@/lib/query-keys";
 import { ActivityType } from "@/lib/constants";
 import { ActivityDetails, ActivitySearchResponse } from "@/lib/types";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type { SortingState } from "@tanstack/react-table";
 import { useMemo } from "react";
 
@@ -11,15 +11,30 @@ export interface ActivitySearchFilters {
   activityTypes: ActivityType[];
 }
 
-export interface UseActivitySearchOptions {
+interface BaseOptions {
   filters: ActivitySearchFilters;
   searchQuery: string;
   sorting: SortingState;
   pageSize?: number;
 }
 
-export interface UseActivitySearchResult {
-  flatData: ActivityDetails[];
+export interface UseActivitySearchInfiniteOptions extends BaseOptions {
+  mode?: "infinite";
+}
+
+export interface UseActivitySearchPaginatedOptions extends BaseOptions {
+  mode: "paginated";
+  pageIndex: number;
+}
+
+export type UseActivitySearchOptions =
+  | UseActivitySearchInfiniteOptions
+  | UseActivitySearchPaginatedOptions;
+
+// Result type for infinite mode (load more)
+export interface UseActivitySearchInfiniteResult {
+  mode: "infinite";
+  data: ActivityDetails[];
   totalRowCount: number;
   fetchNextPage: () => Promise<unknown>;
   hasNextPage: boolean | undefined;
@@ -29,15 +44,35 @@ export interface UseActivitySearchResult {
   refetch: () => Promise<unknown>;
 }
 
+// Result type for paginated mode
+export interface UseActivitySearchPaginatedResult {
+  mode: "paginated";
+  data: ActivityDetails[];
+  totalRowCount: number;
+  pageCount: number;
+  isFetching: boolean;
+  isLoading: boolean;
+  refetch: () => Promise<unknown>;
+}
+
+export type UseActivitySearchResult =
+  | UseActivitySearchInfiniteResult
+  | UseActivitySearchPaginatedResult;
+
 const DEFAULT_SORT = { id: "date", desc: true };
 const DEFAULT_PAGE_SIZE = 50;
 
-export function useActivitySearch({
-  filters,
-  searchQuery,
-  sorting,
-  pageSize = DEFAULT_PAGE_SIZE,
-}: UseActivitySearchOptions): UseActivitySearchResult {
+export function useActivitySearch(
+  options: UseActivitySearchInfiniteOptions,
+): UseActivitySearchInfiniteResult;
+export function useActivitySearch(
+  options: UseActivitySearchPaginatedOptions,
+): UseActivitySearchPaginatedResult;
+export function useActivitySearch(options: UseActivitySearchOptions): UseActivitySearchResult {
+  const { filters, searchQuery, sorting, pageSize = DEFAULT_PAGE_SIZE } = options;
+  const mode = options.mode ?? "infinite";
+  const pageIndex = "pageIndex" in options ? options.pageIndex : 0;
+
   const normalizedFilters = useMemo(() => {
     return {
       accountIds: filters.accountIds.length > 0 ? filters.accountIds : undefined,
@@ -53,10 +88,11 @@ export function useActivitySearch({
         })
       : DEFAULT_SORT;
 
-  const query = useInfiniteQuery<ActivitySearchResponse, Error>({
+  // Infinite query for "load more" mode
+  const infiniteQuery = useInfiniteQuery<ActivitySearchResponse, Error>({
     queryKey: [
       QueryKeys.ACTIVITY_DATA,
-      "shared",
+      "infinite",
       normalizedFilters,
       searchQuery,
       primarySort.id,
@@ -72,26 +108,64 @@ export function useActivitySearch({
       const fetched = allPages.reduce((acc, page) => acc + page.data.length, 0);
       return fetched < lastPage.meta.totalRowCount ? allPages.length : undefined;
     },
+    enabled: mode === "infinite",
   });
 
-  const flatData = useMemo(
-    () => query.data?.pages.flatMap((page) => page.data) ?? [],
-    [query.data?.pages],
+  // Standard query for paginated mode
+  const paginatedQuery = useQuery<ActivitySearchResponse, Error>({
+    queryKey: [
+      QueryKeys.ACTIVITY_DATA,
+      "paginated",
+      normalizedFilters,
+      searchQuery,
+      primarySort.id,
+      primarySort.desc,
+      pageIndex,
+      pageSize,
+    ],
+    queryFn: async () => {
+      return searchActivities(pageIndex, pageSize, normalizedFilters, searchQuery, primarySort);
+    },
+    enabled: mode === "paginated",
+  });
+
+  // Memoized data for infinite mode
+  const infiniteData = useMemo(
+    () => infiniteQuery.data?.pages.flatMap((page) => page.data) ?? [],
+    [infiniteQuery.data?.pages],
   );
 
-  const totalRowCount = useMemo(
-    () => query.data?.pages?.[0]?.meta.totalRowCount ?? 0,
-    [query.data?.pages],
+  const infiniteTotalRowCount = useMemo(
+    () => infiniteQuery.data?.pages?.[0]?.meta.totalRowCount ?? 0,
+    [infiniteQuery.data?.pages],
   );
+
+  // Memoized data for paginated mode
+  const paginatedData = paginatedQuery.data?.data ?? [];
+  const paginatedTotalRowCount = paginatedQuery.data?.meta.totalRowCount ?? 0;
+  const pageCount = Math.ceil(paginatedTotalRowCount / pageSize);
+
+  if (mode === "paginated") {
+    return {
+      mode: "paginated",
+      data: paginatedData,
+      totalRowCount: paginatedTotalRowCount,
+      pageCount,
+      isFetching: paginatedQuery.isFetching,
+      isLoading: paginatedQuery.isLoading,
+      refetch: paginatedQuery.refetch,
+    };
+  }
 
   return {
-    flatData,
-    totalRowCount,
-    fetchNextPage: query.fetchNextPage,
-    hasNextPage: query.hasNextPage,
-    isFetching: query.isFetching,
-    isFetchingNextPage: query.isFetchingNextPage,
-    isLoading: query.isLoading,
-    refetch: query.refetch,
+    mode: "infinite",
+    data: infiniteData,
+    totalRowCount: infiniteTotalRowCount,
+    fetchNextPage: infiniteQuery.fetchNextPage,
+    hasNextPage: infiniteQuery.hasNextPage,
+    isFetching: infiniteQuery.isFetching,
+    isFetchingNextPage: infiniteQuery.isFetchingNextPage,
+    isLoading: infiniteQuery.isLoading,
+    refetch: infiniteQuery.refetch,
   };
 }

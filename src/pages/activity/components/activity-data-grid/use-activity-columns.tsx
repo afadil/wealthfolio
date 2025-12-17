@@ -113,27 +113,33 @@ export function useActivityColumns({
         accessorKey: "quantity",
         header: "Quantity",
         size: 120,
+        enableSorting: false,
         meta: { cell: { variant: "number", step: 0.000001 } },
       },
       {
         accessorKey: "unitPrice",
         header: "Unit Price",
         size: 120,
+        enableSorting: false,
         meta: { cell: { variant: "number", step: 0.000001 } },
       },
       {
         accessorKey: "amount",
         header: "Amount",
         size: 120,
+        enableSorting: false,
         meta: { cell: { variant: "number", step: 0.000001 } },
       },
       {
         accessorKey: "fee",
         header: "Fee",
         size: 100,
+        enableSorting: false,
         meta: { cell: { variant: "number", step: 0.000001 } },
       },
       {
+        // Uses accountId for data but sorts by accountName on the API
+        id: "accountName",
         accessorKey: "accountId",
         header: "Account",
         size: 180,
@@ -143,12 +149,14 @@ export function useActivityColumns({
         accessorKey: "currency",
         header: "Currency",
         size: 110,
+        enableSorting: false,
         meta: { cell: { variant: "select", options: currencyOptions } },
       },
       {
         accessorKey: "comment",
         header: "Comment",
         size: 260,
+        enableSorting: false,
         meta: { cell: { variant: "long-text" } },
       },
       {
