@@ -1,16 +1,18 @@
+import { searchTicker } from "@/commands/market-data";
 import { ActivityType, ActivityTypeNames } from "@/lib/constants";
 import type { Account, ActivityDetails } from "@/lib/types";
 import { formatDateTimeLocal } from "@/lib/utils";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
   Checkbox,
+  type SymbolSearchResult,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
   worldCurrencies,
 } from "@wealthfolio/ui";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";
 import type { LocalTransaction } from "./types";
@@ -71,6 +73,18 @@ export function useActivityColumns({
       .sort()
       .map((value) => ({ value, label: value }));
   }, [accounts, localTransactions]);
+
+  const handleSymbolSearch = useCallback(async (query: string): Promise<SymbolSearchResult[]> => {
+    const results = await searchTicker(query);
+    return results.map((result) => ({
+      symbol: result.symbol,
+      shortName: result.shortName,
+      longName: result.longName,
+      exchange: result.exchange,
+      score: result.score,
+      dataSource: result.dataSource,
+    }));
+  }, []);
 
   const columns = useMemo<ColumnDef<LocalTransaction>[]>(
     () => [
@@ -162,7 +176,7 @@ export function useActivityColumns({
         accessorKey: "assetSymbol",
         header: "Symbol",
         size: 140,
-        meta: { cell: { variant: "short-text" } },
+        meta: { cell: { variant: "symbol", onSearch: handleSymbolSearch } },
       },
       {
         accessorKey: "quantity",
@@ -237,7 +251,15 @@ export function useActivityColumns({
         ),
       },
     ],
-    [accountOptions, activityTypeOptions, currencyOptions, onDelete, onDuplicate, onEditActivity],
+    [
+      accountOptions,
+      activityTypeOptions,
+      currencyOptions,
+      handleSymbolSearch,
+      onDelete,
+      onDuplicate,
+      onEditActivity,
+    ],
   );
 
   return columns;

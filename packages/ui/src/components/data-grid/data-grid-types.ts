@@ -11,6 +11,15 @@ export interface CellSelectOption {
   count?: number;
 }
 
+export interface SymbolSearchResult {
+  symbol: string;
+  shortName?: string;
+  longName?: string;
+  exchange?: string;
+  score: number;
+  dataSource?: string;
+}
+
 export type CellOpts =
   | {
       variant: "short-text";
@@ -47,6 +56,11 @@ export type CellOpts =
       maxFiles?: number;
       accept?: string;
       multiple?: boolean;
+    }
+  | {
+      variant: "symbol";
+      onSearch: (query: string) => Promise<SymbolSearchResult[]>;
+      onSelect?: (symbol: string, result?: SymbolSearchResult) => void;
     };
 
 export interface UpdateCell {
@@ -76,36 +90,16 @@ declare module "@tanstack/react-table" {
     getIsActiveSearchMatch?: (rowIndex: number, columnId: string) => boolean;
     rowHeight?: RowHeightValue;
     onRowHeightChange?: (value: RowHeightValue) => void;
-    onRowSelect?: (
-      rowIndex: number,
-      checked: boolean,
-      shiftKey: boolean,
-    ) => void;
+    onRowSelect?: (rowIndex: number, checked: boolean, shiftKey: boolean) => void;
     onDataUpdate?: (params: UpdateCell | Array<UpdateCell>) => void;
     onRowsDelete?: (rowIndices: number[]) => void | Promise<void>;
     onColumnClick?: (columnId: string) => void;
-    onCellClick?: (
-      rowIndex: number,
-      columnId: string,
-      event?: React.MouseEvent,
-    ) => void;
+    onCellClick?: (rowIndex: number, columnId: string, event?: React.MouseEvent) => void;
     onCellDoubleClick?: (rowIndex: number, columnId: string) => void;
-    onCellMouseDown?: (
-      rowIndex: number,
-      columnId: string,
-      event: React.MouseEvent,
-    ) => void;
-    onCellMouseEnter?: (
-      rowIndex: number,
-      columnId: string,
-      event: React.MouseEvent,
-    ) => void;
+    onCellMouseDown?: (rowIndex: number, columnId: string, event: React.MouseEvent) => void;
+    onCellMouseEnter?: (rowIndex: number, columnId: string, event: React.MouseEvent) => void;
     onCellMouseUp?: () => void;
-    onCellContextMenu?: (
-      rowIndex: number,
-      columnId: string,
-      event: React.MouseEvent,
-    ) => void;
+    onCellContextMenu?: (rowIndex: number, columnId: string, event: React.MouseEvent) => void;
     onCellEditingStart?: (rowIndex: number, columnId: string) => void;
     onCellEditingStop?: (opts?: {
       direction?: NavigationDirection;
