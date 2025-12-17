@@ -21,7 +21,8 @@ interface DataGridProps<TData>
     >,
     Omit<React.ComponentProps<"div">, "contextMenu"> {
   dir?: Direction;
-  height?: number;
+  /** Height of the grid. Can be a number (px) or CSS string like "100%" */
+  height?: number | string;
   stretchColumns?: boolean;
   virtualTotalSize: number;
   virtualItems: ReturnType<typeof useDataGrid<TData>>["virtualItems"];
@@ -51,7 +52,7 @@ export function DataGrid<TData>({
   contextMenu,
   pasteDialog,
   onRowAdd,
-  height = 600,
+  height,
   stretchColumns = false,
   className,
   ...props
@@ -102,10 +103,15 @@ export function DataGrid<TData>({
         data-slot="grid"
         tabIndex={0}
         ref={dataGridRef}
-        className="relative grid select-none overflow-auto rounded-md border focus:outline-none"
+        className={cn(
+          "relative grid select-none overflow-auto rounded-md border focus:outline-none",
+          className,
+        )}
         style={{
           ...columnSizeVars,
-          maxHeight: `${height}px`,
+          ...(height !== undefined && {
+            maxHeight: typeof height === "number" ? `${height}px` : height,
+          }),
         }}
         onContextMenu={onDataGridContextMenu}
       >

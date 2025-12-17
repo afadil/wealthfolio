@@ -34,9 +34,17 @@ export function ActivityDataGridToolbar({
   onSave,
   onCancel,
 }: ActivityDataGridToolbarProps) {
+  // Prevent mousedown from bubbling to document, which would clear DataGrid selection
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 px-2.5 py-1.5">
-      <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
+    <div
+      className="bg-muted/20 flex flex-wrap items-center justify-between gap-2 rounded-md border px-2.5 py-1.5"
+      onMouseDown={handleMouseDown}
+    >
+      <div className="text-muted-foreground flex items-center gap-2.5 text-xs">
         {/* Selection info */}
         {selectedRowCount > 0 && (
           <span className="font-medium">
@@ -47,14 +55,14 @@ export function ActivityDataGridToolbar({
         {/* Pending changes info */}
         {hasUnsavedChanges && (
           <div className="flex items-center gap-2">
-            <span className="font-medium text-primary">
+            <span className="text-primary font-medium">
               {changesSummary.totalPendingChanges} pending change
               {changesSummary.totalPendingChanges === 1 ? "" : "s"}
             </span>
-            <div className="h-3.5 w-px bg-border" />
+            <div className="bg-border h-3.5 w-px" />
             <div className="flex items-center gap-4">
               {changesSummary.newCount > 0 && (
-                <span className="flex items-center gap-1 text-success">
+                <span className="text-success flex items-center gap-1">
                   <Icons.PlusCircle className="h-3 w-3" />
                   <span className="font-medium">{changesSummary.newCount}</span>
                 </span>
@@ -66,7 +74,7 @@ export function ActivityDataGridToolbar({
                 </span>
               )}
               {changesSummary.deletedCount > 0 && (
-                <span className="flex items-center gap-1 text-destructive">
+                <span className="text-destructive flex items-center gap-1">
                   <Icons.Trash className="h-3 w-3" />
                   <span className="font-medium">{changesSummary.deletedCount}</span>
                 </span>
@@ -74,7 +82,6 @@ export function ActivityDataGridToolbar({
             </div>
           </div>
         )}
-
       </div>
 
       {/* Action buttons */}
@@ -93,9 +100,8 @@ export function ActivityDataGridToolbar({
 
         {selectedRowCount > 0 && (
           <>
-            <div className="mx-1 h-4 w-px bg-border" />
+            <div className="bg-border mx-1 h-4 w-px" />
             <Button
-              onMouseDown={(e) => e.preventDefault()}
               onClick={onDeleteSelected}
               size="xs"
               variant="destructive"
@@ -112,7 +118,7 @@ export function ActivityDataGridToolbar({
 
         {hasUnsavedChanges && (
           <>
-            <div className="mx-1 h-4 w-px bg-border" />
+            <div className="bg-border mx-1 h-4 w-px" />
             <Button
               onClick={onSave}
               size="xs"
