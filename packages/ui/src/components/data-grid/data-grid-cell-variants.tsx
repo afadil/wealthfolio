@@ -397,8 +397,11 @@ export function NumberCell<TData>({
   }
 
   const onBlur = React.useCallback(() => {
+    console.log("[NumberCell.onBlur] triggered");
     const numValue = value === "" ? null : Number(value);
+    console.log("[NumberCell.onBlur]", { value, numValue, initialValue, readOnly, hasOnDataUpdate: !!tableMeta?.onDataUpdate });
     if (!readOnly && numValue !== initialValue) {
+      console.log("[NumberCell.onBlur] calling onDataUpdate");
       tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: numValue });
     }
     tableMeta?.onCellEditingStop?.();
@@ -439,19 +442,51 @@ export function NumberCell<TData>({
         // Handle Backspace to start editing with empty value
         if (event.key === "Backspace") {
           setValue("");
+          startedByTypingRef.current = true;
         } else if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
           // Handle typing to pre-fill the value when editing starts
           setValue(event.key);
+          startedByTypingRef.current = true;
         }
       }
     },
     [isEditing, isFocused, initialValue, tableMeta, rowIndex, columnId, value],
   );
 
+  // Track if editing was started by typing (vs double-click/Enter)
+  const startedByTypingRef = React.useRef(false);
+
+  // Track previous editing state to detect when editing stops
+  const wasEditingRef = React.useRef(isEditing);
+  const valueRef = React.useRef(value);
+  valueRef.current = value;
+
+  React.useEffect(() => {
+    // When editing stops (transitions from true to false), save the value
+    if (wasEditingRef.current && !isEditing) {
+      const currentValue = valueRef.current;
+      const numValue = currentValue === "" ? null : Number(currentValue);
+      if (!readOnly && numValue !== initialValue) {
+        tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: numValue });
+      }
+      startedByTypingRef.current = false;
+    }
+    wasEditingRef.current = isEditing;
+  }, [isEditing, initialValue, readOnly, tableMeta, rowIndex, columnId]);
+
   React.useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
-      inputRef.current.select();
+      // Only select all if editing was NOT started by typing
+      // Note: input type="number" doesn't support select() in all browsers,
+      // but focus() is enough when started by typing
+      if (!startedByTypingRef.current) {
+        try {
+          inputRef.current.select();
+        } catch {
+          // Safari and some browsers don't support select() on number inputs
+        }
+      }
     }
   }, [isEditing]);
 
