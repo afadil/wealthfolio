@@ -138,6 +138,13 @@ export function useActivityColumns({
         meta: { cell: { variant: "number", step: 0.000001 } },
       },
       {
+        accessorKey: "fxRate",
+        header: "FX Rate",
+        size: 100,
+        enableSorting: false,
+        meta: { cell: { variant: "number", step: 0.000001 } },
+      },
+      {
         // Uses accountId for data but sorts by accountName on the API
         id: "accountName",
         accessorKey: "accountId",

@@ -14,7 +14,7 @@ import { generateTempActivityId } from "./use-activity-grid-state";
 /**
  * Set of numeric field names for value comparison
  */
-const NUMERIC_FIELDS = new Set(["quantity", "unitPrice", "amount", "fee"]);
+const NUMERIC_FIELDS = new Set(["quantity", "unitPrice", "amount", "fee", "fxRate"]);
 
 /**
  * Safely converts a value to a number for comparison
@@ -192,6 +192,8 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
     applySplitDefaults(updated);
   } else if (field === "comment") {
     updated.comment = typeof value === "string" ? value : "";
+  } else if (field === "fxRate") {
+    updated.fxRate = parseDecimalInput(value as string | number);
   }
 
   updated.updatedAt = new Date();
@@ -278,6 +280,7 @@ export function buildSavePayload(
       amount: toPayloadNumber(transaction.amount),
       currency: currencyForPayload,
       fee: toPayloadNumber(transaction.fee),
+      fxRate: transaction.fxRate != null ? toPayloadNumber(transaction.fxRate) : null,
       isDraft: false,
       comment: transaction.comment ?? undefined,
     };
@@ -319,6 +322,7 @@ export const TRACKED_FIELDS: (keyof LocalTransaction)[] = [
   "unitPrice",
   "amount",
   "fee",
+  "fxRate",
   "accountId",
   "currency",
   "comment",

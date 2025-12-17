@@ -192,6 +192,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 activities::amount,
                 activities::is_draft,
                 activities::comment,
+                activities::fx_rate,
                 activities::created_at,
                 activities::updated_at,
                 accounts::name,
