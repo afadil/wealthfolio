@@ -19,8 +19,10 @@ interface ActivityViewControlsProps {
   onActivityTypesChange: (types: ActivityType[]) => void;
   viewMode: ActivityViewMode;
   onViewModeChange: (mode: ActivityViewMode) => void;
-  totalFetched: number;
-  totalRowCount: number;
+  /** Shown only in table view - number of activities fetched so far */
+  totalFetched?: number;
+  /** Shown only in table view - total number of activities matching filters */
+  totalRowCount?: number;
   isFetching: boolean;
 }
 
@@ -147,16 +149,19 @@ export function ActivityViewControls({
       </div>
 
       <div className="flex items-center gap-3">
-        <span className="text-muted-foreground text-xs">
-          {isFetching ? (
-            <span className="inline-flex items-center gap-1">
-              <Icons.Spinner className="h-4 w-4 animate-spin" />
-              Loading…
-            </span>
-          ) : (
-            `${totalFetched} / ${totalRowCount} activities`
-          )}
-        </span>
+        {/* Show fetched/total count only in table view (when totalFetched is provided) */}
+        {totalFetched !== undefined && totalRowCount !== undefined && (
+          <span className="text-muted-foreground text-xs">
+            {isFetching ? (
+              <span className="inline-flex items-center gap-1">
+                <Icons.Spinner className="h-4 w-4 animate-spin" />
+                Loading…
+              </span>
+            ) : (
+              `${totalFetched} / ${totalRowCount} activities`
+            )}
+          </span>
+        )}
         <AnimatedToggleGroup
           value={viewMode}
           rounded="lg"

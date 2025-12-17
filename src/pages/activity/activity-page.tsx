@@ -55,6 +55,10 @@ const ActivityPage = () => {
     true,
   );
 
+  // Pagination state for datagrid view
+  const [pageIndex, setPageIndex] = usePersistentState("activity-datagrid-page-index", 0);
+  const [pageSize, setPageSize] = usePersistentState("activity-datagrid-page-size", 50);
+
   const isMobileViewport = useIsMobileViewport();
 
   // Debounced search handler
@@ -88,23 +92,40 @@ const ActivityPage = () => {
   const accounts = accountsData ?? [];
 
   const { deleteActivityMutation, duplicateActivityMutation } = useActivityMutations();
-  const {
-    flatData,
-    totalRowCount,
-    fetchNextPage,
-    isFetching,
-    isLoading,
-    isFetchingNextPage,
-    hasNextPage,
-    refetch,
-  } = useActivitySearch({
+
+  const isDatagridView = viewMode === "datagrid";
+
+  // Infinite scroll search for table view
+  const infiniteSearch = useActivitySearch({
+    mode: "infinite",
     filters: { accountIds: selectedAccounts, activityTypes: selectedActivityTypes },
     searchQuery,
     sorting,
   });
-  const totalFetched = flatData.length;
 
-  const isDatagridView = viewMode === "datagrid";
+  // Paginated search for datagrid view
+  const paginatedSearch = useActivitySearch({
+    mode: "paginated",
+    filters: { accountIds: selectedAccounts, activityTypes: selectedActivityTypes },
+    searchQuery,
+    sorting,
+    pageIndex,
+    pageSize,
+  });
+
+  // Reset page index when filters or search change (only for datagrid)
+  useEffect(() => {
+    if (isDatagridView && pageIndex !== 0) {
+      setPageIndex(0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAccounts, selectedActivityTypes, searchQuery, sorting]);
+
+  // Use appropriate data based on view mode
+  const tableActivities = infiniteSearch.data;
+  const datagridActivities = paginatedSearch.data;
+  const totalFetched = tableActivities.length;
+  const totalRowCount = isDatagridView ? paginatedSearch.totalRowCount : infiniteSearch.totalRowCount;
 
   const handleEdit = useCallback((activity?: ActivityDetails, activityType?: ActivityType) => {
     setSelectedActivity(activity ?? { activityType });
@@ -210,16 +231,16 @@ const ActivityPage = () => {
               onActivityTypesChange={setSelectedActivityTypes}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
-              totalFetched={totalFetched}
-              totalRowCount={totalRowCount}
-              isFetching={isFetching}
+              totalFetched={isDatagridView ? undefined : totalFetched}
+              totalRowCount={isDatagridView ? undefined : totalRowCount}
+              isFetching={isDatagridView ? paginatedSearch.isFetching : infiniteSearch.isFetching}
             />
           )}
 
           {/* View-Specific Renderers */}
           {isMobileViewport ? (
             <ActivityTableMobile
-              activities={flatData}
+              activities={tableActivities}
               isCompactView={isCompactView}
               handleEdit={handleEdit}
               handleDelete={handleDelete}
@@ -228,16 +249,23 @@ const ActivityPage = () => {
           ) : isDatagridView ? (
             <ActivityDataGrid
               accounts={accounts}
-              activities={flatData}
-              onRefetch={refetch}
+              activities={datagridActivities}
+              onRefetch={paginatedSearch.refetch}
               onEditActivity={handleEdit}
               sorting={sorting}
               onSortingChange={setSorting}
+              pageIndex={pageIndex}
+              pageSize={pageSize}
+              pageCount={paginatedSearch.pageCount}
+              totalRowCount={paginatedSearch.totalRowCount}
+              isFetching={paginatedSearch.isFetching}
+              onPageChange={setPageIndex}
+              onPageSizeChange={setPageSize}
             />
           ) : (
             <ActivityTable
-              activities={flatData}
-              isLoading={isLoading}
+              activities={tableActivities}
+              isLoading={infiniteSearch.isLoading}
               sorting={sorting}
               onSortingChange={setSorting}
               handleEdit={handleEdit}
@@ -245,13 +273,16 @@ const ActivityPage = () => {
             />
           )}
 
-          <ActivityPagination
-            hasMore={hasNextPage ?? false}
-            onLoadMore={fetchNextPage}
-            isFetching={isFetchingNextPage}
-            totalFetched={totalFetched}
-            totalCount={totalRowCount}
-          />
+          {/* Load more pagination - only for table view (not datagrid) */}
+          {!isDatagridView && (
+            <ActivityPagination
+              hasMore={infiniteSearch.hasNextPage ?? false}
+              onLoadMore={infiniteSearch.fetchNextPage}
+              isFetching={infiniteSearch.isFetchingNextPage}
+              totalFetched={totalFetched}
+              totalCount={infiniteSearch.totalRowCount}
+            />
+          )}
         </div>
         {isMobileViewport ? (
           <MobileActivityForm

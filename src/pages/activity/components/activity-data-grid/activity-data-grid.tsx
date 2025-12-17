@@ -5,6 +5,7 @@ import type { SortingState, Updater } from "@tanstack/react-table";
 import { DataGrid, useDataGrid } from "@wealthfolio/ui";
 import { useCallback, useMemo } from "react";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
+import { ActivityDataGridPagination } from "./activity-data-grid-pagination";
 import { ActivityDataGridToolbar } from "./activity-data-grid-toolbar";
 import {
   applyTransactionUpdate,
@@ -25,6 +26,14 @@ interface ActivityDataGridProps {
   onEditActivity: (activity: ActivityDetails) => void;
   sorting: SortingState;
   onSortingChange: (updater: Updater<SortingState>) => void;
+  // Pagination props
+  pageIndex: number;
+  pageSize: number;
+  pageCount: number;
+  totalRowCount: number;
+  isFetching: boolean;
+  onPageChange: (pageIndex: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
 }
 
 /**
@@ -37,6 +46,13 @@ export function ActivityDataGrid({
   onEditActivity,
   sorting,
   onSortingChange,
+  pageIndex,
+  pageSize,
+  pageCount,
+  totalRowCount,
+  isFetching,
+  onPageChange,
+  onPageSizeChange,
 }: ActivityDataGridProps) {
   // State management
   const {
@@ -375,8 +391,18 @@ export function ActivityDataGrid({
       />
 
       <div className="min-h-0 flex-1 overflow-hidden">
-        <DataGrid {...dataGrid} stretchColumns height="calc(100vh - 220px)" />
+        <DataGrid {...dataGrid} stretchColumns height="calc(100vh - 260px)" />
       </div>
+
+      <ActivityDataGridPagination
+        pageIndex={pageIndex}
+        pageSize={pageSize}
+        pageCount={pageCount}
+        totalRowCount={totalRowCount}
+        isFetching={isFetching}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+      />
     </div>
   );
 }
