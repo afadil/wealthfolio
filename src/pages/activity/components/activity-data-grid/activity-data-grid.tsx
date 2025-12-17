@@ -100,6 +100,20 @@ const createDraftTransaction = (
   };
 };
 
+const NUMERIC_FIELDS = new Set(["quantity", "unitPrice", "amount", "fee"]);
+
+function valuesAreEqual(field: string, prevValue: unknown, nextValue: unknown): boolean {
+  // For numeric fields, compare as numbers to handle string/number type differences
+  if (NUMERIC_FIELDS.has(field)) {
+    const prevNum = typeof prevValue === "number" ? prevValue : parseFloat(String(prevValue ?? "0"));
+    const nextNum = typeof nextValue === "number" ? nextValue : parseFloat(String(nextValue ?? "0"));
+    // Handle NaN cases
+    if (Number.isNaN(prevNum) && Number.isNaN(nextNum)) return true;
+    return prevNum === nextNum;
+  }
+  return Object.is(prevValue, nextValue);
+}
+
 function applyTransactionUpdate(params: {
   transaction: LocalTransaction;
   field: keyof LocalTransaction;
@@ -331,63 +345,79 @@ export function ActivityDataGrid({
     [accounts],
   );
 
-  const localCurrenciesKey = useMemo(() => {
-    const currencies = new Set<string>();
-    localTransactions.forEach((transaction) => {
-      if (transaction.currency) {
-        currencies.add(transaction.currency);
-      }
-    });
-
-    return Array.from(currencies).sort().join("|");
-  }, [localTransactions]);
-
   const currencyOptions = useMemo(() => {
-    const entries = new Map<string, string>();
+    const entries = new Set<string>();
 
-    worldCurrencies.forEach(({ value, label }) => {
-      entries.set(value, label);
-    });
+    // Add all world currencies
+    worldCurrencies.forEach(({ value }) => entries.add(value));
 
+    // Add account currencies
     accounts.forEach((account) => {
-      if (account.currency) {
-        entries.set(account.currency, entries.get(account.currency) ?? account.currency);
-      }
+      if (account.currency) entries.add(account.currency);
     });
 
-    if (localCurrenciesKey) {
-      localCurrenciesKey.split("|").forEach((currency) => {
-        entries.set(currency, entries.get(currency) ?? currency);
+    // Add currencies from local transactions
+    localTransactions.forEach((transaction) => {
+      if (transaction.currency) entries.add(transaction.currency);
+    });
+
+    return Array.from(entries)
+      .sort()
+      .map((value) => ({ value, label: value }));
+  }, [accounts, localTransactions]);
+
+  const handleDuplicate = useCallback(
+    (activity: ActivityDetails) => {
+      const now = new Date();
+      const source = activity as LocalTransaction;
+      const duplicated: LocalTransaction = {
+        ...source,
+        id: generateTempActivityId(),
+        date: now,
+        createdAt: now,
+        updatedAt: now,
+        isNew: true,
+      };
+      setLocalTransactions((prev) => [duplicated, ...prev]);
+      setDirtyTransactionIds((prev) => new Set(prev).add(duplicated.id));
+    },
+    [setDirtyTransactionIds, setLocalTransactions],
+  );
+
+  const handleDelete = useCallback(
+    (activity: ActivityDetails) => {
+      const { id } = activity;
+      const source = activity as LocalTransaction;
+      setLocalTransactions((prev) => prev.filter((t) => t.id !== id));
+      setDirtyTransactionIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
       });
-    }
+      if (!source.isNew) {
+        setPendingDeleteIds((prev) => new Set(prev).add(id));
+      }
+    },
+    [setDirtyTransactionIds, setLocalTransactions, setPendingDeleteIds],
+  );
 
-    return Array.from(entries.entries()).map(([value]) => ({
-      value,
-      label: value,
-    }));
-  }, [accounts, localCurrenciesKey]);
-
-  const columns = useMemo<ColumnDef<LocalTransaction>[]>(() => {
-    return [
+  const columns = useMemo<ColumnDef<LocalTransaction>[]>(
+    () => [
       {
         id: "select",
         header: ({ table }) => (
-          <div className="flex h-full items-center justify-center">
-            <Checkbox
-              checked={table.getIsAllRowsSelected() || (table.getIsSomeRowsSelected() && "indeterminate")}
-              onCheckedChange={(checked) => table.toggleAllRowsSelected(Boolean(checked))}
-              aria-label="Select all rows"
-            />
-          </div>
+          <Checkbox
+            checked={table.getIsAllRowsSelected() || (table.getIsSomeRowsSelected() && "indeterminate")}
+            onCheckedChange={(checked) => table.toggleAllRowsSelected(Boolean(checked))}
+            aria-label="Select all rows"
+          />
         ),
         cell: ({ row }) => (
-          <div className="flex h-full items-center justify-center">
-            <Checkbox
-              checked={row.getIsSelected()}
-              onCheckedChange={(checked) => row.toggleSelected(Boolean(checked))}
-              aria-label="Select row"
-            />
-          </div>
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(checked) => row.toggleSelected(Boolean(checked))}
+            aria-label="Select row"
+          />
         ),
         size: 44,
         enableSorting: false,
@@ -398,154 +428,86 @@ export function ActivityDataGrid({
         accessorKey: "activityType",
         header: "Type",
         size: 170,
-        meta: {
-          label: "Type",
-          cell: { variant: "select", options: activityTypeOptions },
-        },
+        meta: { cell: { variant: "select", options: activityTypeOptions } },
       },
       {
         id: "date",
         header: "Date & Time",
         size: 180,
         accessorFn: (row) => formatDateTimeLocal(row.date),
-        meta: {
-          label: "Date & Time",
-          cell: { variant: "short-text" },
-        },
+        meta: { cell: { variant: "short-text" } },
       },
       {
         accessorKey: "assetSymbol",
         header: "Symbol",
         size: 140,
-        meta: {
-          label: "Symbol",
-          cell: { variant: "short-text" },
-        },
+        meta: { cell: { variant: "short-text" } },
       },
       {
         accessorKey: "quantity",
         header: "Quantity",
         size: 120,
-        meta: {
-          label: "Quantity",
-          cell: { variant: "number", step: 0.000001 },
-        },
+        meta: { cell: { variant: "number", step: 0.000001 } },
       },
       {
         accessorKey: "unitPrice",
         header: "Unit Price",
         size: 120,
-        meta: {
-          label: "Unit Price",
-          cell: { variant: "number", step: 0.000001 },
-        },
+        meta: { cell: { variant: "number", step: 0.000001 } },
       },
       {
         accessorKey: "amount",
         header: "Amount",
         size: 120,
-        meta: {
-          label: "Amount",
-          cell: { variant: "number", step: 0.000001 },
-        },
+        meta: { cell: { variant: "number", step: 0.000001 } },
       },
       {
         accessorKey: "fee",
         header: "Fee",
         size: 100,
-        meta: {
-          label: "Fee",
-          cell: { variant: "number", step: 0.000001 },
-        },
+        meta: { cell: { variant: "number", step: 0.000001 } },
       },
       {
         accessorKey: "accountId",
         header: "Account",
         size: 180,
-        meta: {
-          label: "Account",
-          cell: { variant: "select", options: accountOptions },
-        },
+        meta: { cell: { variant: "select", options: accountOptions } },
       },
       {
         accessorKey: "currency",
         header: "Currency",
         size: 110,
-        meta: {
-          label: "Currency",
-          cell: { variant: "select", options: currencyOptions },
-        },
+        meta: { cell: { variant: "select", options: currencyOptions } },
       },
       {
         accessorKey: "comment",
         header: "Comment",
         size: 260,
-        meta: {
-          label: "Comment",
-          cell: { variant: "long-text" },
-        },
+        meta: { cell: { variant: "long-text" } },
       },
       {
         id: "actions",
-        header: () => null,
-        cell: ({ row }) => (
-          <div className="flex h-full items-center justify-center">
-            <ActivityOperations
-              activity={row.original}
-              onEdit={onEditActivity}
-              onDuplicate={(activity) => {
-                const now = new Date();
-                const source = activity as LocalTransaction;
-                const duplicated: LocalTransaction = {
-                  ...source,
-                  id: generateTempActivityId(),
-                  date: now,
-                  createdAt: now,
-                  updatedAt: now,
-                  isNew: true,
-                };
-
-                setLocalTransactions((prev) => [duplicated, ...prev]);
-                setDirtyTransactionIds((prev) => new Set(prev).add(duplicated.id));
-              }}
-              onDelete={(activity) => {
-                const id = activity.id;
-                const source = activity as LocalTransaction;
-                setLocalTransactions((prev) => prev.filter((t) => t.id !== id));
-                setDirtyTransactionIds((prev) => {
-                  const next = new Set(prev);
-                  next.delete(id);
-                  return next;
-                });
-                setPendingDeleteIds((prev) => {
-                  const next = new Set(prev);
-                  if (!source.isNew) {
-                    next.add(id);
-                  }
-                  return next;
-                });
-              }}
-            />
-          </div>
-        ),
         size: 64,
         enableSorting: false,
         enableResizing: false,
         enableHiding: false,
+        cell: ({ row }) => (
+          <ActivityOperations
+            activity={row.original}
+            onEdit={onEditActivity}
+            onDuplicate={handleDuplicate}
+            onDelete={handleDelete}
+          />
+        ),
       },
-    ];
-  }, [
-    accountOptions,
-    activityTypeOptions,
-    currencyOptions,
-    onEditActivity,
-    setDirtyTransactionIds,
-    setLocalTransactions,
-    setPendingDeleteIds,
-  ]);
+    ],
+    [accountOptions, activityTypeOptions, currencyOptions, handleDelete, handleDuplicate, onEditActivity],
+  );
 
   const onDataChange = useCallback(
     (nextData: LocalTransaction[]) => {
+      console.log('[ActivityDataGrid] onDataChange called, nextData.length:', nextData.length);
+      console.trace('[ActivityDataGrid] onDataChange stacktrace');
       setLocalTransactions((prev) => {
         const prevById = new Map(prev.map((t) => [t.id, t]));
         const changedIds: string[] = [];
@@ -574,11 +536,13 @@ export function ActivityDataGrid({
           ];
 
           for (const field of fields) {
-            if (!Object.is((previous as Record<string, unknown>)[field], (nextRow as Record<string, unknown>)[field])) {
+            const prevValue = (previous as Record<string, unknown>)[field];
+            const nextValue = (nextRow as Record<string, unknown>)[field];
+            if (!valuesAreEqual(field, prevValue, nextValue)) {
               updated = applyTransactionUpdate({
                 transaction: updated,
                 field,
-                value: (nextRow as Record<string, unknown>)[field],
+                value: nextValue,
                 accountLookup,
                 assetCurrencyLookup,
                 fallbackCurrency,
@@ -618,30 +582,18 @@ export function ActivityDataGrid({
   );
 
   const onRowAdd = useCallback(() => {
-    const now = new Date();
-    const draft = {
-      ...createDraftTransaction(accounts, fallbackCurrency),
-      date: now,
-      createdAt: now,
-      updatedAt: now,
-    };
-
+    const draft = createDraftTransaction(accounts, fallbackCurrency);
     setLocalTransactions((prev) => [...prev, draft]);
     setDirtyTransactionIds((prev) => new Set(prev).add(draft.id));
-
     return { columnId: "activityType" };
   }, [accounts, fallbackCurrency, setDirtyTransactionIds, setLocalTransactions]);
 
   const onRowsAdd = useCallback(
     (count: number) => {
       if (count <= 0) return;
-      const now = new Date();
-      const drafts = Array.from({ length: count }, () => ({
-        ...createDraftTransaction(accounts, fallbackCurrency),
-        date: now,
-        createdAt: now,
-        updatedAt: now,
-      }));
+      const drafts = Array.from({ length: count }, () =>
+        createDraftTransaction(accounts, fallbackCurrency),
+      );
 
       setLocalTransactions((prev) => [...prev, ...drafts]);
       setDirtyTransactionIds((prev) => {
@@ -654,22 +606,23 @@ export function ActivityDataGrid({
   );
 
   const onRowsDelete = useCallback(
-    async (rowsToDelete: LocalTransaction[]) => {
+    (rowsToDelete: LocalTransaction[]) => {
+      console.log('[ActivityDataGrid] onRowsDelete called, rowsToDelete.length:', rowsToDelete.length);
       if (rowsToDelete.length === 0) return;
 
-      const idsToDelete = rowsToDelete.map((row) => row.id);
-      const deletedRows = rowsToDelete.filter((row) => !row.isNew);
+      const idsToDelete = new Set(rowsToDelete.map((row) => row.id));
+      const existingRowsToDelete = rowsToDelete.filter((row) => !row.isNew);
 
-      setLocalTransactions((prev) => prev.filter((t) => !idsToDelete.includes(t.id)));
+      setLocalTransactions((prev) => prev.filter((t) => !idsToDelete.has(t.id)));
       setDirtyTransactionIds((prev) => {
         const next = new Set(prev);
         idsToDelete.forEach((id) => next.delete(id));
         return next;
       });
-      if (deletedRows.length > 0) {
+      if (existingRowsToDelete.length > 0) {
         setPendingDeleteIds((prev) => {
           const next = new Set(prev);
-          deletedRows.forEach((row) => next.add(row.id));
+          existingRowsToDelete.forEach((row) => next.add(row.id));
           return next;
         });
       }
@@ -699,12 +652,18 @@ export function ActivityDataGrid({
   });
 
   const selectedRowCount = dataGrid.table.getSelectedRowModel().rows.length;
+  console.log("[ActivityDataGrid] render, selectedRowCount:", selectedRowCount);
 
   const deleteSelectedRows = useCallback(() => {
+    console.log("[deleteSelectedRows] called, selectedRowCount:", dataGrid.table.getSelectedRowModel().rows.length);
     const selected = dataGrid.table.getSelectedRowModel().rows;
-    if (selected.length === 0) return;
+    if (selected.length === 0) {
+      console.log("[deleteSelectedRows] no rows selected, returning");
+      return;
+    }
 
     const selectedTransactions = selected.map((row) => row.original);
+    console.log("[deleteSelectedRows] deleting:", selectedTransactions.map(t => t.id));
     onRowsDelete(selectedTransactions);
     dataGrid.table.resetRowSelection();
   }, [dataGrid.table, onRowsDelete]);
@@ -920,6 +879,7 @@ export function ActivityDataGrid({
             <>
               <div className="mx-1 h-4 w-px bg-border" />
               <Button
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={deleteSelectedRows}
                 size="xs"
                 variant="destructive"
