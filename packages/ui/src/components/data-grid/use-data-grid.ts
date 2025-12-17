@@ -1957,12 +1957,6 @@ function useDataGrid<TData>({
           ? updater(currentState.rowSelection)
           : updater;
 
-      console.log('[useDataGrid] onRowSelectionChange', {
-        prev: currentState.rowSelection,
-        next: newRowSelection,
-      });
-      console.trace('[useDataGrid] onRowSelectionChange stacktrace');
-
       const selectedRows = Object.keys(newRowSelection).filter(
         (key) => newRowSelection[key],
       );

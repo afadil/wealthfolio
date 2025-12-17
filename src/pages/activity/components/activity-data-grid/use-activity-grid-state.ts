@@ -94,18 +94,57 @@ export const useActivityGridState = ({
     dirtyTransactionIdsRef.current = dirtyTransactionIds;
   }, [dirtyTransactionIds]);
 
-  // Only sync local state from server if there are no unsaved changes
+  // Ref to track pending delete IDs without triggering effect re-runs
+  const pendingDeleteIdsRef = useRef(pendingDeleteIds);
   useEffect(() => {
-    if (
-      dirtyTransactionIds.size === 0 &&
-      pendingDeleteIds.size === 0 &&
-      !localTransactions.some((transaction) => transaction.isNew)
-    ) {
-      setLocalTransactions(serverTransactions);
-    }
-    // Otherwise, preserve local state (pending changes)
-    // This ensures deletes/edits persist until Save/Cancel
-    // and toolbar can show correct pending state
+    pendingDeleteIdsRef.current = pendingDeleteIds;
+  }, [pendingDeleteIds]);
+
+  // Sync local state from server while preserving local changes
+  // Uses refs to access current state without stale closures
+  useEffect(() => {
+    setLocalTransactions((currentLocal) => {
+      const currentDirtyIds = dirtyTransactionIdsRef.current;
+      const currentPendingDeleteIds = pendingDeleteIdsRef.current;
+
+      // Check if there are any local changes that need preserving
+      const hasNewTransactions = currentLocal.some((t) => t.isNew);
+      const hasDirtyTransactions = currentDirtyIds.size > 0;
+      const hasPendingDeletes = currentPendingDeleteIds.size > 0;
+
+      // If no local changes, just use server data
+      if (!hasNewTransactions && !hasDirtyTransactions && !hasPendingDeletes) {
+        return serverTransactions;
+      }
+
+      // Merge: preserve local changes, update non-dirty items from server
+      const merged: LocalTransaction[] = [];
+
+      // First, add all local transactions that need preserving (dirty, new, or pending delete)
+      const preservedIds = new Set<string>();
+      for (const local of currentLocal) {
+        if (local.isNew || currentDirtyIds.has(local.id)) {
+          merged.push(local);
+          preservedIds.add(local.id);
+        }
+      }
+
+      // Then, add/update non-dirty items from server (excluding pending deletes)
+      for (const server of serverTransactions) {
+        if (currentPendingDeleteIds.has(server.id)) {
+          // Skip - marked for deletion
+          continue;
+        }
+        if (preservedIds.has(server.id)) {
+          // Already preserved from local - skip
+          continue;
+        }
+        // This is a non-dirty item - use server version
+        merged.push(server as LocalTransaction);
+      }
+
+      return merged;
+    });
   }, [serverTransactions]);
 
   // Mark a single transaction as dirty

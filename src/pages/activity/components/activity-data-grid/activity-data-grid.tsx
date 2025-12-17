@@ -210,22 +210,22 @@ export function ActivityDataGrid({
     ],
   );
 
-  // Add single row
+  // Add single row at the top
   const onRowAdd = useCallback(() => {
     const draft = createDraftTransaction(accounts, fallbackCurrency);
-    setLocalTransactions((prev) => [...prev, draft]);
+    setLocalTransactions((prev) => [draft, ...prev]);
     markDirtyBatch([draft.id]);
-    return { columnId: "activityType" };
+    return { rowIndex: 0, columnId: "activityType" };
   }, [accounts, fallbackCurrency, markDirtyBatch, setLocalTransactions]);
 
-  // Add multiple rows
+  // Add multiple rows at the top
   const onRowsAdd = useCallback(
     (count: number) => {
       if (count <= 0) return;
       const drafts = Array.from({ length: count }, () =>
         createDraftTransaction(accounts, fallbackCurrency),
       );
-      setLocalTransactions((prev) => [...prev, ...drafts]);
+      setLocalTransactions((prev) => [...drafts, ...prev]);
       markDirtyBatch(drafts.map((d) => d.id));
     },
     [accounts, fallbackCurrency, markDirtyBatch, setLocalTransactions],
@@ -374,8 +374,8 @@ export function ActivityDataGrid({
         onCancel={handleCancelChanges}
       />
 
-      <div className="bg-background min-h-80 flex-1 overflow-hidden rounded-lg border">
-        <DataGrid {...dataGrid} height={600} stretchColumns />
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <DataGrid {...dataGrid} stretchColumns height="calc(100vh - 220px)" />
       </div>
     </div>
   );
