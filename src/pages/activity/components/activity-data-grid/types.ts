@@ -78,6 +78,7 @@ export interface ActivityCreatePayload {
   amount?: number;
   currency?: string;
   fee?: number;
+  fxRate?: number | null;
   isDraft: boolean;
   comment?: string;
 }

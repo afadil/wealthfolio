@@ -59,6 +59,7 @@ export interface ActivityDetails {
   currency: string;
   isDraft: boolean;
   comment?: string;
+  fxRate?: number | null;
   createdAt: Date;
   assetId: string;
   updatedAt: Date;
