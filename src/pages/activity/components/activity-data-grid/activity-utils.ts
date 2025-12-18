@@ -248,7 +248,7 @@ export function buildSavePayload(
     options?: CurrencyResolutionOptions,
   ) => string | undefined,
   dirtyCurrencyLookup: Map<string, string>,
-  assetCurrencyLookup: Map<string, string>,
+  _assetCurrencyLookup: Map<string, string>,
   fallbackCurrency: string,
 ): SavePayloadResult {
   const creates: ActivityCreatePayload[] = [];
@@ -264,9 +264,12 @@ export function buildSavePayload(
       resolveTransactionCurrency(transaction, { includeFallback: false }) ??
       dirtyCurrencyLookup.get(transaction.id);
     const currencyFallback = transaction.accountCurrency ?? fallbackCurrency;
-    const assetKey = (transaction.assetId ?? transaction.assetSymbol ?? "").toUpperCase();
-    const currencyForPayload =
-      resolvedCurrency ?? (!assetCurrencyLookup.has(assetKey) ? currencyFallback : undefined);
+    // For assets not in our lookup (new assets), send undefined currency to let the backend
+    // derive it from the asset and properly register the FX pair if needed.
+    // Only use account currency fallback for cash activities where the currency is deterministic.
+    const currencyForPayload = resolvedCurrency ?? (isCashActivity(transaction.activityType)
+      ? currencyFallback
+      : undefined);
 
     const payload: ActivityCreatePayload = {
       id: transaction.id,

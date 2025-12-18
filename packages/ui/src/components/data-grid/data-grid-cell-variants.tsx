@@ -35,6 +35,7 @@ import * as React from "react";
 import { toast } from "sonner";
 import { useBadgeOverflow } from "../../hooks/use-badge-overflow";
 import { useDebouncedCallback } from "../../hooks/use-debounced-callback";
+import { worldCurrencies } from "../../lib/currencies";
 import { cn } from "../../lib/utils";
 import { DataGridCellWrapper } from "./data-grid-cell-wrapper";
 import type { DataGridCellProps, FileCellData, SymbolSearchResult } from "./data-grid-types";
@@ -2202,6 +2203,171 @@ export function SymbolCell<TData>({
                     ))}
                   </CommandGroup>
                 ) : null}
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        )}
+      </Popover>
+    </DataGridCellWrapper>
+  );
+}
+
+export function CurrencyCell<TData>({
+  cell,
+  tableMeta,
+  rowIndex,
+  columnId,
+  rowHeight,
+  isFocused,
+  isEditing,
+  isSelected,
+  isSearchMatch,
+  isActiveSearchMatch,
+  readOnly,
+}: DataGridCellProps<TData>) {
+  const initialValue = cell.getValue() as string;
+  const [value, setValue] = React.useState(initialValue ?? "");
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const sideOffset = -(containerRef.current?.clientHeight ?? 0);
+
+  const prevInitialValueRef = React.useRef(initialValue);
+  if (initialValue !== prevInitialValueRef.current) {
+    prevInitialValueRef.current = initialValue;
+    setValue(initialValue ?? "");
+  }
+
+  const filteredCurrencies = React.useMemo(() => {
+    if (!searchQuery.trim()) {
+      return worldCurrencies;
+    }
+    const query = searchQuery.toLowerCase();
+    return worldCurrencies.filter(
+      (currency) =>
+        currency.value.toLowerCase().includes(query) || currency.label.toLowerCase().includes(query),
+    );
+  }, [searchQuery]);
+
+  const handleSelect = React.useCallback(
+    (currencyValue: string) => {
+      setValue(currencyValue);
+      tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: currencyValue });
+      setSearchQuery("");
+      tableMeta?.onCellEditingStop?.();
+    },
+    [tableMeta, rowIndex, columnId],
+  );
+
+  const onOpenChange = React.useCallback(
+    (isOpen: boolean) => {
+      if (isOpen && !readOnly) {
+        tableMeta?.onCellEditingStart?.(rowIndex, columnId);
+      } else {
+        setSearchQuery("");
+        tableMeta?.onCellEditingStop?.();
+      }
+    },
+    [tableMeta, rowIndex, columnId, readOnly],
+  );
+
+  const onOpenAutoFocus: NonNullable<React.ComponentProps<typeof PopoverContent>["onOpenAutoFocus"]> =
+    React.useCallback((event) => {
+      event.preventDefault();
+      inputRef.current?.focus();
+    }, []);
+
+  const onWrapperKeyDown = React.useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (isEditing && event.key === "Escape") {
+        event.preventDefault();
+        setValue(initialValue ?? "");
+        setSearchQuery("");
+        tableMeta?.onCellEditingStop?.();
+      } else if (!isEditing && isFocused && event.key === "Tab") {
+        event.preventDefault();
+        tableMeta?.onCellEditingStop?.({
+          direction: event.shiftKey ? "left" : "right",
+        });
+      }
+    },
+    [isEditing, isFocused, initialValue, tableMeta],
+  );
+
+  const onInputKeyDown = React.useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setValue(initialValue ?? "");
+        setSearchQuery("");
+        tableMeta?.onCellEditingStop?.();
+      } else if (event.key === "Tab") {
+        event.preventDefault();
+        setSearchQuery("");
+        tableMeta?.onCellEditingStop?.({
+          direction: event.shiftKey ? "left" : "right",
+        });
+      }
+    },
+    [initialValue, tableMeta],
+  );
+
+  return (
+    <DataGridCellWrapper<TData>
+      ref={containerRef}
+      cell={cell}
+      tableMeta={tableMeta}
+      rowIndex={rowIndex}
+      columnId={columnId}
+      rowHeight={rowHeight}
+      isEditing={isEditing}
+      isFocused={isFocused}
+      isSelected={isSelected}
+      isSearchMatch={isSearchMatch}
+      isActiveSearchMatch={isActiveSearchMatch}
+      readOnly={readOnly}
+      onKeyDown={onWrapperKeyDown}
+    >
+      <Popover open={isEditing} onOpenChange={onOpenChange}>
+        <PopoverAnchor asChild>
+          <span data-slot="grid-cell-content" className={cn(!value && "text-muted-foreground")}>
+            {value || "Currency"}
+          </span>
+        </PopoverAnchor>
+        {isEditing && (
+          <PopoverContent
+            data-grid-cell-editor=""
+            align="start"
+            sideOffset={sideOffset}
+            className="w-[280px] rounded-none p-0"
+            onOpenAutoFocus={onOpenAutoFocus}
+          >
+            <Command shouldFilter={false}>
+              <CommandInput
+                ref={inputRef}
+                placeholder="Search currency..."
+                value={searchQuery}
+                onValueChange={setSearchQuery}
+                onKeyDown={onInputKeyDown}
+              />
+              <CommandList>
+                <CommandEmpty>No currency found.</CommandEmpty>
+                <CommandGroup className="max-h-[300px] overflow-y-auto">
+                  {filteredCurrencies.map((currency) => (
+                    <CommandItem
+                      key={currency.value}
+                      value={currency.value}
+                      onSelect={() => handleSelect(currency.value)}
+                      className="flex items-center justify-between"
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-mono text-xs font-semibold">{currency.value}</span>
+                        <span className="text-muted-foreground text-xs">{currency.label}</span>
+                      </div>
+                      {value === currency.value && <Check className="size-4" />}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
               </CommandList>
             </Command>
           </PopoverContent>

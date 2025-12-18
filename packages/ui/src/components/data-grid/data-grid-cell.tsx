@@ -4,6 +4,7 @@ import * as React from "react";
 
 import {
   CheckboxCell,
+  CurrencyCell,
   DateCell,
   FileCell,
   LongTextCell,
@@ -90,6 +91,9 @@ function DataGridCellImpl<TData>({
       break;
     case "symbol":
       Comp = SymbolCell;
+      break;
+    case "currency":
+      Comp = CurrencyCell;
       break;
 
     default:

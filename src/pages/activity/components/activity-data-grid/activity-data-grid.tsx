@@ -164,7 +164,6 @@ export function ActivityDataGrid({
   // Column definitions
   const columns = useActivityColumns({
     accounts,
-    localTransactions,
     onEditActivity,
     onDuplicate: handleDuplicate,
     onDelete: handleDelete,
