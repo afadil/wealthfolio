@@ -93,6 +93,7 @@ export interface ActivityCreate {
   fee?: number;
   isDraft: boolean;
   comment?: string | null;
+  fxRate?: number | null;
 }
 
 export type ActivityUpdate = ActivityCreate & { id: string };

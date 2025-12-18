@@ -332,8 +332,7 @@ impl PerformanceService {
         start_date_opt: Option<NaiveDate>,
         end_date_opt: Option<NaiveDate>,
     ) -> Result<PerformanceMetrics> {
-        let effective_end_date =
-            end_date_opt.unwrap_or_else(|| chrono::Local::now().naive_local().date());
+        let effective_end_date = end_date_opt.unwrap_or_else(|| chrono::Utc::now().date_naive());
         let effective_start_date =
             start_date_opt.unwrap_or_else(|| effective_end_date - chrono::Duration::days(365));
 

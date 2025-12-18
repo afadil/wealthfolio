@@ -355,11 +355,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
                         new_activity.validate()?;
                         let temp_id = new_activity.id.clone();
                         let mut activity_db: ActivityDB = new_activity.into();
-                        let generated_id = if activity_db.id.is_empty() {
-                            Uuid::new_v4().to_string()
-                        } else {
-                            activity_db.id.clone()
-                        };
+                        // Always generate a new UUID for created activities
+                        let generated_id = Uuid::new_v4().to_string();
                         activity_db.id = generated_id.clone();
                         let inserted_activity = diesel::insert_into(activities::table)
                             .values(&activity_db)

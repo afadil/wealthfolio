@@ -142,19 +142,46 @@ export const CommonFields = ({ accounts }: { accounts: AccountSelectOption[] }) 
         )}
       />
       {showCurrency && (
-        <FormField
-          control={control}
-          name="currency"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Activity Currency</FormLabel>
-              <FormControl>
-                <CurrencyInput {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <>
+          <FormField
+            control={control}
+            name="currency"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Activity Currency</FormLabel>
+                <FormControl>
+                  <CurrencyInput {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={control}
+            name="fxRate"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>FX Rate (optional)</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    step="any"
+                    min="0"
+                    placeholder="Exchange rate to account currency"
+                    {...field}
+                    value={field.value ?? ""}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      field.onChange(value === "" ? null : parseFloat(value));
+                    }}
+                    aria-label="FX Rate"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </>
       )}
       <FormField
         control={control}
