@@ -6,7 +6,7 @@ use crate::assets::AssetRepositoryTrait;
 use crate::constants::{DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
 use crate::errors::{CalculatorError, Error, Result};
 use crate::fx::fx_traits::FxServiceTrait;
-use crate::portfolio::snapshot::{AccountStateSnapshot, Lot, Position};
+use crate::portfolio::snapshot::{AccountStateSnapshot, HoldingsCalculationWarning, Lot, Position};
 use crate::utils::time_utils::get_days_between;
 
 use async_trait::async_trait;
@@ -193,7 +193,7 @@ impl SnapshotService {
             return Ok(0);
         }
 
-        let (_final_holdings_states, keyframes_to_save) = self.calculate_daily_holdings_snapshots(
+        let (_final_holdings_states, keyframes_to_save, calculation_warnings) = self.calculate_daily_holdings_snapshots(
             &accounts_needing_calculation,
             &activities_by_account_date,
             &start_keyframes,
@@ -201,6 +201,17 @@ impl SnapshotService {
             calculation_min_date,
             calculation_end_date,
         )?;
+
+        // Log detailed warnings for any activities that couldn't be processed
+        if !calculation_warnings.is_empty() {
+            error!(
+                "Holdings snapshot calculation completed with {} activity warning(s):",
+                calculation_warnings.len()
+            );
+            for warning in &calculation_warnings {
+                error!("  - {}", warning);
+            }
+        }
 
         // Step 8: Persist keyframe snapshots using the new clear method
         for acc_id in accounts_needing_calculation.keys() {
@@ -484,6 +495,7 @@ impl SnapshotService {
 
     // --- Step 7: Calculate daily holdings snapshots (in memory) and identify keyframes ---
     // Iterates through dates and calculates holdings for each account needing processing (incl. TOTAL).
+    // Returns (final_states, keyframes, warnings) - warnings contain info about activities that couldn't be processed.
     fn calculate_daily_holdings_snapshots(
         &self,
         accounts_needing_calculation: &AccountsMap, // Actual accounts to process
@@ -495,9 +507,11 @@ impl SnapshotService {
     ) -> Result<(
         HashMap<String, AccountStateSnapshot>, // Final states
         Vec<AccountStateSnapshot>,             // Keyframes to save
+        Vec<HoldingsCalculationWarning>,       // Warnings for activities that couldn't be processed
     )> {
         let mut current_holdings_snapshots = start_keyframes.clone();
         let mut keyframes_to_save: Vec<AccountStateSnapshot> = Vec::new();
+        let mut all_warnings: Vec<HoldingsCalculationWarning> = Vec::new();
         let date_range = get_days_between(calculation_min_date, calculation_end_date);
 
         for current_date in date_range {
@@ -562,9 +576,21 @@ impl SnapshotService {
                         &activities_today, // Pass the already fetched activities
                         current_date,
                     ) {
-                        Ok(calculated_snapshot) => {
+                        Ok(calc_result) => {
+                            // Collect any warnings from activity processing
+                            if calc_result.has_warnings() {
+                                for warning in &calc_result.warnings {
+                                    warn!(
+                                        "Holdings calculation warning for account {} on {}: {}",
+                                        account_id, current_date, warning
+                                    );
+                                }
+                                all_warnings.extend(calc_result.warnings);
+                            }
+
                             // Calculator provides the new state, including updated calculated_at
-                            current_holdings_snapshot = calculated_snapshot;
+                            current_holdings_snapshot = calc_result.snapshot;
+
                             debug!(
                                 "Holdings calculated successfully for account {} on {}",
                                 account_id, current_date
@@ -613,8 +639,16 @@ impl SnapshotService {
             keyframes_to_save.extend(keyframes_today);
         }
 
-        // Return the final holdings states and the identified keyframes
-        Ok((current_holdings_snapshots, keyframes_to_save))
+        // Log summary of warnings if any occurred
+        if !all_warnings.is_empty() {
+            warn!(
+                "Holdings calculation completed with {} warning(s) for activities that could not be processed",
+                all_warnings.len()
+            );
+        }
+
+        // Return the final holdings states, keyframes, and any warnings
+        Ok((current_holdings_snapshots, keyframes_to_save, all_warnings))
     }
 
     // Renamed and refined from the previous aggregate_total_portfolio_snapshot

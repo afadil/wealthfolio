@@ -421,7 +421,7 @@ mod tests {
         let result =
             calculator.calculate_next_holdings(&previous_snapshot, &activities_today, target_date);
         assert!(result.is_ok());
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         // Check position - amounts should be converted from CAD to USD
         assert_eq!(next_state.positions.len(), 1);
@@ -515,7 +515,7 @@ mod tests {
         let result =
             calculator.calculate_next_holdings(&previous_snapshot, &activities_today, target_date);
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         // Check position
         assert_eq!(next_state.positions.len(), 1);
@@ -578,7 +578,7 @@ mod tests {
         let result =
             calculator.calculate_next_holdings(&previous_snapshot, &activities_today, target_date);
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         // Check position (cost basis should be in asset's currency - USD)
         assert_eq!(next_state.positions.len(), 1);
@@ -652,7 +652,7 @@ mod tests {
         let result =
             calculator.calculate_next_holdings(&previous_snapshot, &activities_today, target_date);
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         // Check cash balance (in account currency - CAD)
         // Deposit amount in USD: 100 USD
@@ -724,7 +724,7 @@ mod tests {
         let result =
             calculator.calculate_next_holdings(&previous_snapshot, &activities_today, target_date);
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         // Check cash balance (in account currency - CAD)
         // Withdrawal amount in USD: 50 USD
@@ -806,7 +806,7 @@ mod tests {
         let result =
             calculator.calculate_next_holdings(&previous_snapshot, &activities_today, target_date);
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         // Check cash balance (in account currency - CAD)
         // Initial cash: 1000 CAD
@@ -889,7 +889,7 @@ mod tests {
         let result =
             calculator.calculate_next_holdings(&previous_snapshot, &activities_today, target_date);
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         // Check cash balance (in account currency - CAD)
         // Initial cash: 1000 CAD
@@ -969,7 +969,7 @@ mod tests {
             "AddHolding calculation failed: {:?}",
             result_add.err()
         );
-        let state_after_add = result_add.unwrap();
+        let state_after_add = result_add.unwrap().snapshot;
 
         // Check position after AddHolding (cost basis in USD)
         let position_tsla = state_after_add.positions.get("TSLA").unwrap();
@@ -1031,7 +1031,7 @@ mod tests {
             "RemoveHolding calculation failed: {:?}",
             result_remove.err()
         );
-        let state_after_remove = result_remove.unwrap();
+        let state_after_remove = result_remove.unwrap().snapshot;
 
         // Check position after RemoveHolding (cost basis in USD)
         let position_tsla_after_remove = state_after_remove.positions.get("TSLA").unwrap();
@@ -1126,7 +1126,7 @@ mod tests {
             "Asset TransferIn failed: {:?}",
             result_asset_tx_in.err()
         );
-        let state_after_asset_tx_in = result_asset_tx_in.unwrap();
+        let state_after_asset_tx_in = result_asset_tx_in.unwrap().snapshot;
 
         // Position checks (USD)
         let position_testusd = state_after_asset_tx_in.positions.get("TESTUSD").unwrap();
@@ -1180,7 +1180,7 @@ mod tests {
             "Asset TransferOut failed: {:?}",
             result_asset_tx_out.err()
         );
-        let state_after_asset_tx_out = result_asset_tx_out.unwrap();
+        let state_after_asset_tx_out = result_asset_tx_out.unwrap().snapshot;
 
         // Position checks (USD)
         let position_testusd_after_out = state_after_asset_tx_out.positions.get("TESTUSD").unwrap();
@@ -1235,7 +1235,7 @@ mod tests {
             "Cash TransferIn failed: {:?}",
             result_cash_tx_in.err()
         );
-        let state_after_cash_tx_in = result_cash_tx_in.unwrap();
+        let state_after_cash_tx_in = result_cash_tx_in.unwrap().snapshot;
 
         // Cash checks (CAD)
         let net_cash_in_usd = transfer_in_cash_activity.unit_price - transfer_in_cash_activity.fee; // 1000 - 8 = 992 USD
@@ -1282,7 +1282,7 @@ mod tests {
             "Cash TransferOut failed: {:?}",
             result_cash_tx_out.err()
         );
-        let state_after_cash_tx_out = result_cash_tx_out.unwrap();
+        let state_after_cash_tx_out = result_cash_tx_out.unwrap().snapshot;
 
         // Cash checks (CAD)
         let total_cash_out_usd =
@@ -1362,7 +1362,7 @@ mod tests {
         let result =
             calculator.calculate_next_holdings(&previous_snapshot, &activities_today, target_date);
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         // --- Check Position (MSFT in USD) ---
         // Bought 20 @ 300 USD (cost basis 300*20+10 = 6010 USD, avg 300.5 USD)
@@ -1458,7 +1458,7 @@ mod tests {
             "Calculation should still succeed with FX fallback: {:?}",
             result.err()
         );
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         // --- Check Position (ADS.DE in EUR) ---
         // Position cost basis is always in asset's currency (EUR)
@@ -1581,7 +1581,7 @@ mod tests {
         let result =
             calculator.calculate_next_holdings(&previous_snapshot, &activities_today, target_date);
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         // --- Assert Cash Balances ---
         // For an individual account snapshot produced by HoldingsCalculator, cash should be consolidated
@@ -1710,7 +1710,7 @@ mod tests {
             "First calculation failed: {:?}",
             result1.err()
         );
-        let snapshot_after_first = result1.unwrap();
+        let snapshot_after_first = result1.unwrap().snapshot;
 
         // Verify first buy created position in USD (AMZN's listing currency)
         assert_eq!(snapshot_after_first.positions.len(), 1);
@@ -1775,7 +1775,7 @@ mod tests {
             "Second calculation failed: {:?}",
             result2.err()
         );
-        let final_snapshot = result2.unwrap();
+        let final_snapshot = result2.unwrap().snapshot;
 
         // Verify the USD activity was added to the same USD position
         assert_eq!(
@@ -1920,7 +1920,7 @@ mod tests {
             "First calculation failed: {:?}",
             result1.err()
         );
-        let snapshot_after_first = result1.unwrap();
+        let snapshot_after_first = result1.unwrap().snapshot;
 
         // Verify first buy created position in USD (first currency used)
         assert_eq!(snapshot_after_first.positions.len(), 1);
@@ -1970,7 +1970,7 @@ mod tests {
             "Second calculation failed: {:?}",
             result2.err()
         );
-        let final_snapshot = result2.unwrap();
+        let final_snapshot = result2.unwrap().snapshot;
 
         // Verify the EUR activity was converted to USD and added to the same position
         let final_position = final_snapshot.positions.get("AMZN").unwrap();
@@ -2067,7 +2067,7 @@ mod tests {
         let result =
             calculator.calculate_next_holdings(&initial_snapshot, &activities, target_date);
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
-        let final_snapshot = result.unwrap();
+        let final_snapshot = result.unwrap().snapshot;
 
         // Verify position was created
         assert_eq!(final_snapshot.positions.len(), 1);
@@ -2238,7 +2238,7 @@ mod tests {
             calculator.calculate_next_holdings(&previous_snapshot, &activities, target_date);
 
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         // Position should be in USD (MSFT's listing currency)
         let position = next_state.positions.get("MSFT").unwrap();
@@ -2305,7 +2305,7 @@ mod tests {
             calculator.calculate_next_holdings(&previous_snapshot, &activities, target_date);
 
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         // Cash should be deducted using the FxService rate (1.30)
         let expected_cost_usd = dec!(10) * dec!(100) + dec!(5);
@@ -2357,7 +2357,7 @@ mod tests {
             calculator.calculate_next_holdings(&previous_snapshot, &activities, target_date);
 
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         // Cash should be deducted using the FxService rate (1.30) since fx_rate=0 is invalid
         let expected_cost_usd = dec!(10) * dec!(100) + dec!(5);
@@ -2413,7 +2413,7 @@ mod tests {
             calculator.calculate_next_holdings(&previous_snapshot, &activities, target_date);
 
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         // Deposit amount should be converted using activity's fx_rate (1.40)
         // $500 USD * 1.40 = 700 CAD
@@ -2513,7 +2513,7 @@ mod tests {
             calculator.calculate_next_holdings(&previous_snapshot, &activities, target_date);
 
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         // Proceeds should be converted using activity's fx_rate (1.38)
         // Proceeds in USD: (10 * 120) - 5 = 1195 USD
@@ -2564,7 +2564,7 @@ mod tests {
             calculator.calculate_next_holdings(&previous_snapshot, &activities, target_date);
 
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         // Cash should be deducted at 1:1 (no conversion)
         let expected_cost = dec!(10) * dec!(100) + dec!(5); // 1005 USD
@@ -2619,7 +2619,7 @@ mod tests {
             calculator.calculate_next_holdings(&previous_snapshot, &activities, target_date);
 
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         // Withdrawal should be converted using activity's fx_rate (1.42)
         // $200 USD * 1.42 = 284 CAD
@@ -2674,7 +2674,7 @@ mod tests {
             calculator.calculate_next_holdings(&previous_snapshot, &activities, target_date);
 
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         // Dividend should be converted using activity's fx_rate (1.33)
         // $50 USD * 1.33 = 66.50 CAD
@@ -2734,7 +2734,7 @@ mod tests {
             calculator.calculate_next_holdings(&previous_snapshot, &activities, target_date);
 
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         // Fee should be deducted using activity's fx_rate
         // Fee: $10 USD * 1.36 = 13.60 CAD
@@ -2812,7 +2812,7 @@ mod tests {
             result.err()
         );
 
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         // Position should exist and be in USD (AAPL's listing currency)
         let position = next_state
@@ -2875,7 +2875,7 @@ mod tests {
             result.err()
         );
 
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         let position = next_state
             .positions
@@ -2964,7 +2964,7 @@ mod tests {
             result.err()
         );
 
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         let position = next_state
             .positions
@@ -3081,7 +3081,7 @@ mod tests {
             result.err()
         );
 
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
         let position = next_state
             .positions
             .get("AAPL")
@@ -3141,7 +3141,7 @@ mod tests {
             result.err()
         );
 
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         // Position should exist and be in USD (AAPL's listing currency)
         let position = next_state
@@ -3209,7 +3209,7 @@ mod tests {
             result.err()
         );
 
-        let next_state = result.unwrap();
+        let next_state = result.unwrap().snapshot;
 
         let position = next_state
             .positions

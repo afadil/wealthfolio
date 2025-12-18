@@ -4,6 +4,8 @@ use crate::constants::CASH_ASSET_PREFIX;
 use crate::errors::{CalculatorError, Error, Result};
 use crate::fx::fx_traits::FxServiceTrait;
 use crate::portfolio::snapshot::AccountStateSnapshot;
+use crate::portfolio::snapshot::HoldingsCalculationResult;
+use crate::portfolio::snapshot::HoldingsCalculationWarning;
 use crate::portfolio::snapshot::Position;
 
 use chrono::{DateTime, NaiveDate, Utc};
@@ -36,12 +38,16 @@ impl HoldingsCalculator {
     /// Calculates the next day's holding state based on the previous state and today's activities.
     /// Returns a snapshot with updated positions, cash, cost basis, and net deposits,
     /// but with valuation fields (market value, base conversions, day gain) potentially stale or zeroed.
+    ///
+    /// The result includes both the calculated snapshot and any warnings for activities that
+    /// could not be processed. This allows callers to see which activities failed without
+    /// stopping the entire calculation.
     pub fn calculate_next_holdings(
         &self,
         previous_snapshot: &AccountStateSnapshot,
         activities_today: &[Activity], // Assumes these are for the *target* date and already split-adjusted
         target_date: NaiveDate,
-    ) -> Result<AccountStateSnapshot> {
+    ) -> Result<HoldingsCalculationResult> {
         debug!(
             "Calculating holdings for account {} on date {}",
             previous_snapshot.account_id, target_date
@@ -55,27 +61,36 @@ impl HoldingsCalculator {
         next_state.net_contribution_base = previous_snapshot.net_contribution_base;
 
         let account_currency = next_state.currency.clone();
+        let mut warnings: Vec<HoldingsCalculationWarning> = Vec::new();
 
         for activity in activities_today {
             if activity.activity_date.naive_utc().date() != target_date {
-                warn!(
-                    "Activity {} date {} does not match target snapshot date {}. Skipping.",
-                    activity.id,
-                    activity.activity_date.naive_utc().date(),
-                    target_date
-                );
+                let warning = HoldingsCalculationWarning {
+                    activity_id: activity.id.clone(),
+                    account_id: next_state.account_id.clone(),
+                    date: target_date,
+                    message: format!(
+                        "Activity date {} does not match target snapshot date {}. Skipped.",
+                        activity.activity_date.naive_utc().date(),
+                        target_date
+                    ),
+                };
+                warn!("{}", warning);
+                warnings.push(warning);
                 continue;
             }
             match self.process_single_activity(activity, &mut next_state, &account_currency) {
-                Ok(_) => {} // Log success if needed
+                Ok(_) => {} // Activity processed successfully
                 Err(e) => {
-                    // Using Error::Calculation which now directly wraps CalculatorError
-                    let calc_error = CalculatorError::Calculation(format!(
-                        "Error processing activity {} for account {} on date {}: {}",
-                        activity.id, next_state.account_id, target_date, e
-                    ));
-                    error!("{}", calc_error);
-                    // Decide whether to return Err(Error::Calculation(calc_error)) or continue
+                    let warning = HoldingsCalculationWarning {
+                        activity_id: activity.id.clone(),
+                        account_id: next_state.account_id.clone(),
+                        date: target_date,
+                        message: format!("Failed to process activity: {}", e),
+                    };
+                    error!("{}", warning);
+                    warnings.push(warning);
+                    // Continue processing other activities
                 }
             }
         }
@@ -125,7 +140,7 @@ impl HoldingsCalculator {
             target_date.format("%Y-%m-%d")
         );
 
-        Ok(next_state)
+        Ok(HoldingsCalculationResult::with_warnings(next_state, warnings))
     }
 
     /// Processes a single activity, updating positions, cash, and net_deposit.
