@@ -1,4 +1,5 @@
 import { toast } from "@/components/ui/use-toast";
+import { useSettingsContext } from "@/lib/settings-provider";
 import type { Account, ActivityBulkMutationRequest, ActivityDetails } from "@/lib/types";
 import { useAssets } from "@/pages/asset/hooks/use-assets";
 import type { SortingState, Updater } from "@tanstack/react-table";
@@ -70,19 +71,11 @@ export function ActivityDataGrid({
 
   const { saveActivitiesMutation } = useActivityMutations();
   const { assets } = useAssets();
+  const { settings } = useSettingsContext();
 
-  // Derived values
-  const fallbackCurrency = useMemo(() => {
-    const defaultAccount = accounts.find((account) => account.isDefault);
-    if (defaultAccount?.currency) {
-      return defaultAccount.currency;
-    }
-    const activeAccount = accounts.find((account) => account.isActive);
-    if (activeAccount?.currency) {
-      return activeAccount.currency;
-    }
-    return accounts[0]?.currency ?? "USD";
-  }, [accounts]);
+  // Derived values - use app base currency as the ultimate fallback
+  const baseCurrency = settings?.baseCurrency ?? "USD";
+  const fallbackCurrency = baseCurrency;
 
   const accountLookup = useMemo(
     () => new Map(accounts.map((account) => [account.id, account])),
