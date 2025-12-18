@@ -170,10 +170,15 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
     updated.assetSymbol = upper;
     updated.assetId = upper;
 
+    // Auto-fill currency: asset currency → account currency → base currency
     const assetKey = (updated.assetId ?? updated.assetSymbol ?? "").trim().toUpperCase();
     const assetCurrency = assetCurrencyLookup.get(assetKey);
     if (assetCurrency) {
       updated.currency = assetCurrency;
+    } else if (updated.accountCurrency) {
+      updated.currency = updated.accountCurrency;
+    } else {
+      updated.currency = fallbackCurrency;
     }
   } else if (field === "activityType") {
     updated.activityType = value as ActivityType;
@@ -185,7 +190,15 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
     if (account) {
       updated.accountName = account.name;
       updated.accountCurrency = account.currency;
-      updated.currency = account.currency;
+
+      // Auto-fill currency: asset currency → account currency → base currency
+      const assetKey = (updated.assetId ?? updated.assetSymbol ?? "").trim().toUpperCase();
+      const assetCurrency = assetCurrencyLookup.get(assetKey);
+      if (assetCurrency) {
+        updated.currency = assetCurrency;
+      } else {
+        updated.currency = account.currency;
+      }
     }
     applyCashDefaults(updated, resolveTransactionCurrency, fallbackCurrency);
     applySplitDefaults(updated);
@@ -205,7 +218,11 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
 }
 
 /**
- * Creates a currency resolution function for a given context
+ * Creates a currency resolution function for a given context.
+ * Resolution order:
+ * 1. Asset currency (from assetCurrencyLookup or $CASH- prefix)
+ * 2. Account currency (from transaction.accountCurrency)
+ * 3. App base currency (fallbackCurrency)
  */
 export function createCurrencyResolver(
   assetCurrencyLookup: Map<string, string>,
@@ -215,21 +232,28 @@ export function createCurrencyResolver(
     transaction: LocalTransaction,
     options: CurrencyResolutionOptions = { includeFallback: true },
   ): string | undefined => {
+    // If currency is already set on the transaction, use it
+    if (transaction.currency) {
+      return transaction.currency;
+    }
+
+    // 1. Try to get currency from the asset
     const assetKey = (transaction.assetId ?? transaction.assetSymbol ?? "").trim().toUpperCase();
     const isCashAsset = assetKey.startsWith("$CASH-");
     const cashCurrency = isCashAsset ? assetKey.replace("$CASH-", "") : undefined;
     const assetCurrency = cashCurrency ?? assetCurrencyLookup.get(assetKey);
-
-    if (transaction.currency) {
-      return transaction.currency;
-    }
 
     if (assetCurrency) {
       return assetCurrency;
     }
 
     if (options.includeFallback !== false) {
-      return transaction.accountCurrency || fallbackCurrency;
+      // 2. Fall back to account currency
+      if (transaction.accountCurrency) {
+        return transaction.accountCurrency;
+      }
+      // 3. Fall back to app base currency
+      return fallbackCurrency;
     }
 
     return undefined;
