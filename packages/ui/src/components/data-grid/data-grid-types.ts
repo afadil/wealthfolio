@@ -61,6 +61,9 @@ export type CellOpts =
       variant: "symbol";
       onSearch: (query: string) => Promise<SymbolSearchResult[]>;
       onSelect?: (symbol: string, result?: SymbolSearchResult) => void;
+    }
+  | {
+      variant: "currency";
     };
 
 export interface UpdateCell {

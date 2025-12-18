@@ -10,7 +10,6 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-  worldCurrencies,
 } from "@wealthfolio/ui";
 import { useCallback, useMemo } from "react";
 import { ActivityOperations } from "../activity-operations";
@@ -19,7 +18,6 @@ import type { LocalTransaction } from "./types";
 
 interface UseActivityColumnsOptions {
   accounts: Account[];
-  localTransactions: LocalTransaction[];
   onEditActivity: (activity: ActivityDetails) => void;
   onDuplicate: (activity: ActivityDetails) => void;
   onDelete: (activity: ActivityDetails) => void;
@@ -30,7 +28,6 @@ interface UseActivityColumnsOptions {
  */
 export function useActivityColumns({
   accounts,
-  localTransactions,
   onEditActivity,
   onDuplicate,
   onDelete,
@@ -53,26 +50,6 @@ export function useActivityColumns({
     [accounts],
   );
 
-  const currencyOptions = useMemo(() => {
-    const entries = new Set<string>();
-
-    // Add all world currencies
-    worldCurrencies.forEach(({ value }) => entries.add(value));
-
-    // Add account currencies
-    accounts.forEach((account) => {
-      if (account.currency) entries.add(account.currency);
-    });
-
-    // Add currencies from local transactions
-    localTransactions.forEach((transaction) => {
-      if (transaction.currency) entries.add(transaction.currency);
-    });
-
-    return Array.from(entries)
-      .sort()
-      .map((value) => ({ value, label: value }));
-  }, [accounts, localTransactions]);
 
   const handleSymbolSearch = useCallback(async (query: string): Promise<SymbolSearchResult[]> => {
     const results = await searchTicker(query);
@@ -160,7 +137,7 @@ export function useActivityColumns({
         size: 150,
         enablePinning: false,
         cell: ({ row }) => {
-          const type = row.original.activityType as ActivityType;
+          const type = row.original.activityType;
           return <ActivityTypeBadge type={type} className="text-xs font-normal" />;
         },
         meta: { cell: { variant: "select", options: activityTypeOptions } },
@@ -187,7 +164,7 @@ export function useActivityColumns({
       },
       {
         accessorKey: "unitPrice",
-        header: "Unit Price",
+        header: "Price",
         size: 120,
         enableSorting: false,
         meta: { cell: { variant: "number", step: 0.000001 } },
@@ -226,7 +203,7 @@ export function useActivityColumns({
         header: "Currency",
         size: 110,
         enableSorting: false,
-        meta: { cell: { variant: "select", options: currencyOptions } },
+        meta: { cell: { variant: "currency" } },
       },
       {
         accessorKey: "comment",
@@ -254,7 +231,6 @@ export function useActivityColumns({
     [
       accountOptions,
       activityTypeOptions,
-      currencyOptions,
       handleSymbolSearch,
       onDelete,
       onDuplicate,
