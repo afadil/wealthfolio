@@ -1,6 +1,15 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Icons, Page, PageContent, PageHeader, Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui";
+import {
+  Icons,
+  Page,
+  PageContent,
+  PageHeader,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@wealthfolio/ui";
 import React, { Suspense, useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import SpendingPage from "@/pages/spending/spending-page";
@@ -34,7 +43,8 @@ type CashflowTab = "spending" | "income" | "events";
 export default function CashflowPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get("tab") as CashflowTab | null;
-  const currentTab: CashflowTab = tabFromUrl === "income" ? "income" : tabFromUrl === "events" ? "events" : "spending";
+  const currentTab: CashflowTab =
+    tabFromUrl === "income" ? "income" : tabFromUrl === "events" ? "events" : "spending";
 
   // State to capture actions from child pages
   const [spendingActions, setSpendingActions] = useState<React.ReactNode>(null);

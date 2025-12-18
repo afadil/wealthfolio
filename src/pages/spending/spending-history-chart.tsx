@@ -1,9 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
 import { Icons } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
@@ -104,7 +100,16 @@ export function SpendingHistoryChart({
         previousSpending: Number(previousMonthlySpendingData[index]?.[1]) || 0,
       };
     });
-  }, [monthlySpendingData, previousMonthlySpendingData, byMonthByCategory, byMonthBySubcategory, allCategoryIds, allSubcategoryIds, hiddenCategories, hiddenSubcategories]);
+  }, [
+    monthlySpendingData,
+    previousMonthlySpendingData,
+    byMonthByCategory,
+    byMonthBySubcategory,
+    allCategoryIds,
+    allSubcategoryIds,
+    hiddenCategories,
+    hiddenSubcategories,
+  ]);
 
   const periodDescription =
     selectedPeriod === "TOTAL"
@@ -222,7 +227,7 @@ export function SpendingHistoryChart({
                             }
                           />
                           <div className="flex flex-1 items-center justify-between gap-2">
-                            <span className="text-muted-foreground text-xs md:text-sm truncate max-w-[120px]">
+                            <span className="text-muted-foreground max-w-[120px] truncate text-xs md:text-sm">
                               {displayName}
                             </span>
                             <span className="text-foreground font-mono text-xs font-medium tabular-nums md:text-sm">

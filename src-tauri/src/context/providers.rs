@@ -97,7 +97,11 @@ pub async fn initialize_context(
         asset_service.clone(),
         fx_service.clone(),
     ));
-    let goal_service = Arc::new(GoalService::new(goal_repo.clone()));
+    let goal_service = Arc::new(GoalService::new(
+        goal_repo.clone(),
+        account_repository.clone(),
+        valuation_repository.clone(),
+    ));
     let limits_service = Arc::new(ContributionLimitService::new(
         fx_service.clone(),
         limit_repository.clone(),

@@ -101,7 +101,13 @@ const editableFields: EditableField[] = [
   "description",
 ];
 
-type CategorizationStatus = "categorized" | "uncategorized" | "with-events" | "without-events" | "with-recurrence" | "without-recurrence";
+type CategorizationStatus =
+  | "categorized"
+  | "uncategorized"
+  | "with-events"
+  | "without-events"
+  | "with-recurrence"
+  | "without-recurrence";
 
 const CATEGORY_STATUS_VALUES = ["uncategorized", "categorized"] as const;
 const EVENT_STATUS_VALUES = ["with-events", "without-events"] as const;
@@ -165,8 +171,13 @@ export function CashImportEditStep({
   const [selectedSubCategoryIds, setSelectedSubCategoryIds] = useState<Set<string>>(new Set());
   const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
   const [selectedRecurrenceTypes, setSelectedRecurrenceTypes] = useState<Set<string>>(new Set());
-  const [selectedCategorizationStatuses, setSelectedCategorizationStatuses] = useState<Set<CategorizationStatus>>(new Set());
-  const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({ min: "", max: "" });
+  const [selectedCategorizationStatuses, setSelectedCategorizationStatuses] = useState<
+    Set<CategorizationStatus>
+  >(new Set());
+  const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({
+    min: "",
+    max: "",
+  });
   const [displayedTransactions, setDisplayedTransactions] = useState<CashImportRow[]>([]);
   const [pendingFilterChanges, setPendingFilterChanges] = useState(0);
   const [lastAppliedFilter, setLastAppliedFilter] = useState<{
@@ -222,7 +233,7 @@ export function CashImportEditStep({
 
   const categories = useMemo(
     () => [...expenseCategories, ...incomeCategories],
-    [expenseCategories, incomeCategories]
+    [expenseCategories, incomeCategories],
   );
 
   const { data: events = [] } = useQuery<Event[]>({
@@ -271,7 +282,7 @@ export function CashImportEditStep({
       ...expenseCategoryOptions,
       ...incomeCategoryOptions,
     ],
-    [expenseCategoryOptions, incomeCategoryOptions]
+    [expenseCategoryOptions, incomeCategoryOptions],
   );
 
   const categoryLookup = useMemo(
@@ -492,7 +503,9 @@ export function CashImportEditStep({
       }
 
       if (filters.subCategoryIds.size > 0) {
-        result = result.filter((t) => t.subCategoryId && filters.subCategoryIds.has(t.subCategoryId));
+        result = result.filter(
+          (t) => t.subCategoryId && filters.subCategoryIds.has(t.subCategoryId),
+        );
       }
 
       if (filters.eventIds.size > 0) {
@@ -821,7 +834,8 @@ export function CashImportEditStep({
             return {
               ...t,
               categoryId: result.categoryId || t.categoryId,
-              subCategoryId: result.subCategoryId || (result.categoryId ? undefined : t.subCategoryId),
+              subCategoryId:
+                result.subCategoryId || (result.categoryId ? undefined : t.subCategoryId),
               // Override activity type if the rule specifies one
               activityType: (result.activityType as ActivityType) || t.activityType,
               // Override recurrence if the rule specifies one
@@ -900,9 +914,7 @@ export function CashImportEditStep({
   const bulkAssignActivityType = useCallback(
     (activityType: ActivityType) => {
       setLocalTransactions((prev) =>
-        prev.map((t) =>
-          selectedIds.has(t.lineNumber) ? { ...t, activityType } : t,
-        ),
+        prev.map((t) => (selectedIds.has(t.lineNumber) ? { ...t, activityType } : t)),
       );
       setSelectedIds(new Set());
       setBulkActivityTypeModalOpen(false);
@@ -1144,27 +1156,31 @@ export function CashImportEditStep({
         <DataTableFacetedFilter
           title="Category"
           options={filterCategoryOptions}
-          selectedValues={new Set([
-            ...selectedCategoryIds,
-            ...Array.from(selectedCategorizationStatuses).filter((s) =>
-              CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number])
-            ),
-          ])}
+          selectedValues={
+            new Set([
+              ...selectedCategoryIds,
+              ...Array.from(selectedCategorizationStatuses).filter((s) =>
+                CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number]),
+              ),
+            ])
+          }
           onFilterChange={(values) => {
             const allValues = Array.from(values);
             const statusValues = allValues.filter((v) =>
-              CATEGORY_STATUS_VALUES.includes(v as (typeof CATEGORY_STATUS_VALUES)[number])
+              CATEGORY_STATUS_VALUES.includes(v as (typeof CATEGORY_STATUS_VALUES)[number]),
             ) as CategorizationStatus[];
             const newCategoryIds = allValues.filter(
-              (v) => !CATEGORY_STATUS_VALUES.includes(v as (typeof CATEGORY_STATUS_VALUES)[number])
+              (v) => !CATEGORY_STATUS_VALUES.includes(v as (typeof CATEGORY_STATUS_VALUES)[number]),
             );
 
             setSelectedCategoryIds(new Set(newCategoryIds));
 
             const eventStatuses = Array.from(selectedCategorizationStatuses).filter((s) =>
-              EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number])
+              EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number]),
             );
-            setSelectedCategorizationStatuses(new Set([...statusValues, ...eventStatuses] as CategorizationStatus[]));
+            setSelectedCategorizationStatuses(
+              new Set([...statusValues, ...eventStatuses] as CategorizationStatus[]),
+            );
 
             if (newCategoryIds.length === 0) {
               setSelectedSubCategoryIds(new Set());
@@ -1172,7 +1188,10 @@ export function CashImportEditStep({
               const validSubCategories = new Set<string>();
               selectedSubCategoryIds.forEach((subId) => {
                 categories.some((cat) => {
-                  if (newCategoryIds.includes(cat.id) && cat.children?.some((child) => child.id === subId)) {
+                  if (
+                    newCategoryIds.includes(cat.id) &&
+                    cat.children?.some((child) => child.id === subId)
+                  ) {
                     validSubCategories.add(subId);
                     return true;
                   }
@@ -1197,46 +1216,53 @@ export function CashImportEditStep({
         <DataTableFacetedFilter
           title="Event"
           options={filterEventOptions}
-          selectedValues={new Set([
-            ...selectedEventIds,
-            ...Array.from(selectedCategorizationStatuses).filter((s) =>
-              EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number])
-            ),
-          ])}
+          selectedValues={
+            new Set([
+              ...selectedEventIds,
+              ...Array.from(selectedCategorizationStatuses).filter((s) =>
+                EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number]),
+              ),
+            ])
+          }
           onFilterChange={(values) => {
             const allValues = Array.from(values);
             const statusValues = allValues.filter((v) =>
-              EVENT_STATUS_VALUES.includes(v as (typeof EVENT_STATUS_VALUES)[number])
+              EVENT_STATUS_VALUES.includes(v as (typeof EVENT_STATUS_VALUES)[number]),
             ) as CategorizationStatus[];
             const newEventIds = allValues.filter(
-              (v) => !EVENT_STATUS_VALUES.includes(v as (typeof EVENT_STATUS_VALUES)[number])
+              (v) => !EVENT_STATUS_VALUES.includes(v as (typeof EVENT_STATUS_VALUES)[number]),
             );
 
             setSelectedEventIds(new Set(newEventIds));
 
             const categoryStatuses = Array.from(selectedCategorizationStatuses).filter((s) =>
-              CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number])
+              CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number]),
             );
-            setSelectedCategorizationStatuses(new Set([...categoryStatuses, ...statusValues] as CategorizationStatus[]));
+            setSelectedCategorizationStatuses(
+              new Set([...categoryStatuses, ...statusValues] as CategorizationStatus[]),
+            );
           }}
         />
 
         <DataTableFacetedFilter
           title="Recurrence"
           options={filterRecurrenceOptions}
-          selectedValues={new Set([
-            ...selectedRecurrenceTypes,
-            ...Array.from(selectedCategorizationStatuses).filter((s) =>
-              RECURRENCE_STATUS_VALUES.includes(s as (typeof RECURRENCE_STATUS_VALUES)[number])
-            ),
-          ])}
+          selectedValues={
+            new Set([
+              ...selectedRecurrenceTypes,
+              ...Array.from(selectedCategorizationStatuses).filter((s) =>
+                RECURRENCE_STATUS_VALUES.includes(s as (typeof RECURRENCE_STATUS_VALUES)[number]),
+              ),
+            ])
+          }
           onFilterChange={(values) => {
             const allValues = Array.from(values);
             const statusValues = allValues.filter((v) =>
-              RECURRENCE_STATUS_VALUES.includes(v as (typeof RECURRENCE_STATUS_VALUES)[number])
+              RECURRENCE_STATUS_VALUES.includes(v as (typeof RECURRENCE_STATUS_VALUES)[number]),
             ) as CategorizationStatus[];
             const newRecurrenceTypes = allValues.filter(
-              (v) => !RECURRENCE_STATUS_VALUES.includes(v as (typeof RECURRENCE_STATUS_VALUES)[number])
+              (v) =>
+                !RECURRENCE_STATUS_VALUES.includes(v as (typeof RECURRENCE_STATUS_VALUES)[number]),
             );
 
             setSelectedRecurrenceTypes(new Set(newRecurrenceTypes));
@@ -1244,9 +1270,11 @@ export function CashImportEditStep({
             const otherStatuses = Array.from(selectedCategorizationStatuses).filter(
               (s) =>
                 CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number]) ||
-                EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number])
+                EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number]),
             );
-            setSelectedCategorizationStatuses(new Set([...otherStatuses, ...statusValues] as CategorizationStatus[]));
+            setSelectedCategorizationStatuses(
+              new Set([...otherStatuses, ...statusValues] as CategorizationStatus[]),
+            );
           }}
         />
 
@@ -1557,15 +1585,9 @@ export function CashImportEditStep({
         onClose={() => setManageCategoriesOpen(false)}
       />
 
-      <ManageRulesDialog
-        open={manageRulesOpen}
-        onClose={() => setManageRulesOpen(false)}
-      />
+      <ManageRulesDialog open={manageRulesOpen} onClose={() => setManageRulesOpen(false)} />
 
-      <ManageEventsDialog
-        open={manageEventsOpen}
-        onClose={() => setManageEventsOpen(false)}
-      />
+      <ManageEventsDialog open={manageEventsOpen} onClose={() => setManageEventsOpen(false)} />
     </div>
   );
 }
@@ -1775,9 +1797,7 @@ const ImportTransactionRow = memo(
             onFocus={() => handleFocus("recurrence")}
             onNavigate={onNavigate}
             isFocused={focusedField === "recurrence"}
-            renderValue={(value) =>
-              value ? value.charAt(0).toUpperCase() + value.slice(1) : ""
-            }
+            renderValue={(value) => (value ? value.charAt(0).toUpperCase() + value.slice(1) : "")}
             className="text-xs"
           />
         </TableCell>
@@ -1858,9 +1878,7 @@ function BulkActivityTypeAssignModal({
           <DialogTitle>
             Assign Type to {selectedCount} Transaction{selectedCount !== 1 ? "s" : ""}
           </DialogTitle>
-          <DialogDescription>
-            Select an activity type to assign.
-          </DialogDescription>
+          <DialogDescription>Select an activity type to assign.</DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-2 gap-2 py-4">
           {ACTIVITY_TYPE_OPTIONS.map((type) => {
@@ -1909,7 +1927,9 @@ function BulkCategoryAssignModal({
   const [selectedSub, setSelectedSub] = useState("");
 
   const isNoneSelected = selectedCat === NONE_CATEGORY_VALUE;
-  const selectedCategory = !isNoneSelected ? categories.find((c) => c.id === selectedCat) : undefined;
+  const selectedCategory = !isNoneSelected
+    ? categories.find((c) => c.id === selectedCat)
+    : undefined;
   const subCategories = selectedCategory?.children || [];
 
   const handleAssign = () => {
@@ -2098,9 +2118,7 @@ function BulkRecurrenceAssignModal({
           <DialogTitle>
             Assign Recurrence to {selectedCount} Transaction{selectedCount !== 1 ? "s" : ""}
           </DialogTitle>
-          <DialogDescription>
-            Select a recurrence type to assign.
-          </DialogDescription>
+          <DialogDescription>Select a recurrence type to assign.</DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-2 gap-2 py-4">
           {RECURRENCE_TYPE_OPTIONS.map((type) => {
@@ -2200,4 +2218,3 @@ function SelectParentCategoryModal({
     </Dialog>
   );
 }
-

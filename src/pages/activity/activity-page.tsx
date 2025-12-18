@@ -45,7 +45,10 @@ const ActivityPage = ({ renderActions }: ActivityPageProps) => {
   const [selectedActivityTypes, setSelectedActivityTypes] = useState<ActivityType[]>([]);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({ min: "", max: "" });
+  const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({
+    min: "",
+    max: "",
+  });
   const [viewMode, setViewMode] = usePersistentState<ActivityViewMode>(
     "activity-view-mode",
     "table",
@@ -88,7 +91,8 @@ const ActivityPage = ({ renderActions }: ActivityPageProps) => {
 
   // Filter to only show SECURITIES and CRYPTOCURRENCY accounts (investment accounts)
   const accounts = (accountsData ?? []).filter(
-    (acc) => acc.accountType === AccountType.SECURITIES || acc.accountType === AccountType.CRYPTOCURRENCY,
+    (acc) =>
+      acc.accountType === AccountType.SECURITIES || acc.accountType === AccountType.CRYPTOCURRENCY,
   );
 
   const { deleteActivityMutation, duplicateActivityMutation } = useActivityMutations();
@@ -202,123 +206,123 @@ const ActivityPage = ({ renderActions }: ActivityPageProps) => {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-hidden px-2 pt-2 pb-2 md:pb-4 lg:px-4 lg:pb-5">
-          {isMobileViewport ? (
-            <ActivityMobileControls
-              accounts={accounts}
-              searchQuery={searchInput}
-              onSearchQueryChange={handleSearchChange}
-              selectedAccountIds={selectedAccounts}
-              onAccountIdsChange={setSelectedAccounts}
-              selectedActivityTypes={selectedActivityTypes}
-              onActivityTypesChange={setSelectedActivityTypes}
-              isCompactView={isCompactView}
-              onCompactViewChange={setIsCompactView}
-            />
-          ) : (
-            <ActivityViewControls
-              accounts={accounts}
-              searchQuery={searchInput}
-              onSearchQueryChange={handleSearchChange}
-              selectedAccountIds={selectedAccounts}
-              onAccountIdsChange={setSelectedAccounts}
-              selectedActivityTypes={selectedActivityTypes}
-              onActivityTypesChange={setSelectedActivityTypes}
-              amountRange={amountRange}
-              onAmountRangeChange={setAmountRange}
-              viewMode={viewMode}
-              onViewModeChange={setViewMode}
-              totalFetched={totalFetched}
-              totalRowCount={totalRowCount}
-              isFetching={isFetching}
-            />
-          )}
-
-          {isMobileViewport ? (
-            <ActivityTableMobile
-              activities={flatData}
-              isCompactView={isCompactView}
-              handleEdit={handleEdit}
-              handleDelete={handleDelete}
-              onDuplicate={handleDuplicate}
-            />
-          ) : isDatagridView ? (
-            <ActivityDatagrid
-              accounts={accounts}
-              activities={flatData}
-              onRefetch={refetch}
-              onEditActivity={handleEdit}
-              sorting={sorting}
-              onSortingChange={setSorting}
-            />
-          ) : (
-            <ActivityTable
-              activities={flatData}
-              isLoading={isLoading}
-              sorting={sorting}
-              onSortingChange={setSorting}
-              handleEdit={handleEdit}
-              handleDelete={handleDelete}
-            />
-          )}
-
-          <ActivityPagination
-            hasMore={hasNextPage ?? false}
-            onLoadMore={fetchNextPage}
-            isFetching={isFetchingNextPage}
-            totalFetched={totalFetched}
-            totalCount={totalRowCount}
-          />
-
-        {isMobileViewport ? (
-          <MobileActivityForm
-            key={selectedActivity?.id ?? "new"}
-            accounts={
-              accounts
-                ?.filter((acc) => acc.isActive)
-                .map((account) => ({
-                  value: account.id,
-                  label: account.name,
-                  currency: account.currency,
-                })) ?? []
-            }
-            activity={selectedActivity}
-            open={showForm}
-            onClose={handleFormClose}
-          />
-        ) : (
-          <ActivityForm
-            accounts={
-              accounts
-                ?.filter((acc) => acc.isActive)
-                .map((account) => ({
-                  value: account.id,
-                  label: account.name,
-                  currency: account.currency,
-                })) || []
-            }
-            activity={selectedActivity}
-            open={showForm}
-            onClose={handleFormClose}
-          />
-        )}
-
-        <ActivityDeleteModal
-          isOpen={showDeleteAlert}
-          isDeleting={deleteActivityMutation.isPending}
-          onConfirm={handleDeleteConfirm}
-          onCancel={() => {
-            setShowDeleteAlert(false);
-            setSelectedActivity(undefined);
-          }}
+      {isMobileViewport ? (
+        <ActivityMobileControls
+          accounts={accounts}
+          searchQuery={searchInput}
+          onSearchQueryChange={handleSearchChange}
+          selectedAccountIds={selectedAccounts}
+          onAccountIdsChange={setSelectedAccounts}
+          selectedActivityTypes={selectedActivityTypes}
+          onActivityTypesChange={setSelectedActivityTypes}
+          isCompactView={isCompactView}
+          onCompactViewChange={setIsCompactView}
         />
-
-        <BulkHoldingsModal
-          open={showBulkHoldingsForm}
-          onClose={() => setShowBulkHoldingsForm(false)}
-          onSuccess={() => {
-            setShowBulkHoldingsForm(false);
-          }}
+      ) : (
+        <ActivityViewControls
+          accounts={accounts}
+          searchQuery={searchInput}
+          onSearchQueryChange={handleSearchChange}
+          selectedAccountIds={selectedAccounts}
+          onAccountIdsChange={setSelectedAccounts}
+          selectedActivityTypes={selectedActivityTypes}
+          onActivityTypesChange={setSelectedActivityTypes}
+          amountRange={amountRange}
+          onAmountRangeChange={setAmountRange}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          totalFetched={totalFetched}
+          totalRowCount={totalRowCount}
+          isFetching={isFetching}
         />
+      )}
+
+      {isMobileViewport ? (
+        <ActivityTableMobile
+          activities={flatData}
+          isCompactView={isCompactView}
+          handleEdit={handleEdit}
+          handleDelete={handleDelete}
+          onDuplicate={handleDuplicate}
+        />
+      ) : isDatagridView ? (
+        <ActivityDatagrid
+          accounts={accounts}
+          activities={flatData}
+          onRefetch={refetch}
+          onEditActivity={handleEdit}
+          sorting={sorting}
+          onSortingChange={setSorting}
+        />
+      ) : (
+        <ActivityTable
+          activities={flatData}
+          isLoading={isLoading}
+          sorting={sorting}
+          onSortingChange={setSorting}
+          handleEdit={handleEdit}
+          handleDelete={handleDelete}
+        />
+      )}
+
+      <ActivityPagination
+        hasMore={hasNextPage ?? false}
+        onLoadMore={fetchNextPage}
+        isFetching={isFetchingNextPage}
+        totalFetched={totalFetched}
+        totalCount={totalRowCount}
+      />
+
+      {isMobileViewport ? (
+        <MobileActivityForm
+          key={selectedActivity?.id ?? "new"}
+          accounts={
+            accounts
+              ?.filter((acc) => acc.isActive)
+              .map((account) => ({
+                value: account.id,
+                label: account.name,
+                currency: account.currency,
+              })) ?? []
+          }
+          activity={selectedActivity}
+          open={showForm}
+          onClose={handleFormClose}
+        />
+      ) : (
+        <ActivityForm
+          accounts={
+            accounts
+              ?.filter((acc) => acc.isActive)
+              .map((account) => ({
+                value: account.id,
+                label: account.name,
+                currency: account.currency,
+              })) || []
+          }
+          activity={selectedActivity}
+          open={showForm}
+          onClose={handleFormClose}
+        />
+      )}
+
+      <ActivityDeleteModal
+        isOpen={showDeleteAlert}
+        isDeleting={deleteActivityMutation.isPending}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => {
+          setShowDeleteAlert(false);
+          setSelectedActivity(undefined);
+        }}
+      />
+
+      <BulkHoldingsModal
+        open={showBulkHoldingsForm}
+        onClose={() => setShowBulkHoldingsForm(false)}
+        onSuccess={() => {
+          setShowBulkHoldingsForm(false);
+        }}
+      />
     </div>
   );
 };

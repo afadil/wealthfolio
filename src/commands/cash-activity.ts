@@ -1,9 +1,4 @@
-import {
-  Activity,
-  ActivityCreate,
-  ActivitySearchResponse,
-  ActivityUpdate,
-} from "@/lib/types";
+import { Activity, ActivityCreate, ActivitySearchResponse, ActivityUpdate } from "@/lib/types";
 import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb, logger } from "@/adapters";
 
 // Cash-specific activity types
@@ -164,7 +159,6 @@ export const createTransfer = async (
   transfer: NewTransfer,
 ): Promise<{ sourceActivity: Activity; destinationActivity: Activity }> => {
   try {
-
     // Create TRANSFER_OUT on source account (negative)
     const sourceActivity: ActivityCreate = {
       accountId: transfer.sourceAccountId,

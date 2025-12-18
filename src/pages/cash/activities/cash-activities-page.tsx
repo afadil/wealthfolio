@@ -15,7 +15,11 @@ import {
   Icons,
 } from "@wealthfolio/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CashActivityFilters, CashActivityViewMode, CategorizationStatus } from "./components/cash-activity-filters";
+import {
+  CashActivityFilters,
+  CashActivityViewMode,
+  CategorizationStatus,
+} from "./components/cash-activity-filters";
 import type { RecurrenceType } from "@/lib/types";
 import { CashActivityForm } from "./components/cash-activity-form";
 import { CashActivityTable } from "./components/cash-activity-table";
@@ -47,18 +51,23 @@ function CashActivitiesPage({ renderActions }: CashActivitiesPageProps) {
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [selectedActivityTypes, setSelectedActivityTypes] = useState<CashActivityType[]>([]);
   const [selectedParentCategoryIds, setSelectedParentCategoryIds] = useState<string[]>(
-    urlCategoryId ? [urlCategoryId] : []
+    urlCategoryId ? [urlCategoryId] : [],
   );
   const [selectedSubCategoryIds, setSelectedSubCategoryIds] = useState<string[]>(
-    urlSubcategoryId ? [urlSubcategoryId] : []
+    urlSubcategoryId ? [urlSubcategoryId] : [],
   );
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>(
-    urlEventId ? [urlEventId] : []
+    urlEventId ? [urlEventId] : [],
   );
   const [selectedRecurrenceTypes, setSelectedRecurrenceTypes] = useState<RecurrenceType[]>([]);
-  const [selectedCategorizationStatuses, setSelectedCategorizationStatuses] = useState<CategorizationStatus[]>([]);
+  const [selectedCategorizationStatuses, setSelectedCategorizationStatuses] = useState<
+    CategorizationStatus[]
+  >([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({ min: "", max: "" });
+  const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({
+    min: "",
+    max: "",
+  });
   const [dateRange, setDateRange] = useState<{ startDate?: string; endDate?: string }>({
     startDate: urlStartDate ?? undefined,
     endDate: urlEndDate ?? undefined,
@@ -151,9 +160,8 @@ function CashActivitiesPage({ renderActions }: CashActivitiesPageProps) {
     filters: {
       accountIds: selectedAccounts,
       activityTypes: selectedActivityTypes,
-      categoryIds: selectedSubCategoryIds.length > 0
-        ? selectedSubCategoryIds
-        : selectedParentCategoryIds,
+      categoryIds:
+        selectedSubCategoryIds.length > 0 ? selectedSubCategoryIds : selectedParentCategoryIds,
       eventIds: selectedEventIds,
       recurrenceTypes: selectedRecurrenceTypes,
       search: searchQuery,
@@ -258,85 +266,85 @@ function CashActivitiesPage({ renderActions }: CashActivitiesPageProps) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-hidden px-2 pt-2 pb-2 lg:px-4 lg:pb-4">
-          <CashActivityFilters
-            accounts={accounts}
-            searchQuery={searchQuery}
-            onSearchQueryChange={setSearchQuery}
-            selectedAccountIds={selectedAccounts}
-            onAccountIdsChange={setSelectedAccounts}
-            selectedActivityTypes={selectedActivityTypes}
-            onActivityTypesChange={setSelectedActivityTypes}
-            selectedParentCategoryIds={selectedParentCategoryIds}
-            onParentCategoryIdsChange={setSelectedParentCategoryIds}
-            selectedSubCategoryIds={selectedSubCategoryIds}
-            onSubCategoryIdsChange={setSelectedSubCategoryIds}
-            selectedEventIds={selectedEventIds}
-            onEventIdsChange={setSelectedEventIds}
-            selectedRecurrenceTypes={selectedRecurrenceTypes}
-            onRecurrenceTypesChange={setSelectedRecurrenceTypes}
-            selectedCategorizationStatuses={selectedCategorizationStatuses}
-            onCategorizationStatusesChange={setSelectedCategorizationStatuses}
-            amountRange={amountRange}
-            onAmountRangeChange={setAmountRange}
-            dateRange={dateRange}
-            onDateRangeChange={setDateRange}
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
-            totalFetched={totalFetched}
-            totalRowCount={totalRowCount}
-            isFetching={isFetching}
-          />
+      <CashActivityFilters
+        accounts={accounts}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        selectedAccountIds={selectedAccounts}
+        onAccountIdsChange={setSelectedAccounts}
+        selectedActivityTypes={selectedActivityTypes}
+        onActivityTypesChange={setSelectedActivityTypes}
+        selectedParentCategoryIds={selectedParentCategoryIds}
+        onParentCategoryIdsChange={setSelectedParentCategoryIds}
+        selectedSubCategoryIds={selectedSubCategoryIds}
+        onSubCategoryIdsChange={setSelectedSubCategoryIds}
+        selectedEventIds={selectedEventIds}
+        onEventIdsChange={setSelectedEventIds}
+        selectedRecurrenceTypes={selectedRecurrenceTypes}
+        onRecurrenceTypesChange={setSelectedRecurrenceTypes}
+        selectedCategorizationStatuses={selectedCategorizationStatuses}
+        onCategorizationStatusesChange={setSelectedCategorizationStatuses}
+        amountRange={amountRange}
+        onAmountRangeChange={setAmountRange}
+        dateRange={dateRange}
+        onDateRangeChange={setDateRange}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        totalFetched={totalFetched}
+        totalRowCount={totalRowCount}
+        isFetching={isFetching}
+      />
 
-          {viewMode === "edit" ? (
-            <CashActivityDatagrid
-              accounts={cashAccounts}
-              activities={flatData}
-              onRefetch={refetch}
-              onEditActivity={handleEdit}
-            />
-          ) : (
-            <CashActivityTable
-              activities={flatData}
-              isLoading={isLoading}
-              sorting={sorting}
-              onSortingChange={setSorting}
-              handleEdit={handleEdit}
-              handleDelete={handleDelete}
-              handleDuplicate={handleDuplicate}
-            />
-          )}
-
-          <ActivityPagination
-            hasMore={hasNextPage ?? false}
-            onLoadMore={fetchNextPage}
-            isFetching={isFetchingNextPage}
-            totalFetched={totalFetched}
-            totalCount={totalRowCount}
-          />
-
-        <CashActivityForm
-          key={selectedActivity?.id ?? "new"}
-          accounts={cashAccounts.map((account) => ({
-            value: account.id,
-            label: account.name,
-            currency: account.currency,
-          }))}
-          activity={selectedActivity}
-          open={showForm}
-          onClose={handleFormClose}
+      {viewMode === "edit" ? (
+        <CashActivityDatagrid
+          accounts={cashAccounts}
+          activities={flatData}
+          onRefetch={refetch}
+          onEditActivity={handleEdit}
         />
-
-        <ActivityDeleteModal
-          isOpen={showDeleteAlert}
-          isDeleting={deleteCashActivityMutation.isPending}
-          onConfirm={handleDeleteConfirm}
-          onCancel={() => {
-            setShowDeleteAlert(false);
-            setSelectedActivity(undefined);
-          }}
+      ) : (
+        <CashActivityTable
+          activities={flatData}
+          isLoading={isLoading}
+          sorting={sorting}
+          onSortingChange={setSorting}
+          handleEdit={handleEdit}
+          handleDelete={handleDelete}
+          handleDuplicate={handleDuplicate}
         />
+      )}
+
+      <ActivityPagination
+        hasMore={hasNextPage ?? false}
+        onLoadMore={fetchNextPage}
+        isFetching={isFetchingNextPage}
+        totalFetched={totalFetched}
+        totalCount={totalRowCount}
+      />
+
+      <CashActivityForm
+        key={selectedActivity?.id ?? "new"}
+        accounts={cashAccounts.map((account) => ({
+          value: account.id,
+          label: account.name,
+          currency: account.currency,
+        }))}
+        activity={selectedActivity}
+        open={showForm}
+        onClose={handleFormClose}
+      />
+
+      <ActivityDeleteModal
+        isOpen={showDeleteAlert}
+        isDeleting={deleteCashActivityMutation.isPending}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => {
+          setShowDeleteAlert(false);
+          setSelectedActivity(undefined);
+        }}
+      />
     </div>
   );
-};
+}
 
 export default CashActivitiesPage;

@@ -11,7 +11,9 @@ import { QueryKeys } from "@/lib/query-keys";
 import { ActivityCreate, ActivityDetails, ActivityUpdate } from "@/lib/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-export function useCashActivityMutations(onSuccess?: (activity: { accountId?: string | null }) => void) {
+export function useCashActivityMutations(
+  onSuccess?: (activity: { accountId?: string | null }) => void,
+) {
   const queryClient = useQueryClient();
 
   const createMutationOptions = (action: string) => ({

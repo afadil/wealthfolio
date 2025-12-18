@@ -100,7 +100,10 @@ export const ImportPreviewTable = ({
     pageSize: 10,
   });
 
-  const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({ min: "", max: "" });
+  const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({
+    min: "",
+    max: "",
+  });
 
   // Client-side amount filtering
   const filteredActivities = useMemo(() => {
@@ -236,9 +239,7 @@ export const ImportPreviewTable = ({
                       type="number"
                       placeholder="Min"
                       value={amountRange.min}
-                      onChange={(e) =>
-                        setAmountRange((prev) => ({ ...prev, min: e.target.value }))
-                      }
+                      onChange={(e) => setAmountRange((prev) => ({ ...prev, min: e.target.value }))}
                       className="h-8"
                     />
                     <span className="text-muted-foreground text-sm">to</span>
@@ -246,9 +247,7 @@ export const ImportPreviewTable = ({
                       type="number"
                       placeholder="Max"
                       value={amountRange.max}
-                      onChange={(e) =>
-                        setAmountRange((prev) => ({ ...prev, max: e.target.value }))
-                      }
+                      onChange={(e) => setAmountRange((prev) => ({ ...prev, max: e.target.value }))}
                       className="h-8"
                     />
                   </div>

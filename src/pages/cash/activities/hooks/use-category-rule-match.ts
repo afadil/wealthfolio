@@ -33,41 +33,38 @@ export function useActivityRuleMatch({
   // Keep track of the latest request to avoid race conditions
   const latestRequestRef = useRef<string | null>(null);
 
-  const performMatch = useCallback(
-    async (searchName: string, searchAccountId?: string | null) => {
-      if (!searchName || searchName.trim().length === 0) {
+  const performMatch = useCallback(async (searchName: string, searchAccountId?: string | null) => {
+    if (!searchName || searchName.trim().length === 0) {
+      setMatch(null);
+      setIsAutoCategorized(false);
+      return;
+    }
+
+    const requestId = `${searchName}-${searchAccountId || ""}`;
+    latestRequestRef.current = requestId;
+
+    setIsLoading(true);
+    try {
+      const result = await applyActivityRules(searchName, searchAccountId);
+
+      // Only update if this is still the latest request
+      if (latestRequestRef.current === requestId) {
+        setMatch(result);
+        setIsAutoCategorized(result !== null);
+      }
+    } catch (error) {
+      // Only clear if this is still the latest request
+      if (latestRequestRef.current === requestId) {
         setMatch(null);
         setIsAutoCategorized(false);
-        return;
       }
-
-      const requestId = `${searchName}-${searchAccountId || ""}`;
-      latestRequestRef.current = requestId;
-
-      setIsLoading(true);
-      try {
-        const result = await applyActivityRules(searchName, searchAccountId);
-
-        // Only update if this is still the latest request
-        if (latestRequestRef.current === requestId) {
-          setMatch(result);
-          setIsAutoCategorized(result !== null);
-        }
-      } catch (error) {
-        // Only clear if this is still the latest request
-        if (latestRequestRef.current === requestId) {
-          setMatch(null);
-          setIsAutoCategorized(false);
-        }
-      } finally {
-        // Only update loading if this is still the latest request
-        if (latestRequestRef.current === requestId) {
-          setIsLoading(false);
-        }
+    } finally {
+      // Only update loading if this is still the latest request
+      if (latestRequestRef.current === requestId) {
+        setIsLoading(false);
       }
-    },
-    [],
-  );
+    }
+  }, []);
 
   // Create debounced version
   const debouncedMatch = useCallback(

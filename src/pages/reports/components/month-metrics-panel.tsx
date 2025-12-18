@@ -38,7 +38,7 @@ export function MonthMetricsPanel({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Transaction Metrics</CardTitle>
-          <Icons.BarChart className="h-4 w-4 text-muted-foreground" />
+          <Icons.BarChart className="text-muted-foreground h-4 w-4" />
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-3 gap-4">
@@ -65,10 +65,10 @@ export function MonthMetricsPanel({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Transaction Metrics</CardTitle>
-          <Icons.BarChart className="h-4 w-4 text-muted-foreground" />
+          <Icons.BarChart className="text-muted-foreground h-4 w-4" />
         </CardHeader>
         <CardContent className="flex h-[200px] items-center justify-center">
-          <p className="text-sm text-muted-foreground">No transaction data for this month</p>
+          <p className="text-muted-foreground text-sm">No transaction data for this month</p>
         </CardContent>
       </Card>
     );
@@ -76,7 +76,7 @@ export function MonthMetricsPanel({
 
   const renderChangeIndicator = (changePercent: number | null | undefined) => {
     if (changePercent === null || changePercent === undefined) {
-      return <span className="text-xs text-muted-foreground">-</span>;
+      return <span className="text-muted-foreground text-xs">-</span>;
     }
 
     // For spending metrics, increase is bad (destructive), decrease is good (success)
@@ -101,12 +101,12 @@ export function MonthMetricsPanel({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">Transaction Metrics</CardTitle>
-        <Icons.BarChart className="h-4 w-4 text-muted-foreground" />
+        <Icons.BarChart className="text-muted-foreground h-4 w-4" />
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-3 gap-4">
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Avg Transaction</p>
+            <p className="text-muted-foreground text-xs">Avg Transaction</p>
             <p className="text-lg font-semibold">
               <PrivacyAmount value={metrics.avgTransactionSize} currency={currency} />
             </p>
@@ -114,15 +114,13 @@ export function MonthMetricsPanel({
           </div>
 
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground"># of Transactions</p>
-            <p className="text-lg font-semibold">
-              {isHidden ? "••••" : metrics.transactionCount}
-            </p>
+            <p className="text-muted-foreground text-xs"># of Transactions</p>
+            <p className="text-lg font-semibold">{isHidden ? "••••" : metrics.transactionCount}</p>
             {renderChangeIndicator(metrics.prevMonth?.countChangePercent)}
           </div>
 
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Median</p>
+            <p className="text-muted-foreground text-xs">Median</p>
             <p className="text-lg font-semibold">
               <PrivacyAmount value={metrics.medianTransaction} currency={currency} />
             </p>
@@ -130,41 +128,61 @@ export function MonthMetricsPanel({
         </div>
 
         <div className="border-t pt-3">
-          <p className="text-xs font-medium text-muted-foreground mb-3">Recurrence Breakdown</p>
+          <p className="text-muted-foreground mb-3 text-xs font-medium">Recurrence Breakdown</p>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-0.5">
-              <p className="text-xs text-muted-foreground">Fixed</p>
+              <p className="text-muted-foreground text-xs">Fixed</p>
               <p className="text-sm font-medium">
                 {formatPercent((metrics.recurrenceBreakdown?.fixedPercent ?? 0) / 100)}{" "}
                 <span className="text-muted-foreground">
-                  (<PrivacyAmount value={metrics.recurrenceBreakdown?.fixedAmount ?? 0} currency={currency} />)
+                  (
+                  <PrivacyAmount
+                    value={metrics.recurrenceBreakdown?.fixedAmount ?? 0}
+                    currency={currency}
+                  />
+                  )
                 </span>
               </p>
             </div>
             <div className="space-y-0.5">
-              <p className="text-xs text-muted-foreground">Variable</p>
+              <p className="text-muted-foreground text-xs">Variable</p>
               <p className="text-sm font-medium">
                 {formatPercent((metrics.recurrenceBreakdown?.variablePercent ?? 0) / 100)}{" "}
                 <span className="text-muted-foreground">
-                  (<PrivacyAmount value={metrics.recurrenceBreakdown?.variableAmount ?? 0} currency={currency} />)
+                  (
+                  <PrivacyAmount
+                    value={metrics.recurrenceBreakdown?.variableAmount ?? 0}
+                    currency={currency}
+                  />
+                  )
                 </span>
               </p>
             </div>
             <div className="space-y-0.5">
-              <p className="text-xs text-muted-foreground">Periodic</p>
+              <p className="text-muted-foreground text-xs">Periodic</p>
               <p className="text-sm font-medium">
                 {formatPercent((metrics.recurrenceBreakdown?.periodicPercent ?? 0) / 100)}{" "}
                 <span className="text-muted-foreground">
-                  (<PrivacyAmount value={metrics.recurrenceBreakdown?.periodicAmount ?? 0} currency={currency} />)
+                  (
+                  <PrivacyAmount
+                    value={metrics.recurrenceBreakdown?.periodicAmount ?? 0}
+                    currency={currency}
+                  />
+                  )
                 </span>
               </p>
             </div>
             <div className="space-y-0.5">
-              <p className="text-xs text-muted-foreground">Non-recurring</p>
+              <p className="text-muted-foreground text-xs">Non-recurring</p>
               <p className="text-sm font-medium">
                 {formatPercent((metrics.recurrenceBreakdown?.nonRecurringPercent ?? 0) / 100)}{" "}
                 <span className="text-muted-foreground">
-                  (<PrivacyAmount value={metrics.recurrenceBreakdown?.nonRecurringAmount ?? 0} currency={currency} />)
+                  (
+                  <PrivacyAmount
+                    value={metrics.recurrenceBreakdown?.nonRecurringAmount ?? 0}
+                    currency={currency}
+                  />
+                  )
                 </span>
               </p>
             </div>
@@ -172,9 +190,9 @@ export function MonthMetricsPanel({
         </div>
 
         <div className="border-t pt-3">
-          <p className="text-xs font-medium text-muted-foreground mb-3">Top Expenses</p>
+          <p className="text-muted-foreground mb-3 text-xs font-medium">Top Expenses</p>
           {topTransactions.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">No expenses this month</p>
+            <p className="text-muted-foreground py-4 text-center text-sm">No expenses this month</p>
           ) : (
             <div className="space-y-2">
               {topTransactions.map((transaction) => (
@@ -182,23 +200,23 @@ export function MonthMetricsPanel({
                   key={transaction.id}
                   className="flex items-center justify-between rounded-lg border p-2"
                 >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
-                      <Icons.CreditCard className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex min-w-0 items-center gap-2">
+                    <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
+                      <Icons.CreditCard className="text-muted-foreground h-4 w-4" />
                     </div>
                     <div className="min-w-0">
-                      <p className="font-medium truncate text-sm">
+                      <p className="truncate text-sm font-medium">
                         {transaction.name || transaction.assetId}
                       </p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="text-muted-foreground flex items-center gap-2 text-xs">
                         <span>{transaction.categoryName || "Uncategorized"}</span>
                         <span>·</span>
                         <span>{format(transaction.date, "MMM d")}</span>
                       </div>
                     </div>
                   </div>
-                  <div className="shrink-0 ml-2">
-                    <span className="font-semibold text-destructive text-sm">
+                  <div className="ml-2 shrink-0">
+                    <span className="text-destructive text-sm font-semibold">
                       <PrivacyAmount value={transaction.amount} currency={currency} />
                     </span>
                   </div>
@@ -211,7 +229,7 @@ export function MonthMetricsPanel({
               startDate: format(startOfMonth(parseISO(selectedMonth + "-01")), "yyyy-MM-dd"),
               endDate: format(endOfMonth(parseISO(selectedMonth + "-01")), "yyyy-MM-dd"),
             }}
-            className="w-full gap-2 mt-3"
+            className="mt-3 w-full gap-2"
           />
         </div>
       </CardContent>

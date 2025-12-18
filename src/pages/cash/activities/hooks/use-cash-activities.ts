@@ -50,9 +50,13 @@ export function useCashActivities({
     return {
       accountIds: filters.accountIds.length > 0 ? filters.accountIds : undefined,
       activityTypes: filters.activityTypes.length > 0 ? filters.activityTypes : undefined,
-      categoryIds: filters.categoryIds && filters.categoryIds.length > 0 ? filters.categoryIds : undefined,
+      categoryIds:
+        filters.categoryIds && filters.categoryIds.length > 0 ? filters.categoryIds : undefined,
       eventIds: filters.eventIds && filters.eventIds.length > 0 ? filters.eventIds : undefined,
-      recurrenceTypes: filters.recurrenceTypes && filters.recurrenceTypes.length > 0 ? filters.recurrenceTypes : undefined,
+      recurrenceTypes:
+        filters.recurrenceTypes && filters.recurrenceTypes.length > 0
+          ? filters.recurrenceTypes
+          : undefined,
       search: filters.search,
       isCategorized: filters.isCategorized,
       hasEvent: filters.hasEvent,

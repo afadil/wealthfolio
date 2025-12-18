@@ -1,6 +1,15 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Icons, Page, PageContent, PageHeader, Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui";
+import {
+  Icons,
+  Page,
+  PageContent,
+  PageHeader,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@wealthfolio/ui";
 import { Suspense, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import HoldingsInsightsPage from "../holdings/holdings-insights-page";

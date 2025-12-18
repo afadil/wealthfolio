@@ -3,6 +3,10 @@ pub mod goals_repository;
 pub mod goals_service;
 pub mod goals_traits;
 
+pub use goals_model::{
+    AccountFreeCash, Goal, GoalContribution, GoalContributionWithStatus, GoalWithContributions,
+    NewGoal, NewGoalContribution,
+};
 pub use goals_repository::GoalRepository;
 pub use goals_service::GoalService;
 pub use goals_traits::{GoalRepositoryTrait, GoalServiceTrait};

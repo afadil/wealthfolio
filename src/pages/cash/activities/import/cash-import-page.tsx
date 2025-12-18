@@ -19,7 +19,10 @@ import { CashMappingStep } from "./steps/cash-mapping-step";
 import { CashImportEditStep } from "./steps/cash-import-edit-step";
 import { CashPreviewStep } from "./steps/cash-preview-step";
 import { CashResultStep } from "./steps/cash-result-step";
-import { parseCsvToCashImportRows, convertCashImportRowToActivity } from "./utils/cash-validation-utils";
+import {
+  parseCsvToCashImportRows,
+  convertCashImportRowToActivity,
+} from "./utils/cash-validation-utils";
 
 const STEPS = [
   { id: 1, title: "Select Account & File" },
@@ -72,11 +75,13 @@ function CashImportPage() {
   } = useCsvParser();
 
   // Track if user has unsaved import progress (past step 1 with data, but not on results step)
-  const hasUnsavedChanges = currentStep > 1 && currentStep < STEPS.length && (data.length > 0 || importRows.length > 0);
+  const hasUnsavedChanges =
+    currentStep > 1 && currentStep < STEPS.length && (data.length > 0 || importRows.length > 0);
 
   const { UnsavedChangesDialog } = useUnsavedChanges({
     hasUnsavedChanges,
-    message: "You have an import in progress. Are you sure you want to leave? Your import progress will be lost.",
+    message:
+      "You have an import in progress. Are you sure you want to leave? Your import progress will be lost.",
   });
 
   // Reset the entire import process
@@ -165,7 +170,12 @@ function CashImportPage() {
     if (!selectedAccount) return [];
 
     return importRows.map((row) =>
-      convertCashImportRowToActivity(row, selectedAccount.id, selectedAccount.currency, accountCurrencyMap),
+      convertCashImportRowToActivity(
+        row,
+        selectedAccount.id,
+        selectedAccount.currency,
+        accountCurrencyMap,
+      ),
     );
   };
 
@@ -266,7 +276,7 @@ function CashImportPage() {
       </PageContent>
     </Page>
   );
-};
+}
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }> {
   override state = { hasError: false, error: null };

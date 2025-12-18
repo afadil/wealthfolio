@@ -42,7 +42,14 @@ import {
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ActivityType, ActivityTypeNames } from "@/lib/constants";
-import type { Account, ActivityImport, CashImportRow, Category, CategoryWithChildren, Event } from "@/lib/types";
+import type {
+  Account,
+  ActivityImport,
+  CashImportRow,
+  Category,
+  CategoryWithChildren,
+  Event,
+} from "@/lib/types";
 import { cn, formatDateTime, toPascalCase } from "@/lib/utils";
 import { formatAmount } from "@wealthfolio/ui";
 import { motion } from "motion/react";
@@ -53,7 +60,10 @@ const hasFieldError = (activity: ActivityImport | CashImportRow, fieldName: stri
 };
 
 // Helper function to get error message for a field
-const getFieldErrorMessage = (activity: ActivityImport | CashImportRow, fieldName: string): string[] => {
+const getFieldErrorMessage = (
+  activity: ActivityImport | CashImportRow,
+  fieldName: string,
+): string[] => {
   if (activity.errors?.[fieldName]) {
     return activity.errors[fieldName];
   }
@@ -175,7 +185,10 @@ export const CashImportPreviewTable = ({
     pageSize: 10,
   });
 
-  const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({ min: "", max: "" });
+  const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({
+    min: "",
+    max: "",
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatusValues, setSelectedStatusValues] = useState<Set<string>>(new Set());
   const [selectedActivityTypes, setSelectedActivityTypes] = useState<Set<string>>(new Set());
@@ -183,13 +196,21 @@ export const CashImportPreviewTable = ({
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<string>>(new Set());
   const [selectedSubCategoryIds, setSelectedSubCategoryIds] = useState<Set<string>>(new Set());
   const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
-  const [selectedCategorizationStatuses, setSelectedCategorizationStatuses] = useState<Set<string>>(new Set());
+  const [selectedCategorizationStatuses, setSelectedCategorizationStatuses] = useState<Set<string>>(
+    new Set(),
+  );
 
   // Status values for category, event, and recurrence filters (like Step 3)
   const CATEGORY_STATUS_VALUES = ["uncategorized", "categorized"] as const;
   const EVENT_STATUS_VALUES = ["with-events", "without-events"] as const;
   const RECURRENCE_STATUS_VALUES = ["with-recurrence", "without-recurrence"] as const;
-  type CategorizationStatus = "categorized" | "uncategorized" | "with-events" | "without-events" | "with-recurrence" | "without-recurrence";
+  type CategorizationStatus =
+    | "categorized"
+    | "uncategorized"
+    | "with-events"
+    | "without-events"
+    | "with-recurrence"
+    | "without-recurrence";
 
   // Client-side filtering (search, amount, and all filter states) - matching Step 3 logic
   const filteredActivities = useMemo(() => {
@@ -223,7 +244,8 @@ export const CashImportPreviewTable = ({
 
       // Activity type filter
       if (selectedActivityTypes.size > 0) {
-        if (!activity.activityType || !selectedActivityTypes.has(activity.activityType)) return false;
+        if (!activity.activityType || !selectedActivityTypes.has(activity.activityType))
+          return false;
       }
 
       // Account filter
@@ -238,7 +260,8 @@ export const CashImportPreviewTable = ({
 
       // Subcategory filter
       if (selectedSubCategoryIds.size > 0) {
-        if (!activity.subCategoryId || !selectedSubCategoryIds.has(activity.subCategoryId)) return false;
+        if (!activity.subCategoryId || !selectedSubCategoryIds.has(activity.subCategoryId))
+          return false;
       }
 
       // Event filter (only actual event IDs, not statuses)
@@ -271,7 +294,18 @@ export const CashImportPreviewTable = ({
 
       return true;
     });
-  }, [activities, amountRange, searchQuery, selectedStatusValues, selectedActivityTypes, selectedAccountIds, selectedCategoryIds, selectedSubCategoryIds, selectedEventIds, selectedCategorizationStatuses]);
+  }, [
+    activities,
+    amountRange,
+    searchQuery,
+    selectedStatusValues,
+    selectedActivityTypes,
+    selectedAccountIds,
+    selectedCategoryIds,
+    selectedSubCategoryIds,
+    selectedEventIds,
+    selectedCategorizationStatuses,
+  ]);
 
   const hasAmountFilter = amountRange.min !== "" || amountRange.max !== "";
 
@@ -298,7 +332,9 @@ export const CashImportPreviewTable = ({
   }, [externalSelectedRows, activities, internalRowSelection]);
 
   // Handle row selection changes
-  const handleRowSelectionChange = (updater: RowSelectionState | ((old: RowSelectionState) => RowSelectionState)) => {
+  const handleRowSelectionChange = (
+    updater: RowSelectionState | ((old: RowSelectionState) => RowSelectionState),
+  ) => {
     const newSelection = typeof updater === "function" ? updater(rowSelection) : updater;
 
     if (onSelectionChange) {
@@ -486,7 +522,10 @@ export const CashImportPreviewTable = ({
       options.push({ value: "with-recurrence", label: `With Recurrence (${withRecurrenceCount})` });
     }
     if (withoutRecurrenceCount > 0) {
-      options.push({ value: "without-recurrence", label: `Without Recurrence (${withoutRecurrenceCount})` });
+      options.push({
+        value: "without-recurrence",
+        label: `Without Recurrence (${withoutRecurrenceCount})`,
+      });
     }
 
     // Add recurrence types that have at least one activity
@@ -511,7 +550,8 @@ export const CashImportPreviewTable = ({
     return options;
   }, [activities, withRecurrenceCount, withoutRecurrenceCount]);
 
-  const hasActiveFilters = searchQuery.trim().length > 0 ||
+  const hasActiveFilters =
+    searchQuery.trim().length > 0 ||
     hasAmountFilter ||
     selectedStatusValues.size > 0 ||
     selectedActivityTypes.size > 0 ||
@@ -533,371 +573,368 @@ export const CashImportPreviewTable = ({
     setSelectedCategorizationStatuses(new Set());
   }, []);
 
-  const columns = useMemo<ColumnDef<ActivityImport>[]>(
-    () => {
-      const cols: ColumnDef<ActivityImport>[] = [];
+  const columns = useMemo<ColumnDef<ActivityImport>[]>(() => {
+    const cols: ColumnDef<ActivityImport>[] = [];
 
-      // Selection column (if selectable)
-      if (selectable) {
-        cols.push({
-          id: "select",
-          header: ({ table }) => (
-            <Checkbox
-              checked={table.getIsAllPageRowsSelected()}
-              onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-              aria-label="Select all"
-            />
-          ),
-          cell: ({ row }) => (
-            <Checkbox
-              checked={row.getIsSelected()}
-              onCheckedChange={(value) => row.toggleSelected(!!value)}
-              aria-label="Select row"
-            />
-          ),
-          enableSorting: false,
-          enableHiding: false,
-        });
-      }
-
-      // Standard columns
-      cols.push(
-        {
-          id: "lineNumber",
-          accessorKey: "lineNumber",
-        },
-        {
-          id: "isValid",
-          accessorKey: "isValid",
-          header: () => <span className="sr-only">Status</span>,
-          cell: ({ row }) => {
-            const isValid = row.getValue("isValid");
-            const errors = row.original.errors || {};
-            const lineNumber = row.original.lineNumber;
-
-            // Format all errors for tooltip display
-            const allErrors = Object.entries(errors).flatMap(([field, fieldErrors]) =>
-              fieldErrors.map((err) => `${field}: ${err}`),
-            );
-
-            return isValid ? (
-              <div className="flex w-[60px] items-center gap-1 text-xs">
-                <div className="bg-success/20 text-success flex h-5 w-5 items-center justify-center rounded-full">
-                  <Icons.CheckCircle className="h-3.5 w-3.5" />
-                </div>
-                <span className="text-muted-foreground text-xs">
-                  {String(lineNumber).padStart(2, "0")}
-                </span>
-              </div>
-            ) : (
-              <TooltipProvider>
-                <Tooltip delayDuration={30}>
-                  <TooltipTrigger asChild>
-                    <div className="flex w-[60px] cursor-help items-center gap-1 text-xs">
-                      <div className="bg-destructive/20 text-destructive flex h-5 w-5 items-center justify-center rounded-full">
-                        <Icons.XCircle className="h-3.5 w-3.5" />
-                      </div>
-                      <span className="text-muted-foreground text-xs">
-                        {String(lineNumber).padStart(2, "0")}
-                      </span>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent
-                    side="right"
-                    sideOffset={10}
-                    className="bg-destructive text-destructive-foreground max-w-xs border-none p-3"
-                  >
-                    <h4 className="mb-2 font-medium">Validation Errors</h4>
-                    <ul className="max-h-[300px] list-disc space-y-1 overflow-y-auto pl-5 text-sm">
-                      {allErrors.length > 0 ? (
-                        allErrors.map((error, index) => <li key={index}>{error}</li>)
-                      ) : (
-                        <li>Invalid activity</li>
-                      )}
-                    </ul>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            );
-          },
-          filterFn: (row, id, filterValue: string[]) => {
-            const isValid = row.getValue(id);
-            const filterBoolean = filterValue[0] === "true";
-            return isValid === filterBoolean;
-          },
-          sortingFn: (rowA, rowB, id) => {
-            const statusA = rowA.getValue(id);
-            const statusB = rowB.getValue(id);
-            return statusA === statusB ? 0 : statusA ? -1 : 1;
-          },
-        },
-        {
-          id: "date",
-          accessorKey: "date",
-          header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
-          cell: ({ row }) => {
-            const formattedDate = formatDateTime(row.getValue("date"));
-            const hasError = hasFieldError(row.original, "date");
-            const errorMessages = getFieldErrorMessage(row.original, "date");
-
-            return (
-              <ErrorCell hasError={hasError} errorMessages={errorMessages}>
-                <div className="flex flex-col">
-                  <span className="text-xs">{formattedDate.date}</span>
-                  <span className="text-muted-foreground text-xs">{formattedDate.time}</span>
-                </div>
-              </ErrorCell>
-            );
-          },
-        },
-        {
-          id: "name",
-          accessorKey: "name",
-          header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
-          cell: ({ row }) => {
-            const name = row.original.name;
-            return (
-              <div className="max-w-[150px] truncate text-sm font-medium" title={name || ""}>
-                {name || "-"}
-              </div>
-            );
-          },
-        },
-        {
-          id: "activityType",
-          accessorKey: "activityType",
-          header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
-          cell: ({ row }) => {
-            const type = row.getValue("activityType") as ActivityType;
-            const hasError = hasFieldError(row.original, "activityType");
-            const errorMessages = getFieldErrorMessage(row.original, "activityType");
-            return (
-              <ErrorCell hasError={hasError} errorMessages={errorMessages}>
-                <Badge variant={getTypeBadgeVariant(type)}>
-                  {ActivityTypeNames[type] || String(type)}
-                </Badge>
-              </ErrorCell>
-            );
-          },
-          filterFn: (row, id, value: string) => {
-            return value.includes(row.getValue(id));
-          },
-        },
-      );
-
-      // Account column (used for filtering, hidden in view)
+    // Selection column (if selectable)
+    if (selectable) {
       cols.push({
-        id: "accountId",
-        accessorKey: "accountId",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Account" />,
-        cell: ({ row }) => {
-          const accountId = row.original.accountId;
-          const account = accountId ? accounts.find((acc) => acc.id === accountId) : null;
-          return (
-            <div className="text-sm">
-              {account ? (
-                <Badge variant="outline" className="text-xs">
-                  {account.name}
-                </Badge>
-              ) : (
-                <span className="text-muted-foreground">-</span>
-              )}
-            </div>
-          );
-        },
-        filterFn: (row, id, value: string) => {
-          return value.includes(row.getValue(id));
-        },
+        id: "select",
+        header: ({ table }) => (
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected()}
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label="Select all"
+          />
+        ),
+        cell: ({ row }) => (
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label="Select row"
+          />
+        ),
+        enableSorting: false,
+        enableHiding: false,
       });
+    }
 
-      // Category column (always shown)
-      cols.push({
-        id: "categoryId",
-        accessorKey: "categoryId",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Category" />,
+    // Standard columns
+    cols.push(
+      {
+        id: "lineNumber",
+        accessorKey: "lineNumber",
+      },
+      {
+        id: "isValid",
+        accessorKey: "isValid",
+        header: () => <span className="sr-only">Status</span>,
         cell: ({ row }) => {
-          const categoryId = row.original.categoryId;
-          const subCategoryId = row.original.subCategoryId;
-          const category = categoryId && categoryMap ? categoryMap.get(categoryId) : null;
-          const subCategory = subCategoryId && categoryMap ? categoryMap.get(subCategoryId) : null;
+          const isValid = row.getValue("isValid");
+          const errors = row.original.errors || {};
           const lineNumber = row.original.lineNumber;
 
-          if (editable && onRowChange && lineNumber !== undefined && categories.length > 0) {
-            return (
-              <EditableCategoryCell
-                categoryId={categoryId}
-                subCategoryId={subCategoryId}
-                categories={categories}
-                categoryMap={categoryMap}
-                onChange={(catId, subId) => {
-                  onRowChange(lineNumber, {
-                    categoryId: catId,
-                    subCategoryId: subId,
-                    isManualOverride: true,
-                    matchedRuleId: undefined,
-                    matchedRuleName: undefined,
-                  });
-                }}
-              />
-            );
-          }
+          // Format all errors for tooltip display
+          const allErrors = Object.entries(errors).flatMap(([field, fieldErrors]) =>
+            fieldErrors.map((err) => `${field}: ${err}`),
+          );
 
-          return (
-            <div className="text-sm">
-              {category ? (
-                <div className="flex flex-col">
-                  <span>{category.name}</span>
-                  {subCategory && (
-                    <span className="text-muted-foreground text-xs">{subCategory.name}</span>
-                  )}
-                </div>
-              ) : (
-                <span className="text-muted-foreground">Uncategorized</span>
-              )}
+          return isValid ? (
+            <div className="flex w-[60px] items-center gap-1 text-xs">
+              <div className="bg-success/20 text-success flex h-5 w-5 items-center justify-center rounded-full">
+                <Icons.CheckCircle className="h-3.5 w-3.5" />
+              </div>
+              <span className="text-muted-foreground text-xs">
+                {String(lineNumber).padStart(2, "0")}
+              </span>
             </div>
+          ) : (
+            <TooltipProvider>
+              <Tooltip delayDuration={30}>
+                <TooltipTrigger asChild>
+                  <div className="flex w-[60px] cursor-help items-center gap-1 text-xs">
+                    <div className="bg-destructive/20 text-destructive flex h-5 w-5 items-center justify-center rounded-full">
+                      <Icons.XCircle className="h-3.5 w-3.5" />
+                    </div>
+                    <span className="text-muted-foreground text-xs">
+                      {String(lineNumber).padStart(2, "0")}
+                    </span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="right"
+                  sideOffset={10}
+                  className="bg-destructive text-destructive-foreground max-w-xs border-none p-3"
+                >
+                  <h4 className="mb-2 font-medium">Validation Errors</h4>
+                  <ul className="max-h-[300px] list-disc space-y-1 overflow-y-auto pl-5 text-sm">
+                    {allErrors.length > 0 ? (
+                      allErrors.map((error, index) => <li key={index}>{error}</li>)
+                    ) : (
+                      <li>Invalid activity</li>
+                    )}
+                  </ul>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           );
         },
-        filterFn: (row, id, value: string) => {
-          return value.includes(row.getValue(id));
+        filterFn: (row, id, filterValue: string[]) => {
+          const isValid = row.getValue(id);
+          const filterBoolean = filterValue[0] === "true";
+          return isValid === filterBoolean;
         },
-      });
-
-      // Subcategory column
-      cols.push({
-        id: "subCategoryId",
-        accessorKey: "subCategoryId",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Subcategory" />,
+        sortingFn: (rowA, rowB, id) => {
+          const statusA = rowA.getValue(id);
+          const statusB = rowB.getValue(id);
+          return statusA === statusB ? 0 : statusA ? -1 : 1;
+        },
+      },
+      {
+        id: "date",
+        accessorKey: "date",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
         cell: ({ row }) => {
-          const subCategoryId = row.original.subCategoryId;
-          const subCategory = subCategoryId && categoryMap ? categoryMap.get(subCategoryId) : null;
-          return (
-            <div className="text-sm">
-              {subCategory ? (
-                <span>{subCategory.name}</span>
-              ) : (
-                <span className="text-muted-foreground">-</span>
-              )}
-            </div>
-          );
-        },
-        filterFn: (row, id, value: string) => {
-          return value.includes(row.getValue(id));
-        },
-      });
-
-      // Event column (always shown)
-      cols.push({
-        id: "eventId",
-        accessorKey: "eventId",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Event" />,
-        cell: ({ row }) => {
-          const eventId = row.original.eventId;
-          const event = eventId && eventMap ? eventMap.get(eventId) : null;
-
-          return (
-            <div className="text-sm">
-              {event ? (
-                <Badge variant="outline" className="text-xs">
-                  {event.name}
-                </Badge>
-              ) : (
-                <span className="text-muted-foreground">-</span>
-              )}
-            </div>
-          );
-        },
-        filterFn: (row, id, value: string) => {
-          return value.includes(row.getValue(id));
-        },
-      });
-
-      // Recurrence column
-      cols.push({
-        id: "recurrence",
-        accessorKey: "recurrence",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Recurrence" />,
-        cell: ({ row }) => {
-          const recurrence = row.original.recurrence;
-
-          return (
-            <div className="text-sm">
-              {recurrence ? (
-                <Badge variant="outline" className="text-xs">
-                  {recurrence.charAt(0).toUpperCase() + recurrence.slice(1)}
-                </Badge>
-              ) : (
-                <span className="text-muted-foreground">-</span>
-              )}
-            </div>
-          );
-        },
-        filterFn: (row, id, value: string) => {
-          return value.includes(row.getValue(id));
-        },
-      });
-
-      // Description column
-      cols.push({
-        id: "description",
-        accessorKey: "comment",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Description" />,
-        cell: ({ row }) => {
-          const comment = row.original.comment;
-          return (
-            <div className="max-w-[150px] truncate text-sm" title={comment || ""}>
-              {comment || "-"}
-            </div>
-          );
-        },
-      });
-
-      // Amount column
-      cols.push({
-        id: "amount",
-        accessorKey: "amount",
-        header: ({ column }) => (
-          <DataTableColumnHeader className="justify-end text-right" column={column} title="Amount" />
-        ),
-        cell: ({ row }) => {
-          const amount = row.getValue("amount");
-          const currency = row.getValue("currency") || "USD";
-          const hasError = hasFieldError(row.original, "amount");
-          const errorMessages = getFieldErrorMessage(row.original, "amount");
+          const formattedDate = formatDateTime(row.getValue("date"));
+          const hasError = hasFieldError(row.original, "date");
+          const errorMessages = getFieldErrorMessage(row.original, "date");
 
           return (
             <ErrorCell hasError={hasError} errorMessages={errorMessages}>
-              <div className="text-right font-medium tabular-nums">
-                {safeFormatAmount(Number(amount), typeof currency === "string" ? currency : "USD")}
+              <div className="flex flex-col">
+                <span className="text-xs">{formattedDate.date}</span>
+                <span className="text-muted-foreground text-xs">{formattedDate.time}</span>
               </div>
             </ErrorCell>
           );
         },
-      });
-
-      // Currency column
-      cols.push({
-        id: "currency",
-        accessorKey: "currency",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Currency" />,
+      },
+      {
+        id: "name",
+        accessorKey: "name",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
         cell: ({ row }) => {
-          const hasError = hasFieldError(row.original, "currency");
-          const errorMessages = getFieldErrorMessage(row.original, "currency");
-          const currency = row.getValue("currency") || "-";
-
+          const name = row.original.name;
+          return (
+            <div className="max-w-[150px] truncate text-sm font-medium" title={name || ""}>
+              {name || "-"}
+            </div>
+          );
+        },
+      },
+      {
+        id: "activityType",
+        accessorKey: "activityType",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
+        cell: ({ row }) => {
+          const type = row.getValue("activityType") as ActivityType;
+          const hasError = hasFieldError(row.original, "activityType");
+          const errorMessages = getFieldErrorMessage(row.original, "activityType");
           return (
             <ErrorCell hasError={hasError} errorMessages={errorMessages}>
-              <Badge variant="outline" className="font-medium">
-                {typeof currency === "string" ? currency : "-"}
+              <Badge variant={getTypeBadgeVariant(type)}>
+                {ActivityTypeNames[type] || String(type)}
               </Badge>
             </ErrorCell>
           );
         },
-      });
+        filterFn: (row, id, value: string) => {
+          return value.includes(row.getValue(id));
+        },
+      },
+    );
 
-      return cols;
-    },
-    [accounts, editable, categories, categoryMap, events, eventMap, onRowChange, selectable],
-  );
+    // Account column (used for filtering, hidden in view)
+    cols.push({
+      id: "accountId",
+      accessorKey: "accountId",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Account" />,
+      cell: ({ row }) => {
+        const accountId = row.original.accountId;
+        const account = accountId ? accounts.find((acc) => acc.id === accountId) : null;
+        return (
+          <div className="text-sm">
+            {account ? (
+              <Badge variant="outline" className="text-xs">
+                {account.name}
+              </Badge>
+            ) : (
+              <span className="text-muted-foreground">-</span>
+            )}
+          </div>
+        );
+      },
+      filterFn: (row, id, value: string) => {
+        return value.includes(row.getValue(id));
+      },
+    });
+
+    // Category column (always shown)
+    cols.push({
+      id: "categoryId",
+      accessorKey: "categoryId",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Category" />,
+      cell: ({ row }) => {
+        const categoryId = row.original.categoryId;
+        const subCategoryId = row.original.subCategoryId;
+        const category = categoryId && categoryMap ? categoryMap.get(categoryId) : null;
+        const subCategory = subCategoryId && categoryMap ? categoryMap.get(subCategoryId) : null;
+        const lineNumber = row.original.lineNumber;
+
+        if (editable && onRowChange && lineNumber !== undefined && categories.length > 0) {
+          return (
+            <EditableCategoryCell
+              categoryId={categoryId}
+              subCategoryId={subCategoryId}
+              categories={categories}
+              categoryMap={categoryMap}
+              onChange={(catId, subId) => {
+                onRowChange(lineNumber, {
+                  categoryId: catId,
+                  subCategoryId: subId,
+                  isManualOverride: true,
+                  matchedRuleId: undefined,
+                  matchedRuleName: undefined,
+                });
+              }}
+            />
+          );
+        }
+
+        return (
+          <div className="text-sm">
+            {category ? (
+              <div className="flex flex-col">
+                <span>{category.name}</span>
+                {subCategory && (
+                  <span className="text-muted-foreground text-xs">{subCategory.name}</span>
+                )}
+              </div>
+            ) : (
+              <span className="text-muted-foreground">Uncategorized</span>
+            )}
+          </div>
+        );
+      },
+      filterFn: (row, id, value: string) => {
+        return value.includes(row.getValue(id));
+      },
+    });
+
+    // Subcategory column
+    cols.push({
+      id: "subCategoryId",
+      accessorKey: "subCategoryId",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Subcategory" />,
+      cell: ({ row }) => {
+        const subCategoryId = row.original.subCategoryId;
+        const subCategory = subCategoryId && categoryMap ? categoryMap.get(subCategoryId) : null;
+        return (
+          <div className="text-sm">
+            {subCategory ? (
+              <span>{subCategory.name}</span>
+            ) : (
+              <span className="text-muted-foreground">-</span>
+            )}
+          </div>
+        );
+      },
+      filterFn: (row, id, value: string) => {
+        return value.includes(row.getValue(id));
+      },
+    });
+
+    // Event column (always shown)
+    cols.push({
+      id: "eventId",
+      accessorKey: "eventId",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Event" />,
+      cell: ({ row }) => {
+        const eventId = row.original.eventId;
+        const event = eventId && eventMap ? eventMap.get(eventId) : null;
+
+        return (
+          <div className="text-sm">
+            {event ? (
+              <Badge variant="outline" className="text-xs">
+                {event.name}
+              </Badge>
+            ) : (
+              <span className="text-muted-foreground">-</span>
+            )}
+          </div>
+        );
+      },
+      filterFn: (row, id, value: string) => {
+        return value.includes(row.getValue(id));
+      },
+    });
+
+    // Recurrence column
+    cols.push({
+      id: "recurrence",
+      accessorKey: "recurrence",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Recurrence" />,
+      cell: ({ row }) => {
+        const recurrence = row.original.recurrence;
+
+        return (
+          <div className="text-sm">
+            {recurrence ? (
+              <Badge variant="outline" className="text-xs">
+                {recurrence.charAt(0).toUpperCase() + recurrence.slice(1)}
+              </Badge>
+            ) : (
+              <span className="text-muted-foreground">-</span>
+            )}
+          </div>
+        );
+      },
+      filterFn: (row, id, value: string) => {
+        return value.includes(row.getValue(id));
+      },
+    });
+
+    // Description column
+    cols.push({
+      id: "description",
+      accessorKey: "comment",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Description" />,
+      cell: ({ row }) => {
+        const comment = row.original.comment;
+        return (
+          <div className="max-w-[150px] truncate text-sm" title={comment || ""}>
+            {comment || "-"}
+          </div>
+        );
+      },
+    });
+
+    // Amount column
+    cols.push({
+      id: "amount",
+      accessorKey: "amount",
+      header: ({ column }) => (
+        <DataTableColumnHeader className="justify-end text-right" column={column} title="Amount" />
+      ),
+      cell: ({ row }) => {
+        const amount = row.getValue("amount");
+        const currency = row.getValue("currency") || "USD";
+        const hasError = hasFieldError(row.original, "amount");
+        const errorMessages = getFieldErrorMessage(row.original, "amount");
+
+        return (
+          <ErrorCell hasError={hasError} errorMessages={errorMessages}>
+            <div className="text-right font-medium tabular-nums">
+              {safeFormatAmount(Number(amount), typeof currency === "string" ? currency : "USD")}
+            </div>
+          </ErrorCell>
+        );
+      },
+    });
+
+    // Currency column
+    cols.push({
+      id: "currency",
+      accessorKey: "currency",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Currency" />,
+      cell: ({ row }) => {
+        const hasError = hasFieldError(row.original, "currency");
+        const errorMessages = getFieldErrorMessage(row.original, "currency");
+        const currency = row.getValue("currency") || "-";
+
+        return (
+          <ErrorCell hasError={hasError} errorMessages={errorMessages}>
+            <Badge variant="outline" className="font-medium">
+              {typeof currency === "string" ? currency : "-"}
+            </Badge>
+          </ErrorCell>
+        );
+      },
+    });
+
+    return cols;
+  }, [accounts, editable, categories, categoryMap, events, eventMap, onRowChange, selectable]);
 
   const table = useReactTable({
     data: filteredActivities,
@@ -981,25 +1018,28 @@ export const CashImportPreviewTable = ({
             <DataTableFacetedFilter
               title="Category"
               options={filterCategoryOptions}
-              selectedValues={new Set([
-                ...selectedCategoryIds,
-                ...Array.from(selectedCategorizationStatuses).filter((s) =>
-                  CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number])
-                ),
-              ])}
+              selectedValues={
+                new Set([
+                  ...selectedCategoryIds,
+                  ...Array.from(selectedCategorizationStatuses).filter((s) =>
+                    CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number]),
+                  ),
+                ])
+              }
               onFilterChange={(values) => {
                 const allValues = Array.from(values);
                 const statusValues = allValues.filter((v) =>
-                  CATEGORY_STATUS_VALUES.includes(v as (typeof CATEGORY_STATUS_VALUES)[number])
+                  CATEGORY_STATUS_VALUES.includes(v as (typeof CATEGORY_STATUS_VALUES)[number]),
                 ) as CategorizationStatus[];
                 const newCategoryIds = allValues.filter(
-                  (v) => !CATEGORY_STATUS_VALUES.includes(v as (typeof CATEGORY_STATUS_VALUES)[number])
+                  (v) =>
+                    !CATEGORY_STATUS_VALUES.includes(v as (typeof CATEGORY_STATUS_VALUES)[number]),
                 );
 
                 setSelectedCategoryIds(new Set(newCategoryIds));
 
                 const eventStatuses = Array.from(selectedCategorizationStatuses).filter((s) =>
-                  EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number])
+                  EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number]),
                 );
                 setSelectedCategorizationStatuses(new Set([...statusValues, ...eventStatuses]));
 
@@ -1011,7 +1051,10 @@ export const CashImportPreviewTable = ({
                   const validSubCategories = new Set<string>();
                   selectedSubCategoryIds.forEach((subId) => {
                     categories.some((cat) => {
-                      if (newCategoryIds.includes(cat.id) && cat.children?.some((child) => child.id === subId)) {
+                      if (
+                        newCategoryIds.includes(cat.id) &&
+                        cat.children?.some((child) => child.id === subId)
+                      ) {
                         validSubCategories.add(subId);
                         return true;
                       }
@@ -1038,25 +1081,27 @@ export const CashImportPreviewTable = ({
             <DataTableFacetedFilter
               title="Event"
               options={filterEventOptions}
-              selectedValues={new Set([
-                ...selectedEventIds,
-                ...Array.from(selectedCategorizationStatuses).filter((s) =>
-                  EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number])
-                ),
-              ])}
+              selectedValues={
+                new Set([
+                  ...selectedEventIds,
+                  ...Array.from(selectedCategorizationStatuses).filter((s) =>
+                    EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number]),
+                  ),
+                ])
+              }
               onFilterChange={(values) => {
                 const allValues = Array.from(values);
                 const statusValues = allValues.filter((v) =>
-                  EVENT_STATUS_VALUES.includes(v as (typeof EVENT_STATUS_VALUES)[number])
+                  EVENT_STATUS_VALUES.includes(v as (typeof EVENT_STATUS_VALUES)[number]),
                 ) as CategorizationStatus[];
                 const newEventIds = allValues.filter(
-                  (v) => !EVENT_STATUS_VALUES.includes(v as (typeof EVENT_STATUS_VALUES)[number])
+                  (v) => !EVENT_STATUS_VALUES.includes(v as (typeof EVENT_STATUS_VALUES)[number]),
                 );
 
                 setSelectedEventIds(new Set(newEventIds));
 
                 const categoryStatuses = Array.from(selectedCategorizationStatuses).filter((s) =>
-                  CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number])
+                  CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number]),
                 );
                 setSelectedCategorizationStatuses(new Set([...categoryStatuses, ...statusValues]));
               }}
@@ -1067,23 +1112,30 @@ export const CashImportPreviewTable = ({
             <DataTableFacetedFilter
               title="Recurrence"
               options={filterRecurrenceOptions}
-              selectedValues={new Set([
-                ...Array.from(selectedCategorizationStatuses).filter((s) =>
-                  RECURRENCE_STATUS_VALUES.includes(s as (typeof RECURRENCE_STATUS_VALUES)[number]) ||
-                  ["fixed", "variable", "periodic"].includes(s)
-                ),
-              ])}
+              selectedValues={
+                new Set([
+                  ...Array.from(selectedCategorizationStatuses).filter(
+                    (s) =>
+                      RECURRENCE_STATUS_VALUES.includes(
+                        s as (typeof RECURRENCE_STATUS_VALUES)[number],
+                      ) || ["fixed", "variable", "periodic"].includes(s),
+                  ),
+                ])
+              }
               onFilterChange={(values) => {
                 const allValues = Array.from(values);
-                const statusValues = allValues.filter((v) =>
-                  RECURRENCE_STATUS_VALUES.includes(v as (typeof RECURRENCE_STATUS_VALUES)[number]) ||
-                  ["fixed", "variable", "periodic"].includes(v)
+                const statusValues = allValues.filter(
+                  (v) =>
+                    RECURRENCE_STATUS_VALUES.includes(
+                      v as (typeof RECURRENCE_STATUS_VALUES)[number],
+                    ) || ["fixed", "variable", "periodic"].includes(v),
                 ) as CategorizationStatus[];
 
                 // Keep category and event statuses, replace recurrence statuses
-                const otherStatuses = Array.from(selectedCategorizationStatuses).filter((s) =>
-                  CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number]) ||
-                  EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number])
+                const otherStatuses = Array.from(selectedCategorizationStatuses).filter(
+                  (s) =>
+                    CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number]) ||
+                    EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number]),
                 );
                 setSelectedCategorizationStatuses(new Set([...otherStatuses, ...statusValues]));
               }}
@@ -1118,9 +1170,7 @@ export const CashImportPreviewTable = ({
                     type="number"
                     placeholder="Min"
                     value={amountRange.min}
-                    onChange={(e) =>
-                      setAmountRange((prev) => ({ ...prev, min: e.target.value }))
-                    }
+                    onChange={(e) => setAmountRange((prev) => ({ ...prev, min: e.target.value }))}
                     className="h-8"
                   />
                   <span className="text-muted-foreground text-sm">to</span>
@@ -1128,9 +1178,7 @@ export const CashImportPreviewTable = ({
                     type="number"
                     placeholder="Max"
                     value={amountRange.max}
-                    onChange={(e) =>
-                      setAmountRange((prev) => ({ ...prev, max: e.target.value }))
-                    }
+                    onChange={(e) => setAmountRange((prev) => ({ ...prev, max: e.target.value }))}
                     className="h-8"
                   />
                 </div>

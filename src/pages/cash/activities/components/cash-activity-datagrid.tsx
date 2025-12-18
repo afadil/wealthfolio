@@ -268,10 +268,7 @@ export function CashActivityDatagrid({
     [categories],
   );
 
-  const getCategoryOptionsForActivityType = useCallback(
-    () => categoryOptions,
-    [categoryOptions],
-  );
+  const getCategoryOptionsForActivityType = useCallback(() => categoryOptions, [categoryOptions]);
 
   const categoryLookup = useMemo(() => {
     return new Map(categories.map((cat) => [cat.id, cat]));
@@ -798,9 +795,7 @@ export function CashActivityDatagrid({
 
   const clearAllRecurrence = useCallback(() => {
     setLocalTransactions((prev) =>
-      prev.map((t) =>
-        selectedIds.has(t.id) ? { ...t, recurrence: undefined } : t,
-      ),
+      prev.map((t) => (selectedIds.has(t.id) ? { ...t, recurrence: undefined } : t)),
     );
     setDirtyTransactionIds((prev) => {
       const next = new Set(prev);
@@ -1490,9 +1485,7 @@ function BulkRecurrenceAssignModal({
           <DialogTitle>
             Assign Recurrence to {selectedCount} Transaction{selectedCount !== 1 ? "s" : ""}
           </DialogTitle>
-          <DialogDescription>
-            Select a recurrence type to assign.
-          </DialogDescription>
+          <DialogDescription>Select a recurrence type to assign.</DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-2 gap-2 py-4">
           {RECURRENCE_TYPE_OPTIONS.map((type) => {

@@ -1,5 +1,11 @@
 import z from "zod";
-import { Goal, GoalAllocation } from "@/lib/types";
+import {
+  Goal,
+  GoalWithContributions,
+  AccountFreeCash,
+  GoalContributionWithStatus,
+  NewGoalContribution,
+} from "@/lib/types";
 import { newGoalSchema } from "@/lib/schemas";
 import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb } from "@/adapters";
 import { logger } from "@/adapters";
@@ -18,6 +24,22 @@ export const getGoals = async (): Promise<Goal[]> => {
     }
   } catch (error) {
     logger.error("Error fetching goals.");
+    throw error;
+  }
+};
+
+export const getGoalsWithContributions = async (): Promise<GoalWithContributions[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri("get_goals_with_contributions");
+      case RUN_ENV.WEB:
+        return invokeWeb("get_goals_with_contributions");
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error("Error fetching goals with contributions.");
     throw error;
   }
 };
@@ -78,36 +100,54 @@ export const deleteGoal = async (goalId: string): Promise<void> => {
   }
 };
 
-export const updateGoalsAllocations = async (allocations: GoalAllocation[]): Promise<void> => {
+export const getAccountFreeCash = async (accountIds: string[]): Promise<AccountFreeCash[]> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        await invokeTauri("update_goal_allocations", { allocations });
-        return;
+        return invokeTauri("get_account_free_cash", { accountIds });
       case RUN_ENV.WEB:
-        await invokeWeb("update_goal_allocations", { allocations });
-        return;
+        return invokeWeb("get_account_free_cash", { accountIds });
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error("Error saving goals allocations.");
+    logger.error("Error fetching account free cash.");
     throw error;
   }
 };
 
-export const getGoalsAllocation = async (): Promise<GoalAllocation[]> => {
+export const addGoalContribution = async (
+  contribution: NewGoalContribution,
+): Promise<GoalContributionWithStatus> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri("load_goals_allocations");
+        return invokeTauri("add_goal_contribution", { contribution });
       case RUN_ENV.WEB:
-        return invokeWeb("load_goals_allocations");
+        return invokeWeb("add_goal_contribution", { contribution });
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error("Error fetching goals allocations.");
+    logger.error("Error adding goal contribution.");
+    throw error;
+  }
+};
+
+export const removeGoalContribution = async (contributionId: string): Promise<void> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        await invokeTauri("remove_goal_contribution", { contributionId });
+        return;
+      case RUN_ENV.WEB:
+        await invokeWeb("remove_goal_contribution", { contributionId });
+        return;
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error("Error removing goal contribution.");
     throw error;
   }
 };

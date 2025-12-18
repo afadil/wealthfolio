@@ -50,7 +50,6 @@ import { useQuery } from "@tanstack/react-query";
 import type { SortingState } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
-  Badge,
   Button,
   Checkbox,
   DropdownMenu,
@@ -162,10 +161,7 @@ function formatAmountDisplay(
   }
 }
 
-function createDraftTransaction(
-  accounts: Account[],
-  fallbackCurrency: string,
-): LocalTransaction {
+function createDraftTransaction(accounts: Account[], fallbackCurrency: string): LocalTransaction {
   const defaultAccount = accounts.find((account) => account.isActive) ?? accounts[0];
   const now = new Date();
 
@@ -192,7 +188,7 @@ function createDraftTransaction(
     subRows: undefined,
     isNew: true,
   };
-};
+}
 
 interface SortableHeaderProps {
   title: string;
@@ -1116,299 +1112,299 @@ export function ActivityDatagrid({
       <UnsavedChangesDialog />
       <div className="flex min-h-0 flex-1 flex-col space-y-3">
         <div className="bg-muted/20 flex flex-wrap items-center justify-between gap-2 rounded-md border px-2.5 py-1.5">
-        <div className="text-muted-foreground flex items-center gap-2.5 text-xs">
-          {selectedIds.size > 0 && (
-            <span className="font-medium">
-              {selectedIds.size} row{selectedIds.size === 1 ? "" : "s"} selected
-            </span>
-          )}
-          {hasUnsavedChanges && (
-            <div className="flex items-center gap-2">
-              <span className="text-primary font-medium">
-                {dirtyTransactionIds.size + pendingDeleteIds.size} pending change
-                {dirtyTransactionIds.size + pendingDeleteIds.size === 1 ? "" : "s"}
+          <div className="text-muted-foreground flex items-center gap-2.5 text-xs">
+            {selectedIds.size > 0 && (
+              <span className="font-medium">
+                {selectedIds.size} row{selectedIds.size === 1 ? "" : "s"} selected
               </span>
-              <div className="bg-border h-3.5 w-px" />
-              <div className="flex items-center gap-4">
-                {changesCounts.newCount > 0 && (
-                  <span className="text-success flex items-center gap-1">
-                    <Icons.PlusCircle className="h-3 w-3" />
-                    <span className="font-medium">{changesCounts.newCount}</span>
-                  </span>
-                )}
-                {changesCounts.updatedCount > 0 && (
-                  <span className="flex items-center gap-1 text-blue-500 dark:text-blue-400">
-                    <Icons.Pencil className="h-3 w-3" />
-                    <span className="font-medium">{changesCounts.updatedCount}</span>
-                  </span>
-                )}
-                {changesCounts.deletedCount > 0 && (
-                  <span className="text-destructive flex items-center gap-1">
-                    <Icons.Trash className="h-3 w-3" />
-                    <span className="font-medium">{changesCounts.deletedCount}</span>
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1">
-          <Button
-            onClick={addNewRow}
-            variant="outline"
-            size="xs"
-            className="shrink-0 rounded-md"
-            title="Add transaction"
-            aria-label="Add transaction"
-          >
-            <Icons.Plus className="h-3.5 w-3.5" />
-            <span>Add</span>
-          </Button>
-
-          {selectedIds.size > 0 && (
-            <>
-              <div className="bg-border mx-1 h-4 w-px" />
-              <Button
-                onClick={() => setBulkActivityTypeModalOpen(true)}
-                variant="outline"
-                size="xs"
-                className="shrink-0"
-              >
-                <Icons.ArrowRightLeft className="mr-1 h-3.5 w-3.5" />
-                Type
-              </Button>
-              <Button
-                onClick={() => setBulkCategoryModalOpen(true)}
-                variant="outline"
-                size="xs"
-                className="shrink-0"
-              >
-                <Icons.Tag className="mr-1 h-3.5 w-3.5" />
-                Category
-              </Button>
-              <Button
-                onClick={() => setBulkEventModalOpen(true)}
-                variant="outline"
-                size="xs"
-                className="shrink-0"
-              >
-                <Icons.Calendar className="mr-1 h-3.5 w-3.5" />
-                Event
-              </Button>
-
-              <div className="bg-border mx-1 h-4 w-px" />
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="xs" className="shrink-0">
-                    <Icons.XCircle className="mr-1 h-3.5 w-3.5" />
-                    Clear
-                    <Icons.ChevronDown className="ml-1 h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  <DropdownMenuItem onClick={clearAllCategories}>
-                    <Icons.Tag className="mr-2 h-4 w-4" />
-                    Clear Categories
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={clearAllEvents}>
-                    <Icons.Calendar className="mr-2 h-4 w-4" />
-                    Clear Events
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <Button
-                onClick={deleteSelected}
-                size="xs"
-                variant="destructive"
-                className="shrink-0 rounded-md text-xs"
-                title="Delete selected"
-                aria-label="Delete selected"
-                disabled={saveActivitiesMutation.isPending}
-              >
-                <Icons.Trash className="h-3.5 w-3.5" />
-                <span>Delete</span>
-              </Button>
-
-              <Button
-                onClick={clearSelection}
-                variant="ghost"
-                size="xs"
-                className="shrink-0 ml-auto"
-              >
-                Deselect
-              </Button>
-            </>
-          )}
-
-          {hasUnsavedChanges && (
-            <>
-              <div className="bg-border mx-1 h-4 w-px" />
-              <Button
-                onClick={handleSaveChanges}
-                size="xs"
-                className="shrink-0 rounded-md text-xs"
-                title="Save changes"
-                aria-label="Save changes"
-                disabled={saveActivitiesMutation.isPending}
-              >
-                {saveActivitiesMutation.isPending ? (
-                  <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Icons.Save className="h-3.5 w-3.5" />
-                )}
-                <span>Save</span>
-              </Button>
-
-              <Button
-                onClick={handleCancelChanges}
-                size="xs"
-                variant="outline"
-                className="shrink-0 rounded-md text-xs"
-                title="Discard changes"
-                aria-label="Discard changes"
-                disabled={saveActivitiesMutation.isPending}
-              >
-                <Icons.Undo className="h-3.5 w-3.5" />
-                <span>Cancel</span>
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div
-        ref={scrollContainerRef}
-        className="bg-background min-h-[320px] flex-1 overflow-auto rounded-lg border [&>div]:overflow-visible"
-      >
-        <Table className="min-w-[1080px]">
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="bg-muted/30 h-9 w-12 border-r px-0 py-0">
-                <div className="flex h-full items-center justify-center">
-                  <Checkbox
-                    checked={
-                      sortedTransactions.length > 0 &&
-                      selectedIds.size === sortedTransactions.length
-                    }
-                    onCheckedChange={toggleSelectAll}
-                  />
+            )}
+            {hasUnsavedChanges && (
+              <div className="flex items-center gap-2">
+                <span className="text-primary font-medium">
+                  {dirtyTransactionIds.size + pendingDeleteIds.size} pending change
+                  {dirtyTransactionIds.size + pendingDeleteIds.size === 1 ? "" : "s"}
+                </span>
+                <div className="bg-border h-3.5 w-px" />
+                <div className="flex items-center gap-4">
+                  {changesCounts.newCount > 0 && (
+                    <span className="text-success flex items-center gap-1">
+                      <Icons.PlusCircle className="h-3 w-3" />
+                      <span className="font-medium">{changesCounts.newCount}</span>
+                    </span>
+                  )}
+                  {changesCounts.updatedCount > 0 && (
+                    <span className="flex items-center gap-1 text-blue-500 dark:text-blue-400">
+                      <Icons.Pencil className="h-3 w-3" />
+                      <span className="font-medium">{changesCounts.updatedCount}</span>
+                    </span>
+                  )}
+                  {changesCounts.deletedCount > 0 && (
+                    <span className="text-destructive flex items-center gap-1">
+                      <Icons.Trash className="h-3 w-3" />
+                      <span className="font-medium">{changesCounts.deletedCount}</span>
+                    </span>
+                  )}
                 </div>
-              </TableHead>
-              <SortableHeader
-                className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold"
-                title="Type"
-                columnId="activityType"
-                sorting={sorting}
-                onSortingChange={onSortingChange}
-              />
-              <SortableHeader
-                className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold"
-                title="Date & Time"
-                columnId="date"
-                sorting={sorting}
-                onSortingChange={onSortingChange}
-              />
-              <SortableHeader
-                className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold"
-                title="Symbol"
-                columnId="assetSymbol"
-                sorting={sorting}
-                onSortingChange={onSortingChange}
-              />
-              <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
-                Quantity
-              </TableHead>
-              <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
-                Unit Price
-              </TableHead>
-              <TableHead className="bg-muted/30 h-9 w-24 border-r px-2 py-1.5 text-right text-xs font-semibold">
-                Amount
-              </TableHead>
-              <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
-                Fee
-              </TableHead>
-              <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
-                Total
-              </TableHead>
-              <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
-                Account
-              </TableHead>
-              <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
-                Currency
-              </TableHead>
-              <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
-                Comment
-              </TableHead>
-              <TableHead className="bg-muted/30 h-9 px-2 py-1.5" />
-            </TableRow>
-          </TableHeader>
-          {sortedTransactions.length === 0 ? (
-            <TableBody>
-              <TableRow>
-                <TableCell colSpan={12} className="text-muted-foreground h-32 text-center">
-                  No investment activity yet. Add a trade or import from your brokerage.
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          ) : (
-            <TableBody>
-              {paddingTop > 0 ? (
-                <TableRow key="virtual-padding-top">
-                  <TableCell colSpan={12} style={{ height: paddingTop }} />
-                </TableRow>
-              ) : null}
+              </div>
+            )}
+          </div>
 
-              {virtualRows.map((virtualRow) => {
-                const transaction = sortedTransactions[virtualRow.index];
-                if (!transaction) {
-                  return null;
-                }
+          <div className="flex items-center gap-1">
+            <Button
+              onClick={addNewRow}
+              variant="outline"
+              size="xs"
+              className="shrink-0 rounded-md"
+              title="Add transaction"
+              aria-label="Add transaction"
+            >
+              <Icons.Plus className="h-3.5 w-3.5" />
+              <span>Add</span>
+            </Button>
 
-                return (
-                  <Fragment key={virtualRow.key}>
-                    <TransactionRow
-                      transaction={transaction}
-                      activityTypeOptions={activityTypeOptions}
-                      accountOptions={accountOptions}
-                      currencyOptions={currencyOptions}
-                      accountLookup={accountLookup}
-                      isSelected={selectedIds.has(transaction.id)}
-                      isDirty={dirtyTransactionIds.has(transaction.id)}
-                      focusedField={
-                        focusedCell?.rowId === transaction.id ? focusedCell.field : null
+            {selectedIds.size > 0 && (
+              <>
+                <div className="bg-border mx-1 h-4 w-px" />
+                <Button
+                  onClick={() => setBulkActivityTypeModalOpen(true)}
+                  variant="outline"
+                  size="xs"
+                  className="shrink-0"
+                >
+                  <Icons.ArrowRightLeft className="mr-1 h-3.5 w-3.5" />
+                  Type
+                </Button>
+                <Button
+                  onClick={() => setBulkCategoryModalOpen(true)}
+                  variant="outline"
+                  size="xs"
+                  className="shrink-0"
+                >
+                  <Icons.Tag className="mr-1 h-3.5 w-3.5" />
+                  Category
+                </Button>
+                <Button
+                  onClick={() => setBulkEventModalOpen(true)}
+                  variant="outline"
+                  size="xs"
+                  className="shrink-0"
+                >
+                  <Icons.Calendar className="mr-1 h-3.5 w-3.5" />
+                  Event
+                </Button>
+
+                <div className="bg-border mx-1 h-4 w-px" />
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="xs" className="shrink-0">
+                      <Icons.XCircle className="mr-1 h-3.5 w-3.5" />
+                      Clear
+                      <Icons.ChevronDown className="ml-1 h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem onClick={clearAllCategories}>
+                      <Icons.Tag className="mr-2 h-4 w-4" />
+                      Clear Categories
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={clearAllEvents}>
+                      <Icons.Calendar className="mr-2 h-4 w-4" />
+                      Clear Events
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Button
+                  onClick={deleteSelected}
+                  size="xs"
+                  variant="destructive"
+                  className="shrink-0 rounded-md text-xs"
+                  title="Delete selected"
+                  aria-label="Delete selected"
+                  disabled={saveActivitiesMutation.isPending}
+                >
+                  <Icons.Trash className="h-3.5 w-3.5" />
+                  <span>Delete</span>
+                </Button>
+
+                <Button
+                  onClick={clearSelection}
+                  variant="ghost"
+                  size="xs"
+                  className="ml-auto shrink-0"
+                >
+                  Deselect
+                </Button>
+              </>
+            )}
+
+            {hasUnsavedChanges && (
+              <>
+                <div className="bg-border mx-1 h-4 w-px" />
+                <Button
+                  onClick={handleSaveChanges}
+                  size="xs"
+                  className="shrink-0 rounded-md text-xs"
+                  title="Save changes"
+                  aria-label="Save changes"
+                  disabled={saveActivitiesMutation.isPending}
+                >
+                  {saveActivitiesMutation.isPending ? (
+                    <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Icons.Save className="h-3.5 w-3.5" />
+                  )}
+                  <span>Save</span>
+                </Button>
+
+                <Button
+                  onClick={handleCancelChanges}
+                  size="xs"
+                  variant="outline"
+                  className="shrink-0 rounded-md text-xs"
+                  title="Discard changes"
+                  aria-label="Discard changes"
+                  disabled={saveActivitiesMutation.isPending}
+                >
+                  <Icons.Undo className="h-3.5 w-3.5" />
+                  <span>Cancel</span>
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div
+          ref={scrollContainerRef}
+          className="bg-background min-h-[320px] flex-1 overflow-auto rounded-lg border [&>div]:overflow-visible"
+        >
+          <Table className="min-w-[1080px]">
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="bg-muted/30 h-9 w-12 border-r px-0 py-0">
+                  <div className="flex h-full items-center justify-center">
+                    <Checkbox
+                      checked={
+                        sortedTransactions.length > 0 &&
+                        selectedIds.size === sortedTransactions.length
                       }
-                      onToggleSelect={toggleSelect}
-                      onUpdateTransaction={updateTransaction}
-                      onEditTransaction={handleEditTransaction}
-                      onDuplicate={duplicateRow}
-                      onDelete={deleteRow}
-                      onNavigate={handleCellNavigation}
-                      setFocusedCell={setFocusedCell}
-                      resolvedCurrency={
-                        dirtyCurrencyLookup.get(transaction.id) ??
-                        transaction.currency ??
-                        transaction.accountCurrency ??
-                        fallbackCurrency
-                      }
-                      fallbackCurrency={fallbackCurrency}
-                      rowRef={rowVirtualizer.measureElement}
+                      onCheckedChange={toggleSelectAll}
                     />
-                  </Fragment>
-                );
-              })}
-
-              {paddingBottom > 0 ? (
-                <TableRow key="virtual-padding-bottom">
-                  <TableCell colSpan={12} style={{ height: paddingBottom }} />
+                  </div>
+                </TableHead>
+                <SortableHeader
+                  className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold"
+                  title="Type"
+                  columnId="activityType"
+                  sorting={sorting}
+                  onSortingChange={onSortingChange}
+                />
+                <SortableHeader
+                  className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold"
+                  title="Date & Time"
+                  columnId="date"
+                  sorting={sorting}
+                  onSortingChange={onSortingChange}
+                />
+                <SortableHeader
+                  className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold"
+                  title="Symbol"
+                  columnId="assetSymbol"
+                  sorting={sorting}
+                  onSortingChange={onSortingChange}
+                />
+                <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
+                  Quantity
+                </TableHead>
+                <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
+                  Unit Price
+                </TableHead>
+                <TableHead className="bg-muted/30 h-9 w-24 border-r px-2 py-1.5 text-right text-xs font-semibold">
+                  Amount
+                </TableHead>
+                <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
+                  Fee
+                </TableHead>
+                <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
+                  Total
+                </TableHead>
+                <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
+                  Account
+                </TableHead>
+                <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
+                  Currency
+                </TableHead>
+                <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
+                  Comment
+                </TableHead>
+                <TableHead className="bg-muted/30 h-9 px-2 py-1.5" />
+              </TableRow>
+            </TableHeader>
+            {sortedTransactions.length === 0 ? (
+              <TableBody>
+                <TableRow>
+                  <TableCell colSpan={12} className="text-muted-foreground h-32 text-center">
+                    No investment activity yet. Add a trade or import from your brokerage.
+                  </TableCell>
                 </TableRow>
-              ) : null}
-            </TableBody>
-          )}
-        </Table>
-      </div>
+              </TableBody>
+            ) : (
+              <TableBody>
+                {paddingTop > 0 ? (
+                  <TableRow key="virtual-padding-top">
+                    <TableCell colSpan={12} style={{ height: paddingTop }} />
+                  </TableRow>
+                ) : null}
+
+                {virtualRows.map((virtualRow) => {
+                  const transaction = sortedTransactions[virtualRow.index];
+                  if (!transaction) {
+                    return null;
+                  }
+
+                  return (
+                    <Fragment key={virtualRow.key}>
+                      <TransactionRow
+                        transaction={transaction}
+                        activityTypeOptions={activityTypeOptions}
+                        accountOptions={accountOptions}
+                        currencyOptions={currencyOptions}
+                        accountLookup={accountLookup}
+                        isSelected={selectedIds.has(transaction.id)}
+                        isDirty={dirtyTransactionIds.has(transaction.id)}
+                        focusedField={
+                          focusedCell?.rowId === transaction.id ? focusedCell.field : null
+                        }
+                        onToggleSelect={toggleSelect}
+                        onUpdateTransaction={updateTransaction}
+                        onEditTransaction={handleEditTransaction}
+                        onDuplicate={duplicateRow}
+                        onDelete={deleteRow}
+                        onNavigate={handleCellNavigation}
+                        setFocusedCell={setFocusedCell}
+                        resolvedCurrency={
+                          dirtyCurrencyLookup.get(transaction.id) ??
+                          transaction.currency ??
+                          transaction.accountCurrency ??
+                          fallbackCurrency
+                        }
+                        fallbackCurrency={fallbackCurrency}
+                        rowRef={rowVirtualizer.measureElement}
+                      />
+                    </Fragment>
+                  );
+                })}
+
+                {paddingBottom > 0 ? (
+                  <TableRow key="virtual-padding-bottom">
+                    <TableCell colSpan={12} style={{ height: paddingBottom }} />
+                  </TableRow>
+                ) : null}
+              </TableBody>
+            )}
+          </Table>
+        </div>
       </div>
 
       <BulkActivityTypeAssignModal

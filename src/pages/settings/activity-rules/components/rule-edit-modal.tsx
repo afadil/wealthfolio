@@ -5,7 +5,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@wealthfolio/ui";
-import type { ActivityRule, CategoryWithChildren, NewActivityRule, UpdateActivityRule } from "@/lib/types";
+import type {
+  ActivityRule,
+  CategoryWithChildren,
+  NewActivityRule,
+  UpdateActivityRule,
+  RecurrenceType,
+} from "@/lib/types";
 import { RuleForm } from "./rule-form";
 
 interface RuleEditModalProps {
@@ -48,7 +54,7 @@ export function RuleEditModal({
           categoryId: values.categoryId || undefined,
           subCategoryId: values.subCategoryId || undefined,
           activityType: values.activityType || undefined,
-          recurrence: values.recurrence || undefined,
+          recurrence: (values.recurrence as RecurrenceType) || undefined,
           priority: values.priority,
           isGlobal: values.isGlobal,
         },
@@ -61,7 +67,7 @@ export function RuleEditModal({
         categoryId: values.categoryId || undefined,
         subCategoryId: values.subCategoryId || undefined,
         activityType: values.activityType || undefined,
-        recurrence: values.recurrence || undefined,
+        recurrence: (values.recurrence as RecurrenceType) || undefined,
         priority: values.priority,
         isGlobal: values.isGlobal,
       });

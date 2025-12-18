@@ -130,9 +130,7 @@ const TreemapTooltip = ({ active, payload, currency = "USD" }: TreemapTooltipPro
       <Card>
         <CardContent className="space-y-1 p-3">
           <div className="text-sm font-medium">{data.categoryName || "Uncategorized"}</div>
-          <div className="text-foreground font-semibold">
-            {formatAmount(data.amount, currency)}
-          </div>
+          <div className="text-foreground font-semibold">{formatAmount(data.amount, currency)}</div>
           <div className="text-muted-foreground text-xs">{formatPercent(percent)} of total</div>
         </CardContent>
       </Card>

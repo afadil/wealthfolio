@@ -7,7 +7,13 @@ import { CashActivityType, CASH_ACTIVITY_TYPES } from "@/commands/cash-activity"
 import { getCategoriesHierarchical } from "@/commands/category";
 import { getEventsWithNames } from "@/commands/event";
 import { useUnsavedChangesContext } from "@/context/unsaved-changes-context";
-import { Account, CategoryWithChildren, EventWithTypeName, RECURRENCE_TYPES, RecurrenceType } from "@/lib/types";
+import {
+  Account,
+  CategoryWithChildren,
+  EventWithTypeName,
+  RECURRENCE_TYPES,
+  RecurrenceType,
+} from "@/lib/types";
 import { QueryKeys } from "@/lib/query-keys";
 import {
   AnimatedToggleGroup,
@@ -23,7 +29,13 @@ import { DataTableFacetedFilter } from "@/pages/activity/components/activity-dat
 import { useQuery } from "@tanstack/react-query";
 
 export type CashActivityViewMode = "view" | "edit";
-export type CategorizationStatus = "uncategorized" | "categorized" | "with_events" | "without_events" | "with_recurrence" | "without_recurrence";
+export type CategorizationStatus =
+  | "uncategorized"
+  | "categorized"
+  | "with_events"
+  | "without_events"
+  | "with_recurrence"
+  | "without_recurrence";
 
 interface AmountRange {
   min: string;
@@ -127,7 +139,7 @@ export function CashActivityFilters({
       if (viewMode === "edit" && newMode === "view") {
         const canProceed = confirmAction(
           () => onViewModeChange(newMode),
-          "You have unsaved changes in Edit mode. Switching to View mode will discard your changes."
+          "You have unsaved changes in Edit mode. Switching to View mode will discard your changes.",
         );
         if (canProceed) {
           onViewModeChange(newMode);
@@ -136,7 +148,7 @@ export function CashActivityFilters({
         onViewModeChange(newMode);
       }
     },
-    [viewMode, onViewModeChange, confirmAction]
+    [viewMode, onViewModeChange, confirmAction],
   );
 
   const { data: categories = [] } = useQuery<CategoryWithChildren[], Error>({
@@ -195,9 +207,7 @@ export function CashActivityFilters({
 
   const subCategoryOptions = useMemo(() => {
     const options: { value: string; label: string; color?: string }[] = [];
-    const selectedParents = categories.filter((cat) =>
-      selectedParentCategoryIds.includes(cat.id)
-    );
+    const selectedParents = categories.filter((cat) => selectedParentCategoryIds.includes(cat.id));
 
     selectedParents.forEach((category) => {
       if (category.children && category.children.length > 0) {
@@ -353,9 +363,7 @@ export function CashActivityFilters({
               >
                 <Icons.Calendar className="mr-2 h-4 w-4" />
                 Date
-                {hasDateFilter && (
-                  <span className="ml-2 text-xs">{formatDateRangeDisplay()}</span>
-                )}
+                {hasDateFilter && <span className="ml-2 text-xs">{formatDateRangeDisplay()}</span>}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -365,7 +373,9 @@ export function CashActivityFilters({
                 selected={calendarDateRange as DayPickerDateRange | undefined}
                 onSelect={(selectedRange: DayPickerDateRange | undefined) => {
                   onDateRangeChange({
-                    startDate: selectedRange?.from ? format(selectedRange.from, "yyyy-MM-dd") : undefined,
+                    startDate: selectedRange?.from
+                      ? format(selectedRange.from, "yyyy-MM-dd")
+                      : undefined,
                     endDate: selectedRange?.to ? format(selectedRange.to, "yyyy-MM-dd") : undefined,
                   });
                 }}
@@ -406,25 +416,27 @@ export function CashActivityFilters({
         <DataTableFacetedFilter
           title="Category"
           options={parentCategoryOptions}
-          selectedValues={new Set([
-            ...selectedParentCategoryIds,
-            ...selectedCategorizationStatuses.filter((s) =>
-              CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number])
-            ),
-          ])}
+          selectedValues={
+            new Set([
+              ...selectedParentCategoryIds,
+              ...selectedCategorizationStatuses.filter((s) =>
+                CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number]),
+              ),
+            ])
+          }
           onFilterChange={(values: Set<string>) => {
             const allValues = Array.from(values);
             const statusValues = allValues.filter((v) =>
-              CATEGORY_STATUS_VALUES.includes(v as (typeof CATEGORY_STATUS_VALUES)[number])
+              CATEGORY_STATUS_VALUES.includes(v as (typeof CATEGORY_STATUS_VALUES)[number]),
             ) as CategorizationStatus[];
             const newParentIds = allValues.filter(
-              (v) => !CATEGORY_STATUS_VALUES.includes(v as (typeof CATEGORY_STATUS_VALUES)[number])
+              (v) => !CATEGORY_STATUS_VALUES.includes(v as (typeof CATEGORY_STATUS_VALUES)[number]),
             );
 
             onParentCategoryIdsChange(newParentIds);
 
             const eventStatuses = selectedCategorizationStatuses.filter((s) =>
-              EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number])
+              EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number]),
             );
             onCategorizationStatusesChange([...statusValues, ...eventStatuses]);
 
@@ -435,7 +447,7 @@ export function CashActivityFilters({
                 return categories.some(
                   (cat) =>
                     newParentIds.includes(cat.id) &&
-                    cat.children?.some((child) => child.id === subId)
+                    cat.children?.some((child) => child.id === subId),
                 );
               });
               if (validSubCategories.length !== selectedSubCategoryIds.length) {
@@ -456,60 +468,73 @@ export function CashActivityFilters({
         <DataTableFacetedFilter
           title="Event"
           options={eventOptions}
-          selectedValues={new Set([
-            ...selectedEventIds,
-            ...selectedCategorizationStatuses.filter((s) =>
-              EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number])
-            ),
-          ])}
+          selectedValues={
+            new Set([
+              ...selectedEventIds,
+              ...selectedCategorizationStatuses.filter((s) =>
+                EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number]),
+              ),
+            ])
+          }
           onFilterChange={(values: Set<string>) => {
             const allValues = Array.from(values);
             const statusValues = allValues.filter((v) =>
-              EVENT_STATUS_VALUES.includes(v as (typeof EVENT_STATUS_VALUES)[number])
+              EVENT_STATUS_VALUES.includes(v as (typeof EVENT_STATUS_VALUES)[number]),
             ) as CategorizationStatus[];
             const newEventIds = allValues.filter(
-              (v) => !EVENT_STATUS_VALUES.includes(v as (typeof EVENT_STATUS_VALUES)[number])
+              (v) => !EVENT_STATUS_VALUES.includes(v as (typeof EVENT_STATUS_VALUES)[number]),
             );
 
             onEventIdsChange(newEventIds);
 
             const categoryStatuses = selectedCategorizationStatuses.filter((s) =>
-              CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number])
+              CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number]),
             );
             const recurrenceStatuses = selectedCategorizationStatuses.filter((s) =>
-              RECURRENCE_STATUS_VALUES.includes(s as (typeof RECURRENCE_STATUS_VALUES)[number])
+              RECURRENCE_STATUS_VALUES.includes(s as (typeof RECURRENCE_STATUS_VALUES)[number]),
             );
-            onCategorizationStatusesChange([...categoryStatuses, ...statusValues, ...recurrenceStatuses]);
+            onCategorizationStatusesChange([
+              ...categoryStatuses,
+              ...statusValues,
+              ...recurrenceStatuses,
+            ]);
           }}
         />
 
         <DataTableFacetedFilter
           title="Recurrence"
           options={recurrenceOptions}
-          selectedValues={new Set([
-            ...selectedRecurrenceTypes,
-            ...selectedCategorizationStatuses.filter((s) =>
-              RECURRENCE_STATUS_VALUES.includes(s as (typeof RECURRENCE_STATUS_VALUES)[number])
-            ),
-          ])}
+          selectedValues={
+            new Set([
+              ...selectedRecurrenceTypes,
+              ...selectedCategorizationStatuses.filter((s) =>
+                RECURRENCE_STATUS_VALUES.includes(s as (typeof RECURRENCE_STATUS_VALUES)[number]),
+              ),
+            ])
+          }
           onFilterChange={(values: Set<string>) => {
             const allValues = Array.from(values);
             const statusValues = allValues.filter((v) =>
-              RECURRENCE_STATUS_VALUES.includes(v as (typeof RECURRENCE_STATUS_VALUES)[number])
+              RECURRENCE_STATUS_VALUES.includes(v as (typeof RECURRENCE_STATUS_VALUES)[number]),
             ) as CategorizationStatus[];
             const newRecurrenceTypes = allValues.filter(
-              (v) => !RECURRENCE_STATUS_VALUES.includes(v as (typeof RECURRENCE_STATUS_VALUES)[number])
+              (v) =>
+                !RECURRENCE_STATUS_VALUES.includes(v as (typeof RECURRENCE_STATUS_VALUES)[number]),
             ) as RecurrenceType[];
 
             onRecurrenceTypesChange(newRecurrenceTypes);
 
             const categoryStatuses = selectedCategorizationStatuses.filter((s) =>
-              CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number])
+              CATEGORY_STATUS_VALUES.includes(s as (typeof CATEGORY_STATUS_VALUES)[number]),
             );
             const eventStatuses = selectedCategorizationStatuses.filter((s) =>
-              EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number])
+              EVENT_STATUS_VALUES.includes(s as (typeof EVENT_STATUS_VALUES)[number]),
             );
-            onCategorizationStatusesChange([...categoryStatuses, ...eventStatuses, ...statusValues]);
+            onCategorizationStatusesChange([
+              ...categoryStatuses,
+              ...eventStatuses,
+              ...statusValues,
+            ]);
           }}
         />
 

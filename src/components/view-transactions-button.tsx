@@ -31,7 +31,7 @@ export function ViewTransactionsButton({
       navigate(`/activity?tab=transactions&event=${eventId}`);
     } else if (dateRange) {
       navigate(
-        `/activity?tab=transactions&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
+        `/activity?tab=transactions&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`,
       );
     }
   };

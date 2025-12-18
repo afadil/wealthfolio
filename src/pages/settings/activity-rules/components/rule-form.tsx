@@ -29,20 +29,22 @@ import { ActivityType, ActivityTypeNames } from "@/lib/constants";
 
 type FormMatchType = "contains" | "starts_with" | "exact";
 
-const ruleFormSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  pattern: z.string().min(1, "Pattern is required"),
-  matchType: z.enum(["contains", "starts_with", "exact"]),
-  categoryId: z.string().optional(),
-  subCategoryId: z.string().optional(),
-  activityType: z.string().optional(),
-  recurrence: z.enum(["fixed", "variable", "periodic"]).optional(),
-  priority: z.coerce.number().int().min(0),
-  isGlobal: z.boolean(),
-}).refine(
-  (data) => data.categoryId || data.activityType || data.recurrence,
-  { message: "At least a category, activity type, or recurrence is required", path: ["categoryId"] }
-);
+const ruleFormSchema = z
+  .object({
+    name: z.string().min(1, "Name is required"),
+    pattern: z.string().min(1, "Pattern is required"),
+    matchType: z.enum(["contains", "starts_with", "exact"]),
+    categoryId: z.string().optional(),
+    subCategoryId: z.string().optional(),
+    activityType: z.string().optional(),
+    recurrence: z.enum(["fixed", "variable", "periodic"]).optional(),
+    priority: z.coerce.number().int().min(0),
+    isGlobal: z.boolean(),
+  })
+  .refine((data) => data.categoryId || data.activityType || data.recurrence, {
+    message: "At least a category, activity type, or recurrence is required",
+    path: ["categoryId"],
+  });
 
 type RuleFormValues = z.infer<typeof ruleFormSchema>;
 
@@ -71,13 +73,7 @@ const MATCH_TYPE_OPTIONS: { value: FormMatchType; label: string; description: st
   { value: "exact", label: "Exact match", description: "Text matches pattern exactly" },
 ];
 
-export function RuleForm({
-  rule,
-  categories,
-  onSubmit,
-  onCancel,
-  isLoading,
-}: RuleFormProps) {
+export function RuleForm({ rule, categories, onSubmit, onCancel, isLoading }: RuleFormProps) {
   const [testText, setTestText] = useState("");
   const [testResult, setTestResult] = useState<boolean | null>(null);
   const [testing, setTesting] = useState(false);
@@ -198,11 +194,7 @@ export function RuleForm({
             onClick={handleTest}
             disabled={testing || !testText || !form.getValues("pattern")}
           >
-            {testing ? (
-              <Icons.Spinner className="h-4 w-4 animate-spin" />
-            ) : (
-              "Test"
-            )}
+            {testing ? <Icons.Spinner className="h-4 w-4 animate-spin" /> : "Test"}
           </Button>
           {testResult !== null && (
             <Badge variant={testResult ? "default" : "destructive"} className="text-xs">
@@ -336,9 +328,7 @@ export function RuleForm({
               <FormControl>
                 <Input type="number" min={0} {...field} />
               </FormControl>
-              <FormDescription>
-                Higher priority rules are checked first (0-100)
-              </FormDescription>
+              <FormDescription>Higher priority rules are checked first (0-100)</FormDescription>
               <FormMessage />
             </FormItem>
           )}

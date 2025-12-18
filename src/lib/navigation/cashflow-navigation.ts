@@ -15,7 +15,10 @@ export interface CashflowNavigationParams {
  * @param period - The period type: YTD (year-to-date), LAST_YEAR, or TOTAL
  * @returns An object with startDate and endDate (both optional, as TOTAL has no dates)
  */
-export function periodToDateRange(period: SpendingPeriod): { startDate?: string; endDate?: string } {
+export function periodToDateRange(period: SpendingPeriod): {
+  startDate?: string;
+  endDate?: string;
+} {
   const today = new Date();
 
   switch (period) {

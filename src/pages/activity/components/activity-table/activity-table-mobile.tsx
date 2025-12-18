@@ -35,9 +35,7 @@ export const ActivityTableMobile = ({
     return (
       <div className="flex h-48 flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
         <h3 className="text-lg font-medium">No investment activity found</h3>
-        <p className="text-muted-foreground text-sm">
-          Add a trade or import from your brokerage.
-        </p>
+        <p className="text-muted-foreground text-sm">Add a trade or import from your brokerage.</p>
       </div>
     );
   }

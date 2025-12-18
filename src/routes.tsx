@@ -91,7 +91,9 @@ export function AppRoutes() {
                 path={path}
                 element={
                   <Suspense
-                    fallback={<div className="flex h-64 items-center justify-center">Loading...</div>}
+                    fallback={
+                      <div className="flex h-64 items-center justify-center">Loading...</div>
+                    }
                   >
                     <Component />
                   </Suspense>

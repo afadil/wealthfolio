@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { QueryKeys } from '@/lib/query-keys';
-import { getEventsWithNames, getEventActivityCounts } from '@/commands/event';
-import { getEventTypes } from '@/commands/event-type';
-import { toast } from '@/components/ui/use-toast';
-import { SettingsHeader } from '../settings-header';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { QueryKeys } from "@/lib/query-keys";
+import { getEventsWithNames, getEventActivityCounts } from "@/commands/event";
+import { getEventTypes } from "@/commands/event-type";
+import { toast } from "@/components/ui/use-toast";
+import { SettingsHeader } from "../settings-header";
 import {
   Button,
   Icons,
@@ -23,13 +23,13 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@wealthfolio/ui';
-import { EventFormDialog } from './components/event-form-dialog';
-import { EventTypeFormDialog } from './components/event-type-form-dialog';
-import { useEventTypeMutations } from './use-event-type-mutations';
-import { useEventMutations } from './use-event-mutations';
-import type { EventType, EventWithTypeName } from '@/lib/types';
-import { buildCashflowUrl } from '@/lib/navigation/cashflow-navigation';
+} from "@wealthfolio/ui";
+import { EventFormDialog } from "./components/event-form-dialog";
+import { EventTypeFormDialog } from "./components/event-type-form-dialog";
+import { useEventTypeMutations } from "./use-event-type-mutations";
+import { useEventMutations } from "./use-event-mutations";
+import type { EventType, EventWithTypeName } from "@/lib/types";
+import { buildCashflowUrl } from "@/lib/navigation/cashflow-navigation";
 
 export const EventsPage = () => {
   const navigate = useNavigate();
@@ -37,7 +37,9 @@ export const EventsPage = () => {
   const [isEventTypeDialogOpen, setIsEventTypeDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<EventWithTypeName | undefined>();
   const [selectedEventType, setSelectedEventType] = useState<EventType | undefined>();
-  const [selectedEventTypeForNewEvent, setSelectedEventTypeForNewEvent] = useState<EventType | undefined>();
+  const [selectedEventTypeForNewEvent, setSelectedEventTypeForNewEvent] = useState<
+    EventType | undefined
+  >();
   const [expandedTypes, setExpandedTypes] = useState<Set<string>>(new Set());
 
   const { data: events, isLoading: eventsLoading } = useQuery({
@@ -60,13 +62,16 @@ export const EventsPage = () => {
 
   const isLoading = eventsLoading || typesLoading;
 
-  const eventsByType = (events || []).reduce((acc, event) => {
-    if (!acc[event.eventTypeId]) {
-      acc[event.eventTypeId] = [];
-    }
-    acc[event.eventTypeId].push(event);
-    return acc;
-  }, {} as Record<string, EventWithTypeName[]>);
+  const eventsByType = (events || []).reduce(
+    (acc, event) => {
+      if (!acc[event.eventTypeId]) {
+        acc[event.eventTypeId] = [];
+      }
+      acc[event.eventTypeId].push(event);
+      return acc;
+    },
+    {} as Record<string, EventWithTypeName[]>,
+  );
 
   const toggleExpanded = (typeId: string) => {
     setExpandedTypes((prev) => {
@@ -119,9 +124,9 @@ export const EventsPage = () => {
     const count = activityCounts?.[event.id] ?? 0;
     if (count > 0) {
       toast({
-        title: 'Cannot delete event',
-        description: `This event has ${count} transaction${count !== 1 ? 's' : ''} associated with it. Please reassign or remove the transactions first.`,
-        variant: 'destructive',
+        title: "Cannot delete event",
+        description: `This event has ${count} transaction${count !== 1 ? "s" : ""} associated with it. Please reassign or remove the transactions first.`,
+        variant: "destructive",
       });
     }
   };
@@ -130,9 +135,9 @@ export const EventsPage = () => {
     const count = getEventTypeTransactionCount(eventType.id);
     if (count > 0) {
       toast({
-        title: 'Cannot delete event type',
-        description: `This event type has ${count} transaction${count !== 1 ? 's' : ''} associated with its events. Please reassign or remove the transactions first.`,
-        variant: 'destructive',
+        title: "Cannot delete event type",
+        description: `This event type has ${count} transaction${count !== 1 ? "s" : ""} associated with its events. Please reassign or remove the transactions first.`,
+        variant: "destructive",
       });
     }
   };
@@ -165,7 +170,7 @@ export const EventsPage = () => {
 
             return (
               <div key={type.id}>
-                <div className="flex items-center justify-between py-3 px-4">
+                <div className="flex items-center justify-between px-4 py-3">
                   <div className="flex items-center gap-3">
                     {hasEvents ? (
                       <Button
@@ -191,9 +196,7 @@ export const EventsPage = () => {
                     )}
                     <span className="font-medium">{type.name}</span>
                     {hasEvents && (
-                      <span className="text-xs text-muted-foreground">
-                        ({typeEvents.length})
-                      </span>
+                      <span className="text-muted-foreground text-xs">({typeEvents.length})</span>
                     )}
                   </div>
                   <div className="flex items-center gap-1">
@@ -235,8 +238,9 @@ export const EventsPage = () => {
                             <AlertDialogDescription>
                               Are you sure you want to delete &quot;{type.name}&quot;?
                               {hasEvents && (
-                                <span className="mt-2 block font-medium text-destructive">
-                                  This will also delete all {typeEvents.length} event(s) under this type.
+                                <span className="text-destructive mt-2 block font-medium">
+                                  This will also delete all {typeEvents.length} event(s) under this
+                                  type.
                                 </span>
                               )}
                               This action cannot be undone.
@@ -270,19 +274,24 @@ export const EventsPage = () => {
                                   <TooltipProvider>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
-                                        <span className="text-xs text-muted-foreground cursor-default">
+                                        <span className="text-muted-foreground cursor-default text-xs">
                                           ({activityCounts?.[event.id]})
                                         </span>
                                       </TooltipTrigger>
                                       <TooltipContent>
-                                        <p>{activityCounts?.[event.id]} transaction{activityCounts?.[event.id] !== 1 ? 's' : ''}</p>
+                                        <p>
+                                          {activityCounts?.[event.id]} transaction
+                                          {activityCounts?.[event.id] !== 1 ? "s" : ""}
+                                        </p>
                                       </TooltipContent>
                                     </Tooltip>
                                   </TooltipProvider>
                                 )}
                               </div>
-                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <span>{event.startDate} - {event.endDate}</span>
+                              <div className="text-muted-foreground flex items-center gap-2 text-xs">
+                                <span>
+                                  {event.startDate} - {event.endDate}
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -323,8 +332,8 @@ export const EventsPage = () => {
                                   <AlertDialogHeader>
                                     <AlertDialogTitle>Delete Event</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                      Are you sure you want to delete &quot;{event.name}&quot;?
-                                      This action cannot be undone.
+                                      Are you sure you want to delete &quot;{event.name}&quot;? This
+                                      action cannot be undone.
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>

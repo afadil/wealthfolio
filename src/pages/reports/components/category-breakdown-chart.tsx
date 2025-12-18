@@ -64,10 +64,10 @@ export function CategoryBreakdownChart({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Category Breakdown</CardTitle>
-          <Icons.BarChart className="h-4 w-4 text-muted-foreground" />
+          <Icons.BarChart className="text-muted-foreground h-4 w-4" />
         </CardHeader>
         <CardContent className="flex h-[280px] items-center justify-center">
-          <p className="text-sm text-muted-foreground">No spending data for this month</p>
+          <p className="text-muted-foreground text-sm">No spending data for this month</p>
         </CardContent>
       </Card>
     );
@@ -77,7 +77,7 @@ export function CategoryBreakdownChart({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">Category Breakdown</CardTitle>
-        <Icons.BarChart className="h-4 w-4 text-muted-foreground" />
+        <Icons.BarChart className="text-muted-foreground h-4 w-4" />
       </CardHeader>
       <CardContent>
         <div className="flex items-start gap-4">
@@ -88,12 +88,12 @@ export function CategoryBreakdownChart({
                   if (!active || !payload?.length) return null;
                   const data = payload[0].payload;
                   return (
-                    <div className="rounded-lg border bg-background p-2 shadow-sm">
+                    <div className="bg-background rounded-lg border p-2 shadow-sm">
                       <div className="font-medium">{data.name}</div>
-                      <div className="text-sm text-muted-foreground">
+                      <div className="text-muted-foreground text-sm">
                         {isHidden ? "••••" : formatAmount(data.value, currency)}
                       </div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-muted-foreground text-xs">
                         {formatPercent(data.percent / 100)}
                       </div>
                     </div>
@@ -120,18 +120,18 @@ export function CategoryBreakdownChart({
           <div className="flex-1 space-y-2 pt-2">
             {chartData.map((cat, index) => (
               <div key={index} className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex min-w-0 items-center gap-2">
                   <div
-                    className="h-3 w-3 rounded-full shrink-0"
+                    className="h-3 w-3 shrink-0 rounded-full"
                     style={{ backgroundColor: cat.fill }}
                   />
-                  <span className="truncate text-muted-foreground">{cat.name}</span>
+                  <span className="text-muted-foreground truncate">{cat.name}</span>
                 </div>
-                <div className="flex items-center gap-2 shrink-0 ml-2">
+                <div className="ml-2 flex shrink-0 items-center gap-2">
                   <span className="font-medium">
                     <PrivacyAmount value={cat.value} currency={currency} />
                   </span>
-                  <span className="text-xs text-muted-foreground w-10 text-right">
+                  <span className="text-muted-foreground w-10 text-right text-xs">
                     {formatPercent(cat.percent / 100)}
                   </span>
                 </div>

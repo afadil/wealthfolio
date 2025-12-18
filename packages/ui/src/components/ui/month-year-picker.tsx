@@ -5,16 +5,21 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr",
-  "May", "Jun", "Jul", "Aug",
-  "Sep", "Oct", "Nov", "Dec",
-];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 const FULL_MONTHS = [
-  "January", "February", "March", "April",
-  "May", "June", "July", "August",
-  "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
 interface MonthYearPickerProps {
@@ -30,13 +35,7 @@ interface MonthYearPickerProps {
   className?: string;
 }
 
-function MonthYearPicker({
-  value,
-  onChange,
-  minDate,
-  maxDate,
-  className,
-}: MonthYearPickerProps) {
+function MonthYearPicker({ value, onChange, minDate, maxDate, className }: MonthYearPickerProps) {
   // Parse current value or use current date
   const [selectedYear, selectedMonth] = React.useMemo(() => {
     if (value) {
@@ -111,26 +110,14 @@ function MonthYearPicker({
   };
 
   return (
-    <div className={cn("p-3 w-[240px]", className)} data-slot="month-year-picker">
+    <div className={cn("w-[240px] p-3", className)} data-slot="month-year-picker">
       {/* Year navigation */}
-      <div className="flex items-center justify-between mb-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={handlePrevYear}
-          disabled={!canGoPrevYear}
-        >
+      <div className="mb-3 flex items-center justify-between">
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handlePrevYear} disabled={!canGoPrevYear}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <span className="text-sm font-medium">{viewYear}</span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={handleNextYear}
-          disabled={!canGoNextYear}
-        >
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleNextYear} disabled={!canGoNextYear}>
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
@@ -147,7 +134,7 @@ function MonthYearPicker({
               size="sm"
               className={cn(
                 "h-8 text-xs font-normal",
-                disabled && "opacity-50 cursor-not-allowed",
+                disabled && "cursor-not-allowed opacity-50",
                 selected && "bg-primary text-primary-foreground",
               )}
               onClick={() => !disabled && handleMonthClick(index)}

@@ -64,7 +64,7 @@ export function ActivityViewControls({
       if (viewMode === "datagrid" && newMode === "table") {
         const canProceed = confirmAction(
           () => onViewModeChange(newMode),
-          "You have unsaved changes in Edit mode. Switching to View mode will discard your changes."
+          "You have unsaved changes in Edit mode. Switching to View mode will discard your changes.",
         );
         if (canProceed) {
           onViewModeChange(newMode);
@@ -73,7 +73,7 @@ export function ActivityViewControls({
         onViewModeChange(newMode);
       }
     },
-    [viewMode, onViewModeChange, confirmAction]
+    [viewMode, onViewModeChange, confirmAction],
   );
 
   const debouncedSearch = useMemo(

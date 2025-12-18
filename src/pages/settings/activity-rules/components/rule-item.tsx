@@ -42,14 +42,13 @@ export function RuleItem({ rule, onEdit, onDelete }: RuleItemProps) {
 
   const appliesTo: string[] = [];
   if (rule.activityType) {
-    const activityTypeLabel = ActivityTypeNames[rule.activityType as keyof typeof ActivityTypeNames] || rule.activityType;
+    const activityTypeLabel =
+      ActivityTypeNames[rule.activityType as keyof typeof ActivityTypeNames] || rule.activityType;
     appliesTo.push(activityTypeLabel);
   }
   if (rule.categoryName) {
     appliesTo.push(
-      rule.subCategoryName
-        ? `${rule.categoryName} / ${rule.subCategoryName}`
-        : rule.categoryName
+      rule.subCategoryName ? `${rule.categoryName} / ${rule.subCategoryName}` : rule.categoryName,
     );
   }
   if (rule.recurrence) {
@@ -74,9 +73,7 @@ export function RuleItem({ rule, onEdit, onDelete }: RuleItemProps) {
           <div className="text-muted-foreground flex items-center gap-2 text-sm">
             <code className="bg-muted rounded px-1.5 py-0.5 text-xs">{rule.pattern}</code>
             <Icons.ArrowRight className="h-3 w-3" />
-            <span>
-              {appliesTo.length > 0 ? appliesTo.join(" • ") : "No assignments"}
-            </span>
+            <span>{appliesTo.length > 0 ? appliesTo.join(" • ") : "No assignments"}</span>
           </div>
         </div>
 
@@ -114,7 +111,10 @@ export function RuleItem({ rule, onEdit, onDelete }: RuleItemProps) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

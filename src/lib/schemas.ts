@@ -109,6 +109,7 @@ export const importActivitySchema = z
     categoryId: z.string().optional(),
     subCategoryId: z.string().optional(),
     eventId: z.string().optional(),
+    recurrence: z.enum(["fixed", "variable", "periodic"]).optional(),
   })
   .refine(
     (data) => {

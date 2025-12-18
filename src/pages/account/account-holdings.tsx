@@ -59,9 +59,7 @@ const AccountHoldings = ({ accountId, showEmptyState = true }: AccountHoldingsPr
             <Button
               size="default"
               onClick={() =>
-                navigate(
-                  `/activity/manage?account=${accountId}&redirect-to=/accounts/${accountId}`,
-                )
+                navigate(`/activity/manage?account=${accountId}&redirect-to=/accounts/${accountId}`)
               }
             >
               <Icons.Plus className="mr-2 h-4 w-4" />

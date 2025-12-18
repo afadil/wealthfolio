@@ -63,7 +63,7 @@ export const CashActivityTable = ({
       recurrence: false,
       currency: false,
       comment: false,
-    }
+    },
   );
 
   const columns: ColumnDef<ActivityDetails>[] = React.useMemo(
@@ -164,7 +164,11 @@ export const CashActivityTable = ({
         enableSorting: false,
         enableHiding: false,
         header: ({ column }) => (
-          <DataTableColumnHeader className="justify-end text-right" column={column} title="Amount" />
+          <DataTableColumnHeader
+            className="justify-end text-right"
+            column={column}
+            title="Amount"
+          />
         ),
         cell: ({ row }) => {
           const amount = Number(row.getValue("amount"));
@@ -177,8 +181,11 @@ export const CashActivityTable = ({
           const displayAmount = Math.abs(amount);
 
           return (
-            <div className={`text-right font-medium ${isPositive ? "text-success" : "text-destructive"}`}>
-              {isPositive ? "+" : "-"}{formatAmount(displayAmount, currency)}
+            <div
+              className={`text-right font-medium ${isPositive ? "text-success" : "text-destructive"}`}
+            >
+              {isPositive ? "+" : "-"}
+              {formatAmount(displayAmount, currency)}
             </div>
           );
         },
@@ -205,14 +212,14 @@ export const CashActivityTable = ({
             <div className="flex items-center gap-2">
               {categoryColor && (
                 <span
-                  className="h-3 w-3 rounded-full flex-shrink-0"
+                  className="h-3 w-3 flex-shrink-0 rounded-full"
                   style={{ backgroundColor: categoryColor }}
                 />
               )}
               <div className="flex flex-col">
-                <span className="truncate max-w-[150px]">{categoryName}</span>
+                <span className="max-w-[150px] truncate">{categoryName}</span>
                 {subCategoryName && (
-                  <span className="text-muted-foreground text-xs font-light truncate max-w-[150px]">
+                  <span className="text-muted-foreground max-w-[150px] truncate text-xs font-light">
                     {subCategoryName}
                   </span>
                 )}
@@ -255,9 +262,7 @@ export const CashActivityTable = ({
           if (!recurrence) {
             return <span className="text-muted-foreground">-</span>;
           }
-          return (
-            <span className="capitalize">{recurrence}</span>
-          );
+          return <span className="capitalize">{recurrence}</span>;
         },
       },
       // 9. Description (hidden by default)

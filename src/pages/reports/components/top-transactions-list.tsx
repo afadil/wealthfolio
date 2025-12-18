@@ -35,7 +35,7 @@ export function TopTransactionsList({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Top 5 Largest Expenses</CardTitle>
-          <Icons.Receipt className="h-4 w-4 text-muted-foreground" />
+          <Icons.Receipt className="text-muted-foreground h-4 w-4" />
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -52,12 +52,12 @@ export function TopTransactionsList({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">Top 5 Largest Expenses</CardTitle>
-        <Icons.Receipt className="h-4 w-4 text-muted-foreground" />
+        <Icons.Receipt className="text-muted-foreground h-4 w-4" />
       </CardHeader>
       <CardContent>
         {transactions.length === 0 ? (
           <div className="flex h-[200px] items-center justify-center">
-            <p className="text-sm text-muted-foreground">No expenses this month</p>
+            <p className="text-muted-foreground text-sm">No expenses this month</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -66,23 +66,23 @@ export function TopTransactionsList({
                 key={transaction.id}
                 className="flex items-center justify-between rounded-lg border p-3"
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
-                    <Icons.CreditCard className="h-5 w-5 text-muted-foreground" />
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="bg-muted flex h-10 w-10 shrink-0 items-center justify-center rounded-full">
+                    <Icons.CreditCard className="text-muted-foreground h-5 w-5" />
                   </div>
                   <div className="min-w-0">
-                    <p className="font-medium truncate text-sm">
+                    <p className="truncate text-sm font-medium">
                       {transaction.name || transaction.assetId}
                     </p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="text-muted-foreground flex items-center gap-2 text-xs">
                       <span>{transaction.categoryName || "Uncategorized"}</span>
                       <span>·</span>
                       <span>{format(transaction.date, "MMM d")}</span>
                     </div>
                   </div>
                 </div>
-                <div className="shrink-0 ml-2 text-right">
-                  <span className="font-semibold text-destructive">
+                <div className="ml-2 shrink-0 text-right">
+                  <span className="text-destructive font-semibold">
                     <PrivacyAmount value={transaction.amount} currency={currency} />
                   </span>
                 </div>
@@ -94,7 +94,7 @@ export function TopTransactionsList({
         <Button
           variant="outline"
           size="sm"
-          className="w-full mt-4 gap-2"
+          className="mt-4 w-full gap-2"
           onClick={handleViewTransactions}
         >
           <ExternalLink className="h-4 w-4" />

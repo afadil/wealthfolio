@@ -1,4 +1,12 @@
-import { createContext, useContext, useCallback, useState, useRef, useEffect, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useCallback,
+  useState,
+  useRef,
+  useEffect,
+  type ReactNode,
+} from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   AlertDialog,
@@ -22,7 +30,9 @@ const UnsavedChangesContext = createContext<UnsavedChangesContextType | null>(nu
 
 export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [message, setMessage] = useState("You have unsaved changes. Are you sure you want to leave? Your changes will be lost.");
+  const [message, setMessage] = useState(
+    "You have unsaved changes. Are you sure you want to leave? Your changes will be lost.",
+  );
   const [dialogMessage, setDialogMessage] = useState(message);
   const [showDialog, setShowDialog] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
@@ -124,18 +134,23 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
     setPendingNavigation(null);
   }, [pendingAction, pendingNavigation, navigate]);
 
-  const confirmAction = useCallback((onConfirm: () => void, customMessage?: string): boolean => {
-    if (hasUnsavedChangesRef.current) {
-      setPendingAction(() => onConfirm);
-      setDialogMessage(customMessage || message);
-      setShowDialog(true);
-      return false;
-    }
-    return true;
-  }, [message]);
+  const confirmAction = useCallback(
+    (onConfirm: () => void, customMessage?: string): boolean => {
+      if (hasUnsavedChangesRef.current) {
+        setPendingAction(() => onConfirm);
+        setDialogMessage(customMessage || message);
+        setShowDialog(true);
+        return false;
+      }
+      return true;
+    },
+    [message],
+  );
 
   return (
-    <UnsavedChangesContext.Provider value={{ setHasUnsavedChanges, setMessage, hasUnsavedChanges, confirmAction }}>
+    <UnsavedChangesContext.Provider
+      value={{ setHasUnsavedChanges, setMessage, hasUnsavedChanges, confirmAction }}
+    >
       {children}
       <AlertDialog open={showDialog} onOpenChange={(open) => !open && handleCancel()}>
         <AlertDialogContent>

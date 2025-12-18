@@ -64,7 +64,8 @@ export default function MonthAnalysisPage({ renderActions }: MonthAnalysisPagePr
     const prevSpending = totalSummary.byMonth[prevMonth] || 0;
     const prevIncome = totalIncomeSummary.byMonth[prevMonth] || 0;
 
-    const spendingChange = prevSpending > 0 ? ((spending - prevSpending) / prevSpending) * 100 : null;
+    const spendingChange =
+      prevSpending > 0 ? ((spending - prevSpending) / prevSpending) * 100 : null;
     const incomeChange = prevIncome > 0 ? ((income - prevIncome) / prevIncome) * 100 : null;
 
     const categoryBreakdown = totalSummary.byMonthByCategory?.[selectedMonth] || {};
@@ -117,7 +118,7 @@ export default function MonthAnalysisPage({ renderActions }: MonthAnalysisPagePr
           availableMonths={availableMonths}
         />
       ) : null,
-    [selectedMonth, availableMonths]
+    [selectedMonth, availableMonths],
   );
 
   useEffect(() => {
@@ -133,7 +134,7 @@ export default function MonthAnalysisPage({ renderActions }: MonthAnalysisPagePr
   if (!monthData) {
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-8">
-        <Icons.Calendar className="h-12 w-12 text-muted-foreground mb-4" />
+        <Icons.Calendar className="text-muted-foreground mb-4 h-12 w-12" />
         <p className="text-muted-foreground">No data available for the selected month</p>
       </div>
     );
@@ -145,7 +146,7 @@ export default function MonthAnalysisPage({ renderActions }: MonthAnalysisPagePr
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Spending</CardTitle>
-            <Icons.CreditCard className="h-4 w-4 text-muted-foreground" />
+            <Icons.CreditCard className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -156,7 +157,9 @@ export default function MonthAnalysisPage({ renderActions }: MonthAnalysisPagePr
               />
             </div>
             {monthData.spendingChange !== null && (
-              <p className={`text-xs ${monthData.spendingChange > 0 ? "text-destructive" : "text-success"}`}>
+              <p
+                className={`text-xs ${monthData.spendingChange > 0 ? "text-destructive" : "text-success"}`}
+              >
                 {monthData.spendingChange > 0 ? "+" : ""}
                 {formatPercent(monthData.spendingChange / 100)} vs last month
               </p>
@@ -167,7 +170,7 @@ export default function MonthAnalysisPage({ renderActions }: MonthAnalysisPagePr
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Income</CardTitle>
-            <Icons.Income className="h-4 w-4 text-muted-foreground" />
+            <Icons.Income className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -178,7 +181,9 @@ export default function MonthAnalysisPage({ renderActions }: MonthAnalysisPagePr
               />
             </div>
             {monthData.incomeChange !== null && (
-              <p className={`text-xs ${monthData.incomeChange >= 0 ? "text-success" : "text-destructive"}`}>
+              <p
+                className={`text-xs ${monthData.incomeChange >= 0 ? "text-success" : "text-destructive"}`}
+              >
                 {monthData.incomeChange > 0 ? "+" : ""}
                 {formatPercent(monthData.incomeChange / 100)} vs last month
               </p>
@@ -189,34 +194,34 @@ export default function MonthAnalysisPage({ renderActions }: MonthAnalysisPagePr
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Net Savings</CardTitle>
-            <Icons.Wallet className="h-4 w-4 text-muted-foreground" />
+            <Icons.Wallet className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${monthData.netSavings >= 0 ? "text-success" : "text-destructive"}`}>
+            <div
+              className={`text-2xl font-bold ${monthData.netSavings >= 0 ? "text-success" : "text-destructive"}`}
+            >
               <AmountDisplay
                 value={monthData.netSavings}
                 currency={baseCurrency}
                 isHidden={isBalanceHidden}
               />
             </div>
-            <p className="text-xs text-muted-foreground">
-              Income minus spending
-            </p>
+            <p className="text-muted-foreground text-xs">Income minus spending</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Savings Rate</CardTitle>
-            <Icons.TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <Icons.TrendingUp className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${monthData.savingsRate >= 0 ? "text-success" : "text-destructive"}`}>
+            <div
+              className={`text-2xl font-bold ${monthData.savingsRate >= 0 ? "text-success" : "text-destructive"}`}
+            >
               {formatPercent(monthData.savingsRate / 100)}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Of income saved
-            </p>
+            <p className="text-muted-foreground text-xs">Of income saved</p>
           </CardContent>
         </Card>
       </div>
@@ -259,7 +264,7 @@ function MonthAnalysisSkeleton() {
             </CardHeader>
             <CardContent>
               <Skeleton className="h-8 w-32" />
-              <Skeleton className="h-3 w-20 mt-2" />
+              <Skeleton className="mt-2 h-3 w-20" />
             </CardContent>
           </Card>
         ))}
@@ -296,7 +301,7 @@ function MonthAnalysisSkeleton() {
                   </div>
                 ))}
               </div>
-              <Skeleton className="h-[180px] w-[180px] rounded-full shrink-0" />
+              <Skeleton className="h-[180px] w-[180px] shrink-0 rounded-full" />
             </div>
           </CardContent>
         </Card>

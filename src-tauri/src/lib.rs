@@ -199,8 +199,10 @@ pub fn run() {
             commands::goal::update_goal,
             commands::goal::delete_goal,
             commands::goal::get_goals,
-            commands::goal::update_goal_allocations,
-            commands::goal::load_goals_allocations,
+            commands::goal::get_goals_with_contributions,
+            commands::goal::get_account_free_cash,
+            commands::goal::add_goal_contribution,
+            commands::goal::remove_goal_contribution,
             // Portfolio commands
             commands::portfolio::get_holdings,
             commands::portfolio::get_holding,

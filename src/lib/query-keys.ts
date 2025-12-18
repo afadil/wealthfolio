@@ -17,7 +17,8 @@ export const QueryKeys = {
 
   // Goals related keys
   GOALS: "goals",
-  GOALS_ALLOCATIONS: "goals_allocations",
+  GOALS_WITH_CONTRIBUTIONS: "goals_with_contributions",
+  ACCOUNT_FREE_CASH: "account_free_cash",
 
   // Settings related keys
   SETTINGS: "settings",

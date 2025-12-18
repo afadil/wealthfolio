@@ -22,7 +22,15 @@ import {
 } from "@/components/ui/table";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Badge, SearchableSelect } from "@wealthfolio/ui";
-import type { CashImportFormat, CashImportMappingData, CsvRowData, CategoryWithChildren, Event, Account, RecurrenceType } from "@/lib/types";
+import type {
+  CashImportFormat,
+  CashImportMappingData,
+  CsvRowData,
+  CategoryWithChildren,
+  Event,
+  Account,
+  RecurrenceType,
+} from "@/lib/types";
 import { ActivityType, AccountType, RECURRENCE_TYPES } from "@/lib/types";
 import { cn, tryParseDate } from "@/lib/utils";
 import { motion } from "motion/react";
@@ -75,27 +83,27 @@ export const CashMappingStep = ({
 }: CashMappingStepProps) => {
   // Initialize state from initialMapping if provided, otherwise start empty
   const [fieldMappings, setFieldMappings] = useState<Partial<Record<CashImportFormat, string>>>(
-    initialMapping?.fieldMappings ?? {}
+    initialMapping?.fieldMappings ?? {},
   );
   const [invertAmountSign, setInvertAmountSign] = useState(
-    initialMapping?.invertAmountSign ?? false
+    initialMapping?.invertAmountSign ?? false,
   );
 
   // Value mappings state
-  const [activityTypeMappings, setActivityTypeMappings] = useState<Partial<Record<ActivityType, string[]>>>(
-    initialMapping?.activityTypeMappings ?? {}
-  );
-  const [categoryMappings, setCategoryMappings] = useState<Record<string, { categoryId: string; subCategoryId?: string }>>(
-    initialMapping?.categoryMappings ?? {}
-  );
+  const [activityTypeMappings, setActivityTypeMappings] = useState<
+    Partial<Record<ActivityType, string[]>>
+  >(initialMapping?.activityTypeMappings ?? {});
+  const [categoryMappings, setCategoryMappings] = useState<
+    Record<string, { categoryId: string; subCategoryId?: string }>
+  >(initialMapping?.categoryMappings ?? {});
   const [eventMappings, setEventMappings] = useState<Record<string, string>>(
-    initialMapping?.eventMappings ?? {}
+    initialMapping?.eventMappings ?? {},
   );
   const [accountMappings, setAccountMappings] = useState<Record<string, string>>(
-    initialMapping?.accountMappings ?? {}
+    initialMapping?.accountMappings ?? {},
   );
   const [recurrenceMappings, setRecurrenceMappings] = useState<Record<string, RecurrenceType>>(
-    initialMapping?.recurrenceMappings ?? {}
+    initialMapping?.recurrenceMappings ?? {},
   );
 
   // Fetch categories and events for mapping
@@ -128,13 +136,24 @@ export const CashMappingStep = ({
       accountId,
       fieldMappings,
       invertAmountSign,
-      activityTypeMappings: Object.keys(activityTypeMappings).length > 0 ? activityTypeMappings : undefined,
+      activityTypeMappings:
+        Object.keys(activityTypeMappings).length > 0 ? activityTypeMappings : undefined,
       categoryMappings: Object.keys(categoryMappings).length > 0 ? categoryMappings : undefined,
       eventMappings: Object.keys(eventMappings).length > 0 ? eventMappings : undefined,
       accountMappings: Object.keys(accountMappings).length > 0 ? accountMappings : undefined,
-      recurrenceMappings: Object.keys(recurrenceMappings).length > 0 ? recurrenceMappings : undefined,
+      recurrenceMappings:
+        Object.keys(recurrenceMappings).length > 0 ? recurrenceMappings : undefined,
     };
-  }, [accountId, fieldMappings, invertAmountSign, activityTypeMappings, categoryMappings, eventMappings, accountMappings, recurrenceMappings]);
+  }, [
+    accountId,
+    fieldMappings,
+    invertAmountSign,
+    activityTypeMappings,
+    categoryMappings,
+    eventMappings,
+    accountMappings,
+    recurrenceMappings,
+  ]);
 
   // Track if this is the initial render to avoid calling onChange on mount
   const isInitialMount = useRef(true);
@@ -290,18 +309,21 @@ export const CashMappingStep = ({
   }, []);
 
   // Handle category mapping
-  const handleCategoryMapping = useCallback((csvCategory: string, categoryId: string, subCategoryId?: string) => {
-    setCategoryMappings((prev) => {
-      if (!categoryId) {
-        const { [csvCategory]: _, ...rest } = prev;
-        return rest;
-      }
-      return {
-        ...prev,
-        [csvCategory]: { categoryId, subCategoryId },
-      };
-    });
-  }, []);
+  const handleCategoryMapping = useCallback(
+    (csvCategory: string, categoryId: string, subCategoryId?: string) => {
+      setCategoryMappings((prev) => {
+        if (!categoryId) {
+          const { [csvCategory]: _, ...rest } = prev;
+          return rest;
+        }
+        return {
+          ...prev,
+          [csvCategory]: { categoryId, subCategoryId },
+        };
+      });
+    },
+    [],
+  );
 
   // Handle event mapping
   const handleEventMapping = useCallback((csvEvent: string, eventId: string) => {
@@ -332,18 +354,21 @@ export const CashMappingStep = ({
   }, []);
 
   // Handle recurrence mapping
-  const handleRecurrenceMapping = useCallback((csvRecurrence: string, recurrenceType: RecurrenceType | "") => {
-    setRecurrenceMappings((prev) => {
-      if (!recurrenceType) {
-        const { [csvRecurrence]: _, ...rest } = prev;
-        return rest;
-      }
-      return {
-        ...prev,
-        [csvRecurrence]: recurrenceType,
-      };
-    });
-  }, []);
+  const handleRecurrenceMapping = useCallback(
+    (csvRecurrence: string, recurrenceType: RecurrenceType | "") => {
+      setRecurrenceMappings((prev) => {
+        if (!recurrenceType) {
+          const { [csvRecurrence]: _, ...rest } = prev;
+          return rest;
+        }
+        return {
+          ...prev,
+          [csvRecurrence]: recurrenceType,
+        };
+      });
+    },
+    [],
+  );
 
   // Count unmapped values
   const unmappedActivityTypesCount = distinctActivityTypes.filter((t) => !t.appType).length;
@@ -390,11 +415,13 @@ export const CashMappingStep = ({
       accountId,
       fieldMappings,
       invertAmountSign,
-      activityTypeMappings: Object.keys(activityTypeMappings).length > 0 ? activityTypeMappings : undefined,
+      activityTypeMappings:
+        Object.keys(activityTypeMappings).length > 0 ? activityTypeMappings : undefined,
       categoryMappings: Object.keys(categoryMappings).length > 0 ? categoryMappings : undefined,
       eventMappings: Object.keys(eventMappings).length > 0 ? eventMappings : undefined,
       accountMappings: Object.keys(accountMappings).length > 0 ? accountMappings : undefined,
-      recurrenceMappings: Object.keys(recurrenceMappings).length > 0 ? recurrenceMappings : undefined,
+      recurrenceMappings:
+        Object.keys(recurrenceMappings).length > 0 ? recurrenceMappings : undefined,
     };
 
     onNext(mapping);
@@ -508,7 +535,7 @@ export const CashMappingStep = ({
             size="sm"
             title="Recurrence"
             description={`${distinctRecurrences.length - unmappedRecurrencesCount} of ${distinctRecurrences.length} mapped`}
-            icon={Icons.RefreshCw}
+            icon={Icons.Refresh}
             className="mb-0"
             rightIcon={unmappedRecurrencesCount === 0 ? Icons.CheckCircle : Icons.AlertCircle}
           />
@@ -1007,7 +1034,10 @@ function CashMappingCell({
     if (mappedAccountId && account) {
       return (
         <div className="flex items-center gap-2">
-          <span className="text-muted-foreground max-w-[100px] truncate text-xs" title={normalizedValue}>
+          <span
+            className="text-muted-foreground max-w-[100px] truncate text-xs"
+            title={normalizedValue}
+          >
             {normalizedValue}
           </span>
           <Badge variant="secondary" className="text-xs">

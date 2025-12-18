@@ -55,11 +55,12 @@ export function CategorySelect<T extends FieldValues>({
     queryFn: getIncomeCategories,
   });
 
-  const categories = categoryType === "income"
-    ? incomeCategories
-    : categoryType === "expense"
-      ? expenseCategories
-      : [...expenseCategories, ...incomeCategories];
+  const categories =
+    categoryType === "income"
+      ? incomeCategories
+      : categoryType === "expense"
+        ? expenseCategories
+        : [...expenseCategories, ...incomeCategories];
 
   // Find the selected category to get its children (subcategories)
   const selectedCategory = categories.find((cat) => cat.id === selectedCategoryId);

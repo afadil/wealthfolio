@@ -179,11 +179,12 @@ diesel::table! {
 }
 
 diesel::table! {
-    goals_allocation (id) {
+    goal_contributions (id) {
         id -> Text,
-        percent_allocation -> Integer,
         goal_id -> Text,
         account_id -> Text,
+        amount -> Double,
+        contributed_at -> Text,
     }
 }
 
@@ -244,8 +245,8 @@ diesel::table! {
 
 diesel::joinable!(accounts -> platforms (platform_id));
 diesel::joinable!(activity_rules -> accounts (account_id));
-diesel::joinable!(goals_allocation -> accounts (account_id));
-diesel::joinable!(goals_allocation -> goals (goal_id));
+diesel::joinable!(goal_contributions -> accounts (account_id));
+diesel::joinable!(goal_contributions -> goals (goal_id));
 diesel::joinable!(quotes -> assets (symbol));
 
 diesel::allow_tables_to_appear_in_same_query!(
@@ -260,8 +261,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     daily_account_valuation,
     event_types,
     events,
+    goal_contributions,
     goals,
-    goals_allocation,
     holdings_snapshots,
     market_data_providers,
     platforms,

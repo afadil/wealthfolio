@@ -40,7 +40,13 @@ interface LineConfig {
 
 const LINE_CONFIGS: LineConfig[] = [
   { key: "current", name: "Current Month", color: "var(--primary)", strokeWidth: 2 },
-  { key: "overlay", name: "Compare Month", color: "#a855f7", strokeWidth: 2, strokeDasharray: "6 3" },
+  {
+    key: "overlay",
+    name: "Compare Month",
+    color: "#a855f7",
+    strokeWidth: 2,
+    strokeDasharray: "6 3",
+  },
   { key: "avg3", name: "3 Month Avg", color: "#22c55e", strokeWidth: 1.5, strokeDasharray: "4 4" },
   { key: "avg6", name: "6 Month Avg", color: "#eab308", strokeWidth: 1.5, strokeDasharray: "4 4" },
   { key: "avg9", name: "9 Month Avg", color: "#f97316", strokeWidth: 1.5, strokeDasharray: "4 4" },
@@ -61,7 +67,7 @@ export function SpendingTrendsChart({
 
   // Line visibility states
   const [visibleLines, setVisibleLines] = useState<Set<string>>(
-    new Set(LINE_CONFIGS.map(l => l.key))
+    new Set(LINE_CONFIGS.map((l) => l.key)),
   );
 
   // Set default overlay month to previous month when selectedMonth changes
@@ -74,7 +80,7 @@ export function SpendingTrendsChart({
   }, [selectedMonth]);
 
   const toggleLineVisibility = (lineKey: string) => {
-    setVisibleLines(prev => {
+    setVisibleLines((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(lineKey)) {
         newSet.delete(lineKey);
@@ -131,10 +137,7 @@ export function SpendingTrendsChart({
       value: event.id,
       label: event.name,
     }));
-    return [
-      { value: INCLUDE_ALL_EVENTS_VALUE, label: "Include All Events" },
-      ...eventsAsOptions,
-    ];
+    return [{ value: INCLUDE_ALL_EVENTS_VALUE, label: "Include All Events" }, ...eventsAsOptions];
   }, [events]);
 
   const includeAllEvents = selectedEventValues.has(INCLUDE_ALL_EVENTS_VALUE);
@@ -148,17 +151,17 @@ export function SpendingTrendsChart({
     return ids;
   }, [selectedEventValues]);
 
-  const categoryIdsArray = useMemo(() =>
-    selectedCategoryIds.size > 0 ? Array.from(selectedCategoryIds) : undefined,
-    [selectedCategoryIds]
+  const categoryIdsArray = useMemo(
+    () => (selectedCategoryIds.size > 0 ? Array.from(selectedCategoryIds) : undefined),
+    [selectedCategoryIds],
   );
-  const subcategoryIdsArray = useMemo(() =>
-    selectedSubcategoryIds.size > 0 ? Array.from(selectedSubcategoryIds) : undefined,
-    [selectedSubcategoryIds]
+  const subcategoryIdsArray = useMemo(
+    () => (selectedSubcategoryIds.size > 0 ? Array.from(selectedSubcategoryIds) : undefined),
+    [selectedSubcategoryIds],
   );
-  const includeEventIdsArray = useMemo(() =>
-    includeEventIds.size > 0 ? Array.from(includeEventIds) : undefined,
-    [includeEventIds]
+  const includeEventIdsArray = useMemo(
+    () => (includeEventIds.size > 0 ? Array.from(includeEventIds) : undefined),
+    [includeEventIds],
   );
 
   const handleEventFilterChange = (values: Set<string>) => {
@@ -191,7 +194,7 @@ export function SpendingTrendsChart({
         categoryIdsArray,
         subcategoryIdsArray,
         includeAllEvents ? undefined : includeEventIdsArray,
-        includeAllEvents
+        includeAllEvents,
       ),
     enabled: !!selectedMonth,
   });
@@ -212,7 +215,7 @@ export function SpendingTrendsChart({
         categoryIdsArray,
         subcategoryIdsArray,
         includeAllEvents ? undefined : includeEventIdsArray,
-        includeAllEvents
+        includeAllEvents,
       ),
     enabled: !!overlayMonth && visibleLines.has("overlay"),
   });
@@ -231,7 +234,7 @@ export function SpendingTrendsChart({
       avg3Cumulative.length,
       avg6Cumulative.length,
       avg9Cumulative.length,
-      overlayCumulative.length
+      overlayCumulative.length,
     );
 
     return Array.from({ length: maxDays }, (_, i) => ({
@@ -247,13 +250,9 @@ export function SpendingTrendsChart({
   const maxValue = useMemo(() => {
     if (!chartData.length) return 0;
     return Math.max(
-      ...chartData.map((d) => Math.max(
-        d.current ?? 0,
-        d.overlay ?? 0,
-        d.avg3 ?? 0,
-        d.avg6 ?? 0,
-        d.avg9 ?? 0
-      ))
+      ...chartData.map((d) =>
+        Math.max(d.current ?? 0, d.overlay ?? 0, d.avg3 ?? 0, d.avg6 ?? 0, d.avg9 ?? 0),
+      ),
     );
   }, [chartData]);
 
@@ -274,8 +273,7 @@ export function SpendingTrendsChart({
       const validSubcategories = new Set<string>();
       selectedSubcategoryIds.forEach((subId) => {
         const parentStillSelected = categories.some(
-          (cat) =>
-            values.has(cat.id) && cat.children?.some((child) => child.id === subId)
+          (cat) => values.has(cat.id) && cat.children?.some((child) => child.id === subId),
         );
         if (parentStillSelected) {
           validSubcategories.add(subId);
@@ -286,16 +284,14 @@ export function SpendingTrendsChart({
   };
 
   const hasActiveFilters =
-    selectedCategoryIds.size > 0 ||
-    selectedSubcategoryIds.size > 0 ||
-    selectedEventValues.size > 0;
+    selectedCategoryIds.size > 0 || selectedSubcategoryIds.size > 0 || selectedEventValues.size > 0;
 
   if (isLoading) {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Spending Trends (Day-by-Day)</CardTitle>
-          <Icons.TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <Icons.TrendingUp className="text-muted-foreground h-4 w-4" />
         </CardHeader>
         <CardContent>
           <Skeleton className="h-[320px] w-full" />
@@ -309,10 +305,10 @@ export function SpendingTrendsChart({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Spending Trends (Day-by-Day)</CardTitle>
-          <Icons.TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <Icons.TrendingUp className="text-muted-foreground h-4 w-4" />
         </CardHeader>
         <CardContent className="flex h-[320px] items-center justify-center">
-          <p className="text-sm text-muted-foreground">No spending data available</p>
+          <p className="text-muted-foreground text-sm">No spending data available</p>
         </CardContent>
       </Card>
     );
@@ -322,11 +318,11 @@ export function SpendingTrendsChart({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">Spending Trends (Day-by-Day)</CardTitle>
-        <Icons.TrendingUp className="h-4 w-4 text-muted-foreground" />
+        <Icons.TrendingUp className="text-muted-foreground h-4 w-4" />
       </CardHeader>
       <CardContent>
         {/* Filters row */}
-        <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
           <DataTableFacetedFilter
             title="Category"
             options={categoryOptions}
@@ -356,7 +352,7 @@ export function SpendingTrendsChart({
                 setSelectedSubcategoryIds(new Set());
                 setSelectedEventValues(new Set());
               }}
-              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+              className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs"
             >
               Reset
               <Icons.Close className="h-3 w-3" />
@@ -365,7 +361,7 @@ export function SpendingTrendsChart({
         </div>
 
         {/* Custom legend with eye icons and overlay month selector */}
-        <div className="flex flex-wrap items-center gap-3 mb-2 justify-end">
+        <div className="mb-2 flex flex-wrap items-center justify-end gap-3">
           {LINE_CONFIGS.map((config) => {
             const isVisible = visibleLines.has(config.key);
             // For overlay, show the month dropdown instead of just label
@@ -379,12 +375,12 @@ export function SpendingTrendsChart({
                     }`}
                   >
                     {isVisible ? (
-                      <Eye className="h-3 w-3 text-muted-foreground" />
+                      <Eye className="text-muted-foreground h-3 w-3" />
                     ) : (
-                      <EyeOff className="h-3 w-3 text-muted-foreground" />
+                      <EyeOff className="text-muted-foreground h-3 w-3" />
                     )}
                     <div
-                      className="w-4 h-0.5"
+                      className="h-0.5 w-4"
                       style={{
                         backgroundColor: config.color,
                         backgroundImage: `repeating-linear-gradient(90deg, ${config.color} 0, ${config.color} 4px, transparent 4px, transparent 8px)`,
@@ -395,10 +391,10 @@ export function SpendingTrendsChart({
                     <PopoverTrigger asChild>
                       <Button
                         variant="ghost"
-                        className={`h-6 px-2 text-xs font-normal ${!isVisible ? "opacity-40 line-through" : ""}`}
+                        className={`h-6 px-2 text-xs font-normal ${!isVisible ? "line-through opacity-40" : ""}`}
                       >
                         {overlayMonthLabel || "Compare..."}
-                        <ChevronDown className="h-3 w-3 ml-1 opacity-50" />
+                        <ChevronDown className="ml-1 h-3 w-3 opacity-50" />
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="end">
@@ -408,7 +404,14 @@ export function SpendingTrendsChart({
                           setOverlayMonth(month);
                           setOverlayPickerOpen(false);
                         }}
-                        maxDate={selectedMonth ? format(subMonths(parse(selectedMonth, "yyyy-MM", new Date()), 1), "yyyy-MM") : undefined}
+                        maxDate={
+                          selectedMonth
+                            ? format(
+                                subMonths(parse(selectedMonth, "yyyy-MM", new Date()), 1),
+                                "yyyy-MM",
+                              )
+                            : undefined
+                        }
                       />
                     </PopoverContent>
                   </Popover>
@@ -424,12 +427,12 @@ export function SpendingTrendsChart({
                 }`}
               >
                 {isVisible ? (
-                  <Eye className="h-3 w-3 text-muted-foreground" />
+                  <Eye className="text-muted-foreground h-3 w-3" />
                 ) : (
-                  <EyeOff className="h-3 w-3 text-muted-foreground" />
+                  <EyeOff className="text-muted-foreground h-3 w-3" />
                 )}
                 <div
-                  className="w-4 h-0.5"
+                  className="h-0.5 w-4"
                   style={{
                     backgroundColor: config.color,
                     ...(config.strokeDasharray && {
@@ -446,10 +449,7 @@ export function SpendingTrendsChart({
 
         <ChartContainer config={{}} className="h-[250px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart
-              data={chartData}
-              margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-            >
+            <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <XAxis
                 dataKey="day"
                 axisLine={false}
@@ -475,39 +475,54 @@ export function SpendingTrendsChart({
                   if (!active || !payload?.length) return null;
                   const data = payload[0].payload;
                   return (
-                    <div className="rounded-lg border bg-background p-2 shadow-sm">
+                    <div className="bg-background rounded-lg border p-2 shadow-sm">
                       <div className="font-medium">Day {data.day}</div>
                       {data.current !== null && visibleLines.has("current") && (
-                        <div className="text-sm flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "var(--primary)" }} />
+                        <div className="flex items-center gap-2 text-sm">
+                          <div
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: "var(--primary)" }}
+                          />
                           <span className="text-muted-foreground">Current:</span>
                           <span>{isHidden ? "****" : formatAmount(data.current, currency)}</span>
                         </div>
                       )}
                       {data.overlay !== null && visibleLines.has("overlay") && (
-                        <div className="text-sm flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "#a855f7" }} />
+                        <div className="flex items-center gap-2 text-sm">
+                          <div
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: "#a855f7" }}
+                          />
                           <span className="text-muted-foreground">{overlayMonthLabel}:</span>
                           <span>{isHidden ? "****" : formatAmount(data.overlay, currency)}</span>
                         </div>
                       )}
                       {data.avg3 !== null && visibleLines.has("avg3") && (
-                        <div className="text-sm flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "#22c55e" }} />
+                        <div className="flex items-center gap-2 text-sm">
+                          <div
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: "#22c55e" }}
+                          />
                           <span className="text-muted-foreground">3mo avg:</span>
                           <span>{isHidden ? "****" : formatAmount(data.avg3, currency)}</span>
                         </div>
                       )}
                       {data.avg6 !== null && visibleLines.has("avg6") && (
-                        <div className="text-sm flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "#eab308" }} />
+                        <div className="flex items-center gap-2 text-sm">
+                          <div
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: "#eab308" }}
+                          />
                           <span className="text-muted-foreground">6mo avg:</span>
                           <span>{isHidden ? "****" : formatAmount(data.avg6, currency)}</span>
                         </div>
                       )}
                       {data.avg9 !== null && visibleLines.has("avg9") && (
-                        <div className="text-sm flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "#f97316" }} />
+                        <div className="flex items-center gap-2 text-sm">
+                          <div
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: "#f97316" }}
+                          />
                           <span className="text-muted-foreground">9mo avg:</span>
                           <span>{isHidden ? "****" : formatAmount(data.avg9, currency)}</span>
                         </div>
@@ -578,9 +593,7 @@ export function SpendingTrendsChart({
             </LineChart>
           </ResponsiveContainer>
         </ChartContainer>
-        <div className="mt-2 text-xs text-muted-foreground text-center">
-          Day of Month
-        </div>
+        <div className="text-muted-foreground mt-2 text-center text-xs">Day of Month</div>
       </CardContent>
     </Card>
   );

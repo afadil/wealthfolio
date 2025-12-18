@@ -429,14 +429,49 @@ export interface Goal {
   description?: string;
   targetAmount: number;
   isAchieved?: boolean;
-  allocations?: GoalAllocation[];
 }
 
-export interface GoalAllocation {
+export interface GoalContribution {
   id: string;
   goalId: string;
   accountId: string;
-  percentAllocation: number;
+  amount: number;
+  contributedAt: string;
+}
+
+export interface GoalContributionWithStatus {
+  id: string;
+  goalId: string;
+  accountId: string;
+  accountName: string;
+  accountCurrency: string;
+  amount: number;
+  contributedAt: string;
+  isAtRisk: boolean;
+  atRiskAmount?: number;
+}
+
+export interface AccountFreeCash {
+  accountId: string;
+  accountName: string;
+  accountCurrency: string;
+  cashBalance: number;
+  totalContributions: number;
+  freeCash: number;
+}
+
+export interface GoalWithContributions {
+  goal: Goal;
+  contributions: GoalContributionWithStatus[];
+  totalContributed: number;
+  progress: number;
+  hasAtRiskContributions: boolean;
+}
+
+export interface NewGoalContribution {
+  goalId: string;
+  accountId: string;
+  amount: number;
 }
 
 export interface GoalProgress {
@@ -445,6 +480,7 @@ export interface GoalProgress {
   currentValue: number;
   progress: number;
   currency: string;
+  hasAtRiskContributions?: boolean;
 }
 
 export interface SourceTypeBreakdown {

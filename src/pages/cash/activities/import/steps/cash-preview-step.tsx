@@ -2,7 +2,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Icons } from "@/components/ui/icons";
 import { ProgressIndicator } from "@/components/ui/progress-indicator";
-import type { Account, ActivityImport, Category, CategoryWithChildren, CsvRowData, Event } from "@/lib/types";
+import type {
+  Account,
+  ActivityImport,
+  Category,
+  CategoryWithChildren,
+  CsvRowData,
+  Event,
+} from "@/lib/types";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
 import { ImportAlert } from "@/pages/activity/import/components/import-alert";
@@ -142,7 +149,6 @@ export const CashPreviewStep = ({
   // Calculate summary statistics
   const validActivitiesCount = activities.filter((activity) => activity.isValid).length;
   const hasErrors = validActivitiesCount < activities.length;
-
 
   const handleInitialClick = () => {
     setConfirmationState("confirm");

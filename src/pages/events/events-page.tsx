@@ -10,10 +10,7 @@ import { QueryKeys } from "@/lib/query-keys";
 import { periodToDateRange, type SpendingPeriod } from "@/lib/navigation/cashflow-navigation";
 import type { EventSpendingSummary, EventType } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
-import {
-  AmountDisplay,
-  AnimatedToggleGroup,
-} from "@wealthfolio/ui";
+import { AmountDisplay, AnimatedToggleGroup } from "@wealthfolio/ui";
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { EventCategoryTreemap } from "./components/event-category-treemap";
 import { EventTimeline } from "./components/event-timeline";
@@ -82,11 +79,12 @@ export default function EventsPage({ renderActions }: EventsPageProps) {
     error,
   } = useQuery<EventSpendingSummary[]>({
     queryKey: [QueryKeys.EVENT_SPENDING_SUMMARIES, selectedPeriod, baseCurrency],
-    queryFn: () => getEventSpendingSummaries(
-      dateRange.startDate ?? null,
-      dateRange.endDate ?? null,
-      baseCurrency
-    ),
+    queryFn: () =>
+      getEventSpendingSummaries(
+        dateRange.startDate ?? null,
+        dateRange.endDate ?? null,
+        baseCurrency,
+      ),
   });
 
   const toggleEventType = useCallback((eventTypeId: string) => {
@@ -131,17 +129,13 @@ export default function EventsPage({ renderActions }: EventsPageProps) {
       }
     }
 
-    return Array.from(typeCounts.values())
-      .sort((a, b) => b.count - a.count);
+    return Array.from(typeCounts.values()).sort((a, b) => b.count - a.count);
   }, [filteredSummaries]);
 
   // Memoized period selector to pass to parent
   const periodActions = useMemo(
     () => (
-      <EventsPeriodSelector
-        selectedPeriod={selectedPeriod}
-        onPeriodSelect={setSelectedPeriod}
-      />
+      <EventsPeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
     ),
     [selectedPeriod],
   );
@@ -243,7 +237,7 @@ export default function EventsPage({ renderActions }: EventsPageProps) {
                     axisLine={false}
                     tick={{ fontSize: 11 }}
                     allowDecimals={false}
-                    domain={[0, 'auto']}
+                    domain={[0, "auto"]}
                   />
                   <YAxis
                     type="category"
@@ -258,10 +252,10 @@ export default function EventsPage({ renderActions }: EventsPageProps) {
                       if (!active || !payload?.length) return null;
                       const data = payload[0].payload;
                       return (
-                        <div className="rounded-lg border bg-background p-2 shadow-sm">
+                        <div className="bg-background rounded-lg border p-2 shadow-sm">
                           <div className="font-medium">{data.name}</div>
                           <div className="text-muted-foreground text-sm">
-                            {data.count} event{data.count !== 1 ? 's' : ''}
+                            {data.count} event{data.count !== 1 ? "s" : ""}
                           </div>
                         </div>
                       );
@@ -285,10 +279,7 @@ export default function EventsPage({ renderActions }: EventsPageProps) {
           </CardContent>
         </Card>
 
-        <EventCategoryTreemap
-          events={filteredSummaries}
-          currency={baseCurrency}
-        />
+        <EventCategoryTreemap events={filteredSummaries} currency={baseCurrency} />
       </div>
 
       <Card>

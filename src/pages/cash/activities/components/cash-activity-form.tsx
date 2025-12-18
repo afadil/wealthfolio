@@ -14,7 +14,13 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { ActivityCreate, ActivityDetails, ActivityUpdate, EventWithTypeName, RecurrenceType } from "@/lib/types";
+import type {
+  ActivityCreate,
+  ActivityDetails,
+  ActivityUpdate,
+  EventWithTypeName,
+  RecurrenceType,
+} from "@/lib/types";
 import { RECURRENCE_TYPES } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -34,7 +40,13 @@ import {
   SelectValue,
 } from "@wealthfolio/ui";
 import { useCallback, useEffect, useState } from "react";
-import { useForm, type Control, type FieldValues, type Resolver, type SubmitHandler } from "react-hook-form";
+import {
+  useForm,
+  type Control,
+  type FieldValues,
+  type Resolver,
+  type SubmitHandler,
+} from "react-hook-form";
 import { z } from "zod";
 import { useCashActivityMutations } from "../hooks/use-cash-activity-mutations";
 import { useActivityRuleMatch } from "../hooks/use-category-rule-match";
@@ -43,7 +55,10 @@ import { CategorySelect } from "./category-select";
 import { getEventsWithNames } from "@/commands/event";
 import { useQuery } from "@tanstack/react-query";
 import { QueryKeys } from "@/lib/query-keys";
-import { ActivityTypeSelector, type ActivityType as ActivityTypeUI } from "@/pages/activity/components/activity-type-selector";
+import {
+  ActivityTypeSelector,
+  type ActivityType as ActivityTypeUI,
+} from "@/pages/activity/components/activity-type-selector";
 
 export interface AccountSelectOption {
   value: string;
@@ -120,29 +135,39 @@ export function CashActivityForm({ accounts, activity, open, onClose }: CashActi
     queryFn: getEventsWithNames,
   });
 
-  const isValidActivityType = (type: string | undefined): type is CashActivityFormValues["activityType"] => {
-    return type === "DEPOSIT" || type === "WITHDRAWAL" || type === "TRANSFER_IN" || type === "TRANSFER_OUT";
+  const isValidActivityType = (
+    type: string | undefined,
+  ): type is CashActivityFormValues["activityType"] => {
+    return (
+      type === "DEPOSIT" ||
+      type === "WITHDRAWAL" ||
+      type === "TRANSFER_IN" ||
+      type === "TRANSFER_OUT"
+    );
   };
 
-  const getDefaultValues = useCallback((): Partial<CashActivityFormValues> => ({
-    id: activity?.id,
-    accountId: activity?.accountId || "",
-    activityType: isValidActivityType(activity?.activityType) ? activity.activityType : undefined,
-    amount: activity?.amount ? Math.abs(activity.amount) : undefined,
-    comment: activity?.comment ?? null,
-    name: activity?.name ?? "",
-    categoryId: activity?.categoryId ?? null,
-    subCategoryId: activity?.subCategoryId ?? null,
-    eventId: activity?.eventId ?? null,
-    recurrence: activity?.recurrence ?? null,
-    activityDate: activity?.date
-      ? new Date(activity.date)
-      : (() => {
-          const date = new Date();
-          date.setHours(12, 0, 0, 0);
-          return date;
-        })(),
-  }), [activity]);
+  const getDefaultValues = useCallback(
+    (): Partial<CashActivityFormValues> => ({
+      id: activity?.id,
+      accountId: activity?.accountId || "",
+      activityType: isValidActivityType(activity?.activityType) ? activity.activityType : undefined,
+      amount: activity?.amount ? Math.abs(activity.amount) : undefined,
+      comment: activity?.comment ?? null,
+      name: activity?.name ?? "",
+      categoryId: activity?.categoryId ?? null,
+      subCategoryId: activity?.subCategoryId ?? null,
+      eventId: activity?.eventId ?? null,
+      recurrence: activity?.recurrence ?? null,
+      activityDate: activity?.date
+        ? new Date(activity.date)
+        : (() => {
+            const date = new Date();
+            date.setHours(12, 0, 0, 0);
+            return date;
+          })(),
+    }),
+    [activity],
+  );
 
   const form = useForm<CashActivityFormValues>({
     resolver: zodResolver(cashActivityFormSchema) as Resolver<CashActivityFormValues>,
@@ -154,7 +179,11 @@ export function CashActivityForm({ accounts, activity, open, onClose }: CashActi
   const watchedCategoryId = form.watch("categoryId");
 
   // Activity rule matching hook - only check for matches, don't auto-apply
-  const { match, isLoading: isMatchLoading, clearMatch } = useActivityRuleMatch({
+  const {
+    match,
+    isLoading: isMatchLoading,
+    clearMatch,
+  } = useActivityRuleMatch({
     name: watchedName,
     accountId: watchedAccountId,
     enabled: !activity?.id && !isOverridden, // Only match for new activities when not overridden
@@ -221,9 +250,7 @@ export function CashActivityForm({ accounts, activity, open, onClose }: CashActi
           accountId: data.accountId,
           activityType: data.activityType,
           activityDate:
-            data.activityDate instanceof Date
-              ? data.activityDate.toISOString()
-              : data.activityDate,
+            data.activityDate instanceof Date ? data.activityDate.toISOString() : data.activityDate,
           amount: data.amount,
           quantity: 1,
           unitPrice: data.amount,
@@ -396,7 +423,7 @@ export function CashActivityForm({ accounts, activity, open, onClose }: CashActi
                       <FormLabel className="flex items-center gap-2">
                         Name
                         {isMatchLoading && (
-                          <Icons.Spinner className="h-3 w-3 animate-spin text-muted-foreground" />
+                          <Icons.Spinner className="text-muted-foreground h-3 w-3 animate-spin" />
                         )}
                       </FormLabel>
                       <FormControl>
@@ -413,18 +440,13 @@ export function CashActivityForm({ accounts, activity, open, onClose }: CashActi
 
                 {/* Activity Rule Match Suggestion */}
                 {match && !watchedCategoryId && (
-                  <div className="flex flex-col gap-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
+                  <div className="border-primary/20 bg-primary/5 flex flex-col gap-2 rounded-md border px-3 py-2 text-sm">
                     <div className="flex items-center gap-2">
-                      <Icons.Sparkles className="h-4 w-4 shrink-0 text-primary" />
+                      <Icons.Sparkles className="text-primary h-4 w-4 shrink-0" />
                       <span className="flex-1">
                         Rule matched: <strong>{match.ruleName}</strong>
                       </span>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleApplyMatch}
-                      >
+                      <Button type="button" variant="outline" size="sm" onClick={handleApplyMatch}>
                         Apply
                       </Button>
                       <Button
@@ -438,13 +460,17 @@ export function CashActivityForm({ accounts, activity, open, onClose }: CashActi
                       </Button>
                     </div>
                     {(match.categoryId || match.activityType || match.recurrence) && (
-                      <div className="text-muted-foreground text-xs pl-6">
+                      <div className="text-muted-foreground pl-6 text-xs">
                         Will apply:{" "}
                         {[
-                          match.activityType && `Type: ${ActivityTypeNames[match.activityType as keyof typeof ActivityTypeNames] || match.activityType}`,
+                          match.activityType &&
+                            `Type: ${ActivityTypeNames[match.activityType as keyof typeof ActivityTypeNames] || match.activityType}`,
                           match.categoryId && "Category",
-                          match.recurrence && `Recurrence: ${match.recurrence.charAt(0).toUpperCase() + match.recurrence.slice(1)}`,
-                        ].filter(Boolean).join(", ")}
+                          match.recurrence &&
+                            `Recurrence: ${match.recurrence.charAt(0).toUpperCase() + match.recurrence.slice(1)}`,
+                        ]
+                          .filter(Boolean)
+                          .join(", ")}
                       </div>
                     )}
                   </div>
@@ -467,7 +493,9 @@ export function CashActivityForm({ accounts, activity, open, onClose }: CashActi
                       <FormLabel>Event (optional)</FormLabel>
                       <FormControl>
                         <Select
-                          onValueChange={(value) => field.onChange(value === "__none__" ? null : value)}
+                          onValueChange={(value) =>
+                            field.onChange(value === "__none__" ? null : value)
+                          }
                           value={field.value || "__none__"}
                         >
                           <SelectTrigger aria-label="Event">
@@ -504,7 +532,9 @@ export function CashActivityForm({ accounts, activity, open, onClose }: CashActi
                       <FormLabel>Recurrence (optional)</FormLabel>
                       <FormControl>
                         <Select
-                          onValueChange={(value) => field.onChange(value === "__none__" ? null : value)}
+                          onValueChange={(value) =>
+                            field.onChange(value === "__none__" ? null : value)
+                          }
                           value={field.value || "__none__"}
                         >
                           <SelectTrigger aria-label="Recurrence">

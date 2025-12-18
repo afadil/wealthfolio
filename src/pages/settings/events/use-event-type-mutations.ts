@@ -1,8 +1,8 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { QueryKeys } from '@/lib/query-keys';
-import type { NewEventType, UpdateEventType } from '@/lib/types';
-import { createEventType, updateEventType, deleteEventType } from '@/commands/event-type';
-import { toast } from '@/components/ui/use-toast';
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { QueryKeys } from "@/lib/query-keys";
+import type { NewEventType, UpdateEventType } from "@/lib/types";
+import { createEventType, updateEventType, deleteEventType } from "@/commands/event-type";
+import { toast } from "@/components/ui/use-toast";
 
 export const useEventTypeMutations = () => {
   const queryClient = useQueryClient();
@@ -12,15 +12,15 @@ export const useEventTypeMutations = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.EVENT_TYPES] });
       toast({
-        title: 'Success',
-        description: 'Event type created successfully',
+        title: "Success",
+        description: "Event type created successfully",
       });
     },
     onError: (error: Error) => {
       toast({
-        title: 'Error',
+        title: "Error",
         description: error.message,
-        variant: 'destructive',
+        variant: "destructive",
       });
     },
   });
@@ -31,15 +31,15 @@ export const useEventTypeMutations = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.EVENT_TYPES] });
       toast({
-        title: 'Success',
-        description: 'Event type updated successfully',
+        title: "Success",
+        description: "Event type updated successfully",
       });
     },
     onError: (error: Error) => {
       toast({
-        title: 'Error',
+        title: "Error",
         description: error.message,
-        variant: 'destructive',
+        variant: "destructive",
       });
     },
   });
@@ -49,15 +49,15 @@ export const useEventTypeMutations = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.EVENT_TYPES] });
       toast({
-        title: 'Success',
-        description: 'Event type deleted successfully',
+        title: "Success",
+        description: "Event type deleted successfully",
       });
     },
     onError: (error: Error) => {
       toast({
-        title: 'Error',
+        title: "Error",
         description: error.message,
-        variant: 'destructive',
+        variant: "destructive",
       });
     },
   });

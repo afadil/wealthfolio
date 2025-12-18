@@ -1,12 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Button,
-  Icons,
-  Separator,
-  Skeleton,
-  EmptyPlaceholder,
-} from "@wealthfolio/ui";
+import { Button, Icons, Separator, Skeleton, EmptyPlaceholder } from "@wealthfolio/ui";
 import { getActivityRulesWithNames } from "@/commands/activity-rule";
 import { getCategoriesHierarchical } from "@/commands/category";
 import { QueryKeys } from "@/lib/query-keys";
@@ -28,7 +22,10 @@ function SettingsActivityRulesPage() {
     queryFn: getActivityRulesWithNames,
   });
 
-  const { data: categories, isLoading: categoriesLoading } = useQuery<CategoryWithChildren[], Error>({
+  const { data: categories, isLoading: categoriesLoading } = useQuery<
+    CategoryWithChildren[],
+    Error
+  >({
     queryKey: [QueryKeys.CATEGORIES_HIERARCHICAL],
     queryFn: getCategoriesHierarchical,
   });
@@ -36,8 +33,7 @@ function SettingsActivityRulesPage() {
   const [visibleModal, setVisibleModal] = useState(false);
   const [selectedRule, setSelectedRule] = useState<ActivityRule | undefined>();
 
-  const { createRuleMutation, updateRuleMutation, deleteRuleMutation } =
-    useActivityRuleMutations();
+  const { createRuleMutation, updateRuleMutation, deleteRuleMutation } = useActivityRuleMutations();
 
   const isLoading = rulesLoading || categoriesLoading;
 
@@ -103,12 +99,7 @@ function SettingsActivityRulesPage() {
           text="Auto-assign categories and activity types based on transaction name patterns and priority."
         >
           <>
-            <Button
-              size="icon"
-              className="sm:hidden"
-              onClick={handleAddRule}
-              aria-label="Add rule"
-            >
+            <Button size="icon" className="sm:hidden" onClick={handleAddRule} aria-label="Add rule">
               <Icons.Plus className="h-4 w-4" />
             </Button>
             <Button className="hidden sm:inline-flex" onClick={handleAddRule}>
@@ -124,8 +115,8 @@ function SettingsActivityRulesPage() {
             <EmptyPlaceholder.Icon name="ListFilter" />
             <EmptyPlaceholder.Title>No rules</EmptyPlaceholder.Title>
             <EmptyPlaceholder.Description>
-              You don&apos;t have any activity rules yet. Create rules to automatically
-              assign categories and activity types during import.
+              You don&apos;t have any activity rules yet. Create rules to automatically assign
+              categories and activity types during import.
             </EmptyPlaceholder.Description>
             <Button onClick={handleAddRule}>
               <Icons.Plus className="mr-2 h-4 w-4" />
@@ -156,6 +147,6 @@ function SettingsActivityRulesPage() {
       />
     </>
   );
-};
+}
 
 export default SettingsActivityRulesPage;

@@ -1,4 +1,10 @@
-import type { Event, EventWithTypeName, NewEvent, UpdateEvent, EventSpendingSummary } from "@/lib/types";
+import type {
+  Event,
+  EventWithTypeName,
+  NewEvent,
+  UpdateEvent,
+  EventSpendingSummary,
+} from "@/lib/types";
 import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb } from "@/adapters";
 import { logger } from "@/adapters";
 
@@ -119,7 +125,7 @@ export const getEventActivityCounts = async (): Promise<Record<string, number>> 
 export const getEventSpendingSummaries = async (
   startDate: string | null,
   endDate: string | null,
-  baseCurrency: string
+  baseCurrency: string,
 ): Promise<EventSpendingSummary[]> => {
   try {
     switch (getRunEnv()) {

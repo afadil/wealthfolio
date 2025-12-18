@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import {
   Button,
   Dialog,
@@ -18,7 +18,7 @@ import {
   SelectValue,
   Textarea,
   DatePickerInput,
-} from '@wealthfolio/ui';
+} from "@wealthfolio/ui";
 import {
   Form,
   FormControl,
@@ -27,22 +27,27 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import type { EventType, NewEvent, EventWithTypeName } from '@/lib/types';
-import { useEventMutations } from '../use-event-mutations';
-import { useEffect } from 'react';
+import type { EventType, NewEvent, EventWithTypeName } from "@/lib/types";
+import { useEventMutations } from "../use-event-mutations";
+import { useEffect } from "react";
 
-const eventSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  description: z.string().optional(),
-  eventTypeId: z.string().min(1, 'Event type is required'),
-  startDate: z.date({ required_error: 'Start date is required' }),
-  endDate: z.date({ required_error: 'End date is required' }),
-}).refine((data) => {
-  return data.startDate <= data.endDate;
-}, {
-  message: 'Start date must be before or equal to end date',
-  path: ['endDate'],
-});
+const eventSchema = z
+  .object({
+    name: z.string().min(1, "Name is required"),
+    description: z.string().optional(),
+    eventTypeId: z.string().min(1, "Event type is required"),
+    startDate: z.date({ required_error: "Start date is required" }),
+    endDate: z.date({ required_error: "End date is required" }),
+  })
+  .refine(
+    (data) => {
+      return data.startDate <= data.endDate;
+    },
+    {
+      message: "Start date must be before or equal to end date",
+      path: ["endDate"],
+    },
+  );
 
 type EventFormValues = z.infer<typeof eventSchema>;
 
@@ -54,7 +59,13 @@ interface EventFormDialogProps {
   defaultEventTypeId?: string;
 }
 
-export function EventFormDialog({ eventTypes, event, open, onOpenChange, defaultEventTypeId }: EventFormDialogProps) {
+export function EventFormDialog({
+  eventTypes,
+  event,
+  open,
+  onOpenChange,
+  defaultEventTypeId,
+}: EventFormDialogProps) {
   const { createMutation, updateMutation } = useEventMutations();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditing = !!event;
@@ -62,9 +73,9 @@ export function EventFormDialog({ eventTypes, event, open, onOpenChange, default
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventSchema) as never,
     defaultValues: {
-      name: '',
-      description: '',
-      eventTypeId: '',
+      name: "",
+      description: "",
+      eventTypeId: "",
       startDate: new Date(),
       endDate: new Date(),
     },
@@ -76,16 +87,16 @@ export function EventFormDialog({ eventTypes, event, open, onOpenChange, default
       if (event) {
         form.reset({
           name: event.name,
-          description: event.description || '',
+          description: event.description || "",
           eventTypeId: event.eventTypeId,
           startDate: new Date(event.startDate),
           endDate: new Date(event.endDate),
         });
       } else {
         form.reset({
-          name: '',
-          description: '',
-          eventTypeId: defaultEventTypeId || '',
+          name: "",
+          description: "",
+          eventTypeId: defaultEventTypeId || "",
           startDate: new Date(),
           endDate: new Date(),
         });
@@ -97,8 +108,8 @@ export function EventFormDialog({ eventTypes, event, open, onOpenChange, default
     setIsSubmitting(true);
     try {
       // Convert Date objects to ISO date strings (YYYY-MM-DD)
-      const startDateStr = values.startDate.toISOString().split('T')[0];
-      const endDateStr = values.endDate.toISOString().split('T')[0];
+      const startDateStr = values.startDate.toISOString().split("T")[0];
+      const endDateStr = values.endDate.toISOString().split("T")[0];
 
       if (isEditing && event) {
         await updateMutation.mutateAsync({
@@ -124,7 +135,7 @@ export function EventFormDialog({ eventTypes, event, open, onOpenChange, default
       form.reset();
       onOpenChange(false);
     } catch (error) {
-      console.error(`Failed to ${isEditing ? 'update' : 'create'} event:`, error);
+      console.error(`Failed to ${isEditing ? "update" : "create"} event:`, error);
     } finally {
       setIsSubmitting(false);
     }
@@ -134,11 +145,11 @@ export function EventFormDialog({ eventTypes, event, open, onOpenChange, default
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Edit Event' : 'Create Event'}</DialogTitle>
+          <DialogTitle>{isEditing ? "Edit Event" : "Create Event"}</DialogTitle>
           <DialogDescription>
             {isEditing
-              ? 'Update the event details.'
-              : 'Create a new event to track and categorize cash account transactions.'}
+              ? "Update the event details."
+              : "Create a new event to track and categorize cash account transactions."}
           </DialogDescription>
         </DialogHeader>
 
@@ -247,11 +258,11 @@ export function EventFormDialog({ eventTypes, event, open, onOpenChange, default
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting
                   ? isEditing
-                    ? 'Updating...'
-                    : 'Creating...'
+                    ? "Updating..."
+                    : "Creating..."
                   : isEditing
-                    ? 'Update Event'
-                    : 'Create Event'}
+                    ? "Update Event"
+                    : "Create Event"}
               </Button>
             </DialogFooter>
           </form>

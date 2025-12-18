@@ -33,11 +33,13 @@ const COMMANDS: CommandMap = {
   get_spending_summary: { method: "POST", path: "/spending/summary" },
   // Goals
   get_goals: { method: "GET", path: "/goals" },
+  get_goals_with_contributions: { method: "GET", path: "/goals/with-contributions" },
   create_goal: { method: "POST", path: "/goals" },
   update_goal: { method: "PUT", path: "/goals" },
   delete_goal: { method: "DELETE", path: "/goals" },
-  update_goal_allocations: { method: "POST", path: "/goals/allocations" },
-  load_goals_allocations: { method: "GET", path: "/goals/allocations" },
+  get_account_free_cash: { method: "POST", path: "/goals/free-cash" },
+  add_goal_contribution: { method: "POST", path: "/goals/contributions" },
+  remove_goal_contribution: { method: "DELETE", path: "/goals/contributions" },
   // FX
   get_latest_exchange_rates: { method: "GET", path: "/exchange-rates/latest" },
   update_exchange_rate: { method: "PUT", path: "/exchange-rates" },
@@ -289,9 +291,19 @@ export const invokeWeb = async <T>(
       body = JSON.stringify(goal);
       break;
     }
-    case "update_goal_allocations": {
-      const { allocations } = payload as { allocations: Record<string, unknown> };
-      body = JSON.stringify(allocations);
+    case "get_account_free_cash": {
+      const { accountIds } = payload as { accountIds: string[] };
+      body = JSON.stringify({ account_ids: accountIds });
+      break;
+    }
+    case "add_goal_contribution": {
+      const { contribution } = payload as { contribution: Record<string, unknown> };
+      body = JSON.stringify(contribution);
+      break;
+    }
+    case "remove_goal_contribution": {
+      const { contributionId } = payload as { contributionId: string };
+      url += `/${encodeURIComponent(contributionId)}`;
       break;
     }
     case "update_exchange_rate": {

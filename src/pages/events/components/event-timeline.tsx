@@ -19,26 +19,13 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { ChevronDown, Filter } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ScrollArea } from "@wealthfolio/ui";
 import { ViewTransactionsButton } from "@/components/view-transactions-button";
-import {
-  Area,
-  AreaChart,
-  Cell,
-  Pie,
-  PieChart,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Area, AreaChart, Cell, Pie, PieChart, XAxis, YAxis } from "recharts";
 
 interface PeriodDateRange {
   startDate?: string;
@@ -265,15 +252,13 @@ export function EventTimeline({
 
         // Calculate fraction within the year (0-1)
         const startDayOfYear = Math.floor(
-          (clampedStart.getTime() - new Date(startYear, 0, 1).getTime()) /
-            (1000 * 60 * 60 * 24)
+          (clampedStart.getTime() - new Date(startYear, 0, 1).getTime()) / (1000 * 60 * 60 * 24),
         );
         const daysInStartYear = startYear % 4 === 0 ? 366 : 365;
         const startFraction = startDayOfYear / daysInStartYear;
 
         const endDayOfYear = Math.floor(
-          (clampedEnd.getTime() - new Date(endYear, 0, 1).getTime()) /
-            (1000 * 60 * 60 * 24)
+          (clampedEnd.getTime() - new Date(endYear, 0, 1).getTime()) / (1000 * 60 * 60 * 24),
         );
         const daysInEndYear = endYear % 4 === 0 ? 366 : 365;
         const endFraction = (endDayOfYear + 1) / daysInEndYear;
@@ -354,7 +339,7 @@ export function EventTimeline({
 
   if (filteredEvents.length === 0) {
     return (
-      <div className="flex items-center justify-center h-24 text-muted-foreground text-sm">
+      <div className="text-muted-foreground flex h-24 items-center justify-center text-sm">
         No events to display for this period
       </div>
     );
@@ -364,7 +349,7 @@ export function EventTimeline({
     <TooltipProvider>
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">
+          <span className="text-muted-foreground text-sm">
             {filteredEvents.length} event{filteredEvents.length !== 1 ? "s" : ""}
           </span>
           <DropdownMenu>
@@ -397,7 +382,7 @@ export function EventTimeline({
           </DropdownMenu>
         </div>
 
-        <div className="block md:hidden space-y-3">
+        <div className="block space-y-3 md:hidden">
           {filteredEvents
             .slice()
             .sort((a, b) => b.startDate.localeCompare(a.startDate))
@@ -408,28 +393,29 @@ export function EventTimeline({
                   key={event.eventId}
                   onClick={() => handleEventClick(event.eventId)}
                   className={cn(
-                    "rounded-lg border p-3 cursor-pointer transition-colors",
+                    "cursor-pointer rounded-lg border p-3 transition-colors",
                     isSelected
                       ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/50"
+                      : "border-border hover:border-primary/50",
                   )}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
                       <div
-                        className="h-3 w-3 rounded-full shrink-0"
+                        className="h-3 w-3 shrink-0 rounded-full"
                         style={{ backgroundColor: event.eventTypeColor || "var(--chart-1)" }}
                       />
-                      <span className="font-medium text-sm truncate">{event.eventName}</span>
+                      <span className="truncate text-sm font-medium">{event.eventName}</span>
                     </div>
-                    <span className="text-foreground font-semibold text-sm shrink-0 ml-2">
+                    <span className="text-foreground ml-2 shrink-0 text-sm font-semibold">
                       <PrivacyAmount value={event.totalSpending} currency={event.currency} />
                     </span>
                   </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {event.eventTypeName} · {format(parseISO(event.startDate), "MMM d")} - {format(parseISO(event.endDate), "MMM d, yyyy")}
+                  <div className="text-muted-foreground mt-1 text-xs">
+                    {event.eventTypeName} · {format(parseISO(event.startDate), "MMM d")} -{" "}
+                    {format(parseISO(event.endDate), "MMM d, yyyy")}
                   </div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-muted-foreground text-xs">
                     {event.transactionCount} transactions
                   </div>
                 </div>
@@ -437,7 +423,10 @@ export function EventTimeline({
             })}
         </div>
 
-        <div ref={containerRef} className="hidden md:block relative border rounded-lg overflow-hidden">
+        <div
+          ref={containerRef}
+          className="relative hidden overflow-hidden rounded-lg border md:block"
+        >
           <div>
             <div
               className="relative"
@@ -448,7 +437,7 @@ export function EventTimeline({
               }}
             >
               <div
-                className="sticky top-0 z-20 flex border-b bg-muted/50 backdrop-blur-sm"
+                className="bg-muted/50 sticky top-0 z-20 flex border-b backdrop-blur-sm"
                 style={{ height: `${headerHeight}px` }}
               >
                 {displayMode === "year-blocks"
@@ -458,9 +447,7 @@ export function EventTimeline({
                         className="flex flex-col items-center justify-center border-r text-xs"
                         style={{ width: `${columnWidth}px`, flexShrink: 0 }}
                       >
-                        <span className="text-sm font-semibold text-foreground">
-                          {year.label}
-                        </span>
+                        <span className="text-foreground text-sm font-semibold">{year.label}</span>
                       </div>
                     ))
                   : months.map((month) => (
@@ -470,7 +457,7 @@ export function EventTimeline({
                         style={{ width: `${columnWidth}px`, flexShrink: 0 }}
                       >
                         {month.yearLabel && (
-                          <span className="text-[10px] font-semibold text-foreground">
+                          <span className="text-foreground text-[10px] font-semibold">
                             {month.yearLabel}
                           </span>
                         )}
@@ -480,21 +467,21 @@ export function EventTimeline({
               </div>
 
               <div
-                className="absolute inset-0 flex pointer-events-none"
+                className="pointer-events-none absolute inset-0 flex"
                 style={{ top: `${headerHeight}px` }}
               >
                 {displayMode === "year-blocks"
                   ? yearColumns.map((year) => (
                       <div
                         key={`grid-${year.index}`}
-                        className="h-full border-r border-dashed border-muted/50"
+                        className="border-muted/50 h-full border-r border-dashed"
                         style={{ width: `${columnWidth}px`, flexShrink: 0 }}
                       />
                     ))
                   : months.map((month) => (
                       <div
                         key={`grid-${month.index}`}
-                        className="h-full border-r border-dashed border-muted/50"
+                        className="border-muted/50 h-full border-r border-dashed"
                         style={{ width: `${columnWidth}px`, flexShrink: 0 }}
                       />
                     ))}
@@ -516,9 +503,9 @@ export function EventTimeline({
                       key={event.eventId}
                       onClick={() => handleEventClick(event.eventId)}
                       className={cn(
-                        "absolute flex items-center gap-1 rounded-md border transition-all cursor-pointer",
-                        "hover:shadow-lg hover:z-30",
-                        isSelected ? "z-30 ring-2 ring-primary shadow-lg" : "z-10"
+                        "absolute flex cursor-pointer items-center gap-1 rounded-md border transition-all",
+                        "hover:z-30 hover:shadow-lg",
+                        isSelected ? "ring-primary z-30 shadow-lg ring-2" : "z-10",
                       )}
                       style={{
                         left: `${event.leftPx}px`,
@@ -530,22 +517,22 @@ export function EventTimeline({
                       }}
                     >
                       <div
-                        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-md"
+                        className="absolute top-0 bottom-0 left-0 w-1 rounded-l-md"
                         style={{ backgroundColor: color }}
                       />
 
                       {!event.isNarrow && (
-                        <div className="flex flex-1 items-center justify-between min-w-0 pl-2 pr-1 overflow-hidden">
-                          <div className="flex flex-col items-start min-w-0 overflow-hidden">
-                            <span className="text-xs font-medium truncate max-w-full">
+                        <div className="flex min-w-0 flex-1 items-center justify-between overflow-hidden pr-1 pl-2">
+                          <div className="flex min-w-0 flex-col items-start overflow-hidden">
+                            <span className="max-w-full truncate text-xs font-medium">
                               {event.eventName}
                             </span>
-                            <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                            <span className="text-muted-foreground text-[10px] whitespace-nowrap">
                               {format(parseISO(event.startDate), "MMM d, yyyy")} -{" "}
                               {format(parseISO(event.endDate), "MMM d, yyyy")}
                             </span>
                           </div>
-                          <span className="text-xs font-medium text-foreground whitespace-nowrap ml-1">
+                          <span className="text-foreground ml-1 text-xs font-medium whitespace-nowrap">
                             <PrivacyAmount value={event.totalSpending} currency={event.currency} />
                           </span>
                         </div>
@@ -561,12 +548,15 @@ export function EventTimeline({
                         <TooltipContent side="top" className="max-w-xs">
                           <div className="space-y-1">
                             <div className="font-medium">{event.eventName}</div>
-                            <div className="text-xs text-muted-foreground">
+                            <div className="text-muted-foreground text-xs">
                               {format(parseISO(event.startDate), "MMM d, yyyy")} -{" "}
                               {format(parseISO(event.endDate), "MMM d, yyyy")}
                             </div>
-                            <div className="text-xs text-foreground">
-                              <PrivacyAmount value={event.totalSpending} currency={event.currency} />
+                            <div className="text-foreground text-xs">
+                              <PrivacyAmount
+                                value={event.totalSpending}
+                                currency={event.currency}
+                              />
                             </div>
                           </div>
                         </TooltipContent>
@@ -582,7 +572,7 @@ export function EventTimeline({
         </div>
 
         {selectedEvent && !isMobile && (
-          <div className="hidden md:block rounded-lg border p-4 space-y-6 bg-muted/30">
+          <div className="bg-muted/30 hidden space-y-6 rounded-lg border p-4 md:block">
             <div className="flex items-start justify-between">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
@@ -594,8 +584,8 @@ export function EventTimeline({
                   />
                   <h3 className="text-lg font-semibold">{selectedEvent.eventName}</h3>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span className="px-2 py-0.5 rounded-full bg-muted text-xs font-medium">
+                <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                  <span className="bg-muted rounded-full px-2 py-0.5 text-xs font-medium">
                     {selectedEvent.eventTypeName}
                   </span>
                   <span>&middot;</span>
@@ -606,13 +596,13 @@ export function EventTimeline({
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-2xl font-bold text-foreground">
+                <div className="text-foreground text-2xl font-bold">
                   <PrivacyAmount
                     value={selectedEvent.totalSpending}
                     currency={selectedEvent.currency}
                   />
                 </div>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground text-sm">
                   {selectedEvent.transactionCount} transactions
                 </p>
               </div>
@@ -621,14 +611,11 @@ export function EventTimeline({
             <div className="grid gap-6 md:grid-cols-2">
               {categoryChartData.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-muted-foreground">
+                  <h4 className="text-muted-foreground text-sm font-medium">
                     Spending by Category
                   </h4>
                   <div className="flex items-center gap-4">
-                    <ChartContainer
-                      config={{}}
-                      className="h-[160px] w-[160px]"
-                    >
+                    <ChartContainer config={{}} className="h-[160px] w-[160px]">
                       <PieChart>
                         <ChartTooltip content={<ChartTooltipContent />} />
                         <Pie
@@ -647,20 +634,17 @@ export function EventTimeline({
                         </Pie>
                       </PieChart>
                     </ChartContainer>
-                    <div className="flex-1 space-y-1 max-h-[160px] overflow-y-auto">
+                    <div className="max-h-[160px] flex-1 space-y-1 overflow-y-auto">
                       {categoryChartData.slice(0, 6).map((cat, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center justify-between text-sm"
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
+                        <div key={index} className="flex items-center justify-between text-sm">
+                          <div className="flex min-w-0 items-center gap-2">
                             <div
-                              className="h-2.5 w-2.5 rounded-full shrink-0"
+                              className="h-2.5 w-2.5 shrink-0 rounded-full"
                               style={{ backgroundColor: cat.fill }}
                             />
-                            <span className="truncate text-muted-foreground">{cat.name}</span>
+                            <span className="text-muted-foreground truncate">{cat.name}</span>
                           </div>
-                          <span className="text-foreground font-medium shrink-0 ml-2">
+                          <span className="text-foreground ml-2 shrink-0 font-medium">
                             <PrivacyAmount value={cat.value} currency={selectedEvent.currency} />
                           </span>
                         </div>
@@ -672,9 +656,7 @@ export function EventTimeline({
 
               {spendingTimelineData.length > 1 && (
                 <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-muted-foreground">
-                    Spending Over Time
-                  </h4>
+                  <h4 className="text-muted-foreground text-sm font-medium">Spending Over Time</h4>
                   <ChartContainer
                     config={{
                       amount: {
@@ -686,9 +668,23 @@ export function EventTimeline({
                   >
                     <AreaChart data={spendingTimelineData}>
                       <defs>
-                        <linearGradient id={`gradient-${selectedEvent.eventId}`} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={selectedEvent.eventTypeColor || "var(--chart-1)"} stopOpacity={0.3} />
-                          <stop offset="95%" stopColor={selectedEvent.eventTypeColor || "var(--chart-1)"} stopOpacity={0} />
+                        <linearGradient
+                          id={`gradient-${selectedEvent.eventId}`}
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor={selectedEvent.eventTypeColor || "var(--chart-1)"}
+                            stopOpacity={0.3}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor={selectedEvent.eventTypeColor || "var(--chart-1)"}
+                            stopOpacity={0}
+                          />
                         </linearGradient>
                       </defs>
                       <XAxis
@@ -709,11 +705,16 @@ export function EventTimeline({
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
                             return (
-                              <div className="rounded-lg border bg-background p-2 shadow-sm">
-                                <div className="text-xs text-muted-foreground">
+                              <div className="bg-background rounded-lg border p-2 shadow-sm">
+                                <div className="text-muted-foreground text-xs">
                                   {payload[0].payload.dateLabel}
                                 </div>
-                                <div className="text-sm font-medium" style={{ color: selectedEvent.eventTypeColor || "var(--chart-1)" }}>
+                                <div
+                                  className="text-sm font-medium"
+                                  style={{
+                                    color: selectedEvent.eventTypeColor || "var(--chart-1)",
+                                  }}
+                                >
                                   <PrivacyAmount
                                     value={payload[0].value as number}
                                     currency={selectedEvent.currency}
@@ -740,7 +741,7 @@ export function EventTimeline({
 
             {categoryChartData.length === 0 && Object.keys(selectedEvent.byCategory).length > 0 && (
               <div>
-                <h4 className="text-sm font-medium text-muted-foreground mb-2">
+                <h4 className="text-muted-foreground mb-2 text-sm font-medium">
                   Spending by Category
                 </h4>
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -749,7 +750,7 @@ export function EventTimeline({
                     .map((cat) => (
                       <div
                         key={cat.categoryId || "uncategorized"}
-                        className="flex items-center justify-between text-sm bg-background rounded px-3 py-2"
+                        className="bg-background flex items-center justify-between rounded px-3 py-2 text-sm"
                       >
                         <div className="flex items-center gap-2">
                           <div
@@ -767,10 +768,7 @@ export function EventTimeline({
               </div>
             )}
 
-            <ViewTransactionsButton
-              eventId={selectedEvent.eventId}
-              className="w-full gap-2"
-            />
+            <ViewTransactionsButton eventId={selectedEvent.eventId} className="w-full gap-2" />
           </div>
         )}
 
@@ -781,7 +779,7 @@ export function EventTimeline({
                 <SheetHeader className="text-left">
                   <SheetTitle className="flex items-center gap-2">
                     <div
-                      className="h-3 w-3 rounded-full shrink-0"
+                      className="h-3 w-3 shrink-0 rounded-full"
                       style={{ backgroundColor: selectedEvent.eventTypeColor || "var(--chart-1)" }}
                     />
                     <span className="truncate">{selectedEvent.eventName}</span>
@@ -789,36 +787,37 @@ export function EventTimeline({
                 </SheetHeader>
                 <ScrollArea className="flex-1 py-4">
                   <div className="space-y-4 pr-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Total Spending</span>
-                      <span className="text-lg font-bold text-foreground">
-                        <PrivacyAmount value={selectedEvent.totalSpending} currency={selectedEvent.currency} />
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground text-sm">Total Spending</span>
+                      <span className="text-foreground text-lg font-bold">
+                        <PrivacyAmount
+                          value={selectedEvent.totalSpending}
+                          currency={selectedEvent.currency}
+                        />
                       </span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Date Range</span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground text-sm">Date Range</span>
                       <span className="text-sm">
-                        {format(parseISO(selectedEvent.startDate), "MMM d")} - {format(parseISO(selectedEvent.endDate), "MMM d, yyyy")}
+                        {format(parseISO(selectedEvent.startDate), "MMM d")} -{" "}
+                        {format(parseISO(selectedEvent.endDate), "MMM d, yyyy")}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Type</span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground text-sm">Type</span>
                       <span className="text-sm">{selectedEvent.eventTypeName}</span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Transactions</span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground text-sm">Transactions</span>
                       <span className="text-sm">{selectedEvent.transactionCount}</span>
                     </div>
 
                     {categoryChartData.length > 0 && (
-                      <div className="pt-4 border-t">
-                        <h4 className="text-sm font-medium mb-3">Spending by Category</h4>
+                      <div className="border-t pt-4">
+                        <h4 className="mb-3 text-sm font-medium">Spending by Category</h4>
                         <div className="space-y-4">
                           <div className="flex justify-center">
-                            <ChartContainer
-                              config={{}}
-                              className="h-[140px] w-[140px]"
-                            >
+                            <ChartContainer config={{}} className="h-[140px] w-[140px]">
                               <PieChart>
                                 <ChartTooltip content={<ChartTooltipContent />} />
                                 <Pie
@@ -840,19 +839,21 @@ export function EventTimeline({
                           </div>
                           <div className="space-y-2">
                             {categoryChartData.slice(0, 5).map((cat, index) => (
-                              <div
-                                key={index}
-                                className="flex items-center justify-between"
-                              >
-                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <div key={index} className="flex items-center justify-between">
+                                <div className="flex min-w-0 flex-1 items-center gap-2">
                                   <div
-                                    className="h-2.5 w-2.5 rounded-full shrink-0"
+                                    className="h-2.5 w-2.5 shrink-0 rounded-full"
                                     style={{ backgroundColor: cat.fill }}
                                   />
-                                  <span className="truncate text-sm text-muted-foreground">{cat.name}</span>
+                                  <span className="text-muted-foreground truncate text-sm">
+                                    {cat.name}
+                                  </span>
                                 </div>
-                                <span className="text-foreground font-medium text-sm ml-4">
-                                  <PrivacyAmount value={cat.value} currency={selectedEvent.currency} />
+                                <span className="text-foreground ml-4 text-sm font-medium">
+                                  <PrivacyAmount
+                                    value={cat.value}
+                                    currency={selectedEvent.currency}
+                                  />
                                 </span>
                               </div>
                             ))}
@@ -862,8 +863,8 @@ export function EventTimeline({
                     )}
 
                     {spendingTimelineData.length > 1 && (
-                      <div className="pt-4 border-t">
-                        <h4 className="text-sm font-medium mb-3">Spending Over Time</h4>
+                      <div className="border-t pt-4">
+                        <h4 className="mb-3 text-sm font-medium">Spending Over Time</h4>
                         <ChartContainer
                           config={{
                             amount: {
@@ -878,9 +879,23 @@ export function EventTimeline({
                             margin={{ left: 0, right: 4, top: 8, bottom: 4 }}
                           >
                             <defs>
-                              <linearGradient id={`gradient-mobile-${selectedEvent.eventId}`} x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor={selectedEvent.eventTypeColor || "var(--chart-1)"} stopOpacity={0.3} />
-                                <stop offset="95%" stopColor={selectedEvent.eventTypeColor || "var(--chart-1)"} stopOpacity={0} />
+                              <linearGradient
+                                id={`gradient-mobile-${selectedEvent.eventId}`}
+                                x1="0"
+                                y1="0"
+                                x2="0"
+                                y2="1"
+                              >
+                                <stop
+                                  offset="5%"
+                                  stopColor={selectedEvent.eventTypeColor || "var(--chart-1)"}
+                                  stopOpacity={0.3}
+                                />
+                                <stop
+                                  offset="95%"
+                                  stopColor={selectedEvent.eventTypeColor || "var(--chart-1)"}
+                                  stopOpacity={0}
+                                />
                               </linearGradient>
                             </defs>
                             <XAxis
@@ -901,11 +916,16 @@ export function EventTimeline({
                               content={({ active, payload }) => {
                                 if (active && payload && payload.length) {
                                   return (
-                                    <div className="rounded-lg border bg-background p-2 shadow-sm">
-                                      <div className="text-xs text-muted-foreground">
+                                    <div className="bg-background rounded-lg border p-2 shadow-sm">
+                                      <div className="text-muted-foreground text-xs">
                                         {payload[0].payload.dateLabel}
                                       </div>
-                                      <div className="text-sm font-medium" style={{ color: selectedEvent.eventTypeColor || "var(--chart-1)" }}>
+                                      <div
+                                        className="text-sm font-medium"
+                                        style={{
+                                          color: selectedEvent.eventTypeColor || "var(--chart-1)",
+                                        }}
+                                      >
                                         <PrivacyAmount
                                           value={payload[0].value as number}
                                           currency={selectedEvent.currency}
@@ -931,7 +951,7 @@ export function EventTimeline({
 
                     <ViewTransactionsButton
                       eventId={selectedEvent.eventId}
-                      className="w-full gap-2 mt-4"
+                      className="mt-4 w-full gap-2"
                       onBeforeNavigate={() => setIsMobileDetailsOpen(false)}
                     />
                   </div>

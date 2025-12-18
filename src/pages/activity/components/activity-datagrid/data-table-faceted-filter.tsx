@@ -116,7 +116,7 @@ export function DataTableFacetedFilter({
                     </div>
                     {option.color && (
                       <span
-                        className="mr-2 h-3 w-3 rounded-full flex-shrink-0"
+                        className="mr-2 h-3 w-3 flex-shrink-0 rounded-full"
                         style={{ backgroundColor: option.color }}
                       />
                     )}

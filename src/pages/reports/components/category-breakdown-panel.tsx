@@ -93,9 +93,8 @@ export function CategoryBreakdownPanel({
         const categoryInfo = categorySpending[categoryId];
         const prevAmount = (prevBreakdown[categoryId] as number) || 0;
         const isNew = prevAmount === 0 && (amount as number) > 0;
-        const changePercent = prevAmount > 0
-          ? (((amount as number) - prevAmount) / prevAmount) * 100
-          : null;
+        const changePercent =
+          prevAmount > 0 ? (((amount as number) - prevAmount) / prevAmount) * 100 : null;
 
         return {
           categoryId,
@@ -113,7 +112,10 @@ export function CategoryBreakdownPanel({
 
     // Find categories that existed last month but not this month (X → 0)
     const goneCategories: CategoryWithChange[] = Object.entries(prevBreakdown)
-      .filter(([categoryId]) => !currentBreakdown[categoryId] || (currentBreakdown[categoryId] as number) === 0)
+      .filter(
+        ([categoryId]) =>
+          !currentBreakdown[categoryId] || (currentBreakdown[categoryId] as number) === 0,
+      )
       .map(([categoryId, prevAmount]) => {
         const categoryInfo = categorySpending[categoryId];
         return {
@@ -135,8 +137,16 @@ export function CategoryBreakdownPanel({
 
     const changes = allChanges
       .sort((a, b) => {
-        const aScore = a.isNew ? Infinity : (a.changePercent === -100 ? 100 : Math.abs(a.changePercent || 0));
-        const bScore = b.isNew ? Infinity : (b.changePercent === -100 ? 100 : Math.abs(b.changePercent || 0));
+        const aScore = a.isNew
+          ? Infinity
+          : a.changePercent === -100
+            ? 100
+            : Math.abs(a.changePercent || 0);
+        const bScore = b.isNew
+          ? Infinity
+          : b.changePercent === -100
+            ? 100
+            : Math.abs(b.changePercent || 0);
         return bScore - aScore;
       })
       .slice(0, 5);
@@ -172,10 +182,10 @@ export function CategoryBreakdownPanel({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Category Breakdown</CardTitle>
-          <Icons.PieChart className="h-4 w-4 text-muted-foreground" />
+          <Icons.PieChart className="text-muted-foreground h-4 w-4" />
         </CardHeader>
         <CardContent className="flex h-[280px] items-center justify-center">
-          <p className="text-sm text-muted-foreground">No spending data for this month</p>
+          <p className="text-muted-foreground text-sm">No spending data for this month</p>
         </CardContent>
       </Card>
     );
@@ -185,11 +195,11 @@ export function CategoryBreakdownPanel({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">Category Breakdown</CardTitle>
-        <Icons.PieChart className="h-4 w-4 text-muted-foreground" />
+        <Icons.PieChart className="text-muted-foreground h-4 w-4" />
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex gap-4">
-          <div className="flex-1 space-y-2 max-h-[300px] overflow-y-auto pr-2">
+          <div className="max-h-[300px] flex-1 space-y-2 overflow-y-auto pr-2">
             {allCategories.map((cat, index) => {
               const percent = totalSpending > 0 ? (cat.amount / totalSpending) * 100 : 0;
               const barWidth = maxAmount > 0 ? (cat.amount / maxAmount) * 100 : 0;
@@ -202,54 +212,54 @@ export function CategoryBreakdownPanel({
                   {hasSubcategories ? (
                     <button
                       onClick={() => toggleCategory(cat.categoryId)}
-                      className="flex w-full items-center justify-between text-sm hover:bg-muted/50 rounded px-1 py-0.5 transition-colors"
+                      className="hover:bg-muted/50 flex w-full items-center justify-between rounded px-1 py-0.5 text-sm transition-colors"
                     >
-                      <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex min-w-0 items-center gap-2">
                         {isExpanded ? (
-                          <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+                          <ChevronDown className="text-muted-foreground h-3 w-3 shrink-0" />
                         ) : (
-                          <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+                          <ChevronRight className="text-muted-foreground h-3 w-3 shrink-0" />
                         )}
                         <div
-                          className="h-2.5 w-2.5 rounded-full shrink-0"
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
                           style={{ backgroundColor: color }}
                         />
                         <span className="truncate font-medium">{cat.categoryName}</span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-muted-foreground text-xs">
                           ({cat.subcategories.length})
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0 ml-2">
+                      <div className="ml-2 flex shrink-0 items-center gap-2">
                         <span className="font-medium">
                           <PrivacyAmount value={cat.amount} currency={currency} />
                         </span>
-                        <span className="text-xs text-muted-foreground w-10 text-right">
+                        <span className="text-muted-foreground w-10 text-right text-xs">
                           {formatPercent(percent / 100)}
                         </span>
                       </div>
                     </button>
                   ) : (
-                    <div className="flex items-center justify-between text-sm px-1 py-0.5">
-                      <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center justify-between px-1 py-0.5 text-sm">
+                      <div className="flex min-w-0 items-center gap-2">
                         <div className="w-3" />
                         <div
-                          className="h-2.5 w-2.5 rounded-full shrink-0"
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
                           style={{ backgroundColor: color }}
                         />
-                        <span className="truncate text-muted-foreground">{cat.categoryName}</span>
+                        <span className="text-muted-foreground truncate">{cat.categoryName}</span>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0 ml-2">
+                      <div className="ml-2 flex shrink-0 items-center gap-2">
                         <span className="font-medium">
                           <PrivacyAmount value={cat.amount} currency={currency} />
                         </span>
-                        <span className="text-xs text-muted-foreground w-10 text-right">
+                        <span className="text-muted-foreground w-10 text-right text-xs">
                           {formatPercent(percent / 100)}
                         </span>
                       </div>
                     </div>
                   )}
 
-                  <div className="ml-5 h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div className="bg-muted ml-5 h-1.5 overflow-hidden rounded-full">
                     <div
                       className="h-full rounded-full transition-all duration-300"
                       style={{
@@ -260,29 +270,35 @@ export function CategoryBreakdownPanel({
                   </div>
 
                   {isExpanded && hasSubcategories && (
-                    <div className="ml-6 mt-2 space-y-2 border-l-2 pl-3" style={{ borderColor: color }}>
+                    <div
+                      className="mt-2 ml-6 space-y-2 border-l-2 pl-3"
+                      style={{ borderColor: color }}
+                    >
                       {cat.subcategories.map((sub) => {
                         const subPercent = cat.amount > 0 ? (sub.amount / cat.amount) * 100 : 0;
-                        const subBarWidth = cat.subcategories[0]?.amount > 0
-                          ? (sub.amount / cat.subcategories[0].amount) * 100
-                          : 0;
+                        const subBarWidth =
+                          cat.subcategories[0]?.amount > 0
+                            ? (sub.amount / cat.subcategories[0].amount) * 100
+                            : 0;
 
                         return (
                           <div key={sub.subcategoryId} className="space-y-1">
                             <div className="flex items-center justify-between text-sm">
-                              <span className="truncate text-muted-foreground">{sub.subcategoryName}</span>
-                              <div className="flex items-center gap-2 shrink-0 ml-2">
+                              <span className="text-muted-foreground truncate">
+                                {sub.subcategoryName}
+                              </span>
+                              <div className="ml-2 flex shrink-0 items-center gap-2">
                                 <span className="text-sm">
                                   <PrivacyAmount value={sub.amount} currency={currency} />
                                 </span>
-                                <span className="text-xs text-muted-foreground w-10 text-right">
+                                <span className="text-muted-foreground w-10 text-right text-xs">
                                   {formatPercent(subPercent / 100)}
                                 </span>
                               </div>
                             </div>
-                            <div className="h-1 rounded-full bg-muted/50 overflow-hidden">
+                            <div className="bg-muted/50 h-1 overflow-hidden rounded-full">
                               <div
-                                className="h-full rounded-full transition-all duration-300 opacity-60"
+                                className="h-full rounded-full opacity-60 transition-all duration-300"
                                 style={{
                                   width: `${subBarWidth}%`,
                                   backgroundColor: color,
@@ -307,12 +323,12 @@ export function CategoryBreakdownPanel({
                     if (!active || !payload?.length) return null;
                     const data = payload[0].payload;
                     return (
-                      <div className="rounded-lg border bg-background p-2 shadow-sm">
+                      <div className="bg-background rounded-lg border p-2 shadow-sm">
                         <div className="font-medium">{data.name}</div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-muted-foreground text-sm">
                           {isHidden ? "••••" : formatAmount(data.value, currency)}
                         </div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-muted-foreground text-xs">
                           {formatPercent(data.percent / 100)}
                         </div>
                       </div>
@@ -340,28 +356,26 @@ export function CategoryBreakdownPanel({
 
         {notableChanges.length > 0 && (
           <div className="border-t pt-3">
-            <p className="text-xs font-medium text-muted-foreground mb-2">
-              Notable Changes
-            </p>
+            <p className="text-muted-foreground mb-2 text-xs font-medium">Notable Changes</p>
             <div className="space-y-3">
               {notableChanges.map((cat) => (
                 <div key={cat.categoryId} className="flex items-center justify-between text-sm">
                   <div className="min-w-0 flex-1">
-                    <span className="truncate block text-muted-foreground">{cat.categoryName}</span>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground/70">
+                    <span className="text-muted-foreground block truncate">{cat.categoryName}</span>
+                    <div className="text-muted-foreground/70 flex items-center gap-1 text-xs">
                       <PrivacyAmount value={cat.prevAmount} currency={currency} />
                       <span className="text-muted-foreground/50">→</span>
                       <PrivacyAmount value={cat.amount} currency={currency} />
                     </div>
                   </div>
                   {cat.isNew ? (
-                    <div className="flex items-center gap-1 shrink-0 font-medium text-destructive ml-2">
+                    <div className="text-destructive ml-2 flex shrink-0 items-center gap-1 font-medium">
                       <ArrowUp className="h-3 w-3" />
                       New
                     </div>
                   ) : (
                     <div
-                      className={`flex items-center gap-1 shrink-0 font-medium ml-2 ${
+                      className={`ml-2 flex shrink-0 items-center gap-1 font-medium ${
                         cat.changePercent! > 0 ? "text-destructive" : "text-success"
                       }`}
                     >

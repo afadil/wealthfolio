@@ -1,6 +1,23 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Icons, Badge, AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@wealthfolio/ui";
+import {
+  Button,
+  Icons,
+  Badge,
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@wealthfolio/ui";
 import { toast } from "@/components/ui/use-toast";
 import type { Category } from "@/lib/types";
 import { buildCashflowUrl } from "@/lib/navigation/cashflow-navigation";
@@ -31,17 +48,19 @@ export function CategoryItem({
   const hasTransactions = activityCount > 0;
 
   const handleViewTransactions = () => {
-    navigate(buildCashflowUrl({
-      categoryId: isSubcategory ? undefined : category.id,
-      subcategoryId: isSubcategory ? category.id : undefined,
-    }));
+    navigate(
+      buildCashflowUrl({
+        categoryId: isSubcategory ? undefined : category.id,
+        subcategoryId: isSubcategory ? category.id : undefined,
+      }),
+    );
   };
 
   const handleDeleteClick = () => {
     if (hasTransactions) {
       toast({
         title: "Cannot delete category",
-        description: `This category has ${activityCount} transaction${activityCount !== 1 ? 's' : ''} associated with it. Please reassign or remove the transactions first.`,
+        description: `This category has ${activityCount} transaction${activityCount !== 1 ? "s" : ""} associated with it. Please reassign or remove the transactions first.`,
         variant: "destructive",
       });
     }
@@ -67,14 +86,9 @@ export function CategoryItem({
           )}
           {!hasChildren && !isSubcategory && <div className="w-6" />}
           {category.color && (
-            <div
-              className="h-3 w-3 rounded-full"
-              style={{ backgroundColor: category.color }}
-            />
+            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: category.color }} />
           )}
-          <span className={isSubcategory ? "text-sm" : "font-medium"}>
-            {category.name}
-          </span>
+          <span className={isSubcategory ? "text-sm" : "font-medium"}>{category.name}</span>
           {!!category.isIncome && (
             <Badge variant="secondary" className="text-xs">
               Income
@@ -84,12 +98,14 @@ export function CategoryItem({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="text-xs text-muted-foreground cursor-default">
+                  <span className="text-muted-foreground cursor-default text-xs">
                     ({activityCount})
                   </span>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{activityCount} transaction{activityCount !== 1 ? 's' : ''}</p>
+                  <p>
+                    {activityCount} transaction{activityCount !== 1 ? "s" : ""}
+                  </p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -114,21 +130,11 @@ export function CategoryItem({
           >
             <Icons.ExternalLink className="h-4 w-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onEdit(category)}
-            title="Edit category"
-          >
+          <Button variant="ghost" size="sm" onClick={() => onEdit(category)} title="Edit category">
             <Icons.Pencil className="h-4 w-4" />
           </Button>
           {hasTransactions ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              title="Delete category"
-              onClick={handleDeleteClick}
-            >
+            <Button variant="ghost" size="sm" title="Delete category" onClick={handleDeleteClick}>
               <Icons.Trash className="h-4 w-4" />
             </Button>
           ) : (
@@ -144,7 +150,7 @@ export function CategoryItem({
                   <AlertDialogDescription>
                     Are you sure you want to delete &quot;{category.name}&quot;?
                     {hasChildren && (
-                      <span className="mt-2 block font-medium text-destructive">
+                      <span className="text-destructive mt-2 block font-medium">
                         This will also delete all subcategories.
                       </span>
                     )}

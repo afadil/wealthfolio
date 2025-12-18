@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import {
   Button,
   Dialog,
@@ -17,12 +17,12 @@ import {
   FormLabel,
   FormMessage,
   Input,
-} from '@wealthfolio/ui';
-import type { EventType, NewEventType } from '@/lib/types';
-import { useEventTypeMutations } from '../use-event-type-mutations';
+} from "@wealthfolio/ui";
+import type { EventType, NewEventType } from "@/lib/types";
+import { useEventTypeMutations } from "../use-event-type-mutations";
 
 const eventTypeSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
+  name: z.string().min(1, "Name is required"),
   color: z.string().optional(),
 });
 
@@ -54,7 +54,7 @@ export function EventTypeFormDialog({ eventType, open, onOpenChange }: EventType
   const form = useForm<EventTypeFormValues>({
     resolver: zodResolver(eventTypeSchema),
     defaultValues: {
-      name: eventType?.name || '',
+      name: eventType?.name || "",
       color: eventType?.color || PRESET_COLORS[0],
     },
   });
@@ -63,7 +63,7 @@ export function EventTypeFormDialog({ eventType, open, onOpenChange }: EventType
   useEffect(() => {
     if (open) {
       form.reset({
-        name: eventType?.name || '',
+        name: eventType?.name || "",
         color: eventType?.color || PRESET_COLORS[0],
       });
     }
@@ -90,7 +90,7 @@ export function EventTypeFormDialog({ eventType, open, onOpenChange }: EventType
       form.reset();
       onOpenChange(false);
     } catch (error) {
-      console.error('Failed to save event type:', error);
+      console.error("Failed to save event type:", error);
     } finally {
       setIsSubmitting(false);
     }
@@ -100,11 +100,11 @@ export function EventTypeFormDialog({ eventType, open, onOpenChange }: EventType
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Edit Event Type' : 'Create Event Type'}</DialogTitle>
+          <DialogTitle>{isEditing ? "Edit Event Type" : "Create Event Type"}</DialogTitle>
           <DialogDescription>
             {isEditing
-              ? 'Update the event type name and color.'
-              : 'Create a new event type to categorize events.'}
+              ? "Update the event type name and color."
+              : "Create a new event type to categorize events."}
           </DialogDescription>
         </DialogHeader>
 
@@ -166,7 +166,13 @@ export function EventTypeFormDialog({ eventType, open, onOpenChange }: EventType
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? (isEditing ? 'Updating...' : 'Creating...') : isEditing ? 'Update' : 'Create'}
+                {isSubmitting
+                  ? isEditing
+                    ? "Updating..."
+                    : "Creating..."
+                  : isEditing
+                    ? "Update"
+                    : "Create"}
               </Button>
             </DialogFooter>
           </form>

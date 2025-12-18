@@ -1,9 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
 import { Icons } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
@@ -95,7 +91,15 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
         previousIncome: Number(previousMonthlyIncomeData[index]?.[1]) || 0,
       };
     });
-  }, [monthlyIncomeData, previousMonthlyIncomeData, byMonthBySourceType, byMonthBySymbol, allSymbolIds, hiddenSourceTypes, hiddenSymbols]);
+  }, [
+    monthlyIncomeData,
+    previousMonthlyIncomeData,
+    byMonthBySourceType,
+    byMonthBySymbol,
+    allSymbolIds,
+    hiddenSourceTypes,
+    hiddenSymbols,
+  ]);
 
   const periodDescription =
     selectedPeriod === "TOTAL"
@@ -203,7 +207,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                             }
                           />
                           <div className="flex flex-1 items-center justify-between gap-2">
-                            <span className="text-muted-foreground text-xs md:text-sm truncate max-w-[120px]">
+                            <span className="text-muted-foreground max-w-[120px] truncate text-xs md:text-sm">
                               {displayName}
                             </span>
                             <span className="text-foreground font-mono text-xs font-medium tabular-nums md:text-sm">

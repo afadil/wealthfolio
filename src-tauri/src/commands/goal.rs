@@ -7,12 +7,26 @@ use crate::{
 use log::debug;
 use serde_json::json;
 use tauri::{AppHandle, State};
-use wealthfolio_core::goals::goals_model::{Goal, GoalsAllocation, NewGoal};
+use wealthfolio_core::goals::{
+    AccountFreeCash, Goal, GoalContributionWithStatus, GoalWithContributions, NewGoal,
+    NewGoalContribution,
+};
 
 #[tauri::command]
 pub async fn get_goals(state: State<'_, Arc<ServiceContext>>) -> Result<Vec<Goal>, String> {
     debug!("Fetching active goals...");
     state.goal_service().get_goals().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_goals_with_contributions(
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<GoalWithContributions>, String> {
+    debug!("Fetching goals with contributions...");
+    state
+        .goal_service()
+        .get_goals_with_contributions()
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -80,25 +94,63 @@ pub async fn delete_goal(
 }
 
 #[tauri::command]
-pub async fn update_goal_allocations(
-    allocations: Vec<GoalsAllocation>,
+pub async fn get_account_free_cash(
+    account_ids: Vec<String>,
     state: State<'_, Arc<ServiceContext>>,
-) -> Result<usize, String> {
-    debug!("Updating goal allocations...");
+) -> Result<Vec<AccountFreeCash>, String> {
+    debug!("Fetching account free cash...");
     state
         .goal_service()
-        .upsert_goal_allocations(allocations)
-        .await
+        .get_account_free_cash(&account_ids)
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn load_goals_allocations(
+pub async fn add_goal_contribution(
+    contribution: NewGoalContribution,
     state: State<'_, Arc<ServiceContext>>,
-) -> Result<Vec<GoalsAllocation>, String> {
-    debug!("Loading goal allocations...");
-    state
+    handle: AppHandle,
+) -> Result<GoalContributionWithStatus, String> {
+    debug!("Adding goal contribution...");
+    let result = state
         .goal_service()
-        .load_goals_allocations()
-        .map_err(|e| e.to_string())
+        .add_contribution(contribution)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    emit_resource_changed(
+        &handle,
+        ResourceEventPayload::new(
+            "goal_contribution",
+            "created",
+            json!({ "goal_id": result.goal_id, "contribution_id": result.id }),
+        ),
+    );
+
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn remove_goal_contribution(
+    contribution_id: String,
+    state: State<'_, Arc<ServiceContext>>,
+    handle: AppHandle,
+) -> Result<usize, String> {
+    debug!("Removing goal contribution...");
+    let result = state
+        .goal_service()
+        .remove_contribution(&contribution_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    emit_resource_changed(
+        &handle,
+        ResourceEventPayload::new(
+            "goal_contribution",
+            "deleted",
+            json!({ "contribution_id": contribution_id }),
+        ),
+    );
+
+    Ok(result)
 }

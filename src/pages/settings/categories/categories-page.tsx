@@ -183,6 +183,6 @@ function SettingsCategoriesPage() {
       />
     </>
   );
-};
+}
 
 export default SettingsCategoriesPage;

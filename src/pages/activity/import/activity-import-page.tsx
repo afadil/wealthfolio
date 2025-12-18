@@ -43,7 +43,8 @@ function ActivityImportPage() {
 
   // Filter to only show SECURITIES and CRYPTOCURRENCY accounts (investment accounts)
   const accounts = (accountsData ?? []).filter(
-    (acc) => acc.accountType === AccountType.SECURITIES || acc.accountType === AccountType.CRYPTOCURRENCY,
+    (acc) =>
+      acc.accountType === AccountType.SECURITIES || acc.accountType === AccountType.CRYPTOCURRENCY,
   );
 
   // Pre-select account from URL params
@@ -72,11 +73,13 @@ function ActivityImportPage() {
   } = useCsvParser();
 
   // Track if user has unsaved import progress (past step 1 with data, but not on results step)
-  const hasUnsavedChanges = currentStep > 1 && currentStep < STEPS.length && (data.length > 0 || activities.length > 0);
+  const hasUnsavedChanges =
+    currentStep > 1 && currentStep < STEPS.length && (data.length > 0 || activities.length > 0);
 
   const { UnsavedChangesDialog } = useUnsavedChanges({
     hasUnsavedChanges,
-    message: "You have an import in progress. Are you sure you want to leave? Your import progress will be lost.",
+    message:
+      "You have an import in progress. Are you sure you want to leave? Your import progress will be lost.",
   });
 
   // Reset the entire import process
@@ -228,7 +231,7 @@ function ActivityImportPage() {
       </PageContent>
     </Page>
   );
-};
+}
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }> {
   override state = { hasError: false, error: null };

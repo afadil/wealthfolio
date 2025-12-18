@@ -182,9 +182,7 @@ export function SelectCell({
                   value={`${option.value} ${option.searchValue ?? option.label ?? option.value}`}
                   onSelect={() => handleSelect(option)}
                 >
-                  {value === option.value && (
-                    <Check className="mr-2 h-4 w-4" />
-                  )}
+                  {value === option.value && <Check className="mr-2 h-4 w-4" />}
                   <span className="text-xs">{option.label}</span>
                 </CommandItem>
               ))}
