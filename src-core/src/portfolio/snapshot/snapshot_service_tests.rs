@@ -364,6 +364,7 @@ mod tests {
             _activity_type_filter: Option<Vec<String>>,
             _asset_id_keyword: Option<String>,
             _sort: Option<ActivitySort>,
+            _is_draft_filter: Option<bool>,
         ) -> AppResult<ActivitySearchResponse> {
             unimplemented!()
         }
@@ -475,6 +476,7 @@ mod tests {
             _typ: Option<Vec<String>>,
             _kw: Option<String>,
             _sort: Option<ActivitySort>,
+            _is_draft_filter: Option<bool>,
         ) -> AppResult<ActivitySearchResponse> {
             unimplemented!()
         }

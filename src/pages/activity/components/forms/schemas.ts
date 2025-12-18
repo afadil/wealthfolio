@@ -2,12 +2,17 @@ import { z } from "zod";
 import { ActivityType, DataSource } from "@/lib/constants";
 
 export const baseActivitySchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().optional(),
   accountId: z.string().min(1, { message: "Please select an account." }),
   activityDate: z.union([z.date(), z.string().datetime()]).default(new Date()),
   currency: z.string().optional(),
   comment: z.string().optional().nullable(),
   isDraft: z.boolean().optional().default(false),
+  fxRate: z.coerce
+    .number()
+    .positive({ message: "FX rate must be a positive number." })
+    .optional()
+    .nullable(),
 });
 
 export const holdingsActivitySchema = baseActivitySchema.extend({

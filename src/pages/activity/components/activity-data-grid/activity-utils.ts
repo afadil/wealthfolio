@@ -63,7 +63,10 @@ export function resolveAssetIdForTransaction(
 }
 
 /**
- * Creates a new draft transaction with default values
+ * Creates a new draft transaction with default values.
+ * Note: isDraft is set to false because isDraft=true is reserved for
+ * activities created by the sync service that need user review.
+ * The isNew flag is used to track locally created rows.
  */
 export function createDraftTransaction(
   accounts: Account[],
@@ -81,7 +84,7 @@ export function createDraftTransaction(
     amount: 0,
     fee: 0,
     currency: defaultAccount?.currency ?? fallbackCurrency,
-    isDraft: true,
+    isDraft: false,
     comment: "",
     createdAt: now,
     assetId: "",

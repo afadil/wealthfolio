@@ -85,8 +85,9 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
         })(),
 
     currency: activity?.currency || "",
+    fxRate: activity?.fxRate ?? null,
     assetDataSource: activity?.assetDataSource || DataSource.YAHOO,
-    showCurrencySelect: false,
+    showCurrencySelect: Boolean(activity?.currency && activity?.fxRate),
   };
 
   const form = useForm<NewActivityFormValues>({
@@ -161,7 +162,11 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
                 <HoverCardTrigger>
                   <Icons.AlertCircle className="text-destructive h-5 w-5" />
                 </HoverCardTrigger>
-                <HoverCardContent className="border-destructive/50 bg-destructive text-destructive-foreground dark:border-destructive [&>svg]:text-destructive w-[600px]">
+                <HoverCardContent
+                  side="bottom"
+                  align="start"
+                  className="border-destructive/50 bg-destructive text-destructive-foreground dark:border-destructive [&>svg]:text-destructive max-w-[400px]"
+                >
                   <div className="space-y-2">
                     <h4 className="font-medium">Please Review Your Entry</h4>
                     <ul className="list-disc space-y-1 pl-4 text-sm">

@@ -2,12 +2,12 @@ import { ActivityType } from "@/lib/constants";
 import type { Account } from "@/lib/types";
 import { describe, expect, it } from "vitest";
 import {
-    buildSavePayload,
-    createCurrencyResolver,
-    createDraftTransaction,
-    resolveAssetIdForTransaction,
-    TRACKED_FIELDS,
-    valuesAreEqual,
+  buildSavePayload,
+  createCurrencyResolver,
+  createDraftTransaction,
+  resolveAssetIdForTransaction,
+  TRACKED_FIELDS,
+  valuesAreEqual,
 } from "./activity-utils";
 import type { LocalTransaction } from "./types";
 
@@ -134,7 +134,8 @@ describe("activity-utils", () => {
 
       expect(draft.id).toMatch(/^temp-/);
       expect(draft.isNew).toBe(true);
-      expect(draft.isDraft).toBe(true);
+      // isDraft should be false - it's reserved for sync service activities needing review
+      expect(draft.isDraft).toBe(false);
     });
 
     it("should use default account values", () => {

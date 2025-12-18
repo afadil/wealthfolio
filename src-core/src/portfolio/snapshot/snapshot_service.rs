@@ -10,7 +10,7 @@ use crate::portfolio::snapshot::{AccountStateSnapshot, Lot, Position};
 use crate::utils::time_utils::get_days_between;
 
 use async_trait::async_trait;
-use chrono::{Local, NaiveDate, Utc};
+use chrono::{NaiveDate, Utc};
 use log::{debug, error, info, warn};
 use rust_decimal::Decimal;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
@@ -1011,21 +1011,41 @@ impl SnapshotServiceTrait for SnapshotService {
             "Reconstructing daily holdings snapshots for {} from {:?} to {:?}",
             account_id, start_date_opt, end_date_opt
         );
-        let end_date = end_date_opt.unwrap_or_else(|| Local::now().date_naive());
 
-        // Determine start date: Use provided, else earliest, else end_date
+        // Determine start date: Use provided, else earliest snapshot date
+        let earliest_snapshot_date = self
+            .snapshot_repository
+            .get_earliest_snapshot_date(account_id)?;
+
         let start_date = match start_date_opt {
             Some(date) => date,
+            None => match earliest_snapshot_date {
+                Some(date) => date,
+                None => {
+                    debug!(
+                        "No snapshots found for account {}. Returning empty.",
+                        account_id
+                    );
+                    return Ok(Vec::new());
+                }
+            },
+        };
+
+        // Use provided end_date, or latest snapshot date, or UTC now as fallback
+        let end_date = match end_date_opt {
+            Some(date) => date,
             None => {
+                // Get the latest snapshot to ensure we include all available data
+                // Use a far future date to get the absolute latest snapshot
+                let far_future = Utc::now().date_naive() + chrono::Duration::days(365);
                 match self
                     .snapshot_repository
-                    .get_earliest_snapshot_date(account_id)
+                    .get_latest_snapshot_before_date(account_id, far_future)?
                 {
-                    Ok(Some(date)) => date,
-                    _ => {
-                        warn!("No earliest snapshot found for account {}. Using end date {} as start date.", account_id, end_date);
-                        end_date // Default to end date if no earliest found
+                    Some(latest_snapshot) => {
+                        latest_snapshot.snapshot_date.max(Utc::now().date_naive())
                     }
+                    None => Utc::now().date_naive(),
                 }
             }
         };
