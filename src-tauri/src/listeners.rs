@@ -1,3 +1,4 @@
+use chrono::NaiveDate;
 use futures::future::join_all;
 use log::{debug, error, info, warn};
 use serde::Serialize;
@@ -67,13 +68,21 @@ fn handle_portfolio_request(handle: AppHandle, payload_str: &str, force_recalc: 
                     }
 
                     let sync_start = Instant::now();
+
+                    // Use optimized sync - MarketDataService handles the sync state internally
                     let sync_result = if refetch_all {
+                        // Force refetch specific symbols or all
+                        info!("Using full resync (refetch_all=true) for symbols: {:?}", symbols_to_sync);
                         market_data_service
                             .resync_market_data(symbols_to_sync)
                             .await
                     } else {
+                        // Use optimized sync - MarketDataService internally refreshes sync state
+                        // and generates the optimized sync plan
+                        info!("Using optimized sync (refetch_all=false)");
                         market_data_service.sync_market_data().await
                     };
+
                     let sync_duration = sync_start.elapsed();
                     info!("Market data sync completed in: {:?}", sync_duration);
 
@@ -145,6 +154,7 @@ fn handle_resource_change(handle: AppHandle, payload_str: &str) {
             match event.resource_type.as_str() {
                 "account" => handle_account_resource_change(handle.clone(), &event),
                 "activity" => handle_activity_resource_change(handle.clone(), &event),
+                "asset" => handle_asset_resource_change(handle.clone(), &event),
                 _ => {
                     // Default to a lightweight portfolio update when resource type is unknown
                     emit_portfolio_trigger_update(
@@ -158,6 +168,45 @@ fn handle_resource_change(handle: AppHandle, payload_str: &str) {
             }
         }
         Err(err) => warn!("Failed to parse resource change payload: {}", err),
+    }
+}
+
+fn handle_asset_resource_change(handle: AppHandle, event: &ResourceEventPayload) {
+    let context = match handle.try_state::<Arc<ServiceContext>>() {
+        Some(ctx) => ctx,
+        None => {
+            warn!("ServiceContext not available for asset resource change");
+            return;
+        }
+    };
+
+    match event.action.as_str() {
+        "deleted" => {
+            // Handle asset deletion - remove sync state for this symbol
+            let asset_id = event.payload.get("asset_id").and_then(|v| v.as_str());
+
+            if let Some(asset_id) = asset_id {
+                let asset_id_owned = asset_id.to_string();
+                let market_data_service = context.market_data_service();
+
+                spawn(async move {
+                    if let Err(e) = market_data_service
+                        .delete_sync_state(&asset_id_owned)
+                        .await
+                    {
+                        warn!(
+                            "Failed to delete sync state for asset {}: {}",
+                            asset_id_owned, e
+                        );
+                    } else {
+                        info!("Deleted sync state for asset {}", asset_id_owned);
+                    }
+                });
+            }
+        }
+        _ => {
+            debug!("Unhandled asset action for sync state: {}", event.action);
+        }
     }
 }
 
@@ -269,6 +318,178 @@ fn handle_activity_resource_change(handle: AppHandle, event: &ResourceEventPaylo
         }
     }
 
+    // Handle quote sync state updates based on activity action
+    let market_data_service = context.market_data_service();
+
+    match event.action.as_str() {
+        "created" => {
+            // Handle new activity - update sync state with the activity date
+            let asset_id = event.payload.get("asset_id").and_then(|v| v.as_str());
+            let activity_date_str = event.payload.get("activity_date").and_then(|v| v.as_str());
+
+            if let (Some(asset_id), Some(date_str)) = (asset_id, activity_date_str) {
+                if let Ok(activity_date) = NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
+                    let asset_id_owned = asset_id.to_string();
+                    let service = market_data_service.clone();
+
+                    spawn(async move {
+                        if let Err(e) = service.handle_new_activity(&asset_id_owned, activity_date).await {
+                            warn!(
+                                "Failed to handle new activity for {}: {}",
+                                asset_id_owned, e
+                            );
+                        } else {
+                            debug!(
+                                "Processed new activity for {} on {}",
+                                asset_id_owned, activity_date
+                            );
+                        }
+                    });
+                }
+            }
+        }
+        "updated" => {
+            // Handle activity date changes for quote backfill detection
+            let date_changed = event
+                .payload
+                .get("date_changed")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+
+            if date_changed {
+                let asset_id = event.payload.get("asset_id").and_then(|v| v.as_str());
+                let new_date_str = event.payload.get("activity_date").and_then(|v| v.as_str());
+                let old_date_str = event
+                    .payload
+                    .get("previous_activity_date")
+                    .and_then(|v| v.as_str());
+
+                if let (Some(asset_id), Some(new_date_str)) = (asset_id, new_date_str) {
+                    let new_date = NaiveDate::parse_from_str(new_date_str, "%Y-%m-%d").ok();
+                    let old_date =
+                        old_date_str.and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
+
+                    if let Some(new_date) = new_date {
+                        let asset_id_owned = asset_id.to_string();
+                        let service = market_data_service.clone();
+
+                        spawn(async move {
+                            if let Err(e) = service
+                                .handle_activity_date_change(&asset_id_owned, old_date, new_date)
+                                .await
+                            {
+                                warn!(
+                                    "Failed to handle activity date change for {}: {}",
+                                    asset_id_owned, e
+                                );
+                            } else {
+                                info!(
+                                    "Processed activity date change for {} (old: {:?}, new: {})",
+                                    asset_id_owned, old_date, new_date
+                                );
+                            }
+                        });
+                    }
+                }
+            }
+
+            // Also check if asset_id changed (activity moved to different asset)
+            let previous_asset_id = event
+                .payload
+                .get("previous_asset_id")
+                .and_then(|v| v.as_str());
+            let current_asset_id = event.payload.get("asset_id").and_then(|v| v.as_str());
+
+            if let (Some(prev), Some(curr)) = (previous_asset_id, current_asset_id) {
+                if prev != curr {
+                    // Recalculate dates for both old and new asset
+                    let prev_owned = prev.to_string();
+                    let curr_owned = curr.to_string();
+                    let service = market_data_service.clone();
+                    // Convert to owned String before the async block
+                    let activity_date_owned = event
+                        .payload
+                        .get("activity_date")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+
+                    spawn(async move {
+                        // Handle deletion from old asset
+                        if let Err(e) = service.handle_activity_deleted(&prev_owned).await {
+                            warn!(
+                                "Failed to handle activity removal from {}: {}",
+                                prev_owned, e
+                            );
+                        }
+
+                        // Handle addition to new asset
+                        if let Some(date_str) = activity_date_owned {
+                            if let Ok(activity_date) =
+                                NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+                            {
+                                if let Err(e) =
+                                    service.handle_new_activity(&curr_owned, activity_date).await
+                                {
+                                    warn!(
+                                        "Failed to handle activity addition to {}: {}",
+                                        curr_owned, e
+                                    );
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+        }
+        "deleted" => {
+            // Handle activity deletion - recalculate dates for the asset
+            let asset_id = event.payload.get("asset_id").and_then(|v| v.as_str());
+
+            if let Some(asset_id) = asset_id {
+                let asset_id_owned = asset_id.to_string();
+                let service = market_data_service.clone();
+
+                spawn(async move {
+                    if let Err(e) = service.handle_activity_deleted(&asset_id_owned).await {
+                        warn!(
+                            "Failed to handle activity deletion for {}: {}",
+                            asset_id_owned, e
+                        );
+                    } else {
+                        debug!("Processed activity deletion for {}", asset_id_owned);
+                    }
+                });
+            }
+        }
+        "imported" => {
+            // Handle imported activities - trigger full refresh since there may be many
+            let service = market_data_service.clone();
+
+            spawn(async move {
+                if let Err(e) = service.refresh_sync_state().await {
+                    warn!("Failed to refresh sync state after import: {}", e);
+                } else {
+                    info!("Refreshed sync state after activity import");
+                }
+            });
+        }
+        "bulk-mutated" => {
+            // Handle bulk mutations - trigger full refresh since multiple activities changed
+            let service = market_data_service.clone();
+
+            spawn(async move {
+                if let Err(e) = service.refresh_sync_state().await {
+                    warn!("Failed to refresh sync state after bulk mutation: {}", e);
+                } else {
+                    info!("Refreshed sync state after bulk activity mutation");
+                }
+            });
+        }
+        _ => {
+            debug!("Unhandled activity action for sync state: {}", event.action);
+        }
+    }
+
     let mut builder = PortfolioRequestPayload::builder();
 
     if account_ids.is_empty() {
@@ -281,8 +502,9 @@ fn handle_activity_resource_change(handle: AppHandle, event: &ResourceEventPaylo
         builder = builder.symbols(Some(symbols.into_iter().collect()));
     }
 
-    // Activities can affect market data, force a refresh.
-    builder = builder.refetch_all_market_data(true);
+    // Use optimized sync - the quote sync state service has already been updated
+    // with the activity changes above, so the sync plan will know exactly what to fetch
+    builder = builder.refetch_all_market_data(false);
 
     emit_portfolio_trigger_recalculate(&handle, builder.build());
 }

@@ -6,6 +6,7 @@ use super::market_data_model::{
     LatestQuotePair, MarketDataProviderInfo, Quote, QuoteDb, QuoteImport, QuoteSummary,
 };
 use super::providers::models::AssetProfile;
+use super::quote_sync_state_model::{QuoteSyncState, SymbolSyncPlan};
 use crate::errors::Result;
 use crate::market_data::market_data_model::{
     MarketDataProviderSetting, UpdateMarketDataProviderSetting,
@@ -66,10 +67,42 @@ pub trait MarketDataServiceTrait: Send + Sync {
         overwrite: bool,
     ) -> Result<Vec<QuoteImport>>;
     async fn bulk_upsert_quotes(&self, quotes: Vec<Quote>) -> Result<usize>;
+
+    // --- Quote Sync State Methods ---
+    // These methods manage the sync state for optimized quote fetching
+
+    /// Refresh sync state from current holdings and activities
+    /// This should be called before syncing to ensure state is up to date
+    async fn refresh_sync_state(&self) -> Result<()>;
+
+    /// Get the optimized sync plan based on current state
+    fn get_sync_plan(&self) -> Result<Vec<SymbolSyncPlan>>;
+
+    /// Handle an activity date change (for backfill detection)
+    async fn handle_activity_date_change(
+        &self,
+        symbol: &str,
+        old_date: Option<NaiveDate>,
+        new_date: NaiveDate,
+    ) -> Result<()>;
+
+    /// Handle a new activity being created
+    /// Creates or updates sync state for the symbol with the activity date
+    async fn handle_new_activity(&self, symbol: &str, activity_date: NaiveDate) -> Result<()>;
+
+    /// Handle an activity being deleted
+    /// Recalculates activity dates for the symbol from remaining activities
+    async fn handle_activity_deleted(&self, symbol: &str) -> Result<()>;
+
+    /// Delete sync state for a symbol (e.g., when asset is deleted)
+    async fn delete_sync_state(&self, symbol: &str) -> Result<()>;
+
+    /// Get symbols that need syncing
+    fn get_symbols_needing_sync(&self) -> Result<Vec<QuoteSyncState>>;
 }
 
 #[async_trait]
-pub trait MarketDataRepositoryTrait {
+pub trait MarketDataRepositoryTrait: Send + Sync {
     fn get_all_historical_quotes(&self) -> Result<Vec<Quote>>;
     fn get_historical_quotes_for_symbol(&self, symbol: &str) -> Result<Vec<Quote>>;
     async fn save_quotes(&self, quotes: &[Quote]) -> Result<()>;

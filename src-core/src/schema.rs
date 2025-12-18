@@ -187,6 +187,25 @@ diesel::table! {
 }
 
 diesel::table! {
+    quote_sync_state (symbol) {
+        symbol -> Text,
+        is_active -> Integer,
+        first_activity_date -> Nullable<Text>,
+        last_activity_date -> Nullable<Text>,
+        position_closed_date -> Nullable<Text>,
+        last_synced_at -> Nullable<Text>,
+        last_quote_date -> Nullable<Text>,
+        earliest_quote_date -> Nullable<Text>,
+        data_source -> Text,
+        sync_priority -> Integer,
+        error_count -> Integer,
+        last_error -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
     quotes (id) {
         id -> Text,
         symbol -> Text,
@@ -223,5 +242,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     holdings_snapshots,
     market_data_providers,
     platforms,
+    quote_sync_state,
     quotes,
 );

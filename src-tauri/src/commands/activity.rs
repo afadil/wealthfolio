@@ -51,6 +51,7 @@ pub async fn create_activity(
     debug!("Creating activity...");
     let result = state.activity_service().create_activity(activity).await?;
 
+    let activity_date = result.activity_date.date_naive();
     emit_resource_changed(
         &handle,
         ResourceEventPayload::new(
@@ -61,6 +62,7 @@ pub async fn create_activity(
                 "account_id": result.account_id,
                 "currency": result.currency,
                 "asset_id": result.asset_id,
+                "activity_date": activity_date.to_string(),
             }),
         ),
     );
@@ -83,6 +85,11 @@ pub async fn update_activity(
 
     let result = state.activity_service().update_activity(activity).await?;
 
+    // Detect if the activity date changed (for quote backfill detection)
+    let original_date = original_activity.activity_date.date_naive();
+    let new_date = result.activity_date.date_naive();
+    let date_changed = original_date != new_date;
+
     emit_resource_changed(
         &handle,
         ResourceEventPayload::new(
@@ -93,9 +100,12 @@ pub async fn update_activity(
                 "account_id": result.account_id,
                 "currency": result.currency,
                 "asset_id": result.asset_id,
+                "activity_date": new_date.to_string(),
                 "previous_account_id": original_activity.account_id,
                 "previous_currency": original_activity.currency,
                 "previous_asset_id": original_activity.asset_id,
+                "previous_activity_date": original_date.to_string(),
+                "date_changed": date_changed,
             }),
         ),
     );

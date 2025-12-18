@@ -8,7 +8,7 @@ use wealthfolio_core::{
     fx::{FxRepository, FxService, FxServiceTrait},
     goals::{GoalRepository, GoalService},
     limits::{ContributionLimitRepository, ContributionLimitService},
-    market_data::{MarketDataRepository, MarketDataService, MarketDataServiceTrait},
+    market_data::{MarketDataRepository, MarketDataService, MarketDataServiceTrait, QuoteSyncStateRepository},
     portfolio::{
         holdings::{HoldingsService, HoldingsValuationService},
         income::IncomeService,
@@ -64,11 +64,23 @@ pub async fn initialize_context(
     let instance_id = Arc::new(settings.instance_id.clone());
 
     let secret_store = shared_secret_store();
+
+    // Quote sync state repository for optimized quote syncing
+    let quote_sync_state_repository = Arc::new(QuoteSyncStateRepository::new(
+        pool.clone(),
+        writer.clone(),
+    ));
+
+    // MarketDataService now includes sync state functionality
     let market_data_service: Arc<dyn MarketDataServiceTrait> = Arc::new(
         MarketDataService::new(
             market_data_repo.clone(),
             asset_repository.clone(),
             secret_store.clone(),
+            quote_sync_state_repository.clone(),
+            snapshot_repository.clone(),
+            activity_repository.clone(),
+            account_repository.clone(),
         )
         .await?,
     );
