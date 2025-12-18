@@ -73,8 +73,8 @@ export function ContributionsTimelineChart({
             <AreaChart data={timelineData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorCumulative" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(var(--success))" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="hsl(var(--success))" stopOpacity={0.05} />
+                  <stop offset="5%" stopColor="var(--success)" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="var(--success)" stopOpacity={0.05} />
                 </linearGradient>
               </defs>
               <XAxis
@@ -139,18 +139,18 @@ export function ContributionsTimelineChart({
               <Area
                 type="monotone"
                 dataKey="cumulative"
-                stroke="hsl(var(--success))"
+                stroke="var(--success)"
                 strokeWidth={2}
                 fill="url(#colorCumulative)"
                 dot={{
-                  fill: "hsl(var(--success))",
+                  fill: "var(--success)",
                   strokeWidth: 0,
                   r: 4,
                 }}
                 activeDot={{
-                  fill: "hsl(var(--success))",
+                  fill: "var(--success)",
                   strokeWidth: 2,
-                  stroke: "hsl(var(--background))",
+                  stroke: "var(--background)",
                   r: 6,
                 }}
               />
