@@ -12,3 +12,16 @@ pub const DEFAULT_HISTORY_DAYS: i64 = 3650; // 10 years
 
 /// Time constants
 pub const MARKET_DATA_QUOTE_TIME: (u32, u32, u32) = (16, 0, 0); // 4:00 PM
+
+/// Quote sync optimization constants
+
+/// Days to continue syncing after position closes
+/// After this grace period, quotes will no longer be fetched for the symbol
+pub const CLOSED_POSITION_GRACE_PERIOD_DAYS: i64 = 30;
+
+/// Days of quote history buffer before first activity
+/// When a new position is opened, fetch quotes starting this many days before the first activity
+pub const QUOTE_HISTORY_BUFFER_DAYS: i64 = 30;
+
+/// Maximum days to fetch in a single sync request (for rate limiting)
+pub const MAX_SYNC_DAYS_PER_REQUEST: i64 = 365;

@@ -249,6 +249,48 @@ mod tests {
             unimplemented!()
         }
 
+        // --- Quote Sync State Methods ---
+        async fn refresh_sync_state(&self) -> Result<()> {
+            Ok(())
+        }
+
+        fn get_sync_plan(
+            &self,
+        ) -> Result<Vec<crate::market_data::quote_sync_state_model::SymbolSyncPlan>> {
+            Ok(Vec::new())
+        }
+
+        async fn handle_activity_date_change(
+            &self,
+            _symbol: &str,
+            _old_date: Option<NaiveDate>,
+            _new_date: NaiveDate,
+        ) -> Result<()> {
+            Ok(())
+        }
+
+        async fn handle_new_activity(
+            &self,
+            _symbol: &str,
+            _activity_date: NaiveDate,
+        ) -> Result<()> {
+            Ok(())
+        }
+
+        async fn handle_activity_deleted(&self, _symbol: &str) -> Result<()> {
+            Ok(())
+        }
+
+        async fn delete_sync_state(&self, _symbol: &str) -> Result<()> {
+            Ok(())
+        }
+
+        fn get_symbols_needing_sync(
+            &self,
+        ) -> Result<Vec<crate::market_data::quote_sync_state_model::QuoteSyncState>> {
+            Ok(Vec::new())
+        }
+
         fn get_latest_quotes_pair_for_symbols(
             &self,
             symbols: &[String],
