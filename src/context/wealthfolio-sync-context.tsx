@@ -1,4 +1,5 @@
 import { getRunEnv, listenDeepLinkTauri, logger, openUrlInBrowser, RUN_ENV } from "@/adapters";
+import { getUserInfo, type UserInfo } from "@/commands/brokers-sync";
 import { getSecret } from "@/commands/secrets";
 import { clearSyncSession, storeSyncSession } from "@/commands/wealthfolio-sync";
 import { getPlatform } from "@/hooks/use-platform";
@@ -15,9 +16,9 @@ import {
 } from "react";
 
 // Supabase configuration - these are public keys (safe for client-side)
-// Set via environment variables: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
+// Set via environment variables: VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
 // Keys for storing tokens in keyring
 const REFRESH_TOKEN_KEY = "wealthfolio_sync_refresh_token";
@@ -78,7 +79,7 @@ const getWebRedirectUrl = () => {
 
 // For OAuth on desktop, we use a hosted callback page that redirects to the deep link
 // This is necessary because browsers block direct navigation to custom URL schemes
-const HOSTED_OAUTH_CALLBACK_URL = "https://sync.wealthfolio.app/auth/callback";
+const HOSTED_OAUTH_CALLBACK_URL = "https://connect.wealthfolio.app/auth/callback";
 
 type AuthCallbackPayload = { type: "code"; code: string } | { type: "error"; message: string };
 
@@ -119,16 +120,21 @@ function parseAuthCallbackUrl(url: string): AuthCallbackPayload | null {
 
 interface WealthfolioSyncContextValue {
   isConnected: boolean;
+  isInitializing: boolean;
   isLoading: boolean;
   user: User | null;
   session: Session | null;
+  teamId: string | null;
+  userInfo: UserInfo | null;
   error: string | null;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   signInWithOAuth: (provider: "google" | "apple" | "github") => Promise<void>;
   signInWithMagicLink: (email: string) => Promise<void>;
+  verifyOtp: (email: string, token: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
+  refetchUserInfo: () => Promise<void>;
 }
 
 const WealthfolioSyncContext = createContext<WealthfolioSyncContextValue | undefined>(undefined);
@@ -196,7 +202,7 @@ function createHybridPkceStorage(storageKey: string) {
 // Create a Supabase client with custom storage for persistent auth
 const createSupabaseClient = () => {
   const storageKey = getAuthStorageKey(SUPABASE_URL);
-  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  return createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     auth: {
       storageKey,
       storage: createHybridPkceStorage(storageKey),
@@ -212,9 +218,11 @@ const createSupabaseClient = () => {
 };
 
 export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
-  const [isLoading, setIsLoading] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const supabaseRef = useRef<SupabaseClient | null>(null);
@@ -326,7 +334,7 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
         logger.error("Error restoring session.");
       } finally {
         if (!cancelled) {
-          setIsLoading(false);
+          setIsInitializing(false);
         }
       }
     };
@@ -567,6 +575,38 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
     [supabase],
   );
 
+  const verifyOtp = useCallback(
+    async (email: string, token: string) => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const { data, error: verifyError } = await supabase.auth.verifyOtp({
+          email,
+          token,
+          type: "email",
+        });
+
+        if (verifyError) {
+          throw verifyError;
+        }
+
+        if (data.session) {
+          setSession(data.session);
+          setUser(data.session.user);
+          await storeTokens(data.session);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Invalid verification code";
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [supabase, storeTokens],
+  );
+
   const signOut = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -592,31 +632,71 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
 
   const clearError = useCallback(() => setError(null), []);
 
+  // Fetch user info from the cloud API
+  const refetchUserInfo = useCallback(async () => {
+    if (!session || getRunEnv() !== RUN_ENV.DESKTOP) {
+      setUserInfo(null);
+      return;
+    }
+
+    try {
+      const info = await getUserInfo();
+      setUserInfo(info);
+    } catch (_err) {
+      logger.error("Failed to fetch user info from API.");
+      setUserInfo(null);
+    }
+  }, [session]);
+
+  // Fetch user info when session changes
+  useEffect(() => {
+    if (session) {
+      void refetchUserInfo();
+    } else {
+      setUserInfo(null);
+    }
+  }, [session, refetchUserInfo]);
+
+  // Extract team_id from user's app_metadata
+  const teamId = useMemo(() => {
+    return (user?.app_metadata?.team_id as string | undefined) ?? null;
+  }, [user]);
+
   const value = useMemo<WealthfolioSyncContextValue>(
     () => ({
       isConnected: !!session,
+      isInitializing,
       isLoading,
       user,
       session,
+      teamId,
+      userInfo,
       error,
       signInWithEmail,
       signUpWithEmail,
       signInWithOAuth,
       signInWithMagicLink,
+      verifyOtp,
       signOut,
       clearError,
+      refetchUserInfo,
     }),
     [
       session,
+      isInitializing,
       isLoading,
       user,
+      teamId,
+      userInfo,
       error,
       signInWithEmail,
       signUpWithEmail,
       signInWithOAuth,
       signInWithMagicLink,
+      verifyOtp,
       signOut,
       clearError,
+      refetchUserInfo,
     ],
   );
 

@@ -6,9 +6,9 @@ import { SyncLoginForm } from "./sync-login-form";
 import { SyncConnectedView } from "./sync-connected-view";
 
 export default function WealthfolioSyncPage() {
-  const { isConnected, isLoading } = useWealthfolioSync();
+  const { isConnected, isInitializing } = useWealthfolioSync();
 
-  if (isLoading) {
+  if (isInitializing) {
     return (
       <div className="space-y-6">
         <SettingsHeader
