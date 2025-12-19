@@ -291,6 +291,8 @@ pub fn run() {
             commands::brokers_sync::list_broker_connections,
             commands::brokers_sync::remove_broker_connection,
             commands::brokers_sync::get_connect_portal_url,
+            commands::brokers_sync::get_subscription_plans,
+            commands::brokers_sync::get_user_info,
         ])
         .build(tauri::generate_context!())
         .expect("Failed to build Wealthfolio application")

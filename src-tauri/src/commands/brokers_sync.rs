@@ -910,3 +910,277 @@ pub async fn get_connect_portal_url(
     info!("Connect portal URL retrieved successfully");
     Ok(response)
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Subscription Plans Commands
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A subscription plan as returned by the API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApiSubscriptionPlan {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub features: Vec<String>,
+    pub pricing: ApiPlanPricing,
+    #[serde(default)]
+    pub is_available: Option<bool>,
+    #[serde(default)]
+    pub yearly_discount_percent: Option<i32>,
+}
+
+/// Pricing as returned by the API (just numbers)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApiPlanPricing {
+    pub monthly: f64,
+    pub yearly: f64,
+    #[serde(default)]
+    pub yearly_per_month: Option<f64>,
+}
+
+/// Plans object from API (keyed by plan id)
+#[derive(Debug, Clone, Deserialize)]
+pub struct ApiPlansMap {
+    pub essential: Option<ApiSubscriptionPlan>,
+    pub pro: Option<ApiSubscriptionPlan>,
+}
+
+/// Raw response from subscription.plans endpoint
+#[derive(Debug, Clone, Deserialize)]
+pub struct ApiPlansResponse {
+    pub plans: ApiPlansMap,
+}
+
+/// Pricing information for a subscription plan (frontend format)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlanPricing {
+    pub amount: f64,
+    pub currency: String,
+    pub price_id: Option<String>,
+}
+
+/// A subscription plan (frontend format)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SubscriptionPlan {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub features: Vec<String>,
+    pub pricing: SubscriptionPlanPricing,
+}
+
+/// Pricing options for a subscription plan (frontend format)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SubscriptionPlanPricing {
+    pub monthly: PlanPricing,
+    pub yearly: PlanPricing,
+}
+
+/// Response from subscription.plans endpoint (frontend format)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlansResponse {
+    pub plans: Vec<SubscriptionPlan>,
+}
+
+impl From<ApiSubscriptionPlan> for SubscriptionPlan {
+    fn from(api: ApiSubscriptionPlan) -> Self {
+        Self {
+            id: api.id,
+            name: api.name,
+            description: api.description,
+            features: api.features,
+            pricing: SubscriptionPlanPricing {
+                monthly: PlanPricing {
+                    amount: api.pricing.monthly,
+                    currency: "USD".to_string(),
+                    price_id: None,
+                },
+                yearly: PlanPricing {
+                    amount: api.pricing.yearly,
+                    currency: "USD".to_string(),
+                    price_id: None,
+                },
+            },
+        }
+    }
+}
+
+/// Team info as returned by the user.me tRPC endpoint
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserTeam {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub logo_url: Option<String>,
+    pub plan: String,
+    #[serde(default)]
+    pub subscription_status: Option<String>,
+    #[serde(default)]
+    pub subscription_current_period_end: Option<String>,
+    #[serde(default)]
+    pub subscription_cancel_at_period_end: Option<bool>,
+    #[serde(default)]
+    pub trial_ends_at: Option<String>,
+    // Allow additional fields without failing deserialization
+    #[serde(flatten)]
+    pub extra: std::collections::HashMap<String, serde_json::Value>,
+}
+
+/// User info as returned by the user.me tRPC endpoint
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserInfo {
+    pub id: String,
+    #[serde(default)]
+    pub full_name: Option<String>,
+    pub email: String,
+    #[serde(default)]
+    pub avatar_url: Option<String>,
+    #[serde(default)]
+    pub locale: Option<String>,
+    #[serde(default)]
+    pub week_starts_on_monday: Option<bool>,
+    #[serde(default)]
+    pub timezone: Option<String>,
+    #[serde(default)]
+    pub timezone_auto_sync: Option<bool>,
+    #[serde(default)]
+    pub time_format: Option<i32>,
+    #[serde(default)]
+    pub date_format: Option<String>,
+    #[serde(default)]
+    pub team_id: Option<String>,
+    #[serde(default)]
+    pub team_role: Option<String>,
+    #[serde(default)]
+    pub team: Option<UserTeam>,
+}
+
+impl CloudApiClient {
+    /// Fetch current user info via tRPC
+    async fn get_user_info(&self) -> Result<UserInfo, String> {
+        let safe_url = format!("{}/trpc/user.me", self.base_url);
+        debug!("Fetching user info from: {}", safe_url);
+
+        // Use SuperJSON-style envelope (`{ json: ... }`) for compatibility.
+        let input = serde_json::json!({ "json": serde_json::json!({}) });
+        let input_str = input.to_string();
+        let encoded = urlencoding::encode(&input_str);
+        let url = format!("{}?input={}", safe_url, encoded);
+
+        let response = self
+            .client
+            .get(&url)
+            .headers(self.headers())
+            .send()
+            .await
+            .map_err(|e| format!("Failed to fetch user info: {}", e))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(format!(
+                "API error fetching user info: {} - {}",
+                status, body
+            ));
+        }
+
+        // Parse response manually to handle the tRPC SuperJSON response format
+        let body = response
+            .text()
+            .await
+            .map_err(|e| format!("Failed to read response body: {}", e))?;
+
+        debug!("user.me response body: {}", body);
+
+        let json: serde_json::Value = serde_json::from_str(&body)
+            .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+
+        // Extract user data from the nested structure
+        // Format: {"result":{"data":{"json":{...user data...}}}}
+        let user_data = json
+            .pointer("/result/data/json")
+            .or_else(|| json.pointer("/result/data"))
+            .ok_or_else(|| format!("Missing result.data in response: {}", body))?;
+
+        serde_json::from_value(user_data.clone())
+            .map_err(|e| format!("Failed to parse user info: {} - data: {}", e, user_data))
+    }
+
+    /// Fetch subscription plans via tRPC
+    async fn get_subscription_plans(&self) -> Result<PlansResponse, String> {
+        let safe_url = format!("{}/trpc/subscription.plans", self.base_url);
+        debug!("Fetching subscription plans from: {}", safe_url);
+
+        // Use SuperJSON-style envelope (`{ json: ... }`) for compatibility.
+        let input = serde_json::json!({ "json": serde_json::json!({}) });
+        let input_str = input.to_string();
+        let encoded = urlencoding::encode(&input_str);
+        let url = format!("{}?input={}", safe_url, encoded);
+
+        let response = self
+            .client
+            .get(&url)
+            .headers(self.headers())
+            .send()
+            .await
+            .map_err(|e| format!("Failed to fetch subscription plans: {}", e))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(format!(
+                "API error fetching subscription plans: {} - {}",
+                status, body
+            ));
+        }
+
+        // Parse the API response (plans as object) and convert to frontend format (plans as array)
+        let api_response = parse_trpc_response::<ApiPlansResponse>(response).await?;
+
+        let mut plans = Vec::new();
+        if let Some(essential) = api_response.plans.essential {
+            plans.push(SubscriptionPlan::from(essential));
+        }
+        if let Some(pro) = api_response.plans.pro {
+            plans.push(SubscriptionPlan::from(pro));
+        }
+
+        Ok(PlansResponse { plans })
+    }
+}
+
+/// Get subscription plans from the cloud API
+#[tauri::command]
+pub async fn get_subscription_plans(
+    _state: State<'_, Arc<ServiceContext>>,
+) -> Result<PlansResponse, String> {
+    info!("Fetching subscription plans from cloud API...");
+
+    let client = create_api_client()?;
+    let response = client.get_subscription_plans().await?;
+
+    info!("Found {} subscription plans", response.plans.len());
+    Ok(response)
+}
+
+/// Get current user info from the cloud API
+#[tauri::command]
+pub async fn get_user_info(
+    _state: State<'_, Arc<ServiceContext>>,
+) -> Result<UserInfo, String> {
+    info!("Fetching user info from cloud API...");
+
+    let client = create_api_client()?;
+    let user_info = client.get_user_info().await?;
+
+    info!("User info retrieved for: {}", user_info.email);
+    Ok(user_info)
+}

@@ -120,3 +120,82 @@ export const getConnectPortalUrl = async (
     throw error;
   }
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Subscription Plans Types and Commands
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type PlanId = "essential" | "pro";
+export type BillingPeriod = "monthly" | "yearly";
+
+export interface PlanPricing {
+  amount: number;
+  currency: string;
+  priceId: string | undefined;
+}
+
+export interface SubscriptionPlan {
+  id: PlanId;
+  name: string;
+  description: string;
+  features: string[];
+  pricing: {
+    monthly: PlanPricing;
+    yearly: PlanPricing;
+  };
+}
+
+export interface PlansResponse {
+  plans: SubscriptionPlan[];
+}
+
+export const getSubscriptionPlans = async (): Promise<PlansResponse> => {
+  try {
+    return await invokeDesktop("get_subscription_plans");
+  } catch (error) {
+    logger.error("Error getting subscription plans.");
+    throw error;
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// User Info Types and Commands
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface UserTeam {
+  id: string;
+  name: string;
+  logoUrl: string | null;
+  plan: string;
+  subscriptionStatus: string | null;
+  subscriptionCurrentPeriodEnd: string | null;
+  subscriptionCancelAtPeriodEnd: boolean | null;
+  trialEndsAt: string | null;
+}
+
+export type DateFormat = "dd/MM/yyyy" | "MM/dd/yyyy" | "yyyy-MM-dd" | "dd.MM.yyyy";
+
+export interface UserInfo {
+  id: string;
+  fullName: string | null;
+  email: string;
+  avatarUrl: string | null;
+  locale: string | null;
+  weekStartsOnMonday: boolean | null;
+  timezone: string | null;
+  timezoneAutoSync: boolean | null;
+  timeFormat: number | null;
+  dateFormat: DateFormat | null;
+  teamId: string | null;
+  teamRole: string | null;
+  team: UserTeam | null;
+}
+
+export const getUserInfo = async (): Promise<UserInfo> => {
+  try {
+    return await invokeDesktop("get_user_info");
+  } catch (error) {
+    logger.error("Error getting user info.");
+    throw error;
+  }
+};

@@ -22,6 +22,7 @@ import { ActionConfirm } from "@wealthfolio/ui";
 import { formatDistanceToNow } from "date-fns";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { SnapTradeConnectPortal } from "./snaptrade-connect-portal";
+import { SubscriptionPlans } from "./subscription-plans";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Custom Hooks
@@ -219,7 +220,8 @@ function ConnectionCard({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function SyncConnectedView() {
-  const { user, session, signOut, isLoading, error, clearError } = useWealthfolioSync();
+  const { user, session, teamId, userInfo, signOut, isLoading, error, clearError } =
+    useWealthfolioSync();
   const queryClient = useQueryClient();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
@@ -227,8 +229,11 @@ export function SyncConnectedView() {
   // Check if user is connected (has a valid session)
   const isConnected = !!session;
 
-  // Hooks
-  const connectionsQuery = useBrokerConnections(isConnected);
+  // Check if user has a subscription (has a team)
+  const hasSubscription = !!teamId;
+
+  // Hooks - only fetch broker connections if user has a subscription
+  const connectionsQuery = useBrokerConnections(hasSubscription);
   const removeMutation = useRemoveConnection();
   const snapTradePortal = useSnapTradePortal();
 
@@ -314,204 +319,202 @@ export function SyncConnectedView() {
 
       {/* Account Status Card */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-100 dark:bg-green-900/30">
-                <Icons.CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
-              </div>
-              <div>
-                <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                  Connected to Wealthfolio Sync
-                  <Badge
-                    variant="secondary"
-                    className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                  >
-                    Active
-                  </Badge>
-                </CardTitle>
-                <CardDescription>Your account is connected and syncing.</CardDescription>
-              </div>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="bg-muted/50 rounded-lg p-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <p className="text-muted-foreground text-xs tracking-wide uppercase">Email</p>
-                  <p className="mt-1 text-sm font-medium">{user?.email ?? "N/A"}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs tracking-wide uppercase">
-                    Account Created
-                  </p>
-                  <p className="mt-1 text-sm font-medium">{formatDate(user?.created_at)}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs tracking-wide uppercase">
-                    Last Sign In
-                  </p>
-                  <p className="mt-1 text-sm font-medium">{formatDate(user?.last_sign_in_at)}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs tracking-wide uppercase">User ID</p>
-                  <p className="text-muted-foreground mt-1 truncate font-mono text-xs">
-                    {user?.id ?? "N/A"}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <ActionConfirm
-                handleConfirm={handleSignOut}
-                isPending={isSigningOut}
-                confirmTitle="Sign out of Wealthfolio Sync?"
-                confirmMessage="You'll need to sign in again to access your synced broker accounts. Your local data will not be affected."
-                confirmButtonText="Sign Out"
-                pendingText="Signing out..."
-                cancelButtonText="Cancel"
-                confirmButtonVariant="destructive"
-                button={
-                  <Button variant="outline" disabled={isSigningOut || isLoading}>
-                    {isSigningOut ? (
-                      <>
-                        <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                        Signing out...
-                      </>
-                    ) : (
-                      <>
-                        <Icons.LogOut className="mr-2 h-4 w-4" />
-                        Sign Out
-                      </>
-                    )}
-                  </Button>
-                }
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Broker Connections Card */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base font-medium">Connected Broker Accounts</CardTitle>
-              <CardDescription>
-                Manage your linked broker accounts through Wealthfolio Sync.
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => connectionsQuery.refetch()}
-                disabled={connectionsQuery.isFetching}
-                title="Refresh connections"
-              >
-                {connectionsQuery.isFetching ? (
-                  <Icons.Spinner className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Icons.Refresh className="h-4 w-4" />
-                )}
-              </Button>
-              {connections.length > 0 && (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => syncToLocalMutation.mutate()}
-                    disabled={isSyncing}
-                  >
-                    {isSyncing ? (
-                      <>
-                        <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                        Syncing...
-                      </>
-                    ) : (
-                      <>
-                        <Icons.Download className="mr-2 h-4 w-4" />
-                        Sync to Local
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => snapTradePortal.openPortal()}
-                    disabled={snapTradePortal.isLoading}
-                  >
-                    {snapTradePortal.isLoading ? (
-                      <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Icons.Plus className="mr-2 h-4 w-4" />
-                    )}
-                    Add Broker
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isLoadingConnections ? (
-            <div className="space-y-2">
-              <BrokerConnectionSkeleton />
-              <BrokerConnectionSkeleton />
-            </div>
-          ) : connections.length === 0 ? (
-            <div className="text-muted-foreground flex flex-col items-center justify-center py-8 text-center">
-              <Icons.Link className="mb-3 h-10 w-10 opacity-50" />
-              <p className="text-sm font-medium">No broker accounts connected yet</p>
-              <p className="mt-1 text-xs">
-                Connect your first broker account to start syncing your portfolio automatically.
-              </p>
-              <Button
-                className="mt-4"
-                onClick={() => snapTradePortal.openPortal()}
-                disabled={snapTradePortal.isLoading}
-              >
-                {snapTradePortal.isLoading ? (
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Icons.Plus className="mr-2 h-4 w-4" />
-                )}
-                Connect Broker Account
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {connections.map((connection) => (
-                <ConnectionCard
-                  key={connection.id}
-                  connection={connection}
-                  onReconnect={() => snapTradePortal.openPortal(connection.id)}
-                  onRemove={() => removeMutation.mutate(connection.id)}
-                  isReconnecting={snapTradePortal.isLoading}
-                  isRemoving={removeMutation.isPending}
+        <CardContent className="pt-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
+              {user?.user_metadata?.avatar_url ? (
+                <img
+                  src={user.user_metadata.avatar_url}
+                  alt={user?.email ?? "User avatar"}
+                  className="h-10 w-10 shrink-0 rounded-full object-cover"
                 />
-              ))}
-            </div>
-          )}
-
-          {/* Sync Result */}
-          {syncResult && (
-            <div className="bg-muted/50 mt-4 rounded-lg p-3 text-sm">
-              <p className="font-medium">{syncResult.message}</p>
-              {syncResult.accountsSynced && (
-                <p className="text-muted-foreground mt-1">
-                  {syncResult.accountsSynced.created} accounts created,{" "}
-                  {syncResult.accountsSynced.skipped} skipped
-                </p>
+              ) : (
+                <div
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                    teamId ? "bg-green-100 dark:bg-green-900/30" : "bg-muted"
+                  }`}
+                >
+                  {teamId ? (
+                    <Icons.CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  ) : (
+                    <Icons.Users className="text-muted-foreground h-5 w-5" />
+                  )}
+                </div>
               )}
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold">{userInfo?.fullName ?? user?.email ?? "N/A"}</h3>
+                  {teamId && (
+                    <Badge
+                      variant="secondary"
+                      className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                    >
+                      Active
+                    </Badge>
+                  )}
+                </div>
+                {userInfo?.fullName && (
+                  <p className="text-muted-foreground text-sm">{user?.email}</p>
+                )}
+                <p className="text-muted-foreground text-sm">
+                  {teamId ? "Your account is connected and syncing." : ""}
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  Member since {formatDate(user?.created_at)}
+                </p>
+              </div>
             </div>
-          )}
+            <ActionConfirm
+              handleConfirm={handleSignOut}
+              isPending={isSigningOut}
+              confirmTitle="Sign out of Wealthfolio Sync?"
+              confirmMessage="You'll need to sign in again to access your synced broker accounts. Your local data will not be affected."
+              confirmButtonText="Sign Out"
+              pendingText="Signing out..."
+              cancelButtonText="Cancel"
+              confirmButtonVariant="destructive"
+              button={
+                <Button variant="outline" size="sm" disabled={isSigningOut || isLoading}>
+                  {isSigningOut ? (
+                    <>
+                      <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                      Signing out...
+                    </>
+                  ) : (
+                    <>
+                      <Icons.LogOut className="mr-2 h-4 w-4" />
+                      Sign Out
+                    </>
+                  )}
+                </Button>
+              }
+            />
+          </div>
         </CardContent>
       </Card>
+
+      {/* Show Subscription Plans if user has no team */}
+      {!teamId && <SubscriptionPlans enabled={isConnected && !teamId} />}
+
+      {/* Broker Connections Card - Only show if user has a team */}
+      {teamId && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base font-medium">Connected Broker Accounts</CardTitle>
+                <CardDescription>
+                  Manage your linked broker accounts through Wealthfolio Sync.
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => connectionsQuery.refetch()}
+                  disabled={connectionsQuery.isFetching}
+                  title="Refresh connections"
+                >
+                  {connectionsQuery.isFetching ? (
+                    <Icons.Spinner className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Icons.Refresh className="h-4 w-4" />
+                  )}
+                </Button>
+                {connections.length > 0 && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => syncToLocalMutation.mutate()}
+                      disabled={isSyncing}
+                    >
+                      {isSyncing ? (
+                        <>
+                          <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                          Syncing...
+                        </>
+                      ) : (
+                        <>
+                          <Icons.Download className="mr-2 h-4 w-4" />
+                          Sync to Local
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => snapTradePortal.openPortal()}
+                      disabled={snapTradePortal.isLoading}
+                    >
+                      {snapTradePortal.isLoading ? (
+                        <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Icons.Plus className="mr-2 h-4 w-4" />
+                      )}
+                      Add Broker
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoadingConnections ? (
+              <div className="space-y-2">
+                <BrokerConnectionSkeleton />
+                <BrokerConnectionSkeleton />
+              </div>
+            ) : connections.length === 0 ? (
+              <div className="text-muted-foreground flex flex-col items-center justify-center py-8 text-center">
+                <Icons.Link className="mb-3 h-10 w-10 opacity-50" />
+                <p className="text-sm font-medium">No broker accounts connected yet</p>
+                <p className="mt-1 text-xs">
+                  Connect your first broker account to start syncing your portfolio automatically.
+                </p>
+                <Button
+                  className="mt-4"
+                  onClick={() => snapTradePortal.openPortal()}
+                  disabled={snapTradePortal.isLoading}
+                >
+                  {snapTradePortal.isLoading ? (
+                    <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Icons.Plus className="mr-2 h-4 w-4" />
+                  )}
+                  Connect Broker Account
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {connections.map((connection) => (
+                  <ConnectionCard
+                    key={connection.id}
+                    connection={connection}
+                    onReconnect={() => snapTradePortal.openPortal(connection.id)}
+                    onRemove={() => removeMutation.mutate(connection.id)}
+                    isReconnecting={snapTradePortal.isLoading}
+                    isRemoving={removeMutation.isPending}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Sync Result */}
+            {syncResult && (
+              <div className="bg-muted/50 mt-4 rounded-lg p-3 text-sm">
+                <p className="font-medium">{syncResult.message}</p>
+                {syncResult.accountsSynced && (
+                  <p className="text-muted-foreground mt-1">
+                    {syncResult.accountsSynced.created} accounts created,{" "}
+                    {syncResult.accountsSynced.skipped} skipped
+                  </p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Security Info Card */}
       <Card className="border-dashed">

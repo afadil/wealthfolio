@@ -90,6 +90,7 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
+    "input-otp": "^1.4.2",
     "lucide-react": "^0.561.0",
     "motion": "^12.23.15",
     "react-aria-components": "^1.12.2",

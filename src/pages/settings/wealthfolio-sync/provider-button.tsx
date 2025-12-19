@@ -9,6 +9,7 @@ interface ProviderButtonProps {
   isLastUsed?: boolean;
   variant?: 'default' | 'outline';
   className?: string;
+  type?: 'button' | 'submit';
 }
 
 export function ProviderButton({
@@ -18,6 +19,7 @@ export function ProviderButton({
   isLastUsed = false,
   variant = 'outline',
   className,
+  type = 'button',
 }: ProviderButtonProps) {
   const providerConfig = {
     google: {
@@ -39,7 +41,7 @@ export function ProviderButton({
 
   return (
     <Button
-      type="button"
+      type={type}
       variant={variant}
       onClick={onClick}
       disabled={isLoading}
