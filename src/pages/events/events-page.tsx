@@ -1,7 +1,6 @@
 import { getEventSpendingSummaries } from "@/commands/event";
 import { getEventTypes } from "@/commands/event-type";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
 import { Icons } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
@@ -12,6 +11,7 @@ import type { EventSpendingSummary, EventType } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { AmountDisplay, AnimatedToggleGroup } from "@wealthfolio/ui";
 import React, { useState, useCallback, useMemo, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { EventCategoryTreemap } from "./components/event-category-treemap";
 import { EventTimeline } from "./components/event-timeline";
 import { Bar, BarChart, XAxis, YAxis, Cell } from "recharts";
@@ -155,13 +155,19 @@ export default function EventsPage({ renderActions }: EventsPageProps) {
 
   if (!eventSummaries?.length) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col space-y-6 px-2 pt-2 pb-2 lg:px-4 lg:pb-4">
-        <EmptyPlaceholder
-          className="mx-auto flex max-w-[420px] items-center justify-center pt-12"
-          icon={<Icons.Calendar className="h-10 w-10" />}
-          title="No events with spending"
-          description="There are no events with spending data for the selected period. Try selecting a different time range or create events and assign transactions to them."
-        />
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-8">
+        <Icons.Calendar className="text-muted-foreground mb-4 h-12 w-12" />
+        <h3 className="mb-2 text-lg font-semibold">No Events</h3>
+        <p className="text-muted-foreground mb-4 text-center">
+          Create events to track spending for trips, projects, or special occasions.
+        </p>
+        <Link
+          to="/settings/events"
+          className="text-primary hover:text-primary/80 inline-flex items-center gap-1 text-sm underline-offset-4 hover:underline"
+        >
+          Create an event
+          <Icons.ChevronRight className="h-4 w-4" />
+        </Link>
       </div>
     );
   }

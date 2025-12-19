@@ -14,7 +14,7 @@ import {
 } from "@/lib/navigation/cashflow-navigation";
 import type { SpendingSummary, SubcategorySpending, EventWithTypeName } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { AmountDisplay, AnimatedToggleGroup, GainPercent, PrivacyAmount } from "@wealthfolio/ui";
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { Cell, Pie, PieChart } from "recharts";
@@ -216,13 +216,19 @@ export default function SpendingPage({ renderActions }: SpendingPageProps) {
 
   if (!periodSummary || !totalSummary) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col space-y-6 px-2 pt-2 pb-2 lg:px-4 lg:pb-4">
-        <EmptyPlaceholder
-          className="mx-auto flex max-w-[420px] items-center justify-center pt-12"
-          icon={<Icons.CreditCard className="h-10 w-10" />}
-          title="No spending data available"
-          description="There is no spending data for the selected period. Try selecting a different time range or check back later."
-        />
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-8">
+        <Icons.CreditCard className="text-muted-foreground mb-4 h-12 w-12" />
+        <h3 className="mb-2 text-lg font-semibold">No Spending Data</h3>
+        <p className="text-muted-foreground mb-4 text-center">
+          Import your first transactions to track spending.
+        </p>
+        <Link
+          to="/activities?tab=import"
+          className="text-primary hover:text-primary/80 inline-flex items-center gap-1 text-sm underline-offset-4 hover:underline"
+        >
+          Import transactions
+          <Icons.ChevronRight className="h-4 w-4" />
+        </Link>
       </div>
     );
   }

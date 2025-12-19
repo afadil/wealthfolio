@@ -85,10 +85,6 @@ const BudgetPage = () => {
     activeTab === "expense"
       ? budgetSummary?.expenseAllocations ?? []
       : budgetSummary?.incomeAllocations ?? [];
-  const currentUnallocated =
-    activeTab === "expense"
-      ? budgetSummary?.unallocatedSpending ?? 0
-      : budgetSummary?.unallocatedIncome ?? 0;
 
   const hasConfig = budgetSummary?.config != null;
 

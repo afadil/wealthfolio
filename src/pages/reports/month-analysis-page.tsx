@@ -11,6 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AmountDisplay, formatPercent } from "@wealthfolio/ui";
 import React, { useState, useMemo, useEffect } from "react";
 import { format, subMonths } from "date-fns";
+import { Link } from "react-router-dom";
 import { MonthSwitcher, getDefaultReportMonth } from "./components/month-switcher";
 import { SpendingTrendsChart } from "./components/spending-trends-chart";
 import { CategoryBreakdownPanel } from "./components/category-breakdown-panel";
@@ -134,13 +135,33 @@ export default function MonthAnalysisPage({ renderActions }: MonthAnalysisPagePr
     renderActions?.(monthActions);
   }, [renderActions, monthActions]);
 
-  const isLoading = isSpendingLoading || isIncomeLoading || !selectedMonth;
+  const isLoading = isSpendingLoading || isIncomeLoading;
 
   if (isLoading) {
     return <MonthAnalysisSkeleton />;
   }
 
-  if (!monthData) {
+  // Check if there are no transactions at all
+  if (availableMonths.length === 0) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-8">
+        <Icons.Calendar className="text-muted-foreground mb-4 h-12 w-12" />
+        <h3 className="mb-2 text-lg font-semibold">No Transactions</h3>
+        <p className="text-muted-foreground mb-4 text-center">
+          Import your first transactions to see monthly analysis reports.
+        </p>
+        <Link
+          to="/activities?tab=import"
+          className="text-primary hover:text-primary/80 inline-flex items-center gap-1 text-sm underline-offset-4 hover:underline"
+        >
+          Import transactions
+          <Icons.ChevronRight className="h-4 w-4" />
+        </Link>
+      </div>
+    );
+  }
+
+  if (!selectedMonth || !monthData) {
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-8">
         <Icons.Calendar className="text-muted-foreground mb-4 h-12 w-12" />
@@ -253,7 +274,6 @@ export default function MonthAnalysisPage({ renderActions }: MonthAnalysisPagePr
           <BudgetVsActualCard
             budgetData={budgetData}
             currency={baseCurrency}
-            isHidden={isBalanceHidden}
             isLoading={isBudgetLoading}
           />
         </div>

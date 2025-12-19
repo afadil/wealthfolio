@@ -1,21 +1,19 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icons } from "@/components/ui/icons";
 import { Progress } from "@/components/ui/progress";
-import { formatAmount, formatPercent, PrivacyAmount } from "@wealthfolio/ui";
+import { formatPercent, PrivacyAmount } from "@wealthfolio/ui";
 import type { BudgetVsActual } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface BudgetVsActualCardProps {
   budgetData: BudgetVsActual | null | undefined;
   currency: string;
-  isHidden: boolean;
   isLoading?: boolean;
 }
 
 export function BudgetVsActualCard({
   budgetData,
   currency,
-  isHidden,
   isLoading,
 }: BudgetVsActualCardProps) {
   if (isLoading) {
