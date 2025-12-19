@@ -4,6 +4,7 @@ use std::sync::{Arc, RwLock};
 use wealthfolio_core::{
     accounts::{AccountRepository, AccountService},
     activities::{ActivityRepository, ActivityService},
+    budget::{BudgetRepository, BudgetService},
     categories::{CategoryRepository, CategoryService},
     activity_rules::{ActivityRuleRepository, ActivityRuleService},
     db::{self, write_actor},
@@ -164,6 +165,12 @@ pub async fn initialize_context(
         event_type_repository.clone(),
     ));
 
+    let budget_repository = Arc::new(BudgetRepository::new(pool.clone(), writer.clone()));
+    let budget_service = Arc::new(BudgetService::new(
+        budget_repository.clone(),
+        spending_service.clone(),
+    ));
+
     Ok(ServiceContext {
         base_currency,
         instance_id,
@@ -185,5 +192,6 @@ pub async fn initialize_context(
         activity_rule_service,
         event_type_service,
         event_service,
+        budget_service,
     })
 }

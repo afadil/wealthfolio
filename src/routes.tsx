@@ -29,6 +29,7 @@ import ContributionLimitPage from "./pages/settings/contribution-limits/contribu
 import ExportSettingsPage from "./pages/settings/exports/exports-page";
 import GeneralSettingsPage from "./pages/settings/general/general-page";
 import SettingsGoalsPage from "./pages/settings/goals/goals-page";
+import BudgetPage from "./pages/settings/budget/budget-page";
 import MarketDataImportPage from "./pages/settings/market-data/market-data-import-page";
 import MarketDataSettingsPage from "./pages/settings/market-data/market-data-settings";
 import useGlobalEventListener from "./use-global-event-listener";
@@ -105,6 +106,7 @@ export function AppRoutes() {
               <Route path="general" element={<GeneralSettingsPage />} />
               <Route path="accounts" element={<SettingsAccountsPage />} />
               <Route path="goals" element={<SettingsGoalsPage />} />
+              <Route path="budget" element={<BudgetPage />} />
               <Route path="categories" element={<CategoriesPage />} />
               <Route path="activity-rules" element={<ActivityRulesPage />} />
               <Route path="events" element={<EventsPage />} />

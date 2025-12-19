@@ -4,7 +4,7 @@ import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import { formatAmount, formatPercent, PrivacyAmount } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
 import { format, subMonths } from "date-fns";
-import type { SpendingSummary } from "@/lib/types";
+import type { SpendingSummary, BudgetVsActual, CategoryBudgetVsActual } from "@/lib/types";
 import { ArrowUp, ArrowDown, ChevronDown, ChevronRight } from "lucide-react";
 import { Cell, Pie, PieChart } from "recharts";
 
@@ -24,6 +24,7 @@ interface CategoryBreakdownPanelProps {
   selectedMonth: string;
   currency: string;
   isHidden: boolean;
+  budgetData?: BudgetVsActual | null;
 }
 
 interface SubcategoryData {
@@ -41,6 +42,7 @@ interface CategoryWithChange {
   changePercent: number | null;
   isNew?: boolean;
   subcategories: SubcategoryData[];
+  budgetInfo?: CategoryBudgetVsActual;
 }
 
 export function CategoryBreakdownPanel({
@@ -48,6 +50,7 @@ export function CategoryBreakdownPanel({
   selectedMonth,
   currency,
   isHidden,
+  budgetData,
 }: CategoryBreakdownPanelProps) {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
@@ -62,6 +65,14 @@ export function CategoryBreakdownPanel({
     const categorySpending = spendingData.byCategory || {};
     const monthSubcategories = spendingData.byMonthBySubcategory?.[selectedMonth] || {};
     const subcategoryInfo = spendingData.bySubcategory || {};
+
+    // Create a map of budget data by category for quick lookup
+    const budgetByCategory = new Map<string, CategoryBudgetVsActual>();
+    if (budgetData?.byCategory) {
+      budgetData.byCategory.forEach((cat) => {
+        budgetByCategory.set(cat.categoryId, cat);
+      });
+    }
 
     const total = Object.values(currentBreakdown).reduce((sum, amt) => sum + (amt as number), 0);
 
@@ -105,6 +116,7 @@ export function CategoryBreakdownPanel({
           changePercent,
           isNew,
           subcategories: subcategoriesByCategory.get(categoryId) || [],
+          budgetInfo: budgetByCategory.get(categoryId),
         };
       })
       .filter((c) => c.amount > 0)
@@ -152,7 +164,7 @@ export function CategoryBreakdownPanel({
       .slice(0, 5);
 
     return { allCategories: categoriesWithChanges, notableChanges: changes, totalSpending: total };
-  }, [spendingData, selectedMonth]);
+  }, [spendingData, selectedMonth, budgetData]);
 
   const chartData = useMemo(() => {
     return allCategories.map((cat, index) => ({
@@ -268,6 +280,37 @@ export function CategoryBreakdownPanel({
                       }}
                     />
                   </div>
+
+                  {/* Budget progress indicator */}
+                  {cat.budgetInfo && cat.budgetInfo.budgeted > 0 && (
+                    <div className="ml-5 mt-1 flex items-center gap-2">
+                      <div className="bg-muted relative h-1 flex-1 overflow-hidden rounded-full">
+                        <div
+                          className={`h-full rounded-full transition-all duration-300 ${
+                            cat.budgetInfo.isOverBudget
+                              ? "bg-destructive"
+                              : cat.budgetInfo.percentUsed >= 80
+                                ? "bg-warning"
+                                : "bg-success"
+                          }`}
+                          style={{
+                            width: `${Math.min(cat.budgetInfo.percentUsed, 100)}%`,
+                          }}
+                        />
+                      </div>
+                      <span
+                        className={`text-xs font-medium ${
+                          cat.budgetInfo.isOverBudget
+                            ? "text-destructive"
+                            : cat.budgetInfo.percentUsed >= 80
+                              ? "text-warning"
+                              : "text-success"
+                        }`}
+                      >
+                        {formatPercent(cat.budgetInfo.percentUsed / 100)}
+                      </span>
+                    </div>
+                  )}
 
                   {isExpanded && hasSubcategories && (
                     <div

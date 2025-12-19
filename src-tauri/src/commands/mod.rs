@@ -2,6 +2,7 @@ pub mod account;
 pub mod activity;
 pub mod addon;
 pub mod asset;
+pub mod budget;
 pub mod category;
 pub mod activity_rule;
 pub mod error;

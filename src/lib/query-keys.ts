@@ -99,4 +99,10 @@ export const QueryKeys = {
 
   // Month Metrics
   MONTH_METRICS: "month_metrics",
+
+  // Budget
+  BUDGET_CONFIG: "budget_config",
+  BUDGET_SUMMARY: "budget_summary",
+  BUDGET_ALLOCATIONS: "budget_allocations",
+  BUDGET_VS_ACTUAL: "budget_vs_actual",
 } as const;

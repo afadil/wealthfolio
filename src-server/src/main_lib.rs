@@ -11,6 +11,7 @@ use wealthfolio_core::{
     },
     activity_rules::{ActivityRuleRepository, ActivityRuleService, ActivityRuleServiceTrait},
     assets::{AssetRepository, AssetService, AssetServiceTrait},
+    budget::{BudgetRepository, BudgetService, BudgetServiceTrait},
     categories::{CategoryRepository, CategoryService, CategoryServiceTrait},
     db::{self, write_actor},
     event_types::{EventTypeRepository, EventTypeService, EventTypeServiceTrait},
@@ -48,6 +49,7 @@ pub struct AppState {
     pub income_service: Arc<dyn IncomeServiceTrait + Send + Sync>,
     pub spending_service: Arc<dyn SpendingServiceTrait + Send + Sync>,
     pub goal_service: Arc<dyn GoalServiceTrait + Send + Sync>,
+    pub budget_service: Arc<dyn BudgetServiceTrait + Send + Sync>,
     pub limits_service: Arc<dyn ContributionLimitServiceTrait + Send + Sync>,
     pub fx_service: Arc<dyn FxServiceTrait + Send + Sync>,
     pub activity_service: Arc<dyn ActivityServiceTrait + Send + Sync>,
@@ -201,6 +203,12 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         valuation_repository.clone(),
     ));
 
+    let budget_repository = Arc::new(BudgetRepository::new(pool.clone(), writer.clone()));
+    let budget_service: Arc<dyn BudgetServiceTrait + Send + Sync> = Arc::new(BudgetService::new(
+        budget_repository,
+        spending_service.clone(),
+    ));
+
     let limits_repository = Arc::new(ContributionLimitRepository::new(
         pool.clone(),
         writer.clone(),
@@ -267,6 +275,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         income_service,
         spending_service,
         goal_service,
+        budget_service,
         limits_service,
         fx_service: fx_service.clone(),
         activity_service,

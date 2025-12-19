@@ -21,6 +21,7 @@ mod activities;
 mod activity_rules;
 mod addons;
 mod assets;
+mod budget;
 pub mod categories;
 mod event_types;
 mod events;
@@ -82,6 +83,7 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
         .merge(event_types::router())
         .merge(events::router())
         .merge(goals::router())
+        .merge(budget::router())
         .merge(exchange_rates::router())
         .merge(market_data::router())
         .merge(assets::router())

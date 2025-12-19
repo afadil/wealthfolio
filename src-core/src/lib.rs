@@ -2,6 +2,7 @@ pub mod accounts;
 pub mod activities;
 pub mod addons;
 pub mod assets;
+pub mod budget;
 pub mod categories;
 pub mod activity_rules;
 pub mod constants;

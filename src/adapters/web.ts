@@ -140,6 +140,14 @@ const COMMANDS: CommandMap = {
   download_addon_to_staging: { method: "POST", path: "/addons/store/staging/download" },
   install_addon_from_staging: { method: "POST", path: "/addons/store/install-from-staging" },
   clear_addon_staging: { method: "DELETE", path: "/addons/store/staging" },
+  // Budget
+  get_budget_config: { method: "GET", path: "/budget/config" },
+  upsert_budget_config: { method: "POST", path: "/budget/config" },
+  get_budget_summary: { method: "GET", path: "/budget/summary" },
+  get_budget_allocations: { method: "GET", path: "/budget/allocations" },
+  set_budget_allocation: { method: "POST", path: "/budget/allocations" },
+  delete_budget_allocation: { method: "DELETE", path: "/budget/allocations" },
+  get_budget_vs_actual: { method: "GET", path: "/budget/vs-actual" },
   // Sync (web mode returns not implemented stub)
   get_sync_status: { method: "GET", path: "/sync/status" },
   generate_pairing_payload: { method: "POST", path: "/sync/generate-pairing-payload" },
@@ -274,7 +282,6 @@ export const invokeWeb = async <T>(
       break;
     }
     case "get_income_summary":
-    case "get_spending_summary":
       break;
     case "delete_goal": {
       const { goalId } = payload as { goalId: string };
@@ -697,6 +704,33 @@ export const invokeWeb = async <T>(
       url += `?${params.toString()}`;
       break;
     }
+    // Budget commands
+    case "get_budget_config":
+    case "get_budget_summary":
+    case "get_budget_allocations":
+      break;
+    case "upsert_budget_config": {
+      const { config } = payload as { config: Record<string, unknown> };
+      body = JSON.stringify(config);
+      break;
+    }
+    case "set_budget_allocation": {
+      const { categoryId, amount } = payload as { categoryId: string; amount: number };
+      body = JSON.stringify({ category_id: categoryId, amount });
+      break;
+    }
+    case "delete_budget_allocation": {
+      const { categoryId } = payload as { categoryId: string };
+      url += `/${encodeURIComponent(categoryId)}`;
+      break;
+    }
+    case "get_budget_vs_actual": {
+      const { month } = payload as { month: string };
+      const params = new URLSearchParams();
+      params.set("month", month);
+      url += `?${params.toString()}`;
+      break;
+    }
   }
 
   const headers: HeadersInit = {};
@@ -712,6 +746,7 @@ export const invokeWeb = async <T>(
     method: config.method,
     headers,
     body,
+    cache: "no-store",
   });
   if (res.status === 401) {
     notifyUnauthorized();

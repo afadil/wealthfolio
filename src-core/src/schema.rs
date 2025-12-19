@@ -83,6 +83,28 @@ diesel::table! {
 }
 
 diesel::table! {
+    budget_config (id) {
+        id -> Text,
+        monthly_spending_target -> Text,
+        monthly_income_target -> Text,
+        currency -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    budget_allocations (id) {
+        id -> Text,
+        budget_config_id -> Text,
+        category_id -> Text,
+        amount -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
     categories (id) {
         id -> Text,
         name -> Text,
@@ -245,6 +267,8 @@ diesel::table! {
 
 diesel::joinable!(accounts -> platforms (platform_id));
 diesel::joinable!(activity_rules -> accounts (account_id));
+diesel::joinable!(budget_allocations -> budget_config (budget_config_id));
+diesel::joinable!(budget_allocations -> categories (category_id));
 diesel::joinable!(goal_contributions -> accounts (account_id));
 diesel::joinable!(goal_contributions -> goals (goal_id));
 diesel::joinable!(quotes -> assets (symbol));
@@ -256,6 +280,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     activity_rules,
     app_settings,
     assets,
+    budget_allocations,
+    budget_config,
     categories,
     contribution_limits,
     daily_account_valuation,

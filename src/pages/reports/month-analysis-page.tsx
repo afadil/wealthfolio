@@ -1,11 +1,12 @@
 import { getIncomeSummary, getSpendingSummary } from "@/commands/portfolio";
 import { getTopSpendingTransactions } from "@/commands/activity";
+import { getBudgetVsActual } from "@/commands/budget";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Icons } from "@/components/ui/icons";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { QueryKeys } from "@/lib/query-keys";
-import type { IncomeSummary, SpendingSummary, ActivityDetails } from "@/lib/types";
+import type { IncomeSummary, SpendingSummary, ActivityDetails, BudgetVsActual } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { AmountDisplay, formatPercent } from "@wealthfolio/ui";
 import React, { useState, useMemo, useEffect } from "react";
@@ -14,6 +15,7 @@ import { MonthSwitcher, getDefaultReportMonth } from "./components/month-switche
 import { SpendingTrendsChart } from "./components/spending-trends-chart";
 import { CategoryBreakdownPanel } from "./components/category-breakdown-panel";
 import { MonthMetricsPanel } from "./components/month-metrics-panel";
+import { BudgetVsActualCard } from "./components/budget-vs-actual-card";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 
 interface MonthAnalysisPageProps {
@@ -41,6 +43,13 @@ export default function MonthAnalysisPage({ renderActions }: MonthAnalysisPagePr
   const { data: topTransactions, isLoading: isTransactionsLoading } = useQuery<ActivityDetails[]>({
     queryKey: ["top-spending-transactions", selectedMonth],
     queryFn: () => getTopSpendingTransactions(selectedMonth!, 5),
+    enabled: !!selectedMonth,
+  });
+
+  // Fetch budget vs actual data
+  const { data: budgetData, isLoading: isBudgetLoading } = useQuery<BudgetVsActual>({
+    queryKey: [QueryKeys.BUDGET_VS_ACTUAL, selectedMonth],
+    queryFn: () => getBudgetVsActual(selectedMonth!),
     enabled: !!selectedMonth,
   });
 
@@ -233,12 +242,21 @@ export default function MonthAnalysisPage({ renderActions }: MonthAnalysisPagePr
       />
 
       <div className="grid gap-6 md:grid-cols-2">
-        <CategoryBreakdownPanel
-          spendingData={totalSummary}
-          selectedMonth={selectedMonth}
-          currency={baseCurrency}
-          isHidden={isBalanceHidden}
-        />
+        <div className="space-y-6">
+          <CategoryBreakdownPanel
+            spendingData={totalSummary}
+            selectedMonth={selectedMonth}
+            currency={baseCurrency}
+            isHidden={isBalanceHidden}
+            budgetData={budgetData}
+          />
+          <BudgetVsActualCard
+            budgetData={budgetData}
+            currency={baseCurrency}
+            isHidden={isBalanceHidden}
+            isLoading={isBudgetLoading}
+          />
+        </div>
 
         <MonthMetricsPanel
           selectedMonth={selectedMonth}

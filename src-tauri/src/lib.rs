@@ -303,6 +303,14 @@ pub fn run() {
             commands::event::delete_event,
             commands::event::get_event_activity_counts,
             commands::event::get_event_spending_summaries,
+            // Budget commands
+            commands::budget::get_budget_config,
+            commands::budget::upsert_budget_config,
+            commands::budget::get_budget_summary,
+            commands::budget::get_budget_allocations,
+            commands::budget::set_budget_allocation,
+            commands::budget::delete_budget_allocation,
+            commands::budget::get_budget_vs_actual,
         ])
         .build(tauri::generate_context!())
         .expect("Failed to build Wealthfolio application")

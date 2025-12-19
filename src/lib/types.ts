@@ -925,3 +925,81 @@ export interface MonthMetricsResponse {
   prevMonth: MonthMetricsPrev | null;
   recurrenceBreakdown: RecurrenceBreakdown;
 }
+
+// Budget Types
+export interface BudgetConfig {
+  id: string;
+  monthlySpendingTarget: string;
+  monthlyIncomeTarget: string;
+  currency: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NewBudgetConfig {
+  id?: string;
+  monthlySpendingTarget: string;
+  monthlyIncomeTarget: string;
+  currency: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface BudgetAllocation {
+  id: string;
+  budgetConfigId: string;
+  categoryId: string;
+  amount: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BudgetAllocationWithCategory {
+  id: string;
+  categoryId: string;
+  categoryName: string;
+  categoryColor?: string;
+  amount: number;
+  isIncome: boolean;
+}
+
+export interface BudgetConfigDto {
+  id: string;
+  monthlySpendingTarget: number;
+  monthlyIncomeTarget: number;
+  currency: string;
+}
+
+export interface BudgetSummary {
+  config: BudgetConfigDto | null;
+  expenseAllocations: BudgetAllocationWithCategory[];
+  incomeAllocations: BudgetAllocationWithCategory[];
+  unallocatedSpending: number;
+  unallocatedIncome: number;
+}
+
+export interface BudgetVsActualSummary {
+  budgeted: number;
+  actual: number;
+  difference: number;
+  percentUsed: number;
+}
+
+export interface CategoryBudgetVsActual {
+  categoryId: string;
+  categoryName: string;
+  categoryColor?: string;
+  budgeted: number;
+  actual: number;
+  difference: number;
+  percentUsed: number;
+  isOverBudget: boolean;
+}
+
+export interface BudgetVsActual {
+  month: string;
+  currency: string;
+  spending: BudgetVsActualSummary;
+  income: BudgetVsActualSummary;
+  byCategory: CategoryBudgetVsActual[];
+}
