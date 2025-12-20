@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Icons } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -119,7 +120,7 @@ function PlanCard({ plan, billingPeriod, isPopular }: PlanCardProps) {
         <Button
           className="w-full"
           variant={isPopular ? "default" : "outline"}
-          onClick={() => window.open("https://connect.wealthfolio.app/onboarding", "_blank")}
+          onClick={() => window.open(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/onboarding`, "_blank")}
         >
           Get Started
         </Button>
