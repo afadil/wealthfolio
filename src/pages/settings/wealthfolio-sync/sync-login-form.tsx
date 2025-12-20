@@ -8,6 +8,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useWealthfolioSync } from "@/context/wealthfolio-sync-context";
+import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
 import { getPreferredProvider, savePreferredProvider } from "@/lib/cookie-utils";
 import { isAppleDevice } from "@/lib/device-utils";
 import { useEffect, useState } from "react";
@@ -404,7 +405,7 @@ export function SyncLoginForm() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open("https://connect.wealthfolio.app", "_blank")}
+              onClick={() => window.open(WEALTHFOLIO_CONNECT_PORTAL_URL, "_blank")}
             >
               <Icons.ExternalLink className="mr-2 h-4 w-4" />
               Open

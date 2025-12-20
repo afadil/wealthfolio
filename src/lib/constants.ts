@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+// Wealthfolio Connect Portal URL - centralized configuration
+export const WEALTHFOLIO_CONNECT_PORTAL_URL = "https://connect.wealthfolio.app";
+
 export const PORTFOLIO_ACCOUNT_ID = "TOTAL";
 
 export const HoldingType = {

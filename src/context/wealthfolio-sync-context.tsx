@@ -30,47 +30,6 @@ const DESKTOP_DEEP_LINK_URL = "wealthfolio://auth/callback";
 // Universal link callback URL for Tauri mobile (associated domain)
 const MOBILE_UNIVERSAL_LINK_CALLBACK_URL = "https://auth.wealthfolio.app/callback";
 
-// Custom event for SnapTrade deep link callbacks
-export const SNAPTRADE_CALLBACK_EVENT = "snaptrade-deep-link-callback";
-
-export interface SnapTradeCallbackData {
-  status: "SUCCESS" | "ERROR";
-  authorizationId?: string;
-  errorCode?: string;
-  detail?: string;
-}
-
-/**
- * Parse SnapTrade callback parameters from a deep link URL.
- * SnapTrade sends: wealthfolio://callback?authorizationId=xxx&status=SUCCESS
- * or on error: wealthfolio://callback?status=ERROR&errorCode=xxx&detail=xxx
- */
-function parseSnapTradeCallback(url: string): SnapTradeCallbackData | null {
-  try {
-    const urlObj = new URL(url);
-
-    // Check if this is a SnapTrade callback (not an auth callback)
-    // SnapTrade callbacks won't have access_token and will have status parameter
-    const status = urlObj.searchParams.get("status");
-    if (!status || (status !== "SUCCESS" && status !== "ERROR")) {
-      return null;
-    }
-
-    // If it has access_token, it's a Supabase auth callback, not SnapTrade
-    if (urlObj.searchParams.has("access_token") || urlObj.hash.includes("access_token")) {
-      return null;
-    }
-
-    return {
-      status: status,
-      authorizationId: urlObj.searchParams.get("authorizationId") ?? undefined,
-      errorCode: urlObj.searchParams.get("errorCode") ?? undefined,
-      detail: urlObj.searchParams.get("detail") ?? undefined,
-    };
-  } catch {
-    return null;
-  }
-}
 
 // Web redirect URL for OAuth and magic link
 const getWebRedirectUrl = () => {
@@ -374,16 +333,6 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
       try {
         unlistenFn = await listenDeepLinkTauri<string>((event) => {
           const url = event.payload;
-
-          // First, check if this is a SnapTrade callback
-          const snapTradeData = parseSnapTradeCallback(url);
-          if (snapTradeData) {
-            // Dispatch a custom event that the SnapTrade portal component can listen to
-            window.dispatchEvent(
-              new CustomEvent(SNAPTRADE_CALLBACK_EVENT, { detail: snapTradeData }),
-            );
-            return;
-          }
 
           const authPayload = parseAuthCallbackUrl(url);
           if (authPayload) {

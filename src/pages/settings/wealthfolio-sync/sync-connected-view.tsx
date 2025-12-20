@@ -1,8 +1,6 @@
-import { getRunEnv, RUN_ENV } from "@/adapters";
+import { openUrlInBrowser } from "@/adapters";
 import {
-  getConnectPortalUrl,
   listBrokerConnections,
-  removeBrokerConnection,
   syncBrokerData,
   type BrokerConnection,
   type SyncResult,
@@ -15,13 +13,12 @@ import { Icons } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/use-toast";
 import { useWealthfolioSync } from "@/context/wealthfolio-sync-context";
-import { getPlatform } from "@/hooks/use-platform";
+import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ActionConfirm } from "@wealthfolio/ui";
 import { formatDistanceToNow } from "date-fns";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { SnapTradeConnectPortal } from "./snaptrade-connect-portal";
+import { useCallback, useState } from "react";
 import { SubscriptionPlans } from "./subscription-plans";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,79 +37,12 @@ function useBrokerConnections(isConnected: boolean) {
   });
 }
 
-/**
- * Hook to remove a broker connection.
- */
-function useRemoveConnection() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: removeBrokerConnection,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.BROKER_CONNECTIONS] });
-      toast.success("Connection removed successfully");
-    },
-    onError: (error) => {
-      toast.error(
-        `Failed to remove connection: ${error instanceof Error ? error.message : "Unknown error"}`,
-      );
-    },
-  });
-}
-
-const SNAPTRADE_DESKTOP_CALLBACK_URL = "wealthfolio://callback";
-const SNAPTRADE_MOBILE_CALLBACK_URL = "https://auth.wealthfolio.app/callback";
 
 /**
- * Hook to manage the SnapTrade connect portal state.
+ * Opens the Wealthfolio Connect portal in the browser.
  */
-function useSnapTradePortal() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [loginLink, setLoginLink] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const openPortal = useCallback(async (reconnectAuthorizationId?: string) => {
-    setIsLoading(true);
-    try {
-      // For desktop (Tauri), use deep link callback to redirect back to the app
-      // For web, no redirect URL is passed (backend uses dashboard URL)
-      const isTauri = getRunEnv() === RUN_ENV.DESKTOP;
-      const platform = isTauri ? await getPlatform() : null;
-      const isMobile = platform?.is_mobile ?? false;
-
-      const redirectUrl = isTauri
-        ? isMobile
-          ? SNAPTRADE_MOBILE_CALLBACK_URL
-          : SNAPTRADE_DESKTOP_CALLBACK_URL
-        : undefined;
-
-      const response = await getConnectPortalUrl(reconnectAuthorizationId, redirectUrl);
-      if (response?.redirectUri) {
-        setLoginLink(response.redirectUri);
-        setIsOpen(true);
-      } else {
-        toast.error("Failed to get connection portal URL");
-      }
-    } catch (error) {
-      toast.error(`Failed to connect: ${error instanceof Error ? error.message : "Unknown error"}`);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const closePortal = useCallback(() => {
-    setIsOpen(false);
-    // Clear the login link after a short delay to allow for animation
-    setTimeout(() => setLoginLink(null), 300);
-  }, []);
-
-  return {
-    isOpen,
-    loginLink,
-    isLoading,
-    openPortal,
-    closePortal,
-  };
+function openConnectPortal() {
+  openUrlInBrowser(WEALTHFOLIO_CONNECT_PORTAL_URL);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -133,19 +63,12 @@ function BrokerConnectionSkeleton() {
 
 interface ConnectionCardProps {
   connection: BrokerConnection;
-  onReconnect: () => void;
-  onRemove: () => void;
-  isReconnecting: boolean;
-  isRemoving: boolean;
+  onManage: () => void;
+  onSync: () => void;
+  isSyncing: boolean;
 }
 
-function ConnectionCard({
-  connection,
-  onReconnect,
-  onRemove,
-  isReconnecting,
-  isRemoving,
-}: ConnectionCardProps) {
+function ConnectionCard({ connection, onManage, onSync, isSyncing }: ConnectionCardProps) {
   const logoUrl = connection.brokerage?.awsS3SquareLogoUrl ?? connection.brokerage?.awsS3LogoUrl;
   const name = connection.brokerage?.displayName ?? connection.brokerage?.name ?? "Brokerage";
   const isDisabled = connection.disabled;
@@ -185,30 +108,23 @@ function ConnectionCard({
 
       <div className="flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
         {isDisabled ? (
-          <Button variant="secondary" size="sm" onClick={onReconnect} disabled={isReconnecting}>
-            {isReconnecting ? "Reconnecting..." : "Reconnect"}
+          <Button variant="secondary" size="sm" onClick={onManage}>
+            Reconnect
           </Button>
         ) : (
-          <ActionConfirm
-            handleConfirm={onRemove}
-            isPending={isRemoving}
-            confirmTitle="Remove broker connection?"
-            confirmMessage="This removes the broker connection. Your local data remains safe, but you will need to re-configure a new connection to sync again."
-            confirmButtonText="Remove"
-            pendingText="Removing..."
-            cancelButtonText="Cancel"
-            confirmButtonVariant="destructive"
-            button={
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isRemoving}
-                className="hover:text-destructive text-destructive/90"
-              >
-                {isRemoving ? "Removing..." : "Remove"}
-              </Button>
-            }
-          />
+          <Button variant="outline" size="sm" onClick={onSync} disabled={isSyncing}>
+            {isSyncing ? (
+              <>
+                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                Syncing...
+              </>
+            ) : (
+              <>
+                <Icons.Refresh className="mr-2 h-4 w-4" />
+                Sync Now
+              </>
+            )}
+          </Button>
         )}
       </div>
     </div>
@@ -220,8 +136,7 @@ function ConnectionCard({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function SyncConnectedView() {
-  const { user, session, teamId, userInfo, signOut, isLoading, error, clearError } =
-    useWealthfolioSync();
+  const { user, session, userInfo, signOut, isLoading, error, clearError } = useWealthfolioSync();
   const queryClient = useQueryClient();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
@@ -229,13 +144,11 @@ export function SyncConnectedView() {
   // Check if user is connected (has a valid session)
   const isConnected = !!session;
 
-  // Check if user has a subscription (has a team)
-  const hasSubscription = !!teamId;
+  // Check if user has an active subscription (has a team with a plan)
+  const hasSubscription = !!userInfo?.team?.plan;
 
   // Hooks - only fetch broker connections if user has a subscription
   const connectionsQuery = useBrokerConnections(hasSubscription);
-  const removeMutation = useRemoveConnection();
-  const snapTradePortal = useSnapTradePortal();
 
   // Sync accounts to local database
   const syncToLocalMutation = useMutation({
@@ -258,25 +171,6 @@ export function SyncConnectedView() {
     },
   });
 
-  // Auto-sync on return from SnapTrade (legacy redirect flow)
-  const shouldAutoSync = useMemo(() => {
-    if (typeof window === "undefined") return false;
-    const params = new URLSearchParams(window.location.search);
-    return (
-      params.has("snaptrade") ||
-      params.has("sessionId") ||
-      params.has("authorizationId") ||
-      params.has("brokerage_authorization_id")
-    );
-  }, []);
-
-  useEffect(() => {
-    if (shouldAutoSync) {
-      connectionsQuery.refetch();
-      window.history.replaceState({}, "", window.location.pathname);
-    }
-  }, [shouldAutoSync, connectionsQuery]);
-
   // Handlers
   const handleSignOut = useCallback(async () => {
     setIsSigningOut(true);
@@ -289,10 +183,6 @@ export function SyncConnectedView() {
       setIsSigningOut(false);
     }
   }, [clearError, signOut]);
-
-  const handlePortalSuccess = useCallback(() => {
-    connectionsQuery.refetch();
-  }, [connectionsQuery]);
 
   const formatDate = (dateString: string | undefined) => {
     if (!dateString) return "N/A";
@@ -331,10 +221,10 @@ export function SyncConnectedView() {
               ) : (
                 <div
                   className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                    teamId ? "bg-green-100 dark:bg-green-900/30" : "bg-muted"
+                    hasSubscription ? "bg-green-100 dark:bg-green-900/30" : "bg-muted"
                   }`}
                 >
-                  {teamId ? (
+                  {hasSubscription ? (
                     <Icons.CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                   ) : (
                     <Icons.Users className="text-muted-foreground h-5 w-5" />
@@ -344,7 +234,7 @@ export function SyncConnectedView() {
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <h3 className="font-semibold">{userInfo?.fullName ?? user?.email ?? "N/A"}</h3>
-                  {teamId && (
+                  {hasSubscription && (
                     <Badge
                       variant="secondary"
                       className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
@@ -356,9 +246,6 @@ export function SyncConnectedView() {
                 {userInfo?.fullName && (
                   <p className="text-muted-foreground text-sm">{user?.email}</p>
                 )}
-                <p className="text-muted-foreground text-sm">
-                  {teamId ? "Your account is connected and syncing." : ""}
-                </p>
                 <p className="text-muted-foreground text-xs">
                   Member since {formatDate(user?.created_at)}
                 </p>
@@ -393,11 +280,11 @@ export function SyncConnectedView() {
         </CardContent>
       </Card>
 
-      {/* Show Subscription Plans if user has no team */}
-      {!teamId && <SubscriptionPlans enabled={isConnected && !teamId} />}
+      {/* Show Subscription Plans if user has no active subscription */}
+      {!hasSubscription && <SubscriptionPlans enabled={isConnected && !hasSubscription} />}
 
-      {/* Broker Connections Card - Only show if user has a team */}
-      {teamId && (
+      {/* Broker Connections Card - Only show if user has an active subscription */}
+      {hasSubscription && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -441,18 +328,9 @@ export function SyncConnectedView() {
                         </>
                       )}
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => snapTradePortal.openPortal()}
-                      disabled={snapTradePortal.isLoading}
-                    >
-                      {snapTradePortal.isLoading ? (
-                        <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Icons.Plus className="mr-2 h-4 w-4" />
-                      )}
-                      Add Broker
+                    <Button variant="outline" size="sm" onClick={openConnectPortal}>
+                      <Icons.Settings className="mr-2 h-4 w-4" />
+                      Manage Connections
                     </Button>
                   </>
                 )}
@@ -472,16 +350,8 @@ export function SyncConnectedView() {
                 <p className="mt-1 text-xs">
                   Connect your first broker account to start syncing your portfolio automatically.
                 </p>
-                <Button
-                  className="mt-4"
-                  onClick={() => snapTradePortal.openPortal()}
-                  disabled={snapTradePortal.isLoading}
-                >
-                  {snapTradePortal.isLoading ? (
-                    <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Icons.Plus className="mr-2 h-4 w-4" />
-                  )}
+                <Button className="mt-4" onClick={openConnectPortal}>
+                  <Icons.Plus className="mr-2 h-4 w-4" />
                   Connect Broker Account
                 </Button>
               </div>
@@ -491,10 +361,9 @@ export function SyncConnectedView() {
                   <ConnectionCard
                     key={connection.id}
                     connection={connection}
-                    onReconnect={() => snapTradePortal.openPortal(connection.id)}
-                    onRemove={() => removeMutation.mutate(connection.id)}
-                    isReconnecting={snapTradePortal.isLoading}
-                    isRemoving={removeMutation.isPending}
+                    onManage={openConnectPortal}
+                    onSync={() => syncToLocalMutation.mutate()}
+                    isSyncing={isSyncing}
                   />
                 ))}
               </div>
@@ -544,15 +413,6 @@ export function SyncConnectedView() {
           </div>
         </CardContent>
       </Card>
-
-      {/* SnapTrade Connect Portal */}
-      <SnapTradeConnectPortal
-        loginLink={snapTradePortal.loginLink}
-        isOpen={snapTradePortal.isOpen}
-        onClose={snapTradePortal.closePortal}
-        onSuccess={handlePortalSuccess}
-        initialConnectionIds={connections.map((c) => c.id)}
-      />
     </div>
   );
 }
