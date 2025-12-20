@@ -4,7 +4,7 @@ use super::activities_model::{
     ImportMappingData, IncomeData, MonthMetricsRequest, MonthMetricsResponse, NewActivity,
     RecurrenceBreakdown, Sort, SpendingTrendsRequest, SpendingTrendsResponse,
 };
-use crate::portfolio::income::{CapitalGainsData, CashIncomeData};
+use crate::portfolio::income::{CapitalGainsData, CashIncomeData, InvestmentAccountDepositData};
 use crate::spending::SpendingData;
 use crate::Result;
 use async_trait::async_trait;
@@ -75,6 +75,7 @@ pub trait ActivityRepositoryTrait: Send + Sync {
         include_all_events: bool,
     ) -> Result<Vec<SpendingData>>;
     fn get_cash_income_activities_data(&self) -> Result<Vec<CashIncomeData>>;
+    fn get_investment_account_deposits_data(&self) -> Result<Vec<InvestmentAccountDepositData>>;
     fn get_capital_gains_data(&self) -> Result<Vec<CapitalGainsData>>;
     fn get_top_spending_transactions(&self, month: &str, limit: i64) -> Result<Vec<ActivityDetails>>;
     fn get_daily_spending_for_month(

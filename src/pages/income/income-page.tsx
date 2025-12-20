@@ -466,12 +466,31 @@ export default function IncomePage({ renderActions }: IncomePageProps) {
                     const chartItems = [
                       ...top5Sources.map(([symbol, income]) => {
                         const isCash = symbol.startsWith("[$CASH]");
+                        const isAccountDeposit = symbol.startsWith("[$ACCT]");
+                        const name = symbol.replace(/\[.*?\]-/, "").trim();
+                        const nameParts = name.split(" > ");
+
+                        let displaySymbol: string;
+                        let displayName: string;
+
+                        if (isCash) {
+                          displaySymbol = "Cash";
+                          displayName = name;
+                        } else if (isAccountDeposit) {
+                          displaySymbol = nameParts[0] || name; // Account name
+                          displayName = nameParts[1] || "Account Deposit"; // Account type
+                        } else {
+                          displaySymbol = /\[(.*?)\]/.exec(symbol)?.[1] || symbol;
+                          displayName = name;
+                        }
+
                         return {
-                          symbol: isCash ? "Cash" : /\[(.*?)\]/.exec(symbol)?.[1] || symbol,
-                          companyName: symbol.replace(/\[.*?\]-/, "").trim(),
+                          symbol: displaySymbol,
+                          companyName: displayName,
                           income,
                           isOther: false,
                           isCash,
+                          isAccountDeposit,
                         };
                       }),
                       ...(otherTotal > 0
@@ -482,6 +501,7 @@ export default function IncomePage({ renderActions }: IncomePageProps) {
                               income: otherTotal,
                               isOther: true,
                               isCash: false,
+                              isAccountDeposit: false,
                             },
                           ]
                         : []),
@@ -534,12 +554,18 @@ export default function IncomePage({ renderActions }: IncomePageProps) {
 
                 {topIncomeSources.map(([symbolStr, income], index) => {
                   const isCash = symbolStr.startsWith("[$CASH]");
+                  const isAccountDeposit = symbolStr.startsWith("[$ACCT]");
                   const ticker = /\[(.*?)\]/.exec(symbolStr)?.[1] || symbolStr;
                   const name = symbolStr.replace(/\[.*?\]-/, "").trim();
 
-                  const nameParts = isCash ? name.split(" > ") : [];
+                  // Parse name based on type
+                  const nameParts = isCash || isAccountDeposit ? name.split(" > ") : [];
                   const category = nameParts[0] || name;
                   const subcategory = nameParts[1];
+
+                  // For account deposits: category = account name, subcategory = account type
+                  const accountName = isAccountDeposit ? category : undefined;
+                  const accountType = isAccountDeposit ? subcategory : undefined;
 
                   const percentage =
                     periodSummary.totalIncome > 0 ? (income / periodSummary.totalIncome) * 100 : 0;
@@ -567,11 +593,8 @@ export default function IncomePage({ renderActions }: IncomePageProps) {
                           )}
                         </button>
                         <div
-                          className="mr-2 h-3 w-3 cursor-pointer rounded-full"
+                          className="mr-2 h-3 w-3 rounded-full"
                           style={{ backgroundColor: color }}
-                          onClick={
-                            isCash ? () => handleCashIncomeClick(category, subcategory) : undefined
-                          }
                         />
                         {isCash ? (
                           <div
@@ -585,6 +608,15 @@ export default function IncomePage({ renderActions }: IncomePageProps) {
                               </span>
                             )}
                           </div>
+                        ) : isAccountDeposit ? (
+                          <div className="flex flex-col">
+                            <span className="text-muted-foreground text-xs">{accountName}</span>
+                            {accountType && (
+                              <span className="text-muted-foreground text-xs opacity-70">
+                                {accountType}
+                              </span>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-muted-foreground text-xs">
                             {ticker} - {name}
@@ -592,7 +624,7 @@ export default function IncomePage({ renderActions }: IncomePageProps) {
                         )}
                       </div>
                       <div
-                        className="flex cursor-pointer items-center gap-2"
+                        className="flex items-center gap-2"
                         onClick={
                           isCash ? () => handleCashIncomeClick(category, subcategory) : undefined
                         }

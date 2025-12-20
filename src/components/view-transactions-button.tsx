@@ -28,10 +28,10 @@ export function ViewTransactionsButton({
     onBeforeNavigate?.();
 
     if (eventId) {
-      navigate(`/activity?tab=transactions&event=${eventId}`);
+      navigate(`/activity?tab=cash&event=${eventId}`);
     } else if (dateRange) {
       navigate(
-        `/activity?tab=transactions&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`,
+        `/activity?tab=cash&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`,
       );
     }
   };

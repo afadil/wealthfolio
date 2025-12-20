@@ -14,7 +14,7 @@ use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
 use crate::db::{get_connection, WriteHandle};
 use crate::schema::{accounts, activities, activity_import_profiles};
-use crate::portfolio::income::{CapitalGainsData, CashIncomeData};
+use crate::portfolio::income::{CapitalGainsData, CashIncomeData, InvestmentAccountDepositData};
 use crate::spending::SpendingData;
 use crate::{Error, Result};
 use async_trait::async_trait;
@@ -954,6 +954,67 @@ impl ActivityRepositoryTrait for ActivityRepository {
                     currency: raw.currency,
                     amount,
                     name: raw.name,
+                }
+            })
+            .collect();
+
+        Ok(results)
+    }
+
+    fn get_investment_account_deposits_data(&self) -> Result<Vec<InvestmentAccountDepositData>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        // Query DEPOSIT activities from SECURITIES and CRYPTO accounts
+        // These are direct deposits to investment accounts (e.g., 401k contributions)
+        let query = r#"
+            SELECT
+                strftime('%Y-%m', a.activity_date) as date,
+                a.account_id,
+                acc.name as account_name,
+                acc.account_type,
+                a.currency,
+                COALESCE(a.amount, '0') as amount
+            FROM activities a
+            INNER JOIN accounts acc ON a.account_id = acc.id
+            WHERE acc.is_active = 1
+              AND acc.account_type IN ('SECURITIES', 'CRYPTO')
+              AND a.activity_type = 'DEPOSIT'
+            ORDER BY a.activity_date
+        "#;
+
+        #[derive(QueryableByName, Debug)]
+        struct RawInvestmentDepositData {
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub date: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub account_id: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub account_name: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub account_type: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub currency: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub amount: String,
+        }
+
+        let raw_results = diesel::sql_query(query)
+            .load::<RawInvestmentDepositData>(&mut conn)
+            .map_err(ActivityError::from)?;
+
+        let results = raw_results
+            .into_iter()
+            .map(|raw| {
+                let amount = Decimal::from_str(&raw.amount).unwrap_or_else(|_| Decimal::zero());
+                // Ensure amount is positive for income calculations
+                let amount = amount.abs();
+                InvestmentAccountDepositData {
+                    date: raw.date,
+                    account_id: raw.account_id,
+                    account_name: raw.account_name,
+                    account_type: raw.account_type,
+                    currency: raw.currency,
+                    amount,
                 }
             })
             .collect();

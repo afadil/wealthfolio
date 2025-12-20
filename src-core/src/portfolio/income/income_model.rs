@@ -21,6 +21,18 @@ pub struct CashIncomeData {
     pub name: Option<String>,
 }
 
+/// Deposit data from investment accounts (SECURITIES, CRYPTO)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InvestmentAccountDepositData {
+    pub date: String,
+    pub account_id: String,
+    pub account_name: String,
+    pub account_type: String,
+    pub currency: String,
+    pub amount: Decimal,
+}
+
 /// Capital gains data from SELL activities
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -57,6 +69,7 @@ pub struct IncomeSummary {
     pub investment_income: Decimal,
     pub cash_income: Decimal,
     pub capital_gains: Decimal,
+    pub investment_deposits: Decimal,
     pub currency: String,
     pub monthly_average: Decimal,
     pub yoy_growth: Option<Decimal>,
@@ -77,6 +90,7 @@ impl IncomeSummary {
             investment_income: Decimal::ZERO,
             cash_income: Decimal::ZERO,
             capital_gains: Decimal::ZERO,
+            investment_deposits: Decimal::ZERO,
             currency,
             monthly_average: Decimal::ZERO,
             yoy_growth: None,
@@ -179,6 +193,52 @@ impl IncomeSummary {
         self.cash_income += &converted_amount;
     }
 
+    /// Add investment account deposit (deposits to SECURITIES/CRYPTO accounts)
+    pub fn add_investment_deposit(&mut self, data: &InvestmentAccountDepositData, converted_amount: Decimal) {
+        *self
+            .by_month
+            .entry(data.date.to_string())
+            .or_insert_with(|| Decimal::ZERO) += &converted_amount;
+
+        // Aggregate by month and source type (for stacked bar charts)
+        let month_sources = self
+            .by_month_by_source_type
+            .entry(data.date.to_string())
+            .or_insert_with(HashMap::new);
+        *month_sources
+            .entry("Account Deposits".to_string())
+            .or_insert(Decimal::ZERO) += &converted_amount;
+
+        // Use account type for the by_type breakdown
+        *self
+            .by_type
+            .entry(format!("{} Deposits", data.account_type))
+            .or_insert_with(|| Decimal::ZERO) += &converted_amount;
+
+        // Build display name from account name/type for deposits
+        let symbol_key = format!("[$ACCT]-{} > {}", data.account_name, data.account_type);
+
+        // Aggregate by month and symbol (for filtering chart by symbol)
+        let month_symbols = self
+            .by_month_by_symbol
+            .entry(data.date.to_string())
+            .or_insert_with(HashMap::new);
+        *month_symbols
+            .entry(symbol_key.clone())
+            .or_insert(Decimal::ZERO) += &converted_amount;
+
+        *self
+            .by_symbol
+            .entry(symbol_key)
+            .or_insert_with(|| Decimal::ZERO) += &converted_amount;
+        *self
+            .by_currency
+            .entry(data.currency.clone())
+            .or_insert_with(|| Decimal::ZERO) += &data.amount;
+        self.total_income += &converted_amount;
+        self.investment_deposits += &converted_amount;
+    }
+
     /// Add capital gains from SELL activities
     pub fn add_capital_gains(&mut self, data: &CapitalGainsData, converted_gain: Decimal) {
         // Only add positive gains to income
@@ -231,7 +291,7 @@ impl IncomeSummary {
         }
     }
 
-    /// Calculate source type breakdown (investment income + capital gains combined, cash income)
+    /// Calculate source type breakdown (investment income + capital gains combined, cash income, account deposits)
     pub fn calculate_source_type_breakdown(&mut self) {
         self.by_source_type.clear();
 
@@ -253,6 +313,14 @@ impl IncomeSummary {
                     source_type: "Cash Income".to_string(),
                     amount: self.cash_income,
                     percentage: (self.cash_income / self.total_income) * hundred,
+                });
+            }
+
+            if self.investment_deposits > Decimal::ZERO {
+                self.by_source_type.push(SourceTypeBreakdown {
+                    source_type: "Account Deposits".to_string(),
+                    amount: self.investment_deposits,
+                    percentage: (self.investment_deposits / self.total_income) * hundred,
                 });
             }
         }

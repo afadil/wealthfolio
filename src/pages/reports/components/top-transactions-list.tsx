@@ -27,7 +27,7 @@ export function TopTransactionsList({
     const [year, month] = selectedMonth.split("-").map(Number);
     const start = format(startOfMonth(new Date(year, month - 1)), "yyyy-MM-dd");
     const end = format(endOfMonth(new Date(year, month - 1)), "yyyy-MM-dd");
-    navigate(`/activity?tab=transactions&startDate=${start}&endDate=${end}`);
+    navigate(`/activity?tab=cash&startDate=${start}&endDate=${end}`);
   };
 
   if (isLoading) {

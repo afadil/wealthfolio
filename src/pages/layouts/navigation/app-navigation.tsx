@@ -81,8 +81,8 @@ const staticNavigation: NavigationProps = {
       title: "Activity",
       href: "/activity",
       keywords: [
-        "trades",
-        "transactions",
+        "assets",
+        "cash",
         "buy",
         "sell",
         "dividends",

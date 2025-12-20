@@ -501,6 +501,7 @@ export interface IncomeSummary {
   investmentIncome: number;
   cashIncome: number;
   capitalGains: number;
+  investmentDeposits: number;
   currency: string;
   monthlyAverage: number;
   yoyGrowth: number | null;

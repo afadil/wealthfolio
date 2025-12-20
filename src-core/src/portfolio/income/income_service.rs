@@ -8,7 +8,7 @@ use crate::{
 };
 use chrono::{Datelike, NaiveDate, Utc};
 
-use super::{CashIncomeData, IncomeSummary};
+use super::{CashIncomeData, IncomeSummary, InvestmentAccountDepositData};
 use crate::fx::fx_traits::FxServiceTrait;
 use log::{debug, error, warn};
 use num_traits::Zero;
@@ -123,6 +123,22 @@ impl IncomeServiceTrait for IncomeService {
             }
         }
 
+        // Process investment account deposits (deposits to SECURITIES/CRYPTO accounts)
+        let investment_deposits = self.activity_repository.get_investment_account_deposits_data().unwrap_or_default();
+        for activity in &investment_deposits {
+            if let Some((date, converted_amount, activity_copy)) = self.process_investment_deposit(activity, &base_currency) {
+                total_summary.add_investment_deposit(&activity_copy, converted_amount.clone());
+
+                if date.year() == current_year {
+                    ytd_summary.add_investment_deposit(&activity_copy, converted_amount.clone());
+                } else if date.year() == last_year {
+                    last_year_summary.add_investment_deposit(&activity_copy, converted_amount.clone());
+                } else if date.year() == two_years_ago {
+                    two_years_ago_summary.add_investment_deposit(&activity_copy, converted_amount.clone());
+                }
+            }
+        }
+
         total_summary.calculate_monthly_average(Some(months_since_first_transaction as u32));
         ytd_summary.calculate_monthly_average(Some(current_month));
         last_year_summary.calculate_monthly_average(Some(months_in_last_year as u32));
@@ -163,6 +179,7 @@ impl IncomeServiceTrait for IncomeService {
                 summary.investment_income = summary.investment_income.round_dp(DISPLAY_DECIMAL_PRECISION);
                 summary.cash_income = summary.cash_income.round_dp(DISPLAY_DECIMAL_PRECISION);
                 summary.capital_gains = summary.capital_gains.round_dp(DISPLAY_DECIMAL_PRECISION);
+                summary.investment_deposits = summary.investment_deposits.round_dp(DISPLAY_DECIMAL_PRECISION);
                 summary.monthly_average = summary.monthly_average.round_dp(DISPLAY_DECIMAL_PRECISION);
 
                 if let Some(growth) = summary.yoy_growth {
@@ -272,6 +289,35 @@ impl IncomeService {
             Ok(amount) => amount,
             Err(e) => {
                 error!("Error converting cash income currency: {:?}", e);
+                activity.amount.clone()
+            }
+        };
+
+        Some((date, converted_amount, activity.clone()))
+    }
+
+    /// Process investment account deposit activity and return parsed date, converted amount, and activity copy
+    fn process_investment_deposit(
+        &self,
+        activity: &InvestmentAccountDepositData,
+        base_currency: &str,
+    ) -> Option<(NaiveDate, Decimal, InvestmentAccountDepositData)> {
+        let date = match NaiveDate::parse_from_str(&format!("{}-01", activity.date), "%Y-%m-%d") {
+            Ok(d) => d,
+            Err(e) => {
+                error!("Error parsing investment deposit date {}: {:?}", activity.date, e);
+                return None;
+            }
+        };
+
+        let converted_amount = match self.fx_service.convert_currency(
+            activity.amount.clone(),
+            &activity.currency,
+            base_currency,
+        ) {
+            Ok(amount) => amount,
+            Err(e) => {
+                error!("Error converting investment deposit currency: {:?}", e);
                 activity.amount.clone()
             }
         };

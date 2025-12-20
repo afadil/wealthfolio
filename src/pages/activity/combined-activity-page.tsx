@@ -37,22 +37,22 @@ const ActivityLoader = () => (
   </div>
 );
 
-type ActivityTab = "trades" | "transactions";
+type ActivityTab = "assets" | "cash";
 
 export default function CombinedActivityPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get("tab") as ActivityTab | null;
-  const currentTab: ActivityTab = tabFromUrl === "transactions" ? "transactions" : "trades";
+  const currentTab: ActivityTab = tabFromUrl === "cash" ? "cash" : "assets";
 
-  const [tradesActions, setTradesActions] = useState<React.ReactNode>(null);
-  const [transactionsActions, setTransactionsActions] = useState<React.ReactNode>(null);
+  const [assetsActions, setAssetsActions] = useState<React.ReactNode>(null);
+  const [cashActions, setCashActions] = useState<React.ReactNode>(null);
 
-  const handleTradesActions = useCallback((actions: React.ReactNode) => {
-    setTradesActions(actions);
+  const handleAssetsActions = useCallback((actions: React.ReactNode) => {
+    setAssetsActions(actions);
   }, []);
 
-  const handleTransactionsActions = useCallback((actions: React.ReactNode) => {
-    setTransactionsActions(actions);
+  const handleCashActions = useCallback((actions: React.ReactNode) => {
+    setCashActions(actions);
   }, []);
 
   const handleTabChange = useCallback(
@@ -64,33 +64,33 @@ export default function CombinedActivityPage() {
 
   // Get actions for current tab
   const currentActions = useMemo(() => {
-    return currentTab === "trades" ? tradesActions : transactionsActions;
-  }, [currentTab, tradesActions, transactionsActions]);
+    return currentTab === "assets" ? assetsActions : cashActions;
+  }, [currentTab, assetsActions, cashActions]);
 
   return (
     <Page>
       <Tabs value={currentTab} onValueChange={handleTabChange}>
         <PageHeader actions={currentActions}>
           <TabsList>
-            <TabsTrigger value="trades">
+            <TabsTrigger value="assets">
               <Icons.Activity className="mr-2 size-4" />
-              Trades
+              Asset Accounts
             </TabsTrigger>
-            <TabsTrigger value="transactions">
+            <TabsTrigger value="cash">
               <Icons.Wallet className="mr-2 size-4" />
-              Transactions
+              Cash Accounts
             </TabsTrigger>
           </TabsList>
         </PageHeader>
         <PageContent withPadding={false}>
-          <TabsContent value="trades" className="mt-0">
+          <TabsContent value="assets" className="mt-0">
             <Suspense fallback={<ActivityLoader />}>
-              <ActivityPage renderActions={handleTradesActions} />
+              <ActivityPage renderActions={handleAssetsActions} />
             </Suspense>
           </TabsContent>
-          <TabsContent value="transactions" className="mt-0">
+          <TabsContent value="cash" className="mt-0">
             <Suspense fallback={<ActivityLoader />}>
-              <CashActivitiesPage renderActions={handleTransactionsActions} />
+              <CashActivitiesPage renderActions={handleCashActions} />
             </Suspense>
           </TabsContent>
         </PageContent>

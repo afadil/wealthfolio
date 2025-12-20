@@ -52,6 +52,7 @@ export const searchCashActivities = async (
           pageSize,
           accountIdFilter: filters.accountIds,
           activityTypeFilter,
+          accountTypeFilter: ["CASH"], // Only show activities from CASH accounts
           categoryIdFilter: filters.categoryIds,
           eventIdFilter: filters.eventIds,
           recurrenceFilter: filters.recurrenceTypes,
@@ -71,6 +72,7 @@ export const searchCashActivities = async (
           pageSize,
           accountIdFilter: filters.accountIds,
           activityTypeFilter,
+          accountTypeFilter: ["CASH"], // Only show activities from CASH accounts
           categoryIdFilter: filters.categoryIds,
           eventIdFilter: filters.eventIds,
           recurrenceFilter: filters.recurrenceTypes,

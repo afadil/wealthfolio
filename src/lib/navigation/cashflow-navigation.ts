@@ -43,7 +43,7 @@ export function periodToDateRange(period: SpendingPeriod): {
 
 export function buildCashflowUrl(params: CashflowNavigationParams): string {
   const searchParams = new URLSearchParams();
-  searchParams.set("tab", "transactions");
+  searchParams.set("tab", "cash");
   if (params.categoryId) searchParams.set("category", params.categoryId);
   if (params.subcategoryId) searchParams.set("subcategory", params.subcategoryId);
   if (params.eventId) searchParams.set("event", params.eventId);
