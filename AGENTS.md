@@ -36,7 +36,21 @@ References:
     `README.md`:1)
 - Server only (HTTP API + static):
   `cargo run --manifest-path src-server/Cargo.toml`
-- Tests (frontend/unit): `pnpm test` | `pnpm test:watch` | `pnpm test:coverage`
+
+### Testing
+
+- Unit tests: `pnpm test` | `pnpm test:watch` | `pnpm test:coverage`
+- Single test file: `pnpm test -- path/to/file.test.ts`
+- Test by name: `pnpm test -- -t "pattern"`
+- E2E tests: `pnpm test:e2e` | `pnpm test:e2e:ui`
+- Rust tests: `cargo test --manifest-path src-core/Cargo.toml`
+
+### Quality Checks
+
+- Type check: `pnpm type-check` (all packages) | `pnpm type-check:root` (root only)
+- Lint: `pnpm lint` | `pnpm lint:fix`
+- Format: `pnpm format` | `pnpm format:check`
+- All checks: `pnpm check`
 
 ## Code Layout
 
@@ -159,13 +173,9 @@ Common UI tasks:
 
 ## Useful Commands (Agent Discovery)
 
-- List files quickly: `rg --files`
+- List files: `rg --files`
 - Search text: `rg "keyword"`
-- Inspect scripts: `cat package.json`
-- Frontend dev server: `pnpm dev`
-- Web mode combo: `pnpm run dev:web`
-- Desktop dev: `pnpm tauri dev`
-- Tests: `pnpm test` or `pnpm test:watch`
+- Rust check: `cargo check --manifest-path src-core/Cargo.toml`
 
 ## Addon Development (Quickstart)
 
@@ -231,12 +241,6 @@ Docs entry points:
 - If an adapter call fails, confirm the matching server/Tauri command and
   parameter names.
 
----
-
-This document is intended to make AI agents productive, consistent, and safe in
-this codebase. When in doubt, follow the nearest existing pattern and validate
-via the provided scripts.
-
 ## Backend Rules (Rust)
 
 - Scope: Rust code in `src-tauri/**`, `src-core/**`, and `src-server/**` (Axum).
@@ -265,3 +269,9 @@ via the provided scripts.
   Use fakes/mocks for external deps.
 - Docs & cleanup: add Rustdoc where it clarifies intent; remove dead code during
   refactors.
+
+---
+
+This document is intended to make AI agents productive, consistent, and safe in
+this codebase. When in doubt, follow the nearest existing pattern and validate
+via the provided scripts.

@@ -64,9 +64,19 @@ impl ActivityService {
             activity.currency = asset.currency.clone();
         }
 
+        // Register FX pair for activity currency if different from account currency
         if activity.currency != account.currency {
             self.fx_service
                 .register_currency_pair(account.currency.as_str(), activity.currency.as_str())
+                .await?;
+        }
+
+        // Register FX pair for asset currency if different from account currency
+        // This is needed when the asset's native currency differs from the activity currency
+        // (e.g., asset is EUR but activity was recorded in account's USD)
+        if asset.currency != account.currency && asset.currency != activity.currency {
+            self.fx_service
+                .register_currency_pair(account.currency.as_str(), asset.currency.as_str())
                 .await?;
         }
 
@@ -103,9 +113,19 @@ impl ActivityService {
             activity.currency = asset.currency.clone();
         }
 
+        // Register FX pair for activity currency if different from account currency
         if activity.currency != account.currency {
             self.fx_service
                 .register_currency_pair(account.currency.as_str(), activity.currency.as_str())
+                .await?;
+        }
+
+        // Register FX pair for asset currency if different from account currency
+        // This is needed when the asset's native currency differs from the activity currency
+        // (e.g., asset is EUR but activity was recorded in account's USD)
+        if asset.currency != account.currency && asset.currency != activity.currency {
+            self.fx_service
+                .register_currency_pair(account.currency.as_str(), asset.currency.as_str())
                 .await?;
         }
 

@@ -34,11 +34,6 @@ export function AccountItem({ account, onEdit, onDelete }: AccountItemProps) {
             {account.currency}
             {account.group && <span> - {account.group}</span>}
           </p>
-          {account.platformId && (
-            <Badge variant="outline" className="text-xs font-normal">
-              {account.platformId}
-            </Badge>
-          )}
         </div>
       </div>
       <div className="flex items-center space-x-4">

@@ -1,7 +1,7 @@
 use crate::errors::{Error, Result};
 use crate::fx::currency::{normalize_amount, normalize_currency_code};
 use crate::fx::FxError;
-use crate::market_data::market_data_model::Quote;
+use crate::market_data::Quote;
 use crate::portfolio::snapshot::AccountStateSnapshot;
 use crate::portfolio::valuation::DailyAccountValuation;
 

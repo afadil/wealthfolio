@@ -9,35 +9,13 @@ use diesel::sqlite::SqliteConnection;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use super::model::DailyAccountValuationDB;
 use crate::db::{get_connection, WriteHandle};
-use crate::errors::Result;
-use crate::portfolio::valuation::valuation_model::{
-    DailyAccountValuation, DailyAccountValuationDb,
-};
 use crate::schema::daily_account_valuation;
 use crate::schema::daily_account_valuation::dsl::*;
-
-#[async_trait]
-pub trait ValuationRepositoryTrait: Send + Sync {
-    async fn save_valuations(&self, valuation_records: &[DailyAccountValuation]) -> Result<()>;
-    fn get_historical_valuations(
-        &self,
-        input_account_id: &str,
-        start_date_opt: Option<NaiveDate>,
-        end_date_opt: Option<NaiveDate>,
-    ) -> Result<Vec<DailyAccountValuation>>;
-    fn load_latest_valuation_date(&self, account_id: &str) -> Result<Option<NaiveDate>>;
-    async fn delete_valuations_for_account(&self, account_id: &str) -> Result<()>;
-    fn get_latest_valuations(
-        &self,
-        input_account_ids: &[String],
-    ) -> Result<Vec<DailyAccountValuation>>;
-    fn get_valuations_on_date(
-        &self,
-        account_ids: &[String],
-        date: NaiveDate,
-    ) -> Result<Vec<DailyAccountValuation>>;
-}
+use crate::errors::StorageError;
+use wealthfolio_core::errors::Result;
+use wealthfolio_core::portfolio::valuation::{DailyAccountValuation, ValuationRepositoryTrait};
 
 pub struct ValuationRepository {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
@@ -58,10 +36,10 @@ impl ValuationRepositoryTrait for ValuationRepository {
         }
 
         // Materialize the records once before moving into the closure
-        let records_to_save: Vec<DailyAccountValuationDb> = valuation_records
+        let records_to_save: Vec<DailyAccountValuationDB> = valuation_records
             .iter()
             .cloned()
-            .map(DailyAccountValuationDb::from)
+            .map(DailyAccountValuationDB::from)
             .collect();
 
         self.writer
@@ -69,7 +47,8 @@ impl ValuationRepositoryTrait for ValuationRepository {
                 for chunk in records_to_save.chunks(1000) {
                     diesel::replace_into(daily_account_valuation::table)
                         .values(chunk) // Pass the chunk directly
-                        .execute(conn)?;
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
                 }
                 Ok(())
             })
@@ -97,9 +76,10 @@ impl ValuationRepositoryTrait for ValuationRepository {
             query = query.filter(valuation_date.le(end_date_val));
         }
 
-        let history_dbs = query.load::<DailyAccountValuationDb>(&mut conn)?;
+        let history_dbs = query.load::<DailyAccountValuationDB>(&mut conn)
+            .map_err(StorageError::from)?;
 
-        // Convert Vec<DailyAccountValuationDb> to Vec<DailyAccountValuation>
+        // Convert Vec<DailyAccountValuationDB> to Vec<DailyAccountValuation>
         // Handle potential conversion errors if necessary (using From implicitly handles unwrap_or_default)
         let history_records: Vec<DailyAccountValuation> = history_dbs
             .into_iter()
@@ -121,7 +101,8 @@ impl ValuationRepositoryTrait for ValuationRepository {
             .filter(account_id.eq(input_account_id))
             .select(diesel::dsl::max(valuation_date))
             .first::<Option<NaiveDate>>(&mut conn)
-            .optional()?;
+            .optional()
+            .map_err(StorageError::from)?;
 
         // Flatten the Option<Option<NaiveDate>> to Option<NaiveDate>
         let latest_date = result.flatten();
@@ -136,7 +117,8 @@ impl ValuationRepositoryTrait for ValuationRepository {
                 diesel::delete(
                     daily_account_valuation::table.filter(account_id.eq(account_id_owned)),
                 )
-                .execute(conn)?;
+                .execute(conn)
+                .map_err(StorageError::from)?;
                 Ok(())
             })
             .await
@@ -158,7 +140,7 @@ impl ValuationRepositoryTrait for ValuationRepository {
             .collect::<Vec<&str>>()
             .join(", ");
 
-        // Ensure all fields from DailyAccountValuationDb are selected, in the correct order.
+        // Ensure all fields from DailyAccountValuationDB are selected, in the correct order.
         let sql = format!(
             "WITH RankedValuations AS ( \
                 SELECT \
@@ -185,8 +167,9 @@ impl ValuationRepositoryTrait for ValuationRepository {
             query_builder = query_builder.bind::<Text, _>(acc_id_str);
         }
 
-        let latest_valuations_db: Vec<DailyAccountValuationDb> =
-            query_builder.load::<DailyAccountValuationDb>(&mut conn)?;
+        let latest_valuations_db: Vec<DailyAccountValuationDB> =
+            query_builder.load::<DailyAccountValuationDB>(&mut conn)
+            .map_err(StorageError::from)?;
 
         // To maintain input order, we first put results into a map
         let mut results_map: HashMap<String, DailyAccountValuation> = latest_valuations_db
@@ -224,9 +207,10 @@ impl ValuationRepositoryTrait for ValuationRepository {
         let history_dbs = daily_account_valuation::table
             .filter(account_id.eq_any(input_account_ids)) // Use eq_any for multiple IDs
             .filter(valuation_date.eq(input_date)) // Filter by the specific date
-            .load::<DailyAccountValuationDb>(&mut conn)?;
+            .load::<DailyAccountValuationDB>(&mut conn)
+            .map_err(StorageError::from)?;
 
-        // Convert Vec<DailyAccountValuationDb> to Vec<DailyAccountValuation>
+        // Convert Vec<DailyAccountValuationDB> to Vec<DailyAccountValuation>
         let history_records: Vec<DailyAccountValuation> = history_dbs
             .into_iter()
             .map(DailyAccountValuation::from)

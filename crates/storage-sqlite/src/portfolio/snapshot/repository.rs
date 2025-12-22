@@ -1,7 +1,3 @@
-use crate::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
-use crate::errors::{Error, Result};
-use crate::portfolio::snapshot::AccountStateSnapshot;
-use crate::portfolio::snapshot::AccountStateSnapshotDB;
 use async_trait::async_trait;
 use chrono::NaiveDate;
 use diesel::prelude::*;
@@ -10,97 +6,16 @@ use diesel::sql_query;
 use diesel::sql_types::Text;
 use diesel::sqlite::Sqlite;
 use diesel::SqliteConnection;
+use log::{debug, warn};
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use super::model::AccountStateSnapshotDB;
 use crate::db::{get_connection, WriteHandle};
-use log::{debug, warn};
-
-#[async_trait]
-pub trait SnapshotRepositoryTrait: Send + Sync {
-    async fn save_snapshots(&self, snapshots: &[AccountStateSnapshot]) -> Result<()>;
-
-    fn get_snapshots_by_account(
-        &self,
-        account_id: &str,
-        start_date: Option<NaiveDate>,
-        end_date: Option<NaiveDate>,
-    ) -> Result<Vec<AccountStateSnapshot>>;
-
-    fn get_latest_snapshot_before_date(
-        &self,
-        account_id: &str,
-        date: NaiveDate,
-    ) -> Result<Option<AccountStateSnapshot>>;
-
-    fn get_latest_snapshots_before_date(
-        &self,
-        account_ids: &[String],
-        date: NaiveDate,
-    ) -> Result<HashMap<String, AccountStateSnapshot>>;
-
-    fn get_all_latest_snapshots(
-        &self,
-        account_ids: &[String],
-    ) -> Result<HashMap<String, AccountStateSnapshot>>;
-
-    async fn delete_snapshots_by_account_ids(&self, account_ids: &[String]) -> Result<usize>;
-
-    async fn delete_snapshots_for_account_and_dates(
-        &self,
-        account_id: &str,
-        dates_to_delete: &[NaiveDate],
-    ) -> Result<()>;
-
-    async fn delete_snapshots_for_account_in_range(
-        &self,
-        account_id: &str,
-        start_date: NaiveDate,
-        end_date: NaiveDate,
-    ) -> Result<()>;
-
-    /// Deletes all snapshots for a specific account within a given date range,
-    /// and then saves the provided new snapshots for that account.
-    /// If `snapshots_to_save` is empty, it effectively only deletes snapshots in the range.
-    async fn overwrite_snapshots_for_account_in_range(
-        &self,
-        account_id: &str,
-        start_date: NaiveDate,
-        end_date: NaiveDate,
-        snapshots_to_save: &[AccountStateSnapshot],
-    ) -> Result<()>;
-
-    /// Iterates through the provided snapshots, groups them by account,
-    /// determines the min/max date range for each account's new snapshots,
-    /// and then calls `overwrite_snapshots_for_account_in_range` for each account.
-    async fn overwrite_multiple_account_snapshot_ranges(
-        &self,
-        new_snapshots: &[AccountStateSnapshot],
-    ) -> Result<()>;
-
-    fn get_total_portfolio_snapshots(
-        &self,
-        start_date: Option<NaiveDate>,
-        end_date: Option<NaiveDate>,
-    ) -> Result<Vec<AccountStateSnapshot>>;
-
-    fn get_all_active_account_snapshots(
-        &self,
-        start_date: Option<NaiveDate>,
-        end_date: Option<NaiveDate>,
-    ) -> Result<Vec<AccountStateSnapshot>>;
-
-    /// Retrieves the date of the earliest snapshot for a given account.
-    fn get_earliest_snapshot_date(&self, account_id: &str) -> Result<Option<NaiveDate>>;
-
-    /// Deletes all existing snapshots for a given account and saves the new ones
-    /// in a single transaction.
-    async fn overwrite_all_snapshots_for_account(
-        &self,
-        account_id: &str,
-        snapshots_to_save: &[AccountStateSnapshot],
-    ) -> Result<()>;
-}
+use crate::errors::StorageError;
+use wealthfolio_core::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
+use wealthfolio_core::errors::{Error, Result};
+use wealthfolio_core::portfolio::snapshot::{AccountStateSnapshot, SnapshotRepositoryTrait};
 
 pub struct SnapshotRepository {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
@@ -136,7 +51,7 @@ impl SnapshotRepository {
             .exec(move |conn| {
                 diesel::replace_into(holdings_snapshots)
                     .values(&db_models)
-                    .execute(conn)?;
+                    .execute(conn).map_err(StorageError::from)?;
                 Ok(())
             })
             .await
@@ -161,7 +76,8 @@ impl SnapshotRepository {
         }
         let result_db = query
             .order(snapshot_date.asc())
-            .load::<AccountStateSnapshotDB>(&mut conn)?;
+            .load::<AccountStateSnapshotDB>(&mut conn)
+            .map_err(StorageError::from)?;
         debug!(
             "Loaded {} snapshots for account {} from DB via SnapshotRepository",
             result_db.len(),
@@ -186,7 +102,8 @@ impl SnapshotRepository {
             .filter(snapshot_date.le(&target_date_str))
             .order(snapshot_date.desc())
             .first::<AccountStateSnapshotDB>(&mut conn)
-            .optional()?;
+            .optional()
+            .map_err(StorageError::from)?;
         Ok(result_db.map(AccountStateSnapshot::from))
     }
 
@@ -236,7 +153,8 @@ impl SnapshotRepository {
         query_builder = query_builder.bind::<Text, _>(target_date_str); // SQLite uses TEXT for dates
 
         let latest_snapshots_db: Vec<AccountStateSnapshotDB> =
-            query_builder.load::<AccountStateSnapshotDB>(&mut conn)?;
+            query_builder.load::<AccountStateSnapshotDB>(&mut conn)
+            .map_err(StorageError::from)?;
 
         let results_map: HashMap<String, AccountStateSnapshot> = latest_snapshots_db
             .into_iter()
@@ -293,7 +211,8 @@ impl SnapshotRepository {
         }
 
         let latest_snapshots_db: Vec<AccountStateSnapshotDB> =
-            query_builder.load::<AccountStateSnapshotDB>(&mut conn)?;
+            query_builder.load::<AccountStateSnapshotDB>(&mut conn)
+            .map_err(StorageError::from)?;
 
         let results_map: HashMap<String, AccountStateSnapshot> = latest_snapshots_db
             .into_iter()
@@ -324,7 +243,7 @@ impl SnapshotRepository {
             .exec(move |conn| {
                 let deleted_count =
                     diesel::delete(holdings_snapshots.filter(account_id.eq_any(final_ids)))
-                        .execute(conn)?;
+                        .execute(conn).map_err(StorageError::from)?;
                 Ok(deleted_count)
             })
             .await
@@ -359,7 +278,7 @@ impl SnapshotRepository {
                         .filter(account_id.eq(account_id_owned))
                         .filter(snapshot_date.eq_any(date_strings)),
                 )
-                .execute(conn)?;
+                .execute(conn).map_err(StorageError::from)?;
                 Ok(())
             })
             .await
@@ -385,7 +304,7 @@ impl SnapshotRepository {
                         .filter(snapshot_date.ge(start_date_str))
                         .filter(snapshot_date.le(end_date_str)),
                 )
-                .execute(conn)?;
+                .execute(conn).map_err(StorageError::from)?;
                 Ok(())
             })
             .await
@@ -509,7 +428,8 @@ impl SnapshotRepository {
         let active_account_ids: Vec<String> = accounts_dsl::accounts
             .filter(accounts_dsl::is_active.eq(true))
             .select(accounts_dsl::id)
-            .load::<String>(&mut conn)?;
+            .load::<String>(&mut conn)
+            .map_err(StorageError::from)?;
         if active_account_ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -525,7 +445,8 @@ impl SnapshotRepository {
         }
         let result_db = query
             .order(snapshot_date.asc())
-            .load::<AccountStateSnapshotDB>(&mut conn)?;
+            .load::<AccountStateSnapshotDB>(&mut conn)
+            .map_err(StorageError::from)?;
         Ok(result_db
             .into_iter()
             .map(AccountStateSnapshot::from)
@@ -541,7 +462,8 @@ impl SnapshotRepository {
             .select(snapshot_date)
             .order(snapshot_date.asc())
             .first::<String>(&mut conn)
-            .optional()?;
+            .optional()
+            .map_err(StorageError::from)?;
 
         match earliest_date_str {
             Some(date_str) => NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
@@ -573,13 +495,13 @@ impl SnapshotRepository {
             .exec(move |conn| {
                 // Delete all for this account
                 diesel::delete(holdings_snapshots.filter(account_id.eq(&account_id_owned)))
-                    .execute(conn)?;
+                    .execute(conn).map_err(StorageError::from)?;
 
                 // Save new ones
                 if !db_models.is_empty() {
                     diesel::replace_into(holdings_snapshots)
                         .values(&db_models)
-                        .execute(conn)?;
+                        .execute(conn).map_err(StorageError::from)?;
                 }
                 Ok(())
             })

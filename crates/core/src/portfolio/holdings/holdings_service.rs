@@ -1,5 +1,4 @@
-use crate::assets::AssetServiceTrait;
-use crate::assets_model::{Asset, Country as AssetCountry, Sector as AssetSector};
+use crate::assets::{Asset, AssetServiceTrait, Country as AssetCountry, Sector as AssetSector};
 use crate::errors::{CalculatorError, Error as CoreError, Result};
 use crate::fx::currency::{get_normalization_rule, normalize_currency_code};
 use crate::portfolio::holdings::holdings_model::{

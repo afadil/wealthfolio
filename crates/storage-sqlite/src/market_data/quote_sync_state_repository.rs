@@ -7,66 +7,12 @@ use log::debug;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::quote_sync_state_model::{QuoteSyncState, QuoteSyncStateDb, QuoteSyncStateUpdate};
+use super::model::{QuoteSyncStateDB, QuoteSyncStateUpdateDB};
 use crate::db::{get_connection, WriteHandle};
-use crate::errors::Result;
+use crate::errors::StorageError;
 use crate::schema::quote_sync_state::dsl as qss_dsl;
-
-/// Trait for quote sync state repository operations
-#[async_trait]
-pub trait QuoteSyncStateRepositoryTrait: Send + Sync {
-    /// Get all sync states
-    fn get_all(&self) -> Result<Vec<QuoteSyncState>>;
-
-    /// Get sync state by symbol
-    fn get_by_symbol(&self, symbol: &str) -> Result<Option<QuoteSyncState>>;
-
-    /// Get sync states for multiple symbols
-    fn get_by_symbols(&self, symbols: &[String]) -> Result<HashMap<String, QuoteSyncState>>;
-
-    /// Get all active symbols (is_active = true)
-    fn get_active_symbols(&self) -> Result<Vec<QuoteSyncState>>;
-
-    /// Get symbols that need syncing (active or recently closed)
-    fn get_symbols_needing_sync(&self, grace_period_days: i64) -> Result<Vec<QuoteSyncState>>;
-
-    /// Upsert a sync state (insert or update)
-    async fn upsert(&self, state: &QuoteSyncState) -> Result<QuoteSyncState>;
-
-    /// Upsert multiple sync states
-    async fn upsert_batch(&self, states: &[QuoteSyncState]) -> Result<usize>;
-
-    /// Update sync state after successful sync
-    async fn update_after_sync(
-        &self,
-        symbol: &str,
-        last_quote_date: NaiveDate,
-        earliest_quote_date: Option<NaiveDate>,
-    ) -> Result<()>;
-
-    /// Update sync state after sync failure
-    async fn update_after_failure(&self, symbol: &str, error: &str) -> Result<()>;
-
-    /// Mark symbol as inactive (position closed)
-    async fn mark_inactive(&self, symbol: &str, closed_date: NaiveDate) -> Result<()>;
-
-    /// Mark symbol as active
-    async fn mark_active(&self, symbol: &str) -> Result<()>;
-
-    /// Update activity dates for a symbol
-    async fn update_activity_dates(
-        &self,
-        symbol: &str,
-        first_date: Option<NaiveDate>,
-        last_date: Option<NaiveDate>,
-    ) -> Result<()>;
-
-    /// Delete sync state for a symbol
-    async fn delete(&self, symbol: &str) -> Result<()>;
-
-    /// Delete all sync states (used for reset)
-    async fn delete_all(&self) -> Result<usize>;
-}
+use wealthfolio_core::market_data::{QuoteSyncState, QuoteSyncStateRepositoryTrait};
+use wealthfolio_core::Result;
 
 pub struct QuoteSyncStateRepository {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
@@ -86,7 +32,8 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
 
         let results = qss_dsl::quote_sync_state
             .order(qss_dsl::sync_priority.desc())
-            .load::<QuoteSyncStateDb>(&mut conn)?;
+            .load::<QuoteSyncStateDB>(&mut conn)
+            .map_err(StorageError::from)?;
 
         Ok(results.into_iter().map(QuoteSyncState::from).collect())
     }
@@ -96,8 +43,9 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
 
         let result = qss_dsl::quote_sync_state
             .filter(qss_dsl::symbol.eq(symbol))
-            .first::<QuoteSyncStateDb>(&mut conn)
-            .optional()?;
+            .first::<QuoteSyncStateDB>(&mut conn)
+            .optional()
+            .map_err(StorageError::from)?;
 
         Ok(result.map(QuoteSyncState::from))
     }
@@ -111,7 +59,8 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
 
         let results = qss_dsl::quote_sync_state
             .filter(qss_dsl::symbol.eq_any(symbols))
-            .load::<QuoteSyncStateDb>(&mut conn)?;
+            .load::<QuoteSyncStateDB>(&mut conn)
+            .map_err(StorageError::from)?;
 
         Ok(results
             .into_iter()
@@ -128,7 +77,8 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
         let results = qss_dsl::quote_sync_state
             .filter(qss_dsl::is_active.eq(1))
             .order(qss_dsl::sync_priority.desc())
-            .load::<QuoteSyncStateDb>(&mut conn)?;
+            .load::<QuoteSyncStateDB>(&mut conn)
+            .map_err(StorageError::from)?;
 
         Ok(results.into_iter().map(QuoteSyncState::from).collect())
     }
@@ -149,23 +99,26 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
                 ),
             )
             .order(qss_dsl::sync_priority.desc())
-            .load::<QuoteSyncStateDb>(&mut conn)?;
+            .load::<QuoteSyncStateDB>(&mut conn)
+            .map_err(StorageError::from)?;
 
         Ok(results.into_iter().map(QuoteSyncState::from).collect())
     }
 
     async fn upsert(&self, state: &QuoteSyncState) -> Result<QuoteSyncState> {
-        let db_state = QuoteSyncStateDb::from(state);
+        let db_state = QuoteSyncStateDB::from(state);
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<QuoteSyncState> {
                 diesel::replace_into(qss_dsl::quote_sync_state)
                     .values(&db_state)
-                    .execute(conn)?;
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
 
                 let result = qss_dsl::quote_sync_state
                     .filter(qss_dsl::symbol.eq(&db_state.symbol))
-                    .first::<QuoteSyncStateDb>(conn)?;
+                    .first::<QuoteSyncStateDB>(conn)
+                    .map_err(StorageError::from)?;
 
                 Ok(QuoteSyncState::from(result))
             })
@@ -177,7 +130,7 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
             return Ok(0);
         }
 
-        let db_states: Vec<QuoteSyncStateDb> = states.iter().map(QuoteSyncStateDb::from).collect();
+        let db_states: Vec<QuoteSyncStateDB> = states.iter().map(QuoteSyncStateDB::from).collect();
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
@@ -185,7 +138,8 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
                 for chunk in db_states.chunks(500) {
                     total += diesel::replace_into(qss_dsl::quote_sync_state)
                         .values(chunk)
-                        .execute(conn)?;
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
                 }
                 Ok(total)
             })
@@ -205,7 +159,7 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
-                let mut update = QuoteSyncStateUpdate {
+                let mut update = QuoteSyncStateUpdateDB {
                     last_synced_at: Some(Some(now.clone())),
                     last_quote_date: Some(Some(last_quote_str)),
                     error_count: Some(0),
@@ -220,7 +174,8 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
 
                 diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::symbol.eq(&symbol_owned)))
                     .set(&update)
-                    .execute(conn)?;
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
 
                 Ok(())
             })
@@ -235,14 +190,15 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
                 // First get current error count
-                let current: Option<QuoteSyncStateDb> = qss_dsl::quote_sync_state
+                let current: Option<QuoteSyncStateDB> = qss_dsl::quote_sync_state
                     .filter(qss_dsl::symbol.eq(&symbol_owned))
                     .first(conn)
-                    .optional()?;
+                    .optional()
+                    .map_err(StorageError::from)?;
 
                 let new_error_count = current.map(|s| s.error_count + 1).unwrap_or(1);
 
-                let update = QuoteSyncStateUpdate {
+                let update = QuoteSyncStateUpdateDB {
                     error_count: Some(new_error_count),
                     last_error: Some(Some(error_owned)),
                     updated_at: Some(now),
@@ -251,7 +207,8 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
 
                 diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::symbol.eq(&symbol_owned)))
                     .set(&update)
-                    .execute(conn)?;
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
 
                 Ok(())
             })
@@ -267,7 +224,7 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
-                let update = QuoteSyncStateUpdate {
+                let update = QuoteSyncStateUpdateDB {
                     is_active: Some(0),
                     position_closed_date: Some(Some(closed_date_str)),
                     sync_priority: Some(50), // RecentlyClosed priority
@@ -277,7 +234,8 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
 
                 diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::symbol.eq(&symbol_owned)))
                     .set(&update)
-                    .execute(conn)?;
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
 
                 Ok(())
             })
@@ -292,7 +250,7 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
-                let update = QuoteSyncStateUpdate {
+                let update = QuoteSyncStateUpdateDB {
                     is_active: Some(1),
                     position_closed_date: Some(None),
                     sync_priority: Some(100), // Active priority
@@ -302,7 +260,8 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
 
                 diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::symbol.eq(&symbol_owned)))
                     .set(&update)
-                    .execute(conn)?;
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
 
                 Ok(())
             })
@@ -321,12 +280,13 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
                 // Get current state
-                let current: Option<QuoteSyncStateDb> = qss_dsl::quote_sync_state
+                let current: Option<QuoteSyncStateDB> = qss_dsl::quote_sync_state
                     .filter(qss_dsl::symbol.eq(&symbol_owned))
                     .first(conn)
-                    .optional()?;
+                    .optional()
+                    .map_err(StorageError::from)?;
 
-                let mut update = QuoteSyncStateUpdate {
+                let mut update = QuoteSyncStateUpdateDB {
                     updated_at: Some(now),
                     ..Default::default()
                 };
@@ -361,7 +321,8 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
 
                 diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::symbol.eq(&symbol_owned)))
                     .set(&update)
-                    .execute(conn)?;
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
 
                 Ok(())
             })
@@ -374,7 +335,8 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
                 diesel::delete(qss_dsl::quote_sync_state.filter(qss_dsl::symbol.eq(&symbol_owned)))
-                    .execute(conn)?;
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
                 Ok(())
             })
             .await
@@ -383,7 +345,9 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
     async fn delete_all(&self) -> Result<usize> {
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
-                let count = diesel::delete(qss_dsl::quote_sync_state).execute(conn)?;
+                let count = diesel::delete(qss_dsl::quote_sync_state)
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
                 Ok(count)
             })
             .await

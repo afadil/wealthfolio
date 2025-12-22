@@ -1,51 +1,45 @@
 [package]
-name = "wealthfolio_core"
-version = "2.1.0"
+name = "wealthfolio-core"
+version.workspace = true
+edition.workspace = true
 description = "An Open Source Desktop Portfolio tracker"
 authors = ["Aziz Fadil"]
 license = "AGPL-3.0"
 repository = "https://github.com/afadil/wealthfolio"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-
 
 [features]
 default = []
 
 [dependencies]
-anyhow = "1"
-log = "0.4"
-uuid = { version = "1.10", features = ["v4", "serde"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-futures = "0.3"
-chrono = { version = "0.4", features = ["serde"] }
-reqwest = { version = "0.12", features = ["json", "cookies" ] }
+# Workspace dependencies
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+diesel = { workspace = true }
+diesel_migrations = { workspace = true }
+rusqlite = { workspace = true }
+r2d2 = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+uuid = { workspace = true }
+rust_decimal = { workspace = true }
+rust_decimal_macros = { workspace = true }
+num-traits = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+log = { workspace = true }
+reqwest = { workspace = true, features = ["cookies"] }
+
+# Additional dependencies not in workspace
 yahoo_finance_api = "4.1"
 regex = "1.10"
 lazy_static = "1.5"
-thiserror = "1.0"
 dashmap = "6.1"
-async-trait = "0.1"
-rust_decimal = { version = "1.39", features = ["maths","serde-float"] }
-num-traits = "0.2"
-rust_decimal_macros = "1.39"
 serde_with = "3"
 urlencoding = "2"
 csv = "1.4.0"
 zip = "2.2.0"
-
-# SQLite / Diesel
-rusqlite = { version = "0.34", features = ["bundled"] }
-diesel = { version = "2.2", features = ["sqlite", "chrono", "r2d2", "numeric", "returning_clauses_for_sqlite_3_35"] }
-diesel_migrations = { version = "2.2", features = ["sqlite"] }
-r2d2 = "0.8"
-
-# Runtime
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync"] }
-
 
 [dev-dependencies]
 tempfile = "3"

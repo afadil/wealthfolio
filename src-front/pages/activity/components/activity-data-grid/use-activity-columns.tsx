@@ -1,20 +1,13 @@
 import { searchTicker } from "@/commands/market-data";
 import { ActivityType, ActivityTypeNames } from "@/lib/constants";
 import type { Account, ActivityDetails } from "@/lib/types";
-import { formatDateTimeLocal } from "@/lib/utils";
 import type { ColumnDef } from "@tanstack/react-table";
-import {
-  Checkbox,
-  type SymbolSearchResult,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@wealthfolio/ui";
+import { Checkbox, type SymbolSearchResult } from "@wealthfolio/ui";
 import { useCallback, useMemo } from "react";
 import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";
-import type { LocalTransaction } from "./types";
+import { StatusHeaderIndicator, StatusIndicator } from "./status-indicator";
+import { isPendingReview, type LocalTransaction } from "./types";
 
 interface UseActivityColumnsOptions {
   accounts: Account[];
@@ -93,19 +86,12 @@ export function useActivityColumns({
       },
       {
         id: "status",
-        header: () => (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="text-destructive w-full cursor-help text-center">●</div>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p>Newly imported &</p>
-                <p>Pending verification</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        ),
+        header: ({ table }) => {
+          const hasRowsToReview = table
+            .getRowModel()
+            .rows.some((row) => isPendingReview(row.original));
+          return <StatusHeaderIndicator hasRowsToReview={hasRowsToReview} />;
+        },
         size: 32,
         minSize: 32,
         maxSize: 32,
@@ -113,41 +99,29 @@ export function useActivityColumns({
         enableSorting: false,
         enableHiding: false,
         enablePinning: false,
-        cell: ({ row }) => {
-          const isDraft = row.original.isDraft;
-          const isNew = row.original.isNew;
-
-          // Show indicator for synced activities that need review (isDraft=true and not a locally created new row)
-          const needsReview = isDraft === true && isNew !== true;
-
-          if (!needsReview) {
-            return null;
-          }
-
-          return (
-            <div className="flex h-full w-full items-center justify-center">
-              <div className="text-destructive w-full cursor-help text-center">●</div>
-            </div>
-          );
-        },
+        cell: ({ row }) => <StatusIndicator transaction={row.original} />,
       },
       {
         accessorKey: "activityType",
         header: "Type",
         size: 150,
         enablePinning: false,
-        cell: ({ row }) => {
-          const type = row.original.activityType;
-          return <ActivityTypeBadge type={type} className="text-xs font-normal" />;
+        meta: {
+          cell: {
+            variant: "select",
+            options: activityTypeOptions,
+            valueRenderer: (value: string) => (
+              <ActivityTypeBadge type={value as ActivityType} className="text-xs font-normal" />
+            ),
+          },
         },
-        meta: { cell: { variant: "select", options: activityTypeOptions } },
       },
       {
         id: "date",
+        accessorKey: "date",
         header: "Date & Time",
         size: 180,
-        accessorFn: (row) => formatDateTimeLocal(row.date),
-        meta: { cell: { variant: "short-text" } },
+        meta: { cell: { variant: "datetime" } },
       },
       {
         accessorKey: "assetSymbol",

@@ -5,12 +5,13 @@ use diesel::sqlite::SqliteConnection;
 use std::sync::Arc;
 
 use crate::db::{get_connection, WriteHandle};
-use crate::errors::Result;
+use crate::errors::StorageError;
 use crate::schema::accounts;
 use crate::schema::accounts::dsl::*;
 
-use super::accounts_model::{Account, AccountDB, AccountUpdate, NewAccount};
-use super::accounts_traits::AccountRepositoryTrait;
+use super::model::AccountDB;
+use wealthfolio_core::accounts::{Account, AccountRepositoryTrait, AccountUpdate, NewAccount};
+use wealthfolio_core::errors::Result;
 
 /// Repository for managing account data in the database
 pub struct AccountRepository {
@@ -31,22 +32,22 @@ impl AccountRepository {
 // Implement the trait
 #[async_trait]
 impl AccountRepositoryTrait for AccountRepository {
-    /// Creates a new account within a given database transaction
-    fn create_in_transaction(
-        &self,
-        new_account: NewAccount,
-        conn: &mut SqliteConnection,
-    ) -> Result<Account> {
+    /// Creates a new account
+    async fn create(&self, new_account: NewAccount) -> Result<Account> {
         new_account.validate()?;
 
-        let mut account_db: AccountDB = new_account.into();
-        account_db.id = uuid::Uuid::new_v4().to_string();
+        self.writer
+            .exec(move |conn| {
+                let mut account_db: AccountDB = new_account.into();
+                account_db.id = uuid::Uuid::new_v4().to_string();
 
-        diesel::insert_into(accounts::table)
-            .values(&account_db)
-            .execute(conn)?;
+                diesel::insert_into(accounts::table)
+                    .values(&account_db)
+                    .execute(conn).map_err(StorageError::from)?;
 
-        Ok(account_db.into())
+                Ok(account_db.into())
+            })
+            .await
     }
 
     async fn update(&self, account_update: AccountUpdate) -> Result<Account> {
@@ -59,7 +60,8 @@ impl AccountRepositoryTrait for AccountRepository {
                 let existing = accounts
                     .select(AccountDB::as_select())
                     .find(&account_db.id)
-                    .first::<AccountDB>(conn)?;
+                    .first::<AccountDB>(conn)
+                    .map_err(StorageError::from)?;
 
                 account_db.currency = existing.currency;
                 account_db.created_at = existing.created_at;
@@ -67,7 +69,7 @@ impl AccountRepositoryTrait for AccountRepository {
 
                 diesel::update(accounts.find(&account_db.id))
                     .set(&account_db)
-                    .execute(conn)?;
+                    .execute(conn).map_err(StorageError::from)?;
 
                 Ok(account_db.into())
             })
@@ -81,7 +83,8 @@ impl AccountRepositoryTrait for AccountRepository {
         let account = accounts
             .select(AccountDB::as_select())
             .find(account_id)
-            .first::<AccountDB>(&mut conn)?;
+            .first::<AccountDB>(&mut conn)
+            .map_err(StorageError::from)?;
 
         Ok(account.into())
     }
@@ -107,7 +110,8 @@ impl AccountRepositoryTrait for AccountRepository {
         let results = query
             .select(AccountDB::as_select())
             .order((is_active.desc(), name.asc()))
-            .load::<AccountDB>(&mut conn)?;
+            .load::<AccountDB>(&mut conn)
+            .map_err(StorageError::from)?;
 
         let accounts_list: Vec<Account> = results.into_iter().map(Account::from).collect();
         Ok(accounts_list)
@@ -119,7 +123,7 @@ impl AccountRepositoryTrait for AccountRepository {
         self.writer
             .exec(move |conn| {
                 let affected_rows =
-                    diesel::delete(accounts.find(id_to_delete_owned)).execute(conn)?;
+                    diesel::delete(accounts.find(id_to_delete_owned)).execute(conn).map_err(StorageError::from)?;
                 Ok(affected_rows)
             })
             .await

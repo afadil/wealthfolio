@@ -1,22 +1,9 @@
-use crate::accounts::Account;
-use diesel::prelude::*;
-use diesel::Queryable;
-use diesel::Selectable;
+//! Goals domain models.
+
 use serde::{Deserialize, Serialize};
 
-#[derive(
-    Queryable,
-    Identifiable,
-    AsChangeset,
-    Selectable,
-    PartialEq,
-    Serialize,
-    Deserialize,
-    Debug,
-    Clone,
-)]
-#[diesel(table_name = crate::schema::goals)]
-#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+/// Domain model representing a goal
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Goal {
     pub id: String,
@@ -26,8 +13,8 @@ pub struct Goal {
     pub is_achieved: bool,
 }
 
-#[derive(Insertable, Serialize, Deserialize, Debug, Clone)]
-#[diesel(table_name = crate::schema::goals)]
+/// Input model for creating a new goal
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NewGoal {
     pub id: Option<String>,
@@ -37,23 +24,8 @@ pub struct NewGoal {
     pub is_achieved: bool,
 }
 
-#[derive(
-    Insertable,
-    Queryable,
-    Identifiable,
-    Associations,
-    AsChangeset,
-    Selectable,
-    PartialEq,
-    Serialize,
-    Deserialize,
-    Debug,
-    Clone,
-)]
-#[diesel(belongs_to(Goal))]
-#[diesel(belongs_to(Account))]
-#[diesel(table_name = crate::schema::goals_allocation)]
-#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+/// Domain model for goal-account allocation
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct GoalsAllocation {
     pub id: String,

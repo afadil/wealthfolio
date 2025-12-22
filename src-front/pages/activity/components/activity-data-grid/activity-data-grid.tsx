@@ -1,24 +1,24 @@
 import { toast } from "@/components/ui/use-toast";
 import { useSettingsContext } from "@/lib/settings-provider";
-import type { Account, ActivityBulkMutationRequest, ActivityDetails } from "@/lib/types";
+import type { Account, ActivityDetails } from "@/lib/types";
 import { useAssets } from "@/pages/asset/hooks/use-assets";
 import type { SortingState, Updater } from "@tanstack/react-table";
 import { DataGrid, useDataGrid } from "@wealthfolio/ui";
 import { useCallback, useMemo } from "react";
-import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import { ActivityDataGridPagination } from "./activity-data-grid-pagination";
 import { ActivityDataGridToolbar } from "./activity-data-grid-toolbar";
 import {
   applyTransactionUpdate,
-  buildSavePayload,
   createCurrencyResolver,
   createDraftTransaction,
+  PINNED_COLUMNS,
   TRACKED_FIELDS,
   valuesAreEqual,
 } from "./activity-utils";
-import type { LocalTransaction } from "./types";
+import { isPendingReview, toLocalTransaction, type LocalTransaction } from "./types";
 import { useActivityColumns } from "./use-activity-columns";
 import { generateTempActivityId, useActivityGridState } from "./use-activity-grid-state";
+import { useSaveActivities } from "./use-save-activities";
 
 interface ActivityDataGridProps {
   accounts: Account[];
@@ -69,7 +69,6 @@ export function ActivityDataGrid({
     resetChangeState,
   } = useActivityGridState({ activities });
 
-  const { saveActivitiesMutation } = useActivityMutations();
   const { assets } = useAssets();
   const { settings } = useSettingsContext();
 
@@ -99,22 +98,13 @@ export function ActivityDataGrid({
     [assetCurrencyLookup, fallbackCurrency],
   );
 
-  // Currency lookup for dirty transactions
+  // Currency lookup for dirty transactions (single pass)
   const dirtyCurrencyLookup = useMemo(() => {
-    const idsToResolve = new Set<string>();
-    localTransactions.forEach((transaction) => {
-      if (dirtyTransactionIds.has(transaction.id) || transaction.isNew) {
-        idsToResolve.add(transaction.id);
-      }
-    });
-
-    if (idsToResolve.size === 0) {
-      return new Map<string, string>();
-    }
-
     const lookup = new Map<string, string>();
-    localTransactions.forEach((transaction) => {
-      if (!idsToResolve.has(transaction.id)) return;
+    for (const transaction of localTransactions) {
+      const isDirtyOrNew = dirtyTransactionIds.has(transaction.id) || transaction.isNew;
+      if (!isDirtyOrNew) continue;
+
       const resolved =
         transaction.currency ??
         resolveTransactionCurrency(transaction) ??
@@ -123,7 +113,7 @@ export function ActivityDataGrid({
       if (resolved) {
         lookup.set(transaction.id, resolved);
       }
-    });
+    }
     return lookup;
   }, [dirtyTransactionIds, fallbackCurrency, localTransactions, resolveTransactionCurrency]);
 
@@ -131,7 +121,7 @@ export function ActivityDataGrid({
   const handleDuplicate = useCallback(
     (activity: ActivityDetails) => {
       const now = new Date();
-      const source = activity as LocalTransaction;
+      const source = toLocalTransaction(activity);
       const duplicated: LocalTransaction = {
         ...source,
         id: generateTempActivityId(),
@@ -148,7 +138,7 @@ export function ActivityDataGrid({
 
   const handleDelete = useCallback(
     (activity: ActivityDetails) => {
-      const source = activity as LocalTransaction;
+      const source = toLocalTransaction(activity);
       markForDeletion(activity.id, !!source.isNew);
     },
     [markForDeletion],
@@ -266,16 +256,16 @@ export function ActivityDataGrid({
     onSortingChange,
     initialState: {
       sorting,
-      columnPinning: { left: ["select", "status", "activityType"], right: ["actions"] },
+      columnPinning: { left: [...PINNED_COLUMNS.left], right: [...PINNED_COLUMNS.right] },
     },
   });
 
   const selectedRows = dataGrid.table.getSelectedRowModel().rows;
   const selectedRowCount = selectedRows.length;
 
-  // Count selected rows that are pending (isDraft=true and not new)
+  // Count selected rows that are pending review (isDraft=true and not new)
   const selectedPendingCount = useMemo(
-    () => selectedRows.filter((row) => row.original.isDraft && !row.original.isNew).length,
+    () => selectedRows.filter((row) => isPendingReview(row.original)).length,
     [selectedRows],
   );
 
@@ -293,7 +283,7 @@ export function ActivityDataGrid({
   const approveSelectedRows = useCallback(() => {
     const selected = dataGrid.table.getSelectedRowModel().rows;
     const pendingToApprove = selected
-      .filter((row) => row.original.isDraft && !row.original.isNew)
+      .filter((row) => isPendingReview(row.original))
       .map((row) => row.original);
 
     if (pendingToApprove.length === 0) return;
@@ -310,83 +300,30 @@ export function ActivityDataGrid({
     );
 
     // Mark them as dirty so they will be saved
-    markDirtyBatch(pendingToApprove.map((t) => t.id));
+    markDirtyBatch(pendingToApprove.map((transaction) => transaction.id));
     dataGrid.table.resetRowSelection();
   }, [dataGrid.table, markDirtyBatch, setLocalTransactions]);
+
+  // Save activities hook with validation and error handling
+  const { saveActivities, isSaving } = useSaveActivities({
+    localTransactions,
+    dirtyTransactionIds,
+    pendingDeleteIds,
+    resolveTransactionCurrency,
+    dirtyCurrencyLookup,
+    assetCurrencyLookup,
+    fallbackCurrency,
+    setLocalTransactions,
+    resetChangeState,
+    resetRowSelection: () => dataGrid.table.resetRowSelection(),
+    onRefetch,
+  });
 
   // Save changes handler
   const handleSaveChanges = useCallback(async () => {
     if (!hasUnsavedChanges) return;
-
-    const payload = buildSavePayload(
-      localTransactions,
-      dirtyTransactionIds,
-      pendingDeleteIds,
-      resolveTransactionCurrency,
-      dirtyCurrencyLookup,
-      assetCurrencyLookup,
-      fallbackCurrency,
-    );
-
-    const request: ActivityBulkMutationRequest = {
-      creates: payload.creates,
-      updates: payload.updates,
-      deleteIds: payload.deleteIds,
-    };
-
-    try {
-      const result = await saveActivitiesMutation.mutateAsync(request);
-
-      // Map temporary IDs to persisted IDs
-      const createdMappings = new Map(
-        (result.createdMappings ?? [])
-          .filter((mapping) => mapping.tempId && mapping.activityId)
-          .map((mapping) => [mapping.tempId!, mapping.activityId]),
-      );
-
-      // Update local state with persisted IDs
-      setLocalTransactions((prev) =>
-        prev
-          .filter((transaction) => !pendingDeleteIds.has(transaction.id))
-          .map((transaction) => {
-            if (transaction.isNew) {
-              const mappedId = createdMappings.get(transaction.id);
-              if (mappedId) {
-                return { ...transaction, id: mappedId, isNew: false };
-              }
-            }
-            return transaction;
-          }),
-      );
-
-      resetChangeState();
-      dataGrid.table.resetRowSelection();
-
-      toast({
-        title: "Activities saved",
-        description: "Your pending changes are now saved.",
-        variant: "success",
-      });
-
-      await onRefetch();
-    } catch {
-      // Error handling is done by the mutation hook
-    }
-  }, [
-    assetCurrencyLookup,
-    dataGrid.table,
-    dirtyCurrencyLookup,
-    dirtyTransactionIds,
-    fallbackCurrency,
-    hasUnsavedChanges,
-    localTransactions,
-    onRefetch,
-    pendingDeleteIds,
-    resetChangeState,
-    resolveTransactionCurrency,
-    saveActivitiesMutation,
-    setLocalTransactions,
-  ]);
+    await saveActivities();
+  }, [hasUnsavedChanges, saveActivities]);
 
   // Cancel changes handler
   const handleCancelChanges = useCallback(() => {
@@ -408,7 +345,7 @@ export function ActivityDataGrid({
         selectedPendingCount={selectedPendingCount}
         hasUnsavedChanges={hasUnsavedChanges}
         changesSummary={changesSummary}
-        isSaving={saveActivitiesMutation.isPending}
+        isSaving={isSaving}
         onAddRow={() => dataGrid.onRowAdd?.()}
         onDeleteSelected={deleteSelectedRows}
         onApproveSelected={approveSelectedRows}

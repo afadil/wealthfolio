@@ -1,4 +1,4 @@
-use crate::activities::activities_model::IncomeData;
+use crate::activities::IncomeData;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

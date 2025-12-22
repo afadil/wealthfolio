@@ -1,16 +1,16 @@
 import { Icons } from "@/components/ui/icons";
-import { useWealthfolioSync } from "@/context/wealthfolio-sync-context";
+import { useWealthfolioConnect } from "@/context/wealthfolio-connect-context";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 /**
  * Auth callback page that handles OAuth and magic link redirects.
- * Waits for the WealthfolioSyncContext to process the auth tokens,
- * then redirects to the sync settings page.
+ * Waits for the WealthfolioConnectContext to process the auth tokens,
+ * then redirects to the connect settings page.
  */
 export default function AuthCallbackPage() {
   const navigate = useNavigate();
-  const { isConnected, isLoading, error } = useWealthfolioSync();
+  const { isConnected, isLoading, error } = useWealthfolioConnect();
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
 
   useEffect(() => {

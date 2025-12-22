@@ -1,25 +1,14 @@
-use crate::db::{get_connection, DbPool, WriteHandle};
-use crate::errors::{Error, Result};
-use crate::schema::app_settings::dsl::*;
-use crate::schema::{accounts, assets};
-use crate::settings::{AppSetting, Settings, SettingsUpdate};
 use async_trait::async_trait;
 use diesel::prelude::*;
 use std::sync::Arc;
 
-// Define the trait for SettingsRepository
-#[async_trait]
-pub trait SettingsRepositoryTrait: Send + Sync {
-    fn get_settings(&self) -> Result<Settings>;
-    async fn update_settings(&self, new_settings: &SettingsUpdate) -> Result<()>;
-    fn get_setting(&self, setting_key_param: &str) -> Result<String>;
-    async fn update_setting(
-        &self,
-        setting_key_param: &str,
-        setting_value_param: &str,
-    ) -> Result<()>;
-    fn get_distinct_currencies_excluding_base(&self, base_currency: &str) -> Result<Vec<String>>;
-}
+use super::model::AppSettingDB;
+use crate::db::{get_connection, DbPool, WriteHandle};
+use crate::errors::StorageError;
+use crate::schema::app_settings::dsl::*;
+use crate::schema::{accounts, assets};
+use wealthfolio_core::errors::Result;
+use wealthfolio_core::settings::{Settings, SettingsRepositoryTrait, SettingsUpdate};
 
 pub struct SettingsRepository {
     pool: Arc<DbPool>,
@@ -40,7 +29,7 @@ impl SettingsRepositoryTrait for SettingsRepository {
         let all_settings: Vec<(String, String)> = app_settings
             .select((setting_key, setting_value))
             .load::<(String, String)>(&mut conn)
-            .map_err(Error::from)?;
+            .map_err(StorageError::from)?;
 
         let mut settings = Settings::default(); // Use default implementation
 
@@ -75,65 +64,72 @@ impl SettingsRepositoryTrait for SettingsRepository {
             .exec(move |conn| {
                 if let Some(ref theme) = settings.theme {
                     diesel::replace_into(app_settings)
-                        .values(&AppSetting {
+                        .values(&AppSettingDB {
                             setting_key: "theme".to_string(),
                             setting_value: theme.clone(),
                         })
-                        .execute(conn)?;
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
                 }
 
                 if let Some(ref font) = settings.font {
                     diesel::replace_into(app_settings)
-                        .values(&AppSetting {
+                        .values(&AppSettingDB {
                             setting_key: "font".to_string(),
                             setting_value: font.clone(),
                         })
-                        .execute(conn)?;
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
                 }
 
                 if let Some(ref base_currency) = settings.base_currency {
                     diesel::replace_into(app_settings)
-                        .values(&AppSetting {
+                        .values(&AppSettingDB {
                             setting_key: "base_currency".to_string(),
                             setting_value: base_currency.clone(),
                         })
-                        .execute(conn)?;
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
                 }
 
                 if let Some(onboarding_completed) = settings.onboarding_completed {
                     diesel::replace_into(app_settings)
-                        .values(&AppSetting {
+                        .values(&AppSettingDB {
                             setting_key: "onboarding_completed".to_string(),
                             setting_value: onboarding_completed.to_string(),
                         })
-                        .execute(conn)?;
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
                 }
 
                 if let Some(auto_update_check_enabled) = settings.auto_update_check_enabled {
                     diesel::replace_into(app_settings)
-                        .values(&AppSetting {
+                        .values(&AppSettingDB {
                             setting_key: "auto_update_check_enabled".to_string(),
                             setting_value: auto_update_check_enabled.to_string(),
                         })
-                        .execute(conn)?;
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
                 }
 
                 if let Some(menu_bar_visible) = settings.menu_bar_visible {
                     diesel::replace_into(app_settings)
-                        .values(&AppSetting {
+                        .values(&AppSettingDB {
                             setting_key: "menu_bar_visible".to_string(),
                             setting_value: menu_bar_visible.to_string(),
                         })
-                        .execute(conn)?;
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
                 }
 
                 if let Some(sync_enabled) = settings.sync_enabled {
                     diesel::replace_into(app_settings)
-                        .values(&AppSetting {
+                        .values(&AppSettingDB {
                             setting_key: "sync_enabled".to_string(),
                             setting_value: sync_enabled.to_string(),
                         })
-                        .execute(conn)?;
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
                 }
 
                 Ok(())
@@ -159,11 +155,11 @@ impl SettingsRepositoryTrait for SettingsRepository {
                     "auto_update_check_enabled" => "true",
                     "menu_bar_visible" => "true",
                     "sync_enabled" => "true",
-                    _ => return Err(Error::from(diesel::result::Error::NotFound)),
+                    _ => return Err(StorageError::from(diesel::result::Error::NotFound).into()),
                 };
                 Ok(default_value.to_string())
             }
-            Err(e) => Err(Error::from(e)),
+            Err(e) => Err(StorageError::from(e).into()),
         }
     }
 
@@ -178,11 +174,12 @@ impl SettingsRepositoryTrait for SettingsRepository {
         self.writer
             .exec(move |conn| {
                 diesel::replace_into(app_settings)
-                    .values(AppSetting {
+                    .values(AppSettingDB {
                         setting_key: key.clone(),     // Ensure key is cloned if used after move
                         setting_value: value.clone(), // Ensure value is cloned if used after move
                     })
-                    .execute(conn)?;
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
                 Ok(())
             })
             .await
@@ -197,14 +194,14 @@ impl SettingsRepositoryTrait for SettingsRepository {
             .select(assets::currency)
             .distinct()
             .load::<String>(&mut conn)
-            .map_err(Error::from)?;
+            .map_err(StorageError::from)?;
 
         let account_currencies: Vec<String> = accounts::table
             .filter(accounts::currency.ne(base_currency))
             .select(accounts::currency)
             .distinct()
             .load::<String>(&mut conn)
-            .map_err(Error::from)?;
+            .map_err(StorageError::from)?;
 
         let mut all_currencies: Vec<String> = Vec::new();
         all_currencies.extend(currency_assets);

@@ -1,6 +1,6 @@
-use super::settings_repository::SettingsRepositoryTrait;
+use super::SettingsRepositoryTrait;
 use crate::errors::{DatabaseError, Error, Result};
-use crate::fx::fx_traits::FxServiceTrait;
+use crate::fx::FxServiceTrait;
 use crate::settings::{Settings, SettingsUpdate};
 use async_trait::async_trait;
 use log::{debug, error};
@@ -53,9 +53,7 @@ impl SettingsServiceTrait for SettingsService {
     fn get_base_currency(&self) -> Result<Option<String>> {
         match self.settings_repository.get_setting("base_currency") {
             Ok(value) => Ok(Some(value)),
-            Err(Error::Database(DatabaseError::QueryFailed(diesel::result::Error::NotFound))) => {
-                Ok(None)
-            }
+            Err(Error::Database(DatabaseError::NotFound(_))) => Ok(None),
             Err(e) => Err(e),
         }
     }
@@ -96,9 +94,7 @@ impl SettingsServiceTrait for SettingsService {
             .get_setting("auto_update_check_enabled")
         {
             Ok(value) => Ok(value.parse().unwrap_or(true)),
-            Err(Error::Database(DatabaseError::QueryFailed(diesel::result::Error::NotFound))) => {
-                Ok(true)
-            }
+            Err(Error::Database(DatabaseError::NotFound(_))) => Ok(true),
             Err(e) => Err(e),
         }
     }
@@ -106,9 +102,7 @@ impl SettingsServiceTrait for SettingsService {
     fn is_sync_enabled(&self) -> Result<bool> {
         match self.settings_repository.get_setting("sync_enabled") {
             Ok(value) => Ok(value.parse().unwrap_or(false)),
-            Err(Error::Database(DatabaseError::QueryFailed(diesel::result::Error::NotFound))) => {
-                Ok(false)
-            }
+            Err(Error::Database(DatabaseError::NotFound(_))) => Ok(false),
             Err(e) => Err(e),
         }
     }

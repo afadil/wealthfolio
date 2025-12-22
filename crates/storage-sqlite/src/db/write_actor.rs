@@ -1,10 +1,13 @@
-use crate::db::{DbPool, Result};
+use super::DbPool;
+use crate::errors::StorageError;
 use diesel::SqliteConnection;
+use wealthfolio_core::errors::Result;
 use std::any::Any;
 use tokio::sync::{mpsc, oneshot};
 
 // Type alias for the job to be executed by the writer actor.
 // It takes a mutable reference to a SqliteConnection and returns a Result.
+// We use core::Result here since that's what callers expect.
 type Job<T> = Box<dyn FnOnce(&mut SqliteConnection) -> Result<T> + Send + 'static>;
 
 /// Handle for sending jobs to the writer actor.
@@ -85,8 +88,14 @@ pub fn spawn_writer(pool: DbPool) -> WriteHandle {
         // Loop to receive and process jobs.
         while let Some((job, reply_tx)) = rx.recv().await {
             // Execute the job within an immediate database transaction.
-            // This ensures atomicity for each job.
-            let result = conn.immediate_transaction(|c| job(c));
+            // We wrap the job to return StorageError which implements From<diesel::result::Error>.
+            // Then convert back to core::Error at the boundary.
+            let result: Result<Box<dyn Any + Send + 'static>> = conn
+                .immediate_transaction::<_, StorageError, _>(|c| {
+                    // Call the job and convert its error to StorageError if needed
+                    job(c).map_err(StorageError::from)
+                })
+                .map_err(|e: StorageError| e.into());
 
             // Send the result back to the requester.
             // Ignore error if the receiver has dropped (e.g., request timed out or was cancelled).

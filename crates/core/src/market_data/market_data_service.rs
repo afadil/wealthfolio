@@ -16,11 +16,10 @@ use super::market_data_model::{
 use super::market_data_traits::{MarketDataRepositoryTrait, MarketDataServiceTrait};
 use super::providers::models::AssetProfile;
 use super::quote_sync_state_model::{QuoteSyncState, SyncCategory, SymbolSyncPlan};
-use super::quote_sync_state_repository::QuoteSyncStateRepositoryTrait;
+use super::QuoteSyncStateRepositoryTrait;
 use crate::accounts::AccountRepositoryTrait;
 use crate::activities::ActivityRepositoryTrait;
-use crate::assets::assets_constants::CASH_ASSET_TYPE;
-use crate::assets::assets_traits::AssetRepositoryTrait;
+use crate::assets::{AssetRepositoryTrait, CASH_ASSET_TYPE, FOREX_ASSET_TYPE};
 use crate::errors::Result;
 use crate::market_data::providers::ProviderRegistry;
 use crate::portfolio::snapshot::SnapshotRepositoryTrait;
@@ -1251,7 +1250,7 @@ impl MarketDataService {
             .collect();
 
         let sync_plan =
-            self.calculate_sync_plan_legacy(refetch_all, &symbols_with_currencies, end_date)?;
+            self.calculate_sync_plan_for_symbols(refetch_all, &symbols_with_currencies, end_date)?;
 
         if sync_plan.is_empty() {
             debug!("All tracked symbols are already up to date; nothing to fetch from providers.");
@@ -1458,7 +1457,7 @@ impl MarketDataService {
         Ok(((), failed_syncs))
     }
 
-    fn calculate_sync_plan_legacy(
+    fn calculate_sync_plan_for_symbols(
         &self,
         refetch_all: bool,
         symbols_with_currencies: &[(String, String)],
@@ -1472,36 +1471,49 @@ impl MarketDataService {
         let default_history_days = DEFAULT_HISTORY_DAYS;
         let default_start_date = end_date - Duration::days(default_history_days);
 
-        if refetch_all {
-            let default_start_time: SystemTime = Utc
-                .from_utc_datetime(&default_start_date.and_hms_opt(0, 0, 0).unwrap())
-                .into();
-
-            let plan = symbols_with_currencies
-                .iter()
-                .map(|(symbol, currency)| SymbolSyncPlanItem {
-                    symbol: symbol.clone(),
-                    currency: currency.clone(),
-                    start: default_start_time,
-                })
-                .collect();
-            return Ok(plan);
-        }
-
-        let symbols_for_latest: Vec<String> = symbols_with_currencies
+        // Get sync states to determine start dates based on first_activity_date
+        let symbols_list: Vec<String> = symbols_with_currencies
             .iter()
             .map(|(sym, _)| sym.clone())
             .collect();
 
+        let sync_states = self
+            .sync_state_repository
+            .get_by_symbols(&symbols_list)
+            .unwrap_or_default();
+
+        if refetch_all {
+            // For refetch_all, use first_activity_date - buffer, or fall back to default
+            let mut plan = Vec::new();
+            for (symbol, currency) in symbols_with_currencies {
+                let start_date = sync_states
+                    .get(symbol)
+                    .and_then(|state| state.first_activity_date)
+                    .map(|d| d - Duration::days(QUOTE_HISTORY_BUFFER_DAYS))
+                    .unwrap_or(default_start_date);
+
+                let start_time: SystemTime = Utc
+                    .from_utc_datetime(&start_date.and_hms_opt(0, 0, 0).unwrap())
+                    .into();
+
+                plan.push(SymbolSyncPlanItem {
+                    symbol: symbol.clone(),
+                    currency: currency.clone(),
+                    start: start_time,
+                });
+            }
+            return Ok(plan);
+        }
+
         let quotes_map = match self
             .repository
-            .get_latest_quotes_for_symbols(&symbols_for_latest)
+            .get_latest_quotes_for_symbols(&symbols_list)
         {
             Ok(map) => map,
             Err(e) => {
                 error!(
                     "Failed to get latest quotes for symbols {:?}: {}. Falling back to default history window.",
-                    symbols_for_latest, e
+                    symbols_list, e
                 );
                 HashMap::new()
             }
@@ -1521,7 +1533,14 @@ impl MarketDataService {
                         last_date.succ_opt().unwrap_or(last_date)
                     }
                 }
-                None => default_start_date,
+                None => {
+                    // No quotes yet - use first_activity_date - buffer, or fall back to default
+                    sync_states
+                        .get(symbol)
+                        .and_then(|state| state.first_activity_date)
+                        .map(|d| d - Duration::days(QUOTE_HISTORY_BUFFER_DAYS))
+                        .unwrap_or(default_start_date)
+                }
             };
 
             if start_date > end_date {
@@ -1743,18 +1762,31 @@ impl MarketDataService {
         // 4. Get quote date ranges
         let quote_ranges = self.get_quote_date_ranges()?;
 
-        // 5. Get asset data sources
+        // 5. Get asset data sources and collect FOREX assets
         let assets = self.asset_repository.list()?;
         let asset_data_sources: HashMap<String, String> = assets
             .iter()
             .map(|a| (a.symbol.clone(), a.data_source.clone()))
             .collect();
 
+        // Collect FOREX assets that need syncing (non-manual data source)
+        let forex_symbols: HashSet<String> = assets
+            .iter()
+            .filter(|a| {
+                a.asset_type.as_deref() == Some(FOREX_ASSET_TYPE)
+                    && a.data_source != DATA_SOURCE_MANUAL
+            })
+            .map(|a| a.symbol.clone())
+            .collect();
+        debug!("Found {} FOREX symbols to sync", forex_symbols.len());
+
         // 6. Combine all symbols
         let mut all_symbols: HashSet<String> = HashSet::new();
         all_symbols.extend(active_symbols.iter().cloned());
         all_symbols.extend(activity_dates.keys().cloned());
         all_symbols.extend(existing_map.keys().cloned());
+        // Include FOREX assets so FX rates are synced even without activities
+        all_symbols.extend(forex_symbols.iter().cloned());
 
         // Filter out manual data source symbols and cash
         all_symbols.retain(|s| {
@@ -1769,7 +1801,9 @@ impl MarketDataService {
         let mut sync_states = Vec::new();
 
         for symbol in all_symbols {
-            let is_active = active_symbols.contains(&symbol);
+            // FOREX assets are always considered active since they're needed for currency conversion
+            let is_forex = forex_symbols.contains(&symbol);
+            let is_active = active_symbols.contains(&symbol) || is_forex;
             let (first_activity, last_activity) = activity_dates
                 .get(&symbol)
                 .cloned()

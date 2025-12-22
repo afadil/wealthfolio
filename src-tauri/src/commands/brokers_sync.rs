@@ -10,11 +10,11 @@ use tauri::State;
 
 use crate::context::ServiceContext;
 use crate::secret_store::KeyringSecretStore;
-use wealthfolio_core::secrets::SecretStore;
-use wealthfolio_core::sync::{
+use wealthfolio_connect::{
     BrokerAccount, BrokerConnection, ConnectPortalResponse, PaginatedUniversalActivity, Platform,
     SyncAccountsResponse, SyncActivitiesResponse, SyncConnectionsResponse,
 };
+use wealthfolio_core::secrets::SecretStore;
 
 /// Secret key for storing the cloud API access token (same as frontend)
 const CLOUD_ACCESS_TOKEN_KEY: &str = "wealthfolio_sync_access_token";
@@ -22,7 +22,6 @@ const CLOUD_ACCESS_TOKEN_KEY: &str = "wealthfolio_sync_access_token";
 /// Default base URL for Wealthfolio Sync cloud service.
 /// Override with `WEALTHFOLIO_SYNC_API_URL` (preferred) or `API_URL` (legacy/dev).
 const DEFAULT_CLOUD_API_URL: &str = "https://api.wealthfolio.app";
-
 
 fn normalize_cloud_api_base_url(raw: &str) -> String {
     let mut url = raw.trim().trim_end_matches('/').to_string();
@@ -109,7 +108,10 @@ async fn parse_trpc_response<T: DeserializeOwned>(
     parse_trpc_body(status, &body)
 }
 
-fn parse_trpc_body<T: DeserializeOwned>(status: reqwest::StatusCode, body: &str) -> Result<T, String> {
+fn parse_trpc_body<T: DeserializeOwned>(
+    status: reqwest::StatusCode,
+    body: &str,
+) -> Result<T, String> {
     let envelope: TrpcEnvelope<TrpcData<T>> = serde_json::from_str(body).map_err(|e| {
         // tRPC can return errors with HTTP 200 (especially for query procedures).
         // Try to surface a clean error message without logging the full response body.
@@ -128,12 +130,14 @@ fn parse_trpc_body<T: DeserializeOwned>(status: reqwest::StatusCode, body: &str)
 
     let data = match envelope {
         TrpcEnvelope::Single(r) => r.result.data,
-        TrpcEnvelope::Batch(items) => items
-            .into_iter()
-            .next()
-            .ok_or_else(|| "Empty batched tRPC response".to_string())?
-            .result
-            .data,
+        TrpcEnvelope::Batch(items) => {
+            items
+                .into_iter()
+                .next()
+                .ok_or_else(|| "Empty batched tRPC response".to_string())?
+                .result
+                .data
+        }
     };
 
     Ok(data.into_inner())
@@ -399,7 +403,10 @@ impl CloudApiClient {
         // Build inner JSON with optional fields
         let mut inner = serde_json::Map::new();
         if let Some(id) = reconnect_authorization_id {
-            inner.insert("reconnectAuthorizationId".to_string(), serde_json::json!(id));
+            inner.insert(
+                "reconnectAuthorizationId".to_string(),
+                serde_json::json!(id),
+            );
         }
         if let Some(url) = redirect_url {
             inner.insert("redirectUrl".to_string(), serde_json::json!(url));
@@ -627,8 +634,9 @@ pub async fn sync_broker_data(state: State<'_, Arc<ServiceContext>>) -> Result<S
             continue;
         }
 
-        let (start_date, end_date_filter) = compute_activity_query_window(&state, &account, end_date)
-            .map_err(|e| format!("Failed to compute activity sync window: {}", e))?;
+        let (start_date, end_date_filter) =
+            compute_activity_query_window(&state, &account, end_date)
+                .map_err(|e| format!("Failed to compute activity sync window: {}", e))?;
 
         let window_label = match (&start_date, &end_date_filter) {
             (Some(s), Some(e)) => format!("{} -> {}", s, e),
@@ -775,10 +783,8 @@ pub async fn sync_broker_data(state: State<'_, Arc<ServiceContext>>) -> Result<S
     Ok(SyncResult {
         success: activity_errors.is_empty(),
         message: format!(
-            "Sync completed. {} platforms, {} accounts created, {} accounts activity-synced, {} activities upserted{}",
-            connections_result.platforms_created,
+            "Sync completed. {} accounts created, {} activities synced{}",
             accounts_result.created,
-            activities_summary.accounts_synced,
             activities_summary.activities_upserted,
             if activity_errors.is_empty() {
                 ".".to_string()
@@ -817,7 +823,10 @@ fn compute_activity_query_window(
         .map(|d| (d - chrono::Days::new(1)).min(end_date));
 
     if let Some(d) = from_state {
-        return Ok((Some(d.format("%Y-%m-%d").to_string()), Some(end_date.format("%Y-%m-%d").to_string())));
+        return Ok((
+            Some(d.format("%Y-%m-%d").to_string()),
+            Some(end_date.format("%Y-%m-%d").to_string()),
+        ));
     }
 
     Ok((None, None))
@@ -1098,10 +1107,8 @@ impl CloudApiClient {
             .await
             .map_err(|e| format!("Failed to read response body: {}", e))?;
 
-        debug!("user.me response body: {}", body);
-
-        let json: serde_json::Value = serde_json::from_str(&body)
-            .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+        let json: serde_json::Value =
+            serde_json::from_str(&body).map_err(|e| format!("Failed to parse JSON: {}", e))?;
 
         // Extract user data from the nested structure
         // Format: {"result":{"data":{"json":{...user data...}}}}
@@ -1173,9 +1180,7 @@ pub async fn get_subscription_plans(
 
 /// Get current user info from the cloud API
 #[tauri::command]
-pub async fn get_user_info(
-    _state: State<'_, Arc<ServiceContext>>,
-) -> Result<UserInfo, String> {
+pub async fn get_user_info(_state: State<'_, Arc<ServiceContext>>) -> Result<UserInfo, String> {
     info!("Fetching user info from cloud API...");
 
     let client = create_api_client()?;

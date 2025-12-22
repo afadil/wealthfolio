@@ -1,6 +1,6 @@
 use crate::errors::{CalculatorError, Error as CoreError, Result as CoreResult};
 use crate::fx::currency::normalize_currency_code;
-use crate::fx::fx_traits::FxServiceTrait;
+use crate::fx::FxServiceTrait;
 use crate::market_data::MarketDataServiceTrait;
 use crate::portfolio::snapshot::SnapshotServiceTrait;
 use crate::portfolio::valuation::valuation_calculator::calculate_valuation;

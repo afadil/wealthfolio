@@ -17,30 +17,18 @@ import { Link } from "react-router-dom";
 export function SavingGoals() {
   const { isBalanceHidden } = useBalancePrivacy();
 
-  const { accounts, isLoading: isLoadingAccounts, isError: isErrorAccounts } = useAccounts();
+  const { accounts, isLoading: isLoadingAccounts } = useAccounts();
 
   const accountIds = useMemo(() => accounts?.map((acc) => acc.id) ?? [], [accounts]);
 
-  const {
-    latestValuations,
-    isLoading: isLoadingValuations,
-    error: errorValuations,
-  } = useLatestValuations(accountIds);
+  const { latestValuations, isLoading: isLoadingValuations } = useLatestValuations(accountIds);
 
-  const {
-    data: goals,
-    isLoading: isLoadingGoals,
-    isError: isErrorGoals,
-  } = useQuery<Goal[], Error>({
+  const { data: goals, isLoading: isLoadingGoals } = useQuery<Goal[], Error>({
     queryKey: ["goals"],
     queryFn: getGoals,
   });
 
-  const {
-    data: allocations,
-    isLoading: isLoadingAllocations,
-    isError: isErrorAllocations,
-  } = useQuery<GoalAllocation[], Error>({
+  const { data: allocations, isLoading: isLoadingAllocations } = useQuery<GoalAllocation[], Error>({
     queryKey: ["goals_allocations"],
     queryFn: getGoalsAllocation,
   });
@@ -54,7 +42,9 @@ export function SavingGoals() {
 
   const isLoading =
     isLoadingAccounts || isLoadingValuations || isLoadingGoals || isLoadingAllocations;
-  const isError = isErrorAccounts || !!errorValuations || isErrorGoals || isErrorAllocations;
+
+  // Check for empty goals - this is a valid state, show empty state instead of error
+  const hasGoals = goals && goals.length > 0;
 
   if (isLoading) {
     return (
@@ -77,29 +67,6 @@ export function SavingGoals() {
       </Card>
     );
   }
-
-  if (isError) {
-    return (
-      <Card className="w-full border-0 bg-transparent shadow-none">
-        <CardHeader className="py-2">
-          <CardTitle className="text-md">Saving Goals</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Card className="w-full shadow-sm">
-            <CardContent className="pt-6">
-              <div className="text-destructive flex flex-col items-center justify-center py-6 text-center">
-                <Icons.AlertCircle className="mb-2 h-12 w-12" />
-                <p className="text-sm">Could not load saving goals data.</p>
-                <p className="text-xs">Please try again later.</p>
-              </div>
-            </CardContent>
-          </Card>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const hasGoals = goals && goals.length > 0;
 
   if (!hasGoals) {
     return (

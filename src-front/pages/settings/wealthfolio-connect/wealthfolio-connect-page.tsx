@@ -1,18 +1,18 @@
 import { Icons } from "@/components/ui/icons";
 import { Separator } from "@/components/ui/separator";
-import { useWealthfolioSync } from "@/context/wealthfolio-sync-context";
+import { useWealthfolioConnect } from "@/context/wealthfolio-connect-context";
 import { SettingsHeader } from "../settings-header";
 import { SyncLoginForm } from "./sync-login-form";
 import { SyncConnectedView } from "./sync-connected-view";
 
-export default function WealthfolioSyncPage() {
-  const { isConnected, isInitializing } = useWealthfolioSync();
+export default function WealthfolioConnectPage() {
+  const { isConnected, isInitializing } = useWealthfolioConnect();
 
   if (isInitializing) {
     return (
       <div className="space-y-6">
         <SettingsHeader
-          heading="Wealthfolio Sync"
+          heading="Wealthfolio Connect"
           text="Connect your broker accounts through our cloud service."
         />
         <Separator />

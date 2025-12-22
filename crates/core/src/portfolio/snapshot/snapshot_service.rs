@@ -1,11 +1,11 @@
 use super::holdings_calculator::HoldingsCalculator;
-use super::snapshot_repository::SnapshotRepositoryTrait;
+use super::SnapshotRepositoryTrait;
 use crate::accounts::{Account, AccountRepositoryTrait};
 use crate::activities::{Activity, ActivityRepositoryTrait};
 use crate::assets::AssetRepositoryTrait;
 use crate::constants::{DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
 use crate::errors::{CalculatorError, Error, Result};
-use crate::fx::fx_traits::FxServiceTrait;
+use crate::fx::FxServiceTrait;
 use crate::portfolio::snapshot::{AccountStateSnapshot, HoldingsCalculationWarning, Lot, Position};
 use crate::utils::time_utils::get_days_between;
 
@@ -808,7 +808,7 @@ impl SnapshotService {
         start_date: NaiveDate,
         end_date: NaiveDate,
     ) -> HashMap<String, Vec<(NaiveDate, Decimal)>> {
-        use crate::activities::activities_constants::ACTIVITY_TYPE_SPLIT;
+        use crate::activities::ACTIVITY_TYPE_SPLIT;
         let mut split_factors: HashMap<String, Vec<(NaiveDate, Decimal)>> = HashMap::new();
         for activity in activities.iter().filter(|a| {
             a.activity_type == ACTIVITY_TYPE_SPLIT
@@ -850,7 +850,7 @@ impl SnapshotService {
         activities: &[Activity],
         split_factors: &HashMap<String, Vec<(NaiveDate, Decimal)>>,
     ) -> Vec<Activity> {
-        use crate::activities::activities_constants::ACTIVITY_TYPE_SPLIT;
+        use crate::activities::ACTIVITY_TYPE_SPLIT;
 
         let mut adjusted_activities = Vec::with_capacity(activities.len());
         for activity in activities {

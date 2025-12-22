@@ -3,7 +3,7 @@ use chrono::{NaiveDate, NaiveDateTime};
 use std::collections::{HashMap, HashSet};
 
 use super::market_data_model::{
-    LatestQuotePair, MarketDataProviderInfo, Quote, QuoteDb, QuoteImport, QuoteSummary,
+    LatestQuotePair, MarketDataProviderInfo, Quote, QuoteImport, QuoteSummary,
 };
 use super::providers::models::AssetProfile;
 use super::quote_sync_state_model::{QuoteSyncState, SymbolSyncPlan};
@@ -141,8 +141,8 @@ pub trait MarketDataRepositoryTrait: Send + Sync {
     ) -> Result<MarketDataProviderSetting>;
 
     // --- Quote Import Methods ---
-    async fn bulk_insert_quotes(&self, quote_records: Vec<QuoteDb>) -> Result<usize>;
-    async fn bulk_update_quotes(&self, quote_records: Vec<QuoteDb>) -> Result<usize>;
+    async fn bulk_insert_quotes(&self, quote_records: Vec<Quote>) -> Result<usize>;
+    async fn bulk_update_quotes(&self, quote_records: Vec<Quote>) -> Result<usize>;
     async fn bulk_upsert_quotes(&self, quote_records: Vec<Quote>) -> Result<usize>;
     fn quote_exists(&self, symbol_param: &str, date: &str) -> Result<bool>;
     fn get_existing_quotes_for_period(

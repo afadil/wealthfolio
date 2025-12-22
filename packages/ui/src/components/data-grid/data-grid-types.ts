@@ -36,6 +36,8 @@ export type CellOpts =
   | {
       variant: "select";
       options: CellSelectOption[];
+      /** Custom renderer for the selected value in display mode */
+      valueRenderer?: (value: string, option?: CellSelectOption) => React.ReactNode;
     }
   | {
       variant: "multi-select";
@@ -46,6 +48,9 @@ export type CellOpts =
     }
   | {
       variant: "date";
+    }
+  | {
+      variant: "datetime";
     }
   | {
       variant: "url";

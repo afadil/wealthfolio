@@ -1,15 +1,12 @@
 use crate::constants::DISPLAY_DECIMAL_PRECISION;
 use crate::{
-    activities::{
-        activities_errors::ActivityError, activities_model::IncomeData,
-        activities_traits::ActivityRepositoryTrait,
-    },
+    activities::{ActivityError, ActivityRepositoryTrait, IncomeData},
     Error, Result,
 };
 use chrono::{Datelike, NaiveDate, Utc};
 
 use super::IncomeSummary;
-use crate::fx::fx_traits::FxServiceTrait;
+use crate::fx::FxServiceTrait;
 use log::{debug, error};
 use num_traits::Zero;
 use rust_decimal::Decimal;

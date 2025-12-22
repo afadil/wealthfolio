@@ -1,0 +1,25 @@
+[package]
+name = "wealthfolio-connect"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+wealthfolio-core = { workspace = true }
+wealthfolio-storage-sqlite = { path = "../storage-sqlite" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+uuid = { workspace = true }
+rust_decimal = { workspace = true }
+log = { workspace = true }
+
+# Database (needed for repositories)
+diesel = { workspace = true }
+r2d2 = { workspace = true }
+
+[features]
+default = ["broker"]
+broker = []

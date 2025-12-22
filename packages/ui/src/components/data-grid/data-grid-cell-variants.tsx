@@ -490,6 +490,7 @@ export function NumberCell<TData>({
       isActiveSearchMatch={isActiveSearchMatch}
       readOnly={readOnly}
       onKeyDown={onWrapperKeyDown}
+      className="text-end"
     >
       {isEditing ? (
         <input
@@ -501,7 +502,7 @@ export function NumberCell<TData>({
           step={step}
           onBlur={onBlur}
           onChange={onChange}
-          className="w-full border-none bg-transparent p-0 outline-none"
+          className="w-full border-none bg-transparent p-0 text-end outline-none"
         />
       ) : (
         <span data-slot="grid-cell-content">{value}</span>
@@ -842,6 +843,7 @@ export function SelectCell<TData>({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const cellOpts = cell.column.columnDef.meta?.cell;
   const options = cellOpts?.variant === "select" ? cellOpts.options : [];
+  const valueRenderer = cellOpts?.variant === "select" ? cellOpts.valueRenderer : undefined;
 
   const prevInitialValueRef = React.useRef(initialValue);
   if (initialValue !== prevInitialValueRef.current) {
@@ -886,7 +888,25 @@ export function SelectCell<TData>({
     [isEditing, isFocused, initialValue, tableMeta],
   );
 
-  const displayLabel = options.find((opt) => opt.value === value)?.label ?? value;
+  const selectedOption = options.find((opt) => opt.value === value);
+  const displayLabel = selectedOption?.label ?? value;
+
+  // Render the display content - use valueRenderer if provided, otherwise default Badge
+  const renderDisplayContent = () => {
+    if (!displayLabel) return null;
+
+    if (valueRenderer) {
+      // Don't wrap in data-slot="grid-cell-content" - let valueRenderer control its own styling
+      // This prevents line-clamp from truncating badges/custom renderers
+      return valueRenderer(value, selectedOption);
+    }
+
+    return (
+      <Badge data-slot="grid-cell-content" variant="secondary" className="px-1.5 text-xs whitespace-pre-wrap">
+        {displayLabel}
+      </Badge>
+    );
+  };
 
   return (
     <DataGridCellWrapper<TData>
@@ -933,11 +953,9 @@ export function SelectCell<TData>({
             ))}
           </SelectContent>
         </Select>
-      ) : displayLabel ? (
-        <Badge data-slot="grid-cell-content" variant="secondary" className="px-1.5 text-xs whitespace-pre-wrap">
-          {displayLabel}
-        </Badge>
-      ) : null}
+      ) : (
+        renderDisplayContent()
+      )}
     </DataGridCellWrapper>
   );
 }
@@ -1302,6 +1320,198 @@ export function DateCell<TData>({
           </PopoverContent>
         )}
       </Popover>
+    </DataGridCellWrapper>
+  );
+}
+
+function formatDateTimeForDisplay(date: Date | string | undefined): string {
+  if (!date) return "";
+  const d = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(d.getTime())) return "";
+  // Format: YYYY-MM-DD, HH:MM AM/PM (matches datetime-local visual style)
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hours = d.getHours();
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  const ampm = hours >= 12 ? "PM" : "AM";
+  const hour12 = hours % 12 || 12;
+  const hourStr = String(hour12).padStart(2, "0");
+  return `${year}-${month}-${day}, ${hourStr}:${minutes} ${ampm}`;
+}
+
+function toDateTimeLocalString(date: Date | string | undefined): string {
+  if (!date) return "";
+  const d = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(d.getTime())) return "";
+  // Format: YYYY-MM-DDTHH:mm (required format for datetime-local input)
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+// Helper to get timestamp from date value for comparison
+function getDateTimestamp(value: Date | string | undefined): number | null {
+  if (!value) return null;
+  if (value instanceof Date) return value.getTime();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
+}
+
+export function DateTimeCell<TData>({
+  cell,
+  tableMeta,
+  rowIndex,
+  columnId,
+  rowHeight,
+  isFocused,
+  isEditing,
+  isSelected,
+  isSearchMatch,
+  isActiveSearchMatch,
+  readOnly,
+}: DataGridCellProps<TData>) {
+  const initialValue = cell.getValue() as Date | string | undefined;
+  const [value, setValue] = React.useState(() => toDateTimeLocalString(initialValue));
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  // Compare by timestamp instead of reference for Date objects
+  const prevTimestampRef = React.useRef(getDateTimestamp(initialValue));
+  const currentTimestamp = getDateTimestamp(initialValue);
+  if (currentTimestamp !== prevTimestampRef.current) {
+    prevTimestampRef.current = currentTimestamp;
+    setValue(toDateTimeLocalString(initialValue));
+  }
+
+  const onBlur = React.useCallback(() => {
+    if (readOnly) {
+      tableMeta?.onCellEditingStop?.();
+      return;
+    }
+    const date = value ? new Date(value) : undefined;
+    const initialDate = initialValue
+      ? initialValue instanceof Date
+        ? initialValue
+        : new Date(initialValue)
+      : undefined;
+
+    // Only update if value changed
+    if (date?.getTime() !== initialDate?.getTime()) {
+      tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: date });
+    }
+    tableMeta?.onCellEditingStop?.();
+  }, [tableMeta, rowIndex, columnId, value, initialValue, readOnly]);
+
+  const onChange = React.useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setValue(event.target.value);
+  }, []);
+
+  // Track previous editing state to detect when editing stops
+  const wasEditingRef = React.useRef(isEditing);
+  const valueRef = React.useRef(value);
+  valueRef.current = value;
+
+  React.useEffect(() => {
+    // When editing stops (transitions from true to false), save the value
+    if (wasEditingRef.current && !isEditing) {
+      const currentValue = valueRef.current;
+      const date = currentValue ? new Date(currentValue) : undefined;
+      const initialDate = initialValue
+        ? initialValue instanceof Date
+          ? initialValue
+          : new Date(initialValue)
+        : undefined;
+
+      if (!readOnly && date?.getTime() !== initialDate?.getTime()) {
+        tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: date });
+      }
+    }
+    wasEditingRef.current = isEditing;
+  }, [isEditing, initialValue, readOnly, tableMeta, rowIndex, columnId]);
+
+  const onWrapperKeyDown = React.useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (isEditing) {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          const date = value ? new Date(value) : undefined;
+          const initialDate = initialValue
+            ? initialValue instanceof Date
+              ? initialValue
+              : new Date(initialValue)
+            : undefined;
+          if (date?.getTime() !== initialDate?.getTime()) {
+            tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: date });
+          }
+          tableMeta?.onCellEditingStop?.({ moveToNextRow: true });
+        } else if (event.key === "Tab") {
+          event.preventDefault();
+          const date = value ? new Date(value) : undefined;
+          const initialDate = initialValue
+            ? initialValue instanceof Date
+              ? initialValue
+              : new Date(initialValue)
+            : undefined;
+          if (date?.getTime() !== initialDate?.getTime()) {
+            tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: date });
+          }
+          tableMeta?.onCellEditingStop?.({
+            direction: event.shiftKey ? "left" : "right",
+          });
+        } else if (event.key === "Escape") {
+          event.preventDefault();
+          setValue(toDateTimeLocalString(initialValue));
+          tableMeta?.onCellEditingStop?.();
+        }
+      } else if (isFocused && event.key === "Tab") {
+        event.preventDefault();
+        tableMeta?.onCellEditingStop?.({
+          direction: event.shiftKey ? "left" : "right",
+        });
+      }
+    },
+    [isEditing, isFocused, initialValue, tableMeta, rowIndex, columnId, value],
+  );
+
+  React.useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  return (
+    <DataGridCellWrapper<TData>
+      ref={containerRef}
+      cell={cell}
+      tableMeta={tableMeta}
+      rowIndex={rowIndex}
+      columnId={columnId}
+      rowHeight={rowHeight}
+      isEditing={isEditing}
+      isFocused={isFocused}
+      isSelected={isSelected}
+      isSearchMatch={isSearchMatch}
+      isActiveSearchMatch={isActiveSearchMatch}
+      readOnly={readOnly}
+      onKeyDown={onWrapperKeyDown}
+    >
+      {isEditing ? (
+        <input
+          ref={inputRef}
+          type="datetime-local"
+          value={value}
+          onChange={onChange}
+          onBlur={onBlur}
+          className="w-full border-none bg-transparent p-0 text-sm outline-none"
+        />
+      ) : (
+        <span data-slot="grid-cell-content">{formatDateTimeForDisplay(value)}</span>
+      )}
     </DataGridCellWrapper>
   );
 }

@@ -4,16 +4,27 @@ use async_trait::async_trait;
 use log::{debug, info, warn};
 use std::sync::Arc;
 
-use super::brokers_sync_state_repository::BrokersSyncStateRepository;
-use super::broker_models::{AccountUniversalActivity, BrokerAccount, BrokerConnection, SyncAccountsResponse, SyncConnectionsResponse};
-use super::platform_repository::{Platform, PlatformRepository};
-use super::sync_traits::SyncServiceTrait;
-use crate::accounts::{Account, AccountRepositoryTrait, NewAccount};
-use crate::errors::Result;
-use crate::{activities::activities_model::NewActivity, assets::assets_model::AssetDB, db::WriteHandle, schema};
+use crate::platform::{Platform, PlatformRepository};
+use crate::state::BrokersSyncState;
+use crate::state::BrokersSyncStateRepository;
+use super::models::{
+    AccountUniversalActivity, BrokerAccount, BrokerConnection, SyncAccountsResponse,
+    SyncConnectionsResponse,
+};
+use super::traits::SyncServiceTrait;
 use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 use std::collections::HashSet;
+use wealthfolio_core::accounts::{Account, AccountRepositoryTrait, NewAccount};
+use wealthfolio_core::activities::{self, NewActivity};
+use wealthfolio_core::assets::NewAsset;
+use wealthfolio_core::errors::Result;
+use wealthfolio_core::market_data::DataSource;
+use wealthfolio_storage_sqlite::activities::ActivityDB;
+use wealthfolio_storage_sqlite::assets::AssetDB;
+use wealthfolio_storage_sqlite::db::{DbPool, WriteHandle};
+use wealthfolio_storage_sqlite::errors::StorageError;
+use wealthfolio_storage_sqlite::schema;
 
 const DEFAULT_BROKERAGE_PROVIDER: &str = "snaptrade";
 
@@ -29,7 +40,7 @@ impl SyncService {
     pub fn new(
         account_repository: Arc<dyn AccountRepositoryTrait>,
         platform_repository: Arc<PlatformRepository>,
-        pool: std::sync::Arc<crate::db::DbPool>,
+        pool: Arc<DbPool>,
         writer: WriteHandle,
     ) -> Self {
         Self {
@@ -63,7 +74,10 @@ impl SyncServiceTrait for SyncService {
                     .unwrap_or_else(|| brokerage.id.clone().unwrap_or_default());
 
                 if platform_id.is_empty() {
-                    warn!("Skipping connection with no brokerage slug or id: {:?}", connection.id);
+                    warn!(
+                        "Skipping connection with no brokerage slug or id: {:?}",
+                        connection.id
+                    );
                     continue;
                 }
 
@@ -73,7 +87,10 @@ impl SyncServiceTrait for SyncService {
                 let platform = Platform {
                     id: platform_id.clone(),
                     name: brokerage.display_name.clone().or(brokerage.name.clone()),
-                    url: format!("https://{}.com", platform_id.to_lowercase().replace('_', "")),
+                    url: format!(
+                        "https://{}.com",
+                        platform_id.to_lowercase().replace('_', "")
+                    ),
                     external_id: brokerage.id.clone(),
                 };
 
@@ -152,11 +169,8 @@ impl SyncServiceTrait for SyncService {
                 meta: broker_account.to_meta_json(),
             };
 
-            // Create the account in a transaction
-            let repo = self.account_repository.clone();
-            self.writer
-                .exec(move |conn| repo.create_in_transaction(new_account, conn))
-                .await?;
+            // Create the account
+            self.account_repository.create(new_account).await?;
 
             created += 1;
             info!(
@@ -189,11 +203,9 @@ impl SyncServiceTrait for SyncService {
         self.platform_repository.list()
     }
 
-    fn get_activity_sync_state(
-        &self,
-        account_id: &str,
-    ) -> Result<Option<super::BrokersSyncState>> {
-        self.brokers_sync_state_repository.get_by_account_id(account_id)
+    fn get_activity_sync_state(&self, account_id: &str) -> Result<Option<BrokersSyncState>> {
+        self.brokers_sync_state_repository
+            .get_by_account_id(account_id)
     }
 
     async fn mark_activity_sync_attempt(&self, account_id: String) -> Result<()> {
@@ -205,11 +217,11 @@ impl SyncServiceTrait for SyncService {
     async fn upsert_account_activities(
         &self,
         account_id: String,
-        activities: Vec<AccountUniversalActivity>,
+        activities_data: Vec<AccountUniversalActivity>,
     ) -> Result<(usize, usize)> {
         use diesel::prelude::*;
 
-        if activities.is_empty() {
+        if activities_data.is_empty() {
             return Ok((0, 0));
         }
 
@@ -219,10 +231,11 @@ impl SyncServiceTrait for SyncService {
         let mut asset_rows: Vec<AssetDB> = Vec::new();
         let mut seen_assets: HashSet<String> = HashSet::new();
 
-        let mut activity_rows: Vec<crate::activities::activities_model::ActivityDB> = Vec::new();
+        let mut activity_rows: Vec<ActivityDB> =
+            Vec::new();
         let mut seen_activity_ids: HashSet<String> = HashSet::new();
 
-        for activity in activities {
+        for activity in activities_data {
             let activity_id = match activity.id.clone().filter(|v| !v.trim().is_empty()) {
                 Some(v) => v,
                 None => continue,
@@ -242,7 +255,9 @@ impl SyncServiceTrait for SyncService {
                 .activity_type
                 .clone()
                 .unwrap_or_else(|| "UNKNOWN".to_string());
-            let Some(mapped_type) = map_broker_activity_type(&raw_type, activity.amount, activity.units) else {
+            let Some(mapped_type) =
+                map_broker_activity_type(&raw_type, activity.amount, activity.units)
+            else {
                 warn!(
                     "Skipping unmapped broker activity {} (type='{}') for account {}",
                     activity_id, raw_type, account_id
@@ -252,14 +267,14 @@ impl SyncServiceTrait for SyncService {
 
             let is_cash_like = matches!(
                 mapped_type.as_str(),
-                crate::activities::ACTIVITY_TYPE_DEPOSIT
-                    | crate::activities::ACTIVITY_TYPE_WITHDRAWAL
-                    | crate::activities::ACTIVITY_TYPE_DIVIDEND
-                    | crate::activities::ACTIVITY_TYPE_INTEREST
-                    | crate::activities::ACTIVITY_TYPE_FEE
-                    | crate::activities::ACTIVITY_TYPE_TAX
-                    | crate::activities::ACTIVITY_TYPE_TRANSFER_IN
-                    | crate::activities::ACTIVITY_TYPE_TRANSFER_OUT
+                activities::ACTIVITY_TYPE_DEPOSIT
+                    | activities::ACTIVITY_TYPE_WITHDRAWAL
+                    | activities::ACTIVITY_TYPE_DIVIDEND
+                    | activities::ACTIVITY_TYPE_INTEREST
+                    | activities::ACTIVITY_TYPE_FEE
+                    | activities::ACTIVITY_TYPE_TAX
+                    | activities::ACTIVITY_TYPE_TRANSFER_IN
+                    | activities::ACTIVITY_TYPE_TRANSFER_OUT
             );
 
             let asset_id = activity
@@ -286,7 +301,7 @@ impl SyncServiceTrait for SyncService {
 
             if seen_assets.insert(asset_id.clone()) {
                 let asset_db = if asset_id.starts_with("$CASH-") {
-                    let new_asset = crate::assets::NewAsset::new_cash_asset(&currency_code);
+                    let new_asset = NewAsset::new_cash_asset(&currency_code);
                     let mut db: AssetDB = new_asset.into();
                     db.created_at = now_naive;
                     db.updated_at = now_naive;
@@ -296,7 +311,9 @@ impl SyncServiceTrait for SyncService {
                         .symbol
                         .as_ref()
                         .and_then(|s| s.symbol_type.as_ref())
-                        .and_then(|t| broker_symbol_type_label(t.code.as_deref(), t.description.as_deref()));
+                        .and_then(|t| {
+                            broker_symbol_type_label(t.code.as_deref(), t.description.as_deref())
+                        });
 
                     AssetDB {
                         id: asset_id.clone(),
@@ -309,9 +326,7 @@ impl SyncServiceTrait for SyncService {
                         asset_type: symbol_type_label.clone(),
                         asset_class: symbol_type_label,
                         currency: currency_code.clone(),
-                        data_source: crate::market_data::market_data_model::DataSource::Yahoo
-                            .as_str()
-                            .to_string(),
+                        data_source: DataSource::Yahoo.as_str().to_string(),
                         created_at: now_naive,
                         updated_at: now_naive,
                         ..Default::default()
@@ -396,7 +411,8 @@ impl SyncServiceTrait for SyncService {
                         .values(&asset_db)
                         .on_conflict(schema::assets::id)
                         .do_nothing()
-                        .execute(conn)?;
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
 
                     if let Some(asset_type) = asset_type {
                         diesel::update(
@@ -405,7 +421,8 @@ impl SyncServiceTrait for SyncService {
                                 .filter(schema::assets::asset_type.is_null()),
                         )
                         .set(schema::assets::asset_type.eq(asset_type))
-                        .execute(conn)?;
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
                     }
                     if let Some(asset_class) = asset_class {
                         diesel::update(
@@ -414,7 +431,8 @@ impl SyncServiceTrait for SyncService {
                                 .filter(schema::assets::asset_class.is_null()),
                         )
                         .set(schema::assets::asset_class.eq(asset_class))
-                        .execute(conn)?;
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
                     }
                 }
 
@@ -426,12 +444,16 @@ impl SyncServiceTrait for SyncService {
                         .on_conflict(schema::activities::id)
                         .do_update()
                         .set((
-                            schema::activities::account_id.eq(excluded(schema::activities::account_id)),
+                            schema::activities::account_id
+                                .eq(excluded(schema::activities::account_id)),
                             schema::activities::asset_id.eq(excluded(schema::activities::asset_id)),
-                            schema::activities::activity_type.eq(excluded(schema::activities::activity_type)),
-                            schema::activities::activity_date.eq(excluded(schema::activities::activity_date)),
+                            schema::activities::activity_type
+                                .eq(excluded(schema::activities::activity_type)),
+                            schema::activities::activity_date
+                                .eq(excluded(schema::activities::activity_date)),
                             schema::activities::quantity.eq(excluded(schema::activities::quantity)),
-                            schema::activities::unit_price.eq(excluded(schema::activities::unit_price)),
+                            schema::activities::unit_price
+                                .eq(excluded(schema::activities::unit_price)),
                             schema::activities::currency.eq(excluded(schema::activities::currency)),
                             schema::activities::fee.eq(excluded(schema::activities::fee)),
                             schema::activities::amount.eq(excluded(schema::activities::amount)),
@@ -446,7 +468,8 @@ impl SyncServiceTrait for SyncService {
                                 .eq(excluded(schema::activities::external_broker_id)),
                             schema::activities::updated_at.eq(now_update),
                         ))
-                        .execute(conn)?;
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
                 }
 
                 Ok((activities_upserted, assets_inserted))
@@ -467,11 +490,19 @@ impl SyncServiceTrait for SyncService {
         last_synced_date: String,
     ) -> Result<()> {
         self.brokers_sync_state_repository
-            .upsert_success(account_id, DEFAULT_BROKERAGE_PROVIDER.to_string(), last_synced_date)
+            .upsert_success(
+                account_id,
+                DEFAULT_BROKERAGE_PROVIDER.to_string(),
+                last_synced_date,
+            )
             .await
     }
 
-    async fn finalize_activity_sync_failure(&self, account_id: String, error: String) -> Result<()> {
+    async fn finalize_activity_sync_failure(
+        &self,
+        account_id: String,
+        error: String,
+    ) -> Result<()> {
         self.brokers_sync_state_repository
             .upsert_failure(account_id, DEFAULT_BROKERAGE_PROVIDER.to_string(), error)
             .await
@@ -556,69 +587,71 @@ fn map_broker_activity_type(
 
     let wealthfolio_passthrough = matches!(
         t.as_str(),
-        crate::activities::ACTIVITY_TYPE_BUY
-            | crate::activities::ACTIVITY_TYPE_SELL
-            | crate::activities::ACTIVITY_TYPE_DIVIDEND
-            | crate::activities::ACTIVITY_TYPE_INTEREST
-            | crate::activities::ACTIVITY_TYPE_DEPOSIT
-            | crate::activities::ACTIVITY_TYPE_WITHDRAWAL
-            | crate::activities::ACTIVITY_TYPE_ADD_HOLDING
-            | crate::activities::ACTIVITY_TYPE_REMOVE_HOLDING
-            | crate::activities::ACTIVITY_TYPE_TRANSFER_IN
-            | crate::activities::ACTIVITY_TYPE_TRANSFER_OUT
-            | crate::activities::ACTIVITY_TYPE_FEE
-            | crate::activities::ACTIVITY_TYPE_TAX
-            | crate::activities::ACTIVITY_TYPE_SPLIT
+        activities::ACTIVITY_TYPE_BUY
+            | activities::ACTIVITY_TYPE_SELL
+            | activities::ACTIVITY_TYPE_DIVIDEND
+            | activities::ACTIVITY_TYPE_INTEREST
+            | activities::ACTIVITY_TYPE_DEPOSIT
+            | activities::ACTIVITY_TYPE_WITHDRAWAL
+            | activities::ACTIVITY_TYPE_ADD_HOLDING
+            | activities::ACTIVITY_TYPE_REMOVE_HOLDING
+            | activities::ACTIVITY_TYPE_TRANSFER_IN
+            | activities::ACTIVITY_TYPE_TRANSFER_OUT
+            | activities::ACTIVITY_TYPE_FEE
+            | activities::ACTIVITY_TYPE_TAX
+            | activities::ACTIVITY_TYPE_SPLIT
     );
     if wealthfolio_passthrough {
         return Some(t);
     }
 
     match t.as_str() {
-        "BUY" => Some(crate::activities::ACTIVITY_TYPE_BUY.to_string()),
-        "SELL" => Some(crate::activities::ACTIVITY_TYPE_SELL.to_string()),
-        "DIVIDEND" => Some(crate::activities::ACTIVITY_TYPE_DIVIDEND.to_string()),
-        "INTEREST" | "CRYPTO_STAKING_REWARD" => Some(crate::activities::ACTIVITY_TYPE_INTEREST.to_string()),
-        "CONTRIBUTION" | "DEPOSIT" => Some(crate::activities::ACTIVITY_TYPE_DEPOSIT.to_string()),
-        "WITHDRAWAL" => Some(crate::activities::ACTIVITY_TYPE_WITHDRAWAL.to_string()),
-        "REI" => Some(crate::activities::ACTIVITY_TYPE_BUY.to_string()),
-        "STOCK_DIVIDEND" => Some(crate::activities::ACTIVITY_TYPE_ADD_HOLDING.to_string()),
-        "FEE" => Some(crate::activities::ACTIVITY_TYPE_FEE.to_string()),
-        "TAX" => Some(crate::activities::ACTIVITY_TYPE_TAX.to_string()),
-        "SPLIT" => Some(crate::activities::ACTIVITY_TYPE_SPLIT.to_string()),
-        "EXTERNAL_ASSET_TRANSFER_IN" => Some(crate::activities::ACTIVITY_TYPE_ADD_HOLDING.to_string()),
-        "EXTERNAL_ASSET_TRANSFER_OUT" => Some(crate::activities::ACTIVITY_TYPE_REMOVE_HOLDING.to_string()),
+        "BUY" => Some(activities::ACTIVITY_TYPE_BUY.to_string()),
+        "SELL" => Some(activities::ACTIVITY_TYPE_SELL.to_string()),
+        "DIVIDEND" => Some(activities::ACTIVITY_TYPE_DIVIDEND.to_string()),
+        "INTEREST" | "CRYPTO_STAKING_REWARD" => {
+            Some(activities::ACTIVITY_TYPE_INTEREST.to_string())
+        }
+        "CONTRIBUTION" | "DEPOSIT" => Some(activities::ACTIVITY_TYPE_DEPOSIT.to_string()),
+        "WITHDRAWAL" => Some(activities::ACTIVITY_TYPE_WITHDRAWAL.to_string()),
+        "REI" => Some(activities::ACTIVITY_TYPE_BUY.to_string()),
+        "STOCK_DIVIDEND" => Some(activities::ACTIVITY_TYPE_ADD_HOLDING.to_string()),
+        "FEE" => Some(activities::ACTIVITY_TYPE_FEE.to_string()),
+        "TAX" => Some(activities::ACTIVITY_TYPE_TAX.to_string()),
+        "SPLIT" => Some(activities::ACTIVITY_TYPE_SPLIT.to_string()),
+        "EXTERNAL_ASSET_TRANSFER_IN" => Some(activities::ACTIVITY_TYPE_ADD_HOLDING.to_string()),
+        "EXTERNAL_ASSET_TRANSFER_OUT" => Some(activities::ACTIVITY_TYPE_REMOVE_HOLDING.to_string()),
         "TRANSFER" => match infer_direction() {
-            Some("IN") => Some(crate::activities::ACTIVITY_TYPE_TRANSFER_IN.to_string()),
-            Some("OUT") => Some(crate::activities::ACTIVITY_TYPE_TRANSFER_OUT.to_string()),
+            Some("IN") => Some(activities::ACTIVITY_TYPE_TRANSFER_IN.to_string()),
+            Some("OUT") => Some(activities::ACTIVITY_TYPE_TRANSFER_OUT.to_string()),
             _ => None,
         },
         "ADJUSTMENT" => match infer_direction() {
             Some("IN") => match amount.filter(|a| is_nonzero(*a)) {
-                Some(_) => Some(crate::activities::ACTIVITY_TYPE_DEPOSIT.to_string()),
-                None => Some(crate::activities::ACTIVITY_TYPE_ADD_HOLDING.to_string()),
+                Some(_) => Some(activities::ACTIVITY_TYPE_DEPOSIT.to_string()),
+                None => Some(activities::ACTIVITY_TYPE_ADD_HOLDING.to_string()),
             },
             Some("OUT") => match amount.filter(|a| is_nonzero(*a)) {
-                Some(_) => Some(crate::activities::ACTIVITY_TYPE_WITHDRAWAL.to_string()),
-                None => Some(crate::activities::ACTIVITY_TYPE_REMOVE_HOLDING.to_string()),
+                Some(_) => Some(activities::ACTIVITY_TYPE_WITHDRAWAL.to_string()),
+                None => Some(activities::ACTIVITY_TYPE_REMOVE_HOLDING.to_string()),
             },
             _ => None,
         },
         "OPTIONEXERCISE" | "OPTIONASSIGNMENT" => match infer_direction() {
             Some("IN") => match amount.filter(|a| is_nonzero(*a)) {
-                Some(_) => Some(crate::activities::ACTIVITY_TYPE_SELL.to_string()),
-                None => Some(crate::activities::ACTIVITY_TYPE_BUY.to_string()),
+                Some(_) => Some(activities::ACTIVITY_TYPE_SELL.to_string()),
+                None => Some(activities::ACTIVITY_TYPE_BUY.to_string()),
             },
             Some("OUT") => match amount.filter(|a| is_nonzero(*a)) {
-                Some(_) => Some(crate::activities::ACTIVITY_TYPE_BUY.to_string()),
-                None => Some(crate::activities::ACTIVITY_TYPE_SELL.to_string()),
+                Some(_) => Some(activities::ACTIVITY_TYPE_BUY.to_string()),
+                None => Some(activities::ACTIVITY_TYPE_SELL.to_string()),
             },
             _ => None,
         },
         "OPTIONEXPIRATION" => match units.filter(|u| is_nonzero(*u)) {
-            Some(u) if u < 0.0 => Some(crate::activities::ACTIVITY_TYPE_REMOVE_HOLDING.to_string()),
-            Some(_) => Some(crate::activities::ACTIVITY_TYPE_ADD_HOLDING.to_string()),
-            None => Some(crate::activities::ACTIVITY_TYPE_REMOVE_HOLDING.to_string()),
+            Some(u) if u < 0.0 => Some(activities::ACTIVITY_TYPE_REMOVE_HOLDING.to_string()),
+            Some(_) => Some(activities::ACTIVITY_TYPE_ADD_HOLDING.to_string()),
+            None => Some(activities::ACTIVITY_TYPE_REMOVE_HOLDING.to_string()),
         },
         _ => None,
     }
@@ -645,7 +678,11 @@ fn broker_symbol_type_label(code: Option<&str>, description: Option<&str>) -> Op
         }
         out.push_str(&capitalize_word(word));
     }
-    if out.is_empty() { None } else { Some(out) }
+    if out.is_empty() {
+        None
+    } else {
+        Some(out)
+    }
 }
 
 fn capitalize_word(word: &str) -> String {

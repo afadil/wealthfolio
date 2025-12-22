@@ -17,10 +17,8 @@ use reqwest::StatusCode as HttpStatusCode;
 use semver::Version;
 use serde::Deserialize;
 use tokio::{fs, task};
-use wealthfolio_core::{
-    db,
-    settings::{Settings, SettingsServiceTrait, SettingsUpdate},
-};
+use wealthfolio_core::settings::{Settings, SettingsServiceTrait, SettingsUpdate};
+use wealthfolio_storage_sqlite::db;
 
 async fn get_settings(State(state): State<Arc<AppState>>) -> ApiResult<Json<Settings>> {
     let s = state.settings_service.get_settings()?;

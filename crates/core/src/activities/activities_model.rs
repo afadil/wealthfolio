@@ -1,7 +1,8 @@
+//! Activity domain models.
+
 use crate::activities::activities_errors::ActivityError;
 use crate::Result;
-use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
-use diesel::prelude::*;
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -9,7 +10,7 @@ use std::str::FromStr;
 
 /// Helper function to parse a string into a Decimal,
 /// with a fallback for scientific notation by parsing as f64 first.
-fn parse_decimal_string_tolerant(value_str: &str, field_name: &str) -> Decimal {
+pub fn parse_decimal_string_tolerant(value_str: &str, field_name: &str) -> Decimal {
     // Attempt to parse directly as Decimal
     match Decimal::from_str(value_str) {
         Ok(d) => d,
@@ -67,45 +68,6 @@ pub struct Activity {
     pub created_at: DateTime<Utc>,
     #[serde(with = "timestamp_format")]
     pub updated_at: DateTime<Utc>,
-}
-
-/// Database model for activities
-#[derive(
-    Queryable,
-    Identifiable,
-    Insertable,
-    AsChangeset,
-    Selectable,
-    PartialEq,
-    Serialize,
-    Deserialize,
-    Debug,
-    Clone,
-    Default,
-)]
-#[diesel(table_name = crate::schema::activities)]
-#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
-#[diesel(belongs_to(Account))]
-#[diesel(treat_none_as_null = true)]
-pub struct ActivityDB {
-    pub id: String,
-    pub account_id: String,
-    pub asset_id: String,
-    pub activity_type: String,
-    pub activity_date: String,
-    pub quantity: String,
-    pub unit_price: String,
-    pub currency: String,
-    pub fee: String,
-    pub amount: Option<String>,
-    pub is_draft: bool,
-    pub comment: Option<String>,
-    pub fx_rate: Option<String>,
-    pub provider_type: Option<String>,
-    pub external_provider_id: Option<String>,
-    pub external_broker_id: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
 }
 
 /// Input model for creating a new activity
@@ -260,49 +222,28 @@ pub struct ActivityBulkIdentifierMapping {
 }
 
 /// Model for activity details including related data
-#[derive(Queryable, QueryableByName, Serialize, Deserialize, Clone, Debug)]
-#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ActivityDetails {
-    #[diesel(sql_type = diesel::sql_types::Text)]
     pub id: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
     pub account_id: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
     pub asset_id: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
     pub activity_type: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
     pub date: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
     pub quantity: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
     pub unit_price: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
     pub currency: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
     pub fee: String,
-    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub amount: Option<String>,
-    #[diesel(sql_type = diesel::sql_types::Bool)]
     pub is_draft: bool,
-    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub comment: Option<String>,
-    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub fx_rate: Option<String>,
-    #[diesel(sql_type = diesel::sql_types::Text)]
     pub created_at: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
     pub updated_at: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
     pub account_name: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
     pub account_currency: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
     pub asset_symbol: String,
-    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub asset_name: Option<String>,
-    #[diesel(sql_type = diesel::sql_types::Text)]
     pub asset_data_source: String,
 }
 
@@ -387,13 +328,8 @@ pub struct Sort {
     pub desc: bool,
 }
 
-/// Model for activity import profile mapping
-#[derive(
-    Debug, Clone, Serialize, Deserialize, Queryable, Identifiable, AsChangeset, Insertable,
-)]
-#[diesel(primary_key(account_id))]
-#[diesel(table_name = crate::schema::activity_import_profiles)]
-#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+/// Domain model for activity import profile mapping
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportMapping {
     pub account_id: String,
@@ -584,233 +520,14 @@ mod timestamp_format {
     }
 }
 
-// Conversion implementations
-impl From<ActivityDB> for Activity {
-    fn from(db: ActivityDB) -> Self {
-        Self {
-            id: db.id,
-            account_id: db.account_id,
-            asset_id: db.asset_id,
-            activity_type: db.activity_type,
-            activity_date: DateTime::parse_from_rfc3339(&db.activity_date)
-                .map(|dt| dt.with_timezone(&Utc))
-                .unwrap_or_else(|e| {
-                    log::error!(
-                        "Failed to parse activity_date '{}': {}",
-                        db.activity_date,
-                        e
-                    );
-                    Utc::now() // Fallback to now
-                }),
-            quantity: parse_decimal_string_tolerant(&db.quantity, "quantity"),
-            unit_price: parse_decimal_string_tolerant(&db.unit_price, "unit_price"),
-            currency: db.currency,
-            fee: parse_decimal_string_tolerant(&db.fee, "fee"),
-            amount: db
-                .amount
-                .map(|s| parse_decimal_string_tolerant(&s, "amount")),
-            is_draft: db.is_draft,
-            comment: db.comment,
-            fx_rate: db
-                .fx_rate
-                .as_deref()
-                .map(|s| parse_decimal_string_tolerant(s, "fx_rate")),
-            provider_type: db.provider_type,
-            external_provider_id: db.external_provider_id,
-            external_broker_id: db.external_broker_id,
-            created_at: DateTime::parse_from_rfc3339(&db.created_at)
-                .map(|dt| dt.with_timezone(&Utc))
-                .unwrap_or_else(|e| {
-                    log::error!("Failed to parse created_at '{}': {}", db.created_at, e);
-                    Utc::now() // Fallback to now
-                }),
-            updated_at: DateTime::parse_from_rfc3339(&db.updated_at)
-                .map(|dt| dt.with_timezone(&Utc))
-                .unwrap_or_else(|e| {
-                    log::error!("Failed to parse updated_at '{}': {}", db.updated_at, e);
-                    Utc::now() // Fallback to now
-                }),
-        }
-    }
-}
-
-impl From<NewActivity> for ActivityDB {
-    fn from(domain: NewActivity) -> Self {
-        let now = Utc::now();
-
-        // Parse the date and normalize to UTC
-        let activity_datetime = DateTime::parse_from_rfc3339(&domain.activity_date)
-            .map(|dt| dt.with_timezone(&Utc))
-            .or_else(|_| {
-                // If date-only format, use midnight UTC
-                NaiveDate::parse_from_str(&domain.activity_date, "%Y-%m-%d").map(|date| {
-                    Utc.from_utc_datetime(&date.and_hms_opt(0, 0, 0).unwrap_or_default())
-                })
-            })
-            .unwrap_or_else(|e| {
-                log::error!(
-                    "Failed to parse activity date '{}': {}",
-                    domain.activity_date,
-                    e
-                );
-                // If parsing fails, use midnight UTC today
-                Utc.from_utc_datetime(
-                    &now.date_naive()
-                        .and_hms_opt(0, 0, 0)
-                        .unwrap_or_else(|| now.naive_utc()),
-                )
-            });
-
-        // Handle cash activities and splits
-        let activity_type = domain.activity_type.as_str();
-        let is_transfer = activity_type == "TRANSFER_IN" || activity_type == "TRANSFER_OUT";
-        let is_cash_asset = domain
-            .asset_id
-            .starts_with(crate::constants::CASH_ASSET_PREFIX);
-        let is_cash_or_split = activity_type == "DEPOSIT"
-            || activity_type == "WITHDRAWAL"
-            || activity_type == "FEE"
-            || activity_type == "INTEREST"
-            || activity_type == "DIVIDEND"
-            || activity_type == "SPLIT"
-            || (is_transfer && is_cash_asset);
-
-        let (quantity, unit_price, amount) = if is_cash_or_split {
-            // For cash activities and splits, set quantity and unit_price to 0
-            // Use amount if provided, otherwise use quantity
-            let amount_str = match &domain.amount {
-                Some(amount) => amount.to_string(),
-                None => domain.quantity.unwrap_or(Decimal::ZERO).to_string(),
-            };
-            ("0".to_string(), "0".to_string(), Some(amount_str))
-        } else if is_transfer && !is_cash_asset {
-            // For asset transfers, preserve quantity/unit_price for holdings calculations.
-            (
-                domain.quantity.unwrap_or(Decimal::ZERO).to_string(),
-                domain.unit_price.unwrap_or(Decimal::ZERO).to_string(),
-                domain.amount.as_ref().map(|a| a.to_string()),
-            )
-        } else {
-            // For other activities, use the provided values
-            (
-                domain.quantity.unwrap_or(Decimal::ZERO).to_string(),
-                domain.unit_price.unwrap_or(Decimal::ZERO).to_string(),
-                domain.amount.as_ref().map(|a| a.to_string()),
-            )
-        };
-
-        Self {
-            id: domain.id.unwrap_or_default(),
-            account_id: domain.account_id,
-            asset_id: domain.asset_id,
-            activity_type: domain.activity_type,
-            activity_date: activity_datetime.to_rfc3339(),
-            quantity,
-            unit_price,
-            currency: domain.currency,
-            fee: domain.fee.unwrap_or(Decimal::ZERO).to_string(),
-            amount,
-            is_draft: domain.is_draft,
-            comment: domain.comment,
-            fx_rate: domain.fx_rate.map(|d| d.to_string()),
-            provider_type: domain.provider_type,
-            external_provider_id: domain.external_provider_id,
-            external_broker_id: domain.external_broker_id,
-            created_at: now.to_rfc3339(),
-            updated_at: now.to_rfc3339(),
-        }
-    }
-}
-
-impl From<ActivityUpdate> for ActivityDB {
-    fn from(domain: ActivityUpdate) -> Self {
-        let now = Utc::now();
-
-        // Use the same date parsing logic as NewActivity for consistency
-        let activity_datetime = DateTime::parse_from_rfc3339(&domain.activity_date)
-            .map(|dt| dt.with_timezone(&Utc))
-            .or_else(|_| {
-                NaiveDate::parse_from_str(&domain.activity_date, "%Y-%m-%d").map(|date| {
-                    Utc.from_utc_datetime(&date.and_hms_opt(0, 0, 0).unwrap_or_default())
-                })
-            })
-            .unwrap_or_else(|e| {
-                log::error!(
-                    "Failed to parse activity date '{}': {}",
-                    domain.activity_date,
-                    e
-                );
-                Utc.from_utc_datetime(
-                    &now.date_naive()
-                        .and_hms_opt(0, 0, 0)
-                        .unwrap_or_else(|| now.naive_utc()),
-                )
-            });
-
-        // Handle cash activities and splits
-        let activity_type = domain.activity_type.as_str();
-        let is_cash_or_split = activity_type == "DEPOSIT"
-            || activity_type == "WITHDRAWAL"
-            || activity_type == "FEE"
-            || activity_type == "INTEREST"
-            || activity_type == "DIVIDEND"
-            || activity_type == "SPLIT"
-            || activity_type == "TRANSFER_IN"
-            || activity_type == "TRANSFER_OUT";
-
-        let (quantity, unit_price, amount) = if is_cash_or_split {
-            // For cash activities and splits, set quantity and unit_price to 0
-            // Use amount if provided, otherwise use quantity
-            let amount_str = match &domain.amount {
-                Some(amount) => amount.to_string(),
-                None => domain.quantity.unwrap_or(Decimal::ZERO).to_string(),
-            };
-            ("0".to_string(), "0".to_string(), Some(amount_str))
-        } else {
-            // For other activities, use the provided values
-            (
-                domain.quantity.unwrap_or(Decimal::ZERO).to_string(),
-                domain.unit_price.unwrap_or(Decimal::ZERO).to_string(),
-                domain.amount.as_ref().map(|a| a.to_string()),
-            )
-        };
-
-        Self {
-            id: domain.id,
-            account_id: domain.account_id,
-            asset_id: domain.asset_id,
-            activity_type: domain.activity_type,
-            activity_date: activity_datetime.to_rfc3339(),
-            quantity,
-            unit_price,
-            currency: domain.currency,
-            fee: domain.fee.unwrap_or(Decimal::ZERO).to_string(),
-            amount,
-            is_draft: domain.is_draft,
-            comment: domain.comment,
-            fx_rate: domain.fx_rate.map(|d| d.to_string()),
-            provider_type: domain.provider_type,
-            external_provider_id: domain.external_provider_id,
-            external_broker_id: domain.external_broker_id,
-            created_at: now.to_rfc3339(), // This should ideally preserve original created_at. Need to fetch before update.
-            updated_at: now.to_rfc3339(),
-        }
-    }
-}
-#[derive(Debug, Serialize, QueryableByName)]
+/// Model for income data from activities
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[diesel(table_name = crate::schema::activities)]
 pub struct IncomeData {
-    #[diesel(sql_type = diesel::sql_types::Text)]
     pub date: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
     pub income_type: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
     pub symbol: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
     pub symbol_name: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
     pub currency: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
     pub amount: Decimal,
 }

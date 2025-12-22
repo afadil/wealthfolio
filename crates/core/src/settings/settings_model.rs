@@ -1,5 +1,5 @@
-use diesel::prelude::*;
-use diesel::Queryable;
+//! Settings domain models.
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -49,8 +49,8 @@ pub struct Sort {
     pub desc: bool,
 }
 
-#[derive(Queryable, Insertable, Serialize, Deserialize, Debug)]
-#[diesel(table_name= crate::schema::app_settings)]
+/// Domain model for app setting key-value pair
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSetting {
     pub setting_key: String,

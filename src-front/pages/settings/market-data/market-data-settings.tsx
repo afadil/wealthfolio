@@ -30,24 +30,25 @@ import {
   useUpdateMarketDataProviderSettings,
 } from "./use-market-data-settings";
 
-const useApiKeyStatus = (providerId: string) => {
+const useApiKeyStatus = (providerId: string, shouldFetchKey: boolean = false) => {
   const queryClient = useQueryClient();
   const needsApiKey = providerId !== "YAHOO" && providerId !== "MANUAL";
 
-  const { data: apiKey, isLoading } = useQuery({
+  const { data: apiKey, isLoading, isFetched } = useQuery({
     queryKey: QueryKeys.secrets.apiKey(providerId),
     queryFn: () => getSecret(providerId),
-    enabled: needsApiKey,
+    enabled: needsApiKey && shouldFetchKey,
     staleTime: Infinity,
   });
 
-  const isSecretSet = !!apiKey;
+  // Only know if secret is set after fetching
+  const isSecretSet = isFetched && !!apiKey;
 
   const invalidateApiKeyStatus = () => {
     queryClient.invalidateQueries({ queryKey: QueryKeys.secrets.apiKey(providerId) });
   };
 
-  return { apiKey, isSecretSet, isLoading, needsApiKey, invalidateApiKeyStatus };
+  return { apiKey, isSecretSet, isLoading, needsApiKey, invalidateApiKeyStatus, hasFetched: isFetched };
 };
 
 interface ProviderSettingsProps {
@@ -67,7 +68,10 @@ function ProviderSettings({
 }: ProviderSettingsProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
-  const { apiKey, isSecretSet, needsApiKey, invalidateApiKeyStatus } = useApiKeyStatus(provider.id);
+  const { apiKey, isSecretSet, needsApiKey, invalidateApiKeyStatus, hasFetched } = useApiKeyStatus(
+    provider.id,
+    showApiKey,
+  );
   const { mutate: setApiKey } = useSetApiKey();
   const { mutate: deleteApiKey } = useDeleteApiKey();
 
@@ -97,7 +101,8 @@ function ProviderSettings({
     }
   };
 
-  const isConfigured = !needsApiKey || isSecretSet;
+  // Consider configured if doesn't need API key, or if we haven't checked yet, or if we know it's set
+  const isConfigured = !needsApiKey || !hasFetched || isSecretSet;
 
   return (
     <Card
@@ -239,7 +244,13 @@ function ProviderSettings({
                     type={showApiKey ? "text" : "password"}
                     value={apiKeyValue ?? ""}
                     onChange={(e) => setApiKeyValue(e.target.value)}
-                    placeholder={isSecretSet && !apiKeyValue ? "API Key is Set" : "Enter API Key"}
+                    placeholder={
+                      !hasFetched
+                        ? "Click reveal to view API key"
+                        : isSecretSet && !apiKeyValue
+                          ? "API Key is Set"
+                          : "Enter API Key"
+                    }
                     className="grow"
                   />
                   <Button
@@ -258,13 +269,18 @@ function ProviderSettings({
                     <Icons.Save className="mr-2 h-4 w-4" /> Save Key
                   </Button>
                 </div>
-                {isSecretSet && !apiKeyValue && (
+                {!hasFetched && !apiKeyValue && (
+                  <p className="text-muted-foreground text-xs">
+                    Click the eye icon to reveal any existing API key.
+                  </p>
+                )}
+                {hasFetched && isSecretSet && !apiKeyValue && (
                   <p className="text-muted-foreground text-xs">
                     An API key is set. Enter a new key to update, or leave blank and save to clear
                     the key.
                   </p>
                 )}
-                {!isSecretSet && !apiKeyValue && (
+                {hasFetched && !isSecretSet && !apiKeyValue && (
                   <p className="text-muted-foreground text-xs">
                     No API key set. Enter a key and save.
                   </p>

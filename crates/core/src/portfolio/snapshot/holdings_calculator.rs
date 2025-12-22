@@ -2,7 +2,7 @@ use crate::activities::{Activity, ActivityType};
 use crate::assets::AssetRepositoryTrait;
 use crate::constants::CASH_ASSET_PREFIX;
 use crate::errors::{CalculatorError, Error, Result};
-use crate::fx::fx_traits::FxServiceTrait;
+use crate::fx::FxServiceTrait;
 use crate::portfolio::snapshot::AccountStateSnapshot;
 use crate::portfolio::snapshot::HoldingsCalculationResult;
 use crate::portfolio::snapshot::HoldingsCalculationWarning;

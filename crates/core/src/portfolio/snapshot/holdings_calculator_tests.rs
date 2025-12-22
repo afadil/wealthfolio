@@ -4,7 +4,7 @@ mod tests {
     use crate::activities::{Activity, ActivityType};
     use crate::assets::{Asset, AssetRepositoryTrait, NewAsset, UpdateAssetProfile};
     use crate::errors::Result;
-    use crate::fx::fx_traits::FxServiceTrait;
+    use crate::fx::FxServiceTrait;
     use crate::fx::FxError;
     use crate::portfolio::snapshot::holdings_calculator::HoldingsCalculator;
     use crate::portfolio::snapshot::{AccountStateSnapshot, Lot, Position};

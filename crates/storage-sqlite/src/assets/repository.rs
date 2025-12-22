@@ -5,12 +5,13 @@ use diesel::sqlite::SqliteConnection;
 use log::debug;
 use std::sync::Arc;
 
-use crate::db::{get_connection, WriteHandle};
-use crate::errors::{Error, Result};
-use crate::schema::{activities, assets, quotes};
+use wealthfolio_core::assets::{Asset, AssetRepositoryTrait, NewAsset, UpdateAssetProfile};
+use wealthfolio_core::{Error, Result};
 
-use super::assets_model::{Asset, AssetDB, NewAsset, UpdateAssetProfile};
-use super::assets_traits::AssetRepositoryTrait;
+use super::model::AssetDB;
+use crate::db::{get_connection, WriteHandle};
+use crate::errors::StorageError;
+use crate::schema::{activities, assets, quotes};
 
 /// Repository for managing asset data in the database
 pub struct AssetRepository {
@@ -34,7 +35,8 @@ impl AssetRepository {
         let result = assets::table
             .select(AssetDB::as_select())
             .find(asset_id)
-            .first::<AssetDB>(&mut conn)?;
+            .first::<AssetDB>(&mut conn)
+            .map_err(StorageError::from)?;
 
         Ok(result.into())
     }
@@ -45,7 +47,8 @@ impl AssetRepository {
 
         let results = assets::table
             .select(AssetDB::as_select())
-            .load::<AssetDB>(&mut conn)?;
+            .load::<AssetDB>(&mut conn)
+            .map_err(StorageError::from)?;
 
         Ok(results.into_iter().map(Asset::from).collect())
     }
@@ -58,7 +61,8 @@ impl AssetRepository {
             .select(AssetDB::as_select())
             .filter(assets::asset_type.eq("CASH"))
             .filter(assets::symbol.like(format!("{}%", base_currency)))
-            .load::<AssetDB>(&mut conn)?;
+            .load::<AssetDB>(&mut conn)
+            .map_err(StorageError::from)?;
 
         Ok(results.into_iter().map(Asset::from).collect())
     }
@@ -69,7 +73,8 @@ impl AssetRepository {
         let results = assets::table
             .select(AssetDB::as_select())
             .filter(assets::id.eq_any(symbols))
-            .load::<AssetDB>(&mut conn)?;
+            .load::<AssetDB>(&mut conn)
+            .map_err(StorageError::from)?;
 
         Ok(results.into_iter().map(Asset::from).collect())
     }
@@ -86,7 +91,8 @@ impl AssetRepositoryTrait for AssetRepository {
             .exec(move |conn: &mut SqliteConnection| -> Result<Asset> {
                 let result_db = diesel::insert_into(assets::table)
                     .values(&asset_db)
-                    .get_result::<AssetDB>(conn)?;
+                    .get_result::<AssetDB>(conn)
+                    .map_err(StorageError::from)?;
                 Ok(result_db.into())
             })
             .await
@@ -116,7 +122,8 @@ impl AssetRepositoryTrait for AssetRepository {
                         assets::asset_class.eq(&payload_owned.asset_class),
                         assets::symbol_mapping.eq(normalized_symbol_mapping),
                     ))
-                    .get_result::<AssetDB>(conn)?;
+                    .get_result::<AssetDB>(conn)
+                    .map_err(StorageError::from)?;
                 Ok(result_db.into())
             })
             .await
@@ -133,7 +140,8 @@ impl AssetRepositoryTrait for AssetRepository {
             .exec(move |conn: &mut SqliteConnection| -> Result<Asset> {
                 let result_db = diesel::update(assets::table.filter(assets::id.eq(asset_id_owned)))
                     .set(assets::data_source.eq(data_source))
-                    .get_result::<AssetDB>(conn)?;
+                    .get_result::<AssetDB>(conn)
+                    .map_err(StorageError::from)?;
                 Ok(result_db.into())
             })
             .await
@@ -167,7 +175,8 @@ impl AssetRepositoryTrait for AssetRepository {
                 let activity_count: i64 = activities::table
                     .filter(activities::asset_id.eq(&asset_id_owned))
                     .count()
-                    .get_result(conn)?;
+                    .get_result(conn)
+                    .map_err(StorageError::from)?;
 
                 if activity_count > 0 {
                     return Err(Error::ConstraintViolation(
@@ -179,15 +188,18 @@ impl AssetRepositoryTrait for AssetRepository {
                 let asset_symbol: String = assets::table
                     .filter(assets::id.eq(&asset_id_owned))
                     .select(assets::symbol)
-                    .first(conn)?;
+                    .first(conn)
+                    .map_err(StorageError::from)?;
 
                 // Delete all quotes for this asset (by symbol)
                 diesel::delete(quotes::table.filter(quotes::symbol.eq(&asset_symbol)))
-                    .execute(conn)?;
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
 
                 // Delete the asset
                 diesel::delete(assets::table.filter(assets::id.eq(&asset_id_owned)))
-                    .execute(conn)?;
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
 
                 Ok(())
             })

@@ -8,14 +8,14 @@
 
     // Path mapping for main app
     "paths": {
-      "@/*": ["./src/*"],
+      "@/*": ["./src-front/*"],
       "@wealthfolio/addon-sdk": ["packages/addon-sdk/src"],
       "@wealthfolio/ui": ["packages/ui/src"],
       "@wealthfolio/ui/*": ["packages/ui/src/*"],
       "@/components/ui/*": ["packages/ui/src/components/ui/*"]
     }
   },
-  "include": ["src"],
+  "include": ["src-front"],
   "references": [
     { "path": "./tsconfig.node.json" },
     { "path": "./packages/ui" },
