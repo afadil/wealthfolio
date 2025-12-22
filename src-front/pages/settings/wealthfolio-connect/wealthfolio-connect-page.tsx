@@ -1,12 +1,35 @@
 import { Icons } from "@/components/ui/icons";
 import { Separator } from "@/components/ui/separator";
 import { useWealthfolioConnect } from "@/context/wealthfolio-connect-context";
+import { Card, CardDescription, CardHeader, CardTitle } from "@wealthfolio/ui";
 import { SettingsHeader } from "../settings-header";
-import { SyncLoginForm } from "./sync-login-form";
 import { SyncConnectedView } from "./sync-connected-view";
+import { SyncLoginForm } from "./sync-login-form";
 
 export default function WealthfolioConnectPage() {
-  const { isConnected, isInitializing } = useWealthfolioConnect();
+  const { isEnabled, isConnected, isInitializing } = useWealthfolioConnect();
+
+  // Show "not configured" state when Connect feature is disabled
+  if (!isEnabled) {
+    return (
+      <div className="space-y-6">
+        <SettingsHeader
+          heading="Wealthfolio Connect"
+          text="Connect your broker accounts through our cloud service."
+        />
+        <Separator />
+        <Card>
+          <CardHeader className="items-center text-center">
+            <div className="bg-muted mb-2 flex h-12 w-12 items-center justify-center rounded-full">
+              <Icons.Cloud className="text-muted-foreground h-6 w-6" />
+            </div>
+            <CardTitle>Not Configured</CardTitle>
+            <CardDescription>Wealthfolio Connect is not configured for this build.</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
 
   if (isInitializing) {
     return (
@@ -26,8 +49,8 @@ export default function WealthfolioConnectPage() {
   return (
     <div className="space-y-6">
       <SettingsHeader
-        heading="Wealthfolio Sync"
-        text="Connect your broker accounts through our cloud service."
+        heading="Wealthfolio Connect"
+        text="Connect your broker accounts and devices through our cloud service."
       />
       <Separator />
       {isConnected ? <SyncConnectedView /> : <SyncLoginForm />}

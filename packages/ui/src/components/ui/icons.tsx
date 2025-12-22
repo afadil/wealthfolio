@@ -32,6 +32,8 @@ import {
   CloudSync,
   Copy,
   CreditCard,
+  DatabaseBackup,
+  DatabaseZap,
   DollarSign,
   Download,
   Eraser,
@@ -86,6 +88,7 @@ import {
   Save,
   ScrollText,
   Search,
+  Settings2,
   Shield,
   Smartphone,
   Sparkles,
@@ -108,7 +111,7 @@ import {
   Wifi,
   X,
   XCircle,
-  type LucideIcon
+  type LucideIcon,
 } from "lucide-react";
 
 export type Icon = LucideIcon;
@@ -116,6 +119,8 @@ export type Icon = LucideIcon;
 export const Icons = {
   AlertCircle: AlertCircle,
   AlertTriangle: AlertTriangle,
+  DatabaseBackup: DatabaseBackup,
+  DatabaseZap: DatabaseZap,
   Blocks: Blocks,
   BadgeDollarSign: BadgeDollarSign,
   Grid3x3: Grid3x3,
@@ -223,6 +228,7 @@ export const Icons = {
   RectangleEllipsis: RectangleEllipsis,
   Mail: Mail,
   OctagonX: OctagonX,
+  Settings2: Settings2,
   Dashboard: ({ size, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -620,12 +626,13 @@ export const Icons = {
     <svg
       xmlns="http://www.w3.org/2000/svg"
       {...props}
-      width={size ?? 32}
-      height={size ?? 32}
+      width={size ?? 92}
+      height={size ?? 92}
       fill="currentColor"
       viewBox="0 0 256 256"
     >
-    <path d="M240,128a80,80,0,0,1-80,80H72A56,56,0,1,1,85.92,97.74l0,.1A80,80,0,0,1,240,128Z" opacity="0.2"></path><path d="M248,128a87.34,87.34,0,0,1-17.6,52.81,8,8,0,1,1-12.8-9.62A71.34,71.34,0,0,0,232,128a72,72,0,0,0-144,0,8,8,0,0,1-16,0,88,88,0,0,1,3.29-23.88C74.2,104,73.1,104,72,104a48,48,0,0,0,0,96H96a8,8,0,0,1,0,16H72A64,64,0,1,1,81.29,88.68,88,88,0,0,1,248,128Zm-69.66,42.34L160,188.69V128a8,8,0,0,0-16,0v60.69l-18.34-18.35a8,8,0,0,0-11.32,11.32l32,32a8,8,0,0,0,11.32,0l32-32a8,8,0,0,0-11.32-11.32Z"></path>
-</svg>
+      <path d="M240,128a80,80,0,0,1-80,80H72A56,56,0,1,1,85.92,97.74l0,.1A80,80,0,0,1,240,128Z" opacity="0.2"></path>
+      <path d="M248,128a87.34,87.34,0,0,1-17.6,52.81,8,8,0,1,1-12.8-9.62A71.34,71.34,0,0,0,232,128a72,72,0,0,0-144,0,8,8,0,0,1-16,0,88,88,0,0,1,3.29-23.88C74.2,104,73.1,104,72,104a48,48,0,0,0,0,96H96a8,8,0,0,1,0,16H72A64,64,0,1,1,81.29,88.68,88,88,0,0,1,248,128Zm-69.66,42.34L160,188.69V128a8,8,0,0,0-16,0v60.69l-18.34-18.35a8,8,0,0,0-11.32,11.32l32,32a8,8,0,0,0,11.32,0l32-32a8,8,0,0,0-11.32-11.32Z"></path>
+    </svg>
   ),
 };

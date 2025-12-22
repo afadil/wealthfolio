@@ -27,7 +27,7 @@ export function AccountItem({ account, onEdit, onDelete }: AccountItemProps) {
           >
             {account.name}
           </Link>
-          {isSynced && <Icons.CloudSync className="text-muted-foreground h-3.5 w-3.5" />}
+          {isSynced && <Icons.CloudSync2 className="text-muted-foreground h-3.5 w-3.5" />}
         </div>
         <div className="flex items-center gap-2">
           <p className="text-muted-foreground text-sm">

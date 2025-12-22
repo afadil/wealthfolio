@@ -1,7 +1,7 @@
+import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
 import path from "path";
 import { defineConfig } from "vitest/config";
-import react from "@vitejs/plugin-react";
-import tailwindcss from "@tailwindcss/vite";
 
 const host = process.env.TAURI_DEV_HOST;
 const apiTarget =
@@ -60,7 +60,7 @@ export default defineConfig({
   },
   // 3. to make use of `TAURI_DEBUG` and other env variables
   // https://tauri.app/v1/api/config#buildconfig.beforedevcommand
-  envPrefix: ["VITE_", "TAURI_"],
+  envPrefix: ["VITE_", "TAURI_", "CONNECT_"],
   build: {
     // Tauri uses Chromium on Windows and WebKit on macOS and Linux
     //target: process.env.TAURI_PLATFORM == 'windows' ? 'chrome105' : 'safari13',

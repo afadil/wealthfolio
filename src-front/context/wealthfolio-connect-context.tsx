@@ -3,6 +3,7 @@ import { getUserInfo, type UserInfo } from "@/commands/brokers-sync";
 import { getSecret } from "@/commands/secrets";
 import { clearSyncSession, storeSyncSession } from "@/commands/wealthfolio-connect";
 import { getPlatform } from "@/hooks/use-platform";
+import { CONNECT_ENABLED } from "@/lib/connect-config";
 import { createClient, Session, SupabaseClient, User } from "@supabase/supabase-js";
 import {
   createContext,
@@ -15,10 +16,10 @@ import {
   type ReactNode,
 } from "react";
 
-// Supabase configuration - these are public keys (safe for client-side)
-// Set via environment variables: VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+// Auth configuration - these are public keys (safe for client-side)
+// Set via environment variables: CONNECT_AUTH_URL and CONNECT_AUTH_PUBLISHABLE_KEY
+const SUPABASE_URL = import.meta.env.CONNECT_AUTH_URL as string;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.CONNECT_AUTH_PUBLISHABLE_KEY as string;
 
 // Keys for storing tokens in keyring
 const REFRESH_TOKEN_KEY = "wealthfolio_sync_refresh_token";
@@ -29,7 +30,6 @@ const DESKTOP_DEEP_LINK_URL = "wealthfolio://auth/callback";
 
 // Universal link callback URL for Tauri mobile (associated domain)
 const MOBILE_UNIVERSAL_LINK_CALLBACK_URL = "https://auth.wealthfolio.app/callback";
-
 
 // Web redirect URL for OAuth and magic link
 const getWebRedirectUrl = () => {
@@ -78,9 +78,11 @@ function parseAuthCallbackUrl(url: string): AuthCallbackPayload | null {
 }
 
 interface WealthfolioConnectContextValue {
+  isEnabled: boolean;
   isConnected: boolean;
   isInitializing: boolean;
   isLoading: boolean;
+  isLoadingUserInfo: boolean;
   user: User | null;
   session: Session | null;
   teamId: string | null;
@@ -96,7 +98,32 @@ interface WealthfolioConnectContextValue {
   refetchUserInfo: () => Promise<void>;
 }
 
-const WealthfolioConnectContext = createContext<WealthfolioConnectContextValue | undefined>(undefined);
+const WealthfolioConnectContext = createContext<WealthfolioConnectContextValue | undefined>(
+  undefined,
+);
+
+// Disabled context value - used when CONNECT_ENABLED is false
+// All methods are no-ops that return resolved promises
+const disabledContextValue: WealthfolioConnectContextValue = {
+  isEnabled: false,
+  isConnected: false,
+  isInitializing: false,
+  isLoading: false,
+  isLoadingUserInfo: false,
+  user: null,
+  session: null,
+  teamId: null,
+  userInfo: null,
+  error: null,
+  signInWithEmail: async () => {},
+  signUpWithEmail: async () => {},
+  signInWithOAuth: async () => {},
+  signInWithMagicLink: async () => {},
+  verifyOtp: async () => {},
+  signOut: async () => {},
+  clearError: () => {},
+  refetchUserInfo: async () => {},
+};
 
 function getAuthStorageKey(supabaseUrl: string): string {
   try {
@@ -176,9 +203,11 @@ const createSupabaseClient = () => {
   });
 };
 
-export function WealthfolioConnectProvider({ children }: { children: ReactNode }) {
+// Internal provider used when Connect is enabled
+function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }) {
   const [isInitializing, setIsInitializing] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingUserInfo, setIsLoadingUserInfo] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
@@ -585,15 +614,23 @@ export function WealthfolioConnectProvider({ children }: { children: ReactNode }
   const refetchUserInfo = useCallback(async () => {
     if (!session || getRunEnv() !== RUN_ENV.DESKTOP) {
       setUserInfo(null);
+      setIsLoadingUserInfo(false);
       return;
     }
+
+    setIsLoadingUserInfo(true);
+    setError(null);
 
     try {
       const info = await getUserInfo();
       setUserInfo(info);
-    } catch (_err) {
+    } catch (err) {
       logger.error("Failed to fetch user info from API.");
       setUserInfo(null);
+      const message = err instanceof Error ? err.message : "Failed to fetch user info";
+      setError(message);
+    } finally {
+      setIsLoadingUserInfo(false);
     }
   }, [session]);
 
@@ -613,9 +650,11 @@ export function WealthfolioConnectProvider({ children }: { children: ReactNode }
 
   const value = useMemo<WealthfolioConnectContextValue>(
     () => ({
+      isEnabled: true,
       isConnected: !!session,
       isInitializing,
       isLoading,
+      isLoadingUserInfo,
       user,
       session,
       teamId,
@@ -634,6 +673,7 @@ export function WealthfolioConnectProvider({ children }: { children: ReactNode }
       session,
       isInitializing,
       isLoading,
+      isLoadingUserInfo,
       user,
       teamId,
       userInfo,
@@ -650,8 +690,23 @@ export function WealthfolioConnectProvider({ children }: { children: ReactNode }
   );
 
   return (
-    <WealthfolioConnectContext.Provider value={value}>{children}</WealthfolioConnectContext.Provider>
+    <WealthfolioConnectContext.Provider value={value}>
+      {children}
+    </WealthfolioConnectContext.Provider>
   );
+}
+
+// Main provider that chooses enabled/disabled path based on configuration
+export function WealthfolioConnectProvider({ children }: { children: ReactNode }) {
+  if (!CONNECT_ENABLED) {
+    return (
+      <WealthfolioConnectContext.Provider value={disabledContextValue}>
+        {children}
+      </WealthfolioConnectContext.Provider>
+    );
+  }
+
+  return <EnabledWealthfolioConnectProvider>{children}</EnabledWealthfolioConnectProvider>;
 }
 
 export const useWealthfolioConnect = () => {
