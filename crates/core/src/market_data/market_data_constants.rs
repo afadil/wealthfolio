@@ -8,7 +8,7 @@ pub const DATA_SOURCE_METAL_PRICE_API: &str = "METAL_PRICE_API";
 
 /// Default values
 pub const DEFAULT_QUOTE_BATCH_SIZE: usize = 1000;
-pub const DEFAULT_HISTORY_DAYS: i64 = 3650; // 10 years
+pub const DEFAULT_HISTORY_DAYS: i64 = 1825; // 5 years
 
 /// Time constants
 pub const MARKET_DATA_QUOTE_TIME: (u32, u32, u32) = (16, 0, 0); // 4:00 PM

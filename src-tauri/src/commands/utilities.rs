@@ -5,7 +5,7 @@ use std::io::Read;
 use std::path::Path;
 use tauri::Manager;
 use tauri::{AppHandle, Emitter};
-use wealthfolio_core::db;
+use wealthfolio_storage_sqlite::db;
 
 use crate::context::ServiceContext;
 #[cfg(desktop)]

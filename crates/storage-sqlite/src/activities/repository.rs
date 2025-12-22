@@ -8,13 +8,18 @@ use std::str::FromStr;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use super::activities_traits::ActivityRepositoryTrait;
-use crate::activities::activities_constants::*;
-use crate::activities::activities_errors::ActivityError;
-use crate::activities::activities_model::*;
+use wealthfolio_core::activities::{
+    Activity, ActivityBulkIdentifierMapping, ActivityBulkMutationResult, ActivityDetails,
+    ActivityRepositoryTrait, ActivitySearchResponse, ActivitySearchResponseMeta, ActivityUpdate,
+    ImportMapping, IncomeData, NewActivity, Sort, INCOME_ACTIVITY_TYPES, TRADING_ACTIVITY_TYPES,
+};
+use wealthfolio_core::activities::ActivityError;
+use wealthfolio_core::{Error, Result};
+
+use super::model::{ActivityDB, ActivityDetailsDB, ImportMappingDB};
 use crate::db::{get_connection, WriteHandle};
+use crate::errors::StorageError;
 use crate::schema::{accounts, activities, activity_import_profiles, assets};
-use crate::{Error, Result};
 use async_trait::async_trait;
 use diesel::dsl::min;
 use num_traits::Zero;
@@ -55,7 +60,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .filter(activities::activity_type.eq_any(TRADING_ACTIVITY_TYPES))
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
-            .load::<ActivityDB>(&mut conn)?;
+            .load::<ActivityDB>(&mut conn)
+            .map_err(StorageError::from)?;
 
         Ok(activities_db.into_iter().map(Activity::from).collect())
     }
@@ -69,7 +75,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .filter(activities::activity_type.eq_any(INCOME_ACTIVITY_TYPES))
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
-            .load::<ActivityDB>(&mut conn)?;
+            .load::<ActivityDB>(&mut conn)
+            .map_err(StorageError::from)?;
 
         Ok(activities_db.into_iter().map(Activity::from).collect())
     }
@@ -82,7 +89,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .filter(accounts::is_active.eq(true))
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
-            .load::<ActivityDB>(&mut conn)?;
+            .load::<ActivityDB>(&mut conn)
+            .map_err(StorageError::from)?;
 
         Ok(activities_db.into_iter().map(Activity::from).collect())
     }
@@ -179,10 +187,11 @@ impl ActivityRepositoryTrait for ActivityRepository {
         // Count query
         let total_row_count = create_base_query(&conn)
             .count()
-            .get_result::<i64>(&mut conn)?;
+            .get_result::<i64>(&mut conn)
+            .map_err(StorageError::from)?;
 
         // Data fetching query
-        let results = create_base_query(&conn)
+        let results_db = create_base_query(&conn)
             .select((
                 activities::id,
                 activities::account_id,
@@ -207,7 +216,10 @@ impl ActivityRepositoryTrait for ActivityRepository {
             ))
             .limit(page_size)
             .offset(offset)
-            .load::<ActivityDetails>(&mut conn)?;
+            .load::<ActivityDetailsDB>(&mut conn)
+            .map_err(StorageError::from)?;
+
+        let results: Vec<ActivityDetails> = results_db.into_iter().map(ActivityDetails::from).collect();
 
         Ok(ActivitySearchResponse {
             data: results,
@@ -225,7 +237,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 activity_to_insert.id = Uuid::new_v4().to_string();
                 let inserted_activity = diesel::insert_into(activities::table)
                     .values(&activity_to_insert)
-                    .get_result::<ActivityDB>(conn)?;
+                    .get_result::<ActivityDB>(conn)
+                    .map_err(StorageError::from)?;
                 Ok(Activity::from(inserted_activity))
             })
             .await
@@ -242,7 +255,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 let existing = activities::table
                     .select(ActivityDB::as_select())
                     .find(&activity_id_owned)
-                    .first::<ActivityDB>(conn)?;
+                    .first::<ActivityDB>(conn)
+                    .map_err(StorageError::from)?;
 
                 let ActivityDB {
                     created_at,
@@ -271,7 +285,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 let updated_activity =
                     diesel::update(activities::table.find(&activity_to_update.id))
                         .set(&activity_to_update)
-                        .get_result::<ActivityDB>(conn)?;
+                        .get_result::<ActivityDB>(conn)
+                        .map_err(StorageError::from)?;
                 Ok(Activity::from(updated_activity))
             })
             .await
@@ -283,9 +298,11 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 let activity = activities::table
                     .select(ActivityDB::as_select())
                     .find(&activity_id)
-                    .first::<ActivityDB>(conn)?;
+                    .first::<ActivityDB>(conn)
+                    .map_err(StorageError::from)?;
                 diesel::delete(activities::table.filter(activities::id.eq(&activity_id)))
-                    .execute(conn)?;
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
                 Ok(activity.into())
             })
             .await
@@ -306,9 +323,11 @@ impl ActivityRepositoryTrait for ActivityRepository {
                         let activity_db = activities::table
                             .select(ActivityDB::as_select())
                             .find(&delete_id)
-                            .first::<ActivityDB>(conn)?;
+                            .first::<ActivityDB>(conn)
+                            .map_err(StorageError::from)?;
                         diesel::delete(activities::table.filter(activities::id.eq(&delete_id)))
-                            .execute(conn)?;
+                            .execute(conn)
+                            .map_err(StorageError::from)?;
                         outcome.deleted.push(Activity::from(activity_db));
                     }
 
@@ -318,7 +337,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
                         let existing = activities::table
                             .select(ActivityDB::as_select())
                             .find(&activity_db.id)
-                            .first::<ActivityDB>(conn)?;
+                            .first::<ActivityDB>(conn)
+                            .map_err(StorageError::from)?;
 
                         let ActivityDB {
                             created_at,
@@ -347,7 +367,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
                         let updated_activity =
                             diesel::update(activities::table.find(&activity_db.id))
                                 .set(&activity_db)
-                                .get_result::<ActivityDB>(conn)?;
+                                .get_result::<ActivityDB>(conn)
+                                .map_err(StorageError::from)?;
                         outcome.updated.push(Activity::from(updated_activity));
                     }
 
@@ -360,7 +381,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
                         activity_db.id = generated_id.clone();
                         let inserted_activity = diesel::insert_into(activities::table)
                             .values(&activity_db)
-                            .get_result::<ActivityDB>(conn)?;
+                            .get_result::<ActivityDB>(conn)
+                            .map_err(StorageError::from)?;
                         outcome
                             .created
                             .push(Activity::from(inserted_activity.clone()));
@@ -388,7 +410,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .filter(activities::account_id.eq(account_id))
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
-            .load::<ActivityDB>(&mut conn)?;
+            .load::<ActivityDB>(&mut conn)
+            .map_err(StorageError::from)?;
 
         Ok(activities_db.into_iter().map(Activity::from).collect())
     }
@@ -403,7 +426,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .filter(activities::account_id.eq_any(account_ids))
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
-            .load::<ActivityDB>(&mut conn)?;
+            .load::<ActivityDB>(&mut conn)
+            .map_err(StorageError::from)?;
 
         Ok(activities_db.into_iter().map(Activity::from).collect())
     }
@@ -443,7 +467,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
         )
         .bind::<diesel::sql_types::Text, _>(account_id)
         .bind::<diesel::sql_types::Text, _>(asset_id)
-        .get_result(&mut conn)?;
+        .get_result(&mut conn)
+        .map_err(StorageError::from)?;
 
         Ok(Decimal::from_str(&result.average_cost).unwrap_or_default())
     }
@@ -452,24 +477,26 @@ impl ActivityRepositoryTrait for ActivityRepository {
     fn get_import_mapping(&self, some_account_id: &str) -> Result<Option<ImportMapping>> {
         let mut conn = get_connection(&self.pool)?;
 
-        activity_import_profiles::table
+        let result = activity_import_profiles::table
             .filter(activity_import_profiles::account_id.eq(some_account_id))
-            .first::<ImportMapping>(&mut conn)
+            .first::<ImportMappingDB>(&mut conn)
             .optional()
-            .map_err(Error::from)
+            .map_err(StorageError::from)?;
+
+        Ok(result.map(ImportMapping::from))
     }
 
     async fn save_import_mapping(&self, mapping: &ImportMapping) -> Result<()> {
-        let mapping_owned = mapping.clone();
+        let mapping_db: ImportMappingDB = mapping.clone().into();
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
-                let profile_db = mapping_owned;
                 diesel::insert_into(activity_import_profiles::table)
-                    .values(&profile_db)
+                    .values(&mapping_db)
                     .on_conflict(activity_import_profiles::account_id)
                     .do_update()
-                    .set(&profile_db)
-                    .execute(conn)?;
+                    .set(&mapping_db)
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
                 Ok(())
             })
             .await
@@ -497,7 +524,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
                 let num_inserted = diesel::insert_into(activities::table)
                     .values(&activities_db_owned)
-                    .execute(conn)?;
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
                 Ok(num_inserted)
             })
             .await
@@ -614,7 +642,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .filter(accounts::is_active.eq(true))
             .select(min(activities::activity_date))
             .first::<Option<String>>(&mut conn)
-            .map_err(Error::from)?
+            .map_err(StorageError::from)?
             .ok_or(ActivityError::NotFound("No activities found.".to_string()))?;
 
         // Parse the string result
@@ -642,7 +670,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
 
         let min_date_str_opt = query
             .first::<Option<String>>(&mut conn)
-            .map_err(Error::from)?;
+            .map_err(StorageError::from)?;
 
         match min_date_str_opt {
             Some(date_str) => DateTime::parse_from_rfc3339(&date_str)

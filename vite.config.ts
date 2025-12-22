@@ -32,7 +32,7 @@ export default defineConfig({
       "@/components/ui": path.resolve(__dirname, "packages/ui/src/components/ui"),
       "@wealthfolio/addon-sdk": path.resolve(__dirname, "packages/addon-sdk/src"),
       "@wealthfolio/ui": path.resolve(__dirname, "packages/ui/src"),
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(__dirname, "./src-front"),
     },
     extensions: [".js", ".ts", ".jsx", ".tsx", ".json"],
   },
@@ -72,7 +72,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "jsdom",
-    setupFiles: "./src/test/setup.ts",
-    include: ["src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
+    setupFiles: "./src-front/test/setup.ts",
+    include: ["src-front/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
   },
 } as unknown as import("vitest/config").UserConfigExport);

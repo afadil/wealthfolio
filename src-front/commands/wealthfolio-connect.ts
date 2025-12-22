@@ -1,7 +1,7 @@
 import { getRunEnv, invokeTauri, logger, RUN_ENV } from "@/adapters";
 
 const DESKTOP_ONLY_ERROR_MESSAGE =
-  "Wealthfolio Sync secure session storage is only available in the desktop app.";
+  "Wealthfolio Connect secure session storage is only available in the desktop app.";
 
 const assertDesktop = () => {
   if (getRunEnv() !== RUN_ENV.DESKTOP) {

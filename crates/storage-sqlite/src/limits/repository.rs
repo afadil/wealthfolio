@@ -5,11 +5,15 @@ use diesel::sqlite::SqliteConnection;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use super::limits_model::{ContributionLimit, NewContributionLimit};
-use super::limits_traits::ContributionLimitRepositoryTrait;
+use wealthfolio_core::limits::{
+    ContributionLimit, ContributionLimitRepositoryTrait, NewContributionLimit,
+};
+use wealthfolio_core::Result;
+
+use super::model::ContributionLimitDB;
 use crate::db::{get_connection, WriteHandle};
-use crate::errors::{Error, Result};
-use crate::schema::contribution_limits; // Import the schema module directly
+use crate::errors::StorageError;
+use crate::schema::contribution_limits;
 
 pub struct ContributionLimitRepository {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
@@ -24,17 +28,19 @@ impl ContributionLimitRepository {
     // Read methods can remain in inherent impl if preferred, or be called by trait methods.
     fn get_contribution_limit_impl(&self, id_param: &str) -> Result<ContributionLimit> {
         let mut conn = get_connection(&self.pool)?;
-        contribution_limits::table
+        let result_db = contribution_limits::table
             .find(id_param)
-            .first(&mut conn)
-            .map_err(Error::from)
+            .first::<ContributionLimitDB>(&mut conn)
+            .map_err(StorageError::from)?;
+        Ok(ContributionLimit::from(result_db))
     }
 
     fn get_contribution_limits_impl(&self) -> Result<Vec<ContributionLimit>> {
         let mut conn = get_connection(&self.pool)?;
-        contribution_limits::table
-            .load(&mut conn)
-            .map_err(Error::from)
+        let results_db = contribution_limits::table
+            .load::<ContributionLimitDB>(&mut conn)
+            .map_err(StorageError::from)?;
+        Ok(results_db.into_iter().map(ContributionLimit::from).collect())
     }
 }
 
@@ -70,10 +76,11 @@ impl ContributionLimitRepositoryTrait for ContributionLimitRepository {
                         contribution_limits::updated_at.eq(chrono::Utc::now().naive_utc()),
                     );
 
-                    diesel::insert_into(contribution_limits::table)
+                    let result_db = diesel::insert_into(contribution_limits::table)
                         .values(new_limit_record)
-                        .get_result(conn)
-                        .map_err(Error::from)
+                        .get_result::<ContributionLimitDB>(conn)
+                        .map_err(StorageError::from)?;
+                    Ok(ContributionLimit::from(result_db))
                 },
             )
             .await
@@ -91,7 +98,7 @@ impl ContributionLimitRepositoryTrait for ContributionLimitRepository {
             .exec(
                 move |conn: &mut SqliteConnection| -> Result<ContributionLimit> {
                     let target = contribution_limits::table.find(id_owned); // id_owned is moved
-                    diesel::update(target)
+                    let result_db = diesel::update(target)
                         .set((
                             contribution_limits::group_name.eq(updated_limit_owned.group_name),
                             contribution_limits::contribution_year
@@ -102,8 +109,9 @@ impl ContributionLimitRepositoryTrait for ContributionLimitRepository {
                             contribution_limits::end_date.eq(updated_limit_owned.end_date),
                             contribution_limits::updated_at.eq(chrono::Utc::now().naive_utc()),
                         ))
-                        .get_result(conn)
-                        .map_err(Error::from)
+                        .get_result::<ContributionLimitDB>(conn)
+                        .map_err(StorageError::from)?;
+                    Ok(ContributionLimit::from(result_db))
                 },
             )
             .await
@@ -116,8 +124,8 @@ impl ContributionLimitRepositoryTrait for ContributionLimitRepository {
                 // id_owned is moved
                 diesel::delete(contribution_limits::table.find(id_owned))
                     .execute(conn)
-                    .map_err(Error::from)
-                    .map(|_| ())
+                    .map_err(StorageError::from)?;
+                Ok(())
             })
             .await
     }

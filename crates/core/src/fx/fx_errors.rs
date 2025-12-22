@@ -31,11 +31,6 @@ impl fmt::Display for FxError {
 
 impl Error for FxError {}
 
-impl From<diesel::result::Error> for FxError {
-    fn from(err: diesel::result::Error) -> Self {
-        FxError::DatabaseError(err.to_string())
-    }
-}
 
 impl From<DatabaseError> for FxError {
     fn from(err: DatabaseError) -> Self {
@@ -82,7 +77,7 @@ impl
                 '_,
                 std::collections::HashMap<
                     String,
-                    Vec<crate::market_data::market_data_model::Quote>,
+                    Vec<crate::market_data::Quote>,
                 >,
             >,
         >,
@@ -94,7 +89,7 @@ impl
                 '_,
                 std::collections::HashMap<
                     String,
-                    Vec<crate::market_data::market_data_model::Quote>,
+                    Vec<crate::market_data::Quote>,
                 >,
             >,
         >,
@@ -110,7 +105,7 @@ impl
                 '_,
                 std::collections::HashMap<
                     String,
-                    Vec<crate::market_data::market_data_model::Quote>,
+                    Vec<crate::market_data::Quote>,
                 >,
             >,
         >,
@@ -122,7 +117,7 @@ impl
                 '_,
                 std::collections::HashMap<
                     String,
-                    Vec<crate::market_data::market_data_model::Quote>,
+                    Vec<crate::market_data::Quote>,
                 >,
             >,
         >,
@@ -130,5 +125,3 @@ impl
         FxError::CacheError(err.to_string())
     }
 }
-
-use diesel;

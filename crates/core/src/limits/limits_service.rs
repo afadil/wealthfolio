@@ -4,9 +4,9 @@ use std::sync::Arc;
 use chrono::NaiveDateTime;
 use rust_decimal::Decimal;
 
-use crate::activities::activities_traits::ActivityRepositoryTrait;
+use crate::activities::ActivityRepositoryTrait;
 use crate::errors::{Error, Result, ValidationError};
-use crate::fx::fx_traits::FxServiceTrait;
+use crate::fx::FxServiceTrait;
 
 use super::limits_model::{
     AccountDeposit, ContributionLimit, DepositsCalculation, NewContributionLimit,

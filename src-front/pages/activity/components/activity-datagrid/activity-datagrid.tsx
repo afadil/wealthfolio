@@ -45,7 +45,7 @@ import {
   worldCurrencies,
 } from "@wealthfolio/ui";
 import type { Dispatch, SetStateAction } from "react";
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";
@@ -480,54 +480,51 @@ export function ActivityDatagrid({
       ? rowVirtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end
       : 0;
 
-  const handleCellNavigation = useCallback(
-    (direction: "up" | "down" | "left" | "right") => {
-      setFocusedCell((current) => {
-        if (!current) return current;
+  const handleCellNavigation = useCallback((direction: "up" | "down" | "left" | "right") => {
+    setFocusedCell((current) => {
+      if (!current) return current;
 
-        const transactions = filteredTransactionsRef.current;
-        if (!transactions || transactions.length === 0) return current;
+      const transactions = filteredTransactionsRef.current;
+      if (!transactions || transactions.length === 0) return current;
 
-        const currentRowIndex = transactionIndexLookupRef.current.get(current.rowId) ?? -1;
-        if (currentRowIndex === -1) return current;
+      const currentRowIndex = transactionIndexLookupRef.current.get(current.rowId) ?? -1;
+      if (currentRowIndex === -1) return current;
 
-        const currentFieldIndex = editableFields.indexOf(current.field);
-        if (currentFieldIndex === -1) return current;
+      const currentFieldIndex = editableFields.indexOf(current.field);
+      if (currentFieldIndex === -1) return current;
 
-        let newRowIndex = currentRowIndex;
-        let newFieldIndex = currentFieldIndex;
+      let newRowIndex = currentRowIndex;
+      let newFieldIndex = currentFieldIndex;
 
-        switch (direction) {
-          case "up":
-            newRowIndex = Math.max(0, currentRowIndex - 1);
-            break;
-          case "down":
-            newRowIndex = Math.min(transactions.length - 1, currentRowIndex + 1);
-            break;
-          case "left":
-            newFieldIndex = Math.max(0, currentFieldIndex - 1);
-            break;
-          case "right":
-            newFieldIndex = Math.min(editableFields.length - 1, currentFieldIndex + 1);
-            break;
-        }
+      switch (direction) {
+        case "up":
+          newRowIndex = Math.max(0, currentRowIndex - 1);
+          break;
+        case "down":
+          newRowIndex = Math.min(transactions.length - 1, currentRowIndex + 1);
+          break;
+        case "left":
+          newFieldIndex = Math.max(0, currentFieldIndex - 1);
+          break;
+        case "right":
+          newFieldIndex = Math.min(editableFields.length - 1, currentFieldIndex + 1);
+          break;
+      }
 
-        const nextRow = transactions[newRowIndex];
-        const nextField = editableFields[newFieldIndex];
+      const nextRow = transactions[newRowIndex];
+      const nextField = editableFields[newFieldIndex];
 
-        if (!nextRow || !nextField) {
-          return current;
-        }
+      if (!nextRow || !nextField) {
+        return current;
+      }
 
-        if (nextRow.id === current.rowId && nextField === current.field) {
-          return current;
-        }
+      if (nextRow.id === current.rowId && nextField === current.field) {
+        return current;
+      }
 
-        return { rowId: nextRow.id, field: nextField };
-      });
-    },
-    [],
-  );
+      return { rowId: nextRow.id, field: nextField };
+    });
+  }, []);
 
   const addNewRow = useCallback(() => {
     const now = new Date();

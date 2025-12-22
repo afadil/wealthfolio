@@ -4,7 +4,7 @@ use super::fx_model::{ExchangeRate, NewExchangeRate};
 use super::fx_traits::{FxRepositoryTrait, FxServiceTrait};
 use crate::errors::Result;
 use crate::fx::currency::{denormalization_multiplier, normalize_currency_code};
-use crate::market_data::market_data_model::DataSource;
+use crate::market_data::DataSource;
 use async_trait::async_trait;
 use chrono::{NaiveDate, Utc};
 use rust_decimal::Decimal;

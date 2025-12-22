@@ -1,39 +1,46 @@
 [package]
 name = "wealthfolio-app"
-version = "2.1.0"
+version.workspace = true
+edition.workspace = true
 description = "Portfolio tracker"
 authors = ["Aziz Fadil"]
 license = "AGPL-3.0"
 repository = ""
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
 tauri-build = { version = "2.5", features = [] }
 
 [dependencies]
-tauri = { version = " 2.9.3", features = [] }
-wealthfolio_core = { path = "../src-core" }
-diesel = { version = "2.3", features = ["sqlite", "chrono", "r2d2", "numeric", "returning_clauses_for_sqlite_3_35"] }
-dotenvy = "0.15.7"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0.128"
-chrono = { version = "0.4.38", features = ["serde"] }
+# Internal crates
+wealthfolio-core = { workspace = true }
+wealthfolio-connect = { workspace = true }
+wealthfolio-storage-sqlite = { workspace = true }
+
+# Tauri
+tauri = { version = "2.9.3", features = [] }
 tauri-plugin-fs = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-log = "2"
-log = "0.4"
-futures = "0.3"
-reqwest = { version = "0.12", features = ["json"] }
-tokio = { version = "1", features = ["time", "sync"] }
-keyring = "2.0"
 tauri-plugin-deep-link = "2"
-uuid = { version = "1.0", features = ["v4"] }
+
+# Workspace dependencies
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+log = { workspace = true }
+futures = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true, features = ["time"] }
+uuid = { workspace = true }
+anyhow = { workspace = true }
+diesel = { workspace = true }
+
+# Additional dependencies
+dotenvy = "0.15.7"
+keyring = "2.0"
 local-ip-address = "0.6"
 hostname = "0.3"
-anyhow = "1"
 base64 = "0.22"
 urlencoding = "2.1.3"
 

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { useWealthfolioSync } from "@/context/wealthfolio-sync-context";
+import { useWealthfolioConnect } from "@/context/wealthfolio-connect-context";
 import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
 import { getPreferredProvider, savePreferredProvider } from "@/lib/cookie-utils";
 import { isAppleDevice } from "@/lib/device-utils";
@@ -18,7 +18,7 @@ type Provider = "google" | "apple" | "email";
 
 export function SyncLoginForm() {
   const { signInWithOAuth, signInWithMagicLink, verifyOtp, error, clearError, isLoading } =
-    useWealthfolioSync();
+    useWealthfolioConnect();
 
   // State management
   const [email, setEmail] = useState("");
@@ -163,7 +163,7 @@ export function SyncLoginForm() {
               <Icons.Globe className="text-primary h-6 w-6" />
             </div>
             <div>
-              <CardTitle className="text-lg font-semibold">Sign in to Wealthfolio Sync</CardTitle>
+              <CardTitle className="text-lg font-semibold">Sign in to Wealthfolio Connect</CardTitle>
               <CardDescription>
                 Connect your broker accounts and access your portfolio from anywhere.
               </CardDescription>

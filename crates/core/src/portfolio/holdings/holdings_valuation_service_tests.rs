@@ -3,7 +3,7 @@
 mod tests {
     use crate::errors::{Error, Result};
     use crate::fx::fx_model::*;
-    use crate::fx::fx_traits::FxServiceTrait;
+    use crate::fx::FxServiceTrait;
     use crate::market_data::market_data_model::DataSource;
     use crate::market_data::market_data_model::*;
     use crate::market_data::market_data_traits::MarketDataServiceTrait;

@@ -2,14 +2,14 @@
 
 use async_trait::async_trait;
 
-use super::broker_models::{
-    AccountUniversalActivity, BrokerAccount, BrokerBrokerage, BrokerConnection, SyncAccountsResponse,
-    SyncConnectionsResponse,
+use super::models::{
+    AccountUniversalActivity, BrokerAccount, BrokerBrokerage, BrokerConnection,
+    SyncAccountsResponse, SyncConnectionsResponse,
 };
-use super::brokers_sync_state_repository::BrokersSyncState;
-use super::platform_repository::Platform;
-use crate::accounts::Account;
-use crate::errors::Result;
+use crate::platform::Platform;
+use crate::state::BrokersSyncState;
+use wealthfolio_core::accounts::Account;
+use wealthfolio_core::errors::Result;
 
 /// Trait for fetching data from the cloud broker API
 #[async_trait]
@@ -18,7 +18,10 @@ pub trait BrokerApiClient: Send + Sync {
     async fn list_connections(&self) -> Result<Vec<BrokerConnection>>;
 
     /// Fetch all broker accounts for the user
-    async fn list_accounts(&self, authorization_ids: Option<Vec<String>>) -> Result<Vec<BrokerAccount>>;
+    async fn list_accounts(
+        &self,
+        authorization_ids: Option<Vec<String>>,
+    ) -> Result<Vec<BrokerAccount>>;
 
     /// Fetch all available brokerages
     async fn list_brokerages(&self) -> Result<Vec<BrokerBrokerage>>;
@@ -38,10 +41,14 @@ pub trait PlatformRepositoryTrait: Send + Sync {
 #[async_trait]
 pub trait SyncServiceTrait: Send + Sync {
     /// Sync connections from the broker API to local platforms table
-    async fn sync_connections(&self, connections: Vec<BrokerConnection>) -> Result<SyncConnectionsResponse>;
+    async fn sync_connections(
+        &self,
+        connections: Vec<BrokerConnection>,
+    ) -> Result<SyncConnectionsResponse>;
 
     /// Sync accounts from the broker API to local accounts table
-    async fn sync_accounts(&self, broker_accounts: Vec<BrokerAccount>) -> Result<SyncAccountsResponse>;
+    async fn sync_accounts(&self, broker_accounts: Vec<BrokerAccount>)
+        -> Result<SyncAccountsResponse>;
 
     /// Get all synced accounts (accounts with external_id set)
     fn get_synced_accounts(&self) -> Result<Vec<Account>>;
@@ -70,5 +77,6 @@ pub trait SyncServiceTrait: Send + Sync {
     ) -> Result<()>;
 
     /// Finalize an activity sync as failed for an account.
-    async fn finalize_activity_sync_failure(&self, account_id: String, error: String) -> Result<()>;
+    async fn finalize_activity_sync_failure(&self, account_id: String, error: String)
+        -> Result<()>;
 }

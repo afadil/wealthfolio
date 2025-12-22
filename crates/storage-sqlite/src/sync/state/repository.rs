@@ -1,61 +1,14 @@
 use diesel::prelude::*;
 use diesel::r2d2::{self, Pool};
 use diesel::sqlite::SqliteConnection;
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::db::{get_connection, WriteHandle};
-use crate::errors::Result;
+use crate::errors::StorageError;
 use crate::schema::brokers_sync_state;
+use wealthfolio_core::errors::Result;
 
-#[derive(
-    Queryable,
-    Insertable,
-    AsChangeset,
-    Selectable,
-    Serialize,
-    Deserialize,
-    Debug,
-    Clone,
-    Default,
-)]
-#[diesel(table_name = crate::schema::brokers_sync_state)]
-#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
-#[diesel(primary_key(account_id))]
-pub struct BrokersSyncStateDB {
-    pub account_id: String,
-    pub provider: String,
-    pub last_synced_date: Option<String>,
-    pub last_attempted_at: Option<String>,
-    pub last_successful_at: Option<String>,
-    pub last_error: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BrokersSyncState {
-    pub account_id: String,
-    pub provider: String,
-    pub last_synced_date: Option<String>,
-    pub last_attempted_at: Option<String>,
-    pub last_successful_at: Option<String>,
-    pub last_error: Option<String>,
-}
-
-impl From<BrokersSyncStateDB> for BrokersSyncState {
-    fn from(db: BrokersSyncStateDB) -> Self {
-        Self {
-            account_id: db.account_id,
-            provider: db.provider,
-            last_synced_date: db.last_synced_date,
-            last_attempted_at: db.last_attempted_at,
-            last_successful_at: db.last_successful_at,
-            last_error: db.last_error,
-        }
-    }
-}
+use super::model::{BrokersSyncState, BrokersSyncStateDB};
 
 pub struct BrokersSyncStateRepository {
     pool: Arc<Pool<r2d2::ConnectionManager<SqliteConnection>>>,
@@ -76,7 +29,8 @@ impl BrokersSyncStateRepository {
             .select(BrokersSyncStateDB::as_select())
             .find(account_id)
             .first::<BrokersSyncStateDB>(&mut conn)
-            .optional()?;
+            .optional()
+            .map_err(StorageError::from)?;
         Ok(state.map(BrokersSyncState::from))
     }
 
@@ -104,7 +58,7 @@ impl BrokersSyncStateRepository {
                         brokers_sync_state::last_attempted_at.eq(&state.last_attempted_at),
                         brokers_sync_state::updated_at.eq(&state.updated_at),
                     ))
-                    .execute(conn)?;
+                    .execute(conn).map_err(StorageError::from)?;
                 Ok(())
             })
             .await
@@ -142,13 +96,18 @@ impl BrokersSyncStateRepository {
                         brokers_sync_state::last_error.eq::<Option<String>>(None),
                         brokers_sync_state::updated_at.eq(&state.updated_at),
                     ))
-                    .execute(conn)?;
+                    .execute(conn).map_err(StorageError::from)?;
                 Ok(())
             })
             .await
     }
 
-    pub async fn upsert_failure(&self, account_id: String, provider: String, error: String) -> Result<()> {
+    pub async fn upsert_failure(
+        &self,
+        account_id: String,
+        provider: String,
+        error: String,
+    ) -> Result<()> {
         let now = chrono::Utc::now().to_rfc3339();
         let error_trimmed = error.chars().take(4096).collect::<String>();
         let state = BrokersSyncStateDB {
@@ -174,10 +133,9 @@ impl BrokersSyncStateRepository {
                         brokers_sync_state::last_error.eq(&state.last_error),
                         brokers_sync_state::updated_at.eq(&state.updated_at),
                     ))
-                    .execute(conn)?;
+                    .execute(conn).map_err(StorageError::from)?;
                 Ok(())
             })
             .await
     }
 }
-

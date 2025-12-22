@@ -9,6 +9,33 @@ export interface LocalTransaction extends ActivityDetails {
 }
 
 /**
+ * Type guard to check if an ActivityDetails is a LocalTransaction
+ */
+export function isLocalTransaction(
+  activity: ActivityDetails,
+): activity is LocalTransaction {
+  return "isNew" in activity;
+}
+
+/**
+ * Converts an ActivityDetails to a LocalTransaction with default isNew=false
+ */
+export function toLocalTransaction(activity: ActivityDetails): LocalTransaction {
+  if (isLocalTransaction(activity)) {
+    return activity;
+  }
+  return { ...activity, isNew: false };
+}
+
+/**
+ * Checks if a transaction is pending review (synced but not yet approved)
+ * A transaction is pending review if isDraft=true AND it's not a locally created new row
+ */
+export function isPendingReview(transaction: LocalTransaction): boolean {
+  return transaction.isDraft === true && transaction.isNew !== true;
+}
+
+/**
  * Tracks the state of changes to transactions
  */
 export interface TransactionChangeState {

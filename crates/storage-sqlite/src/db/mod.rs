@@ -11,7 +11,9 @@ use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 use diesel::sqlite::SqliteConnection;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
-use crate::errors::{DatabaseError, Error, Result};
+use wealthfolio_core::errors::{DatabaseError, Error, Result};
+
+use crate::errors::StorageError;
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
@@ -31,10 +33,10 @@ pub fn init(app_data_dir: &str) -> Result<String> {
     }
 
     {
-        let mut conn = SqliteConnection::establish(&db_path)?;
+        let mut conn = SqliteConnection::establish(&db_path).map_err(StorageError::from)?;
         conn.batch_execute(
             "\n            PRAGMA journal_mode = WAL;\n            PRAGMA foreign_keys = ON;\n            PRAGMA busy_timeout = 30000;\n            PRAGMA synchronous  = NORMAL;\n        ",
-        )?;
+        ).map_err(StorageError::from)?;
     }
 
     Ok(db_path)
@@ -48,7 +50,7 @@ pub fn create_pool(db_path: &str) -> Result<Arc<DbPool>> {
         .connection_timeout(std::time::Duration::from_secs(30))
         .connection_customizer(Box::new(ConnectionCustomizer {}))
         .build(manager)
-        .map_err(DatabaseError::PoolCreationFailed)?;
+        .map_err(|e| DatabaseError::PoolCreationFailed(e.to_string()))?;
     Ok(Arc::new(pool))
 }
 
@@ -299,7 +301,7 @@ pub fn restore_database_safe(app_data_dir: &str, backup_file_path: &str) -> Resu
 
 /// Gets a connection from the pool
 pub fn get_connection(pool: &Pool<ConnectionManager<SqliteConnection>>) -> Result<DbConnection> {
-    Ok(pool.get()?)
+    Ok(pool.get().map_err(StorageError::from)?)
 }
 
 #[derive(Debug)]
@@ -421,12 +423,12 @@ impl DbTransactionExecutor for DbPool {
         F: FnOnce(&mut DbConnection) -> std::result::Result<T, E>,
         E: Into<Error>,
     {
-        let mut conn = self.get()?;
+        let mut conn = self.get().map_err(StorageError::from)?;
 
         conn.transaction(|tx_conn| {
             f(tx_conn).map_err(|_| diesel::result::Error::RollbackTransaction)
         })
-        .map_err(|e| Error::Database(DatabaseError::QueryFailed(e)))
+        .map_err(|e| Error::Database(DatabaseError::QueryFailed(e.to_string())))
     }
 }
 

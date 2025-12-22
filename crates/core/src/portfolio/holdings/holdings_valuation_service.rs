@@ -1,8 +1,7 @@
 use crate::errors::Result;
 use crate::fx::currency::{normalize_amount, normalize_currency_code};
-use crate::fx::fx_traits::FxServiceTrait;
-use crate::market_data::market_data_model::LatestQuotePair;
-use crate::market_data::market_data_traits::MarketDataServiceTrait;
+use crate::fx::FxServiceTrait;
+use crate::market_data::{LatestQuotePair, MarketDataServiceTrait};
 use crate::portfolio::holdings::{Holding, HoldingType, MonetaryValue};
 use async_trait::async_trait;
 use chrono::Utc;

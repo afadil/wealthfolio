@@ -1,16 +1,16 @@
-// src-core/src/portfolio/snapshot/mod.rs
+//! Portfolio snapshot module - holdings calculation and state management.
 
 pub mod holdings_calculator;
 mod positions_model;
 mod snapshot_model;
-mod snapshot_repository;
 pub mod snapshot_service;
+mod snapshot_traits;
 
 pub use holdings_calculator::*;
 pub use positions_model::*;
 pub use snapshot_model::*;
-pub use snapshot_repository::*;
 pub use snapshot_service::*;
+pub use snapshot_traits::*;
 
 #[cfg(test)]
 mod holdings_calculator_tests;

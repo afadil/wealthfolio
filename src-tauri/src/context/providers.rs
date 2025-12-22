@@ -1,24 +1,38 @@
 use super::registry::ServiceContext;
 use crate::secret_store::shared_secret_store;
 use std::sync::{Arc, RwLock};
+use wealthfolio_connect::{PlatformRepository, SyncService};
 use wealthfolio_core::{
-    accounts::{AccountRepository, AccountService},
-    activities::{ActivityRepository, ActivityService},
-    db::{self, write_actor},
-    fx::{FxRepository, FxService, FxServiceTrait},
-    goals::{GoalRepository, GoalService},
-    limits::{ContributionLimitRepository, ContributionLimitService},
-    market_data::{MarketDataRepository, MarketDataService, MarketDataServiceTrait, QuoteSyncStateRepository},
+    accounts::AccountService,
+    activities::ActivityService,
+    fx::{FxService, FxServiceTrait},
+    goals::GoalService,
+    limits::ContributionLimitService,
+    market_data::{MarketDataService, MarketDataServiceTrait},
     portfolio::{
         holdings::{HoldingsService, HoldingsValuationService},
         income::IncomeService,
         performance::PerformanceService,
+        snapshot::SnapshotService,
+        valuation::ValuationService,
     },
-    settings::{settings_repository::SettingsRepository, SettingsService, SettingsServiceTrait},
-    snapshot::{SnapshotRepository, SnapshotService},
-    sync::{PlatformRepository, SyncService},
-    valuation::{ValuationRepository, ValuationService},
-    AssetRepository, AssetService,
+    settings::{SettingsService, SettingsServiceTrait},
+    assets::AssetService,
+};
+use wealthfolio_storage_sqlite::{
+    accounts::AccountRepository,
+    activities::ActivityRepository,
+    assets::AssetRepository,
+    db::{self, write_actor},
+    fx::FxRepository,
+    goals::GoalRepository,
+    limits::ContributionLimitRepository,
+    market_data::{MarketDataRepository, QuoteSyncStateRepository},
+    portfolio::{
+        snapshot::SnapshotRepository,
+        valuation::ValuationRepository,
+    },
+    settings::SettingsRepository,
 };
 
 // Other imports
@@ -48,8 +62,6 @@ pub async fn initialize_context(
     let snapshot_repository = Arc::new(SnapshotRepository::new(pool.clone(), writer.clone()));
     let valuation_repository = Arc::new(ValuationRepository::new(pool.clone(), writer.clone()));
     let platform_repository = Arc::new(PlatformRepository::new(pool.clone(), writer.clone()));
-    // Instantiate Transaction Executor using the Arc<DbPool> directly
-    let transaction_executor = pool.clone();
 
     let fx_service = Arc::new(FxService::new(fx_repository.clone()));
     fx_service.initialize()?;
@@ -93,7 +105,6 @@ pub async fn initialize_context(
     let account_service = Arc::new(AccountService::new(
         account_repository.clone(),
         fx_service.clone(),
-        transaction_executor.clone(),
         base_currency.clone(),
     ));
     let activity_service = Arc::new(ActivityService::new(

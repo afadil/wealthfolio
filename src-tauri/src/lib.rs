@@ -136,6 +136,11 @@ pub fn run() {
                 } else {
                     log::LevelFilter::Info
                 })
+                // Suppress verbose debug logs from the updater plugin
+                .filter(|metadata| {
+                    !metadata.target().starts_with("tauri_plugin_updater")
+                        || metadata.level() <= log::Level::Info
+                })
                 .build(),
         )
         .plugin(tauri_plugin_shell::init())
@@ -280,8 +285,8 @@ pub fn run() {
             commands::addon::clear_addon_staging,
             commands::addon::submit_addon_rating,
             // Sync commands
-            commands::wealthfolio_sync::store_sync_session,
-            commands::wealthfolio_sync::clear_sync_session,
+            commands::wealthfolio_connect::store_sync_session,
+            commands::wealthfolio_connect::clear_sync_session,
             commands::brokers_sync::set_sync_credentials,
             commands::brokers_sync::get_sync_credentials,
             commands::brokers_sync::clear_sync_credentials,

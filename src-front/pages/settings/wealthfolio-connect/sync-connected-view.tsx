@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Icons } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/use-toast";
-import { useWealthfolioSync } from "@/context/wealthfolio-sync-context";
+import { useWealthfolioConnect } from "@/context/wealthfolio-connect-context";
 import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -136,13 +136,16 @@ function ConnectionCard({ connection, onManage, onSync, isSyncing }: ConnectionC
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function SyncConnectedView() {
-  const { user, session, userInfo, signOut, isLoading, error, clearError } = useWealthfolioSync();
+  const { user, session, userInfo, signOut, isLoading, error, clearError } = useWealthfolioConnect();
   const queryClient = useQueryClient();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
 
   // Check if user is connected (has a valid session)
   const isConnected = !!session;
+
+  // Check if user info is still being fetched (session exists but userInfo hasn't loaded yet)
+  const isLoadingUserInfo = isConnected && userInfo === null;
 
   // Check if user has an active subscription (has a team with a plan)
   const hasSubscription = !!userInfo?.team?.plan;
@@ -254,7 +257,7 @@ export function SyncConnectedView() {
             <ActionConfirm
               handleConfirm={handleSignOut}
               isPending={isSigningOut}
-              confirmTitle="Sign out of Wealthfolio Sync?"
+              confirmTitle="Sign out of Wealthfolio Connect?"
               confirmMessage="You'll need to sign in again to access your synced broker accounts. Your local data will not be affected."
               confirmButtonText="Sign Out"
               pendingText="Signing out..."
@@ -280,8 +283,24 @@ export function SyncConnectedView() {
         </CardContent>
       </Card>
 
-      {/* Show Subscription Plans if user has no active subscription */}
-      {!hasSubscription && <SubscriptionPlans enabled={isConnected && !hasSubscription} />}
+      {/* Show loading skeleton while user info is being fetched */}
+      {isLoadingUserInfo && (
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-5 w-48" />
+            <Skeleton className="mt-2 h-4 w-72" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <Skeleton className="h-20 w-full rounded-lg" />
+              <Skeleton className="h-20 w-full rounded-lg" />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Show Subscription Plans if user has no active subscription (only after userInfo is loaded) */}
+      {!isLoadingUserInfo && !hasSubscription && <SubscriptionPlans enabled={isConnected && !hasSubscription} />}
 
       {/* Broker Connections Card - Only show if user has an active subscription */}
       {hasSubscription && (
@@ -291,7 +310,7 @@ export function SyncConnectedView() {
               <div>
                 <CardTitle className="text-base font-medium">Connected Broker Accounts</CardTitle>
                 <CardDescription>
-                  Manage your linked broker accounts through Wealthfolio Sync.
+                  Manage your linked broker accounts through Wealthfolio Connect.
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">

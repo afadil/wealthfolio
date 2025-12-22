@@ -7,20 +7,21 @@ use log::{debug, error};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use super::market_data_errors::MarketDataError;
-use super::market_data_model::{
-    LatestQuotePair, MarketDataProviderSetting, Quote, QuoteDb, UpdateMarketDataProviderSetting,
+use super::model::{MarketDataProviderSettingDB, QuoteDB};
+use wealthfolio_core::market_data::{
+    LatestQuotePair, MarketDataError, MarketDataProviderSetting, MarketDataRepositoryTrait, Quote,
+    UpdateMarketDataProviderSetting,
 };
-use super::market_data_traits::MarketDataRepositoryTrait;
 use crate::db::{get_connection, WriteHandle};
-use crate::errors::Result;
+use crate::errors::StorageError;
+use wealthfolio_core::Result;
 use crate::schema::quotes::dsl::{quotes, symbol, timestamp};
 use diesel::sql_query;
 use diesel::sql_types::Text;
 use diesel::sqlite::Sqlite;
 
 // Import for daily_account_valuation table
-use super::market_data_constants::{DATA_SOURCE_MANUAL, DATA_SOURCE_YAHOO};
+use wealthfolio_core::market_data::{DATA_SOURCE_MANUAL, DATA_SOURCE_YAHOO};
 use crate::schema::daily_account_valuation::dsl as dav_dsl;
 use crate::schema::market_data_providers::dsl as market_data_providers_dsl;
 
@@ -42,7 +43,7 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
 
         Ok(quotes
             .order(timestamp.desc())
-            .load::<QuoteDb>(&mut conn)
+            .load::<QuoteDB>(&mut conn)
             .map_err(MarketDataError::DatabaseError)?
             .into_iter()
             .map(Quote::from)
@@ -55,7 +56,7 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
         Ok(quotes
             .filter(symbol.eq(input_symbol))
             .order(timestamp.desc())
-            .load::<QuoteDb>(&mut conn)
+            .load::<QuoteDB>(&mut conn)
             .map_err(MarketDataError::DatabaseError)?
             .into_iter()
             .map(Quote::from)
@@ -67,7 +68,7 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
             return Ok(());
         }
         let quotes_owned: Vec<Quote> = input_quotes.to_vec();
-        let db_rows: Vec<QuoteDb> = quotes_owned.iter().map(QuoteDb::from).collect();
+        let db_rows: Vec<QuoteDB> = quotes_owned.iter().map(QuoteDB::from).collect();
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
@@ -122,7 +123,7 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
             .filter(symbol_col.eq(input_symbol))
             .filter(crate::schema::quotes::dsl::data_source.eq(source))
             .order(timestamp.asc())
-            .load::<QuoteDb>(&mut conn)
+            .load::<QuoteDB>(&mut conn)
             .map_err(MarketDataError::DatabaseError)?
             .into_iter()
             .map(Quote::from)
@@ -135,7 +136,7 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
         let query_result = quotes
             .filter(symbol.eq(input_symbol))
             .order(timestamp.desc())
-            .first::<QuoteDb>(&mut conn)
+            .first::<QuoteDB>(&mut conn)
             .optional();
 
         match query_result {
@@ -183,8 +184,8 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
             query_builder = query_builder.bind::<Text, _>(symbol_val);
         }
 
-        let ranked_quotes_db: Vec<QuoteDb> = query_builder
-            .load::<QuoteDb>(&mut conn)
+        let ranked_quotes_db: Vec<QuoteDB> = query_builder
+            .load::<QuoteDB>(&mut conn)
             .map_err(MarketDataError::DatabaseError)?;
 
         let result: HashMap<String, Quote> = ranked_quotes_db
@@ -230,8 +231,8 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
             query_builder = query_builder.bind::<Text, _>(symbol_val);
         }
 
-        let ranked_quotes_db: Vec<QuoteDb> = query_builder
-            .load::<QuoteDb>(&mut conn)
+        let ranked_quotes_db: Vec<QuoteDB> = query_builder
+            .load::<QuoteDB>(&mut conn)
             .map_err(MarketDataError::DatabaseError)?;
 
         let mut result_map: HashMap<String, LatestQuotePair> = HashMap::new();
@@ -309,7 +310,7 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
             .filter(timestamp.ge(start_str))
             .filter(timestamp.le(end_str))
             .order(timestamp.asc())
-            .load::<QuoteDb>(&mut conn)
+            .load::<QuoteDB>(&mut conn)
             .map_err(MarketDataError::DatabaseError)?
             .into_iter()
             .map(Quote::from)
@@ -329,7 +330,7 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
         Ok(quotes
             .filter(symbol.eq_any(symbols_vec))
             .order(timestamp.asc())
-            .load::<QuoteDb>(&mut conn)
+            .load::<QuoteDB>(&mut conn)
             .map_err(MarketDataError::DatabaseError)?
             .into_iter()
             .map(Quote::from)
@@ -351,7 +352,7 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
             .filter(symbol.eq_any(symbols_vec))
             .filter(crate::schema::quotes::dsl::data_source.eq(source))
             .order(timestamp.asc())
-            .load::<QuoteDb>(&mut conn)
+            .load::<QuoteDB>(&mut conn)
             .map_err(MarketDataError::DatabaseError)?
             .into_iter()
             .map(Quote::from)
@@ -364,7 +365,8 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
         let latest_calculated_at_str: Option<String> = dav_dsl::daily_account_valuation
             .select(diesel::dsl::max(dav_dsl::calculated_at))
             .first::<Option<String>>(&mut conn)
-            .optional()?
+            .optional()
+            .map_err(StorageError::from)?
             .flatten();
 
         let latest_sync_naive_datetime: Option<NaiveDateTime> =
@@ -384,20 +386,27 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
 
     fn get_all_providers(&self) -> Result<Vec<MarketDataProviderSetting>> {
         let mut conn = get_connection(&self.pool)?;
-        market_data_providers_dsl::market_data_providers
+        let db_results = market_data_providers_dsl::market_data_providers
             .order(market_data_providers_dsl::priority.desc())
-            .select(MarketDataProviderSetting::as_select())
-            .load::<MarketDataProviderSetting>(&mut conn)
-            .map_err(|e| MarketDataError::DatabaseError(e).into())
+            .select(MarketDataProviderSettingDB::as_select())
+            .load::<MarketDataProviderSettingDB>(&mut conn)
+            .map_err(|e| MarketDataError::DatabaseError(e))?;
+
+        Ok(db_results
+            .into_iter()
+            .map(MarketDataProviderSetting::from)
+            .collect())
     }
 
     fn get_provider_by_id(&self, provider_id_input: &str) -> Result<MarketDataProviderSetting> {
         let mut conn = get_connection(&self.pool)?;
-        market_data_providers_dsl::market_data_providers
+        let db_result = market_data_providers_dsl::market_data_providers
             .find(provider_id_input)
-            .select(MarketDataProviderSetting::as_select())
-            .first::<MarketDataProviderSetting>(&mut conn)
-            .map_err(|e| MarketDataError::DatabaseError(e).into())
+            .select(MarketDataProviderSettingDB::as_select())
+            .first::<MarketDataProviderSettingDB>(&mut conn)
+            .map_err(|e| MarketDataError::DatabaseError(e))?;
+
+        Ok(MarketDataProviderSetting::from(db_result))
     }
 
     async fn update_provider_settings(
@@ -405,15 +414,30 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
         provider_id_input: String,
         changes: UpdateMarketDataProviderSetting,
     ) -> Result<MarketDataProviderSetting> {
+        use super::model::UpdateMarketDataProviderSettingDB;
+
+        let changes_db = UpdateMarketDataProviderSettingDB {
+            priority: changes.priority,
+            enabled: changes.enabled,
+        };
+
         self.writer
             .exec(
                 move |conn: &mut SqliteConnection| -> Result<MarketDataProviderSetting> {
                     diesel::update(
                         market_data_providers_dsl::market_data_providers.find(&provider_id_input),
                     )
-                    .set(&changes)
-                    .get_result(conn)
-                    .map_err(|e| MarketDataError::DatabaseError(e).into())
+                    .set(&changes_db)
+                    .execute(conn)
+                    .map_err(|e| MarketDataError::DatabaseError(e))?;
+
+                    let db_result = market_data_providers_dsl::market_data_providers
+                        .find(&provider_id_input)
+                        .select(MarketDataProviderSettingDB::as_select())
+                        .first::<MarketDataProviderSettingDB>(conn)
+                        .map_err(|e| MarketDataError::DatabaseError(e))?;
+
+                    Ok(MarketDataProviderSetting::from(db_result))
                 },
             )
             .await
@@ -421,16 +445,17 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
 
     // --- Quote Import Methods ---
 
-    async fn bulk_insert_quotes(&self, quote_records: Vec<QuoteDb>) -> Result<usize> {
+    async fn bulk_insert_quotes(&self, quote_records: Vec<Quote>) -> Result<usize> {
         if quote_records.is_empty() {
             return Ok(0);
         }
 
-        let quotes_owned = quote_records.clone();
+        // Convert domain models to DB models
+        let quotes_db: Vec<QuoteDB> = quote_records.iter().map(QuoteDB::from).collect();
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
                 let mut total_inserted = 0;
-                for chunk in quotes_owned.chunks(1000) {
+                for chunk in quotes_db.chunks(1000) {
                     total_inserted += diesel::insert_into(quotes)
                         .values(chunk)
                         .execute(conn)
@@ -441,16 +466,17 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
             .await
     }
 
-    async fn bulk_update_quotes(&self, quote_records: Vec<QuoteDb>) -> Result<usize> {
+    async fn bulk_update_quotes(&self, quote_records: Vec<Quote>) -> Result<usize> {
         if quote_records.is_empty() {
             return Ok(0);
         }
 
-        let quotes_owned = quote_records.clone();
+        // Convert domain models to DB models
+        let quotes_db: Vec<QuoteDB> = quote_records.iter().map(QuoteDB::from).collect();
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
                 let mut total_updated = 0;
-                for chunk in quotes_owned.chunks(1000) {
+                for chunk in quotes_db.chunks(1000) {
                     total_updated += diesel::replace_into(quotes)
                         .values(chunk)
                         .execute(conn)
@@ -473,14 +499,14 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
         }
 
         debug!(
-            "🔄 Converting {} Quote structs to QuoteDb structs",
+            "🔄 Converting {} Quote structs to QuoteDB structs",
             quote_records.len()
         );
         let quotes_owned = quote_records.clone();
-        let db_rows: Vec<QuoteDb> = quotes_owned.iter().map(QuoteDb::from).collect();
-        debug!("✅ Converted to {} QuoteDb records", db_rows.len());
+        let db_rows: Vec<QuoteDB> = quotes_owned.iter().map(QuoteDB::from).collect();
+        debug!("✅ Converted to {} QuoteDB records", db_rows.len());
         debug!(
-            "🎯 Sample QuoteDb: id={}, symbol={}, timestamp={}, data_source={}",
+            "🎯 Sample QuoteDB: id={}, symbol={}, timestamp={}, data_source={}",
             db_rows[0].id, db_rows[0].symbol, db_rows[0].timestamp, db_rows[0].data_source
         );
 
@@ -579,7 +605,7 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
             .filter(crate::schema::quotes::dsl::timestamp.ge(start_date))
             .filter(crate::schema::quotes::dsl::timestamp.le(end_date))
             .order(timestamp.asc())
-            .load::<QuoteDb>(&mut conn)
+            .load::<QuoteDB>(&mut conn)
             .map_err(MarketDataError::DatabaseError)?
             .into_iter()
             .map(Quote::from)

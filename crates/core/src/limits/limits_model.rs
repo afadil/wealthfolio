@@ -1,11 +1,12 @@
+//! Contribution limits domain models.
+
 use chrono::NaiveDateTime;
-use diesel::prelude::*;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Queryable, Insertable, Identifiable, Serialize, Deserialize, Debug, Clone)]
-#[diesel(table_name = crate::schema::contribution_limits)]
+/// Domain model for contribution limit
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContributionLimit {
     pub id: String,
@@ -19,8 +20,8 @@ pub struct ContributionLimit {
     pub end_date: Option<String>,
 }
 
-#[derive(Insertable, AsChangeset, Serialize, Deserialize, Debug, Clone)]
-#[diesel(table_name = crate::schema::contribution_limits)]
+/// Input model for creating a new contribution limit
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NewContributionLimit {
     pub id: Option<String>,

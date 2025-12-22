@@ -6,6 +6,7 @@ import {
   CheckboxCell,
   CurrencyCell,
   DateCell,
+  DateTimeCell,
   FileCell,
   LongTextCell,
   MultiSelectCell,
@@ -85,6 +86,9 @@ function DataGridCellImpl<TData>({
       break;
     case "date":
       Comp = DateCell;
+      break;
+    case "datetime":
+      Comp = DateTimeCell;
       break;
     case "file":
       Comp = FileCell;

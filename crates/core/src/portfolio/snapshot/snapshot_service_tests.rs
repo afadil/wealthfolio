@@ -17,7 +17,7 @@ mod tests {
     use crate::constants::{DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
     use crate::errors::{Error, Result as AppResult};
     use crate::fx::fx_model::{ExchangeRate, NewExchangeRate};
-    use crate::fx::fx_traits::FxServiceTrait;
+    use crate::fx::FxServiceTrait;
     use crate::portfolio::snapshot::{
         snapshot_repository::SnapshotRepositoryTrait, AccountStateSnapshot, Lot, Position,
         SnapshotService, SnapshotServiceTrait,

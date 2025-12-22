@@ -7,7 +7,7 @@ use axum::{
     Json, Router,
 };
 use wealthfolio_core::portfolio::{
-    holdings::holdings_model::Holding, valuation::valuation_model::DailyAccountValuation,
+    holdings::Holding, valuation::DailyAccountValuation,
 };
 
 #[derive(serde::Deserialize)]

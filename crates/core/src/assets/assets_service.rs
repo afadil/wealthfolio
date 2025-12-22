@@ -1,12 +1,11 @@
 use log::{debug, error};
 use std::sync::Arc;
 
-use crate::market_data::market_data_traits::MarketDataServiceTrait;
+use crate::market_data::MarketDataServiceTrait;
 
 use super::assets_model::{Asset, NewAsset, UpdateAssetProfile};
 use super::assets_traits::{AssetRepositoryTrait, AssetServiceTrait};
 use crate::errors::{DatabaseError, Error, Result};
-use diesel::result::Error as DieselError;
 
 /// Service for managing assets
 pub struct AssetService {
@@ -74,7 +73,7 @@ impl AssetServiceTrait for AssetService {
     ) -> Result<Asset> {
         match self.asset_repository.get_by_id(asset_id) {
             Ok(existing_asset) => Ok(existing_asset),
-            Err(Error::Database(DatabaseError::QueryFailed(DieselError::NotFound))) => {
+            Err(Error::Database(DatabaseError::NotFound(_))) => {
                 debug!(
                     "Asset not found locally, attempting to fetch from market data: {}",
                     asset_id

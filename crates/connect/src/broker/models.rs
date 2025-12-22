@@ -1,5 +1,5 @@
 //! Models representing broker data from the cloud API.
-//! These models mirror the provider API response structures.
+//! These models mirror Wealthfolio Connect API response structures.
 
 use serde::{Deserialize, Serialize};
 
@@ -188,7 +188,11 @@ pub struct PaginationDetails {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PaginatedUniversalActivity {
     #[serde(default)]
-    #[serde(alias = "activities", alias = "universalActivities", alias = "universal_activities")]
+    #[serde(
+        alias = "activities",
+        alias = "universalActivities",
+        alias = "universal_activities"
+    )]
     pub data: Vec<AccountUniversalActivity>,
     #[serde(default)]
     #[serde(alias = "paginationDetails", alias = "page")]

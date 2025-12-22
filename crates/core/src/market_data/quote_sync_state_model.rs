@@ -1,6 +1,6 @@
-use crate::schema::quote_sync_state;
-use chrono::{DateTime, NaiveDate, Utc};
-use diesel::prelude::*;
+//! Quote sync state domain models.
+
+use chrono::{DateTime, Duration, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 
 /// Sync category determines how a symbol should be synced
@@ -64,105 +64,6 @@ pub struct QuoteSyncState {
     pub updated_at: DateTime<Utc>,
 }
 
-/// Database model for quote_sync_state table
-#[derive(
-    Debug,
-    Clone,
-    Queryable,
-    Identifiable,
-    Selectable,
-    Insertable,
-    AsChangeset,
-    QueryableByName,
-)]
-#[diesel(table_name = quote_sync_state)]
-#[diesel(primary_key(symbol))]
-#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
-pub struct QuoteSyncStateDb {
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub symbol: String,
-    #[diesel(sql_type = diesel::sql_types::Integer)]
-    pub is_active: i32,
-    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
-    pub first_activity_date: Option<String>,
-    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
-    pub last_activity_date: Option<String>,
-    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
-    pub position_closed_date: Option<String>,
-    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
-    pub last_synced_at: Option<String>,
-    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
-    pub last_quote_date: Option<String>,
-    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
-    pub earliest_quote_date: Option<String>,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub data_source: String,
-    #[diesel(sql_type = diesel::sql_types::Integer)]
-    pub sync_priority: i32,
-    #[diesel(sql_type = diesel::sql_types::Integer)]
-    pub error_count: i32,
-    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
-    pub last_error: Option<String>,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub created_at: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub updated_at: String,
-}
-
-// Conversion from DB model to domain model
-impl From<QuoteSyncStateDb> for QuoteSyncState {
-    fn from(db: QuoteSyncStateDb) -> Self {
-        let parse_datetime = |s: &str| -> DateTime<Utc> {
-            DateTime::parse_from_rfc3339(s)
-                .map(|dt| dt.with_timezone(&Utc))
-                .unwrap_or_else(|_| Utc::now())
-        };
-
-        let parse_date = |s: &str| -> Option<NaiveDate> {
-            NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()
-        };
-
-        QuoteSyncState {
-            symbol: db.symbol,
-            is_active: db.is_active != 0,
-            first_activity_date: db.first_activity_date.as_deref().and_then(parse_date),
-            last_activity_date: db.last_activity_date.as_deref().and_then(parse_date),
-            position_closed_date: db.position_closed_date.as_deref().and_then(parse_date),
-            last_synced_at: db.last_synced_at.as_deref().map(parse_datetime),
-            last_quote_date: db.last_quote_date.as_deref().and_then(parse_date),
-            earliest_quote_date: db.earliest_quote_date.as_deref().and_then(parse_date),
-            data_source: db.data_source,
-            sync_priority: db.sync_priority,
-            error_count: db.error_count,
-            last_error: db.last_error,
-            created_at: parse_datetime(&db.created_at),
-            updated_at: parse_datetime(&db.updated_at),
-        }
-    }
-}
-
-// Conversion from domain model to DB model
-impl From<&QuoteSyncState> for QuoteSyncStateDb {
-    fn from(state: &QuoteSyncState) -> Self {
-        QuoteSyncStateDb {
-            symbol: state.symbol.clone(),
-            is_active: if state.is_active { 1 } else { 0 },
-            first_activity_date: state.first_activity_date.map(|d| d.format("%Y-%m-%d").to_string()),
-            last_activity_date: state.last_activity_date.map(|d| d.format("%Y-%m-%d").to_string()),
-            position_closed_date: state.position_closed_date.map(|d| d.format("%Y-%m-%d").to_string()),
-            last_synced_at: state.last_synced_at.map(|dt| dt.to_rfc3339()),
-            last_quote_date: state.last_quote_date.map(|d| d.format("%Y-%m-%d").to_string()),
-            earliest_quote_date: state.earliest_quote_date.map(|d| d.format("%Y-%m-%d").to_string()),
-            data_source: state.data_source.clone(),
-            sync_priority: state.sync_priority,
-            error_count: state.error_count,
-            last_error: state.last_error.clone(),
-            created_at: state.created_at.to_rfc3339(),
-            updated_at: state.updated_at.to_rfc3339(),
-        }
-    }
-}
-
 impl QuoteSyncState {
     /// Create a new sync state for a symbol
     pub fn new(symbol: String, data_source: String) -> Self {
@@ -188,7 +89,6 @@ impl QuoteSyncState {
     /// Determine the sync category based on current state
     /// Note: Uses QUOTE_HISTORY_BUFFER_DAYS (30 days) for backfill calculation
     pub fn determine_category(&self, grace_period_days: i64) -> SyncCategory {
-        use chrono::Duration;
         const QUOTE_HISTORY_BUFFER_DAYS: i64 = 30;
 
         let today = Utc::now().date_naive();
@@ -308,18 +208,17 @@ impl QuoteSyncState {
 }
 
 /// Update payload for partial updates
-#[derive(Debug, Clone, Default, AsChangeset)]
-#[diesel(table_name = quote_sync_state)]
+#[derive(Debug, Clone, Default)]
 pub struct QuoteSyncStateUpdate {
-    pub is_active: Option<i32>,
-    pub first_activity_date: Option<Option<String>>,
-    pub last_activity_date: Option<Option<String>>,
-    pub position_closed_date: Option<Option<String>>,
-    pub last_synced_at: Option<Option<String>>,
-    pub last_quote_date: Option<Option<String>>,
-    pub earliest_quote_date: Option<Option<String>>,
+    pub is_active: Option<bool>,
+    pub first_activity_date: Option<Option<NaiveDate>>,
+    pub last_activity_date: Option<Option<NaiveDate>>,
+    pub position_closed_date: Option<Option<NaiveDate>>,
+    pub last_synced_at: Option<Option<DateTime<Utc>>>,
+    pub last_quote_date: Option<Option<NaiveDate>>,
+    pub earliest_quote_date: Option<Option<NaiveDate>>,
     pub sync_priority: Option<i32>,
     pub error_count: Option<i32>,
     pub last_error: Option<Option<String>>,
-    pub updated_at: Option<String>,
+    pub updated_at: Option<DateTime<Utc>>,
 }

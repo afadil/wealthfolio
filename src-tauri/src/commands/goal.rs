@@ -7,7 +7,7 @@ use crate::{
 use log::debug;
 use serde_json::json;
 use tauri::{AppHandle, State};
-use wealthfolio_core::goals::goals_model::{Goal, GoalsAllocation, NewGoal};
+use wealthfolio_core::goals::{Goal, GoalsAllocation, NewGoal};
 
 #[tauri::command]
 pub async fn get_goals(state: State<'_, Arc<ServiceContext>>) -> Result<Vec<Goal>, String> {

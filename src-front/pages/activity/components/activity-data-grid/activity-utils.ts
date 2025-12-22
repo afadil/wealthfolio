@@ -26,7 +26,19 @@ function toNumber(value: unknown): number {
 }
 
 /**
- * Compares two values for equality, handling numeric comparisons specially
+ * Converts a value to a timestamp for date comparison
+ */
+function toTimestamp(value: unknown): number | null {
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "string" || typeof value === "number") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date.getTime();
+  }
+  return null;
+}
+
+/**
+ * Compares two values for equality, handling numeric and date comparisons specially
  */
 export function valuesAreEqual(field: string, prevValue: unknown, nextValue: unknown): boolean {
   if (NUMERIC_FIELDS.has(field)) {
@@ -34,6 +46,14 @@ export function valuesAreEqual(field: string, prevValue: unknown, nextValue: unk
     const nextNum = toNumber(nextValue);
     if (Number.isNaN(prevNum) && Number.isNaN(nextNum)) return true;
     return prevNum === nextNum;
+  }
+  // Handle date field comparison by timestamp
+  if (field === "date") {
+    const prevTime = toTimestamp(prevValue);
+    const nextTime = toTimestamp(nextValue);
+    if (prevTime === null && nextTime === null) return true;
+    if (prevTime === null || nextTime === null) return false;
+    return prevTime === nextTime;
   }
   return Object.is(prevValue, nextValue);
 }
@@ -102,32 +122,40 @@ export function createDraftTransaction(
 
 /**
  * Applies cash activity defaults (sets asset to $CASH-{currency})
+ * Returns a new transaction object with the defaults applied (immutable)
  */
 function applyCashDefaults(
   transaction: LocalTransaction,
   resolveTransactionCurrency: TransactionUpdateParams["resolveTransactionCurrency"],
   fallbackCurrency: string,
-): void {
+): LocalTransaction {
   if (!isCashActivity(transaction.activityType)) {
-    return;
+    return transaction;
   }
   const derivedCurrency = resolveTransactionCurrency(transaction) ?? fallbackCurrency;
   const cashSymbol = `$CASH-${derivedCurrency.toUpperCase()}`;
-  transaction.assetSymbol = cashSymbol;
-  transaction.assetId = cashSymbol;
-  transaction.quantity = 0;
-  transaction.unitPrice = 0;
+  return {
+    ...transaction,
+    assetSymbol: cashSymbol,
+    assetId: cashSymbol,
+    quantity: 0,
+    unitPrice: 0,
+  };
 }
 
 /**
  * Applies split activity defaults
+ * Returns a new transaction object with the defaults applied (immutable)
  */
-function applySplitDefaults(transaction: LocalTransaction): void {
+function applySplitDefaults(transaction: LocalTransaction): LocalTransaction {
   if (transaction.activityType !== ActivityType.SPLIT) {
-    return;
+    return transaction;
   }
-  transaction.quantity = 0;
-  transaction.unitPrice = 0;
+  return {
+    ...transaction,
+    quantity: 0,
+    unitPrice: 0,
+  };
 }
 
 /**
@@ -144,77 +172,75 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
     resolveTransactionCurrency,
   } = params;
 
-  const updated: LocalTransaction = { ...transaction };
+  let updated: LocalTransaction = { ...transaction };
 
   if (field === "date") {
     if (typeof value === "string") {
-      updated.date = parseLocalDateTime(value);
+      updated = { ...updated, date: parseLocalDateTime(value) };
     } else if (value instanceof Date) {
-      updated.date = value;
+      updated = { ...updated, date: value };
     }
   } else if (field === "quantity") {
-    updated.quantity = parseDecimalInput(value as string | number);
-    applySplitDefaults(updated);
+    updated = { ...updated, quantity: parseDecimalInput(value as string | number) };
+    updated = applySplitDefaults(updated);
   } else if (field === "unitPrice") {
-    updated.unitPrice = parseDecimalInput(value as string | number);
+    const newUnitPrice = parseDecimalInput(value as string | number);
+    updated = { ...updated, unitPrice: newUnitPrice };
     if (isCashActivity(updated.activityType) || isIncomeActivity(updated.activityType)) {
-      updated.amount = updated.unitPrice;
+      updated = { ...updated, amount: newUnitPrice };
     }
-    applySplitDefaults(updated);
+    updated = applySplitDefaults(updated);
   } else if (field === "amount") {
-    updated.amount = parseDecimalInput(value as string | number);
+    updated = { ...updated, amount: parseDecimalInput(value as string | number) };
   } else if (field === "fee") {
-    updated.fee = parseDecimalInput(value as string | number);
+    updated = { ...updated, fee: parseDecimalInput(value as string | number) };
   } else if (field === "assetSymbol") {
     const upper = (typeof value === "string" ? value : "").trim().toUpperCase();
-    updated.assetSymbol = upper;
-    updated.assetId = upper;
+    updated = { ...updated, assetSymbol: upper, assetId: upper };
 
     // Auto-fill currency: asset currency → account currency → base currency
-    const assetKey = (updated.assetId ?? updated.assetSymbol ?? "").trim().toUpperCase();
+    const assetKey = upper;
     const assetCurrency = assetCurrencyLookup.get(assetKey);
     if (assetCurrency) {
-      updated.currency = assetCurrency;
+      updated = { ...updated, currency: assetCurrency };
     } else if (updated.accountCurrency) {
-      updated.currency = updated.accountCurrency;
+      updated = { ...updated, currency: updated.accountCurrency };
     } else {
-      updated.currency = fallbackCurrency;
+      updated = { ...updated, currency: fallbackCurrency };
     }
   } else if (field === "activityType") {
-    updated.activityType = value as ActivityType;
-    applyCashDefaults(updated, resolveTransactionCurrency, fallbackCurrency);
-    applySplitDefaults(updated);
+    updated = { ...updated, activityType: value as ActivityType };
+    updated = applyCashDefaults(updated, resolveTransactionCurrency, fallbackCurrency);
+    updated = applySplitDefaults(updated);
   } else if (field === "accountId") {
-    updated.accountId = typeof value === "string" ? value : "";
-    const account = accountLookup.get(updated.accountId);
+    const newAccountId = typeof value === "string" ? value : "";
+    updated = { ...updated, accountId: newAccountId };
+    const account = accountLookup.get(newAccountId);
     if (account) {
-      updated.accountName = account.name;
-      updated.accountCurrency = account.currency;
+      updated = { ...updated, accountName: account.name, accountCurrency: account.currency };
 
       // Auto-fill currency: asset currency → account currency → base currency
       const assetKey = (updated.assetId ?? updated.assetSymbol ?? "").trim().toUpperCase();
       const assetCurrency = assetCurrencyLookup.get(assetKey);
       if (assetCurrency) {
-        updated.currency = assetCurrency;
+        updated = { ...updated, currency: assetCurrency };
       } else {
-        updated.currency = account.currency;
+        updated = { ...updated, currency: account.currency };
       }
     }
-    applyCashDefaults(updated, resolveTransactionCurrency, fallbackCurrency);
-    applySplitDefaults(updated);
+    updated = applyCashDefaults(updated, resolveTransactionCurrency, fallbackCurrency);
+    updated = applySplitDefaults(updated);
   } else if (field === "currency") {
-    updated.currency = typeof value === "string" ? value : updated.currency;
-    applyCashDefaults(updated, resolveTransactionCurrency, fallbackCurrency);
-    applySplitDefaults(updated);
+    updated = { ...updated, currency: typeof value === "string" ? value : updated.currency };
+    updated = applyCashDefaults(updated, resolveTransactionCurrency, fallbackCurrency);
+    updated = applySplitDefaults(updated);
   } else if (field === "comment") {
-    updated.comment = typeof value === "string" ? value : "";
+    updated = { ...updated, comment: typeof value === "string" ? value : "" };
   } else if (field === "fxRate") {
-    updated.fxRate = parseDecimalInput(value as string | number);
+    updated = { ...updated, fxRate: parseDecimalInput(value as string | number) };
   }
 
-  updated.updatedAt = new Date();
-
-  return updated;
+  return { ...updated, updatedAt: new Date() };
 }
 
 /**
@@ -357,3 +383,117 @@ export const TRACKED_FIELDS: (keyof LocalTransaction)[] = [
   "currency",
   "comment",
 ];
+
+/**
+ * Column IDs that should be pinned to the left/right of the grid
+ */
+export const PINNED_COLUMNS = {
+  left: ["select", "status", "activityType"] as const,
+  right: ["actions"] as const,
+};
+
+/**
+ * Validation error for a transaction
+ */
+export interface TransactionValidationError {
+  transactionId: string;
+  field: string;
+  message: string;
+}
+
+/**
+ * Result of validating transactions before save
+ */
+export interface ValidationResult {
+  isValid: boolean;
+  errors: TransactionValidationError[];
+}
+
+/**
+ * Validates a single transaction before save
+ */
+function validateTransaction(transaction: LocalTransaction): TransactionValidationError[] {
+  const errors: TransactionValidationError[] = [];
+
+  // Required field: accountId
+  if (!transaction.accountId?.trim()) {
+    errors.push({
+      transactionId: transaction.id,
+      field: "accountId",
+      message: "Account is required",
+    });
+  }
+
+  // Required field: activityType
+  if (!transaction.activityType) {
+    errors.push({
+      transactionId: transaction.id,
+      field: "activityType",
+      message: "Activity type is required",
+    });
+  }
+
+  // Required field: date
+  if (!transaction.date) {
+    errors.push({
+      transactionId: transaction.id,
+      field: "date",
+      message: "Date is required",
+    });
+  }
+
+  // Non-cash activities require a symbol
+  if (!isCashActivity(transaction.activityType)) {
+    const hasSymbol = transaction.assetSymbol?.trim() || transaction.assetId?.trim();
+    if (!hasSymbol) {
+      errors.push({
+        transactionId: transaction.id,
+        field: "assetSymbol",
+        message: "Symbol is required for this activity type",
+      });
+    }
+  }
+
+  // Validate non-negative values for certain fields
+  if (transaction.fee != null && transaction.fee < 0) {
+    errors.push({
+      transactionId: transaction.id,
+      field: "fee",
+      message: "Fee cannot be negative",
+    });
+  }
+
+  if (transaction.fxRate != null && transaction.fxRate < 0) {
+    errors.push({
+      transactionId: transaction.id,
+      field: "fxRate",
+      message: "FX rate cannot be negative",
+    });
+  }
+
+  return errors;
+}
+
+/**
+ * Validates all dirty transactions before save
+ */
+export function validateTransactionsForSave(
+  localTransactions: LocalTransaction[],
+  dirtyTransactionIds: Set<string>,
+): ValidationResult {
+  const errors: TransactionValidationError[] = [];
+
+  const dirtyTransactions = localTransactions.filter((transaction) =>
+    dirtyTransactionIds.has(transaction.id),
+  );
+
+  for (const transaction of dirtyTransactions) {
+    const transactionErrors = validateTransaction(transaction);
+    errors.push(...transactionErrors);
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+}

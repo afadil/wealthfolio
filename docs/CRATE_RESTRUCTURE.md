@@ -300,16 +300,16 @@ pnpm tauri dev
 
 ## File Mapping Reference
 
-| Old Location | New Location |
-|--------------|--------------|
-| `src-core/` | `crates/core/` |
-| `src-core/src/sync/` | `crates/connect/src/` |
-| `src-core/src/sync/broker_models.rs` | `crates/connect/src/broker/models.rs` |
-| `src-core/src/sync/sync_service.rs` | `crates/connect/src/broker/service.rs` |
-| `src-core/src/sync/sync_traits.rs` | `crates/connect/src/broker/traits.rs` |
-| `src-core/src/sync/brokers_sync_state_repository.rs` | `crates/connect/src/state/repository.rs` |
-| `src-core/src/sync/platform_repository.rs` | `crates/connect/src/platform/repository.rs` |
-| `src/` | `src-front/` |
+| Old Location                                         | New Location                                |
+| ---------------------------------------------------- | ------------------------------------------- |
+| `src-core/`                                          | `crates/core/`                              |
+| `src-core/src/sync/`                                 | `crates/connect/src/`                       |
+| `src-core/src/sync/broker_models.rs`                 | `crates/connect/src/broker/models.rs`       |
+| `src-core/src/sync/sync_service.rs`                  | `crates/connect/src/broker/service.rs`      |
+| `src-core/src/sync/sync_traits.rs`                   | `crates/connect/src/broker/traits.rs`       |
+| `src-core/src/sync/brokers_sync_state_repository.rs` | `crates/connect/src/state/repository.rs`    |
+| `src-core/src/sync/platform_repository.rs`           | `crates/connect/src/platform/repository.rs` |
+| `src/`                                               | `src-front/`                                |
 
 ---
 
@@ -340,7 +340,11 @@ pnpm tauri dev
 
 ## Notes
 
-- **Tauri structure unchanged**: `src-tauri/` stays as-is, only dependency paths change
-- **Crate naming**: Uses `wealthfolio-connect` (hyphen) in Cargo, import as `wealthfolio_connect` (underscore)
-- **Workspace benefits**: Single `cargo build`, shared dep versions, unified clippy/fmt
-- **Future crates**: Can add `crates/addons/`, `crates/ai/`, etc. following same pattern
+- **Tauri structure unchanged**: `src-tauri/` stays as-is, only dependency paths
+  change
+- **Crate naming**: Uses `wealthfolio-connect` (hyphen) in Cargo, import as
+  `wealthfolio_connect` (underscore)
+- **Workspace benefits**: Single `cargo build`, shared dep versions, unified
+  clippy/fmt
+- **Future crates**: Can add `crates/addons/`, `crates/ai/`, etc. following same
+  pattern

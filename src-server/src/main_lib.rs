@@ -5,33 +5,43 @@ use crate::{auth::AuthManager, config::Config, events::EventBus, secrets::build_
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, EnvFilter};
 use wealthfolio_core::{
-    accounts::{AccountRepository, AccountService},
-    activities::{
-        ActivityRepository, ActivityService as CoreActivityService, ActivityServiceTrait,
-    },
-    assets::{AssetRepository, AssetService, AssetServiceTrait},
-    db::{self, write_actor},
-    fx::{FxRepository, FxService, FxServiceTrait},
-    goals::{GoalRepository, GoalService, GoalServiceTrait},
-    limits::{
-        ContributionLimitRepository, ContributionLimitService, ContributionLimitServiceTrait,
-    },
-    market_data::{MarketDataRepository, MarketDataService, MarketDataServiceTrait},
+    accounts::AccountService,
+    activities::{ActivityService as CoreActivityService, ActivityServiceTrait},
+    assets::{AssetService, AssetServiceTrait},
+    fx::{FxService, FxServiceTrait},
+    goals::{GoalService, GoalServiceTrait},
+    limits::{ContributionLimitService, ContributionLimitServiceTrait},
+    market_data::{MarketDataService, MarketDataServiceTrait},
     portfolio::income::{IncomeService, IncomeServiceTrait},
     portfolio::{
         holdings::{
             holdings_valuation_service::HoldingsValuationService, HoldingsService,
             HoldingsServiceTrait,
         },
-        snapshot::{SnapshotRepository, SnapshotService, SnapshotServiceTrait},
-        valuation::{ValuationRepository, ValuationService, ValuationServiceTrait},
+        snapshot::{SnapshotService, SnapshotServiceTrait},
+        valuation::{ValuationService, ValuationServiceTrait},
     },
     secrets::SecretStore,
-    settings::{settings_repository::SettingsRepository, SettingsService, SettingsServiceTrait},
+    settings::{SettingsService, SettingsServiceTrait},
+};
+use wealthfolio_storage_sqlite::{
+    accounts::AccountRepository,
+    activities::ActivityRepository,
+    assets::AssetRepository,
+    db::{self, write_actor},
+    fx::FxRepository,
+    goals::GoalRepository,
+    limits::ContributionLimitRepository,
+    market_data::{MarketDataRepository, QuoteSyncStateRepository},
+    portfolio::{
+        snapshot::SnapshotRepository,
+        valuation::ValuationRepository,
+    },
+    settings::SettingsRepository,
 };
 
 pub struct AppState {
-    pub account_service: Arc<AccountService<Arc<db::DbPool>>>,
+    pub account_service: Arc<AccountService>,
     pub settings_service: Arc<SettingsService>,
     pub holdings_service: Arc<dyn HoldingsServiceTrait + Send + Sync>,
     pub valuation_service: Arc<dyn ValuationServiceTrait + Send + Sync>,
@@ -110,22 +120,30 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let base_currency = Arc::new(RwLock::new(settings.base_currency));
 
     let account_repo = Arc::new(AccountRepository::new(pool.clone(), writer.clone()));
-    let transaction_executor = pool.clone();
     let account_service = Arc::new(AccountService::new(
         account_repo.clone(),
         fx_service.clone(),
-        transaction_executor,
         base_currency.clone(),
     ));
 
     // Additional repositories/services for web API
     let asset_repository = Arc::new(AssetRepository::new(pool.clone(), writer.clone()));
     let market_data_repository = Arc::new(MarketDataRepository::new(pool.clone(), writer.clone()));
+    let activity_repository = Arc::new(ActivityRepository::new(pool.clone(), writer.clone()));
+    let snapshot_repository = Arc::new(SnapshotRepository::new(pool.clone(), writer.clone()));
+    let quote_sync_state_repository = Arc::new(QuoteSyncStateRepository::new(
+        pool.clone(),
+        writer.clone(),
+    ));
     let market_data_service = Arc::new(
         MarketDataService::new(
             market_data_repository.clone(),
             asset_repository.clone(),
             secret_store.clone(),
+            quote_sync_state_repository.clone(),
+            snapshot_repository.clone(),
+            activity_repository.clone(),
+            account_repo.clone(),
         )
         .await?,
     );
@@ -134,8 +152,6 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         asset_repository.clone(),
         market_data_service.clone(),
     )?);
-    let activity_repository = Arc::new(ActivityRepository::new(pool.clone(), writer.clone()));
-    let snapshot_repository = Arc::new(SnapshotRepository::new(pool.clone(), writer.clone()));
     let snapshot_service = Arc::new(SnapshotService::new(
         base_currency.clone(),
         account_repo.clone(),

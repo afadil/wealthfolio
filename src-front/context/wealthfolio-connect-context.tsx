@@ -1,7 +1,7 @@
 import { getRunEnv, listenDeepLinkTauri, logger, openUrlInBrowser, RUN_ENV } from "@/adapters";
 import { getUserInfo, type UserInfo } from "@/commands/brokers-sync";
 import { getSecret } from "@/commands/secrets";
-import { clearSyncSession, storeSyncSession } from "@/commands/wealthfolio-sync";
+import { clearSyncSession, storeSyncSession } from "@/commands/wealthfolio-connect";
 import { getPlatform } from "@/hooks/use-platform";
 import { createClient, Session, SupabaseClient, User } from "@supabase/supabase-js";
 import {
@@ -77,7 +77,7 @@ function parseAuthCallbackUrl(url: string): AuthCallbackPayload | null {
   }
 }
 
-interface WealthfolioSyncContextValue {
+interface WealthfolioConnectContextValue {
   isConnected: boolean;
   isInitializing: boolean;
   isLoading: boolean;
@@ -96,7 +96,7 @@ interface WealthfolioSyncContextValue {
   refetchUserInfo: () => Promise<void>;
 }
 
-const WealthfolioSyncContext = createContext<WealthfolioSyncContextValue | undefined>(undefined);
+const WealthfolioConnectContext = createContext<WealthfolioConnectContextValue | undefined>(undefined);
 
 function getAuthStorageKey(supabaseUrl: string): string {
   try {
@@ -176,7 +176,7 @@ const createSupabaseClient = () => {
   });
 };
 
-export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
+export function WealthfolioConnectProvider({ children }: { children: ReactNode }) {
   const [isInitializing, setIsInitializing] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -611,7 +611,7 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
     return (user?.app_metadata?.team_id as string | undefined) ?? null;
   }, [user]);
 
-  const value = useMemo<WealthfolioSyncContextValue>(
+  const value = useMemo<WealthfolioConnectContextValue>(
     () => ({
       isConnected: !!session,
       isInitializing,
@@ -650,14 +650,14 @@ export function WealthfolioSyncProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <WealthfolioSyncContext.Provider value={value}>{children}</WealthfolioSyncContext.Provider>
+    <WealthfolioConnectContext.Provider value={value}>{children}</WealthfolioConnectContext.Provider>
   );
 }
 
-export const useWealthfolioSync = () => {
-  const ctx = useContext(WealthfolioSyncContext);
+export const useWealthfolioConnect = () => {
+  const ctx = useContext(WealthfolioConnectContext);
   if (!ctx) {
-    throw new Error("useWealthfolioSync must be used within a WealthfolioSyncProvider");
+    throw new Error("useWealthfolioConnect must be used within a WealthfolioConnectProvider");
   }
   return ctx;
 };
