@@ -19,8 +19,8 @@ use wealthfolio_core::secrets::SecretStore;
 /// Secret key for storing the cloud API access token (same as frontend)
 const CLOUD_ACCESS_TOKEN_KEY: &str = "wealthfolio_sync_access_token";
 
-/// Default base URL for Wealthfolio Sync cloud service.
-/// Override with `WEALTHFOLIO_SYNC_API_URL` (preferred) or `API_URL` (legacy/dev).
+/// Default base URL for Wealthfolio Connect cloud service.
+/// Override with `CONNECT_API_URL` environment variable.
 const DEFAULT_CLOUD_API_URL: &str = "https://api.wealthfolio.app";
 
 fn normalize_cloud_api_base_url(raw: &str) -> String {
@@ -35,9 +35,8 @@ fn normalize_cloud_api_base_url(raw: &str) -> String {
 }
 
 fn cloud_api_base_url() -> String {
-    std::env::var("WEALTHFOLIO_SYNC_API_URL")
+    std::env::var("CONNECT_API_URL")
         .ok()
-        .or_else(|| std::env::var("API_URL").ok())
         .map(|v| normalize_cloud_api_base_url(&v))
         .filter(|v| !v.is_empty())
         .unwrap_or_else(|| DEFAULT_CLOUD_API_URL.to_string())

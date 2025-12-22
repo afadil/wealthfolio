@@ -9,7 +9,7 @@ const sidebarNavItems = [
     title: "General",
     href: "general",
     subtitle: "Currency and general preferences",
-    icon: <Icons.Settings className="size-5" />,
+    icon: <Icons.Settings2 className="size-5" />,
   },
   {
     title: "Appearance",
@@ -48,12 +48,6 @@ const sidebarNavItems = [
     icon: <Icons.BarChart className="size-5" />,
   },
   {
-    title: "Wealthfolio Connect",
-    href: "wealthfolio-connect",
-    subtitle: "Login to your Wealthfolio Connect account",
-    icon: <Icons.CloudSync className="size-5" />,
-  },
-  {
     title: "Add-ons",
     href: "addons",
     subtitle: "Extend Wealthfolio with features",
@@ -64,6 +58,12 @@ const sidebarNavItems = [
     href: "exports",
     subtitle: "Backup and export your data",
     icon: <Icons.Download className="size-5" />,
+  },
+  {
+    title: "Connect",
+    href: "wealthfolio-connect",
+    subtitle: "Login to your Wealthfolio Connect account",
+    icon: <Icons.CloudSync2 className="size-6 text-blue-400" />,
   },
   {
     title: "About",

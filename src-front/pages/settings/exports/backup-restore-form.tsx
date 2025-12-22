@@ -62,7 +62,7 @@ const DesktopBackupPanel = ({
         <Card className="flex h-full flex-col">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <Icons.Activity className="h-5 w-5" />
+              <Icons.DatabaseBackup className="h-5 w-5" />
               Restore Backup
             </CardTitle>
             <CardDescription>
@@ -151,7 +151,7 @@ const BackupCard = ({
   <Card className="flex h-full flex-col">
     <CardHeader>
       <CardTitle className="flex items-center gap-2 text-lg">
-        <Icons.Database className="h-5 w-5" />
+        <Icons.DatabaseZap className="h-5 w-5" />
         {title}
       </CardTitle>
       <CardDescription>{description}</CardDescription>

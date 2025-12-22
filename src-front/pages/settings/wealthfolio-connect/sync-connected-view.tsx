@@ -136,16 +136,13 @@ function ConnectionCard({ connection, onManage, onSync, isSyncing }: ConnectionC
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function SyncConnectedView() {
-  const { user, session, userInfo, signOut, isLoading, error, clearError } = useWealthfolioConnect();
+  const { user, session, userInfo, signOut, isLoading, isLoadingUserInfo, error, clearError } = useWealthfolioConnect();
   const queryClient = useQueryClient();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
 
   // Check if user is connected (has a valid session)
   const isConnected = !!session;
-
-  // Check if user info is still being fetched (session exists but userInfo hasn't loaded yet)
-  const isLoadingUserInfo = isConnected && userInfo === null;
 
   // Check if user has an active subscription (has a team with a plan)
   const hasSubscription = !!userInfo?.team?.plan;

@@ -66,7 +66,7 @@ const SettingsAccountsPage = () => {
         <Separator />
         <div className="w-full pt-8">
           {accounts?.length ? (
-            <div className="divide-border divide-y rounded-md border">
+            <div className="divide-border bg-card divide-y rounded-md border">
               {accounts.map((account: Account) => (
                 <AccountItem
                   key={account.id}
