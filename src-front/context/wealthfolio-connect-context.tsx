@@ -1,7 +1,7 @@
 import { getRunEnv, listenDeepLinkTauri, logger, openUrlInBrowser, RUN_ENV } from "@/adapters";
+import { authenticate as authenticateWithASWebAuth } from "tauri-plugin-web-auth-api";
 import { getUserInfo, type UserInfo } from "@/commands/brokers-sync";
-import { getSecret } from "@/commands/secrets";
-import { clearSyncSession, storeSyncSession } from "@/commands/wealthfolio-connect";
+import { getSecret, setSecret, deleteSecret } from "@/commands/secrets";
 import { getPlatform } from "@/hooks/use-platform";
 import { CONNECT_ENABLED } from "@/lib/connect-config";
 import { createClient, Session, SupabaseClient, User } from "@supabase/supabase-js";
@@ -21,9 +21,10 @@ import {
 const SUPABASE_URL = import.meta.env.CONNECT_AUTH_URL as string;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.CONNECT_AUTH_PUBLISHABLE_KEY as string;
 
-// Keys for storing tokens in keyring
-const REFRESH_TOKEN_KEY = "wealthfolio_sync_refresh_token";
-const ACCESS_TOKEN_KEY = "wealthfolio_sync_access_token";
+// Keys for storing tokens in keyring/localStorage
+// Note: For keyring (Tauri), the "wealthfolio_" prefix is added automatically by SecretStore
+const REFRESH_TOKEN_KEY = "sync_refresh_token";
+const ACCESS_TOKEN_KEY = "sync_access_token";
 
 // Deep-link URL for desktop callbacks (custom URL scheme)
 const DESKTOP_DEEP_LINK_URL = "wealthfolio://auth/callback";
@@ -220,11 +221,20 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
 
   const supabase = supabaseRef.current;
 
-  // Store tokens securely in keyring (desktop) or localStorage (web fallback)
+  // Store tokens securely in keyring (desktop/mobile) or localStorage (web fallback)
   const storeTokens = useCallback(async (session: Session | null) => {
+    const runEnv = getRunEnv();
+    logger.info(`storeTokens called, runEnv=${runEnv}, hasSession=${!!session}`);
+
     if (!session) {
-      if (getRunEnv() === RUN_ENV.DESKTOP) {
-        await clearSyncSession().catch(() => undefined);
+      if (runEnv === RUN_ENV.DESKTOP) {
+        // Use the working setSecret/deleteSecret commands
+        await deleteSecret("sync_access_token").catch((err) => {
+          logger.warn(`Failed to delete access token: ${err}`);
+        });
+        await deleteSecret("sync_refresh_token").catch((err) => {
+          logger.warn(`Failed to delete refresh token: ${err}`);
+        });
       } else {
         localStorage.removeItem(REFRESH_TOKEN_KEY);
         localStorage.removeItem(ACCESS_TOKEN_KEY);
@@ -232,9 +242,31 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
       return;
     }
 
-    if (getRunEnv() === RUN_ENV.DESKTOP) {
-      await storeSyncSession(session.access_token, session.refresh_token ?? undefined);
+    if (runEnv === RUN_ENV.DESKTOP) {
+      try {
+        // Use the working setSecret command directly (same keyring, works on iOS)
+        logger.info("Storing access token via setSecret...");
+        await setSecret("sync_access_token", session.access_token);
+        logger.info("Access token stored successfully");
+
+        if (session.refresh_token) {
+          logger.info("Storing refresh token via setSecret...");
+          await setSecret("sync_refresh_token", session.refresh_token);
+          logger.info("Refresh token stored successfully");
+        }
+      } catch (err) {
+        logger.error(`setSecret failed: ${err}`);
+        // Fallback to localStorage if keyring fails
+        logger.info("Falling back to localStorage for token storage");
+        if (session.refresh_token) {
+          localStorage.setItem(REFRESH_TOKEN_KEY, session.refresh_token);
+        }
+        if (session.access_token) {
+          localStorage.setItem(ACCESS_TOKEN_KEY, session.access_token);
+        }
+      }
     } else {
+      logger.info("Using localStorage for token storage (web mode)");
       if (session.refresh_token) {
         localStorage.setItem(REFRESH_TOKEN_KEY, session.refresh_token);
       }
@@ -255,38 +287,51 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
   // Handle auth callback from URL (deep link or web redirect)
   const handleAuthCallback = useCallback(
     async (url: string) => {
+      logger.info(`handleAuthCallback called with URL: ${url.substring(0, 100)}...`);
       const payload = parseAuthCallbackUrl(url);
 
       if (!payload) {
+        logger.error("Failed to parse auth callback URL - no payload");
         return;
       }
 
+      logger.info(`Parsed payload type: ${payload.type}`);
+
       if (payload.type === "error") {
+        logger.error(`Auth callback error: ${payload.message}`);
         setError(payload.message);
         return;
       }
 
       try {
+        logger.info("Exchanging code for session...");
         const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(
           payload.code,
         );
 
         if (exchangeError) {
-          logger.error("Failed to exchange auth code for session.");
+          logger.error(`Failed to exchange auth code: ${exchangeError.message}`);
           setError(exchangeError.message);
           return;
         }
 
         if (!data.session) {
+          logger.error("No session returned after code exchange");
           setError("No session returned after completing sign-in.");
           return;
         }
 
+        logger.info("Session received, storing tokens...");
+        logger.info(`Access token length: ${data.session.access_token?.length ?? 0}`);
+        logger.info(`Refresh token length: ${data.session.refresh_token?.length ?? 0}`);
+        // Store tokens BEFORE setting session to avoid race condition
+        await storeTokens(data.session);
+        logger.info("storeTokens function returned, setting session state...");
         setSession(data.session);
         setUser(data.session.user);
-        await storeTokens(data.session);
+        logger.info("Auth callback completed successfully");
       } catch (err) {
-        logger.error("Error handling auth callback.");
+        logger.error(`Error in handleAuthCallback: ${err instanceof Error ? err.message : err}`);
         setError(err instanceof Error ? err.message : "Failed to complete sign in");
       }
     },
@@ -312,10 +357,10 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
             // Clear invalid tokens
             await storeTokens(null);
           } else if (data.session && !cancelled) {
+            // Store tokens BEFORE setting session to avoid race condition
+            await storeTokens(data.session);
             setSession(data.session);
             setUser(data.session.user);
-            // Store the new tokens (refresh token rotation)
-            await storeTokens(data.session);
           }
         }
       } catch (_err) {
@@ -336,9 +381,11 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
       if (cancelled) return;
 
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        // Store tokens BEFORE setting session to avoid race condition
+        // where isConnected becomes true before token is in keyring
+        await storeTokens(newSession);
         setSession(newSession);
         setUser(newSession?.user ?? null);
-        await storeTokens(newSession);
       } else if (event === "SIGNED_OUT") {
         setSession(null);
         setUser(null);
@@ -407,9 +454,10 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
         }
 
         if (data.session) {
+          // Store tokens BEFORE setting session to avoid race condition
+          await storeTokens(data.session);
           setSession(data.session);
           setUser(data.session.user);
-          await storeTokens(data.session);
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Sign in failed";
@@ -439,9 +487,10 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
 
         // If email confirmation is not required, user will be signed in
         if (data.session) {
+          // Store tokens BEFORE setting session to avoid race condition
+          await storeTokens(data.session);
           setSession(data.session);
           setUser(data.session.user);
-          await storeTokens(data.session);
         } else if (data.user && !data.session) {
           // Email confirmation required
           setError("Please check your email to confirm your account.");
@@ -466,15 +515,26 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
         const isTauri = getRunEnv() === RUN_ENV.DESKTOP;
         const platform = isTauri ? await getPlatform() : null;
         const isMobile = platform?.is_mobile ?? false;
+        const isIOS = platform?.os === "ios";
 
-        const redirectUrl =
-          isTauri && import.meta.env.PROD
+        // iOS mobile: Use ASWebAuthenticationSession with deep link callback
+        // This is required because Google blocks OAuth from embedded webviews (WKWebView)
+        // ASWebAuthenticationSession opens a secure Safari sheet that Google accepts
+        // Note: This is needed in both dev and prod modes on iOS
+        const useASWebAuth = isTauri && isMobile && isIOS;
+
+        // Determine redirect URL based on platform
+        // iOS ASWebAuth always needs deep link URL (works in dev and prod)
+        // Desktop prod uses hosted callback, other cases use web redirect
+        const redirectUrl = useASWebAuth
+          ? DESKTOP_DEEP_LINK_URL // iOS: Always use deep link for ASWebAuthenticationSession
+          : isTauri && import.meta.env.PROD
             ? isMobile
-              ? MOBILE_UNIVERSAL_LINK_CALLBACK_URL
-              : HOSTED_OAUTH_CALLBACK_URL
-            : getWebRedirectUrl();
+              ? MOBILE_UNIVERSAL_LINK_CALLBACK_URL // Android prod
+              : HOSTED_OAUTH_CALLBACK_URL // Desktop prod
+            : getWebRedirectUrl(); // Web or dev mode
 
-        const useSystemBrowser = isTauri && import.meta.env.PROD;
+        const useSystemBrowser = isTauri && import.meta.env.PROD && !useASWebAuth;
         const queryParams =
           provider === "google"
             ? {
@@ -486,7 +546,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
         const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
           provider,
           options: {
-            skipBrowserRedirect: useSystemBrowser,
+            skipBrowserRedirect: useSystemBrowser || useASWebAuth,
             redirectTo: redirectUrl,
             queryParams,
           },
@@ -496,7 +556,43 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
           throw oauthError;
         }
 
-        // On Tauri production, open the OAuth URL in the system browser
+        // iOS mobile: Use ASWebAuthenticationSession plugin
+        // This opens a secure Safari sheet that Google accepts for OAuth
+        if (useASWebAuth && data.url) {
+          try {
+            logger.info("Starting ASWebAuth flow...");
+            logger.info(`OAuth URL: ${data.url.substring(0, 100)}...`);
+
+            const result = await authenticateWithASWebAuth({
+              url: data.url,
+              callbackScheme: "wealthfolio",
+            });
+
+            logger.info(`ASWebAuth result: ${JSON.stringify(result)}`);
+
+            // The plugin returns the full callback URL with the auth code
+            if (result?.callbackUrl) {
+              logger.info(`Callback URL received: ${result.callbackUrl.substring(0, 100)}...`);
+              await handleAuthCallback(result.callbackUrl);
+              logger.info("handleAuthCallback completed");
+            } else {
+              logger.error("No callbackUrl in ASWebAuth result");
+            }
+          } catch (authErr) {
+            // User cancelled or auth failed
+            const message =
+              authErr instanceof Error ? authErr.message : "Authentication was cancelled";
+            logger.error(`ASWebAuth error: ${message}`);
+            // Don't throw if user just cancelled
+            if (!message.toLowerCase().includes("cancel")) {
+              throw authErr;
+            }
+            logger.info("OAuth authentication was cancelled by user");
+          }
+          return;
+        }
+
+        // Desktop: Open the OAuth URL in the system browser
         if (useSystemBrowser && data.url) {
           await openUrlInBrowser(data.url);
         }
@@ -508,7 +604,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
         setIsLoading(false);
       }
     },
-    [supabase],
+    [supabase, handleAuthCallback],
   );
 
   const signInWithMagicLink = useCallback(
@@ -570,9 +666,10 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
         }
 
         if (data.session) {
+          // Store tokens BEFORE setting session to avoid race condition
+          await storeTokens(data.session);
           setSession(data.session);
           setUser(data.session.user);
-          await storeTokens(data.session);
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Invalid verification code";

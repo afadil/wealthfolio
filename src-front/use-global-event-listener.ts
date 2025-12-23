@@ -1,6 +1,8 @@
 // useGlobalEventListener.ts
 import { updatePortfolio } from "@/commands/portfolio";
 import { listenMarketSyncComplete } from "@/commands/portfolio-listener";
+import { usePortfolioSyncOptional } from "@/context/portfolio-sync-context";
+import { useIsMobileViewport } from "@/hooks/use-platform";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
@@ -19,55 +21,85 @@ const TOAST_IDS = {
   portfolioUpdateError: "portfolio-update-error",
 } as const;
 
-function handleMarketSyncStart() {
-  toast.loading("Syncing market data...", {
-    id: TOAST_IDS.marketSyncStart,
-    duration: 3000,
-  });
-}
-
-function handleMarketSyncComplete(event: { payload: { failed_syncs: [string, string][] } }) {
-  const { failed_syncs } = event.payload || { failed_syncs: [] };
-  if (failed_syncs && failed_syncs.length > 0) {
-    const failedSymbols = failed_syncs.map(([symbol]) => symbol).join(", ");
-    toast.dismiss(TOAST_IDS.marketSyncStart);
-    toast.error("Market Data Update Incomplete", {
-      id: `market-sync-error-${failedSymbols || "unknown"}`,
-      description: `Unable to update market data for: ${failedSymbols}. This may affect your portfolio calculations and analytics. Please try again later.`,
-      duration: 15000,
-    });
-  } else {
-    toast.dismiss(TOAST_IDS.marketSyncStart);
-  }
-}
-
-const handlePortfolioUpdateStart = () => {
-  toast.loading("Calculating portfolio performance...", {
-    id: TOAST_IDS.portfolioUpdateStart,
-    duration: 2000,
-  });
-};
-
-const handlePortfolioUpdateError = (error: string) => {
-  toast.dismiss(TOAST_IDS.portfolioUpdateStart);
-  toast.error("Portfolio Update Failed", {
-    id: TOAST_IDS.portfolioUpdateError,
-    description:
-      "There was an error updating your portfolio. Please try again or contact support if the issue persists.",
-    duration: 5000,
-  });
-  logger.error("Portfolio Update Error: " + error);
-};
-
 const useGlobalEventListener = () => {
   const queryClient = useQueryClient();
   const hasTriggeredInitialUpdate = useRef(false);
   const isDesktop = getRunEnv() === RUN_ENV.DESKTOP;
+  const isMobileViewport = useIsMobileViewport();
+  const syncContext = usePortfolioSyncOptional();
+
+  // Mobile-aware handlers
+  const handleMarketSyncStart = useCallback(() => {
+    if (isMobileViewport && syncContext) {
+      syncContext.setMarketSyncing();
+    } else {
+      toast.loading("Syncing market data...", {
+        id: TOAST_IDS.marketSyncStart,
+        duration: 3000,
+      });
+    }
+  }, [isMobileViewport, syncContext]);
+
+  const handleMarketSyncComplete = useCallback(
+    (event: { payload: { failed_syncs: [string, string][] } }) => {
+      const { failed_syncs } = event.payload || { failed_syncs: [] };
+
+      if (isMobileViewport && syncContext) {
+        syncContext.setIdle();
+      } else {
+        toast.dismiss(TOAST_IDS.marketSyncStart);
+      }
+
+      // Show error toast on both mobile and desktop for failed syncs
+      if (failed_syncs && failed_syncs.length > 0) {
+        const failedSymbols = failed_syncs.map(([symbol]) => symbol).join(", ");
+        toast.error("Market Data Update Incomplete", {
+          id: `market-sync-error-${failedSymbols || "unknown"}`,
+          description: `Unable to update market data for: ${failedSymbols}. This may affect your portfolio calculations and analytics. Please try again later.`,
+          duration: 15000,
+        });
+      }
+    },
+    [isMobileViewport, syncContext],
+  );
+
+  const handlePortfolioUpdateStart = useCallback(() => {
+    if (isMobileViewport && syncContext) {
+      syncContext.setPortfolioCalculating();
+    } else {
+      toast.loading("Calculating portfolio performance...", {
+        id: TOAST_IDS.portfolioUpdateStart,
+        duration: 2000,
+      });
+    }
+  }, [isMobileViewport, syncContext]);
+
+  const handlePortfolioUpdateError = useCallback(
+    (error: string) => {
+      if (isMobileViewport && syncContext) {
+        syncContext.setIdle();
+      } else {
+        toast.dismiss(TOAST_IDS.portfolioUpdateStart);
+      }
+      toast.error("Portfolio Update Failed", {
+        id: TOAST_IDS.portfolioUpdateError,
+        description:
+          "There was an error updating your portfolio. Please try again or contact support if the issue persists.",
+        duration: 5000,
+      });
+      logger.error("Portfolio Update Error: " + error);
+    },
+    [isMobileViewport, syncContext],
+  );
 
   const handlePortfolioUpdateComplete = useCallback(() => {
-    toast.dismiss(TOAST_IDS.portfolioUpdateStart);
+    if (isMobileViewport && syncContext) {
+      syncContext.setIdle();
+    } else {
+      toast.dismiss(TOAST_IDS.portfolioUpdateStart);
+    }
     queryClient.invalidateQueries();
-  }, [queryClient]);
+  }, [queryClient, isMobileViewport, syncContext]);
 
   const handleDatabaseRestored = useCallback(() => {
     queryClient.invalidateQueries();
@@ -134,7 +166,15 @@ const useGlobalEventListener = () => {
       isMounted = false;
       cleanupFn?.();
     };
-  }, [handlePortfolioUpdateComplete, handleDatabaseRestored, isDesktop]);
+  }, [
+    handlePortfolioUpdateComplete,
+    handlePortfolioUpdateStart,
+    handlePortfolioUpdateError,
+    handleMarketSyncStart,
+    handleMarketSyncComplete,
+    handleDatabaseRestored,
+    isDesktop,
+  ]);
 
   return null;
 };

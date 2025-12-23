@@ -4,14 +4,16 @@ export const setSecret = async (providerId: string, secret: string): Promise<voi
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri("set_secret", { providerId, secret });
+        await invokeTauri("set_secret", { providerId, secret });
+        return;
       case RUN_ENV.WEB:
-        return invokeWeb("set_secret", { providerId, secret });
+        await invokeWeb("set_secret", { providerId, secret });
+        return;
       default:
-        throw new Error(`Unsupported`);
+        throw new Error(`Unsupported environment`);
     }
   } catch (error) {
-    logger.error("Error setting secret.");
+    logger.error(`Error setting secret for ${providerId}: ${error}`);
     throw error;
   }
 };
@@ -20,14 +22,14 @@ export const getSecret = async (providerId: string): Promise<string | null> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri("get_secret", { providerId });
+        return await invokeTauri("get_secret", { providerId });
       case RUN_ENV.WEB:
-        return invokeWeb("get_secret", { providerId });
+        return await invokeWeb("get_secret", { providerId });
       default:
         return null;
     }
   } catch (error) {
-    logger.error("Error getting secret.");
+    logger.error(`Error getting secret for ${providerId}: ${error}`);
     throw error;
   }
 };
@@ -36,14 +38,16 @@ export const deleteSecret = async (providerId: string): Promise<void> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri("delete_secret", { providerId });
+        await invokeTauri("delete_secret", { providerId });
+        return;
       case RUN_ENV.WEB:
-        return invokeWeb("delete_secret", { providerId });
+        await invokeWeb("delete_secret", { providerId });
+        return;
       default:
-        throw new Error(`Unsupported`);
+        throw new Error(`Unsupported environment`);
     }
   } catch (error) {
-    logger.error("Error deleting secret.");
+    logger.error(`Error deleting secret for ${providerId}: ${error}`);
     throw error;
   }
 };

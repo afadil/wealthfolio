@@ -153,7 +153,7 @@ export const getSubscriptionPlans = async (): Promise<PlansResponse> => {
   try {
     return await invokeDesktop("get_subscription_plans");
   } catch (error) {
-    logger.error("Error getting subscription plans.");
+    logger.error(`Error getting subscription plans: ${error}`);
     throw error;
   }
 };
@@ -195,7 +195,7 @@ export const getUserInfo = async (): Promise<UserInfo> => {
   try {
     return await invokeDesktop("get_user_info");
   } catch (error) {
-    logger.error("Error getting user info.");
+    logger.error(`Error getting user info: ${error}`);
     throw error;
   }
 };

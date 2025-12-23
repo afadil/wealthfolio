@@ -56,6 +56,13 @@ futures = "0.3"
 # Logging
 log = "0.4"
 
+# Crypto
+chacha20poly1305 = { version = "0.10", features = ["std"] }
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+hkdf = "0.12"
+sha2 = "0.10"
+rand = "0.8"
+
 # Internal crates
 wealthfolio-core = { path = "crates/core" }
 wealthfolio-connect = { path = "crates/connect" }

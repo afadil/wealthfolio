@@ -707,6 +707,15 @@ number-flow-react.muted-fraction::part(fraction) {
   }
 }
 
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
 @utility animate-accordion-down {
   animation: accordion-down 0.2s ease-out;
 }
