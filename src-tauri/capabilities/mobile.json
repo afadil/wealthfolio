@@ -39,6 +39,8 @@
     "haptics:allow-impact-feedback",
     "haptics:allow-notification-feedback",
     "haptics:allow-selection-feedback",
-    "haptics:allow-vibrate"
+    "haptics:allow-vibrate",
+    "web-auth:default",
+    "web-auth:allow-authenticate"
   ]
 }

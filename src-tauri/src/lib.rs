@@ -87,6 +87,12 @@ mod mobile {
     /// Initializes mobile-specific plugins.
     pub fn init_plugins(handle: &AppHandle) {
         let _ = handle.plugin(tauri_plugin_haptics::init());
+
+        // iOS-specific: Web Auth plugin for ASWebAuthenticationSession (required for Google OAuth)
+        #[cfg(target_os = "ios")]
+        {
+            let _ = handle.plugin(tauri_plugin_web_auth::init());
+        }
     }
 
     /// Performs async setup on mobile without blocking the main thread.
@@ -298,6 +304,37 @@ pub fn run() {
             commands::brokers_sync::get_connect_portal_url,
             commands::brokers_sync::get_subscription_plans,
             commands::brokers_sync::get_user_info,
+            // Device sync commands
+            commands::device_sync::get_device_id,
+            commands::device_sync::set_device_id,
+            commands::device_sync::clear_device_id,
+            commands::device_sync::register_device,
+            commands::device_sync::get_current_device,
+            commands::device_sync::list_devices,
+            commands::device_sync::get_sync_status,
+            commands::device_sync::enable_e2ee,
+            commands::device_sync::create_pairing,
+            commands::device_sync::claim_pairing,
+            commands::device_sync::approve_pairing,
+            commands::device_sync::cancel_pairing,
+            commands::device_sync::poll_pairing_messages,
+            commands::device_sync::send_pairing_message,
+            commands::device_sync::mark_device_trusted,
+            commands::device_sync::rename_device,
+            commands::device_sync::revoke_device,
+            commands::device_sync::reset_sync,
+            // Sync crypto commands
+            commands::sync_crypto::sync_generate_root_key,
+            commands::sync_crypto::sync_derive_dek,
+            commands::sync_crypto::sync_generate_keypair,
+            commands::sync_crypto::sync_compute_shared_secret,
+            commands::sync_crypto::sync_derive_session_key,
+            commands::sync_crypto::sync_encrypt,
+            commands::sync_crypto::sync_decrypt,
+            commands::sync_crypto::sync_generate_pairing_code,
+            commands::sync_crypto::sync_hash_pairing_code,
+            commands::sync_crypto::sync_compute_sas,
+            commands::sync_crypto::sync_generate_device_id,
         ])
         .build(tauri::generate_context!())
         .expect("Failed to build Wealthfolio application")

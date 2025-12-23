@@ -1,5 +1,6 @@
 import { ChartConfig, ChartContainer } from "@/components/ui/chart";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { useIsMobileViewport } from "@/hooks/use-platform";
 import { formatDate } from "@/lib/utils";
 import { AmountDisplay } from "@wealthfolio/ui";
 import { useState } from "react";
@@ -99,6 +100,7 @@ export function HistoryChart({
 }) {
   const { isBalanceHidden } = useBalancePrivacy();
   const [isChartHovered, setIsChartHovered] = useState(false);
+  const isMobile = useIsMobileViewport();
 
   const chartConfig = {
     totalValue: {
@@ -134,7 +136,7 @@ export function HistoryChart({
           </linearGradient>
         </defs>
         <Tooltip
-          position={{ y: -20 }}
+          position={isMobile ? { y: 60 } : { y: -20 }}
           content={(props) => (
             <CustomTooltip
               {...(props as TooltipBaseProps)}

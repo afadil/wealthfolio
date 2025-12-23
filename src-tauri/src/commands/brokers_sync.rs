@@ -1,6 +1,6 @@
 //! Commands for syncing broker data from the cloud API.
 
-use log::{debug, info};
+use log::{debug, error, info};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,8 @@ use wealthfolio_connect::{
 use wealthfolio_core::secrets::SecretStore;
 
 /// Secret key for storing the cloud API access token (same as frontend)
-const CLOUD_ACCESS_TOKEN_KEY: &str = "wealthfolio_sync_access_token";
+/// Note: SecretStore adds "wealthfolio_" prefix automatically
+const CLOUD_ACCESS_TOKEN_KEY: &str = "sync_access_token";
 
 /// Default base URL for Wealthfolio Connect cloud service.
 /// Override with `CONNECT_API_URL` environment variable.
@@ -856,10 +857,21 @@ pub async fn get_platforms(state: State<'_, Arc<ServiceContext>>) -> Result<Vec<
 // ─────────────────────────────────────────────────────────────────────────────
 
 fn create_api_client() -> Result<CloudApiClient, String> {
-    let access_token = KeyringSecretStore
-        .get_secret(CLOUD_ACCESS_TOKEN_KEY)
-        .map_err(|e| format!("Failed to get access token: {}", e))?
-        .ok_or_else(|| "No access token configured. Please sign in first.".to_string())?;
+    info!("create_api_client: attempting to get access token from keyring...");
+    let access_token = match KeyringSecretStore.get_secret(CLOUD_ACCESS_TOKEN_KEY) {
+        Ok(Some(token)) => {
+            info!("create_api_client: found access token (length={})", token.len());
+            token
+        }
+        Ok(None) => {
+            error!("create_api_client: no access token found in keyring");
+            return Err("No access token configured. Please sign in first.".to_string());
+        }
+        Err(e) => {
+            error!("create_api_client: error reading from keyring: {}", e);
+            return Err(format!("Failed to get access token: {}", e));
+        }
+    };
 
     CloudApiClient::try_new(cloud_api_base_url(), access_token)
 }
@@ -1171,10 +1183,16 @@ pub async fn get_subscription_plans(
     info!("Fetching subscription plans from cloud API...");
 
     let client = create_api_client()?;
-    let response = client.get_subscription_plans().await?;
-
-    info!("Found {} subscription plans", response.plans.len());
-    Ok(response)
+    match client.get_subscription_plans().await {
+        Ok(response) => {
+            info!("Found {} subscription plans", response.plans.len());
+            Ok(response)
+        }
+        Err(e) => {
+            error!("Failed to get subscription plans: {}", e);
+            Err(e)
+        }
+    }
 }
 
 /// Get current user info from the cloud API
@@ -1183,8 +1201,14 @@ pub async fn get_user_info(_state: State<'_, Arc<ServiceContext>>) -> Result<Use
     info!("Fetching user info from cloud API...");
 
     let client = create_api_client()?;
-    let user_info = client.get_user_info().await?;
-
-    info!("User info retrieved for: {}", user_info.email);
-    Ok(user_info)
+    match client.get_user_info().await {
+        Ok(user_info) => {
+            info!("User info retrieved for: {}", user_info.email);
+            Ok(user_info)
+        }
+        Err(e) => {
+            error!("Failed to get user info: {}", e);
+            Err(e)
+        }
+    }
 }

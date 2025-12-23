@@ -11,8 +11,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icons } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/components/ui/use-toast";
 import { useWealthfolioConnect } from "@/context/wealthfolio-connect-context";
+import { DeviceSyncSection } from "@/features/sync";
 import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -64,69 +66,58 @@ function BrokerConnectionSkeleton() {
 interface ConnectionCardProps {
   connection: BrokerConnection;
   onManage: () => void;
-  onSync: () => void;
-  isSyncing: boolean;
 }
 
-function ConnectionCard({ connection, onManage, onSync, isSyncing }: ConnectionCardProps) {
+function ConnectionCard({ connection, onManage }: ConnectionCardProps) {
   const logoUrl = connection.brokerage?.awsS3SquareLogoUrl ?? connection.brokerage?.awsS3LogoUrl;
   const name = connection.brokerage?.displayName ?? connection.brokerage?.name ?? "Brokerage";
   const isDisabled = connection.disabled;
 
   const lastSyncedText = connection.updatedAt
-    ? `Synced ${formatDistanceToNow(new Date(connection.updatedAt), { addSuffix: false })} ago`
+    ? `Last synced ${formatDistanceToNow(new Date(connection.updatedAt), { addSuffix: false })} ago`
     : "Never synced";
 
   return (
     <div
-      className={`group relative flex items-center gap-4 rounded-lg p-4 transition-all ${
-        isDisabled ? "bg-destructive/5 border-destructive/20 border" : "hover:bg-muted/50 border"
+      className={`flex items-center justify-between gap-3 rounded-lg border p-3 ${
+        isDisabled ? "border-destructive/30 bg-destructive/5" : "bg-muted/30"
       }`}
     >
-      {logoUrl ? (
-        <img
-          src={logoUrl}
-          alt={name}
-          className="h-12 w-12 rounded-lg bg-white object-contain p-1"
-        />
-      ) : (
-        <div className="bg-muted flex h-12 w-12 items-center justify-center rounded-lg text-lg font-semibold">
-          {name.charAt(0)}
-        </div>
-      )}
-
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <h4 className="truncate font-semibold">{name}</h4>
-        </div>
-        <div className="text-muted-foreground flex items-center gap-2 text-sm">
-          <span>{lastSyncedText}</span>
-          {!isDisabled && <span className="h-1.5 w-1.5 rounded-full bg-green-500" />}
-          {isDisabled && <span className="text-destructive text-xs">Disconnected</span>}
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-        {isDisabled ? (
-          <Button variant="secondary" size="sm" onClick={onManage}>
-            Reconnect
-          </Button>
+      {/* Logo and info */}
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        {logoUrl ? (
+          <img
+            src={logoUrl}
+            alt={name}
+            className="h-9 w-9 shrink-0 rounded-lg bg-white object-contain p-1"
+          />
         ) : (
-          <Button variant="outline" size="sm" onClick={onSync} disabled={isSyncing}>
-            {isSyncing ? (
-              <>
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                Syncing...
-              </>
-            ) : (
-              <>
-                <Icons.Refresh className="mr-2 h-4 w-4" />
-                Sync Now
-              </>
-            )}
-          </Button>
+          <div className="bg-muted flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-semibold">
+            {name.charAt(0)}
+          </div>
         )}
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-sm font-medium">{name}</span>
+            {isDisabled && (
+              <Badge variant="destructive" className="h-5 shrink-0 text-[10px]">
+                Disconnected
+              </Badge>
+            )}
+          </div>
+          <p className="text-muted-foreground text-xs">{lastSyncedText}</p>
+        </div>
       </div>
+
+      {/* Status indicator or reconnect button */}
+      {isDisabled ? (
+        <Button variant="outline" size="sm" onClick={onManage} className="h-8 shrink-0 text-xs">
+          Reconnect
+        </Button>
+      ) : (
+        <span className="flex h-2 w-2 shrink-0 rounded-full bg-green-500" />
+      )}
     </div>
   );
 }
@@ -184,15 +175,6 @@ export function SyncConnectedView() {
     }
   }, [clearError, signOut]);
 
-  const formatDate = (dateString: string | undefined) => {
-    if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
   // Derived state
   const connections = connectionsQuery.data ?? [];
   const isLoadingConnections = connectionsQuery.isLoading;
@@ -207,75 +189,69 @@ export function SyncConnectedView() {
         </Alert>
       )}
 
-      {/* Account Status Card */}
+      {/* Account Card */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-4">
-              {user?.user_metadata?.avatar_url ? (
-                <img
-                  src={user.user_metadata.avatar_url}
-                  alt={user?.email ?? "User avatar"}
-                  className="h-10 w-10 shrink-0 rounded-full object-cover"
-                />
-              ) : (
-                <div
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                    hasSubscription ? "bg-green-100 dark:bg-green-900/30" : "bg-muted"
-                  }`}
-                >
-                  {hasSubscription ? (
-                    <Icons.CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                  ) : (
-                    <Icons.Users className="text-muted-foreground h-5 w-5" />
-                  )}
-                </div>
-              )}
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold">{userInfo?.fullName ?? user?.email ?? "N/A"}</h3>
-                  {hasSubscription && (
-                    <Badge
-                      variant="secondary"
-                      className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                    >
-                      Active
-                    </Badge>
-                  )}
-                </div>
-                {userInfo?.fullName && (
-                  <p className="text-muted-foreground text-sm">{user?.email}</p>
-                )}
-                <p className="text-muted-foreground text-xs">
-                  Member since {formatDate(user?.created_at)}
-                </p>
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3">
+            {user?.user_metadata?.avatar_url ? (
+              <img
+                src={user.user_metadata.avatar_url}
+                alt={user?.email ?? "User avatar"}
+                className="h-12 w-12 shrink-0 rounded-full object-cover"
+              />
+            ) : (
+              <div className="bg-primary/10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full">
+                <span className="text-primary text-lg font-semibold">
+                  {(userInfo?.fullName?.[0] ?? user?.email?.[0] ?? "U").toUpperCase()}
+                </span>
               </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <h3 className="truncate text-base font-semibold">
+                  {userInfo?.fullName ?? user?.email?.split("@")[0] ?? "User"}
+                </h3>
+                {hasSubscription && (
+                  <Badge className="h-5 shrink-0 bg-green-100 px-2 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                    Active
+                  </Badge>
+                )}
+              </div>
+              <p className="text-muted-foreground truncate text-sm">{user?.email}</p>
             </div>
-            <ActionConfirm
-              handleConfirm={handleSignOut}
-              isPending={isSigningOut}
-              confirmTitle="Sign out of Wealthfolio Connect?"
-              confirmMessage="You'll need to sign in again to access your synced broker accounts. Your local data will not be affected."
-              confirmButtonText="Sign Out"
-              pendingText="Signing out..."
-              cancelButtonText="Cancel"
-              confirmButtonVariant="destructive"
-              button={
-                <Button variant="outline" size="sm" disabled={isSigningOut || isLoading}>
-                  {isSigningOut ? (
-                    <>
-                      <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                      Signing out...
-                    </>
-                  ) : (
-                    <>
-                      <Icons.LogOut className="mr-2 h-4 w-4" />
-                      Sign Out
-                    </>
-                  )}
-                </Button>
-              }
-            />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <ActionConfirm
+                    handleConfirm={handleSignOut}
+                    isPending={isSigningOut}
+                    confirmTitle="Sign out of Wealthfolio Connect?"
+                    confirmMessage="You'll need to sign in again to access your synced broker accounts. Your local data will not be affected."
+                    confirmButtonText="Sign Out"
+                    pendingText="Signing out..."
+                    cancelButtonText="Cancel"
+                    confirmButtonVariant="destructive"
+                    button={
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-foreground h-8 w-8 shrink-0"
+                        disabled={isSigningOut || isLoading}
+                      >
+                        {isSigningOut ? (
+                          <Icons.Spinner className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Icons.LogOut className="h-4 w-4" />
+                        )}
+                      </Button>
+                    }
+                  />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Sign out</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
         </CardContent>
       </Card>
@@ -302,133 +278,130 @@ export function SyncConnectedView() {
       {/* Broker Connections Card - Only show if user has an active subscription */}
       {hasSubscription && (
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-base font-medium">Connected Broker Accounts</CardTitle>
-                <CardDescription>
-                  Manage your linked broker accounts through Wealthfolio Connect.
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => connectionsQuery.refetch()}
-                  disabled={connectionsQuery.isFetching}
-                  title="Refresh connections"
-                >
-                  {connectionsQuery.isFetching ? (
-                    <Icons.Spinner className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Icons.Refresh className="h-4 w-4" />
-                  )}
-                </Button>
-                {connections.length > 0 && (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => syncToLocalMutation.mutate()}
-                      disabled={isSyncing}
-                    >
-                      {isSyncing ? (
-                        <>
-                          <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                          Syncing...
-                        </>
-                      ) : (
-                        <>
-                          <Icons.Download className="mr-2 h-4 w-4" />
-                          Sync to Local
-                        </>
-                      )}
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={openConnectPortal}>
-                      <Icons.Settings className="mr-2 h-4 w-4" />
-                      Manage Connections
-                    </Button>
-                  </>
-                )}
-              </div>
+              <CardTitle className="text-base font-medium">Broker Accounts</CardTitle>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => connectionsQuery.refetch()}
+                    disabled={connectionsQuery.isFetching}
+                    className="text-muted-foreground hover:text-foreground h-8 w-8 shrink-0"
+                  >
+                    {connectionsQuery.isFetching ? (
+                      <Icons.Spinner className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Icons.Refresh className="h-4 w-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Refresh</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
+            <CardDescription>
+              Manage your linked broker accounts through Wealthfolio Connect.
+            </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             {isLoadingConnections ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <BrokerConnectionSkeleton />
                 <BrokerConnectionSkeleton />
               </div>
             ) : connections.length === 0 ? (
               <div className="text-muted-foreground flex flex-col items-center justify-center py-8 text-center">
-                <Icons.Link className="mb-3 h-10 w-10 opacity-50" />
-                <p className="text-sm font-medium">No broker accounts connected yet</p>
-                <p className="mt-1 text-xs">
+                <div className="bg-muted/50 mb-4 rounded-full p-3">
+                  <Icons.Link className="h-6 w-6 opacity-60" />
+                </div>
+                <p className="text-foreground text-sm font-medium">No broker accounts connected</p>
+                <p className="mt-1 max-w-xs text-xs">
                   Connect your first broker account to start syncing your portfolio automatically.
                 </p>
-                <Button className="mt-4" onClick={openConnectPortal}>
+                <Button className="mt-4" size="sm" onClick={openConnectPortal}>
                   <Icons.Plus className="mr-2 h-4 w-4" />
-                  Connect Broker Account
+                  Connect Broker
                 </Button>
               </div>
             ) : (
-              <div className="space-y-2">
-                {connections.map((connection) => (
-                  <ConnectionCard
-                    key={connection.id}
-                    connection={connection}
-                    onManage={openConnectPortal}
-                    onSync={() => syncToLocalMutation.mutate()}
-                    isSyncing={isSyncing}
-                  />
-                ))}
-              </div>
-            )}
+              <div>
+                {/* Connection list */}
+                <div className="space-y-2">
+                  {connections.map((connection) => (
+                    <ConnectionCard
+                      key={connection.id}
+                      connection={connection}
+                      onManage={openConnectPortal}
+                    />
+                  ))}
+                </div>
 
-            {/* Sync Result */}
-            {syncResult && (
-              <div className="bg-muted/50 mt-4 rounded-lg p-3 text-sm">
-                <p className="font-medium">{syncResult.message}</p>
-                {syncResult.accountsSynced && (
-                  <p className="text-muted-foreground mt-1">
-                    {syncResult.accountsSynced.created} accounts created,{" "}
-                    {syncResult.accountsSynced.skipped} skipped
-                  </p>
+                {/* Sync Result */}
+                {syncResult && (
+                  <div className="bg-muted/50 mt-3 rounded-lg p-3 text-sm">
+                    <p className="font-medium">{syncResult.message}</p>
+                    {syncResult.accountsSynced && (
+                      <p className="text-muted-foreground mt-1">
+                        {syncResult.accountsSynced.created} accounts created,{" "}
+                        {syncResult.accountsSynced.skipped} skipped
+                      </p>
+                    )}
+                  </div>
                 )}
+
+                {/* Actions */}
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => syncToLocalMutation.mutate()}
+                    disabled={isSyncing}
+                    className="flex-1 sm:flex-none"
+                  >
+                    {isSyncing ? (
+                      <>
+                        <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                        Syncing...
+                      </>
+                    ) : (
+                      <>
+                        <Icons.Download className="mr-2 h-4 w-4" />
+                        Sync to Local
+                      </>
+                    )}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={openConnectPortal} className="flex-1 sm:flex-none">
+                    <Icons.ExternalLink className="mr-2 h-4 w-4" />
+                    Manage Accounts
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
       )}
 
-      {/* Security Info Card */}
-      <Card className="border-dashed">
-        <CardContent className="pt-6">
-          <div className="space-y-4">
-            <div className="flex items-start gap-3">
-              <Icons.Shield className="text-muted-foreground mt-0.5 h-5 w-5" />
-              <div>
-                <p className="text-sm font-medium">Secure Storage</p>
-                <p className="text-muted-foreground text-sm">
-                  Your authentication tokens are securely stored in your system&apos;s keychain
-                  (Keychain on macOS, Credential Manager on Windows, Secret Service on Linux).
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <Icons.Refresh className="text-muted-foreground mt-0.5 h-5 w-5" />
-              <div>
-                <p className="text-sm font-medium">Automatic Refresh</p>
-                <p className="text-muted-foreground text-sm">
-                  Your session is automatically refreshed with token rotation enabled for enhanced
-                  security. You&apos;ll only need to sign in again if you change your password, sign
-                  out, or uninstall the app.
-                </p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Device Sync Section - Only show if user has an active subscription */}
+      {hasSubscription && <DeviceSyncSection />}
+
+      {/* Privacy Footnote */}
+      <footer className="border-t pt-4">
+        <p className="text-muted-foreground text-center text-xs leading-relaxed">
+          Wealthfolio Connect doesn&apos;t store your brokerage credentials or financial data.
+          Everything syncs securely via an aggregator to your local database.
+          Device sync uses end-to-end encryption.{" "}
+          <a
+            href="https://wealthfolio.app/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
+          >
+            Learn more
+          </a>
+        </p>
+      </footer>
     </div>
   );
 }

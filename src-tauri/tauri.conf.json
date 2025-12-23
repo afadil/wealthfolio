@@ -42,7 +42,8 @@
       ],
       "desktop": {
         "schemes": ["wealthfolio"]
-      }
+      },
+      "schemes": ["wealthfolio"]
     }
   },
   "app": {

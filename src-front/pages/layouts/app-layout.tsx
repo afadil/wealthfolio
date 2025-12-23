@@ -1,6 +1,8 @@
 import AppLauncher from "@/components/app-launcher";
+import { MobileSyncIndicator } from "@/components/mobile-sync-indicator";
 import { Toaster } from "@/components/sonner";
 import { UpdateDialog } from "@/components/update-dialog";
+import { PortfolioSyncProvider } from "@/context/portfolio-sync-context";
 import useNavigationEventListener from "@/hooks/use-navigation-event-listener";
 import { useIsMobileViewport, usePlatform } from "@/hooks/use-platform";
 import { useSettings } from "@/hooks/use-settings";
@@ -43,6 +45,9 @@ const AppLayoutContent = () => {
           launchBarHeight ? { ["--mobile-nav-ui-height" as string]: launchBarHeight } : undefined
         }
       >
+        {/* Mobile sync loading indicator */}
+        {shouldUseMobileNavigation && <MobileSyncIndicator />}
+
         <div className="scan-hide-target">
           {!shouldUseBottomNavigation && !isDesktopFocusMode && (
             <AppSidebar navigation={navigation} />
@@ -88,9 +93,11 @@ const AppLayoutContent = () => {
 
 const AppLayout = () => {
   return (
-    <NavigationModeProvider>
-      <AppLayoutContent />
-    </NavigationModeProvider>
+    <PortfolioSyncProvider>
+      <NavigationModeProvider>
+        <AppLayoutContent />
+      </NavigationModeProvider>
+    </PortfolioSyncProvider>
   );
 };
 
