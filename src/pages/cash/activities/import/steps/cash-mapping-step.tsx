@@ -653,6 +653,91 @@ function CashMappingTable({
   events,
   cashAccounts,
 }: CashMappingTableProps) {
+  // Only show one representative row per unique value (matches securities import behavior)
+  const distinctRows = useMemo(() => {
+    const rowsNeedingMapping = new Set<CsvRowData>();
+    const processedRows = new Map<string, CsvRowData>();
+    const seenActivityTypes = new Set<string>();
+    const seenCategories = new Set<string>();
+    const seenEvents = new Set<string>();
+    const seenAccounts = new Set<string>();
+    const seenRecurrences = new Set<string>();
+
+    data.forEach((row) => {
+      let shouldInclude = false;
+      let needsMapping = false;
+
+      const activityType = getMappedValue(row, "activityType");
+      if (activityType && !seenActivityTypes.has(activityType.trim())) {
+        seenActivityTypes.add(activityType.trim());
+        shouldInclude = true;
+        if (!findAppTypeForCsvTypeFn(activityType.trim(), activityTypeMappings)) {
+          needsMapping = true;
+        }
+      }
+
+      const category = getMappedValue(row, "category");
+      if (category && !seenCategories.has(category.trim())) {
+        seenCategories.add(category.trim());
+        shouldInclude = true;
+        if (!categoryMappings[category.trim()]) {
+          needsMapping = true;
+        }
+      }
+
+      const event = getMappedValue(row, "event");
+      if (event && !seenEvents.has(event.trim())) {
+        seenEvents.add(event.trim());
+        shouldInclude = true;
+        if (!eventMappings[event.trim()]) {
+          needsMapping = true;
+        }
+      }
+
+      const account = getMappedValue(row, "account");
+      if (account && !seenAccounts.has(account.trim())) {
+        seenAccounts.add(account.trim());
+        shouldInclude = true;
+        if (!accountMappings[account.trim()]) {
+          needsMapping = true;
+        }
+      }
+
+      const recurrence = getMappedValue(row, "recurrence");
+      if (recurrence && !seenRecurrences.has(recurrence.trim())) {
+        seenRecurrences.add(recurrence.trim());
+        shouldInclude = true;
+        if (!recurrenceMappings[recurrence.trim()]) {
+          needsMapping = true;
+        }
+      }
+
+      if (shouldInclude) {
+        processedRows.set(String(row.lineNumber), row);
+        if (needsMapping) {
+          rowsNeedingMapping.add(row);
+        }
+      }
+    });
+
+    return Array.from(processedRows.values()).sort((a, b) => {
+      const aNeedsMapping = rowsNeedingMapping.has(a);
+      const bNeedsMapping = rowsNeedingMapping.has(b);
+      if (aNeedsMapping !== bNeedsMapping) {
+        return aNeedsMapping ? -1 : 1;
+      }
+      return Number(a.lineNumber) - Number(b.lineNumber);
+    });
+  }, [
+    data,
+    getMappedValue,
+    activityTypeMappings,
+    categoryMappings,
+    eventMappings,
+    accountMappings,
+    recurrenceMappings,
+  ]);
+
   return (
     <div className="border-border bg-card h-full max-h-[50vh] w-full overflow-auto rounded-md border shadow-sm">
       <div className="min-w-fit">
@@ -691,7 +776,7 @@ function CashMappingTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((row, index) => (
+              {distinctRows.map((row, index) => (
                 <motion.tr
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
