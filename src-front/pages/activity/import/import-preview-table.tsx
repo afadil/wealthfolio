@@ -15,12 +15,12 @@ import {
 } from "@tanstack/react-table";
 import { useMemo, useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
-import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
-import { DataTableFacetedFilterProps } from "@/components/ui/data-table/data-table-faceted-filter";
-import { DataTablePagination } from "@/components/ui/data-table/data-table-pagination";
-import { DataTableToolbar } from "@/components/ui/data-table/data-table-toolbar";
-import { Icons } from "@/components/ui/icons";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { DataTableColumnHeader } from "@wealthfolio/ui/components/ui/data-table/data-table-column-header";
+import { DataTableFacetedFilterProps } from "@wealthfolio/ui/components/ui/data-table/data-table-faceted-filter";
+import { DataTablePagination } from "@wealthfolio/ui/components/ui/data-table/data-table-pagination";
+import { DataTableToolbar } from "@wealthfolio/ui/components/ui/data-table/data-table-toolbar";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import {
   Table,
   TableBody,
@@ -28,8 +28,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+} from "@wealthfolio/ui/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import type { Account, ActivityImport } from "@/lib/types";
 import { cn, formatDateTime, toPascalCase } from "@/lib/utils";
 import { formatAmount } from "@wealthfolio/ui";

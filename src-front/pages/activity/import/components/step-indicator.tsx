@@ -1,4 +1,4 @@
-import { Icons } from "@/components/ui/icons";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { motion } from "motion/react";
 import { Fragment } from "react";
 

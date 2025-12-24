@@ -4,7 +4,7 @@ import { ACTIVITY_TYPE_PREFIX_LENGTH } from "@/lib/types";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getAccountImportMapping, saveAccountImportMapping } from "@/commands/activity-import";
 import { QueryKeys } from "@/lib/query-keys";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { logger } from "@/adapters";
 
 export function initializeColumnMapping(

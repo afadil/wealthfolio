@@ -1,5 +1,5 @@
-import { Icons } from "@/components/ui/icons";
-import { Separator } from "@/components/ui/separator";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import {
   useWealthfolioConnect,
   ConnectedView,

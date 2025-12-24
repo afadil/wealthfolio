@@ -5,11 +5,11 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@wealthfolio/ui/components/ui/table";
 import { Lot } from "@/lib/types";
 import { formatAmount } from "@wealthfolio/ui";
 import { formatDate } from "@/lib/utils";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { GainAmount } from "@wealthfolio/ui";
 import { GainPercent } from "@wealthfolio/ui";
 

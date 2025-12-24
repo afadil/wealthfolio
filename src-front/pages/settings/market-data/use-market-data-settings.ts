@@ -6,7 +6,7 @@ import {
   MarketDataProviderSetting,
 } from "@/commands/market-data";
 import { setSecret, deleteSecret } from "@/commands/secrets";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 
 export function useMarketDataProviderSettings() {
   return useQuery({

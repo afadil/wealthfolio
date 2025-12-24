@@ -1,13 +1,13 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import {
   ChartContainer,
   ChartLegend,
   ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
-} from "@/components/ui/chart";
-import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
-import { Icons } from "@/components/ui/icons";
+} from "@wealthfolio/ui/components/ui/chart";
+import { EmptyPlaceholder } from "@wealthfolio/ui/components/ui/empty-placeholder";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { cn } from "@/lib/utils";
 import { formatAmount } from "@wealthfolio/ui";
 import { format, parseISO } from "date-fns";

@@ -1,7 +1,7 @@
 import { reloadAllAddons } from "@/addons/addons-core";
 import { updateAddon } from "@/commands/addon";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -9,11 +9,11 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { Icons } from "@/components/ui/icons";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import { useToast } from "@/components/ui/use-toast";
+} from "@wealthfolio/ui/components/ui/dialog";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { ScrollArea } from "@wealthfolio/ui/components/ui/scroll-area";
+import { Separator } from "@wealthfolio/ui/components/ui/separator";
+import { useToast } from "@wealthfolio/ui/components/ui/use-toast";
 import type { AddonUpdateInfo } from "@wealthfolio/addon-sdk";
 import { useState } from "react";
 

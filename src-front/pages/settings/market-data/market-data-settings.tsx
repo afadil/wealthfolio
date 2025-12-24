@@ -1,6 +1,6 @@
-import { Button } from "@/components/ui/button";
-import { Icons } from "@/components/ui/icons";
-import { Separator } from "@/components/ui/separator";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -9,13 +9,13 @@ import { SettingsHeader } from "../settings-header";
 
 import { MarketDataProviderSetting } from "@/commands/market-data";
 import { getSecret } from "@/commands/secrets";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Switch } from "@/components/ui/switch";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@wealthfolio/ui/components/ui/collapsible";
+import { Input } from "@wealthfolio/ui/components/ui/input";
+import { Label } from "@wealthfolio/ui/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
+import { Switch } from "@wealthfolio/ui/components/ui/switch";
 import {
   useRecalculatePortfolioMutation,
   useUpdatePortfolioMutation,

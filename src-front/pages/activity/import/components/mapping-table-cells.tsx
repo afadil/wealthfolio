@@ -1,6 +1,6 @@
 import { AccountSelector } from "@/components/account-selector";
 import TickerSearchInput from "@/components/ticker-search";
-import { Button } from "@/components/ui/button";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 import { IMPORT_REQUIRED_FIELDS } from "@/lib/constants";
 import {
   Account,

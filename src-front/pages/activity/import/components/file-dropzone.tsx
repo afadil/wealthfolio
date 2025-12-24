@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/button";
-import { Icons } from "@/components/ui/icons";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { AnimatePresence, motion } from "motion/react";
 import { useRef, useState } from "react";
 

@@ -1,7 +1,7 @@
 import { searchTicker } from "@/commands/market-data";
-import { Button } from "@/components/ui/button";
-import { Icons } from "@/components/ui/icons";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { ScrollArea } from "@wealthfolio/ui/components/ui/scroll-area";
 import {
   Sheet,
   SheetContent,
@@ -9,8 +9,8 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
+} from "@wealthfolio/ui/components/ui/sheet";
+import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { QuoteSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";

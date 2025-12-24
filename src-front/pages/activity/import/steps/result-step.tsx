@@ -1,6 +1,6 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Icons } from "@/components/ui/icons";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Account, ActivityImport } from "@/lib/types";
 import { motion } from "motion/react";
 import { useMemo } from "react";

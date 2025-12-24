@@ -2,7 +2,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
-import { buttonVariants } from "@/components/ui/button-variants";
+import { buttonVariants } from "@wealthfolio/ui/components/ui/button-variants";
 
 interface SidebarNavProps extends React.HTMLAttributes<HTMLElement> {
   items: {

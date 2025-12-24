@@ -1,6 +1,6 @@
-import { Button } from "@/components/ui/button";
-import { Icons } from "@/components/ui/icons";
-import { ProgressIndicator } from "@/components/ui/progress-indicator";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { ProgressIndicator } from "@wealthfolio/ui/components/ui/progress-indicator";
 import { usePlatform } from "@/hooks/use-platform";
 import { Account, CsvRowError } from "@/lib/types";
 import { AccountSelector } from "../../../../components/account-selector";

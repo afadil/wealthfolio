@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 
-import { Button } from "@/components/ui/button";
-import { Icons } from "@/components/ui/icons";
-import { Separator } from "@/components/ui/separator";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Separator } from "@wealthfolio/ui/components/ui/separator";
 
 import { SettingsHeader } from "../settings-header";
 

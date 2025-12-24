@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@wealthfolio/ui/components/ui/use-toast";
 import { submitAddonRating, getAddonRatings } from "@/commands/addon";
 import { QueryKeys } from "@/lib/query-keys";
 

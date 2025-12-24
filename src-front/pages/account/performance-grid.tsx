@@ -5,8 +5,8 @@ import {
   TIME_WEIGHTED_RETURN_INFO,
   VOLATILITY_INFO,
 } from "@/components/metric-display";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
+import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { PerformanceMetrics } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import React from "react";

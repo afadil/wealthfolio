@@ -1,5 +1,5 @@
 import { getDynamicNavItems, subscribeToNavigationUpdates } from "@/addons/addons-runtime-context";
-import { Icons } from "@/components/ui/icons";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useEffect, useState } from "react";
 
 export interface NavLink {

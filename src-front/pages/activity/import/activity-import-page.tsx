@@ -1,6 +1,6 @@
 import { logger } from "@/adapters";
 import { getAccounts } from "@/commands/account";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@wealthfolio/ui/components/ui/card";
 import { usePlatform } from "@/hooks/use-platform";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, ActivityImport, ImportMappingData } from "@/lib/types";

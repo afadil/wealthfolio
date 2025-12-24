@@ -1,4 +1,4 @@
-import { Separator } from "@/components/ui/separator";
+import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import { useQuoteImport } from "@/hooks/use-quote-import";
 import { cn } from "@/lib/utils";
 import { StepIndicator } from "@/pages/activity/import/components/step-indicator";

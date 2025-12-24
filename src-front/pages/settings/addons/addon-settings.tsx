@@ -17,7 +17,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@wealthfolio/ui";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useState } from "react";
 import { SettingsHeader } from "../settings-header";
 import { useAddonActions } from "./hooks/use-addon-actions";

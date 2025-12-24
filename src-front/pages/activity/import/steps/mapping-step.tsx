@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 import { CsvMappingEditor } from "../components/mapping-editor";
 import { ImportFormat, ActivityType, ImportMappingData, CsvRowData, Account } from "@/lib/types";
 import { useMemo } from "react";
@@ -6,7 +6,7 @@ import { validateTickerSymbol } from "../utils/validation-utils";
 import { useImportMapping } from "../hooks/use-import-mapping";
 import { IMPORT_REQUIRED_FIELDS } from "@/lib/constants";
 import { ImportAlert } from "../components/import-alert";
-import { Icons, Icon } from "@/components/ui/icons";
+import { Icons, Icon } from "@wealthfolio/ui/components/ui/icons";
 
 interface MappingStepProps {
   headers: string[];

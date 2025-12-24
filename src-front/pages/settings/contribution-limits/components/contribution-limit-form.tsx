@@ -3,9 +3,9 @@ import { useForm, useWatch } from "react-hook-form";
 import * as z from "zod";
 import { useEffect } from "react";
 
-import { Button } from "@/components/ui/button";
-import { Icons } from "@/components/ui/icons";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 
 import {
   DialogDescription,

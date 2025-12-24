@@ -1,5 +1,5 @@
 import type { FunctionPermission, Permission } from "@/adapters/tauri";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { getFunctionDisplayName } from "@/pages/settings/addons/components/addon-function-names";
 import { getPermissionCategory } from "@wealthfolio/addon-sdk";
 

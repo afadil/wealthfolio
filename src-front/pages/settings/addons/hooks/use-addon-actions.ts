@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@wealthfolio/ui/components/ui/use-toast";
 import { getRunEnv, RUN_ENV, logger as envLogger } from "@/adapters";
 
 import { reloadAllAddons } from "@/addons/addons-core";

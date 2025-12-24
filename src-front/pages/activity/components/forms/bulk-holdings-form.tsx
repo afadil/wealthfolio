@@ -1,7 +1,7 @@
 import { AccountSelector } from "@/components/account-selector";
 import { TickerAvatar } from "@/components/ticker-avatar";
 import TickerSearchInput from "@/components/ticker-search";
-import { Icons } from "@/components/ui/icons";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Account, QuoteSummary } from "@/lib/types";
 import { DataSource } from "@/lib/constants";
 import { cn } from "@/lib/utils";

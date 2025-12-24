@@ -1,7 +1,7 @@
 import TickerSearchInput from "@/components/ticker-search";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@wealthfolio/ui/components/ui/checkbox";
+import { Input } from "@wealthfolio/ui/components/ui/input";
+import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
 import { DataSource } from "@/lib/constants";
 import type { QuoteSummary } from "@/lib/types";
 import {

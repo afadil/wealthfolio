@@ -1,6 +1,6 @@
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { toast } from "@/components/ui/use-toast";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Input } from "@wealthfolio/ui/components/ui/input";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { Account, Goal, GoalAllocation } from "@/lib/types";
 import { formatAmount } from "@wealthfolio/ui";
 import React, { useState, useEffect } from "react";

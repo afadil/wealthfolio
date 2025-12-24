@@ -1,5 +1,5 @@
-import { AnimatedToggleGroup } from "@/components/ui/animated-toggle-group";
-import { cn } from "@/lib/utils";
+import { AnimatedToggleGroup } from "../ui/animated-toggle-group";
+import { cn } from "../../lib/utils";
 import { startOfYear, subMonths, subWeeks, subYears } from "date-fns";
 import React, { useCallback } from "react";
 

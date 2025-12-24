@@ -1,9 +1,9 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { DataTable } from "@/components/ui/data-table";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { Icons } from "@/components/ui/icons";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
+import { DataTable } from "@wealthfolio/ui/components/ui/data-table";
+import { Dialog, DialogContent, DialogTrigger } from "@wealthfolio/ui/components/ui/dialog";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { ExchangeRate } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { ColumnDef } from "@tanstack/react-table";

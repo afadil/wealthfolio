@@ -1,14 +1,14 @@
 import React from "react";
 
 import { TickerAvatar } from "@/components/ticker-avatar";
-import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
+import { DataTableColumnHeader } from "@wealthfolio/ui/components/ui/data-table/data-table-column-header";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Icons } from "@/components/ui/icons";
+} from "@wealthfolio/ui/components/ui/dropdown-menu";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import {
   Table,
   TableBody,
@@ -16,7 +16,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@wealthfolio/ui/components/ui/table";
 import {
   calculateActivityValue,
   isCashActivity,

@@ -1,8 +1,8 @@
 import { ReactNode } from "react";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Icons } from "@/components/ui/icons";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@wealthfolio/ui/components/ui/hover-card";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import {
   useUpdatePortfolioMutation,
   useRecalculatePortfolioMutation,

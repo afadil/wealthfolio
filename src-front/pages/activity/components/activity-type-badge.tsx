@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { ActivityType, ActivityTypeNames } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 

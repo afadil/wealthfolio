@@ -6,7 +6,7 @@ import {
   updateActivity,
 } from "@/commands/activity";
 import { updateQuote } from "@/commands/market-data";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { isCashActivity } from "@/lib/activity-utils";
 import { DataSource } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";

@@ -1,9 +1,9 @@
 import { CurrencySelectorMobile } from "@/components/currency-selector-mobile";
 import { SymbolSelectorMobile } from "@/components/symbol-selector-mobile";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@wealthfolio/ui/components/ui/checkbox";
+import { Input } from "@wealthfolio/ui/components/ui/input";
+import { ScrollArea } from "@wealthfolio/ui/components/ui/scroll-area";
+import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
 import { DataSource } from "@/lib/constants";
 import {
   Button,

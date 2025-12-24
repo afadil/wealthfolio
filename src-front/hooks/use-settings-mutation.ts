@@ -1,6 +1,6 @@
 import { logger } from "@/adapters";
 import { updateSettings } from "@/commands/settings";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { QueryKeys } from "@/lib/query-keys";
 import { Settings } from "@/lib/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";

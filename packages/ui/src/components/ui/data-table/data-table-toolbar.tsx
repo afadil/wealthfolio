@@ -1,12 +1,12 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "../button";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Icons } from "@/components/ui/icons";
-import { Input } from "@/components/ui/input";
+} from "../dropdown-menu";
+import { Icons } from "../icons";
+import { Input } from "../input";
 import { Table } from "@tanstack/react-table";
 
 import { useEffect, useState } from "react";

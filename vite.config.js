@@ -26,7 +26,6 @@ export default defineConfig({
     plugins: [react(), tailwindcss()],
     resolve: {
         alias: {
-            "@/components/ui": path.resolve(__dirname, "packages/ui/src/components/ui"),
             "@wealthfolio/addon-sdk": path.resolve(__dirname, "packages/addon-sdk/src"),
             "@wealthfolio/ui": path.resolve(__dirname, "packages/ui/src"),
             "@": path.resolve(__dirname, "./src-front"),

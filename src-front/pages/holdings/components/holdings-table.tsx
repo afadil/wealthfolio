@@ -1,14 +1,14 @@
-import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/ui/data-table";
-import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
-import { Icons } from "@/components/ui/icons";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { DataTable } from "@wealthfolio/ui/components/ui/data-table";
+import { DataTableColumnHeader } from "@wealthfolio/ui/components/ui/data-table/data-table-column-header";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { safeDivide } from "@/lib/utils";
 import type { ColumnDef } from "@tanstack/react-table";
 import { GainPercent } from "@wealthfolio/ui";
 
 import { TickerAvatar } from "@/components/ticker-avatar";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { Holding } from "@/lib/types";

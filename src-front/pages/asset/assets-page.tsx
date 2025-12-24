@@ -9,15 +9,15 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+} from "@wealthfolio/ui/components/ui/alert-dialog";
+import { Dialog, DialogContent } from "@wealthfolio/ui/components/ui/dialog";
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from "@/components/ui/sheet";
+} from "@wealthfolio/ui/components/ui/sheet";
 import { Separator } from "@wealthfolio/ui";
 
 import { useIsMobileViewport } from "@/hooks/use-platform";

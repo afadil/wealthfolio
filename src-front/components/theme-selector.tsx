@@ -1,5 +1,5 @@
-import { FormControl, FormItem, FormLabel } from "@/components/ui/form";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { FormControl, FormItem, FormLabel } from "@wealthfolio/ui/components/ui/form";
+import { RadioGroup, RadioGroupItem } from "@wealthfolio/ui/components/ui/radio-group";
 import { cn } from "@/lib/utils";
 
 interface ThemeSelectorProps {

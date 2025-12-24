@@ -1,8 +1,8 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Icons } from "@/components/ui/icons";
-import { ProgressIndicator } from "@/components/ui/progress-indicator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { ProgressIndicator } from "@wealthfolio/ui/components/ui/progress-indicator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
 import { Account, ActivityImport, CsvRowData } from "@/lib/types";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";

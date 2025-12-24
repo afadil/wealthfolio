@@ -1,6 +1,6 @@
 import { HistoryChart } from "@/components/history-chart";
 import { PrivacyToggle } from "@/components/privacy-toggle";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useHoldings } from "@/hooks/use-holdings";
 import { useValuationHistory } from "@/hooks/use-valuation-history";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";

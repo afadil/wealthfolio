@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { logger } from "@/adapters";
 import { importActivities } from "@/commands/activity-import";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 
 export function useActivityImportMutations({
   onSuccess,

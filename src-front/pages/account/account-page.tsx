@@ -17,7 +17,7 @@ import { useMemo, useState } from "react";
 
 import { MobileActionsMenu } from "@/components/mobile-actions-menu";
 import { PrivacyToggle } from "@/components/privacy-toggle";
-import { Button } from "@/components/ui/button";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Command,
   CommandEmpty,
@@ -25,9 +25,9 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
+} from "@wealthfolio/ui/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
+import { ScrollArea } from "@wealthfolio/ui/components/ui/scroll-area";
 import {
   Sheet,
   SheetContent,
@@ -35,7 +35,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from "@/components/ui/sheet";
+} from "@wealthfolio/ui/components/ui/sheet";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useValuationHistory } from "@/hooks/use-valuation-history";
 import { AccountType } from "@/lib/constants";

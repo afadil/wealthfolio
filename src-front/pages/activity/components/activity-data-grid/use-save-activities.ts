@@ -1,5 +1,5 @@
 import { logger } from "@/adapters";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import type { ActivityBulkMutationRequest } from "@/lib/types";
 import { useCallback } from "react";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
