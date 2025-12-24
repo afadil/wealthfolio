@@ -71,6 +71,9 @@ import { ManageCategoriesDialog } from "../components/manage-categories-dialog";
 import { ManageRulesDialog } from "../components/manage-rules-dialog";
 import { ManageEventsDialog } from "../components/manage-events-dialog";
 
+const createOriginalTransactionsMap = (transactions: CashImportRow[]) =>
+  new Map(transactions.map((t) => [t.lineNumber, { ...t }]));
+
 type EditableField =
   | "activityType"
   | "date"
@@ -161,6 +164,9 @@ export function CashImportEditStep({
   const { createCategoryMutation } = useCategoryMutations();
   const { createRuleMutation } = useActivityRuleMutations();
   const [localTransactions, setLocalTransactions] = useState<CashImportRow[]>(initialTransactions);
+  const originalTransactionsRef = useRef<Map<number, CashImportRow>>(
+    createOriginalTransactionsMap(initialTransactions),
+  );
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [focusedCell, setFocusedCell] = useState<CellCoordinate | null>(null);
   const [isApplyingRules, setIsApplyingRules] = useState(false);
@@ -792,6 +798,53 @@ export function CashImportEditStep({
     toast.success(`Deleted ${selectedIds.size} transaction(s)`);
   }, [selectedIds]);
 
+  const resetTransaction = useCallback((lineNumber: number) => {
+    const original = originalTransactionsRef.current.get(lineNumber);
+    if (!original) return;
+
+    setLocalTransactions((prev) =>
+      prev.map((t) =>
+        t.lineNumber === lineNumber
+          ? { ...original, lineNumber: t.lineNumber, isValid: t.isValid }
+          : t,
+      ),
+    );
+    toast.success("Transaction reset to original state");
+  }, []);
+
+  const resetSelected = useCallback(() => {
+    const count = selectedIds.size;
+    setLocalTransactions((prev) =>
+      prev.map((t) => {
+        if (!selectedIds.has(t.lineNumber)) return t;
+        const original = originalTransactionsRef.current.get(t.lineNumber);
+        if (!original) return t;
+        return {
+          ...original,
+          lineNumber: t.lineNumber,
+          isValid: t.isValid,
+        };
+      }),
+    );
+    setSelectedIds(new Set());
+    toast.success(`Reset ${count} transaction(s) to original state`);
+  }, [selectedIds]);
+
+  const isTransactionModified = useCallback((lineNumber: number) => {
+    const original = originalTransactionsRef.current.get(lineNumber);
+    const current = localTransactions.find((t) => t.lineNumber === lineNumber);
+    if (!original || !current) return false;
+
+    return (
+      original.categoryId !== current.categoryId ||
+      original.subCategoryId !== current.subCategoryId ||
+      original.eventId !== current.eventId ||
+      original.recurrence !== current.recurrence ||
+      original.activityType !== current.activityType ||
+      original.matchedRuleId !== current.matchedRuleId
+    );
+  }, [localTransactions]);
+
   const applyRules = useCallback(async () => {
     setIsApplyingRules(true);
     try {
@@ -1367,6 +1420,11 @@ export function CashImportEditStep({
 
           <div className="bg-border mx-1 h-4 w-px" />
 
+          <Button onClick={resetSelected} variant="ghost" size="xs">
+            <Icons.Undo className="mr-1 h-3.5 w-3.5" />
+            Reset
+          </Button>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="xs">
@@ -1478,12 +1536,14 @@ export function CashImportEditStep({
                   accountOptions={accountOptions}
                   accountLookup={accountLookup}
                   isSelected={selectedIds.has(transaction.lineNumber)}
+                  isModified={isTransactionModified(transaction.lineNumber)}
                   focusedField={
                     focusedCell?.rowId === transaction.lineNumber ? focusedCell.field : null
                   }
                   onToggleSelect={toggleSelect}
                   onUpdateTransaction={updateTransaction}
                   onDelete={deleteRow}
+                  onReset={resetTransaction}
                   onNavigate={handleCellNavigation}
                   setFocusedCell={setFocusedCell}
                 />
@@ -1609,10 +1669,12 @@ interface ImportTransactionRowProps {
   accountOptions: { value: string; label: string; searchValue?: string }[];
   accountLookup: Map<string, Account>;
   isSelected: boolean;
+  isModified: boolean;
   focusedField: EditableField | null;
   onToggleSelect: (lineNumber: number) => void;
   onUpdateTransaction: (lineNumber: number, field: EditableField, value: string) => void;
   onDelete: (lineNumber: number) => void;
+  onReset: (lineNumber: number) => void;
   onNavigate: (direction: "up" | "down" | "left" | "right") => void;
   setFocusedCell: Dispatch<SetStateAction<CellCoordinate | null>>;
 }
@@ -1633,10 +1695,12 @@ const ImportTransactionRow = memo(
     accountOptions,
     accountLookup,
     isSelected,
+    isModified,
     focusedField,
     onToggleSelect,
     onUpdateTransaction,
     onDelete,
+    onReset,
     onNavigate,
     setFocusedCell,
   }: ImportTransactionRowProps) {
@@ -1813,6 +1877,17 @@ const ImportTransactionRow = memo(
         </TableCell>
         <TableCell className="h-9 px-2 py-0">
           <div className="pointer-events-none flex justify-end gap-1 opacity-0 transition-opacity group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
+            {isModified && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => onReset(transaction.lineNumber)}
+                title="Reset to original"
+              >
+                <Icons.Undo className="h-3.5 w-3.5" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -1831,6 +1906,7 @@ const ImportTransactionRow = memo(
     return (
       prev.transaction === next.transaction &&
       prev.isSelected === next.isSelected &&
+      prev.isModified === next.isModified &&
       prev.focusedField === next.focusedField &&
       prev.accountCurrency === next.accountCurrency &&
       prev.activityTypeOptions === next.activityTypeOptions &&

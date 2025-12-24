@@ -10,6 +10,8 @@ export function useCategoryMutations() {
   const invalidateCategories = () => {
     queryClient.invalidateQueries({ queryKey: [QueryKeys.CATEGORIES] });
     queryClient.invalidateQueries({ queryKey: [QueryKeys.CATEGORIES_HIERARCHICAL] });
+    queryClient.invalidateQueries({ queryKey: [QueryKeys.EXPENSE_CATEGORIES] });
+    queryClient.invalidateQueries({ queryKey: [QueryKeys.INCOME_CATEGORIES] });
   };
 
   const createCategoryMutation = useMutation({
