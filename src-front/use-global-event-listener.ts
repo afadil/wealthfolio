@@ -4,7 +4,7 @@ import { listenMarketSyncComplete } from "@/commands/portfolio-listener";
 import { usePortfolioSyncOptional } from "@/context/portfolio-sync-context";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
 import {
@@ -28,24 +28,46 @@ const useGlobalEventListener = () => {
   const isMobileViewport = useIsMobileViewport();
   const syncContext = usePortfolioSyncOptional();
 
-  // Mobile-aware handlers
-  const handleMarketSyncStart = useCallback(() => {
-    if (isMobileViewport && syncContext) {
-      syncContext.setMarketSyncing();
-    } else {
-      toast.loading("Syncing market data...", {
-        id: TOAST_IDS.marketSyncStart,
-        duration: 3000,
-      });
-    }
-  }, [isMobileViewport, syncContext]);
+  // Use refs to avoid stale closures in event handlers
+  const isMobileViewportRef = useRef(isMobileViewport);
+  const syncContextRef = useRef(syncContext);
+  const queryClientRef = useRef(queryClient);
 
-  const handleMarketSyncComplete = useCallback(
-    (event: { payload: { failed_syncs: [string, string][] } }) => {
+  // Keep refs up to date
+  useEffect(() => {
+    isMobileViewportRef.current = isMobileViewport;
+  }, [isMobileViewport]);
+
+  useEffect(() => {
+    syncContextRef.current = syncContext;
+  }, [syncContext]);
+
+  useEffect(() => {
+    queryClientRef.current = queryClient;
+  }, [queryClient]);
+
+  useEffect(() => {
+    let isMounted = true;
+    let cleanupFn: (() => void) | undefined;
+
+    const handleMarketSyncStart = () => {
+      if (isMobileViewportRef.current && syncContextRef.current) {
+        syncContextRef.current.setMarketSyncing();
+      } else {
+        toast.loading("Syncing market data...", {
+          id: TOAST_IDS.marketSyncStart,
+          duration: 3000,
+        });
+      }
+    };
+
+    const handleMarketSyncComplete = (event: {
+      payload: { failed_syncs: [string, string][] };
+    }) => {
       const { failed_syncs } = event.payload || { failed_syncs: [] };
 
-      if (isMobileViewport && syncContext) {
-        syncContext.setIdle();
+      if (isMobileViewportRef.current && syncContextRef.current) {
+        syncContextRef.current.setIdle();
       } else {
         toast.dismiss(TOAST_IDS.marketSyncStart);
       }
@@ -59,25 +81,22 @@ const useGlobalEventListener = () => {
           duration: 15000,
         });
       }
-    },
-    [isMobileViewport, syncContext],
-  );
+    };
 
-  const handlePortfolioUpdateStart = useCallback(() => {
-    if (isMobileViewport && syncContext) {
-      syncContext.setPortfolioCalculating();
-    } else {
-      toast.loading("Calculating portfolio performance...", {
-        id: TOAST_IDS.portfolioUpdateStart,
-        duration: 2000,
-      });
-    }
-  }, [isMobileViewport, syncContext]);
+    const handlePortfolioUpdateStart = () => {
+      if (isMobileViewportRef.current && syncContextRef.current) {
+        syncContextRef.current.setPortfolioCalculating();
+      } else {
+        toast.loading("Calculating portfolio performance...", {
+          id: TOAST_IDS.portfolioUpdateStart,
+          duration: 2000,
+        });
+      }
+    };
 
-  const handlePortfolioUpdateError = useCallback(
-    (error: string) => {
-      if (isMobileViewport && syncContext) {
-        syncContext.setIdle();
+    const handlePortfolioUpdateError = (error: string) => {
+      if (isMobileViewportRef.current && syncContextRef.current) {
+        syncContextRef.current.setIdle();
       } else {
         toast.dismiss(TOAST_IDS.portfolioUpdateStart);
       }
@@ -88,34 +107,27 @@ const useGlobalEventListener = () => {
         duration: 5000,
       });
       logger.error("Portfolio Update Error: " + error);
-    },
-    [isMobileViewport, syncContext],
-  );
+    };
 
-  const handlePortfolioUpdateComplete = useCallback(() => {
-    if (isMobileViewport && syncContext) {
-      syncContext.setIdle();
-    } else {
-      toast.dismiss(TOAST_IDS.portfolioUpdateStart);
-    }
-    queryClient.invalidateQueries();
-  }, [queryClient, isMobileViewport, syncContext]);
+    const handlePortfolioUpdateComplete = () => {
+      if (isMobileViewportRef.current && syncContextRef.current) {
+        syncContextRef.current.setIdle();
+      } else {
+        toast.dismiss(TOAST_IDS.portfolioUpdateStart);
+      }
+      queryClientRef.current.invalidateQueries();
+    };
 
-  const handleDatabaseRestored = useCallback(() => {
-    queryClient.invalidateQueries();
-    toast.success("Database restored successfully", {
-      description: "Please restart the application to ensure all data is properly refreshed.",
-    });
-  }, [queryClient]);
-
-  useEffect(() => {
-    let isMounted = true;
-    let cleanupFn: (() => void) | undefined;
+    const handleDatabaseRestored = () => {
+      queryClientRef.current.invalidateQueries();
+      toast.success("Database restored successfully", {
+        description: "Please restart the application to ensure all data is properly refreshed.",
+      });
+    };
 
     const setupListeners = async () => {
-      const unlistenPortfolioSyncStart = await listenPortfolioUpdateStart(
-        handlePortfolioUpdateStart,
-      );
+      const unlistenPortfolioSyncStart =
+        await listenPortfolioUpdateStart(handlePortfolioUpdateStart);
       const unlistenPortfolioSyncComplete = await listenPortfolioUpdateComplete(
         handlePortfolioUpdateComplete,
       );
@@ -166,15 +178,7 @@ const useGlobalEventListener = () => {
       isMounted = false;
       cleanupFn?.();
     };
-  }, [
-    handlePortfolioUpdateComplete,
-    handlePortfolioUpdateStart,
-    handlePortfolioUpdateError,
-    handleMarketSyncStart,
-    handleMarketSyncComplete,
-    handleDatabaseRestored,
-    isDesktop,
-  ]);
+  }, [isDesktop]); // Only re-run if isDesktop changes (which it won't)
 
   return null;
 };

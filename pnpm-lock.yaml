@@ -38,6 +38,9 @@ importers:
       '@tauri-apps/api':
         specifier: ^2.9.0
         version: 2.9.1
+      '@tauri-apps/plugin-barcode-scanner':
+        specifier: ^2.4.2
+        version: 2.4.2
       '@tauri-apps/plugin-dialog':
         specifier: ~2.4.2
         version: 2.4.2
@@ -80,6 +83,9 @@ importers:
       papaparse:
         specifier: ^5.5.3
         version: 5.5.3
+      qrcode.react:
+        specifier: ^4.2.0
+        version: 4.2.0(react@19.2.3)
       react:
         specifier: ^19.1.1
         version: 19.2.3
@@ -2668,6 +2674,9 @@ packages:
     engines: {node: '>= 10'}
     hasBin: true
 
+  '@tauri-apps/plugin-barcode-scanner@2.4.2':
+    resolution: {integrity: sha512-7gKa5StXcvBzdT52fYRdq8TNiRq1ZvnjK+XYK847gnbYcoubTN00NOuR344rAgndWyTR9rtJAfQX7rvykLHnmw==}
+
   '@tauri-apps/plugin-dialog@2.4.2':
     resolution: {integrity: sha512-lNIn5CZuw8WZOn8zHzmFmDSzg5zfohWoa3mdULP0YFh/VogVdMVWZPcWSHlydsiJhRQYaTNSYKN7RmZKE2lCYQ==}
 
@@ -4823,6 +4832,11 @@ packages:
   punycode@2.3.1:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
     engines: {node: '>=6'}
+
+  qrcode.react@4.2.0:
+    resolution: {integrity: sha512-QpgqWi8rD9DsS9EP3z7BT+5lY5SFhsqGjpgW5DY/i3mK4M9DTBNz3ErMi8BWYEfI3L0d8GIbGmcdFAS1uIRGjA==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
   qs@6.14.0:
     resolution: {integrity: sha512-YWWTjgABSKcvs/nWBi9PycY/JiPJqOD4JA6o9Sej2AtvSGarXxKC3OQSk4pAarbdQlKAh5D4FCQkJNkW+GAn3w==}
@@ -8267,6 +8281,10 @@ snapshots:
       '@tauri-apps/cli-win32-ia32-msvc': 2.9.6
       '@tauri-apps/cli-win32-x64-msvc': 2.9.6
 
+  '@tauri-apps/plugin-barcode-scanner@2.4.2':
+    dependencies:
+      '@tauri-apps/api': 2.9.1
+
   '@tauri-apps/plugin-dialog@2.4.2':
     dependencies:
       '@tauri-apps/api': 2.9.1
@@ -10510,6 +10528,10 @@ snapshots:
       ipaddr.js: 1.9.1
 
   punycode@2.3.1: {}
+
+  qrcode.react@4.2.0(react@19.2.3):
+    dependencies:
+      react: 19.2.3
 
   qs@6.14.0:
     dependencies:

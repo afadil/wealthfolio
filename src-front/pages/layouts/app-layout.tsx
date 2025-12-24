@@ -1,5 +1,5 @@
 import AppLauncher from "@/components/app-launcher";
-import { MobileSyncIndicator } from "@/components/mobile-sync-indicator";
+import { MobileLoadingIndicator } from "@/components/mobile-loading-indicator";
 import { Toaster } from "@/components/sonner";
 import { UpdateDialog } from "@/components/update-dialog";
 import { PortfolioSyncProvider } from "@/context/portfolio-sync-context";
@@ -8,6 +8,7 @@ import { useIsMobileViewport, usePlatform } from "@/hooks/use-platform";
 import { useSettings } from "@/hooks/use-settings";
 import { cn } from "@/lib/utils";
 import { MobileNavigationContainer } from "@/pages/layouts/mobile-navigation-container";
+import useGlobalEventListener from "@/use-global-event-listener";
 import { ApplicationShell, ErrorBoundary, PageScrollContainer } from "@wealthfolio/ui";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useNavigation } from "./navigation/app-navigation";
@@ -29,6 +30,7 @@ const AppLayoutContent = () => {
   const launchBarHeight =
     !shouldUseMobileNavigation && isLaunchBar && !isFocusMode ? "56px" : undefined;
 
+  useGlobalEventListener();
   useNavigationEventListener();
 
   if (isSettingsLoading) return null;
@@ -46,7 +48,7 @@ const AppLayoutContent = () => {
         }
       >
         {/* Mobile sync loading indicator */}
-        {shouldUseMobileNavigation && <MobileSyncIndicator />}
+        {shouldUseMobileNavigation && <MobileLoadingIndicator />}
 
         <div className="scan-hide-target">
           {!shouldUseBottomNavigation && !isDesktopFocusMode && (

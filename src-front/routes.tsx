@@ -27,7 +27,6 @@ import SettingsGoalsPage from "./pages/settings/goals/goals-page";
 import MarketDataImportPage from "./pages/settings/market-data/market-data-import-page";
 import MarketDataSettingsPage from "./pages/settings/market-data/market-data-settings";
 import WealthfolioConnectPage from "./pages/settings/wealthfolio-connect/wealthfolio-connect-page";
-import useGlobalEventListener from "./use-global-event-listener";
 // import QRScannerPage from './pages/qr-scanner/qr-scanner-page'; // File not found
 import { getDynamicRoutes, subscribeToNavigationUpdates } from "@/addons/addons-runtime-context";
 import NotFoundPage from "@/pages/not-found";
@@ -36,7 +35,6 @@ import HoldingsInsightsPage from "./pages/holdings/holdings-insights-page";
 import AboutSettingsPage from "./pages/settings/about/about-page";
 
 export function AppRoutes() {
-  useGlobalEventListener();
   const [dynamicRoutes, setDynamicRoutes] = useState<
     { path: string; component: React.LazyExoticComponent<React.ComponentType<unknown>> }[]
   >([]);

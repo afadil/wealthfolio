@@ -136,6 +136,16 @@ pub struct PollMessagesResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct GetSessionResponse {
+    pub session_id: String,
+    pub status: String,
+    pub claimer_device_id: Option<String>,
+    pub claimer_eph_pub: Option<String>,
+    pub expires_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SendMessageRequest {
     pub session_id: String,
     pub to_device_id: String,
@@ -547,6 +557,31 @@ impl DeviceSyncApiClient {
         parse_trpc_response(response).await
     }
 
+    /// Get pairing session status (issuer only)
+    async fn get_session(&self, session_id: &str) -> Result<GetSessionResponse, String> {
+        let url = format!("{}/trpc/syncPairing.getSession", self.base_url);
+        let input = serde_json::json!({ "json": { "sessionId": session_id } });
+        let input_str = input.to_string();
+        let encoded = urlencoding::encode(&input_str);
+        let full_url = format!("{}?input={}", url, encoded);
+
+        let response = self
+            .client
+            .get(&full_url)
+            .headers(self.headers())
+            .send()
+            .await
+            .map_err(|e| format!("Failed to get session: {}", e))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(format!("API error getting session: {} - {}", status, body));
+        }
+
+        parse_trpc_response(response).await
+    }
+
     /// Send a pairing message
     async fn send_message(&self, req: SendMessageRequest) -> Result<(), String> {
         let url = format!("{}/trpc/syncPairing.sendMessage", self.base_url);
@@ -838,6 +873,17 @@ pub async fn poll_pairing_messages(
 ) -> Result<PollMessagesResponse, String> {
     let client = create_api_client()?;
     client.poll_messages(&session_id).await
+}
+
+/// Get pairing session status (issuer only)
+#[tauri::command]
+pub async fn get_pairing_session(
+    session_id: String,
+    _state: State<'_, Arc<ServiceContext>>,
+) -> Result<GetSessionResponse, String> {
+    debug!("Getting pairing session: {}", session_id);
+    let client = create_api_client()?;
+    client.get_session(&session_id).await
 }
 
 /// Send a pairing message

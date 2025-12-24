@@ -41,6 +41,10 @@
     "haptics:allow-selection-feedback",
     "haptics:allow-vibrate",
     "web-auth:default",
-    "web-auth:allow-authenticate"
+    "web-auth:allow-authenticate",
+    "barcode-scanner:allow-scan",
+    "barcode-scanner:allow-cancel",
+    "barcode-scanner:allow-check-permissions",
+    "barcode-scanner:allow-request-permissions"
   ]
 }

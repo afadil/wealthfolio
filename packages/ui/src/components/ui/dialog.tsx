@@ -135,7 +135,7 @@ const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.C
 
     if (isMobile) {
       return (
-        <SheetContent side={side} className={cn(mobileClassName, "mx-1 !rounded-t-4xl")}>
+        <SheetContent side={side} showCloseButton={showCloseButton} className={cn(mobileClassName, "mx-1 !rounded-t-4xl")}>
           {children}
         </SheetContent>
       );
