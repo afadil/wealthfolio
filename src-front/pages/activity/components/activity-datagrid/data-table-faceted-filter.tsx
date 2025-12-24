@@ -1,7 +1,7 @@
 import type * as React from "react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Command,
   CommandEmpty,
@@ -10,9 +10,9 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Separator } from "@/components/ui/separator";
+} from "@wealthfolio/ui/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
+import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { Icons } from "@wealthfolio/ui";
 

@@ -1,11 +1,11 @@
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { AccountSelectOption } from "../activity-form";
 import {
   ActivityTypeSelector,
   type ActivityType as ActivityTypeUI,
 } from "../activity-type-selector";
 import { useFormContext } from "react-hook-form";
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@wealthfolio/ui/components/ui/form";
 import { MoneyInput } from "@wealthfolio/ui";
 import { ConfigurationCheckbox, CommonFields, AssetSymbolInput } from "./common";
 

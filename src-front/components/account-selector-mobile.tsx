@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { ScrollArea } from "@wealthfolio/ui/components/ui/scroll-area";
 import {
   Sheet,
   SheetContent,
@@ -7,8 +7,8 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
+} from "@wealthfolio/ui/components/ui/sheet";
+import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useSettings } from "@/hooks/use-settings";
 import { AccountType, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";

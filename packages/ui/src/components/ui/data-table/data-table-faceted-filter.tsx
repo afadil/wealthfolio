@@ -1,7 +1,7 @@
 import * as React from "react";
 import type { Column } from "@tanstack/react-table";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "../badge";
+import { Button } from "../button";
 import {
   Command,
   CommandEmpty,
@@ -10,12 +10,12 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Separator } from "@/components/ui/separator";
+} from "../command";
+import { Popover, PopoverContent, PopoverTrigger } from "../popover";
+import { Separator } from "../separator";
 
-import { Icons } from "@/components/ui/icons";
-import { cn } from "@/lib/utils";
+import { Icons } from "../icons";
+import { cn } from "../../../lib/utils";
 
 export interface DataTableFacetedFilterProps<TData, TValue> {
   id: string;

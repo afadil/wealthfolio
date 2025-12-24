@@ -1,8 +1,8 @@
 import { logger } from "@/adapters";
-import { Button } from "@/components/ui/button";
-import { Form } from "@/components/ui/form";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { Icons } from "@/components/ui/icons";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Form } from "@wealthfolio/ui/components/ui/form";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@wealthfolio/ui/components/ui/hover-card";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import {
   Sheet,
   SheetContent,
@@ -11,8 +11,8 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from "@/components/ui/sheet";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+} from "@wealthfolio/ui/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
 import { DataSource } from "@/lib/constants";
 import type { ActivityDetails } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";

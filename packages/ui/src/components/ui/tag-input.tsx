@@ -1,6 +1,6 @@
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Badge } from "./badge";
+import { Button } from "./button";
+import { cn } from "../../lib/utils";
 import { XIcon } from "lucide-react";
 import * as React from "react";
 

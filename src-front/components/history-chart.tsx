@@ -1,4 +1,4 @@
-import { ChartConfig, ChartContainer } from "@/components/ui/chart";
+import { ChartConfig, ChartContainer } from "@wealthfolio/ui/components/ui/chart";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { formatDate } from "@/lib/utils";

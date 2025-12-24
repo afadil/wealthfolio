@@ -1,5 +1,5 @@
 import { TickerAvatar } from "@/components/ticker-avatar";
-import { Card } from "@/components/ui/card";
+import { Card } from "@wealthfolio/ui/components/ui/card";
 import {
   calculateActivityValue,
   isCashActivity,

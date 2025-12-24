@@ -10,8 +10,8 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+} from "@wealthfolio/ui/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import { DataSource } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import type { QuoteSummary } from "@/lib/types";

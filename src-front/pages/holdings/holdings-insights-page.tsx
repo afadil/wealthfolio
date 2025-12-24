@@ -1,7 +1,7 @@
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { Icons } from "@/components/ui/icons";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Card, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import {
   Sheet,
   SheetClose,
@@ -9,7 +9,7 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
-} from "@/components/ui/sheet";
+} from "@wealthfolio/ui/components/ui/sheet";
 import { AmountDisplay, EmptyPlaceholder } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
 

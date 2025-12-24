@@ -1,6 +1,6 @@
 import { SwipablePage, SwipablePageView } from "@/components/page";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent, CardHeader } from "@wealthfolio/ui/components/ui/card";
+import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import IncomePage from "@/pages/income/income-page";
 import PerformancePage from "@/pages/performance/performance-page";
 import { Icons } from "@wealthfolio/ui";

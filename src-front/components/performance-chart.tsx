@@ -6,7 +6,7 @@ import {
   ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
-} from "@/components/ui/chart";
+} from "@wealthfolio/ui/components/ui/chart";
 import { ReturnData } from "@/lib/types";
 import { formatPercent } from "@wealthfolio/ui";
 import { differenceInDays, differenceInMonths, format, parseISO } from "date-fns";

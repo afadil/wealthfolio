@@ -14,9 +14,9 @@ import {
 } from "@tanstack/react-table";
 import * as React from "react";
 
-import { Icons } from "@/components/ui/icons";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { usePersistentState } from "@/hooks/use-persistent-state";
+import { Icons } from "../icons";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../table";
+import { usePersistentState } from "../../../hooks/use-persistent-state";
 
 import type { DataTableFacetedFilterProps } from "./data-table-faceted-filter";
 import { DataTableToolbar } from "./data-table-toolbar";

@@ -1,9 +1,9 @@
 import * as React from "react";
-import { Icons } from "@/components/ui/icons";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Icons } from "../ui/icons";
+import { cn } from "../../lib/utils";
+import { Button } from "../ui/button";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "../ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
 interface Option {
   value: string;

@@ -1,8 +1,8 @@
 import { logger } from "@/adapters";
 import { getAccounts } from "@/commands/account";
-import { Button } from "@/components/ui/button";
-import { Form } from "@/components/ui/form";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Form } from "@wealthfolio/ui/components/ui/form";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { ActivityType, DataSource } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";

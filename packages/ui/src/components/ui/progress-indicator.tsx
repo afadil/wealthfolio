@@ -1,6 +1,6 @@
-import { Dialog, DialogDescription, DialogOverlay, DialogPortal, DialogTitle } from "@/components/ui/dialog";
-import { Icons } from "@/components/ui/icons";
-import { cn } from "@/lib/utils";
+import { Dialog, DialogDescription, DialogOverlay, DialogPortal, DialogTitle } from "./dialog";
+import { Icons } from "./icons";
+import { cn } from "../../lib/utils";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { motion } from "motion/react";
 import React, { useEffect, useState } from "react";

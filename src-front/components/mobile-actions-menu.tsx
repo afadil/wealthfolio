@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Sheet,
   SheetContent,
@@ -6,7 +6,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from "@/components/ui/sheet";
+} from "@wealthfolio/ui/components/ui/sheet";
 import { Icons } from "@wealthfolio/ui";
 
 export interface MobileAction {

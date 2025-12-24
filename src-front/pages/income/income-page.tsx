@@ -1,10 +1,10 @@
 import { getIncomeSummary } from "@/commands/portfolio";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
-import { Icons } from "@/components/ui/icons";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@wealthfolio/ui/components/ui/chart";
+import { EmptyPlaceholder } from "@wealthfolio/ui/components/ui/empty-placeholder";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { QueryKeys } from "@/lib/query-keys";
 import type { IncomeSummary } from "@/lib/types";

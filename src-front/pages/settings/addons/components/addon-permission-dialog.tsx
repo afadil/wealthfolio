@@ -1,5 +1,5 @@
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -7,8 +7,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Icons } from "@/components/ui/icons";
+} from "@wealthfolio/ui/components/ui/dialog";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import type {
   AddonManifest,
   Permission,

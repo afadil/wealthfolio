@@ -5,7 +5,7 @@ import {
   getExchangeRates,
   updateExchangeRate as updateExchangeRateApi,
 } from "@/commands/exchange-rates";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { QueryKeys } from "@/lib/query-keys";
 import { ExchangeRate } from "@/lib/types";
 import { useMutation, useQuery } from "@tanstack/react-query";

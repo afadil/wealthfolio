@@ -1,7 +1,7 @@
 import { calculateDepositsForLimit, getContributionLimit } from "@/commands/contribution-limits";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent, CardHeader } from "@wealthfolio/ui/components/ui/card";
+import { Progress } from "@wealthfolio/ui/components/ui/progress";
+import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { QueryKeys } from "@/lib/query-keys";
 import { ContributionLimit, DepositsCalculation } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";

@@ -1,7 +1,7 @@
-import { Button } from "@/components/ui/button";
-import { Icons } from "@/components/ui/icons";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { GainPercent } from "@wealthfolio/ui";
 import React, { useState } from "react";

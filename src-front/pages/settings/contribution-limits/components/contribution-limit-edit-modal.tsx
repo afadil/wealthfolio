@@ -1,4 +1,4 @@
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@wealthfolio/ui/components/ui/dialog";
 import { ContributionLimitForm } from "./contribution-limit-form";
 import type { ContributionLimit } from "@/lib/types";
 

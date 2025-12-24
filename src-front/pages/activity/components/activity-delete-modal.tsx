@@ -1,4 +1,4 @@
-import { Icons } from "@/components/ui/icons";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -7,8 +7,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
+} from "@wealthfolio/ui/components/ui/alert-dialog";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 
 export interface ActivityDeleteModalProps {
   isOpen?: boolean;

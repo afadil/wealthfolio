@@ -4,16 +4,16 @@ import { useNavigate } from "react-router-dom";
 import { Badge, Card } from "@wealthfolio/ui";
 
 import { TickerAvatar } from "@/components/ticker-avatar";
-import { Button } from "@/components/ui/button";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Icons } from "@/components/ui/icons";
-import { Input } from "@/components/ui/input";
+} from "@wealthfolio/ui/components/ui/dropdown-menu";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Input } from "@wealthfolio/ui/components/ui/input";
 import {
   Sheet,
   SheetClose,
@@ -21,9 +21,9 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
-} from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+} from "@wealthfolio/ui/components/ui/sheet";
+import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { Quote } from "@/lib/types";
 import { cn, formatAmount, formatDate } from "@/lib/utils";
 import { ScrollArea, Separator } from "@wealthfolio/ui";

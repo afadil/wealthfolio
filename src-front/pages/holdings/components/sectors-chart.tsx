@@ -1,8 +1,8 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
-import { Icons } from "@/components/ui/icons";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
+import { EmptyPlaceholder } from "@wealthfolio/ui/components/ui/empty-placeholder";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { Holding, Sector } from "@/lib/types";
 import { formatPercent, PrivacyAmount } from "@wealthfolio/ui";
 import { useMemo } from "react";

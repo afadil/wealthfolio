@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -9,15 +9,15 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@wealthfolio/ui/components/ui/alert-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Icons } from "@/components/ui/icons";
+} from "@wealthfolio/ui/components/ui/dropdown-menu";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 
 import type { Goal } from "@/lib/types";
 

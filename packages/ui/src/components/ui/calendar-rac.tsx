@@ -14,7 +14,7 @@ import {
   RangeCalendar as RangeCalendarRac,
 } from "react-aria-components";
 
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 
 interface BaseCalendarProps {
   className?: string;

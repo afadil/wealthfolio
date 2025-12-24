@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { createAccount, updateAccount, deleteAccount } from "@/commands/account";
 import { QueryKeys } from "@/lib/query-keys";
 import { logger } from "@/adapters";

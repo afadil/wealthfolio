@@ -10,7 +10,7 @@ import { PerformanceChart } from "@/components/performance-chart";
 import { PerformanceChartMobile } from "@/components/performance-chart-mobile";
 
 import { PERFORMANCE_CHART_COLORS } from "@/components/performance-chart-colors";
-import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
+import { EmptyPlaceholder } from "@wealthfolio/ui/components/ui/empty-placeholder";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";

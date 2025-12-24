@@ -1,9 +1,9 @@
 import { TickerAvatar } from "@/components/ticker-avatar";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Icons } from "@/components/ui/icons";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Card } from "@wealthfolio/ui/components/ui/card";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Input } from "@wealthfolio/ui/components/ui/input";
+import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { Account, Holding } from "@/lib/types";

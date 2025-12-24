@@ -1,9 +1,9 @@
 import { Command as CommandPrimitive } from "cmdk";
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from "react";
-import { CommandGroup, CommandItem, CommandList, CommandInput } from "@/components/ui/command";
-import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
-import { Icons } from "@/components/ui/icons";
+import { CommandGroup, CommandItem, CommandList, CommandInput } from "./command";
+import { Skeleton } from "./skeleton";
+import { cn } from "../../lib/utils";
+import { Icons } from "./icons";
 
 export type Option = Record<"value" | "label", string> & Record<string, string>;
 

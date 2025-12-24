@@ -7,8 +7,8 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+} from "@wealthfolio/ui/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { Icons } from "@wealthfolio/ui";
 import type React from "react";

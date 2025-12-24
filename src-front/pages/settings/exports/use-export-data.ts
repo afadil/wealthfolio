@@ -5,7 +5,7 @@ import { openFileSaveDialog, openFolderDialog } from "@/commands/file";
 import { getGoals } from "@/commands/goal";
 import { getHistoricalValuations } from "@/commands/portfolio";
 import { backupDatabase, backupDatabaseToPath } from "@/commands/settings";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { formatData } from "@/lib/export-utils";
 import { QueryKeys } from "@/lib/query-keys";
 import {

@@ -1,7 +1,7 @@
 import React from "react";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
+import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import { formatPercent } from "@wealthfolio/ui";
 import { AmountDisplay } from "@wealthfolio/ui";
 import { QuantityDisplay } from "@wealthfolio/ui";

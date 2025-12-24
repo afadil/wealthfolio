@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { syncMarketData } from "@/commands/market-data";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@wealthfolio/ui/components/ui/use-toast";
 
 export function useSyncMarketDataMutation(refetchAll = true) {
   const { toast } = useToast();

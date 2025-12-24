@@ -1,4 +1,4 @@
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import {
   calculateActivityValue,
   isCashActivity,

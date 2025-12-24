@@ -1,6 +1,6 @@
-import { Badge } from "@/components/ui/badge";
-import { Icons } from "@/components/ui/icons";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import type { Account } from "@/lib/types";
 import { Link } from "react-router-dom";
 import { AccountOperations } from "./account-operations";

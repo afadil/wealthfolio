@@ -1,8 +1,8 @@
 import { updateSettings } from "@/commands/settings";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { toast } from "@/components/ui/use-toast";
+import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
+import { Label } from "@wealthfolio/ui/components/ui/label";
+import { Switch } from "@wealthfolio/ui/components/ui/switch";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { QueryKeys } from "@/lib/query-keys";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { useMutation, useQueryClient } from "@tanstack/react-query";

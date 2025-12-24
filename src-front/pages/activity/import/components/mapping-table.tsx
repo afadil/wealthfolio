@@ -5,8 +5,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { TooltipProvider } from "@/components/ui/tooltip";
+} from "@wealthfolio/ui/components/ui/table";
+import { TooltipProvider } from "@wealthfolio/ui/components/ui/tooltip";
 import { IMPORT_REQUIRED_FIELDS } from "@/lib/constants";
 import {
   Account,

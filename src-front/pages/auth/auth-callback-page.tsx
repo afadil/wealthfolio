@@ -1,4 +1,4 @@
-import { Icons } from "@/components/ui/icons";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useWealthfolioConnect } from "@/features/wealthfolio-connect";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";

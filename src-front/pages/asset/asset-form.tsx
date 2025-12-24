@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Form,
   FormControl,
@@ -12,11 +12,11 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Icons } from "@/components/ui/icons";
-import { Input } from "@/components/ui/input";
-import { InputTags } from "@/components/ui/tag-input";
-import { Textarea } from "@/components/ui/textarea";
+} from "@wealthfolio/ui/components/ui/form";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Input } from "@wealthfolio/ui/components/ui/input";
+import { InputTags } from "@wealthfolio/ui/components/ui/tag-input";
+import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
 import { DataSource } from "@/lib/constants";
 import { UpdateAssetProfile } from "@/lib/types";
 import { ResponsiveSelect, type ResponsiveSelectOption } from "@wealthfolio/ui";

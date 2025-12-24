@@ -1,7 +1,7 @@
-import { Button } from "@/components/ui/button";
-import { Icons } from "@/components/ui/icons";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "../button";
+import { Icons } from "../icons";
+import { Input } from "../input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../select";
 import type { Table } from "@tanstack/react-table";
 import { KeyboardEvent, useState } from "react";
 

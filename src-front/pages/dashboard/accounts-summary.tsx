@@ -1,9 +1,9 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Icons } from "@/components/ui/icons";
-import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Separator } from "@wealthfolio/ui/components/ui/separator";
+import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useLatestValuations } from "@/hooks/use-latest-valuations";
 import { useSettingsContext } from "@/lib/settings-provider";

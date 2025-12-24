@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 
 import { getRunEnv, RUN_ENV } from "@/adapters";
-import { Button } from "@/components/ui/button";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Carousel,
   CarouselContent,
   CarouselItem,
   CarouselNext,
   CarouselPrevious,
-} from "@/components/ui/carousel";
-import { toast } from "@/components/ui/use-toast";
+} from "@wealthfolio/ui/components/ui/carousel";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useCheckUpdateOnStartup, useClearUpdate, useInstallUpdate } from "@/hooks/use-updater";
 import { open } from "@tauri-apps/plugin-shell";
 import { Icons } from "@wealthfolio/ui";

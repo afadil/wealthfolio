@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { Country, Holding } from "@/lib/types";
 import { DonutChart, EmptyPlaceholder, Skeleton } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";

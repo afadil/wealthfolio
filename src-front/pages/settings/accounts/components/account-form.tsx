@@ -2,8 +2,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Switch } from "@wealthfolio/ui/components/ui/switch";
 
 import {
   DialogDescription,
@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@wealthfolio/ui/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -19,9 +19,9 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Icons } from "@/components/ui/icons";
-import { Input } from "@/components/ui/input";
+} from "@wealthfolio/ui/components/ui/form";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Input } from "@wealthfolio/ui/components/ui/input";
 import { newAccountSchema } from "@/lib/schemas";
 import { CurrencyInput, ResponsiveSelect, type ResponsiveSelectOption } from "@wealthfolio/ui";
 
