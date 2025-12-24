@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from "react";
 
 export type SyncStatus = "idle" | "syncing-market" | "calculating-portfolio";
 
@@ -33,13 +33,16 @@ export function PortfolioSyncProvider({ children }: { children: ReactNode }) {
     setStatus("idle");
   }, []);
 
-  const value: PortfolioSyncContextType = {
-    status,
-    message: STATUS_MESSAGES[status],
-    setMarketSyncing,
-    setPortfolioCalculating,
-    setIdle,
-  };
+  const value = useMemo<PortfolioSyncContextType>(
+    () => ({
+      status,
+      message: STATUS_MESSAGES[status],
+      setMarketSyncing,
+      setPortfolioCalculating,
+      setIdle,
+    }),
+    [status, setMarketSyncing, setPortfolioCalculating, setIdle],
+  );
 
   return <PortfolioSyncContext.Provider value={value}>{children}</PortfolioSyncContext.Provider>;
 }

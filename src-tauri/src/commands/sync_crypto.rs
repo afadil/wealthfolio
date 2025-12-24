@@ -55,6 +55,7 @@ pub fn derive_dek(root_key_b64: &str, version: u32) -> Result<String, String> {
 
 /// Ephemeral key pair for ECDH
 #[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EphemeralKeyPair {
     pub public_key: String,  // Base64-encoded public key
     pub secret_key: String,  // Base64-encoded secret key (for storage)
@@ -187,11 +188,22 @@ pub fn generate_pairing_code() -> String {
 }
 
 /// Hash a pairing code using SHA-256
+/// Returns hex-encoded hash (64 characters) to match server expectations
+/// Normalizes code to uppercase alphanumeric before hashing
 pub fn hash_pairing_code(code: &str) -> String {
+    // Normalize: uppercase and alphanumeric only (matches server behavior)
+    let normalized: String = code
+        .to_uppercase()
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .collect();
+
     let mut hasher = Sha256::new();
-    hasher.update(code.as_bytes());
+    hasher.update(normalized.as_bytes());
     let result = hasher.finalize();
-    BASE64.encode(result)
+
+    // Return hex-encoded (64 chars) instead of base64 (44 chars)
+    result.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
 /// Compute Short Authentication String (SAS) from shared secret
@@ -343,5 +355,21 @@ mod tests {
 
         assert_eq!(sas.len(), 6);
         assert!(sas.chars().all(|c| c.is_ascii_digit()));
+    }
+
+    #[test]
+    fn test_hash_pairing_code() {
+        let code = "ABC123";
+        let hash = hash_pairing_code(code);
+
+        // Should be 64 hex characters (SHA-256 = 32 bytes = 64 hex chars)
+        assert_eq!(hash.len(), 64);
+        assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
+
+        // Normalization: lowercase and mixed case should produce same hash
+        let hash_lower = hash_pairing_code("abc123");
+        let hash_mixed = hash_pairing_code("AbC 1-2-3");
+        assert_eq!(hash, hash_lower);
+        assert_eq!(hash, hash_mixed);
     }
 }

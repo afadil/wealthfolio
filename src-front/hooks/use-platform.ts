@@ -156,17 +156,21 @@ export async function isMobileDevice(): Promise<boolean> {
 }
 
 // Viewport-based mobile detection (responsive design)
+// Initialize synchronously to avoid flash of wrong state
+const getInitialMobileViewport = () => {
+  if (typeof window === "undefined") return false;
+  return window.innerWidth < 768; // Same as Tailwind's 'md' breakpoint
+};
+
 export function useIsMobileViewport() {
-  const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [isMobile, setIsMobile] = useState<boolean>(getInitialMobileViewport);
 
   useEffect(() => {
     const checkViewport = () => {
-      setIsMobile(window.innerWidth < 768); // Same as Tailwind's 'md' breakpoint
+      setIsMobile(window.innerWidth < 768);
     };
 
-    checkViewport();
     window.addEventListener("resize", checkViewport);
-
     return () => window.removeEventListener("resize", checkViewport);
   }, []);
 

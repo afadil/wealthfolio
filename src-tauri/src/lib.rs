@@ -87,6 +87,7 @@ mod mobile {
     /// Initializes mobile-specific plugins.
     pub fn init_plugins(handle: &AppHandle) {
         let _ = handle.plugin(tauri_plugin_haptics::init());
+        let _ = handle.plugin(tauri_plugin_barcode_scanner::init());
 
         // iOS-specific: Web Auth plugin for ASWebAuthenticationSession (required for Google OAuth)
         #[cfg(target_os = "ios")]
@@ -318,6 +319,7 @@ pub fn run() {
             commands::device_sync::approve_pairing,
             commands::device_sync::cancel_pairing,
             commands::device_sync::poll_pairing_messages,
+            commands::device_sync::get_pairing_session,
             commands::device_sync::send_pairing_message,
             commands::device_sync::mark_device_trusted,
             commands::device_sync::rename_device,
