@@ -84,12 +84,12 @@ export function PerformanceChartMobile({ data }: PerformanceChartMobileProps) {
     return config;
   }, {} as ChartConfig);
 
-  const tooltipFormatter: (value: ValueType, name: NameType) => [string, string] = (
-    value,
-    name,
-  ) => {
-    const formattedValue = formatPercent(Number(value));
-    return [formattedValue + " - ", name.toString()];
+  const tooltipFormatter = (
+    value: ValueType | undefined,
+    name: NameType | undefined,
+  ): [string, string] => {
+    const formattedValue = formatPercent(Number(value ?? 0));
+    return [formattedValue + " - ", (name ?? "").toString()];
   };
 
   const tooltipLabelFormatter = (label: string) => format(parseISO(label), "MMM d, yyyy");

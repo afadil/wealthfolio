@@ -1,33 +1,33 @@
-import { getRunEnv, invokeTauri, logger, RUN_ENV } from "@/adapters";
+import { invoke, logger } from "@/adapters";
 
-const DESKTOP_ONLY_ERROR_MESSAGE =
-  "Wealthfolio Connect secure session storage is only available in the desktop app.";
-
-const assertDesktop = () => {
-  if (getRunEnv() !== RUN_ENV.DESKTOP) {
-    throw new Error(DESKTOP_ONLY_ERROR_MESSAGE);
-  }
-};
-
+/**
+ * Store Wealthfolio Connect tokens in the backend's encrypted secret store.
+ * The backend uses the refresh token to mint fresh access tokens when needed.
+ * Works in both desktop (Tauri) and web modes.
+ */
 export const storeSyncSession = async (
-  accessToken: string,
-  refreshToken?: string,
+  refreshToken: string,
+  accessToken?: string,
 ): Promise<void> => {
   try {
-    assertDesktop();
-    return invokeTauri("store_sync_session", { accessToken, refreshToken });
+    await invoke("store_sync_session", { refreshToken, accessToken });
+    logger.info("Sync session stored in backend");
   } catch (error) {
-    logger.error("Error storing sync session.");
+    logger.error("Error storing sync session in backend");
     throw error;
   }
 };
 
+/**
+ * Clear Wealthfolio Connect session from the backend's secret store.
+ * Works in both desktop (Tauri) and web modes.
+ */
 export const clearSyncSession = async (): Promise<void> => {
   try {
-    assertDesktop();
-    return invokeTauri("clear_sync_session");
+    await invoke("clear_sync_session");
+    logger.info("Sync session cleared from backend");
   } catch (error) {
-    logger.error("Error clearing sync session.");
+    logger.error("Error clearing sync session from backend");
     throw error;
   }
 };

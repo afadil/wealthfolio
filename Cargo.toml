@@ -67,3 +67,4 @@ rand = "0.8"
 wealthfolio-core = { path = "crates/core" }
 wealthfolio-connect = { path = "crates/connect" }
 wealthfolio-storage-sqlite = { path = "crates/storage-sqlite" }
+wealthfolio-device-sync = { path = "crates/device-sync" }

@@ -1,0 +1,23 @@
+[package]
+name = "wealthfolio-device-sync"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+# HTTP client
+reqwest = { workspace = true }
+urlencoding = "2"
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+
+# Logging
+log = { workspace = true }

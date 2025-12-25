@@ -100,14 +100,36 @@ const COMMANDS: CommandMap = {
   download_addon_to_staging: { method: "POST", path: "/addons/store/staging/download" },
   install_addon_from_staging: { method: "POST", path: "/addons/store/install-from-staging" },
   clear_addon_staging: { method: "DELETE", path: "/addons/store/staging" },
-  // Sync (web mode returns not implemented stub)
+  // Device Sync
   get_sync_status: { method: "GET", path: "/sync/status" },
-  generate_pairing_payload: { method: "POST", path: "/sync/generate-pairing-payload" },
-  pair_and_sync: { method: "POST", path: "/sync/pair-and-sync" },
-  force_full_sync_with_peer: { method: "POST", path: "/sync/force-full" },
-  sync_now: { method: "POST", path: "/sync/sync-now" },
-  initialize_sync_for_existing_data: { method: "POST", path: "/sync/initialize-existing" },
-  probe_local_network_access: { method: "POST", path: "/sync/probe" },
+  get_device_id: { method: "GET", path: "/sync/device/id" },
+  set_device_id: { method: "POST", path: "/sync/device/id" },
+  clear_device_id: { method: "DELETE", path: "/sync/device/id" },
+  register_device: { method: "POST", path: "/sync/device/register" },
+  get_current_device: { method: "GET", path: "/sync/device/current" },
+  list_devices: { method: "GET", path: "/sync/devices" },
+  rename_device: { method: "PATCH", path: "/sync/device" },
+  revoke_device: { method: "DELETE", path: "/sync/device" },
+  mark_device_trusted: { method: "POST", path: "/sync/device" },
+  enable_e2ee: { method: "POST", path: "/sync/e2ee/enable" },
+  reset_sync: { method: "POST", path: "/sync/e2ee/reset" },
+  create_pairing: { method: "POST", path: "/sync/pairing/create" },
+  claim_pairing: { method: "POST", path: "/sync/pairing/claim" },
+  get_pairing_session: { method: "GET", path: "/sync/pairing" },
+  approve_pairing: { method: "POST", path: "/sync/pairing" },
+  cancel_pairing: { method: "POST", path: "/sync/pairing" },
+  poll_pairing_messages: { method: "GET", path: "/sync/pairing" },
+  send_pairing_message: { method: "POST", path: "/sync/pairing" },
+  // Wealthfolio Connect (Broker Sync)
+  store_sync_session: { method: "POST", path: "/connect/session" },
+  clear_sync_session: { method: "DELETE", path: "/connect/session" },
+  get_sync_session_status: { method: "GET", path: "/connect/session/status" },
+  sync_broker_connections: { method: "POST", path: "/connect/sync/connections" },
+  sync_broker_accounts: { method: "POST", path: "/connect/sync/accounts" },
+  sync_broker_activities: { method: "POST", path: "/connect/sync/activities" },
+  get_connect_portal: { method: "POST", path: "/connect/portal" },
+  get_subscription_plans: { method: "GET", path: "/connect/plans" },
+  get_user_info: { method: "GET", path: "/connect/user" },
 };
 
 export const invokeWeb = async <T>(
@@ -496,25 +518,112 @@ export const invokeWeb = async <T>(
       url += `?${params.toString()}`;
       break;
     }
-    case "pair_and_sync":
-    case "force_full_sync_with_peer": {
-      const { payload: syncPayload } = payload as { payload: string };
-      body = JSON.stringify({ payload: syncPayload });
+    // Device Sync commands
+    case "set_device_id": {
+      const { device_id } = payload as { device_id: string };
+      body = JSON.stringify({ deviceId: device_id });
       break;
     }
-    case "sync_now": {
-      const { payload: syncPayload } = payload as { payload: Record<string, unknown> };
-      body = JSON.stringify({ payload: syncPayload });
+    case "register_device": {
+      const { device_info } = payload as { device_info: Record<string, unknown> };
+      body = JSON.stringify(device_info);
       break;
     }
-    case "probe_local_network_access": {
-      const { host, port } = payload as { host: string; port: number };
-      body = JSON.stringify({ host, port });
+    case "rename_device": {
+      const { device_id, name } = payload as { device_id: string; name: string };
+      url += `/${encodeURIComponent(device_id)}`;
+      body = JSON.stringify({ name });
       break;
     }
-    case "generate_pairing_payload":
+    case "revoke_device": {
+      const { device_id } = payload as { device_id: string };
+      url += `/${encodeURIComponent(device_id)}`;
+      break;
+    }
+    case "mark_device_trusted": {
+      const { device_id, key_version } = payload as { device_id: string; key_version: number };
+      url += `/${encodeURIComponent(device_id)}/trust`;
+      body = JSON.stringify({ keyVersion: key_version });
+      break;
+    }
+    case "create_pairing": {
+      const { code_hash, ephemeral_public_key } = payload as {
+        code_hash: string;
+        ephemeral_public_key: string;
+      };
+      body = JSON.stringify({ codeHash: code_hash, ephemeralPublicKey: ephemeral_public_key });
+      break;
+    }
+    case "claim_pairing": {
+      const { code, ephemeral_public_key } = payload as {
+        code: string;
+        ephemeral_public_key: string;
+      };
+      body = JSON.stringify({ code, ephemeralPublicKey: ephemeral_public_key });
+      break;
+    }
+    case "get_pairing_session": {
+      const { session_id } = payload as { session_id: string };
+      url += `/${encodeURIComponent(session_id)}`;
+      break;
+    }
+    case "approve_pairing": {
+      const { session_id } = payload as { session_id: string };
+      url += `/${encodeURIComponent(session_id)}/approve`;
+      break;
+    }
+    case "cancel_pairing": {
+      const { session_id } = payload as { session_id: string };
+      url += `/${encodeURIComponent(session_id)}/cancel`;
+      break;
+    }
+    case "poll_pairing_messages": {
+      const { session_id } = payload as { session_id: string };
+      url += `/${encodeURIComponent(session_id)}/messages`;
+      break;
+    }
+    case "send_pairing_message": {
+      const { session_id, to_device_id, payload_type, payload: msgPayload } = payload as {
+        session_id: string;
+        to_device_id: string;
+        payload_type: string;
+        payload: string;
+      };
+      url += `/${encodeURIComponent(session_id)}/messages`;
+      body = JSON.stringify({
+        toDeviceId: to_device_id,
+        payloadType: payload_type,
+        payload: msgPayload,
+      });
+      break;
+    }
+    // Wealthfolio Connect commands
+    case "store_sync_session": {
+      const { accessToken, refreshToken } = payload as {
+        accessToken?: string;
+        refreshToken: string;
+      };
+      body = JSON.stringify({ accessToken, refreshToken });
+      break;
+    }
+    case "get_connect_portal": {
+      body = JSON.stringify(payload);
+      break;
+    }
+    case "get_device_id":
+    case "clear_device_id":
+    case "get_current_device":
+    case "list_devices":
     case "get_sync_status":
-    case "initialize_sync_for_existing_data":
+    case "enable_e2ee":
+    case "reset_sync":
+    case "clear_sync_session":
+    case "get_sync_session_status":
+    case "sync_broker_connections":
+    case "sync_broker_accounts":
+    case "sync_broker_activities":
+    case "get_subscription_plans":
+    case "get_user_info":
       break;
   }
 
@@ -532,7 +641,18 @@ export const invokeWeb = async <T>(
     headers,
     body,
   });
-  if (res.status === 401) {
+
+  // Only notify unauthorized for app auth failures, not for connect cloud token issues
+  // Connect endpoints return 401 when cloud token isn't configured - that's not an app auth failure
+  const connectCommands = [
+    "get_subscription_plans",
+    "get_user_info",
+    "get_connect_portal",
+    "sync_broker_connections",
+    "sync_broker_accounts",
+    "sync_broker_activities",
+  ];
+  if (res.status === 401 && !connectCommands.includes(command)) {
     notifyUnauthorized();
   }
   if (!res.ok) {

@@ -963,8 +963,9 @@ pub struct ApiPlanPricing {
 /// Plans object from API (keyed by plan id)
 #[derive(Debug, Clone, Deserialize)]
 pub struct ApiPlansMap {
-    pub essential: Option<ApiSubscriptionPlan>,
-    pub pro: Option<ApiSubscriptionPlan>,
+    pub essentials: Option<ApiSubscriptionPlan>,
+    pub duo: Option<ApiSubscriptionPlan>,
+    pub plus: Option<ApiSubscriptionPlan>,
 }
 
 /// Raw response from subscription.plans endpoint
@@ -1164,11 +1165,14 @@ impl CloudApiClient {
         let api_response = parse_trpc_response::<ApiPlansResponse>(response).await?;
 
         let mut plans = Vec::new();
-        if let Some(essential) = api_response.plans.essential {
-            plans.push(SubscriptionPlan::from(essential));
+        if let Some(essentials) = api_response.plans.essentials {
+            plans.push(SubscriptionPlan::from(essentials));
         }
-        if let Some(pro) = api_response.plans.pro {
-            plans.push(SubscriptionPlan::from(pro));
+        if let Some(duo) = api_response.plans.duo {
+            plans.push(SubscriptionPlan::from(duo));
+        }
+        if let Some(plus) = api_response.plans.plus {
+            plans.push(SubscriptionPlan::from(plus));
         }
 
         Ok(PlansResponse { plans })

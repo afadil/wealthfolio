@@ -1,18 +1,33 @@
+import { getRunEnv, RUN_ENV } from "@/adapters";
+import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
+import { getPreferredProvider, savePreferredProvider } from "@/lib/cookie-utils";
+import { isAppleDevice } from "@/lib/device-utils";
 import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { Button } from "@wealthfolio/ui/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@wealthfolio/ui/components/ui/collapsible";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@wealthfolio/ui/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@wealthfolio/ui/components/ui/collapsible";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@wealthfolio/ui/components/ui/input-otp";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { Separator } from "@wealthfolio/ui/components/ui/separator";
-import { useWealthfolioConnect } from "../providers/wealthfolio-connect-provider";
-import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
-import { getPreferredProvider, savePreferredProvider } from "@/lib/cookie-utils";
-import { isAppleDevice } from "@/lib/device-utils";
 import { useEffect, useState } from "react";
+import { useWealthfolioConnect } from "../providers/wealthfolio-connect-provider";
 import { ProviderButton } from "./provider-button";
+
+// OAuth is only available on desktop/mobile (Tauri) where we can handle deep links
+// Web (self-hosted) uses email OTP only since we can't register all possible redirect URLs
+const isNativeApp = getRunEnv() === RUN_ENV.DESKTOP;
 
 type Provider = "google" | "apple" | "email";
 
@@ -41,7 +56,12 @@ export function LoginForm() {
 
   // Determine which providers to show at the top
   const getTopProviders = (): Provider[] => {
-    // If user has a preference, show it first
+    // Web (self-hosted): only email OTP is available
+    if (!isNativeApp) {
+      return ["email"];
+    }
+
+    // Native app: if user has a preference, show it first
     if (preferredProvider) {
       return [preferredProvider];
     }
@@ -57,6 +77,11 @@ export function LoginForm() {
 
   // Determine which providers to show in "More options"
   const getMoreOptionsProviders = (): Provider[] => {
+    // Web (self-hosted): no additional options
+    if (!isNativeApp) {
+      return [];
+    }
+
     const topProviders = getTopProviders();
     const allProviders: Provider[] = ["google", "apple", "email"];
     return allProviders.filter((p) => !topProviders.includes(p));
@@ -134,10 +159,33 @@ export function LoginForm() {
       await verifyOtp(pendingEmail, otpCode);
       // Success - context will update isConnected
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Invalid code. Please try again.";
+      const errorMessage = err instanceof Error ? err.message : "";
+      // Check for OTP expired/invalid error and provide a more user-friendly message
+      const isOtpExpired =
+        errorMessage.toLowerCase().includes("expired") ||
+        errorMessage.toLowerCase().includes("invalid");
+      const message = isOtpExpired
+        ? "Code expired or invalid. Please request a new code."
+        : errorMessage || "Invalid code. Please try again.";
       setLocalError(message);
       setOtpCode(""); // Clear OTP on error
+    } finally {
+      setLoadingProvider(null);
+    }
+  };
+
+  const handleResendCode = async () => {
+    setLocalError(null);
+    clearError();
+    setLoadingProvider("email");
+
+    try {
+      await signInWithMagicLink(pendingEmail);
+      setSuccessMessage("A new code has been sent to your email.");
+      setOtpCode(""); // Clear OTP input
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to resend code.";
+      setLocalError(message);
     } finally {
       setLoadingProvider(null);
     }
@@ -163,7 +211,9 @@ export function LoginForm() {
               <Icons.Globe className="text-primary h-6 w-6" />
             </div>
             <div>
-              <CardTitle className="text-lg font-semibold">Sign in to Wealthfolio Connect</CardTitle>
+              <CardTitle className="text-lg font-semibold">
+                Sign in to Wealthfolio Connect
+              </CardTitle>
               <CardDescription>
                 Connect your broker accounts and access your portfolio from anywhere.
               </CardDescription>
@@ -215,6 +265,7 @@ export function LoginForm() {
 
               <div className="flex flex-col items-center gap-2">
                 <Button
+                  variant="default"
                   onClick={handleOtpVerify}
                   disabled={otpCode.length !== 6 || loadingProvider === "email"}
                   className="w-full max-w-sm"
@@ -228,16 +279,29 @@ export function LoginForm() {
                     "Verify"
                   )}
                 </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleBackToEmail}
-                  className="text-muted-foreground"
-                >
-                  <Icons.ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to sign in
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleBackToEmail}
+                    className="text-muted-foreground"
+                  >
+                    <Icons.ArrowLeft className="mr-2 h-4 w-4" />
+                    Back to sign in
+                  </Button>
+                  <span className="text-muted-foreground">•</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleResendCode}
+                    disabled={loadingProvider === "email"}
+                    className="text-muted-foreground"
+                  >
+                    Resend code
+                  </Button>
+                </div>
               </div>
             </div>
           ) : (

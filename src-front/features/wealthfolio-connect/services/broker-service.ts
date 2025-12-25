@@ -2,7 +2,7 @@
 // API commands for broker connections, sync, subscriptions, and user info
 // ========================================================================
 
-import { getRunEnv, invokeTauri, logger, RUN_ENV } from "@/adapters";
+import { getRunEnv, invoke, invokeTauri, logger, RUN_ENV } from "@/adapters";
 import type { Account, Platform } from "@/lib/types";
 import type {
   SyncResult,
@@ -101,7 +101,7 @@ export const getConnectPortalUrl = async (
 
 export const getSubscriptionPlans = async (): Promise<PlansResponse> => {
   try {
-    return await invokeDesktop("get_subscription_plans");
+    return await invoke("get_subscription_plans");
   } catch (error) {
     logger.error(`Error getting subscription plans: ${error}`);
     throw error;
@@ -114,7 +114,7 @@ export const getSubscriptionPlans = async (): Promise<PlansResponse> => {
 
 export const getUserInfo = async (): Promise<UserInfo> => {
   try {
-    return await invokeDesktop("get_user_info");
+    return await invoke("get_user_info");
   } catch (error) {
     logger.error(`Error getting user info: ${error}`);
     throw error;

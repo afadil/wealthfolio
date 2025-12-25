@@ -26,6 +26,17 @@ export const getRunEnv = (): RUN_ENV => {
 export const invokeTauri = tauri.invokeTauri;
 export const invokeWeb = web.invokeWeb;
 
+/**
+ * Unified invoke function that automatically chooses between Tauri and Web implementations.
+ * Use this for commands that should work in both desktop and web modes.
+ */
+export const invoke = async <T>(command: string, payload?: Record<string, unknown>): Promise<T> => {
+  if (getRunEnv() === RUN_ENV.DESKTOP) {
+    return tauri.invokeTauri<T>(command, payload);
+  }
+  return web.invokeWeb<T>(command, payload);
+};
+
 export const logger = getRunEnv() === RUN_ENV.DESKTOP ? tauri.logger : web.logger;
 
 export type { EventCallback, UnlistenFn } from "./tauri";

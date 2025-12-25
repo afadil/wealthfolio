@@ -330,7 +330,11 @@ export function ConnectedView() {
 
       {/* Show Subscription Plans if user has no active subscription (only after userInfo is loaded) */}
       {!isLoadingUserInfo && !isServiceUnavailable && !hasSubscription && (
-        <SubscriptionPlans enabled={isConnected && !hasSubscription} />
+        <SubscriptionPlans
+          enabled={isConnected && !hasSubscription}
+          onRefresh={refetchUserInfo}
+          isRefreshing={isLoadingUserInfo}
+        />
       )}
 
       {/* Broker Connections Card - Only show if user has an active subscription */}
@@ -371,12 +375,12 @@ export function ConnectedView() {
                 <BrokerConnectionSkeleton />
               </div>
             ) : connections.length === 0 ? (
-              <div className="text-muted-foreground flex flex-col items-center justify-center py-8 text-center">
+              <div className="flex flex-col items-center justify-center py-6 text-center">
                 <div className="bg-muted/50 mb-4 rounded-full p-3">
                   <Icons.Link className="h-6 w-6 opacity-60" />
                 </div>
-                <p className="text-foreground text-sm font-medium">No broker accounts connected</p>
-                <p className="mt-1 max-w-xs text-xs">
+                <p className="text-foreground font-medium">No broker accounts connected</p>
+                <p className="text-muted-foreground mt-1 max-w-xs text-xs">
                   Connect your first broker account to start syncing your portfolio automatically.
                 </p>
                 <Button className="mt-4" size="sm" onClick={openConnectPortal}>

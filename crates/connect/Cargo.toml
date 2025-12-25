@@ -20,6 +20,10 @@ log = { workspace = true }
 diesel = { workspace = true }
 r2d2 = { workspace = true }
 
+# HTTP client (for Connect API)
+reqwest = { workspace = true }
+urlencoding = "2.1"
+
 [features]
 default = ["broker"]
 broker = []
