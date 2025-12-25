@@ -1,18 +1,11 @@
 import type { EventCallback, UnlistenFn } from "@/adapters";
 import {
-  getRunEnv,
-  RUN_ENV,
-  listenPortfolioUpdateStartTauri,
-  listenPortfolioUpdateCompleteTauri,
-  listenPortfolioUpdateErrorTauri,
+  listenPortfolioUpdateStart as listenPortfolioUpdateStartAdapter,
+  listenPortfolioUpdateComplete as listenPortfolioUpdateCompleteAdapter,
+  listenPortfolioUpdateError as listenPortfolioUpdateErrorAdapter,
+  listenMarketSyncComplete as listenMarketSyncCompleteAdapter,
+  listenMarketSyncStart as listenMarketSyncStartAdapter,
   logger,
-  listenMarketSyncCompleteTauri,
-  listenMarketSyncStartTauri,
-  listenPortfolioUpdateStartWeb,
-  listenPortfolioUpdateCompleteWeb,
-  listenPortfolioUpdateErrorWeb,
-  listenMarketSyncStartWeb,
-  listenMarketSyncCompleteWeb,
 } from "@/adapters";
 
 // listenPortfolioUpdateStart
@@ -20,14 +13,7 @@ export const listenPortfolioUpdateStart = async <T>(
   handler: EventCallback<T>,
 ): Promise<UnlistenFn> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return listenPortfolioUpdateStartTauri<T>(handler);
-      case RUN_ENV.WEB:
-        return listenPortfolioUpdateStartWeb<T>(handler);
-      default:
-        throw new Error(`Unsupported`);
-    }
+    return await listenPortfolioUpdateStartAdapter(handler);
   } catch (error) {
     logger.error("Error listen portfolio:update-start.");
     throw error;
@@ -39,14 +25,7 @@ export const listenPortfolioUpdateComplete = async <T>(
   handler: EventCallback<T>,
 ): Promise<UnlistenFn> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return listenPortfolioUpdateCompleteTauri<T>(handler);
-      case RUN_ENV.WEB:
-        return listenPortfolioUpdateCompleteWeb<T>(handler);
-      default:
-        throw new Error(`Unsupported`);
-    }
+    return await listenPortfolioUpdateCompleteAdapter(handler);
   } catch (error) {
     logger.error("Error listen portfolio:update-complete.");
     throw error;
@@ -58,14 +37,7 @@ export const listenPortfolioUpdateError = async <T>(
   handler: EventCallback<T>,
 ): Promise<UnlistenFn> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return listenPortfolioUpdateErrorTauri<T>(handler);
-      case RUN_ENV.WEB:
-        return listenPortfolioUpdateErrorWeb<T>(handler);
-      default:
-        throw new Error(`Unsupported`);
-    }
+    return await listenPortfolioUpdateErrorAdapter(handler);
   } catch (error) {
     logger.error("Error listen portfolio:update-error.");
     throw error;
@@ -75,14 +47,7 @@ export const listenPortfolioUpdateError = async <T>(
 // listenMarketSyncStart
 export const listenMarketSyncStart = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return listenMarketSyncStartTauri<T>(handler);
-      case RUN_ENV.WEB:
-        return listenMarketSyncStartWeb<T>(handler);
-      default:
-        throw new Error(`Unsupported`);
-    }
+    return await listenMarketSyncStartAdapter(handler);
   } catch (error) {
     logger.error("Error listen market:sync-start.");
     throw error;
@@ -94,14 +59,7 @@ export const listenMarketSyncComplete = async <T>(
   handler: EventCallback<T>,
 ): Promise<UnlistenFn> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return listenMarketSyncCompleteTauri<T>(handler);
-      case RUN_ENV.WEB:
-        return listenMarketSyncCompleteWeb<T>(handler);
-      default:
-        throw new Error(`Unsupported`);
-    }
+    return await listenMarketSyncCompleteAdapter(handler);
   } catch (error) {
     logger.error("Error listen market:sync-complete.");
     throw error;

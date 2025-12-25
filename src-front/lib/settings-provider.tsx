@@ -1,5 +1,4 @@
-import { getRunEnv, logger, RUN_ENV } from "@/adapters";
-import { getCurrentWindow, Theme } from "@tauri-apps/api/window";
+import { isDesktop, logger } from "@/adapters";
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 
 import { useSettings } from "@/hooks/use-settings";
@@ -153,9 +152,10 @@ const applySettingsToDocument = (newSettings: Settings) => {
     }
 
     // On desktop, also sync with Tauri window theme + listen to OS changes
-    if (getRunEnv() === RUN_ENV.DESKTOP) {
+    if (isDesktop) {
       (async () => {
         try {
+          const { getCurrentWindow } = await import("@tauri-apps/api/window");
           const currentWindow = getCurrentWindow();
           await currentWindow.setTheme(null);
           const current = await currentWindow.theme();
@@ -181,11 +181,12 @@ const applySettingsToDocument = (newSettings: Settings) => {
   applyResolvedTheme(explicit);
 
   // Only call Tauri window APIs when running the desktop app for explicit modes
-  if (getRunEnv() === RUN_ENV.DESKTOP) {
+  if (isDesktop) {
     (async () => {
       try {
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
         const currentWindow = getCurrentWindow();
-        await currentWindow.setTheme(explicit as Theme);
+        await currentWindow.setTheme(explicit as "light" | "dark");
       } catch {
         logger.error("Error setting window theme.");
       }

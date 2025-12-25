@@ -1,4 +1,4 @@
-import { getRunEnv, logger, RUN_ENV } from "@/adapters";
+import { isDesktop, logger } from "@/adapters";
 import { getAccounts } from "@/commands/account";
 import { getActivities } from "@/commands/activity";
 import { openFileSaveDialog, openFolderDialog } from "@/commands/file";
@@ -32,8 +32,7 @@ interface SQLiteBackupResult {
 type ExportMutationResult = SQLiteBackupResult | boolean | null;
 
 export function useExportData() {
-  const runEnv = getRunEnv();
-  const isDesktop = runEnv === RUN_ENV.DESKTOP;
+  const isDesktopEnv = isDesktop;
 
   const { refetch: fetchAccounts } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
@@ -64,7 +63,7 @@ export function useExportData() {
     mutationFn: async (params: ExportParams) => {
       const { format, data: desiredData } = params;
       if (format === "SQLite") {
-        if (isDesktop) {
+        if (isDesktopEnv) {
           // Open folder dialog to let user choose backup location
           const selectedDir = await openFolderDialog();
 

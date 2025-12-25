@@ -24,14 +24,25 @@ const serverProxy = enableProxy
     }
   : undefined;
 
+// Determine build target: "tauri" for desktop, "web" for browser
+// Default to "tauri" when TAURI_DEV_HOST is set (running via tauri dev)
+const buildTarget = process.env.BUILD_TARGET || (host ? "tauri" : "web");
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  define: {
+    __BUILD_TARGET__: JSON.stringify(buildTarget),
+  },
   resolve: {
     alias: {
-      "@/components/ui": path.resolve(__dirname, "packages/ui/src/components/ui"),
       "@wealthfolio/addon-sdk": path.resolve(__dirname, "packages/addon-sdk/src"),
       "@wealthfolio/ui": path.resolve(__dirname, "packages/ui/src"),
+      // Conditional adapter alias based on build target
+      "@/adapters": path.resolve(
+        __dirname,
+        buildTarget === "tauri" ? "./src-front/adapters/tauri" : "./src-front/adapters/web",
+      ),
       "@": path.resolve(__dirname, "./src-front"),
     },
     extensions: [".js", ".ts", ".jsx", ".tsx", ".json"],

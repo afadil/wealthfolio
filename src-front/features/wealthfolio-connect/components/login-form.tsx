@@ -1,4 +1,4 @@
-import { getRunEnv, RUN_ENV } from "@/adapters";
+import { isDesktop } from "@/adapters";
 import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
 import { getPreferredProvider, savePreferredProvider } from "@/lib/cookie-utils";
 import { isAppleDevice } from "@/lib/device-utils";
@@ -27,7 +27,7 @@ import { ProviderButton } from "./provider-button";
 
 // OAuth is only available on desktop/mobile (Tauri) where we can handle deep links
 // Web (self-hosted) uses email OTP only since we can't register all possible redirect URLs
-const isNativeApp = getRunEnv() === RUN_ENV.DESKTOP;
+const isNativeApp = isDesktop;
 
 type Provider = "google" | "apple" | "email";
 

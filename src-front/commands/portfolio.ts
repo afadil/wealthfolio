@@ -1,4 +1,4 @@
-import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb, logger } from "@/adapters";
+import { invoke, logger } from "@/adapters";
 import {
   Holding,
   IncomeSummary,
@@ -9,14 +9,7 @@ import {
 
 export const updatePortfolio = async (): Promise<void> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("update_portfolio");
-      case RUN_ENV.WEB:
-        return invokeWeb("update_portfolio");
-      default:
-        throw new Error(`Unsupported`);
-    }
+    return await invoke("update_portfolio");
   } catch (error) {
     logger.error("Error updating portfolio.");
     throw error;
@@ -25,14 +18,7 @@ export const updatePortfolio = async (): Promise<void> => {
 
 export const recalculatePortfolio = async (): Promise<void> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("recalculate_portfolio");
-      case RUN_ENV.WEB:
-        return invokeWeb("recalculate_portfolio");
-      default:
-        throw new Error(`Unsupported`);
-    }
+    return await invoke("recalculate_portfolio");
   } catch (error) {
     logger.error("Error recalculating portfolio.");
     throw error;
@@ -41,14 +27,7 @@ export const recalculatePortfolio = async (): Promise<void> => {
 
 export const getHoldings = async (accountId: string): Promise<Holding[]> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("get_holdings", { accountId });
-      case RUN_ENV.WEB:
-        return invokeWeb("get_holdings", { accountId });
-      default:
-        throw new Error(`Unsupported`);
-    }
+    return await invoke("get_holdings", { accountId });
   } catch (error) {
     logger.error("Error fetching holdings.");
     throw error;
@@ -57,14 +36,7 @@ export const getHoldings = async (accountId: string): Promise<Holding[]> => {
 
 export const getIncomeSummary = async (): Promise<IncomeSummary[]> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("get_income_summary");
-      case RUN_ENV.WEB:
-        return invokeWeb("get_income_summary");
-      default:
-        throw new Error(`Unsupported`);
-    }
+    return await invoke("get_income_summary");
   } catch (error) {
     logger.error("Error fetching income summary.");
     throw error;
@@ -77,32 +49,15 @@ export const getHistoricalValuations = async (
   endDate?: string,
 ): Promise<AccountValuation[]> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP: {
-        const params: { accountId?: string; startDate?: string; endDate?: string } = {};
-        if (accountId) params.accountId = accountId;
-        if (startDate) params.startDate = startDate;
-        if (endDate) params.endDate = endDate;
+    const params: { accountId?: string; startDate?: string; endDate?: string } = {};
+    if (accountId) params.accountId = accountId;
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
 
-        return invokeTauri(
-          "get_historical_valuations",
-          Object.keys(params).length > 0 ? params : undefined,
-        );
-      }
-      case RUN_ENV.WEB: {
-        const params2: { accountId?: string; startDate?: string; endDate?: string } = {};
-        if (accountId) params2.accountId = accountId;
-        if (startDate) params2.startDate = startDate;
-        if (endDate) params2.endDate = endDate;
-
-        return invokeWeb(
-          "get_historical_valuations",
-          Object.keys(params2).length > 0 ? params2 : undefined,
-        );
-      }
-      default:
-        throw new Error(`Unsupported`);
-    }
+    return await invoke(
+      "get_historical_valuations",
+      Object.keys(params).length > 0 ? params : undefined,
+    );
   } catch (error) {
     logger.error("Error fetching historical valuations.");
     throw error;
@@ -111,14 +66,7 @@ export const getHistoricalValuations = async (
 
 export const getLatestValuations = async (accountIds: string[]): Promise<AccountValuation[]> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("get_latest_valuations", { accountIds });
-      case RUN_ENV.WEB:
-        return invokeWeb("get_latest_valuations", { accountIds });
-      default:
-        throw new Error(`Unsupported`);
-    }
+    return await invoke("get_latest_valuations", { accountIds });
   } catch (error) {
     logger.error("Error fetching latest valuations.");
     throw error;
@@ -132,19 +80,12 @@ export const calculatePerformanceHistory = async (
   endDate: string,
 ): Promise<PerformanceMetrics> => {
   try {
-    const response = await (getRunEnv() === RUN_ENV.DESKTOP
-      ? invokeTauri("calculate_performance_history", {
-          itemType,
-          itemId,
-          startDate,
-          endDate,
-        })
-      : invokeWeb("calculate_performance_history", {
-          itemType,
-          itemId,
-          startDate,
-          endDate,
-        }));
+    const response = await invoke("calculate_performance_history", {
+      itemType,
+      itemId,
+      startDate,
+      endDate,
+    });
 
     if (typeof response === "string" || !response || Object.keys(response).length === 0) {
       throw new Error(
@@ -184,15 +125,10 @@ export const calculatePerformanceSummary = async ({
       args.endDate = endDate;
     }
 
-    const response = await (getRunEnv() === RUN_ENV.DESKTOP
-      ? invokeTauri<PerformanceMetrics>(
-          "calculate_performance_summary",
-          args as unknown as Record<string, unknown>,
-        )
-      : invokeWeb<PerformanceMetrics>(
-          "calculate_performance_summary",
-          args as unknown as Record<string, unknown>,
-        ));
+    const response = await invoke<PerformanceMetrics>(
+      "calculate_performance_summary",
+      args as unknown as Record<string, unknown>,
+    );
 
     if (!response || typeof response !== "object" || !response.id) {
       logger.error(
@@ -217,14 +153,7 @@ export const calculateAccountsSimplePerformance = async (
   accountIds: string[],
 ): Promise<SimplePerformanceMetrics[]> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("calculate_accounts_simple_performance", { accountIds });
-      case RUN_ENV.WEB:
-        return invokeWeb("calculate_accounts_simple_performance", { accountIds });
-      default:
-        throw new Error(`Unsupported`);
-    }
+    return await invoke("calculate_accounts_simple_performance", { accountIds });
   } catch (error) {
     logger.error("Error calculating simple performance for accounts.");
     throw error;
@@ -233,18 +162,9 @@ export const calculateAccountsSimplePerformance = async (
 
 export const getHolding = async (accountId: string, assetId: string): Promise<Holding | null> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri<Holding | null>("get_holding", { accountId, assetId });
-      case RUN_ENV.WEB:
-        return invokeWeb<Holding | null>("get_holding", { accountId, assetId });
-      default:
-        throw new Error(`Unsupported environment`);
-    }
+    return await invoke<Holding | null>("get_holding", { accountId, assetId });
   } catch (error) {
     logger.error(`Error fetching holding for asset ${assetId} in account ${accountId}.`);
-    // Re-throw or return null depending on desired error handling
     throw error;
-    // return null;
   }
 };

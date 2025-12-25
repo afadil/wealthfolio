@@ -13,7 +13,7 @@ import {
   listenPortfolioUpdateError,
   listenPortfolioUpdateStart,
 } from "@/commands/portfolio-listener";
-import { getRunEnv, listenDatabaseRestoredTauri, logger, RUN_ENV } from "./adapters";
+import { isDesktop, listenDatabaseRestored, logger } from "@/adapters";
 
 const TOAST_IDS = {
   marketSyncStart: "market-sync-start",
@@ -24,7 +24,7 @@ const TOAST_IDS = {
 const useGlobalEventListener = () => {
   const queryClient = useQueryClient();
   const hasTriggeredInitialUpdate = useRef(false);
-  const isDesktop = getRunEnv() === RUN_ENV.DESKTOP;
+  const isDesktopEnv = isDesktop;
   const isMobileViewport = useIsMobileViewport();
   const syncContext = usePortfolioSyncOptional();
 
@@ -136,9 +136,7 @@ const useGlobalEventListener = () => {
       });
       const unlistenMarketStart = await listenMarketSyncStart(handleMarketSyncStart);
       const unlistenMarketComplete = await listenMarketSyncComplete(handleMarketSyncComplete);
-      const unlistenDatabaseRestored = isDesktop
-        ? await listenDatabaseRestoredTauri(handleDatabaseRestored)
-        : undefined;
+      const unlistenDatabaseRestored = await listenDatabaseRestored(handleDatabaseRestored);
 
       const cleanup = () => {
         unlistenPortfolioSyncStart();
@@ -146,7 +144,7 @@ const useGlobalEventListener = () => {
         unlistenPortfolioSyncError();
         unlistenMarketStart();
         unlistenMarketComplete();
-        unlistenDatabaseRestored?.();
+        unlistenDatabaseRestored();
       };
 
       // If unmounted while setting up, clean up immediately
@@ -178,7 +176,7 @@ const useGlobalEventListener = () => {
       isMounted = false;
       cleanupFn?.();
     };
-  }, [isDesktop]); // Only re-run if isDesktop changes (which it won't)
+  }, [isDesktopEnv]); // Only re-run if isDesktopEnv changes (which it won't)
 
   return null;
 };

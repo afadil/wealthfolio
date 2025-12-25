@@ -1,4 +1,4 @@
-import { getRunEnv, invokeTauri, invokeWeb, RUN_ENV } from "@/adapters";
+import { invoke, isDesktop } from "@/adapters";
 import type { UpdateInfo } from "@/lib/types";
 
 /** Web API response shape */
@@ -17,31 +17,26 @@ interface WebUpdateCheckResponse {
  * Works for both desktop (Tauri) and web environments.
  */
 export const checkForUpdates = async (): Promise<UpdateInfo | null> => {
-  const env = getRunEnv();
-
-  if (env === RUN_ENV.DESKTOP) {
-    return invokeTauri<UpdateInfo | null>("check_for_updates");
+  if (isDesktop) {
+    return await invoke<UpdateInfo | null>("check_for_updates");
   }
 
-  if (env === RUN_ENV.WEB) {
-    const response = await invokeWeb<WebUpdateCheckResponse>("check_update");
-    if (!response?.updateAvailable) {
-      return null;
-    }
-    // Convert web response to UpdateInfo shape
-    return {
-      currentVersion: "",
-      latestVersion: response.latestVersion,
-      notes: response.notes,
-      pubDate: response.pubDate,
-      isAppStoreBuild: false,
-      storeUrl: response.downloadUrl,
-      changelogUrl: response.changelogUrl,
-      screenshots: response.screenshots,
-    };
+  // Web environment
+  const response = await invoke<WebUpdateCheckResponse>("check_update");
+  if (!response?.updateAvailable) {
+    return null;
   }
-
-  return null;
+  // Convert web response to UpdateInfo shape
+  return {
+    currentVersion: "",
+    latestVersion: response.latestVersion,
+    notes: response.notes,
+    pubDate: response.pubDate,
+    isAppStoreBuild: false,
+    storeUrl: response.downloadUrl,
+    changelogUrl: response.changelogUrl,
+    screenshots: response.screenshots,
+  };
 };
 
 /**
@@ -49,9 +44,9 @@ export const checkForUpdates = async (): Promise<UpdateInfo | null> => {
  * Only available on desktop - web users update via Docker/manual download.
  */
 export const installUpdate = async (): Promise<void> => {
-  if (getRunEnv() !== RUN_ENV.DESKTOP) {
+  if (!isDesktop) {
     throw new Error("Updates can only be installed on the desktop client");
   }
 
-  await invokeTauri("install_app_update");
+  await invoke("install_app_update");
 };

@@ -1,7 +1,4 @@
-import { RUN_ENV, getRunEnv } from "@/adapters";
-import { Button } from "@wealthfolio/ui/components/ui/button";
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Separator } from "@wealthfolio/ui/components/ui/separator";
+import { isWeb } from "@/adapters";
 import { useAuth } from "@/context/auth-context";
 import { cn } from "@/lib/utils";
 import {
@@ -10,6 +7,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@wealthfolio/ui";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { type NavLink, type NavigationProps, isPathActive } from "./app-navigation";
@@ -21,7 +21,6 @@ interface AppSidebarProps {
 export function AppSidebar({ navigation }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(true);
   const { logout } = useAuth();
-  const isWeb = getRunEnv() === RUN_ENV.WEB;
 
   return (
     <div

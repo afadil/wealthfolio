@@ -1,4 +1,4 @@
-import { getRunEnv, RUN_ENV } from "@/adapters";
+import { isWeb } from "@/adapters";
 import { getAuthToken, setAuthToken, setUnauthorizedHandler } from "@/lib/auth-token";
 import {
   createContext,
@@ -26,7 +26,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [requiresAuth, setRequiresAuth] = useState(false);
-  const [statusLoading, setStatusLoading] = useState(getRunEnv() === RUN_ENV.WEB);
+  const [statusLoading, setStatusLoading] = useState(isWeb);
   const [token, setToken] = useState<string | null>(() => getAuthToken());
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [token]);
 
   useEffect(() => {
-    if (getRunEnv() !== RUN_ENV.WEB) {
+    if (!isWeb) {
       setStatusLoading(false);
       return;
     }

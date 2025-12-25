@@ -1,5 +1,42 @@
+// Web adapter - Browser implementation
 import { getAuthToken, notifyUnauthorized } from "@/lib/auth-token";
-import type { EventCallback, UnlistenFn } from "./tauri";
+import type {
+  EventCallback,
+  UnlistenFn,
+  Logger,
+  ExtractedAddon,
+  InstalledAddon,
+  AddonManifest,
+  RunEnv,
+} from "../types";
+import { RunEnvs } from "../types";
+
+// Re-export types and constants
+export type { EventCallback, UnlistenFn, RunEnv } from "../types";
+export { RunEnvs } from "../types";
+export type {
+  AddonFile,
+  AddonInstallResult,
+  AddonManifest,
+  AddonUpdateCheckResult,
+  AddonUpdateInfo,
+  AddonValidationResult,
+  ExtractedAddon,
+  FunctionPermission,
+  InstalledAddon,
+  Permission,
+} from "../types";
+
+/**
+ * Runtime environment identifier - always "web" for web builds
+ */
+export const RUN_ENV: RunEnv = RunEnvs.WEB;
+
+/** True when running in the desktop (Tauri) environment */
+export const isDesktop = false;
+
+/** True when running in the web environment */
+export const isWeb = true;
 
 const API_PREFIX = "/api/v1";
 const EVENTS_ENDPOINT = `${API_PREFIX}/events/stream`;
@@ -132,7 +169,10 @@ const COMMANDS: CommandMap = {
   get_user_info: { method: "GET", path: "/connect/user" },
 };
 
-export const invokeWeb = async <T>(
+/**
+ * Invoke a command via REST API
+ */
+export const invoke = async <T>(
   command: string,
   payload?: Record<string, unknown>,
 ): Promise<T> => {
@@ -683,13 +723,20 @@ export const invokeWeb = async <T>(
   return (await res.json()) as T;
 };
 
-export const logger = {
+/**
+ * Logger implementation using console
+ */
+export const logger: Logger = {
   error: (...args: unknown[]) => console.error(...args),
   warn: (...args: unknown[]) => console.warn(...args),
-  info: (...args: unknown[]) => console.warn(...args),
-  debug: (...args: unknown[]) => console.warn(...args),
-  trace: (...args: unknown[]) => console.warn(...args),
+  info: (...args: unknown[]) => console.info(...args),
+  debug: (...args: unknown[]) => console.debug(...args),
+  trace: (...args: unknown[]) => console.trace(...args),
 };
+
+// ============================================================================
+// Server-Sent Events Bridge
+// ============================================================================
 
 class ServerEventBridge {
   private eventSource: EventSource | null = null;
@@ -798,47 +845,171 @@ class ServerEventBridge {
       event: eventName,
       id: ++this.nextEventId,
       payload,
-      windowLabel: undefined,
     };
     listeners.forEach((listener) => {
-      listener(eventObject as Parameters<EventCallback<unknown>>[0]);
+      listener(eventObject);
     });
   }
 }
 
 const portfolioEventBridge = new ServerEventBridge(EVENTS_ENDPOINT);
 
-export const listenPortfolioUpdateStartWeb = async <T>(
-  handler: EventCallback<T>,
-): Promise<UnlistenFn> => {
+// ============================================================================
+// Event Listeners
+// ============================================================================
+
+export const listenPortfolioUpdateStart = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
   return portfolioEventBridge.listen("portfolio:update-start", handler);
 };
 
-export const listenPortfolioUpdateCompleteWeb = async <T>(
-  handler: EventCallback<T>,
-): Promise<UnlistenFn> => {
+export const listenPortfolioUpdateComplete = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
   return portfolioEventBridge.listen("portfolio:update-complete", handler);
 };
 
-export const listenPortfolioUpdateErrorWeb = async <T>(
-  handler: EventCallback<T>,
-): Promise<UnlistenFn> => {
+export const listenPortfolioUpdateError = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
   return portfolioEventBridge.listen("portfolio:update-error", handler);
 };
 
-export const listenMarketSyncStartWeb = async <T>(
-  handler: EventCallback<T>,
-): Promise<UnlistenFn> => {
+export const listenMarketSyncStart = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
   return portfolioEventBridge.listen("market:sync-start", handler);
 };
 
-export const listenMarketSyncCompleteWeb = async <T>(
-  handler: EventCallback<T>,
-): Promise<UnlistenFn> => {
+export const listenMarketSyncComplete = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
   return portfolioEventBridge.listen("market:sync-complete", handler);
 };
 
+// Desktop-only features - no-op in web
+export const listenFileDropHover = async <T>(_handler: EventCallback<T>): Promise<UnlistenFn> => {
+  return async () => {};
+};
+
+export const listenFileDrop = async <T>(_handler: EventCallback<T>): Promise<UnlistenFn> => {
+  return async () => {};
+};
+
+export const listenFileDropCancelled = async <T>(_handler: EventCallback<T>): Promise<UnlistenFn> => {
+  return async () => {};
+};
+
+export const listenDatabaseRestored = async <T>(_handler: EventCallback<T>): Promise<UnlistenFn> => {
+  return async () => {};
+};
+
+export const listenNavigateToRoute = async <T>(_handler: EventCallback<T>): Promise<UnlistenFn> => {
+  return async () => {};
+};
+
+export const listenDeepLink = async <T>(_handler: EventCallback<T>): Promise<UnlistenFn> => {
+  return async () => {};
+};
+
+// ============================================================================
+// File Dialogs - Web implementations using browser APIs
+// ============================================================================
+
+export const openCsvFileDialog = async (): Promise<null | string | string[]> => {
+  // Web implementation would use file input - return null to indicate not supported
+  return null;
+};
+
+export const openFolderDialog = async (): Promise<string | null> => {
+  // Not supported in web
+  return null;
+};
+
+export const openDatabaseFileDialog = async (): Promise<string | null> => {
+  // Not supported in web
+  return null;
+};
+
+export const openFileSaveDialog = async (
+  fileContent: string | Blob | Uint8Array,
+  fileName: string,
+): Promise<boolean> => {
+  // Web implementation using download
+  try {
+    let blob: Blob;
+    if (typeof fileContent === "string") {
+      blob = new Blob([fileContent], { type: "text/plain" });
+    } else if (fileContent instanceof Blob) {
+      blob = fileContent;
+    } else {
+      blob = new Blob([fileContent as BlobPart]);
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// ============================================================================
+// Shell & Browser
+// ============================================================================
+
+export const openUrlInBrowser = async (url: string): Promise<void> => {
+  window.open(url, "_blank");
+};
+
+// ============================================================================
+// Addon Commands - Web implementations via REST API
+// ============================================================================
+
+export const extractAddonZip = async (zipData: Uint8Array): Promise<ExtractedAddon> => {
+  return await invoke<ExtractedAddon>("extract_addon_zip", { zipData: Array.from(zipData) });
+};
+
+export const installAddonZip = async (
+  zipData: Uint8Array,
+  enableAfterInstall?: boolean,
+): Promise<AddonManifest> => {
+  return await invoke<AddonManifest>("install_addon_zip", {
+    zipData: Array.from(zipData),
+    enableAfterInstall,
+  });
+};
+
+export const installAddonFile = async (
+  fileName: string,
+  fileContent: string,
+  enableAfterInstall?: boolean,
+): Promise<AddonManifest> => {
+  // Web doesn't support single-file addon installation
+  throw new Error(`installAddonFile not supported in web: ${fileName}, ${fileContent}, ${enableAfterInstall}`);
+};
+
+export const listInstalledAddons = async (): Promise<InstalledAddon[]> => {
+  return await invoke<InstalledAddon[]>("list_installed_addons");
+};
+
+export const toggleAddon = async (addonId: string, enabled: boolean): Promise<void> => {
+  return await invoke<void>("toggle_addon", { addonId, enabled });
+};
+
+export const uninstallAddon = async (addonId: string): Promise<void> => {
+  return await invoke<void>("uninstall_addon", { addonId });
+};
+
+export const loadAddonForRuntime = async (addonId: string): Promise<ExtractedAddon> => {
+  return await invoke<ExtractedAddon>("load_addon_for_runtime", { addonId });
+};
+
+export const getEnabledAddonsOnStartup = async (): Promise<ExtractedAddon[]> => {
+  return await invoke<ExtractedAddon[]>("get_enabled_addons_on_startup");
+};
+
+// ============================================================================
 // Helpers
+// ============================================================================
+
 function toBase64(data: Uint8Array | number[]): string {
   const bytes = Array.isArray(data) ? new Uint8Array(data) : data;
   // Fast base64 encoding without TextEncoder for binary

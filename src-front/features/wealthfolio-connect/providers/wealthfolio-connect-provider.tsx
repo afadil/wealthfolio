@@ -1,4 +1,4 @@
-import { getRunEnv, listenDeepLinkTauri, logger, openUrlInBrowser, RUN_ENV } from "@/adapters";
+import { isDesktop, listenDeepLink, logger, openUrlInBrowser } from "@/adapters";
 import { authenticate as authenticateWithASWebAuth } from "tauri-plugin-web-auth-api";
 import { getSecret, setSecret, deleteSecret } from "@/commands/secrets";
 import { getUserInfo } from "../services/broker-service";
@@ -227,8 +227,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
 
   // Store tokens: refresh token goes to backend (for cloud API calls) and locally (for session restoration)
   const storeTokens = useCallback(async (session: Session | null) => {
-    const runEnv = getRunEnv();
-    logger.info(`storeTokens called, runEnv=${runEnv}, hasSession=${!!session}`);
+    logger.info(`storeTokens called, isDesktop=${isDesktop}, hasSession=${!!session}`);
 
     if (!session) {
       // Clear from backend
@@ -237,7 +236,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
       });
 
       // Clear local storage for session restoration
-      if (runEnv === RUN_ENV.DESKTOP) {
+      if (isDesktop) {
         await deleteSecret("sync_refresh_token").catch((err) => {
           logger.warn(`Failed to delete refresh token: ${err}`);
         });
@@ -258,7 +257,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
     }
 
     // Also store refresh token locally for session restoration on app restart
-    if (runEnv === RUN_ENV.DESKTOP) {
+    if (isDesktop) {
       try {
         if (session.refresh_token) {
           await setSecret("sync_refresh_token", session.refresh_token);
@@ -281,7 +280,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
 
   // Retrieve tokens from keyring (desktop) or localStorage (web fallback)
   const retrieveRefreshToken = useCallback(async (): Promise<string | null> => {
-    if (getRunEnv() === RUN_ENV.DESKTOP) {
+    if (isDesktop) {
       return getSecret(REFRESH_TOKEN_KEY).catch(() => null);
     }
     return localStorage.getItem(REFRESH_TOKEN_KEY);
@@ -404,13 +403,13 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
 
   // Listen for deep link events on desktop
   useEffect(() => {
-    if (getRunEnv() !== RUN_ENV.DESKTOP) return;
+    if (!isDesktop) return;
 
-    let unlistenFn: (() => void) | undefined;
+    let unlistenFn: (() => Promise<void>) | undefined;
 
     const setupDeepLinkListener = async () => {
       try {
-        unlistenFn = await listenDeepLinkTauri<string>((event) => {
+        unlistenFn = await listenDeepLink<string>((event) => {
           const url = event.payload;
 
           const authPayload = parseAuthCallbackUrl(url);
@@ -426,7 +425,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
     void setupDeepLinkListener();
 
     return () => {
-      unlistenFn?.();
+      void unlistenFn?.();
     };
   }, [handleAuthCallback]);
 
@@ -515,7 +514,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
       setError(null);
 
       try {
-        const isTauri = getRunEnv() === RUN_ENV.DESKTOP;
+        const isTauri = isDesktop;
         const platform = isTauri ? await getPlatform() : null;
         const isMobile = platform?.is_mobile ?? false;
         const isIOS = platform?.os === "ios";
@@ -617,7 +616,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
       setError(null);
 
       try {
-        const isTauri = getRunEnv() === RUN_ENV.DESKTOP;
+        const isTauri = isDesktop;
         const platform = isTauri ? await getPlatform() : null;
         const isMobile = platform?.is_mobile ?? false;
 
@@ -713,7 +712,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
 
   // Fetch user info from the cloud API
   const refetchUserInfo = useCallback(async () => {
-    if (!session || getRunEnv() !== RUN_ENV.DESKTOP) {
+    if (!session || !isDesktop) {
       setUserInfo(null);
       setIsLoadingUserInfo(false);
       return;

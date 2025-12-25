@@ -7,10 +7,12 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "vite",
+    "dev": "BUILD_TARGET=web vite",
+    "dev:tauri": "BUILD_TARGET=tauri vite",
     "dev:addons": "vite --mode addon-dev",
     "dev:web": "node scripts/dev-web.mjs",
-    "build": "pnpm run build:types && tsc && vite build && pnpm -r build",
+    "build": "BUILD_TARGET=web pnpm run build:types && tsc && vite build && pnpm -r build",
+    "build:tauri": "BUILD_TARGET=tauri vite build",
     "build:types": "pnpm -r run build:types",
     "preview": "vite preview",
     "tauri": "tauri",

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@wealthfolio/ui/components/ui/use-toast";
-import { getRunEnv, RUN_ENV, logger as envLogger } from "@/adapters";
+import { isDesktop, logger as envLogger } from "@/adapters";
+import type { InstalledAddon, Permission, ExtractedAddon } from "@/adapters";
 
 import { reloadAllAddons } from "@/addons/addons-core";
 import {
@@ -12,7 +13,6 @@ import {
   extractAddon,
   clearAddonStaging,
 } from "@/commands/addon";
-import type { InstalledAddon, Permission, ExtractedAddon } from "@/adapters/tauri";
 import type { RiskLevel, AddonManifest } from "@wealthfolio/addon-sdk";
 import { QueryKeys } from "@/lib/query-keys";
 
@@ -76,7 +76,7 @@ export function useAddonActions() {
   const handleLoadAddon = async () => {
     try {
       setIsLoading(true);
-      if (getRunEnv() === RUN_ENV.DESKTOP) {
+      if (isDesktop) {
         // Dynamically import Tauri APIs in desktop to avoid bundling in web
         const { open } = await import("@tauri-apps/plugin-dialog");
         const { readFile } = await import("@tauri-apps/plugin-fs");
