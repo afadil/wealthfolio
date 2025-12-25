@@ -2,7 +2,7 @@
 // Delegates to Rust backend for all crypto operations
 // ====================================================
 
-import { invokeTauri } from "@/adapters";
+import { invoke } from "@/adapters";
 
 // Types
 // -----
@@ -37,7 +37,7 @@ export function base64Decode(str: string): Uint8Array {
  * Returns base64-encoded key
  */
 export async function generateRootKey(): Promise<string> {
-  return invokeTauri<string>("sync_generate_root_key");
+  return invoke<string>("sync_generate_root_key");
 }
 
 /**
@@ -46,7 +46,7 @@ export async function generateRootKey(): Promise<string> {
  * Returns base64-encoded DEK
  */
 export async function deriveDEK(rootKeyB64: string, version: number = 1): Promise<string> {
-  return invokeTauri<string>("sync_derive_dek", {
+  return invoke<string>("sync_derive_dek", {
     rootKey: rootKeyB64,
     version,
   });
@@ -60,7 +60,7 @@ export async function deriveDEK(rootKeyB64: string, version: number = 1): Promis
  * Returns base64-encoded keys
  */
 export async function generateEphemeralKeypair(): Promise<EphemeralKeyPair> {
-  return invokeTauri<EphemeralKeyPair>("sync_generate_keypair");
+  return invoke<EphemeralKeyPair>("sync_generate_keypair");
 }
 
 /**
@@ -71,7 +71,7 @@ export async function computeSharedSecret(
   ourSecretB64: string,
   theirPublicB64: string,
 ): Promise<string> {
-  return invokeTauri<string>("sync_compute_shared_secret", {
+  return invoke<string>("sync_compute_shared_secret", {
     ourSecret: ourSecretB64,
     theirPublic: theirPublicB64,
   });
@@ -86,7 +86,7 @@ export async function deriveSessionKey(
   sharedSecretB64: string,
   context: string = "pairing",
 ): Promise<string> {
-  return invokeTauri<string>("sync_derive_session_key", {
+  return invoke<string>("sync_derive_session_key", {
     sharedSecret: sharedSecretB64,
     context,
   });
@@ -100,7 +100,7 @@ export async function deriveSessionKey(
  * Returns base64-encoded ciphertext (includes nonce)
  */
 export async function encrypt(keyB64: string, plaintext: string): Promise<string> {
-  return invokeTauri<string>("sync_encrypt", {
+  return invoke<string>("sync_encrypt", {
     key: keyB64,
     plaintext,
   });
@@ -112,7 +112,7 @@ export async function encrypt(keyB64: string, plaintext: string): Promise<string
  * @throws if authentication fails
  */
 export async function decrypt(keyB64: string, ciphertextB64: string): Promise<string> {
-  return invokeTauri<string>("sync_decrypt", {
+  return invoke<string>("sync_decrypt", {
     key: keyB64,
     ciphertext: ciphertextB64,
   });
@@ -126,7 +126,7 @@ export async function decrypt(keyB64: string, ciphertextB64: string): Promise<st
  * Uses alphanumeric characters excluding ambiguous ones
  */
 export async function generatePairingCode(): Promise<string> {
-  return invokeTauri<string>("sync_generate_pairing_code");
+  return invoke<string>("sync_generate_pairing_code");
 }
 
 /**
@@ -134,7 +134,7 @@ export async function generatePairingCode(): Promise<string> {
  * Returns base64-encoded SHA-256 hash
  */
 export async function hashPairingCode(code: string): Promise<string> {
-  return invokeTauri<string>("sync_hash_pairing_code", { code });
+  return invoke<string>("sync_hash_pairing_code", { code });
 }
 
 // Short Authentication String (SAS)
@@ -145,7 +145,7 @@ export async function hashPairingCode(code: string): Promise<string> {
  * Used for out-of-band verification during pairing
  */
 export async function computeSAS(sharedSecretB64: string): Promise<string> {
-  return invokeTauri<string>("sync_compute_sas", {
+  return invoke<string>("sync_compute_sas", {
     sharedSecret: sharedSecretB64,
   });
 }
@@ -157,6 +157,6 @@ export async function computeSAS(sharedSecretB64: string): Promise<string> {
  * Generate a new device ID (UUIDv4)
  */
 export async function generateDeviceId(): Promise<string> {
-  return invokeTauri<string>("sync_generate_device_id");
+  return invoke<string>("sync_generate_device_id");
 }
 

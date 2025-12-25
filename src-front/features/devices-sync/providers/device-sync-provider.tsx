@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { useWealthfolioConnect } from "@/features/wealthfolio-connect";
-import { logger } from "@/adapters/tauri";
+import { logger } from "@/adapters";
 import { syncService } from "../services/sync-service";
 import * as crypto from "../crypto";
 import type {

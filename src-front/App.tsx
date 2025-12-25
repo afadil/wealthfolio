@@ -1,4 +1,4 @@
-import { RUN_ENV, getRunEnv } from "@/adapters";
+import { isWeb } from "@/adapters";
 import { AuthGate, AuthProvider } from "@/context/auth-context";
 import { WealthfolioConnectProvider } from "@/features/wealthfolio-connect";
 import { DeviceSyncProvider } from "@/features/devices-sync";
@@ -24,12 +24,12 @@ function App() {
       }),
   );
 
-  const isWeb = getRunEnv() === RUN_ENV.WEB;
+  const isWebEnv = isWeb;
 
   // Make QueryClient available globally for addons
   window.__wealthfolio_query_client__ = queryClient;
 
-  const routedContent = isWeb ? (
+  const routedContent = isWebEnv ? (
     <AuthGate fallback={<LoginPage />}>
       <AppRoutes />
     </AuthGate>

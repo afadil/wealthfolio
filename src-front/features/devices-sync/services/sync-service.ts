@@ -2,7 +2,7 @@
 // Core service for device sync, E2EE, and pairing operations
 // ===========================================================
 
-import { invokeTauri, logger } from "@/adapters/tauri";
+import { invoke, logger } from "@/adapters";
 import { syncStorage } from "../storage/keyring";
 import * as crypto from "../crypto";
 import type {
@@ -26,30 +26,30 @@ import { SyncError, SyncErrorCodes } from "../types";
 async function registerDeviceApi(
   deviceInfo: DeviceRegistration,
 ): Promise<DeviceRegistrationResponse> {
-  return invokeTauri("register_device", { deviceInfo });
+  return invoke("register_device", { deviceInfo });
 }
 
 async function getCurrentDeviceApi(): Promise<Device> {
-  return invokeTauri("get_current_device");
+  return invoke("get_current_device");
 }
 
 async function listDevicesApi(): Promise<Device[]> {
-  return invokeTauri("list_devices");
+  return invoke("list_devices");
 }
 
 async function getSyncStatusApi(): Promise<SyncStatus> {
-  return invokeTauri("get_sync_status");
+  return invoke("get_sync_status");
 }
 
 async function enableE2eeApi(): Promise<EnableE2EEResponse> {
-  return invokeTauri("enable_e2ee");
+  return invoke("enable_e2ee");
 }
 
 async function createPairingApi(
   codeHash: string,
   ephemeralPublicKey: string,
 ): Promise<CreatePairingResponse> {
-  return invokeTauri("create_pairing", {
+  return invoke("create_pairing", {
     codeHash,
     ephemeralPublicKey,
   });
@@ -59,26 +59,26 @@ async function claimPairingApi(
   code: string,
   ephemeralPublicKey: string,
 ): Promise<ClaimPairingResponse> {
-  return invokeTauri("claim_pairing", {
+  return invoke("claim_pairing", {
     code,
     ephemeralPublicKey,
   });
 }
 
 async function approvePairingApi(sessionId: string): Promise<void> {
-  return invokeTauri("approve_pairing", { sessionId });
+  return invoke("approve_pairing", { sessionId });
 }
 
 async function cancelPairingApi(sessionId: string): Promise<void> {
-  return invokeTauri("cancel_pairing", { sessionId });
+  return invoke("cancel_pairing", { sessionId });
 }
 
 async function pollMessagesApi(sessionId: string): Promise<PollMessagesResponse> {
-  return invokeTauri("poll_pairing_messages", { sessionId });
+  return invoke("poll_pairing_messages", { sessionId });
 }
 
 async function getSessionApi(sessionId: string): Promise<GetSessionResponse> {
-  return invokeTauri("get_pairing_session", { sessionId });
+  return invoke("get_pairing_session", { sessionId });
 }
 
 async function sendMessageApi(
@@ -87,23 +87,23 @@ async function sendMessageApi(
   payloadType: string,
   payload: string,
 ): Promise<void> {
-  return invokeTauri("send_pairing_message", { sessionId, toDeviceId, payloadType, payload });
+  return invoke("send_pairing_message", { sessionId, toDeviceId, payloadType, payload });
 }
 
 async function markTrustedApi(deviceId: string, keyVersion: number): Promise<void> {
-  return invokeTauri("mark_device_trusted", { deviceId, keyVersion });
+  return invoke("mark_device_trusted", { deviceId, keyVersion });
 }
 
 async function renameDeviceApi(deviceId: string, name: string): Promise<void> {
-  return invokeTauri("rename_device", { deviceId, name });
+  return invoke("rename_device", { deviceId, name });
 }
 
 async function revokeDeviceApi(deviceId: string): Promise<void> {
-  return invokeTauri("revoke_device", { deviceId });
+  return invoke("revoke_device", { deviceId });
 }
 
 async function resetSyncApi(): Promise<EnableE2EEResponse> {
-  return invokeTauri("reset_sync");
+  return invoke("reset_sync");
 }
 
 /**
@@ -111,7 +111,7 @@ async function resetSyncApi(): Promise<EnableE2EEResponse> {
  */
 async function getDeviceInfo(): Promise<DeviceRegistration> {
   // Get platform info
-  const platformInfo = await invokeTauri<{
+  const platformInfo = await invoke<{
     os: string;
     arch: string;
     is_mobile: boolean;
@@ -124,7 +124,7 @@ async function getDeviceInfo(): Promise<DeviceRegistration> {
   }));
 
   // Get app info
-  const appInfo = await invokeTauri<{
+  const appInfo = await invoke<{
     version: string;
   }>("get_app_info").catch(() => ({ version: "1.0.0" }));
 
@@ -195,7 +195,7 @@ class SyncService {
 
     if (existingDeviceId) {
       // Store it in Tauri keyring as well (for API calls)
-      await invokeTauri("set_device_id", { deviceId: existingDeviceId }).catch(() => {
+      await invoke("set_device_id", { deviceId: existingDeviceId }).catch(() => {
         // Ignore - may already be set
       });
 
@@ -254,7 +254,7 @@ class SyncService {
 
     // Store in Tauri backend keyring (for Rust API calls)
     try {
-      await invokeTauri("set_device_id", { deviceId: this.deviceId });
+      await invoke("set_device_id", { deviceId: this.deviceId });
     } catch (err) {
       logger.error(`[SyncService] Failed to store device ID in Tauri keyring: ${err}`);
       // Don't fail here - frontend storage succeeded, Tauri can use get_secret fallback
@@ -665,7 +665,7 @@ class SyncService {
 
     // Clear storage
     await syncStorage.clearAll();
-    await invokeTauri("clear_device_id").catch(() => {
+    await invoke("clear_device_id").catch(() => {
       // Ignore
     });
   }

@@ -4,7 +4,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useDeviceSync } from "../providers/device-sync-provider";
-import { logger } from "@/adapters/tauri";
+import { logger } from "@/adapters";
 
 export type PairingStep =
   | "idle"

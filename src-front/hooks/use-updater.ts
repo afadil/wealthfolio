@@ -1,10 +1,9 @@
-import { RUN_ENV, getRunEnv, logger } from "@/adapters";
+import { isDesktop, isWeb, logger } from "@/adapters";
 import { isAutoUpdateCheckEnabled } from "@/commands/settings";
 import { checkForUpdates, installUpdate } from "@/commands/updater";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import type { UpdateInfo } from "@/lib/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
 
 const UPDATE_QUERY_KEY = ["app-update"];
@@ -17,41 +16,43 @@ const UPDATE_QUERY_KEY = ["app-update"];
 export function useCheckUpdateOnStartup() {
   const queryClient = useQueryClient();
   const [isAutoCheckEnabled, setIsAutoCheckEnabled] = useState(false);
-  const runEnv = getRunEnv();
 
   // Check if auto-update is enabled (desktop only setting, web always checks)
   useEffect(() => {
-    if (runEnv === RUN_ENV.WEB) {
+    if (isWeb) {
       setIsAutoCheckEnabled(true);
       return;
     }
 
-    if (runEnv === RUN_ENV.DESKTOP) {
+    if (isDesktop) {
       isAutoUpdateCheckEnabled()
         .then(setIsAutoCheckEnabled)
         .catch(() => setIsAutoCheckEnabled(false));
     }
-  }, [runEnv]);
+  }, []);
 
   // Listen for menu-triggered update available events (desktop only)
   useEffect(() => {
-    if (runEnv !== RUN_ENV.DESKTOP) return;
+    if (!isDesktop) return;
 
     let unlisten: (() => void) | undefined;
 
-    listen<UpdateInfo>("app:update-available", (event) => {
-      queryClient.setQueryData(UPDATE_QUERY_KEY, event.payload);
-    }).then((fn) => {
-      unlisten = fn;
+    // Dynamic import for Tauri-specific functionality
+    import("@tauri-apps/api/event").then(({ listen }) => {
+      listen<UpdateInfo>("app:update-available", (event) => {
+        queryClient.setQueryData(UPDATE_QUERY_KEY, event.payload);
+      }).then((fn) => {
+        unlisten = fn;
+      });
     });
 
     return () => unlisten?.();
-  }, [queryClient, runEnv]);
+  }, [queryClient]);
 
   return useQuery({
     queryKey: UPDATE_QUERY_KEY,
     queryFn: checkForUpdates,
-    enabled: (runEnv === RUN_ENV.DESKTOP || runEnv === RUN_ENV.WEB) && isAutoCheckEnabled,
+    enabled: isAutoCheckEnabled,
     staleTime: Infinity, // Don't refetch automatically
     retry: false, // Don't retry on failure (expected in dev/offline)
   });

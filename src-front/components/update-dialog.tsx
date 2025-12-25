@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { getRunEnv, RUN_ENV } from "@/adapters";
+import { isDesktop, openUrlInBrowser } from "@/adapters";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Carousel,
@@ -11,7 +11,6 @@ import {
 } from "@wealthfolio/ui/components/ui/carousel";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useCheckUpdateOnStartup, useClearUpdate, useInstallUpdate } from "@/hooks/use-updater";
-import { open } from "@tauri-apps/plugin-shell";
 import { Icons } from "@wealthfolio/ui";
 
 function formatReleaseDate(pubDate?: string) {
@@ -36,7 +35,7 @@ export function UpdateDialog() {
   const clearUpdate = useClearUpdate();
   const [isOpen, setIsOpen] = useState(false);
   const installMutation = useInstallUpdate();
-  const isDesktop = getRunEnv() === RUN_ENV.DESKTOP;
+  const isDesktopEnv = isDesktop;
 
   const screenshots = updateInfo?.screenshots ?? [];
 
@@ -75,11 +74,7 @@ export function UpdateDialog() {
     if (!updateInfo?.storeUrl) return;
 
     try {
-      if (isDesktop) {
-        await open(updateInfo.storeUrl);
-      } else {
-        window.open(updateInfo.storeUrl, "_blank");
-      }
+      await openUrlInBrowser(updateInfo.storeUrl);
     } catch (error) {
       toast({
         title: "Unable to open the link",
@@ -94,11 +89,7 @@ export function UpdateDialog() {
     if (!updateInfo?.changelogUrl) return;
 
     try {
-      if (isDesktop) {
-        await open(updateInfo.changelogUrl);
-      } else {
-        window.open(updateInfo.changelogUrl, "_blank");
-      }
+      await openUrlInBrowser(updateInfo.changelogUrl);
     } catch (error) {
       toast({
         title: "Unable to open changelog",
@@ -197,7 +188,7 @@ export function UpdateDialog() {
                 View Changelog
               </Button>
             )}
-            {isDesktop ? (
+            {isDesktopEnv ? (
               // Desktop: Show App Store or direct install button
               updateInfo.isAppStoreBuild ? (
                 <Button onClick={handleOpenStore} disabled={!updateInfo.storeUrl}>

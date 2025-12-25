@@ -2,7 +2,7 @@
 // API commands for broker connections, sync, subscriptions, and user info
 // ========================================================================
 
-import { getRunEnv, invoke, invokeTauri, logger, RUN_ENV } from "@/adapters";
+import { invoke, isDesktop, logger } from "@/adapters";
 import type { Account, Platform } from "@/lib/types";
 import type {
   SyncResult,
@@ -20,14 +20,14 @@ const DESKTOP_ONLY_ERROR_MESSAGE =
   "Broker sync is not supported in web mode. Please use the desktop app.";
 
 const assertDesktop = () => {
-  if (getRunEnv() !== RUN_ENV.DESKTOP) {
+  if (!isDesktop) {
     throw new Error(DESKTOP_ONLY_ERROR_MESSAGE);
   }
 };
 
 const invokeDesktop = async <T>(command: string, payload?: Record<string, unknown>): Promise<T> => {
   assertDesktop();
-  return invokeTauri<T>(command, payload);
+  return invoke<T>(command, payload);
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

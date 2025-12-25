@@ -7,7 +7,7 @@ import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui";
 import { usePlatform } from "@/hooks/use-platform";
-import { logger } from "@/adapters/tauri";
+import { logger } from "@/adapters";
 
 interface EnterCodeProps {
   onSubmit: (code: string) => void;

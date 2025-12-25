@@ -6,7 +6,7 @@ import {
   UpdateAssetProfile,
   MarketDataProviderInfo,
 } from "@/lib/types";
-import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb, logger } from "@/adapters";
+import { invoke, logger } from "@/adapters";
 
 // Interface matching the backend struct
 export interface MarketDataProviderSetting {
@@ -24,14 +24,7 @@ export interface MarketDataProviderSetting {
 
 export const searchTicker = async (query: string): Promise<QuoteSummary[]> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("search_symbol", { query });
-      case RUN_ENV.WEB:
-        return invokeWeb("search_symbol", { query });
-      default:
-        throw new Error(`Unsupported`);
-    }
+    return await invoke("search_symbol", { query });
   } catch (error) {
     logger.error("Error searching for ticker.");
     throw error;
@@ -40,16 +33,7 @@ export const searchTicker = async (query: string): Promise<QuoteSummary[]> => {
 
 export const syncHistoryQuotes = async (): Promise<void> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        await invokeTauri("synch_quotes");
-        return;
-      case RUN_ENV.WEB:
-        await invokeWeb("synch_quotes");
-        return;
-      default:
-        throw new Error(`Unsupported`);
-    }
+    await invoke("synch_quotes");
   } catch (error) {
     logger.error("Error syncing history quotes.");
     throw error;
@@ -58,14 +42,7 @@ export const syncHistoryQuotes = async (): Promise<void> => {
 
 export const getAssetProfile = async (assetId: string): Promise<Asset> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("get_asset_profile", { assetId });
-      case RUN_ENV.WEB:
-        return invokeWeb("get_asset_profile", { assetId });
-      default:
-        throw new Error(`Unsupported`);
-    }
+    return await invoke("get_asset_profile", { assetId });
   } catch (error) {
     logger.error("Error loading asset data.");
     throw error;
@@ -74,14 +51,7 @@ export const getAssetProfile = async (assetId: string): Promise<Asset> => {
 
 export const getAssets = async (): Promise<Asset[]> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("get_assets");
-      case RUN_ENV.WEB:
-        return invokeWeb("get_assets");
-      default:
-        throw new Error(`Unsupported`);
-    }
+    return await invoke("get_assets");
   } catch (error) {
     logger.error("Error loading assets.");
     throw error;
@@ -90,14 +60,7 @@ export const getAssets = async (): Promise<Asset[]> => {
 
 export const getLatestQuotes = async (symbols: string[]): Promise<Record<string, Quote>> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("get_latest_quotes", { symbols });
-      case RUN_ENV.WEB:
-        return invokeWeb("get_latest_quotes", { symbols });
-      default:
-        throw new Error(`Unsupported`);
-    }
+    return await invoke("get_latest_quotes", { symbols });
   } catch (error) {
     logger.error("Error loading latest quotes.");
     throw error;
@@ -106,14 +69,7 @@ export const getLatestQuotes = async (symbols: string[]): Promise<Record<string,
 
 export const updateAssetProfile = async (payload: UpdateAssetProfile): Promise<Asset> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("update_asset_profile", { id: payload.symbol, payload });
-      case RUN_ENV.WEB:
-        return invokeWeb("update_asset_profile", { id: payload.symbol, payload });
-      default:
-        throw new Error(`Unsupported`);
-    }
+    return await invoke("update_asset_profile", { id: payload.symbol, payload });
   } catch (error) {
     logger.error("Error updating asset profile.");
     throw error;
@@ -122,16 +78,7 @@ export const updateAssetProfile = async (payload: UpdateAssetProfile): Promise<A
 
 export const deleteAsset = async (id: string): Promise<void> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        await invokeTauri("delete_asset", { id });
-        return;
-      case RUN_ENV.WEB:
-        await invokeWeb("delete_asset", { id });
-        return;
-      default:
-        throw new Error(`Unsupported`);
-    }
+    await invoke("delete_asset", { id });
   } catch (error) {
     logger.error("Error deleting asset.");
     throw error;
@@ -140,14 +87,7 @@ export const deleteAsset = async (id: string): Promise<void> => {
 
 export const updateAssetDataSource = async (symbol: string, dataSource: string): Promise<Asset> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("update_asset_data_source", { id: symbol, dataSource });
-      case RUN_ENV.WEB:
-        return invokeWeb("update_asset_data_source", { id: symbol, dataSource });
-      default:
-        throw new Error(`Unsupported`);
-    }
+    return await invoke("update_asset_data_source", { id: symbol, dataSource });
   } catch (error) {
     logger.error("Error updating asset data source.");
     throw error;
@@ -156,13 +96,7 @@ export const updateAssetDataSource = async (symbol: string, dataSource: string):
 
 export const updateQuote = async (symbol: string, quote: Quote): Promise<void> => {
   try {
-    const runEnv = getRunEnv();
-    if (runEnv === RUN_ENV.DESKTOP) {
-      return invokeTauri("update_quote", { symbol, quote: quote });
-    }
-    if (runEnv === RUN_ENV.WEB) {
-      return invokeWeb("update_quote", { symbol, quote });
-    }
+    return await invoke("update_quote", { symbol, quote });
   } catch (error) {
     logger.error("Error updating quote");
     throw error;
@@ -171,16 +105,7 @@ export const updateQuote = async (symbol: string, quote: Quote): Promise<void> =
 
 export const syncMarketData = async (symbols: string[], refetchAll: boolean): Promise<void> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        await invokeTauri("sync_market_data", { symbols, refetchAll });
-        return;
-      case RUN_ENV.WEB:
-        await invokeWeb("sync_market_data", { symbols, refetchAll });
-        return;
-      default:
-        throw new Error(`Unsupported`);
-    }
+    await invoke("sync_market_data", { symbols, refetchAll });
   } catch (error) {
     logger.error(`Error refreshing quotes for symbols: ${String(error)}`);
     throw error;
@@ -189,13 +114,7 @@ export const syncMarketData = async (symbols: string[], refetchAll: boolean): Pr
 
 export const deleteQuote = async (id: string): Promise<void> => {
   try {
-    const runEnv = getRunEnv();
-    if (runEnv === RUN_ENV.DESKTOP) {
-      return invokeTauri("delete_quote", { id });
-    }
-    if (runEnv === RUN_ENV.WEB) {
-      return invokeWeb("delete_quote", { id });
-    }
+    return await invoke("delete_quote", { id });
   } catch (error) {
     logger.error("Error deleting quote");
     throw error;
@@ -204,14 +123,7 @@ export const deleteQuote = async (id: string): Promise<void> => {
 
 export const getQuoteHistory = async (symbol: string): Promise<Quote[]> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return await invokeTauri("get_quote_history", { symbol });
-      case RUN_ENV.WEB:
-        return await invokeWeb("get_quote_history", { symbol });
-      default:
-        throw new Error(`Unsupported environment`);
-    }
+    return await invoke("get_quote_history", { symbol });
   } catch (error) {
     logger.error(`Error fetching quote history for symbol ${symbol}.`);
     throw error;
@@ -220,15 +132,7 @@ export const getQuoteHistory = async (symbol: string): Promise<Quote[]> => {
 
 export const getMarketDataProviders = async (): Promise<MarketDataProviderInfo[]> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("get_market_data_providers");
-      case RUN_ENV.WEB:
-        return invokeWeb("get_market_data_providers");
-      default:
-        logger.error("Unsupported environment for getMarketDataProviders");
-        throw new Error(`Unsupported environment`);
-    }
+    return await invoke("get_market_data_providers");
   } catch (error) {
     logger.error("Error fetching market data providers.");
     throw error;
@@ -237,14 +141,7 @@ export const getMarketDataProviders = async (): Promise<MarketDataProviderInfo[]
 
 export const getMarketDataProviderSettings = async (): Promise<MarketDataProviderSetting[]> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("get_market_data_providers_settings");
-      case RUN_ENV.WEB:
-        return invokeWeb("get_market_data_providers_settings");
-      default:
-        throw new Error(`Unsupported environment`);
-    }
+    return await invoke("get_market_data_providers_settings");
   } catch (error) {
     logger.error("Error fetching market data provider settings.");
     throw error;
@@ -257,14 +154,7 @@ export const updateMarketDataProviderSettings = async (payload: {
   enabled: boolean;
 }): Promise<MarketDataProviderSetting> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("update_market_data_provider_settings", payload);
-      case RUN_ENV.WEB:
-        return invokeWeb("update_market_data_provider_settings", payload);
-      default:
-        throw new Error(`Unsupported environment`);
-    }
+    return await invoke("update_market_data_provider_settings", payload);
   } catch (error) {
     logger.error("Error updating market data provider settings.");
     throw error;
@@ -274,14 +164,7 @@ export const updateMarketDataProviderSettings = async (payload: {
 export const importManualQuotes = async (quotes: QuoteImport[]): Promise<QuoteImport[]> => {
   try {
     const overwriteExisting = true;
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("import_quotes_csv", { quotes, overwriteExisting });
-      case RUN_ENV.WEB:
-        return invokeWeb("import_quotes_csv", { quotes, overwriteExisting });
-      default:
-        throw new Error("Manual quote import is not supported in this environment.");
-    }
+    return await invoke("import_quotes_csv", { quotes, overwriteExisting });
   } catch (error) {
     logger.error("Error importing manual quotes.");
     throw error;

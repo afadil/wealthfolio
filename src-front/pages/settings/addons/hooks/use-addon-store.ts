@@ -1,5 +1,4 @@
-import { logger } from "@/adapters";
-import type { ExtractedAddon } from "@/adapters/tauri";
+import { logger, type ExtractedAddon } from "@/adapters";
 import {
   clearAddonStaging,
   downloadAddonForReview,

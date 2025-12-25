@@ -1,4 +1,4 @@
-import { RUN_ENV, getRunEnv } from "@/adapters";
+import { isDesktop } from "@/adapters";
 import React from "react";
 import * as ReactDOMLegacy from "react-dom";
 import ReactDOM from "react-dom/client";
@@ -7,11 +7,9 @@ import "./addons/addons-runtime-context";
 import App from "./App";
 import "./styles.css";
 
-const runEnv = getRunEnv();
-
 if (isAddonDevModeEnabled) {
   void import("./addons/addons-dev-mode");
-} else if (runEnv === RUN_ENV.DESKTOP && !import.meta.env.DEV) {
+} else if (isDesktop && !import.meta.env.DEV) {
   void import("./lockdown").then(({ installLockdown }) => {
     installLockdown();
   });

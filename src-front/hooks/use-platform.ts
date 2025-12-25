@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { getRunEnv, RUN_ENV } from "@/adapters";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, isDesktop as isDesktopEnv, isWeb as isWebEnv } from "@/adapters";
 
 export interface PlatformInfo {
   os: string;
@@ -37,9 +36,7 @@ export function usePlatform(): UsePlatformResult {
       return;
     }
 
-    const runEnv = getRunEnv();
-
-    if (runEnv === RUN_ENV.DESKTOP) {
+    if (isDesktopEnv) {
       // We're in Tauri, get actual platform info
       invoke<PlatformInfo>("get_platform")
         .then((info) => {
@@ -64,9 +61,8 @@ export function usePlatform(): UsePlatformResult {
     }
   }, []);
 
-  const runEnv = getRunEnv();
-  const isTauri = runEnv === RUN_ENV.DESKTOP;
-  const isWeb = runEnv === RUN_ENV.WEB;
+  const isTauri = isDesktopEnv;
+  const isWeb = isWebEnv;
 
   return {
     platform,
@@ -131,9 +127,7 @@ export async function getPlatform(): Promise<PlatformInfo> {
     return cachedPlatform;
   }
 
-  const runEnv = getRunEnv();
-
-  if (runEnv === RUN_ENV.DESKTOP) {
+  if (isDesktopEnv) {
     try {
       const info = await invoke<PlatformInfo>("get_platform");
       cachedPlatform = info;

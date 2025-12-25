@@ -1,19 +1,18 @@
-import { getRunEnv, logger, RUN_ENV } from "@/adapters";
+import { isDesktop, logger } from "@/adapters";
 import { openDatabaseFileDialog, openFolderDialog } from "@/commands/file";
 import { backupDatabase, backupDatabaseToPath, restoreDatabase } from "@/commands/settings";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useMutation } from "@tanstack/react-query";
 
 export function useBackupRestore() {
-  const runEnv = getRunEnv();
-  const isDesktop = runEnv === RUN_ENV.DESKTOP;
+  const isDesktopEnv = isDesktop;
 
   const { mutateAsync: backupWithDirectorySelection, isPending: isBackingUp } = useMutation<{
     location: "local" | "server";
     value: string;
   } | null>({
     mutationFn: async () => {
-      if (isDesktop) {
+      if (isDesktopEnv) {
         // Open folder dialog to let user choose backup location
         const selectedDir = await openFolderDialog();
 
@@ -59,7 +58,7 @@ export function useBackupRestore() {
 
   const { mutateAsync: restoreFromBackup, isPending: isRestoring } = useMutation({
     mutationFn: async () => {
-      if (!isDesktop) {
+      if (!isDesktopEnv) {
         throw new Error("Restore is only supported in the desktop app");
       }
 
@@ -100,7 +99,7 @@ export function useBackupRestore() {
   };
 
   const performRestore = async () => {
-    if (!isDesktop) {
+    if (!isDesktopEnv) {
       toast({
         title: "Restore unavailable in web mode",
         description: "Please use the desktop application to restore backups.",
@@ -120,6 +119,6 @@ export function useBackupRestore() {
     performRestore,
     isBackingUp,
     isRestoring,
-    isDesktop,
+    isDesktop: isDesktopEnv,
   };
 }

@@ -11,8 +11,7 @@
       "@/*": ["./src-front/*"],
       "@wealthfolio/addon-sdk": ["packages/addon-sdk/src"],
       "@wealthfolio/ui": ["packages/ui/src"],
-      "@wealthfolio/ui/*": ["packages/ui/src/*"],
-      "@/components/ui/*": ["packages/ui/src/components/ui/*"]
+      "@wealthfolio/ui/*": ["packages/ui/src/*"]
     }
   },
   "include": ["src-front"],

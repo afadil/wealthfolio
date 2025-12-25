@@ -97,6 +97,11 @@ See [ROADMAP.md](./ROADMAP.md).
   all supported activity types and their required fields
 - **[Roadmap](ROADMAP.md)** - Future plans and development roadmap
 
+### Architecture
+
+- **[Adapter System](docs/architecture/adapters.md)** - Compile-time environment
+  detection for Desktop/Web builds
+
 ### Addon Development
 
 - **[Addon Documentation Hub](docs/addons/index.md)** - Main entry point for
@@ -581,14 +586,20 @@ Check out the [addons/](addons/) directory for sample addons including:
 
 ```
 wealthfolio/
-├── src/                         # Main source code for the React application
+├── src-front/                   # Main source code for the React application
+│   ├── adapters/                # Environment adapters (Tauri/Web)
+│   │   ├── tauri/               # Desktop/Tauri implementation
+│   │   ├── web/                 # Web/REST API implementation
+│   │   └── types.ts             # Shared adapter types
 │   ├── addons/                  # Addon system core functionality
+│   ├── commands/                # Backend command wrappers
 │   ├── components/              # React components
 │   ├── pages/                   # Application pages and routes
 │   ├── hooks/                   # Custom React hooks
 │   └── lib/                     # Utility libraries and helpers
 ├── src-core/                    # Core backend functionality (Rust)
 ├── src-tauri/                   # Tauri-specific code for desktop app functionality
+├── src-server/                  # Web server (Axum) for REST API mode
 ├── addons/                      # Example and sample addons
 │   └── goal-progress-tracker/   # Goal Progress tracker addon example
 ├── packages/                    # Shared packages and tools
@@ -597,7 +608,8 @@ wealthfolio/
 │   └── ui/                      # Shared UI components library
 ├── docs/                        # Documentation
 │   ├── addons/                  # Addon development documentation
-│   └── activities/              # Activity types documentation
+│   ├── activities/              # Activity types documentation
+│   └── architecture/            # Architecture documentation
 ├── public/                      # Public assets
 ├── db/                          # Database files and migrations
 ├── LICENSE                      # License file
