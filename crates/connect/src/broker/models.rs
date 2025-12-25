@@ -345,3 +345,76 @@ impl BrokerAccount {
         serde_json::to_string(&meta).ok()
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Subscription Plans Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Pricing information for a subscription plan
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlanPricing {
+    pub amount: f64,
+    pub currency: String,
+    pub price_id: Option<String>,
+}
+
+/// Pricing for monthly and yearly billing periods
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlanPricingPeriods {
+    pub monthly: PlanPricing,
+    pub yearly: PlanPricing,
+}
+
+/// A subscription plan
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubscriptionPlan {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub features: Vec<String>,
+    pub pricing: PlanPricingPeriods,
+}
+
+/// Response containing subscription plans
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlansResponse {
+    pub plans: Vec<SubscriptionPlan>,
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// User Info Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// User's team information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserTeam {
+    pub id: String,
+    pub name: String,
+    pub logo_url: Option<String>,
+    pub plan: String,
+    pub subscription_status: Option<String>,
+    pub subscription_current_period_end: Option<String>,
+    pub subscription_cancel_at_period_end: Option<bool>,
+    pub trial_ends_at: Option<String>,
+}
+
+/// User information from the cloud API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserInfo {
+    pub id: String,
+    pub full_name: Option<String>,
+    pub email: String,
+    pub avatar_url: Option<String>,
+    pub locale: Option<String>,
+    pub week_starts_on_monday: Option<bool>,
+    pub timezone: Option<String>,
+    pub timezone_auto_sync: Option<bool>,
+    pub time_format: Option<i32>,
+    pub date_format: Option<String>,
+    pub team_id: Option<String>,
+    pub team_role: Option<String>,
+    pub team: Option<UserTeam>,
+}

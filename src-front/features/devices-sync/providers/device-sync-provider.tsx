@@ -198,12 +198,15 @@ const DeviceSyncContext = createContext<SyncContextValue | null>(null);
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function DeviceSyncProvider({ children }: { children: ReactNode }) {
-  const { isConnected, isEnabled } = useWealthfolioConnect();
+  const { isConnected, isEnabled, userInfo } = useWealthfolioConnect();
   const [state, dispatch] = useReducer(syncReducer, initialState);
 
-  // Initialize on mount (when connected)
+  // Check if user has a subscription (team)
+  const hasSubscription = !!userInfo?.team?.plan;
+
+  // Initialize on mount (when connected AND has subscription)
   useEffect(() => {
-    if (!isEnabled || !isConnected) {
+    if (!isEnabled || !isConnected || !hasSubscription) {
       dispatch({ type: "RESET" });
       return;
     }
@@ -276,7 +279,7 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [isConnected, isEnabled]);
+  }, [isConnected, isEnabled, hasSubscription]);
 
   // Actions
   const enableE2EE = useCallback(async (): Promise<

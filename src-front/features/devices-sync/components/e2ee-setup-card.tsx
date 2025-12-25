@@ -45,33 +45,36 @@ export function E2EESetupCard() {
           Sync your data securely across all your devices.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-5">
-        <div className="flex flex-col items-center py-4 text-center">
-          <div className="bg-primary/10 mb-4 rounded-full p-3">
-            <Icons.CloudSync className="text-primary h-8 w-8" />
+      <CardContent>
+        <div className="flex flex-col items-center justify-center py-6 text-center">
+          <div className="bg-muted/50 mb-4 rounded-full p-3">
+            <Icons.CloudSync className="h-6 w-6 opacity-60" />
           </div>
           <p className="text-foreground font-medium">Keep your devices in sync</p>
-          <p className="text-muted-foreground mt-1 max-w-xs text-sm">
+          <p className="text-muted-foreground mt-1 max-w-xs text-xs">
             Your data is end-to-end encrypted. Only your devices can read it.
           </p>
-        </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        <Button onClick={handleEnable} disabled={isEnabling} className="h-11 w-full">
-          {isEnabling ? (
-            <>
-              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-              Setting up...
-            </>
-          ) : (
-            "Enable Device Sync"
+          {error && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
-        </Button>
+
+          <Button onClick={handleEnable} disabled={isEnabling} size="sm" className="mt-4">
+            {isEnabling ? (
+              <>
+                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                Setting up...
+              </>
+            ) : (
+              <>
+                <Icons.Shield className="mr-2 h-4 w-4" />
+                Enable Device Sync
+              </>
+            )}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

@@ -10,8 +10,8 @@ use axum::{
 
 #[derive(serde::Deserialize)]
 struct SecretSetBody {
-    #[serde(rename = "providerId")]
-    provider_id: String,
+    #[serde(rename = "secretKey")]
+    secret_key: String,
     secret: String,
 }
 
@@ -21,21 +21,21 @@ async fn set_secret(
 ) -> ApiResult<StatusCode> {
     state
         .secret_store
-        .set_secret(&body.provider_id, &body.secret)?;
+        .set_secret(&body.secret_key, &body.secret)?;
     Ok(StatusCode::NO_CONTENT)
 }
 
 #[derive(serde::Deserialize)]
 struct SecretQuery {
-    #[serde(rename = "providerId")]
-    provider_id: String,
+    #[serde(rename = "secretKey")]
+    secret_key: String,
 }
 
 async fn get_secret(
     State(state): State<Arc<AppState>>,
     Query(q): Query<SecretQuery>,
 ) -> ApiResult<Json<Option<String>>> {
-    let val = state.secret_store.get_secret(&q.provider_id)?;
+    let val = state.secret_store.get_secret(&q.secret_key)?;
     Ok(Json(val))
 }
 
@@ -43,7 +43,7 @@ async fn delete_secret(
     State(state): State<Arc<AppState>>,
     Query(q): Query<SecretQuery>,
 ) -> ApiResult<StatusCode> {
-    state.secret_store.delete_secret(&q.provider_id)?;
+    state.secret_store.delete_secret(&q.secret_key)?;
     Ok(StatusCode::NO_CONTENT)
 }
 

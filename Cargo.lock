@@ -7308,6 +7308,7 @@ dependencies = [
  "uuid",
  "wealthfolio-connect",
  "wealthfolio-core",
+ "wealthfolio-device-sync",
  "wealthfolio-storage-sqlite",
  "x25519-dalek",
 ]
@@ -7321,11 +7322,13 @@ dependencies = [
  "diesel",
  "log",
  "r2d2",
+ "reqwest",
  "rust_decimal",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
+ "urlencoding",
  "uuid",
  "wealthfolio-core",
  "wealthfolio-storage-sqlite",
@@ -7365,6 +7368,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "wealthfolio-device-sync"
+version = "2.1.0"
+dependencies = [
+ "async-trait",
+ "log",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "urlencoding",
+]
+
+[[package]]
 name = "wealthfolio-server"
 version = "2.1.0"
 dependencies = [
@@ -7393,11 +7410,13 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
+ "urlencoding",
  "utoipa",
  "utoipa-swagger-ui",
  "uuid",
  "wealthfolio-connect",
  "wealthfolio-core",
+ "wealthfolio-device-sync",
  "wealthfolio-storage-sqlite",
 ]
 

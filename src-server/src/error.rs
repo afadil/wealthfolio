@@ -16,6 +16,12 @@ pub enum ApiError {
     NotFound,
     #[error("{0}")]
     NotImplemented(String),
+    #[error("{0}")]
+    BadRequest(String),
+    #[error("{0}")]
+    Unauthorized(String),
+    #[error("{0}")]
+    Internal(String),
     // Surface the underlying error message to help debugging during development
     #[error("{0}")]
     Anyhow(#[from] anyhow::Error),
@@ -37,6 +43,9 @@ impl IntoResponse for ApiError {
             },
             ApiError::NotFound => (StatusCode::NOT_FOUND, self.to_string()),
             ApiError::NotImplemented(reason) => (StatusCode::NOT_IMPLEMENTED, reason.clone()),
+            ApiError::BadRequest(reason) => (StatusCode::BAD_REQUEST, reason.clone()),
+            ApiError::Unauthorized(reason) => (StatusCode::UNAUTHORIZED, reason.clone()),
+            ApiError::Internal(reason) => (StatusCode::INTERNAL_SERVER_ERROR, reason.clone()),
             ApiError::Anyhow(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
         };
         let body = Json(ErrorBody {

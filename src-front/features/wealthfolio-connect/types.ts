@@ -58,7 +58,7 @@ export interface ConnectPortalResponse {
 // Subscription Plans Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type PlanId = "essential" | "pro";
+export type PlanId = "essentials" | "duo" | "plus";
 export type BillingPeriod = "monthly" | "yearly";
 
 export interface PlanPricing {

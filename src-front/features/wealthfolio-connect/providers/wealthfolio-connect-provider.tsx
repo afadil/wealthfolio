@@ -2,6 +2,7 @@ import { getRunEnv, listenDeepLinkTauri, logger, openUrlInBrowser, RUN_ENV } fro
 import { authenticate as authenticateWithASWebAuth } from "tauri-plugin-web-auth-api";
 import { getSecret, setSecret, deleteSecret } from "@/commands/secrets";
 import { getUserInfo } from "../services/broker-service";
+import { storeSyncSession, clearSyncSession } from "../services/auth-service";
 import type { UserInfo } from "../types";
 import { getPlatform } from "@/hooks/use-platform";
 import { CONNECT_ENABLED } from "@/lib/connect-config";
@@ -22,10 +23,9 @@ import {
 const SUPABASE_URL = import.meta.env.CONNECT_AUTH_URL as string;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.CONNECT_AUTH_PUBLISHABLE_KEY as string;
 
-// Keys for storing tokens in keyring/localStorage
+// Key for storing refresh token in keyring/localStorage (for session restoration)
 // Note: For keyring (Tauri), the "wealthfolio_" prefix is added automatically by SecretStore
 const REFRESH_TOKEN_KEY = "sync_refresh_token";
-const ACCESS_TOKEN_KEY = "sync_access_token";
 
 // Deep-link URL for desktop callbacks (custom URL scheme)
 const DESKTOP_DEEP_LINK_URL = "wealthfolio://auth/callback";
@@ -40,7 +40,10 @@ const getWebRedirectUrl = () => {
 
 // For OAuth on desktop, we use a hosted callback page that redirects to the deep link
 // This is necessary because browsers block direct navigation to custom URL schemes
-const HOSTED_OAUTH_CALLBACK_URL = "https://connect.wealthfolio.app/auth/callback";
+// Uses env variable in dev, falls back to production URL for bundled builds
+const HOSTED_OAUTH_CALLBACK_URL =
+  (import.meta.env.CONNECT_OAUTH_CALLBACK_URL as string) ||
+  "https://connect.wealthfolio.app/deeplink";
 
 type AuthCallbackPayload = { type: "code"; code: string } | { type: "error"; message: string };
 
@@ -222,57 +225,56 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
 
   const supabase = supabaseRef.current;
 
-  // Store tokens securely in keyring (desktop/mobile) or localStorage (web fallback)
+  // Store tokens: refresh token goes to backend (for cloud API calls) and locally (for session restoration)
   const storeTokens = useCallback(async (session: Session | null) => {
     const runEnv = getRunEnv();
     logger.info(`storeTokens called, runEnv=${runEnv}, hasSession=${!!session}`);
 
     if (!session) {
+      // Clear from backend
+      await clearSyncSession().catch((err) => {
+        logger.warn(`Failed to clear sync session from backend: ${err}`);
+      });
+
+      // Clear local storage for session restoration
       if (runEnv === RUN_ENV.DESKTOP) {
-        // Use the working setSecret/deleteSecret commands
-        await deleteSecret("sync_access_token").catch((err) => {
-          logger.warn(`Failed to delete access token: ${err}`);
-        });
         await deleteSecret("sync_refresh_token").catch((err) => {
           logger.warn(`Failed to delete refresh token: ${err}`);
         });
       } else {
         localStorage.removeItem(REFRESH_TOKEN_KEY);
-        localStorage.removeItem(ACCESS_TOKEN_KEY);
       }
       return;
     }
 
+    // Store tokens in backend's encrypted secret store (backend can mint fresh access tokens if needed)
+    if (session.refresh_token) {
+      try {
+        await storeSyncSession(session.refresh_token, session.access_token);
+        logger.info("Tokens stored in backend successfully");
+      } catch (err) {
+        logger.error(`Failed to store tokens in backend: ${err}`);
+      }
+    }
+
+    // Also store refresh token locally for session restoration on app restart
     if (runEnv === RUN_ENV.DESKTOP) {
       try {
-        // Use the working setSecret command directly (same keyring, works on iOS)
-        logger.info("Storing access token via setSecret...");
-        await setSecret("sync_access_token", session.access_token);
-        logger.info("Access token stored successfully");
-
         if (session.refresh_token) {
-          logger.info("Storing refresh token via setSecret...");
           await setSecret("sync_refresh_token", session.refresh_token);
-          logger.info("Refresh token stored successfully");
+          logger.info("Refresh token stored in keyring");
         }
       } catch (err) {
         logger.error(`setSecret failed: ${err}`);
-        // Fallback to localStorage if keyring fails
-        logger.info("Falling back to localStorage for token storage");
+        // Fallback to localStorage
         if (session.refresh_token) {
           localStorage.setItem(REFRESH_TOKEN_KEY, session.refresh_token);
         }
-        if (session.access_token) {
-          localStorage.setItem(ACCESS_TOKEN_KEY, session.access_token);
-        }
       }
     } else {
-      logger.info("Using localStorage for token storage (web mode)");
+      // Web mode: store refresh token in localStorage for session restoration
       if (session.refresh_token) {
         localStorage.setItem(REFRESH_TOKEN_KEY, session.refresh_token);
-      }
-      if (session.access_token) {
-        localStorage.setItem(ACCESS_TOKEN_KEY, session.access_token);
       }
     }
   }, []);
@@ -526,14 +528,15 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
 
         // Determine redirect URL based on platform
         // iOS ASWebAuth always needs deep link URL (works in dev and prod)
-        // Desktop prod uses hosted callback, other cases use web redirect
+        // Desktop prod uses hosted callback → deep link (can't use in dev - URL scheme not registered)
+        // Dev mode uses webview redirect (simpler, no deep link registration needed)
         const redirectUrl = useASWebAuth
           ? DESKTOP_DEEP_LINK_URL // iOS: Always use deep link for ASWebAuthenticationSession
           : isTauri && import.meta.env.PROD
             ? isMobile
               ? MOBILE_UNIVERSAL_LINK_CALLBACK_URL // Android prod
               : HOSTED_OAUTH_CALLBACK_URL // Desktop prod
-            : getWebRedirectUrl(); // Web or dev mode
+            : getWebRedirectUrl(); // Web or dev mode (webview redirect)
 
         const useSystemBrowser = isTauri && import.meta.env.PROD && !useASWebAuth;
         const queryParams =

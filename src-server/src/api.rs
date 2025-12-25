@@ -20,6 +20,8 @@ mod accounts;
 mod activities;
 mod addons;
 mod assets;
+mod connect;
+mod device_sync;
 mod exchange_rates;
 mod goals;
 mod holdings;
@@ -30,7 +32,6 @@ mod portfolio;
 mod secrets;
 mod settings;
 mod shared;
-mod sync;
 
 #[utoipa::path(get, path = "/api/v1/healthz", responses((status = 200, description = "Health")))]
 pub async fn healthz() -> &'static str {
@@ -50,6 +51,7 @@ pub async fn readyz() -> &'static str {
 )]
 pub struct ApiDoc;
 
+#[allow(deprecated)]
 pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
     let cors = if config.cors_allow.iter().any(|o| o == "*") {
         CorsLayer::new().allow_origin(Any)
@@ -80,7 +82,8 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
         .merge(secrets::router())
         .merge(limits::router())
         .merge(addons::router())
-        .merge(sync::router());
+        .merge(device_sync::router())
+        .merge(connect::router());
 
     let protected_api = if requires_auth {
         protected_api.layer(middleware::from_fn_with_state(

@@ -5,6 +5,7 @@
 
 #[cfg(feature = "broker")]
 pub mod broker;
+pub mod cloud;
 pub mod platform;
 pub mod state;
 
@@ -13,9 +14,12 @@ pub mod state;
 pub use broker::{
     AccountUniversalActivity, BrokerAccount, BrokerApiClient, BrokerBrokerage, BrokerConnection,
     ConnectPortalRequest, ConnectPortalResponse, PaginatedUniversalActivity,
-    PlatformRepositoryTrait, RemoveConnectionRequest, SyncAccountsResponse,
-    SyncActivitiesResponse, SyncConnectionsResponse, SyncService, SyncServiceTrait,
+    PlanPricing, PlanPricingPeriods, PlansResponse, PlatformRepositoryTrait,
+    RemoveConnectionRequest, SubscriptionPlan, SyncAccountsResponse, SyncActivitiesResponse,
+    SyncConnectionsResponse, SyncService, SyncServiceTrait, UserInfo, UserTeam,
 };
+
+pub use cloud::ConnectApiClient;
 
 pub use platform::{Platform, PlatformDB, PlatformRepository};
 pub use state::{BrokersSyncState, BrokersSyncStateRepository};

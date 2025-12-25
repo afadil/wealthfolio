@@ -1,5 +1,5 @@
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useWealthfolioConnect } from "@/features/wealthfolio-connect";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -12,12 +12,6 @@ export default function AuthCallbackPage() {
   const navigate = useNavigate();
   const { isConnected, isLoading, error } = useWealthfolioConnect();
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
-
-  useEffect(() => {
-    // Log the current URL for debugging
-    console.log("AuthCallbackPage mounted, URL:", window.location.href);
-    console.log("Hash:", window.location.hash);
-  }, []);
 
   useEffect(() => {
     // Wait for the context to finish loading
@@ -43,7 +37,6 @@ export default function AuthCallbackPage() {
     // If not connected after checking, wait a bit more then redirect
     // (the context might still be processing)
     const timer = setTimeout(() => {
-      console.log("Timeout reached, redirecting to settings...");
       navigate("/settings/wealthfolio-connect", { replace: true });
     }, 5000);
 

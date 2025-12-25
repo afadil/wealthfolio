@@ -927,8 +927,7 @@ export function SelectCell<TData>({
       {isEditing ? (
         <Select value={value} onValueChange={onValueChange} open={isEditing} onOpenChange={onOpenChange}>
           <SelectTrigger
-            size="sm"
-            className="size-full items-start border-none p-0 shadow-none focus-visible:ring-0 dark:bg-transparent [&_svg]:hidden"
+            className="size-full h-auto items-start border-none p-0 shadow-none focus-visible:ring-0 dark:bg-transparent [&_svg]:hidden"
           >
             {displayLabel ? (
               <Badge variant="secondary" className="px-1.5 text-xs whitespace-pre-wrap">
@@ -1686,7 +1685,7 @@ export function FileCell<TData>({
           const filesWithTemp = [...files, ...tempFiles];
           setFiles(filesWithTemp);
 
-          const uploadingIds = new Set(tempFiles.map((f) => f.id));
+          const uploadingIds: Set<string> = new Set(tempFiles.map((f) => f.id));
           setUploadingFiles(uploadingIds);
 
           let uploadedFiles: FileCellData[] = [];
