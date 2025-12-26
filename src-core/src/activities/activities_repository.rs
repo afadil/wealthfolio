@@ -847,8 +847,14 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .into_iter()
             .map(|raw| {
                 let amount = Decimal::from_str(&raw.amount).unwrap_or_else(|_| Decimal::zero());
-                // Ensure amount is positive for spending calculations
-                let amount = amount.abs();
+                // For spending calculations:
+                // - WITHDRAWAL: positive amount (adds to spending)
+                // - DEPOSIT with expense category: negative amount (subtracts from spending, e.g., refunds)
+                let amount = if raw.activity_type == "DEPOSIT" {
+                    -amount.abs()
+                } else {
+                    amount.abs()
+                };
                 SpendingData {
                     date: raw.date,
                     activity_type: raw.activity_type,
@@ -1113,9 +1119,34 @@ impl ActivityRepositoryTrait for ActivityRepository {
         &self,
         month: &str,
         limit: i64,
+        include_event_ids: Option<&[String]>,
+        include_all_events: bool,
+        category_id: Option<&str>,
     ) -> Result<Vec<ActivityDetails>> {
         use diesel::sql_query;
         let mut conn = get_connection(&self.pool)?;
+
+        // Event inclusion filter: by default excludes all event transactions
+        let event_filter = if include_all_events {
+            String::new()
+        } else {
+            match include_event_ids {
+                Some(ids) if !ids.is_empty() => {
+                    let escaped: Vec<String> = ids.iter().map(|id| id.replace("'", "''")).collect();
+                    format!(
+                        "AND (a.event_id IS NULL OR a.event_id IN ('{}'))",
+                        escaped.join("','")
+                    )
+                }
+                _ => "AND a.event_id IS NULL".to_string(),
+            }
+        };
+
+        // Category filter
+        let category_filter = match category_id {
+            Some(id) => format!("AND a.category_id = '{}'", id.replace("'", "''")),
+            None => String::new(),
+        };
 
         // Get top spending transactions for a given month
         // Spending = WITHDRAWAL activities + DEPOSIT activities with expense categories
@@ -1165,10 +1196,14 @@ impl ActivityRepositoryTrait for ActivityRepository {
                   -- Deposits with expense category only
                   OR (a.activity_type = 'DEPOSIT' AND cat.is_income = 0)
               )
+              {}
+              {}
             ORDER BY ABS(CAST(a.amount AS REAL)) DESC
             LIMIT {}
             "#,
             month.replace("'", "''"),
+            event_filter,
+            category_filter,
             limit
         );
 
@@ -1218,11 +1253,17 @@ impl ActivityRepositoryTrait for ActivityRepository {
         };
 
         // Get daily spending aggregated by day of month
+        // WITHDRAWAL adds to spending, DEPOSIT with expense category subtracts (e.g., refunds)
         let data_sql = format!(
             r#"
             SELECT
                 CAST(strftime('%d', a.activity_date) AS INTEGER) as day,
-                SUM(ABS(CAST(a.amount AS REAL))) as amount
+                SUM(
+                    CASE
+                        WHEN a.activity_type = 'DEPOSIT' THEN -ABS(CAST(a.amount AS REAL))
+                        ELSE ABS(CAST(a.amount AS REAL))
+                    END
+                ) as amount
             FROM activities a
             INNER JOIN accounts acc ON a.account_id = acc.id
             LEFT JOIN categories cat ON a.category_id = cat.id
@@ -1249,15 +1290,40 @@ impl ActivityRepositoryTrait for ActivityRepository {
         Ok(results)
     }
 
-    fn get_month_transaction_amounts(&self, month: &str) -> Result<Vec<f64>> {
+    fn get_month_transaction_amounts(
+        &self,
+        month: &str,
+        include_event_ids: Option<&[String]>,
+        include_all_events: bool,
+    ) -> Result<Vec<f64>> {
         use diesel::sql_query;
         let mut conn = get_connection(&self.pool)?;
 
+        // Event inclusion filter: by default excludes all event transactions
+        let event_filter = if include_all_events {
+            String::new()
+        } else {
+            match include_event_ids {
+                Some(ids) if !ids.is_empty() => {
+                    let escaped: Vec<String> = ids.iter().map(|id| id.replace("'", "''")).collect();
+                    format!(
+                        "AND (a.event_id IS NULL OR a.event_id IN ('{}'))",
+                        escaped.join("','")
+                    )
+                }
+                _ => "AND a.event_id IS NULL".to_string(),
+            }
+        };
+
         // Get all spending transaction amounts for the month
+        // WITHDRAWAL adds to spending, DEPOSIT with expense category subtracts (e.g., refunds)
         let data_sql = format!(
             r#"
             SELECT
-                ABS(CAST(a.amount AS REAL)) as amount
+                CASE
+                    WHEN a.activity_type = 'DEPOSIT' THEN -ABS(CAST(a.amount AS REAL))
+                    ELSE ABS(CAST(a.amount AS REAL))
+                END as amount
             FROM activities a
             INNER JOIN accounts acc ON a.account_id = acc.id
             LEFT JOIN categories cat ON a.category_id = cat.id
@@ -1268,9 +1334,11 @@ impl ActivityRepositoryTrait for ActivityRepository {
                   a.activity_type = 'WITHDRAWAL'
                   OR (a.activity_type = 'DEPOSIT' AND cat.is_income = 0)
               )
+              {}
             ORDER BY amount ASC
             "#,
-            month.replace("'", "''")
+            month.replace("'", "''"),
+            event_filter
         );
 
         #[derive(QueryableByName, Debug)]
@@ -1283,15 +1351,43 @@ impl ActivityRepositoryTrait for ActivityRepository {
         Ok(results.into_iter().map(|r| r.amount).collect())
     }
 
-    fn get_month_recurrence_totals(&self, month: &str) -> Result<RecurrenceBreakdown> {
+    fn get_month_recurrence_totals(
+        &self,
+        month: &str,
+        include_event_ids: Option<&[String]>,
+        include_all_events: bool,
+    ) -> Result<RecurrenceBreakdown> {
         use diesel::sql_query;
         let mut conn = get_connection(&self.pool)?;
 
+        // Build event filter clause
+        let event_filter = if include_all_events {
+            String::new()
+        } else {
+            match include_event_ids {
+                Some(ids) if !ids.is_empty() => {
+                    let escaped: Vec<String> =
+                        ids.iter().map(|id| id.replace("'", "''")).collect();
+                    format!(
+                        "AND (a.event_id IS NULL OR a.event_id IN ('{}'))",
+                        escaped.join("','")
+                    )
+                }
+                _ => "AND a.event_id IS NULL".to_string(),
+            }
+        };
+
+        // WITHDRAWAL adds to spending, DEPOSIT with expense category subtracts (e.g., refunds)
         let data_sql = format!(
             r#"
             SELECT
                 COALESCE(a.recurrence, 'none') as recurrence_type,
-                COALESCE(SUM(ABS(CAST(a.amount AS REAL))), 0.0) as total
+                COALESCE(SUM(
+                    CASE
+                        WHEN a.activity_type = 'DEPOSIT' THEN -ABS(CAST(a.amount AS REAL))
+                        ELSE ABS(CAST(a.amount AS REAL))
+                    END
+                ), 0.0) as total
             FROM activities a
             INNER JOIN accounts acc ON a.account_id = acc.id
             LEFT JOIN categories cat ON a.category_id = cat.id
@@ -1302,9 +1398,11 @@ impl ActivityRepositoryTrait for ActivityRepository {
                   a.activity_type = 'WITHDRAWAL'
                   OR (a.activity_type = 'DEPOSIT' AND cat.is_income = 0)
               )
+              {}
             GROUP BY COALESCE(a.recurrence, 'none')
             "#,
-            month.replace("'", "''")
+            month.replace("'", "''"),
+            event_filter
         );
 
         #[derive(QueryableByName, Debug)]

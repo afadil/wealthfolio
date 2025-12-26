@@ -8,6 +8,7 @@ import {
 import type {
   ActivityRule,
   CategoryWithChildren,
+  MatchType,
   NewActivityRule,
   UpdateActivityRule,
   RecurrenceType,
@@ -50,7 +51,7 @@ export function RuleEditModal({
         update: {
           name: values.name,
           pattern: values.pattern,
-          matchType: values.matchType as "contains" | "starts_with" | "exact",
+          matchType: values.matchType as MatchType,
           categoryId: values.categoryId || undefined,
           subCategoryId: values.subCategoryId || undefined,
           activityType: values.activityType || undefined,
@@ -63,7 +64,7 @@ export function RuleEditModal({
       onSave({
         name: values.name,
         pattern: values.pattern,
-        matchType: values.matchType as "contains" | "starts_with" | "exact",
+        matchType: values.matchType as MatchType,
         categoryId: values.categoryId || undefined,
         subCategoryId: values.subCategoryId || undefined,
         activityType: values.activityType || undefined,

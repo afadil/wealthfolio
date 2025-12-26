@@ -221,6 +221,7 @@ impl EventRepositoryTrait for EventRepository {
             String,           // quantity
             String,           // unit_price
             Option<String>,   // amount (direct amount for cash activities)
+            String,           // activity_type
         )> = query
             .select((
                 events::id,
@@ -238,6 +239,7 @@ impl EventRepositoryTrait for EventRepository {
                 activities::quantity,
                 activities::unit_price,
                 activities::amount,
+                activities::activity_type,
             ))
             .order(activities::activity_date.desc())
             .load(&mut conn)?;
@@ -253,12 +255,21 @@ impl EventRepositoryTrait for EventRepository {
                 let quantity = Decimal::from_str(&row.12).unwrap_or(Decimal::ZERO);
                 let unit_price = Decimal::from_str(&row.13).unwrap_or(Decimal::ZERO);
                 let calculated_amount = quantity * unit_price;
+                let activity_type = &row.15;
 
                 // Use direct amount if it's non-zero, otherwise use calculated amount
-                let amount = if direct_amount != Decimal::ZERO {
+                // For spending calculations:
+                // - DEPOSIT: negative amount (subtracts from spending, e.g., refunds)
+                // - Other types (WITHDRAWAL, etc.): positive amount (adds to spending)
+                let base_amount = if direct_amount != Decimal::ZERO {
                     direct_amount.abs()
                 } else {
                     calculated_amount.abs()
+                };
+                let amount = if activity_type == "DEPOSIT" {
+                    -base_amount
+                } else {
+                    base_amount
                 };
 
                 EventSpendingData {

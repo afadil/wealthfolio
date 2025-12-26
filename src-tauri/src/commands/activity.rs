@@ -6,8 +6,10 @@ use log::debug;
 use rust_decimal::prelude::FromPrimitive;
 use tauri::{AppHandle, State};
 use wealthfolio_core::activities::{
-    Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityImport,
-    ActivitySearchResponse, ActivityUpdate, ImportMappingData, NewActivity, Sort,
+    Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityDetails,
+    ActivityImport, ActivitySearchResponse, ActivityUpdate, ImportMappingData,
+    MonthMetricsRequest, MonthMetricsResponse, NewActivity, Sort, SpendingTrendsRequest,
+    SpendingTrendsResponse,
 };
 
 use serde_json::json;
@@ -267,4 +269,62 @@ pub async fn import_activities(
     );
 
     Ok(result)
+}
+
+#[tauri::command]
+pub async fn get_top_spending_transactions(
+    month: String,
+    limit: i64,
+    include_event_ids: Option<Vec<String>>,
+    include_all_events: Option<bool>,
+    category_id: Option<String>,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<ActivityDetails>, String> {
+    debug!("Getting top spending transactions for month: {}", month);
+    state
+        .activity_service()
+        .get_top_spending_transactions(month, limit, include_event_ids, include_all_events.unwrap_or(false), category_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_spending_trends(
+    month: String,
+    category_ids: Option<Vec<String>>,
+    subcategory_ids: Option<Vec<String>>,
+    include_event_ids: Option<Vec<String>>,
+    include_all_events: Option<bool>,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<SpendingTrendsResponse, String> {
+    debug!("Getting spending trends for month: {}", month);
+    let request = SpendingTrendsRequest {
+        month,
+        category_ids,
+        subcategory_ids,
+        include_event_ids,
+        include_all_events: include_all_events.unwrap_or(false),
+    };
+    state
+        .activity_service()
+        .get_spending_trends(request)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_month_metrics(
+    month: String,
+    include_event_ids: Option<Vec<String>>,
+    include_all_events: Option<bool>,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<MonthMetricsResponse, String> {
+    debug!("Getting month metrics for: {}", month);
+    let request = MonthMetricsRequest {
+        month,
+        include_event_ids,
+        include_all_events: include_all_events.unwrap_or(false),
+    };
+    state
+        .activity_service()
+        .get_month_metrics(request)
+        .map_err(|e| e.to_string())
 }

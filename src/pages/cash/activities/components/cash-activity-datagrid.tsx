@@ -31,8 +31,9 @@ import {
   RecurrenceType,
   RECURRENCE_TYPES,
 } from "@/lib/types";
-import { cn, formatDateTimeDisplay, formatDateTimeLocal } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { EditableCell } from "@/pages/activity/components/activity-datagrid/editable-cell";
+import { DateTimeCell } from "@/pages/activity/components/activity-datagrid/date-time-cell";
 import { SelectCell } from "@/pages/activity/components/activity-datagrid/select-cell";
 import { ActivityTypeBadge } from "@/pages/activity/components/activity-type-badge";
 import { useActivityMutations } from "@/pages/activity/hooks/use-activity-mutations";
@@ -553,7 +554,8 @@ export function CashActivityDatagrid({
       const duplicated: LocalTransaction = {
         ...source,
         id: generateTempActivityId(),
-        date: now,
+        // Preserve the original date from the source transaction
+        date: source.date,
         createdAt: now,
         updatedAt: now,
         isNew: true,
@@ -1609,14 +1611,12 @@ const TransactionRow = memo(
           />
         </TableCell>
         <TableCell className="h-9 border-r px-0 py-0">
-          <EditableCell
-            value={formatDateTimeLocal(transaction.date)}
-            displayValue={formatDateTimeDisplay(transaction.date)}
+          <DateTimeCell
+            value={transaction.date instanceof Date ? transaction.date : new Date(transaction.date)}
             onChange={(value) => onUpdateTransaction(transaction.id, "date", value)}
             onFocus={() => handleFocus("date")}
             onNavigate={onNavigate}
             isFocused={focusedField === "date"}
-            type="datetime-local"
             className="font-mono"
           />
         </TableCell>

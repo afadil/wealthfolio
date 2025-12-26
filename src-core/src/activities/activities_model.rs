@@ -891,6 +891,11 @@ pub struct SpendingTrendsResponse {
 pub struct MonthMetricsRequest {
     /// Target month in YYYY-MM format
     pub month: String,
+    /// Optional list of event IDs to include (if empty/None, excludes all event transactions by default)
+    pub include_event_ids: Option<Vec<String>>,
+    /// If true, include all event transactions (overrides include_event_ids)
+    #[serde(default)]
+    pub include_all_events: bool,
 }
 
 /// Response for month metrics

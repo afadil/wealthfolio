@@ -77,7 +77,14 @@ pub trait ActivityRepositoryTrait: Send + Sync {
     fn get_cash_income_activities_data(&self) -> Result<Vec<CashIncomeData>>;
     fn get_investment_account_deposits_data(&self) -> Result<Vec<InvestmentAccountDepositData>>;
     fn get_capital_gains_data(&self) -> Result<Vec<CapitalGainsData>>;
-    fn get_top_spending_transactions(&self, month: &str, limit: i64) -> Result<Vec<ActivityDetails>>;
+    fn get_top_spending_transactions(
+        &self,
+        month: &str,
+        limit: i64,
+        include_event_ids: Option<&[String]>,
+        include_all_events: bool,
+        category_id: Option<&str>,
+    ) -> Result<Vec<ActivityDetails>>;
     fn get_daily_spending_for_month(
         &self,
         month: &str,
@@ -86,8 +93,18 @@ pub trait ActivityRepositoryTrait: Send + Sync {
         include_event_ids: Option<&[String]>,
         include_all_events: bool,
     ) -> Result<Vec<DailySpendingRow>>;
-    fn get_month_transaction_amounts(&self, month: &str) -> Result<Vec<f64>>;
-    fn get_month_recurrence_totals(&self, month: &str) -> Result<RecurrenceBreakdown>;
+    fn get_month_transaction_amounts(
+        &self,
+        month: &str,
+        include_event_ids: Option<&[String]>,
+        include_all_events: bool,
+    ) -> Result<Vec<f64>>;
+    fn get_month_recurrence_totals(
+        &self,
+        month: &str,
+        include_event_ids: Option<&[String]>,
+        include_all_events: bool,
+    ) -> Result<RecurrenceBreakdown>;
 }
 
 /// Trait defining the contract for Activity service operations.
@@ -145,7 +162,14 @@ pub trait ActivityServiceTrait: Send + Sync {
         &self,
         mapping_data: ImportMappingData,
     ) -> Result<ImportMappingData>;
-    fn get_top_spending_transactions(&self, month: String, limit: i64) -> Result<Vec<ActivityDetails>>;
+    fn get_top_spending_transactions(
+        &self,
+        month: String,
+        limit: i64,
+        include_event_ids: Option<Vec<String>>,
+        include_all_events: bool,
+        category_id: Option<String>,
+    ) -> Result<Vec<ActivityDetails>>;
     fn get_spending_trends(&self, request: SpendingTrendsRequest) -> Result<SpendingTrendsResponse>;
     fn get_month_metrics(&self, request: MonthMetricsRequest) -> Result<MonthMetricsResponse>;
 }

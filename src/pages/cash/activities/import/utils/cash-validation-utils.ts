@@ -302,6 +302,7 @@ export function convertCashImportRowToActivity(
     categoryId: row.categoryId,
     subCategoryId: row.subCategoryId,
     eventId: row.eventId,
+    recurrence: row.recurrence,
     errors: row.errors,
   };
 }

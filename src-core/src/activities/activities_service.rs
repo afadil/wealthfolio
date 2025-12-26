@@ -471,8 +471,21 @@ impl ActivityServiceTrait for ActivityService {
     }
 
     /// Gets top spending transactions for a given month
-    fn get_top_spending_transactions(&self, month: String, limit: i64) -> Result<Vec<ActivityDetails>> {
-        self.activity_repository.get_top_spending_transactions(&month, limit)
+    fn get_top_spending_transactions(
+        &self,
+        month: String,
+        limit: i64,
+        include_event_ids: Option<Vec<String>>,
+        include_all_events: bool,
+        category_id: Option<String>,
+    ) -> Result<Vec<ActivityDetails>> {
+        self.activity_repository.get_top_spending_transactions(
+            &month,
+            limit,
+            include_event_ids.as_deref(),
+            include_all_events,
+            category_id.as_deref(),
+        )
     }
 
     /// Gets spending trends for a given month with comparison to historical averages
@@ -583,7 +596,11 @@ impl ActivityServiceTrait for ActivityService {
             .map_err(|e| crate::Error::from(ActivityError::InvalidData(format!("Invalid month format: {}", e))))?;
 
         // Get transaction amounts for current month
-        let amounts = self.activity_repository.get_month_transaction_amounts(&request.month)?;
+        let amounts = self.activity_repository.get_month_transaction_amounts(
+            &request.month,
+            request.include_event_ids.as_deref(),
+            request.include_all_events,
+        )?;
 
         let count = amounts.len() as i64;
         let total: f64 = amounts.iter().sum();
@@ -607,7 +624,11 @@ impl ActivityServiceTrait for ActivityService {
             .unwrap_or(target_date);
         let prev_month = format!("{}-{:02}", prev_date.year(), prev_date.month());
 
-        let prev_amounts = self.activity_repository.get_month_transaction_amounts(&prev_month)?;
+        let prev_amounts = self.activity_repository.get_month_transaction_amounts(
+            &prev_month,
+            request.include_event_ids.as_deref(),
+            request.include_all_events,
+        )?;
         let prev_count = prev_amounts.len() as i64;
         let prev_total: f64 = prev_amounts.iter().sum();
         let prev_avg = if prev_count > 0 { prev_total / prev_count as f64 } else { 0.0 };
@@ -622,7 +643,11 @@ impl ActivityServiceTrait for ActivityService {
             None
         };
 
-        let recurrence_breakdown = self.activity_repository.get_month_recurrence_totals(&request.month)?;
+        let recurrence_breakdown = self.activity_repository.get_month_recurrence_totals(
+            &request.month,
+            request.include_event_ids.as_deref(),
+            request.include_all_events,
+        )?;
 
         Ok(MonthMetricsResponse {
             avg_transaction_size: avg,

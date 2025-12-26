@@ -186,6 +186,9 @@ pub fn run() {
             commands::activity::import_activities,
             commands::activity::get_account_import_mapping,
             commands::activity::save_account_import_mapping,
+            commands::activity::get_top_spending_transactions,
+            commands::activity::get_spending_trends,
+            commands::activity::get_month_metrics,
             // Settings commands
             commands::settings::get_settings,
             commands::settings::is_auto_update_check_enabled,

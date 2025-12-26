@@ -746,7 +746,7 @@ export interface ActivityRule {
   id: string;
   name: string;
   pattern: string;
-  matchType: "contains" | "starts_with" | "exact";
+  matchType: MatchType;
   categoryId?: string;
   subCategoryId?: string;
   activityType?: string;
@@ -767,7 +767,7 @@ export interface ActivityRuleWithNames extends ActivityRule {
 export interface NewActivityRule {
   name: string;
   pattern: string;
-  matchType: "contains" | "starts_with" | "exact";
+  matchType: MatchType;
   categoryId?: string;
   subCategoryId?: string;
   activityType?: string;
@@ -780,7 +780,7 @@ export interface NewActivityRule {
 export interface UpdateActivityRule {
   name?: string;
   pattern?: string;
-  matchType?: string;
+  matchType?: MatchType;
   categoryId?: string;
   subCategoryId?: string;
   activityType?: string;

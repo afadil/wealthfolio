@@ -372,8 +372,7 @@ export const invokeWeb = async <T>(
       break;
     }
     case "get_top_spending_transactions": {
-      const { month, limit } = payload as { month: string; limit: number };
-      body = JSON.stringify({ month, limit });
+      body = JSON.stringify(payload);
       break;
     }
     case "get_spending_trends": {

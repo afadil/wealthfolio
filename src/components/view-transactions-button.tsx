@@ -10,41 +10,58 @@ interface ViewTransactionsButtonProps {
   };
   /** Navigate to activities filtered by event ID */
   eventId?: string;
+  /** Navigate to activities filtered by category ID */
+  categoryId?: string;
   /** Custom class name */
   className?: string;
+  /** Button size */
+  size?: "default" | "sm" | "lg" | "icon";
   /** Callback before navigation (e.g., to close a modal) */
   onBeforeNavigate?: () => void;
+  /** Custom button text */
+  children?: React.ReactNode;
 }
 
 export function ViewTransactionsButton({
   dateRange,
   eventId,
+  categoryId,
   className,
+  size = "sm",
   onBeforeNavigate,
+  children,
 }: ViewTransactionsButtonProps) {
   const navigate = useNavigate();
 
   const handleClick = () => {
     onBeforeNavigate?.();
 
+    const params = new URLSearchParams();
+    params.set("tab", "cash");
+
     if (eventId) {
-      navigate(`/activity?tab=cash&event=${eventId}`);
-    } else if (dateRange) {
-      navigate(
-        `/activity?tab=cash&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`,
-      );
+      params.set("event", eventId);
     }
+    if (categoryId) {
+      params.set("category", categoryId);
+    }
+    if (dateRange) {
+      params.set("startDate", dateRange.startDate);
+      params.set("endDate", dateRange.endDate);
+    }
+
+    navigate(`/activity?${params.toString()}`);
   };
 
   return (
     <Button
       variant="outline"
-      size="sm"
+      size={size}
       className={className ?? "w-full gap-2"}
       onClick={handleClick}
     >
       <ExternalLink className="h-4 w-4" />
-      View All Transactions
+      {children || "View All Transactions"}
     </Button>
   );
 }

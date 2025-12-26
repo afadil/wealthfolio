@@ -27,13 +27,13 @@ import { RECURRENCE_TYPES } from "@/lib/types";
 import { testActivityRulePattern } from "@/commands/activity-rule";
 import { ActivityType, ActivityTypeNames } from "@/lib/constants";
 
-type FormMatchType = "contains" | "starts_with" | "exact";
+type FormMatchType = "contains" | "starts_with" | "exact" | "regex";
 
 const ruleFormSchema = z
   .object({
     name: z.string().min(1, "Name is required"),
     pattern: z.string().min(1, "Pattern is required"),
-    matchType: z.enum(["contains", "starts_with", "exact"]),
+    matchType: z.enum(["contains", "starts_with", "exact", "regex"]),
     categoryId: z.string().optional(),
     subCategoryId: z.string().optional(),
     activityType: z.string().optional(),
@@ -71,6 +71,7 @@ const MATCH_TYPE_OPTIONS: { value: FormMatchType; label: string; description: st
   { value: "contains", label: "Contains", description: "Pattern found anywhere in text" },
   { value: "starts_with", label: "Starts with", description: "Text begins with pattern" },
   { value: "exact", label: "Exact match", description: "Text matches pattern exactly" },
+  { value: "regex", label: "Regex", description: "Use | for OR (e.g., walmart|costco|target)" },
 ];
 
 export function RuleForm({ rule, categories, onSubmit, onCancel, isLoading }: RuleFormProps) {
@@ -170,8 +171,20 @@ export function RuleForm({ rule, categories, onSubmit, onCancel, isLoading }: Ru
             <FormItem>
               <FormLabel>Pattern</FormLabel>
               <FormControl>
-                <Input placeholder="e.g., walmart" {...field} />
+                <Input
+                  placeholder={
+                    form.watch("matchType") === "regex"
+                      ? "e.g., walmart|costco|target"
+                      : "e.g., walmart"
+                  }
+                  {...field}
+                />
               </FormControl>
+              {form.watch("matchType") === "regex" && (
+                <FormDescription>
+                  Use | for OR matching (e.g., netflix|spotify|hulu matches any of these)
+                </FormDescription>
+              )}
               <FormMessage />
             </FormItem>
           )}
@@ -210,13 +223,19 @@ export function RuleForm({ rule, categories, onSubmit, onCancel, isLoading }: Ru
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Activity Type</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value || ""}>
+                <Select
+                  onValueChange={(val) => field.onChange(val === "__none__" ? "" : val)}
+                  value={field.value || ""}
+                >
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select activity type" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
+                    <SelectItem value="__none__">
+                      <span className="text-muted-foreground">None</span>
+                    </SelectItem>
                     {RULE_ACTIVITY_TYPE_OPTIONS.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
                         {opt.label}
@@ -235,13 +254,19 @@ export function RuleForm({ rule, categories, onSubmit, onCancel, isLoading }: Ru
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Recurrence</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value || ""}>
+                <Select
+                  onValueChange={(val) => field.onChange(val === "__none__" ? undefined : val)}
+                  value={field.value || ""}
+                >
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select recurrence" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
+                    <SelectItem value="__none__">
+                      <span className="text-muted-foreground">None</span>
+                    </SelectItem>
                     {RECURRENCE_TYPES.map((type) => (
                       <SelectItem key={type} value={type}>
                         {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -262,13 +287,19 @@ export function RuleForm({ rule, categories, onSubmit, onCancel, isLoading }: Ru
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Category</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value || ""}>
+                <Select
+                  onValueChange={(val) => field.onChange(val === "__none__" ? "" : val)}
+                  value={field.value || ""}
+                >
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
+                    <SelectItem value="__none__">
+                      <span className="text-muted-foreground">None</span>
+                    </SelectItem>
                     {categories.map((cat) => (
                       <SelectItem key={cat.id} value={cat.id}>
                         <div className="flex items-center gap-2">
@@ -296,7 +327,7 @@ export function RuleForm({ rule, categories, onSubmit, onCancel, isLoading }: Ru
               <FormItem>
                 <FormLabel>Subcategory</FormLabel>
                 <Select
-                  onValueChange={field.onChange}
+                  onValueChange={(val) => field.onChange(val === "__none__" ? undefined : val)}
                   value={field.value || ""}
                   disabled={subCategories.length === 0}
                 >
@@ -306,6 +337,9 @@ export function RuleForm({ rule, categories, onSubmit, onCancel, isLoading }: Ru
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
+                    <SelectItem value="__none__">
+                      <span className="text-muted-foreground">None</span>
+                    </SelectItem>
                     {subCategories.map((cat) => (
                       <SelectItem key={cat.id} value={cat.id}>
                         {cat.name}

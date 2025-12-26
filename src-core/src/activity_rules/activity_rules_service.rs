@@ -5,6 +5,7 @@ use crate::activity_rules::activity_rules_model::{
 use crate::activity_rules::activity_rules_traits::{ActivityRuleRepositoryTrait, ActivityRuleServiceTrait};
 use crate::errors::{Error, Result, ValidationError};
 use async_trait::async_trait;
+use regex::Regex;
 use std::sync::Arc;
 
 pub struct ActivityRuleService<R: ActivityRuleRepositoryTrait, C: CategoryRepositoryTrait> {
@@ -165,6 +166,12 @@ impl<R: ActivityRuleRepositoryTrait + Send + Sync, C: CategoryRepositoryTrait + 
             MatchType::Contains => normalized_text.contains(&normalized_pattern),
             MatchType::StartsWith => normalized_text.starts_with(&normalized_pattern),
             MatchType::Exact => normalized_text == normalized_pattern,
+            MatchType::Regex => {
+                let pattern_with_flags = format!("(?i){}", pattern.trim());
+                Regex::new(&pattern_with_flags)
+                    .map(|re| re.is_match(test_text.trim()))
+                    .unwrap_or(false)
+            }
         };
 
         Ok(result)

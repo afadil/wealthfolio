@@ -282,7 +282,7 @@ export default function IncomePage({ renderActions }: IncomePageProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col space-y-6 px-2 pt-2 pb-2 lg:px-4 lg:pb-4">
       <div className="grid gap-6 md:grid-cols-3">
-        <Card className="border-yellow-500/10 bg-yellow-500/10">
+        <Card className="border-green-500/10 bg-green-500/10">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
               {selectedPeriod === "TOTAL"
@@ -349,7 +349,7 @@ export default function IncomePage({ renderActions }: IncomePageProps) {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-yellow-500/10 bg-yellow-500/10">
+        <Card className="border-green-500/10 bg-green-500/10">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Monthly Average</CardTitle>
             <Icons.DollarSign className="text-muted-foreground h-4 w-4" />
@@ -368,7 +368,7 @@ export default function IncomePage({ renderActions }: IncomePageProps) {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-yellow-500/10 bg-yellow-500/10">
+        <Card className="border-green-500/10 bg-green-500/10">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Income Sources</CardTitle>
             <Icons.PieChart className="text-muted-foreground h-4 w-4" />

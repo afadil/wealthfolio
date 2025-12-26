@@ -300,10 +300,11 @@ export function EventTimeline({
   }, [selectedEventId, filteredEvents]);
 
   // Prepare chart data for selected event
+  // For pie chart, we show absolute spending values (withdrawals add, deposits shown separately or as reduction)
   const categoryChartData = useMemo(() => {
     if (!selectedEvent) return [];
     return Object.values(selectedEvent.byCategory)
-      .filter((cat) => cat.amount > 0)
+      .filter((cat) => cat.amount > 0) // Only show categories with net positive spending
       .sort((a, b) => b.amount - a.amount)
       .map((cat, index) => ({
         name: cat.categoryName,
@@ -312,15 +313,22 @@ export function EventTimeline({
       }));
   }, [selectedEvent]);
 
+  // Convert daily spending to cumulative for the line chart
   const spendingTimelineData = useMemo(() => {
     if (!selectedEvent || !selectedEvent.dailySpending) return [];
-    return Object.entries(selectedEvent.dailySpending)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, amount]) => ({
+    const sortedEntries = Object.entries(selectedEvent.dailySpending).sort(([a], [b]) =>
+      a.localeCompare(b),
+    );
+
+    let cumulative = 0;
+    return sortedEntries.map(([date, amount]) => {
+      cumulative += amount;
+      return {
         date,
         dateLabel: format(parseISO(date), "MMM d"),
-        amount,
-      }));
+        amount: cumulative,
+      };
+    });
   }, [selectedEvent]);
 
   const handleEventClick = (eventId: string) => {

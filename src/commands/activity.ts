@@ -184,13 +184,23 @@ export const deleteActivity = async (activityId: string): Promise<Activity> => {
 export const getTopSpendingTransactions = async (
   month: string,
   limit: number,
+  includeEventIds?: string[],
+  includeAllEvents?: boolean,
+  categoryId?: string,
 ): Promise<ActivityDetails[]> => {
   try {
+    const request = {
+      month,
+      limit,
+      includeEventIds,
+      includeAllEvents: includeAllEvents ?? false,
+      categoryId,
+    };
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri("get_top_spending_transactions", { month, limit });
+        return invokeTauri("get_top_spending_transactions", request);
       case RUN_ENV.WEB:
-        return invokeWeb("get_top_spending_transactions", { month, limit });
+        return invokeWeb("get_top_spending_transactions", request);
       default:
         throw new Error(`Unsupported`);
     }
@@ -229,9 +239,17 @@ export const getSpendingTrends = async (
   }
 };
 
-export const getMonthMetrics = async (month: string): Promise<MonthMetricsResponse> => {
+export const getMonthMetrics = async (
+  month: string,
+  includeEventIds?: string[],
+  includeAllEvents?: boolean,
+): Promise<MonthMetricsResponse> => {
   try {
-    const request = { month };
+    const request = {
+      month,
+      includeEventIds,
+      includeAllEvents: includeAllEvents ?? false,
+    };
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri("get_month_metrics", request);

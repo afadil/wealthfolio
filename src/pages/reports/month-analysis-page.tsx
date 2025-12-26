@@ -1,23 +1,27 @@
 import { getIncomeSummary, getSpendingSummary } from "@/commands/portfolio";
 import { getTopSpendingTransactions } from "@/commands/activity";
-import { getBudgetVsActual } from "@/commands/budget";
+import { getEventsWithNames } from "@/commands/event";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Icons } from "@/components/ui/icons";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { QueryKeys } from "@/lib/query-keys";
-import type { IncomeSummary, SpendingSummary, ActivityDetails, BudgetVsActual } from "@/lib/types";
+import type { IncomeSummary, SpendingSummary, ActivityDetails, EventWithTypeName } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { AmountDisplay, formatPercent } from "@wealthfolio/ui";
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { format, subMonths } from "date-fns";
 import { Link } from "react-router-dom";
 import { MonthSwitcher, getDefaultReportMonth } from "./components/month-switcher";
 import { SpendingTrendsChart } from "./components/spending-trends-chart";
 import { CategoryBreakdownPanel } from "./components/category-breakdown-panel";
 import { MonthMetricsPanel } from "./components/month-metrics-panel";
-import { BudgetVsActualCard } from "./components/budget-vs-actual-card";
+import { NotableChangesPanel } from "./components/notable-changes-panel";
+import { LargestTransactionsPanel } from "./components/largest-transactions-panel";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { DataTableFacetedFilter } from "@/pages/activity/components/activity-datagrid/data-table-faceted-filter";
+
+const INCLUDE_ALL_EVENTS_VALUE = "__include_all_events__";
 
 interface MonthAnalysisPageProps {
   renderActions?: (actions: React.ReactNode) => void;
@@ -26,9 +30,51 @@ interface MonthAnalysisPageProps {
 export default function MonthAnalysisPage({ renderActions }: MonthAnalysisPageProps) {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [hasInitialized, setHasInitialized] = useState(false);
+  const [selectedEventValues, setSelectedEventValues] = useState<Set<string>>(new Set());
   const { isBalanceHidden } = useBalancePrivacy();
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
+
+  // Fetch events for filter
+  const { data: events = [] } = useQuery<EventWithTypeName[], Error>({
+    queryKey: [QueryKeys.EVENTS_WITH_NAMES],
+    queryFn: getEventsWithNames,
+  });
+
+  // Derive event filter params from selection
+  const includeAllEvents = selectedEventValues.has(INCLUDE_ALL_EVENTS_VALUE);
+  const includeEventIds = useMemo(() => {
+    const ids: string[] = [];
+    selectedEventValues.forEach((v) => {
+      if (v !== INCLUDE_ALL_EVENTS_VALUE) {
+        ids.push(v);
+      }
+    });
+    return ids.length > 0 ? ids : undefined;
+  }, [selectedEventValues]);
+
+  const handleEventFilterChange = useCallback((values: Set<string>) => {
+    const wasIncludeAll = selectedEventValues.has(INCLUDE_ALL_EVENTS_VALUE);
+    const isIncludeAll = values.has(INCLUDE_ALL_EVENTS_VALUE);
+
+    if (isIncludeAll && !wasIncludeAll) {
+      setSelectedEventValues(new Set([INCLUDE_ALL_EVENTS_VALUE]));
+    } else if (isIncludeAll && values.size > 1) {
+      const newValues = new Set(values);
+      newValues.delete(INCLUDE_ALL_EVENTS_VALUE);
+      setSelectedEventValues(newValues);
+    } else {
+      setSelectedEventValues(values);
+    }
+  }, [selectedEventValues]);
+
+  const eventOptions = useMemo(() => {
+    const eventsAsOptions = events.map((event) => ({
+      value: event.id,
+      label: event.name,
+    }));
+    return [{ value: INCLUDE_ALL_EVENTS_VALUE, label: "Include All Events" }, ...eventsAsOptions];
+  }, [events]);
 
   const { data: spendingData, isLoading: isSpendingLoading } = useQuery<SpendingSummary[]>({
     queryKey: [QueryKeys.SPENDING_SUMMARY],
@@ -40,17 +86,15 @@ export default function MonthAnalysisPage({ renderActions }: MonthAnalysisPagePr
     queryFn: getIncomeSummary,
   });
 
-  // Fetch top 5 spending transactions from backend
+  // Fetch top 5 spending transactions from backend (with event filter)
   const { data: topTransactions, isLoading: isTransactionsLoading } = useQuery<ActivityDetails[]>({
-    queryKey: ["top-spending-transactions", selectedMonth],
-    queryFn: () => getTopSpendingTransactions(selectedMonth!, 5),
-    enabled: !!selectedMonth,
-  });
-
-  // Fetch budget vs actual data
-  const { data: budgetData, isLoading: isBudgetLoading } = useQuery<BudgetVsActual>({
-    queryKey: [QueryKeys.BUDGET_VS_ACTUAL, selectedMonth],
-    queryFn: () => getBudgetVsActual(selectedMonth!),
+    queryKey: ["top-spending-transactions", selectedMonth, includeEventIds, includeAllEvents],
+    queryFn: () => getTopSpendingTransactions(
+      selectedMonth!,
+      5,
+      includeAllEvents ? undefined : includeEventIds,
+      includeAllEvents
+    ),
     enabled: !!selectedMonth,
   });
 
@@ -78,22 +122,6 @@ export default function MonthAnalysisPage({ renderActions }: MonthAnalysisPagePr
       prevSpending > 0 ? ((spending - prevSpending) / prevSpending) * 100 : null;
     const incomeChange = prevIncome > 0 ? ((income - prevIncome) / prevIncome) * 100 : null;
 
-    const categoryBreakdown = totalSummary.byMonthByCategory?.[selectedMonth] || {};
-    const categorySpending = totalSummary.byCategory || {};
-
-    const categories = Object.entries(categoryBreakdown)
-      .map(([categoryId, amount]) => {
-        const categoryInfo = categorySpending[categoryId];
-        return {
-          categoryId,
-          categoryName: categoryInfo?.categoryName || "Uncategorized",
-          color: categoryInfo?.color || null,
-          amount: amount as number,
-        };
-      })
-      .filter((c) => c.amount > 0)
-      .sort((a, b) => b.amount - a.amount);
-
     return {
       spending,
       income,
@@ -101,7 +129,6 @@ export default function MonthAnalysisPage({ renderActions }: MonthAnalysisPagePr
       savingsRate,
       spendingChange,
       incomeChange,
-      categories,
     };
   }, [totalSummary, totalIncomeSummary, selectedMonth]);
 
@@ -172,6 +199,7 @@ export default function MonthAnalysisPage({ renderActions }: MonthAnalysisPagePr
 
   return (
     <div className="flex min-h-0 flex-1 flex-col space-y-6 px-2 pt-2 pb-2 lg:px-4 lg:pb-4">
+      {/* Top Stats Row */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -256,36 +284,69 @@ export default function MonthAnalysisPage({ renderActions }: MonthAnalysisPagePr
         </Card>
       </div>
 
+      {/* Page-wide Events Filter */}
+      {events.length > 0 && (
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground text-sm">Events:</span>
+          <DataTableFacetedFilter
+            title="Include Events"
+            options={eventOptions}
+            selectedValues={selectedEventValues}
+            onFilterChange={handleEventFilterChange}
+          />
+          {selectedEventValues.size > 0 && (
+            <button
+              onClick={() => setSelectedEventValues(new Set())}
+              className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs"
+            >
+              Reset
+              <Icons.Close className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Spending Trends Chart */}
       <SpendingTrendsChart
         selectedMonth={selectedMonth}
         currency={baseCurrency}
         isHidden={isBalanceHidden}
+        includeEventIds={includeAllEvents ? undefined : includeEventIds}
+        includeAllEvents={includeAllEvents}
       />
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <div className="space-y-6">
-          <CategoryBreakdownPanel
-            spendingData={totalSummary}
-            selectedMonth={selectedMonth}
-            currency={baseCurrency}
-            isHidden={isBalanceHidden}
-            budgetData={budgetData}
-          />
-          <BudgetVsActualCard
-            budgetData={budgetData}
-            currency={baseCurrency}
-            isLoading={isBudgetLoading}
-          />
-        </div>
+      {/* Row 1: Notable Changes | Transaction Metrics | Largest Transactions */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <NotableChangesPanel
+          spendingData={totalSummary}
+          selectedMonth={selectedMonth}
+          currency={baseCurrency}
+        />
 
         <MonthMetricsPanel
           selectedMonth={selectedMonth}
           currency={baseCurrency}
           isHidden={isBalanceHidden}
+          includeEventIds={includeAllEvents ? undefined : includeEventIds}
+          includeAllEvents={includeAllEvents}
+        />
+
+        <LargestTransactionsPanel
+          selectedMonth={selectedMonth}
+          currency={baseCurrency}
           topTransactions={topTransactions ?? []}
-          isTransactionsLoading={isTransactionsLoading}
+          isLoading={isTransactionsLoading}
         />
       </div>
+
+      {/* Row 2: Category Breakdown (full width) */}
+      <CategoryBreakdownPanel
+        spendingData={totalSummary}
+        selectedMonth={selectedMonth}
+        currency={baseCurrency}
+        includeEventIds={includeAllEvents ? undefined : includeEventIds}
+        includeAllEvents={includeAllEvents}
+      />
     </div>
   );
 }
@@ -314,58 +375,34 @@ function MonthAnalysisSkeleton() {
         </CardHeader>
         <CardContent>
           <Skeleton className="h-[250px] w-full" />
-          <div className="mt-2 flex items-center justify-between">
-            <Skeleton className="h-3 w-24" />
-            <Skeleton className="h-3 w-16" />
+        </CardContent>
+      </Card>
+      <div className="grid gap-4 md:grid-cols-3">
+        {[...Array(3)].map((_, i) => (
+          <Card key={i}>
+            <CardHeader>
+              <Skeleton className="h-5 w-32" />
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {[...Array(5)].map((_, j) => (
+                <Skeleton key={j} className="h-10 w-full" />
+              ))}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-5 w-40" />
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-6">
+            <Skeleton className="h-[300px] w-[200px] rounded-full" />
+            <Skeleton className="h-[300px] w-[200px] rounded-full" />
+            <Skeleton className="h-[300px] flex-1" />
           </div>
         </CardContent>
       </Card>
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Category Breakdown with Pie Chart */}
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-5 w-32" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-4">
-              <div className="flex-1 space-y-3">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="space-y-1">
-                    <div className="flex justify-between">
-                      <Skeleton className="h-3 w-24" />
-                      <Skeleton className="h-3 w-16" />
-                    </div>
-                    <Skeleton className="h-1.5 w-full" />
-                  </div>
-                ))}
-              </div>
-              <Skeleton className="h-[180px] w-[180px] shrink-0 rounded-full" />
-            </div>
-          </CardContent>
-        </Card>
-        {/* Transaction Metrics with Top Expenses */}
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-5 w-40" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="space-y-1">
-                  <Skeleton className="h-3 w-16" />
-                  <Skeleton className="h-6 w-20" />
-                </div>
-              ))}
-            </div>
-            <Skeleton className="h-px w-full" />
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-10 w-full" />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }

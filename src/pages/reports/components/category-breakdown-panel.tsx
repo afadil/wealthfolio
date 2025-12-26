@@ -1,12 +1,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icons } from "@/components/ui/icons";
-import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
-import { formatAmount, formatPercent, PrivacyAmount } from "@wealthfolio/ui";
-import { useMemo, useState } from "react";
-import { format, subMonths } from "date-fns";
-import type { SpendingSummary, BudgetVsActual, CategoryBudgetVsActual } from "@/lib/types";
-import { ArrowUp, ArrowDown, ChevronDown, ChevronRight } from "lucide-react";
-import { Cell, Pie, PieChart } from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { formatPercent, PrivacyAmount } from "@wealthfolio/ui";
+import { useMemo, useState, useCallback } from "react";
+import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
+import type { SpendingSummary, ActivityDetails } from "@/lib/types";
+import { Cell, Pie, PieChart, Sector } from "recharts";
+import { ViewTransactionsButton } from "@/components/view-transactions-button";
+import { useQuery } from "@tanstack/react-query";
+import { getTopSpendingTransactions } from "@/commands/activity";
+import { Badge } from "@/components/ui/badge";
 
 const CHART_COLORS = [
   "var(--chart-1)",
@@ -19,12 +22,21 @@ const CHART_COLORS = [
   "var(--chart-8)",
 ];
 
+function generateColorShades(baseColor: string, count: number): string[] {
+  const shades: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const opacity = 1 - i * 0.15;
+    shades.push(`color-mix(in srgb, ${baseColor} ${Math.max(opacity * 100, 40)}%, transparent)`);
+  }
+  return shades;
+}
+
 interface CategoryBreakdownPanelProps {
   spendingData: SpendingSummary | null | undefined;
   selectedMonth: string;
   currency: string;
-  isHidden: boolean;
-  budgetData?: BudgetVsActual | null;
+  includeEventIds?: string[];
+  includeAllEvents?: boolean;
 }
 
 interface SubcategoryData {
@@ -33,50 +45,54 @@ interface SubcategoryData {
   amount: number;
 }
 
-interface CategoryWithChange {
+interface CategoryData {
   categoryId: string;
   categoryName: string;
-  color: string | null;
+  color: string;
   amount: number;
-  prevAmount: number;
-  changePercent: number | null;
-  isNew?: boolean;
+  percent: number;
   subcategories: SubcategoryData[];
-  budgetInfo?: CategoryBudgetVsActual;
 }
+
+const renderActiveShape = (props: any) => {
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
+
+  return (
+    <g>
+      <Sector
+        cx={cx}
+        cy={cy}
+        innerRadius={innerRadius}
+        outerRadius={outerRadius + 8}
+        startAngle={startAngle}
+        endAngle={endAngle}
+        fill={fill}
+      />
+    </g>
+  );
+};
 
 export function CategoryBreakdownPanel({
   spendingData,
   selectedMonth,
   currency,
-  isHidden,
-  budgetData,
+  includeEventIds,
+  includeAllEvents = false,
 }: CategoryBreakdownPanelProps) {
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [selectedCategoryIndex, setSelectedCategoryIndex] = useState<number>(0);
 
-  const { allCategories, notableChanges, totalSpending } = useMemo(() => {
+  const { allCategories } = useMemo(() => {
     if (!spendingData || !selectedMonth) {
-      return { allCategories: [], notableChanges: [], totalSpending: 0 };
+      return { allCategories: [], totalSpending: 0 };
     }
 
-    const prevMonth = format(subMonths(new Date(selectedMonth + "-01"), 1), "yyyy-MM");
     const currentBreakdown = spendingData.byMonthByCategory?.[selectedMonth] || {};
-    const prevBreakdown = spendingData.byMonthByCategory?.[prevMonth] || {};
     const categorySpending = spendingData.byCategory || {};
     const monthSubcategories = spendingData.byMonthBySubcategory?.[selectedMonth] || {};
     const subcategoryInfo = spendingData.bySubcategory || {};
 
-    // Create a map of budget data by category for quick lookup
-    const budgetByCategory = new Map<string, CategoryBudgetVsActual>();
-    if (budgetData?.byCategory) {
-      budgetData.byCategory.forEach((cat) => {
-        budgetByCategory.set(cat.categoryId, cat);
-      });
-    }
-
     const total = Object.values(currentBreakdown).reduce((sum, amt) => sum + (amt as number), 0);
 
-    // Build subcategories map by category
     const subcategoriesByCategory = new Map<string, SubcategoryData[]>();
     Object.entries(monthSubcategories).forEach(([subcategoryId, amount]) => {
       if ((amount as number) <= 0) return;
@@ -94,100 +110,72 @@ export function CategoryBreakdownPanel({
       });
     });
 
-    // Sort subcategories by amount
     subcategoriesByCategory.forEach((subs) => {
       subs.sort((a, b) => b.amount - a.amount);
     });
 
-    const categoriesWithChanges: CategoryWithChange[] = Object.entries(currentBreakdown)
-      .map(([categoryId, amount]) => {
+    const categoriesData: CategoryData[] = Object.entries(currentBreakdown)
+      .map(([categoryId, amount], index) => {
         const categoryInfo = categorySpending[categoryId];
-        const prevAmount = (prevBreakdown[categoryId] as number) || 0;
-        const isNew = prevAmount === 0 && (amount as number) > 0;
-        const changePercent =
-          prevAmount > 0 ? (((amount as number) - prevAmount) / prevAmount) * 100 : null;
-
         return {
           categoryId,
           categoryName: categoryInfo?.categoryName || "Uncategorized",
-          color: categoryInfo?.color || null,
+          color: categoryInfo?.color || CHART_COLORS[index % CHART_COLORS.length],
           amount: amount as number,
-          prevAmount,
-          changePercent,
-          isNew,
+          percent: total > 0 ? ((amount as number) / total) * 100 : 0,
           subcategories: subcategoriesByCategory.get(categoryId) || [],
-          budgetInfo: budgetByCategory.get(categoryId),
         };
       })
       .filter((c) => c.amount > 0)
       .sort((a, b) => b.amount - a.amount);
 
-    // Find categories that existed last month but not this month (X → 0)
-    const goneCategories: CategoryWithChange[] = Object.entries(prevBreakdown)
-      .filter(
-        ([categoryId]) =>
-          !currentBreakdown[categoryId] || (currentBreakdown[categoryId] as number) === 0,
-      )
-      .map(([categoryId, prevAmount]) => {
-        const categoryInfo = categorySpending[categoryId];
-        return {
-          categoryId,
-          categoryName: categoryInfo?.categoryName || "Uncategorized",
-          color: categoryInfo?.color || null,
-          amount: 0,
-          prevAmount: prevAmount as number,
-          changePercent: -100,
-          subcategories: [],
-        };
-      })
-      .filter((c) => c.prevAmount > 0);
+    return { allCategories: categoriesData, totalSpending: total };
+  }, [spendingData, selectedMonth]);
 
-    const allChanges = [
-      ...categoriesWithChanges.filter((c) => c.changePercent !== null || c.isNew),
-      ...goneCategories,
-    ];
+  const selectedCategory = allCategories[selectedCategoryIndex] || null;
 
-    const changes = allChanges
-      .sort((a, b) => {
-        const aScore = a.isNew
-          ? Infinity
-          : a.changePercent === -100
-            ? 100
-            : Math.abs(a.changePercent || 0);
-        const bScore = b.isNew
-          ? Infinity
-          : b.changePercent === -100
-            ? 100
-            : Math.abs(b.changePercent || 0);
-        return bScore - aScore;
-      })
-      .slice(0, 5);
+  const selectedCategoryId = selectedCategory?.categoryId;
+  const { data: categoryTransactions = [] } = useQuery<ActivityDetails[]>({
+    queryKey: [
+      "category-transactions",
+      selectedMonth,
+      selectedCategoryId,
+      includeEventIds,
+      includeAllEvents,
+    ],
+    queryFn: () =>
+      getTopSpendingTransactions(
+        selectedMonth,
+        5,
+        includeAllEvents ? undefined : includeEventIds,
+        includeAllEvents,
+        selectedCategoryId
+      ),
+    enabled: !!selectedMonth && !!selectedCategoryId,
+  });
 
-    return { allCategories: categoriesWithChanges, notableChanges: changes, totalSpending: total };
-  }, [spendingData, selectedMonth, budgetData]);
+  const handleCategoryClick = useCallback((_: any, index: number) => {
+    setSelectedCategoryIndex(index);
+  }, []);
 
-  const chartData = useMemo(() => {
-    return allCategories.map((cat, index) => ({
+  const categoryChartData = useMemo(() => {
+    return allCategories.map((cat) => ({
       name: cat.categoryName,
       value: cat.amount,
-      fill: cat.color || CHART_COLORS[index % CHART_COLORS.length],
-      percent: totalSpending > 0 ? (cat.amount / totalSpending) * 100 : 0,
+      fill: cat.color,
     }));
-  }, [allCategories, totalSpending]);
+  }, [allCategories]);
 
-  const maxAmount = allCategories.length > 0 ? allCategories[0].amount : 0;
-
-  const toggleCategory = (categoryId: string) => {
-    setExpandedCategories((prev) => {
-      const next = new Set(prev);
-      if (next.has(categoryId)) {
-        next.delete(categoryId);
-      } else {
-        next.add(categoryId);
-      }
-      return next;
-    });
-  };
+  const subcategoryChartData = useMemo(() => {
+    if (!selectedCategory || selectedCategory.subcategories.length === 0) return [];
+    const shades = generateColorShades(selectedCategory.color, selectedCategory.subcategories.length);
+    return selectedCategory.subcategories.map((sub, index) => ({
+      name: sub.subcategoryName,
+      value: sub.amount,
+      fill: shades[index] || selectedCategory.color,
+      percent: selectedCategory.amount > 0 ? (sub.amount / selectedCategory.amount) * 100 : 0,
+    }));
+  }, [selectedCategory]);
 
   if (allCategories.length === 0) {
     return (
@@ -209,230 +197,220 @@ export function CategoryBreakdownPanel({
         <CardTitle className="text-sm font-medium">Category Breakdown</CardTitle>
         <Icons.PieChart className="text-muted-foreground h-4 w-4" />
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex gap-4">
-          <div className="max-h-[300px] flex-1 space-y-2 overflow-y-auto pr-2">
-            {allCategories.map((cat, index) => {
-              const percent = totalSpending > 0 ? (cat.amount / totalSpending) * 100 : 0;
-              const barWidth = maxAmount > 0 ? (cat.amount / maxAmount) * 100 : 0;
-              const color = cat.color || CHART_COLORS[index % CHART_COLORS.length];
-              const hasSubcategories = cat.subcategories.length > 0;
-              const isExpanded = expandedCategories.has(cat.categoryId);
-
-              return (
-                <div key={cat.categoryId} className="space-y-1">
-                  {hasSubcategories ? (
-                    <button
-                      onClick={() => toggleCategory(cat.categoryId)}
-                      className="hover:bg-muted/50 flex w-full items-center justify-between rounded px-1 py-0.5 text-sm transition-colors"
-                    >
-                      <div className="flex min-w-0 items-center gap-2">
-                        {isExpanded ? (
-                          <ChevronDown className="text-muted-foreground h-3 w-3 shrink-0" />
-                        ) : (
-                          <ChevronRight className="text-muted-foreground h-3 w-3 shrink-0" />
-                        )}
-                        <div
-                          className="h-2.5 w-2.5 shrink-0 rounded-full"
-                          style={{ backgroundColor: color }}
-                        />
-                        <span className="truncate font-medium">{cat.categoryName}</span>
-                        <span className="text-muted-foreground text-xs">
-                          ({cat.subcategories.length})
-                        </span>
-                      </div>
-                      <div className="ml-2 flex shrink-0 items-center gap-2">
-                        <span className="font-medium">
-                          <PrivacyAmount value={cat.amount} currency={currency} />
-                        </span>
-                        <span className="text-muted-foreground w-10 text-right text-xs">
-                          {formatPercent(percent / 100)}
-                        </span>
-                      </div>
-                    </button>
-                  ) : (
-                    <div className="flex items-center justify-between px-1 py-0.5 text-sm">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <div className="w-3" />
-                        <div
-                          className="h-2.5 w-2.5 shrink-0 rounded-full"
-                          style={{ backgroundColor: color }}
-                        />
-                        <span className="text-muted-foreground truncate">{cat.categoryName}</span>
-                      </div>
-                      <div className="ml-2 flex shrink-0 items-center gap-2">
-                        <span className="font-medium">
-                          <PrivacyAmount value={cat.amount} currency={currency} />
-                        </span>
-                        <span className="text-muted-foreground w-10 text-right text-xs">
-                          {formatPercent(percent / 100)}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="bg-muted ml-5 h-1.5 overflow-hidden rounded-full">
-                    <div
-                      className="h-full rounded-full transition-all duration-300"
-                      style={{
-                        width: `${barWidth}%`,
-                        backgroundColor: color,
-                      }}
-                    />
-                  </div>
-
-                  {/* Budget progress indicator */}
-                  {cat.budgetInfo && cat.budgetInfo.budgeted > 0 && (
-                    <div className="ml-5 mt-1 flex items-center gap-2">
-                      <div className="bg-muted relative h-1 flex-1 overflow-hidden rounded-full">
-                        <div
-                          className={`h-full rounded-full transition-all duration-300 ${
-                            cat.budgetInfo.isOverBudget
-                              ? "bg-destructive"
-                              : cat.budgetInfo.percentUsed >= 80
-                                ? "bg-warning"
-                                : "bg-success"
-                          }`}
-                          style={{
-                            width: `${Math.min(cat.budgetInfo.percentUsed, 100)}%`,
-                          }}
-                        />
-                      </div>
-                      <span
-                        className={`text-xs font-medium ${
-                          cat.budgetInfo.isOverBudget
-                            ? "text-destructive"
-                            : cat.budgetInfo.percentUsed >= 80
-                              ? "text-warning"
-                              : "text-success"
-                        }`}
-                      >
-                        {formatPercent(cat.budgetInfo.percentUsed / 100)}
-                      </span>
-                    </div>
-                  )}
-
-                  {isExpanded && hasSubcategories && (
-                    <div
-                      className="mt-2 ml-6 space-y-2 border-l-2 pl-3"
-                      style={{ borderColor: color }}
-                    >
-                      {cat.subcategories.map((sub) => {
-                        const subPercent = cat.amount > 0 ? (sub.amount / cat.amount) * 100 : 0;
-                        const subBarWidth =
-                          cat.subcategories[0]?.amount > 0
-                            ? (sub.amount / cat.subcategories[0].amount) * 100
-                            : 0;
-
-                        return (
-                          <div key={sub.subcategoryId} className="space-y-1">
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-muted-foreground truncate">
-                                {sub.subcategoryName}
-                              </span>
-                              <div className="ml-2 flex shrink-0 items-center gap-2">
-                                <span className="text-sm">
-                                  <PrivacyAmount value={sub.amount} currency={currency} />
-                                </span>
-                                <span className="text-muted-foreground w-10 text-right text-xs">
-                                  {formatPercent(subPercent / 100)}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="bg-muted/50 h-1 overflow-hidden rounded-full">
-                              <div
-                                className="h-full rounded-full opacity-60 transition-all duration-300"
-                                style={{
-                                  width: `${subBarWidth}%`,
-                                  backgroundColor: color,
-                                }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="shrink-0">
-            <ChartContainer config={{}} className="h-[180px] w-[180px]">
+      <CardContent className="space-y-6">
+        {/* Charts Row */}
+        <div className="grid gap-8 lg:grid-cols-2">
+          {/* Category Chart + Legend */}
+          <div className="flex items-center gap-6">
+            <ChartContainer config={{}} className="h-[280px] w-[280px] shrink-0">
               <PieChart>
-                <ChartTooltip
-                  content={({ active, payload }) => {
-                    if (!active || !payload?.length) return null;
-                    const data = payload[0].payload;
-                    return (
-                      <div className="bg-background rounded-lg border p-2 shadow-sm">
-                        <div className="font-medium">{data.name}</div>
-                        <div className="text-muted-foreground text-sm">
-                          {isHidden ? "••••" : formatAmount(data.value, currency)}
-                        </div>
-                        <div className="text-muted-foreground text-xs">
-                          {formatPercent(data.percent / 100)}
-                        </div>
-                      </div>
-                    );
-                  }}
-                />
+                <ChartTooltip content={<ChartTooltipContent />} />
                 <Pie
-                  data={chartData}
+                  data={categoryChartData}
                   dataKey="value"
                   nameKey="name"
                   cx="50%"
                   cy="50%"
-                  innerRadius={45}
-                  outerRadius={75}
+                  innerRadius={70}
+                  outerRadius={120}
                   paddingAngle={2}
+                  activeIndex={selectedCategoryIndex}
+                  activeShape={renderActiveShape}
+                  onClick={handleCategoryClick}
+                  style={{ cursor: "pointer" }}
                 >
-                  {chartData.map((entry, index) => (
+                  {categoryChartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.fill} />
                   ))}
                 </Pie>
               </PieChart>
             </ChartContainer>
+            {/* Category Legend */}
+            <div className="flex-1 space-y-1.5">
+              <p className="text-muted-foreground mb-3 text-xs font-medium uppercase tracking-wide">Categories</p>
+              <div className="space-y-1">
+                {allCategories.map((cat, index) => (
+                  <button
+                    key={cat.categoryId}
+                    onClick={() => handleCategoryClick(null, index)}
+                    className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm transition-colors ${
+                      index === selectedCategoryIndex
+                        ? "bg-muted font-medium"
+                        : "hover:bg-muted/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="h-3 w-3 rounded-full"
+                        style={{ backgroundColor: cat.color }}
+                      />
+                      <span className="truncate">{cat.categoryName}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-muted-foreground text-xs">
+                        {formatPercent(cat.percent / 100)}
+                      </span>
+                      <span className="w-20 text-right font-medium">
+                        <PrivacyAmount value={cat.amount} currency={currency} />
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
 
-        {notableChanges.length > 0 && (
-          <div className="border-t pt-3">
-            <p className="text-muted-foreground mb-2 text-xs font-medium">Notable Changes</p>
-            <div className="space-y-3">
-              {notableChanges.map((cat) => (
-                <div key={cat.categoryId} className="flex items-center justify-between text-sm">
-                  <div className="min-w-0 flex-1">
-                    <span className="text-muted-foreground block truncate">{cat.categoryName}</span>
-                    <div className="text-muted-foreground/70 flex items-center gap-1 text-xs">
-                      <PrivacyAmount value={cat.prevAmount} currency={currency} />
-                      <span className="text-muted-foreground/50">→</span>
-                      <PrivacyAmount value={cat.amount} currency={currency} />
+          {/* Subcategory Chart + Legend */}
+          {selectedCategory && (
+            <div className="flex items-center gap-6 border-l pl-8">
+              {subcategoryChartData.length > 0 ? (
+                <>
+                  <ChartContainer config={{}} className="h-[280px] w-[280px] shrink-0">
+                    <PieChart>
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Pie
+                        data={subcategoryChartData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={70}
+                        outerRadius={120}
+                        paddingAngle={2}
+                      >
+                        {subcategoryChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ChartContainer>
+                  {/* Subcategory Legend */}
+                  <div className="flex-1 space-y-1.5">
+                    <p className="text-muted-foreground mb-3 text-xs font-medium uppercase tracking-wide">
+                      {selectedCategory.categoryName}
+                    </p>
+                    <div className="space-y-1">
+                      {selectedCategory.subcategories.map((sub, index) => {
+                        const subPercent = selectedCategory.amount > 0
+                          ? (sub.amount / selectedCategory.amount) * 100
+                          : 0;
+                        const shades = generateColorShades(selectedCategory.color, selectedCategory.subcategories.length);
+                        return (
+                          <div
+                            key={sub.subcategoryId}
+                            className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm"
+                          >
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="h-3 w-3 rounded-full"
+                                style={{ backgroundColor: shades[index] || selectedCategory.color }}
+                              />
+                              <span className="truncate">{sub.subcategoryName}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-muted-foreground text-xs">
+                                {formatPercent(subPercent / 100)}
+                              </span>
+                              <span className="w-20 text-right font-medium">
+                                <PrivacyAmount value={sub.amount} currency={currency} />
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                  {cat.isNew ? (
-                    <div className="text-destructive ml-2 flex shrink-0 items-center gap-1 font-medium">
-                      <ArrowUp className="h-3 w-3" />
-                      New
-                    </div>
-                  ) : (
-                    <div
-                      className={`ml-2 flex shrink-0 items-center gap-1 font-medium ${
-                        cat.changePercent! > 0 ? "text-destructive" : "text-success"
-                      }`}
-                    >
-                      {cat.changePercent! > 0 ? (
-                        <ArrowUp className="h-3 w-3" />
-                      ) : (
-                        <ArrowDown className="h-3 w-3" />
-                      )}
-                      {formatPercent(Math.abs(cat.changePercent!) / 100)}
-                    </div>
-                  )}
+                </>
+              ) : (
+                <div className="flex h-[280px] flex-1 items-center justify-center">
+                  <p className="text-muted-foreground text-sm">No subcategories for {selectedCategory.categoryName}</p>
                 </div>
-              ))}
+              )}
             </div>
+          )}
+        </div>
+
+        {/* Transactions Row */}
+        {selectedCategory && (
+          <div className="border-t pt-6">
+            <div className="mb-4 flex items-center gap-3">
+              <div
+                className="h-4 w-4 rounded-full"
+                style={{ backgroundColor: selectedCategory.color }}
+              />
+              <span className="text-lg font-semibold">{selectedCategory.categoryName}</span>
+              <span className="text-muted-foreground">
+                <PrivacyAmount value={selectedCategory.amount} currency={currency} />
+              </span>
+            </div>
+
+            {categoryTransactions.length > 0 ? (
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                {categoryTransactions.map((transaction) => {
+                  const isDeposit = transaction.activityType === "DEPOSIT";
+                  const amountColorClass = isDeposit ? "text-success" : "text-destructive";
+                  const displayAmount = isDeposit
+                    ? Math.abs(transaction.amount)
+                    : -Math.abs(transaction.amount);
+
+                  return (
+                    <div
+                      key={transaction.id}
+                      className="bg-muted/30 flex flex-col rounded-lg border p-3"
+                    >
+                      <div className="mb-2 flex items-start justify-between">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">
+                            {transaction.name || transaction.assetId}
+                          </p>
+                          <p className="text-muted-foreground text-xs">
+                            {format(transaction.date, "MMM d, yyyy")}
+                          </p>
+                        </div>
+                        <span className={`ml-2 shrink-0 text-sm font-bold ${amountColorClass}`}>
+                          <PrivacyAmount value={displayAmount} currency={currency} />
+                        </span>
+                      </div>
+                      <div className="mt-auto space-y-1">
+                        {transaction.subCategoryName && (
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <Icons.Tag className="text-muted-foreground h-3 w-3" />
+                            <span className="text-muted-foreground truncate">{transaction.subCategoryName}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <Icons.Wallet className="text-muted-foreground h-3 w-3" />
+                          <span className="text-muted-foreground truncate">{transaction.accountName}</span>
+                        </div>
+                        {transaction.recurrence && (
+                          <div className="pt-1">
+                            <Badge variant="outline" className="text-xs capitalize">
+                              {transaction.recurrence}
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex h-24 items-center justify-center">
+                <p className="text-muted-foreground text-sm">No transactions in this category</p>
+              </div>
+            )}
+
+            {/* View All Button at bottom */}
+            <ViewTransactionsButton
+              dateRange={{
+                startDate: format(startOfMonth(parseISO(selectedMonth + "-01")), "yyyy-MM-dd"),
+                endDate: format(endOfMonth(parseISO(selectedMonth + "-01")), "yyyy-MM-dd"),
+              }}
+              categoryId={selectedCategory.categoryId}
+              className="mt-4 w-full"
+            >
+              View All {selectedCategory.categoryName} Transactions
+            </ViewTransactionsButton>
           </div>
         )}
       </CardContent>

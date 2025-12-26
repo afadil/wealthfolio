@@ -1,4 +1,5 @@
 use diesel::prelude::*;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 /// Database model for activity rules
@@ -98,6 +99,7 @@ pub enum MatchType {
     Contains,
     StartsWith,
     Exact,
+    Regex,
 }
 
 impl MatchType {
@@ -105,6 +107,7 @@ impl MatchType {
         match s.to_lowercase().as_str() {
             "starts_with" => MatchType::StartsWith,
             "exact" => MatchType::Exact,
+            "regex" => MatchType::Regex,
             _ => MatchType::Contains,
         }
     }
@@ -121,6 +124,13 @@ impl ActivityRule {
             MatchType::Contains => normalized_text.contains(&normalized_pattern),
             MatchType::StartsWith => normalized_text.starts_with(&normalized_pattern),
             MatchType::Exact => normalized_text == normalized_pattern,
+            MatchType::Regex => {
+                // Case-insensitive regex matching
+                let pattern_with_flags = format!("(?i){}", self.pattern.trim());
+                Regex::new(&pattern_with_flags)
+                    .map(|re| re.is_match(transaction_name.trim()))
+                    .unwrap_or(false)
+            }
         }
     }
 

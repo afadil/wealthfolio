@@ -262,9 +262,14 @@ async fn save_account_import_mapping(
 }
 
 #[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct TopSpendingTransactionsBody {
     month: String,
     limit: i64,
+    include_event_ids: Option<Vec<String>>,
+    #[serde(default)]
+    include_all_events: bool,
+    category_id: Option<String>,
 }
 
 async fn get_top_spending_transactions(
@@ -273,7 +278,7 @@ async fn get_top_spending_transactions(
 ) -> ApiResult<Json<Vec<ActivityDetails>>> {
     let res = state
         .activity_service
-        .get_top_spending_transactions(body.month, body.limit)?;
+        .get_top_spending_transactions(body.month, body.limit, body.include_event_ids, body.include_all_events, body.category_id)?;
     Ok(Json(res))
 }
 

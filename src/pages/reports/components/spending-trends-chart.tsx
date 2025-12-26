@@ -1,6 +1,5 @@
 import { getSpendingTrends } from "@/commands/activity";
 import { getCategoriesHierarchical } from "@/commands/category";
-import { getEventsWithNames } from "@/commands/event";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icons } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -8,17 +7,14 @@ import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { formatAmount, MonthYearPicker } from "@wealthfolio/ui";
-// Removed unused Select imports
 import { Line, LineChart, XAxis, YAxis, ResponsiveContainer } from "recharts";
 import { useMemo, useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { QueryKeys } from "@/lib/query-keys";
-import type { SpendingTrendsResponse, CategoryWithChildren, EventWithTypeName } from "@/lib/types";
+import type { SpendingTrendsResponse, CategoryWithChildren } from "@/lib/types";
 import { DataTableFacetedFilter } from "@/pages/activity/components/activity-datagrid/data-table-faceted-filter";
 import { Eye, EyeOff, ChevronDown } from "lucide-react";
 import { format, subMonths, parse } from "date-fns";
-
-const INCLUDE_ALL_EVENTS_VALUE = "__include_all_events__";
 
 interface SpendingTrendsChartProps {
   /** Currently selected month (YYYY-MM) */
@@ -27,6 +23,10 @@ interface SpendingTrendsChartProps {
   currency: string;
   /** Whether to hide amounts */
   isHidden: boolean;
+  /** Event IDs to include (page-wide filter) */
+  includeEventIds?: string[];
+  /** Whether to include all events (page-wide filter) */
+  includeAllEvents?: boolean;
 }
 
 // Line configuration for the chart
@@ -56,10 +56,11 @@ export function SpendingTrendsChart({
   selectedMonth,
   currency,
   isHidden,
+  includeEventIds,
+  includeAllEvents = false,
 }: SpendingTrendsChartProps) {
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<string>>(new Set());
   const [selectedSubcategoryIds, setSelectedSubcategoryIds] = useState<Set<string>>(new Set());
-  const [selectedEventValues, setSelectedEventValues] = useState<Set<string>>(new Set());
 
   // Overlay month for comparison (defaults to previous month)
   const [overlayMonth, setOverlayMonth] = useState<string | null>(null);
@@ -97,12 +98,6 @@ export function SpendingTrendsChart({
     queryFn: getCategoriesHierarchical,
   });
 
-  // Fetch events for filter
-  const { data: events = [] } = useQuery<EventWithTypeName[], Error>({
-    queryKey: [QueryKeys.EVENTS_WITH_NAMES],
-    queryFn: getEventsWithNames,
-  });
-
   // Build category options
   const categoryOptions = useMemo(() => {
     return categories.map((category) => ({
@@ -132,25 +127,6 @@ export function SpendingTrendsChart({
     return options;
   }, [categories, selectedCategoryIds]);
 
-  const eventOptions = useMemo(() => {
-    const eventsAsOptions = events.map((event) => ({
-      value: event.id,
-      label: event.name,
-    }));
-    return [{ value: INCLUDE_ALL_EVENTS_VALUE, label: "Include All Events" }, ...eventsAsOptions];
-  }, [events]);
-
-  const includeAllEvents = selectedEventValues.has(INCLUDE_ALL_EVENTS_VALUE);
-  const includeEventIds = useMemo(() => {
-    const ids = new Set<string>();
-    selectedEventValues.forEach((v) => {
-      if (v !== INCLUDE_ALL_EVENTS_VALUE) {
-        ids.add(v);
-      }
-    });
-    return ids;
-  }, [selectedEventValues]);
-
   const categoryIdsArray = useMemo(
     () => (selectedCategoryIds.size > 0 ? Array.from(selectedCategoryIds) : undefined),
     [selectedCategoryIds],
@@ -159,25 +135,6 @@ export function SpendingTrendsChart({
     () => (selectedSubcategoryIds.size > 0 ? Array.from(selectedSubcategoryIds) : undefined),
     [selectedSubcategoryIds],
   );
-  const includeEventIdsArray = useMemo(
-    () => (includeEventIds.size > 0 ? Array.from(includeEventIds) : undefined),
-    [includeEventIds],
-  );
-
-  const handleEventFilterChange = (values: Set<string>) => {
-    const wasIncludeAll = selectedEventValues.has(INCLUDE_ALL_EVENTS_VALUE);
-    const isIncludeAll = values.has(INCLUDE_ALL_EVENTS_VALUE);
-
-    if (isIncludeAll && !wasIncludeAll) {
-      setSelectedEventValues(new Set([INCLUDE_ALL_EVENTS_VALUE]));
-    } else if (isIncludeAll && values.size > 1) {
-      const newValues = new Set(values);
-      newValues.delete(INCLUDE_ALL_EVENTS_VALUE);
-      setSelectedEventValues(newValues);
-    } else {
-      setSelectedEventValues(values);
-    }
-  };
 
   const { data: trendsData, isLoading } = useQuery<SpendingTrendsResponse>({
     queryKey: [
@@ -185,7 +142,7 @@ export function SpendingTrendsChart({
       selectedMonth,
       categoryIdsArray,
       subcategoryIdsArray,
-      includeEventIdsArray,
+      includeEventIds,
       includeAllEvents,
     ],
     queryFn: () =>
@@ -193,7 +150,7 @@ export function SpendingTrendsChart({
         selectedMonth,
         categoryIdsArray,
         subcategoryIdsArray,
-        includeAllEvents ? undefined : includeEventIdsArray,
+        includeEventIds,
         includeAllEvents,
       ),
     enabled: !!selectedMonth,
@@ -206,7 +163,7 @@ export function SpendingTrendsChart({
       overlayMonth,
       categoryIdsArray,
       subcategoryIdsArray,
-      includeEventIdsArray,
+      includeEventIds,
       includeAllEvents,
     ],
     queryFn: () =>
@@ -214,7 +171,7 @@ export function SpendingTrendsChart({
         overlayMonth!,
         categoryIdsArray,
         subcategoryIdsArray,
-        includeAllEvents ? undefined : includeEventIdsArray,
+        includeEventIds,
         includeAllEvents,
       ),
     enabled: !!overlayMonth && visibleLines.has("overlay"),
@@ -284,7 +241,7 @@ export function SpendingTrendsChart({
   };
 
   const hasActiveFilters =
-    selectedCategoryIds.size > 0 || selectedSubcategoryIds.size > 0 || selectedEventValues.size > 0;
+    selectedCategoryIds.size > 0 || selectedSubcategoryIds.size > 0;
 
   if (isLoading) {
     return (
@@ -321,7 +278,7 @@ export function SpendingTrendsChart({
         <Icons.TrendingUp className="text-muted-foreground h-4 w-4" />
       </CardHeader>
       <CardContent>
-        {/* Filters row */}
+        {/* Filters row (category/subcategory only - events filter is page-wide) */}
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <DataTableFacetedFilter
             title="Category"
@@ -338,19 +295,11 @@ export function SpendingTrendsChart({
             disabled={selectedCategoryIds.size === 0}
           />
 
-          <DataTableFacetedFilter
-            title="Include Events"
-            options={eventOptions}
-            selectedValues={selectedEventValues}
-            onFilterChange={handleEventFilterChange}
-          />
-
           {hasActiveFilters && (
             <button
               onClick={() => {
                 setSelectedCategoryIds(new Set());
                 setSelectedSubcategoryIds(new Set());
-                setSelectedEventValues(new Set());
               }}
               className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs"
             >
