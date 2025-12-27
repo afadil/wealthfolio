@@ -1,9 +1,13 @@
-import { getGoalsWithContributions } from "@/commands/goal";
+import { getGoalsWithContributions, getAccountFreeCash } from "@/commands/goal";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ContributionForm, ContributionList } from "@/components/goals";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { useAccounts } from "@/hooks/use-accounts";
 import { QueryKeys } from "@/lib/query-keys";
-import type { GoalWithContributions } from "@/lib/types";
+import type { AccountFreeCash, GoalWithContributions } from "@/lib/types";
+import { useGoalMutations } from "@/pages/settings/goals/use-goal-mutations";
 import { useQuery } from "@tanstack/react-query";
 import { AmountDisplay, formatPercent, Icons, ToggleGroup, ToggleGroupItem } from "@wealthfolio/ui";
 import React, { useMemo, useState, useEffect } from "react";
@@ -18,6 +22,9 @@ interface AllocationPageProps {
 
 export default function AllocationPage({ renderActions }: AllocationPageProps) {
   const { isBalanceHidden } = useBalancePrivacy();
+  const { accounts } = useAccounts();
+  const [isAddingContribution, setIsAddingContribution] = useState(false);
+  const { addContributionMutation, removeContributionMutation } = useGoalMutations();
 
   const {
     data: goalsWithContributions,
@@ -26,6 +33,14 @@ export default function AllocationPage({ renderActions }: AllocationPageProps) {
   } = useQuery<GoalWithContributions[], Error>({
     queryKey: [QueryKeys.GOALS_WITH_CONTRIBUTIONS],
     queryFn: getGoalsWithContributions,
+  });
+
+  const accountIds = useMemo(() => accounts?.map((a) => a.id) ?? [], [accounts]);
+
+  const { data: freeCashAccounts = [] } = useQuery<AccountFreeCash[], Error>({
+    queryKey: [QueryKeys.ACCOUNT_FREE_CASH, accountIds],
+    queryFn: () => getAccountFreeCash(accountIds),
+    enabled: accountIds.length > 0,
   });
 
   const sortedGoals = useMemo(() => {
@@ -167,24 +182,51 @@ export default function AllocationPage({ renderActions }: AllocationPageProps) {
         </Card>
       </div>
 
-      {selectedGoal.contributions.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Icons.Wallet className="text-muted-foreground mb-4 h-12 w-12" />
-            <h3 className="mb-2 text-lg font-semibold">No Contributions Yet</h3>
-            <p className="text-muted-foreground mb-4 text-center">
-              Add your first contribution to start tracking progress.
-            </p>
-            <Link
-              to="/settings/goals"
-              className="text-primary hover:text-primary/80 inline-flex items-center gap-1 text-sm underline-offset-4 hover:underline"
-            >
-              Add contribution
-              <Icons.ChevronRight className="h-4 w-4" />
-            </Link>
-          </CardContent>
-        </Card>
-      ) : (
+      {/* Contribution Management */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base">Manage Contributions</CardTitle>
+              <CardDescription>Add or remove cash allocations for this goal</CardDescription>
+            </div>
+            {!isAddingContribution && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsAddingContribution(true)}
+              >
+                <Icons.Plus className="mr-2 h-4 w-4" />
+                Add Contribution
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isAddingContribution && (
+            <div className="bg-muted/50 mb-4 rounded-md border p-4">
+              <ContributionForm
+                goalId={selectedGoal.goal.id}
+                freeCashAccounts={freeCashAccounts}
+                onSubmit={(contribution) => {
+                  addContributionMutation.mutate(contribution);
+                  setIsAddingContribution(false);
+                }}
+                onCancel={() => setIsAddingContribution(false)}
+                isSubmitting={addContributionMutation.isPending}
+              />
+            </div>
+          )}
+          <ContributionList
+            contributions={selectedGoal.contributions}
+            onRemove={(id) => removeContributionMutation.mutate(id)}
+            isRemoving={removeContributionMutation.isPending}
+            emptyMessage="No contributions yet. Add your first contribution above."
+          />
+        </CardContent>
+      </Card>
+
+      {selectedGoal.contributions.length > 0 && (
         <>
           <div className="grid gap-6 lg:grid-cols-2">
             <GoalSourcesChart

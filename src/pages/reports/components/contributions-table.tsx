@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { GoalContributionWithStatus } from "@/lib/types";
-import { AmountDisplay, Badge, Icons } from "@wealthfolio/ui";
+import { AmountDisplay } from "@wealthfolio/ui";
 import { useMemo } from "react";
 
 interface ContributionsTableProps {
@@ -44,15 +44,7 @@ export function ContributionsTable({ contributions, isBalanceHidden }: Contribut
               >
                 <div className="flex items-center gap-4">
                   <div className="text-muted-foreground min-w-[100px] text-sm">{formattedDate}</div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{contribution.accountName}</span>
-                    {contribution.isAtRisk && (
-                      <Badge variant="destructive" className="gap-1 text-xs">
-                        <Icons.AlertTriangle className="h-3 w-3" />
-                        At Risk
-                      </Badge>
-                    )}
-                  </div>
+                  <span className="font-medium">{contribution.accountName}</span>
                 </div>
                 <div className="font-medium">
                   <AmountDisplay

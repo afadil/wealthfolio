@@ -1,5 +1,5 @@
 use crate::accounts::AccountRepositoryTrait;
-use crate::errors::{Result, ValidationError};
+use crate::errors::Result;
 use crate::goals::goals_model::{
     AccountFreeCash, Goal, GoalContribution, GoalContributionWithStatus, GoalWithContributions,
     NewGoal, NewGoalContribution,
@@ -211,24 +211,6 @@ impl<
         &self,
         contribution: NewGoalContribution,
     ) -> Result<GoalContributionWithStatus> {
-        // Validate contribution doesn't exceed free cash
-        let free_cash_map = self.calculate_free_cash_map(&[contribution.account_id.clone()])?;
-
-        if let Some(fc) = free_cash_map.get(&contribution.account_id) {
-            if contribution.amount > fc.free_cash {
-                return Err(ValidationError::InvalidInput(format!(
-                    "Contribution amount ({:.2}) exceeds available free cash ({:.2})",
-                    contribution.amount, fc.free_cash
-                ))
-                .into());
-            }
-        } else {
-            return Err(
-                ValidationError::InvalidInput("Account not found or has no valuation data".to_string())
-                    .into(),
-            );
-        }
-
         let inserted = self.goal_repo.insert_contribution(contribution).await?;
 
         // Get account info for response
