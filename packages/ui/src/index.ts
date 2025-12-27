@@ -6,6 +6,7 @@ export * from "./components/ui/animated-toggle-group";
 export * from "./components/ui/autocomplete";
 export * from "./components/ui/avatar";
 export * from "./components/ui/badge";
+export * from "./components/ui/budget-gauge";
 export * from "./components/ui/button";
 export * from "./components/ui/button-variants";
 export * from "./components/ui/calendar";

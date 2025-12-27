@@ -5,8 +5,9 @@ import { getExpenseCategories, getIncomeCategories } from "@/commands/category";
 import { QueryKeys } from "@/lib/query-keys";
 import { BudgetSummary, Category, BudgetAllocationWithCategory } from "@/lib/types";
 import { useSettings } from "@/hooks/use-settings";
+import { useSettingsContext } from "@/lib/settings-provider";
 import { SettingsHeader } from "../settings-header";
-import { Separator, Skeleton, Button, Icons, Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui";
+import { Separator, Skeleton, Button, Icons, Tabs, TabsContent, TabsList, TabsTrigger, Label, RadioGroup, RadioGroupItem } from "@wealthfolio/ui";
 import { BudgetTargetForm } from "./components/budget-target-form";
 import { AllocationList } from "./components/allocation-list";
 import { AllocationFormDialog } from "./components/allocation-form-dialog";
@@ -14,7 +15,9 @@ import { useBudgetMutations } from "./use-budget-mutations";
 
 const BudgetPage = () => {
   const { data: settings, isLoading: isLoadingSettings } = useSettings();
+  const { updateSettings } = useSettingsContext();
   const currency = settings?.baseCurrency ?? "USD";
+  const varianceTolerance = settings?.budgetVarianceTolerance ?? 10;
 
   const { data: budgetSummary, isLoading: isLoadingSummary } = useQuery<BudgetSummary, Error>({
     queryKey: [QueryKeys.BUDGET_SUMMARY],
@@ -103,6 +106,31 @@ const BudgetPage = () => {
           onSave={(config) => upsertConfigMutation.mutate(config)}
           isPending={upsertConfigMutation.isPending}
         />
+
+        <Separator />
+
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-lg font-semibold">Budget Tolerance</h3>
+            <p className="text-muted-foreground text-sm">
+              How close to your budget counts as "on track"? This affects the color coding in budget reports.
+            </p>
+          </div>
+          <RadioGroup
+            value={varianceTolerance.toString()}
+            onValueChange={(value) => updateSettings({ budgetVarianceTolerance: parseInt(value) })}
+            className="flex gap-4"
+          >
+            {[5, 10, 15].map((pct) => (
+              <div key={pct} className="flex items-center space-x-2">
+                <RadioGroupItem value={pct.toString()} id={`tolerance-${pct}`} />
+                <Label htmlFor={`tolerance-${pct}`} className="cursor-pointer">
+                  ±{pct}%
+                </Label>
+              </div>
+            ))}
+          </RadioGroup>
+        </div>
 
         {hasConfig && (
           <>

@@ -8,12 +8,6 @@ import { formatAmount } from "@wealthfolio/ui";
 import { format, parseISO } from "date-fns";
 import React, { useMemo } from "react";
 import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
-import { DataTableFacetedFilter } from "@/pages/activity/components/activity-datagrid/data-table-faceted-filter";
-
-interface EventOption {
-  value: string;
-  label: string;
-}
 
 interface SpendingHistoryChartProps {
   monthlySpendingData: [string, number][];
@@ -27,9 +21,6 @@ interface SpendingHistoryChartProps {
   selectedPeriod: "TOTAL" | "YTD" | "LAST_YEAR";
   currency: string;
   isBalanceHidden: boolean;
-  eventOptions: EventOption[];
-  selectedEventValues: Set<string>;
-  onFilterChange: (values: Set<string>) => void;
 }
 
 export function SpendingHistoryChart({
@@ -44,9 +35,6 @@ export function SpendingHistoryChart({
   selectedPeriod,
   currency,
   isBalanceHidden,
-  eventOptions,
-  selectedEventValues,
-  onFilterChange,
 }: SpendingHistoryChartProps) {
   const [isMobile, setIsMobile] = React.useState(false);
 
@@ -121,23 +109,13 @@ export function SpendingHistoryChart({
   return (
     <Card className="md:col-span-2">
       <CardHeader className="pb-4 md:pb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-sm font-medium">Spending History</CardTitle>
-            <CardDescription className="text-xs md:text-sm">{periodDescription}</CardDescription>
-          </div>
-          <DataTableFacetedFilter
-            title="Events"
-            options={eventOptions}
-            selectedValues={selectedEventValues}
-            onFilterChange={onFilterChange}
-          />
-        </div>
+        <CardTitle className="text-sm font-medium">Spending History</CardTitle>
+        <CardDescription className="text-xs md:text-sm">{periodDescription}</CardDescription>
       </CardHeader>
       <CardContent className="px-4 pt-0 md:px-6">
         {chartData.length === 0 ? (
           <EmptyPlaceholder
-            className="mx-auto flex h-[250px] max-w-[420px] items-center justify-center md:h-[300px]"
+            className="mx-auto flex h-[250px] max-w-[420px] items-center justify-center md:h-[550px]"
             icon={<Icons.Activity className="h-8 w-8 md:h-10 md:w-10" />}
             title="No spending history available"
             description="There is no spending history for the selected period. Try selecting a different time range or check back later."
@@ -158,7 +136,7 @@ export function SpendingHistoryChart({
                 color: "var(--chart-5)",
               },
             }}
-            className={cn("h-[280px] w-full md:h-[380px]")}
+            className={cn("h-[280px] w-full md:h-[550px]")}
           >
             <ComposedChart
               data={chartData}

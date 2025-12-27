@@ -412,6 +412,7 @@ export interface Settings {
   autoUpdateCheckEnabled: boolean;
   menuBarVisible: boolean;
   syncEnabled: boolean;
+  budgetVarianceTolerance: number;
 }
 
 export interface SettingsContextType {
