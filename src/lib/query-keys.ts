@@ -106,3 +106,30 @@ export const QueryKeys = {
   BUDGET_ALLOCATIONS: "budget_allocations",
   BUDGET_VS_ACTUAL: "budget_vs_actual",
 } as const;
+
+import type { QueryClient } from "@tanstack/react-query";
+
+/**
+ * Invalidates all queries that depend on activity data.
+ * Call this after any activity create/update/delete mutation.
+ */
+export const invalidateActivityQueries = (queryClient: QueryClient) => {
+  // Core activity queries
+  queryClient.invalidateQueries({ queryKey: [QueryKeys.ACTIVITIES] });
+  queryClient.invalidateQueries({ queryKey: [QueryKeys.ACTIVITY_DATA] });
+  queryClient.invalidateQueries({ queryKey: [QueryKeys.CASH_ACTIVITIES] });
+
+  // Account-related (balances change with activities)
+  queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNTS] });
+
+  // Spending & Income summaries
+  queryClient.invalidateQueries({ queryKey: [QueryKeys.SPENDING_SUMMARY] });
+  queryClient.invalidateQueries({ queryKey: [QueryKeys.INCOME_SUMMARY] });
+
+  // Reports & Metrics
+  queryClient.invalidateQueries({ queryKey: [QueryKeys.MONTH_METRICS] });
+  queryClient.invalidateQueries({ queryKey: [QueryKeys.EVENT_SPENDING_SUMMARIES] });
+
+  // Portfolio (holdings can change with trading activities)
+  queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS] });
+};

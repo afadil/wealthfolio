@@ -110,7 +110,7 @@ export default function IncomePage({ renderActions }: IncomePageProps) {
     error,
   } = useQuery<IncomeSummary[], Error>({
     queryKey: [QueryKeys.INCOME_SUMMARY],
-    queryFn: getIncomeSummary,
+    queryFn: () => getIncomeSummary(),
   });
 
   const { data: categoriesData } = useQuery<CategoryWithChildren[], Error>({
@@ -572,6 +572,12 @@ export default function IncomePage({ renderActions }: IncomePageProps) {
                   const color = DEFAULT_CHART_COLORS[index % DEFAULT_CHART_COLORS.length];
                   const isHidden = hiddenSymbols.has(symbolStr);
 
+                  // Calculate monthly average for this income source
+                  const monthsWithSource = Object.entries(
+                    periodSummary.byMonthBySymbol || {},
+                  ).filter(([, symbolMap]) => (symbolMap[symbolStr] || 0) > 0).length;
+                  const sourceMonthlyAvg = monthsWithSource > 0 ? income / monthsWithSource : 0;
+
                   return (
                     <div
                       key={index}
@@ -632,8 +638,14 @@ export default function IncomePage({ renderActions }: IncomePageProps) {
                         <span className="text-muted-foreground text-xs">
                           {percentage.toFixed(1)}%
                         </span>
-                        <div className="text-success text-sm font-medium">
-                          <PrivacyAmount value={income} currency={currency} />
+                        <div className="text-right">
+                          <div className="text-success text-sm font-medium">
+                            <PrivacyAmount value={income} currency={currency} />
+                          </div>
+                          <div className="text-muted-foreground text-xs">
+                            <PrivacyAmount value={sourceMonthlyAvg} currency={currency} />
+                            /mo
+                          </div>
                         </div>
                       </div>
                     </div>

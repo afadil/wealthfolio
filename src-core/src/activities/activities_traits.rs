@@ -67,15 +67,27 @@ pub trait ActivityRepositoryTrait: Send + Sync {
     async fn save_import_mapping(&self, mapping: &ImportMapping) -> Result<()>;
     // Add other repository methods if necessary, e.g., calculate_average_cost, get_deposit_activities
     fn calculate_average_cost(&self, account_id: &str, asset_id: &str) -> Result<Decimal>;
-    fn get_income_activities_data(&self) -> Result<Vec<IncomeData>>;
+    fn get_income_activities_data(
+        &self,
+        include_event_ids: Option<&[String]>,
+        include_all_events: bool,
+    ) -> Result<Vec<IncomeData>>;
     fn get_first_activity_date_overall(&self) -> Result<DateTime<Utc>>;
     fn get_spending_activities_data(
         &self,
         include_event_ids: Option<&[String]>,
         include_all_events: bool,
     ) -> Result<Vec<SpendingData>>;
-    fn get_cash_income_activities_data(&self) -> Result<Vec<CashIncomeData>>;
-    fn get_investment_account_deposits_data(&self) -> Result<Vec<InvestmentAccountDepositData>>;
+    fn get_cash_income_activities_data(
+        &self,
+        include_event_ids: Option<&[String]>,
+        include_all_events: bool,
+    ) -> Result<Vec<CashIncomeData>>;
+    fn get_investment_account_deposits_data(
+        &self,
+        include_event_ids: Option<&[String]>,
+        include_all_events: bool,
+    ) -> Result<Vec<InvestmentAccountDepositData>>;
     fn get_capital_gains_data(&self) -> Result<Vec<CapitalGainsData>>;
     fn get_top_spending_transactions(
         &self,

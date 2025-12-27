@@ -647,10 +647,32 @@ impl ActivityRepositoryTrait for ActivityRepository {
         Ok(converted_results)
     }
 
-    fn get_income_activities_data(&self) -> Result<Vec<IncomeData>> {
+    fn get_income_activities_data(
+        &self,
+        include_event_ids: Option<&[String]>,
+        include_all_events: bool,
+    ) -> Result<Vec<IncomeData>> {
         let mut conn = get_connection(&self.pool)?;
 
-        let query = "SELECT strftime('%Y-%m', a.activity_date) as date,
+        // Event filter: by default excludes all event transactions
+        let event_filter = if include_all_events {
+            String::new()
+        } else {
+            match include_event_ids {
+                Some(ids) if !ids.is_empty() => {
+                    let escaped: Vec<String> =
+                        ids.iter().map(|id| id.replace('\'', "''")).collect();
+                    format!(
+                        "AND (a.event_id IS NULL OR a.event_id IN ('{}'))",
+                        escaped.join("','")
+                    )
+                }
+                _ => "AND a.event_id IS NULL".to_string(),
+            }
+        };
+
+        let query = format!(
+            "SELECT strftime('%Y-%m', a.activity_date) as date,
              a.activity_type as income_type,
              a.asset_id as symbol,
              COALESCE(ast.name, 'Unknown') as symbol_name,
@@ -661,7 +683,10 @@ impl ActivityRepositoryTrait for ActivityRepository {
              INNER JOIN accounts acc ON a.account_id = acc.id
              WHERE a.activity_type IN ('DIVIDEND', 'INTEREST', 'OTHER_INCOME')
              AND acc.is_active = 1
-             ORDER BY a.activity_date";
+             {}
+             ORDER BY a.activity_date",
+            event_filter
+        );
 
         // Define a struct to hold the raw query results
         #[derive(QueryableByName, Debug)]
@@ -875,14 +900,36 @@ impl ActivityRepositoryTrait for ActivityRepository {
         Ok(results)
     }
 
-    fn get_cash_income_activities_data(&self) -> Result<Vec<CashIncomeData>> {
+    fn get_cash_income_activities_data(
+        &self,
+        include_event_ids: Option<&[String]>,
+        include_all_events: bool,
+    ) -> Result<Vec<CashIncomeData>> {
         let mut conn = get_connection(&self.pool)?;
+
+        // Event filter: by default excludes all event transactions
+        let event_filter = if include_all_events {
+            String::new()
+        } else {
+            match include_event_ids {
+                Some(ids) if !ids.is_empty() => {
+                    let escaped: Vec<String> =
+                        ids.iter().map(|id| id.replace('\'', "''")).collect();
+                    format!(
+                        "AND (a.event_id IS NULL OR a.event_id IN ('{}'))",
+                        escaped.join("','")
+                    )
+                }
+                _ => "AND a.event_id IS NULL".to_string(),
+            }
+        };
 
         // Query income activities from CASH accounts
         // Income = activities with income categories (is_income = 1)
         // Excludes transfers to avoid double counting
         // Includes subcategory information when available
-        let query = r#"
+        let query = format!(
+            r#"
             SELECT
                 strftime('%Y-%m', a.activity_date) as date,
                 a.activity_type,
@@ -906,8 +953,11 @@ impl ActivityRepositoryTrait for ActivityRepository {
               AND a.activity_type NOT IN ('TRANSFER_IN', 'TRANSFER_OUT')
               -- Income activities by category
               AND cat.is_income = 1
+              {}
             ORDER BY a.activity_date
-        "#;
+        "#,
+            event_filter
+        );
 
         #[derive(QueryableByName, Debug)]
         struct RawCashIncomeData {
@@ -967,12 +1017,34 @@ impl ActivityRepositoryTrait for ActivityRepository {
         Ok(results)
     }
 
-    fn get_investment_account_deposits_data(&self) -> Result<Vec<InvestmentAccountDepositData>> {
+    fn get_investment_account_deposits_data(
+        &self,
+        include_event_ids: Option<&[String]>,
+        include_all_events: bool,
+    ) -> Result<Vec<InvestmentAccountDepositData>> {
         let mut conn = get_connection(&self.pool)?;
+
+        // Event filter: by default excludes all event transactions
+        let event_filter = if include_all_events {
+            String::new()
+        } else {
+            match include_event_ids {
+                Some(ids) if !ids.is_empty() => {
+                    let escaped: Vec<String> =
+                        ids.iter().map(|id| id.replace('\'', "''")).collect();
+                    format!(
+                        "AND (a.event_id IS NULL OR a.event_id IN ('{}'))",
+                        escaped.join("','")
+                    )
+                }
+                _ => "AND a.event_id IS NULL".to_string(),
+            }
+        };
 
         // Query DEPOSIT activities from SECURITIES and CRYPTO accounts
         // These are direct deposits to investment accounts (e.g., 401k contributions)
-        let query = r#"
+        let query = format!(
+            r#"
             SELECT
                 strftime('%Y-%m', a.activity_date) as date,
                 a.account_id,
@@ -985,8 +1057,11 @@ impl ActivityRepositoryTrait for ActivityRepository {
             WHERE acc.is_active = 1
               AND acc.account_type IN ('SECURITIES', 'CRYPTO')
               AND a.activity_type = 'DEPOSIT'
+              {}
             ORDER BY a.activity_date
-        "#;
+        "#,
+            event_filter
+        );
 
         #[derive(QueryableByName, Debug)]
         struct RawInvestmentDepositData {

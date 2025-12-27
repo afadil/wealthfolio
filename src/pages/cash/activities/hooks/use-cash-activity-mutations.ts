@@ -7,7 +7,7 @@ import {
   NewTransfer,
 } from "@/commands/cash-activity";
 import { toast } from "@/components/ui/use-toast";
-import { QueryKeys } from "@/lib/query-keys";
+import { invalidateActivityQueries } from "@/lib/query-keys";
 import { ActivityCreate, ActivityDetails, ActivityUpdate } from "@/lib/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -18,9 +18,7 @@ export function useCashActivityMutations(
 
   const createMutationOptions = (action: string) => ({
     onSuccess: (activity: { accountId?: string | null }) => {
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.CASH_ACTIVITIES] });
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNTS] });
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.EVENT_SPENDING_SUMMARIES] });
+      invalidateActivityQueries(queryClient);
       if (onSuccess) onSuccess(activity);
     },
     onError: (error: string) => {
@@ -57,9 +55,7 @@ export function useCashActivityMutations(
       return createTransfer(data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.CASH_ACTIVITIES] });
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNTS] });
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.EVENT_SPENDING_SUMMARIES] });
+      invalidateActivityQueries(queryClient);
       toast({
         title: "Transfer created successfully",
         variant: "success",

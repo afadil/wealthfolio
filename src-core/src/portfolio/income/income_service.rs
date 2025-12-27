@@ -17,7 +17,11 @@ use std::sync::{Arc, RwLock};
 
 // Define the trait for the income service
 pub trait IncomeServiceTrait: Send + Sync {
-    fn get_income_summary(&self) -> Result<Vec<IncomeSummary>>;
+    fn get_income_summary(
+        &self,
+        include_event_ids: Option<Vec<String>>,
+        include_all_events: bool,
+    ) -> Result<Vec<IncomeSummary>>;
 }
 
 pub struct IncomeService {
@@ -50,8 +54,15 @@ impl IncomeService {
 
 // Implement the trait for IncomeService
 impl IncomeServiceTrait for IncomeService {
-    fn get_income_summary(&self) -> Result<Vec<IncomeSummary>> {
+    fn get_income_summary(
+        &self,
+        include_event_ids: Option<Vec<String>>,
+        include_all_events: bool,
+    ) -> Result<Vec<IncomeSummary>> {
         debug!("Getting holistic income summary (investment + cash)...");
+
+        // Convert to slice reference for repository calls
+        let event_ids_slice = include_event_ids.as_deref();
 
         let base_currency = self.base_currency.read().unwrap().clone();
         let current_date = Utc::now().naive_utc().date();
@@ -92,7 +103,7 @@ impl IncomeServiceTrait for IncomeService {
         let mut two_years_ago_summary = IncomeSummary::new("TWO_YEARS_AGO", base_currency.clone());
 
         // Process investment income (dividends, interest, etc.)
-        let investment_activities = self.activity_repository.get_income_activities_data().unwrap_or_default();
+        let investment_activities = self.activity_repository.get_income_activities_data(event_ids_slice, include_all_events).unwrap_or_default();
         for activity in &investment_activities {
             if let Some((date, converted_amount, activity_copy)) = self.process_investment_income(activity, &base_currency) {
                 total_summary.add_income(&activity_copy, converted_amount.clone());
@@ -108,7 +119,7 @@ impl IncomeServiceTrait for IncomeService {
         }
 
         // Process cash income (deposits with income categories)
-        let cash_activities = self.activity_repository.get_cash_income_activities_data().unwrap_or_default();
+        let cash_activities = self.activity_repository.get_cash_income_activities_data(event_ids_slice, include_all_events).unwrap_or_default();
         for activity in &cash_activities {
             if let Some((date, converted_amount, activity_copy)) = self.process_cash_income(activity, &base_currency) {
                 total_summary.add_cash_income(&activity_copy, converted_amount.clone());
@@ -124,7 +135,7 @@ impl IncomeServiceTrait for IncomeService {
         }
 
         // Process investment account deposits (deposits to SECURITIES/CRYPTO accounts)
-        let investment_deposits = self.activity_repository.get_investment_account_deposits_data().unwrap_or_default();
+        let investment_deposits = self.activity_repository.get_investment_account_deposits_data(event_ids_slice, include_all_events).unwrap_or_default();
         for activity in &investment_deposits {
             if let Some((date, converted_amount, activity_copy)) = self.process_investment_deposit(activity, &base_currency) {
                 total_summary.add_investment_deposit(&activity_copy, converted_amount.clone());

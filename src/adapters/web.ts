@@ -29,7 +29,7 @@ const COMMANDS: CommandMap = {
   calculate_accounts_simple_performance: { method: "POST", path: "/performance/accounts/simple" },
   calculate_performance_history: { method: "POST", path: "/performance/history" },
   calculate_performance_summary: { method: "POST", path: "/performance/summary" },
-  get_income_summary: { method: "GET", path: "/income/summary" },
+  get_income_summary: { method: "POST", path: "/income/summary" },
   get_spending_summary: { method: "POST", path: "/spending/summary" },
   // Goals
   get_goals: { method: "GET", path: "/goals" },
@@ -281,8 +281,14 @@ export const invokeWeb = async <T>(
       if (qs) url += `?${qs}`;
       break;
     }
-    case "get_income_summary":
+    case "get_income_summary": {
+      const { includeEventIds, includeAllEvents } = (payload ?? {}) as {
+        includeEventIds?: string[];
+        includeAllEvents?: boolean;
+      };
+      body = JSON.stringify({ includeEventIds, includeAllEvents });
       break;
+    }
     case "delete_goal": {
       const { goalId } = payload as { goalId: string };
       url += `/${encodeURIComponent(goalId)}`;

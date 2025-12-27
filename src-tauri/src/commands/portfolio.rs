@@ -135,11 +135,13 @@ pub async fn get_latest_valuations(
 #[tauri::command]
 pub async fn get_income_summary(
     state: State<'_, Arc<ServiceContext>>,
+    include_event_ids: Option<Vec<String>>,
+    include_all_events: Option<bool>,
 ) -> Result<Vec<IncomeSummary>, String> {
     debug!("Fetching income summary...");
     state
         .income_service()
-        .get_income_summary()
+        .get_income_summary(include_event_ids, include_all_events.unwrap_or(false))
         .map_err(|e| e.to_string())
 }
 

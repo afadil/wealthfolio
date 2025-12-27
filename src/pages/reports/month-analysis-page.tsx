@@ -77,13 +77,13 @@ export default function MonthAnalysisPage({ renderActions }: MonthAnalysisPagePr
   }, [events]);
 
   const { data: spendingData, isLoading: isSpendingLoading } = useQuery<SpendingSummary[]>({
-    queryKey: [QueryKeys.SPENDING_SUMMARY],
-    queryFn: () => getSpendingSummary(),
+    queryKey: [QueryKeys.SPENDING_SUMMARY, includeEventIds, includeAllEvents],
+    queryFn: () => getSpendingSummary(includeEventIds, includeAllEvents),
   });
 
   const { data: incomeData, isLoading: isIncomeLoading } = useQuery<IncomeSummary[]>({
-    queryKey: [QueryKeys.INCOME_SUMMARY],
-    queryFn: getIncomeSummary,
+    queryKey: [QueryKeys.INCOME_SUMMARY, includeEventIds, includeAllEvents],
+    queryFn: () => getIncomeSummary(includeEventIds, includeAllEvents),
   });
 
   // Fetch top 5 spending transactions from backend (with event filter)
@@ -147,15 +147,26 @@ export default function MonthAnalysisPage({ renderActions }: MonthAnalysisPagePr
   }, [availableMonths, hasInitialized]);
 
   const monthActions = useMemo(
-    () =>
-      selectedMonth ? (
-        <MonthSwitcher
-          selectedMonth={selectedMonth}
-          onMonthChange={setSelectedMonth}
-          availableMonths={availableMonths}
-        />
-      ) : null,
-    [selectedMonth, availableMonths],
+    () => (
+      <div className="flex items-center gap-2">
+        {events.length > 0 && (
+          <DataTableFacetedFilter
+            title="Events"
+            options={eventOptions}
+            selectedValues={selectedEventValues}
+            onFilterChange={handleEventFilterChange}
+          />
+        )}
+        {selectedMonth && (
+          <MonthSwitcher
+            selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
+            availableMonths={availableMonths}
+          />
+        )}
+      </div>
+    ),
+    [selectedMonth, availableMonths, events, eventOptions, selectedEventValues, handleEventFilterChange],
   );
 
   useEffect(() => {
@@ -283,28 +294,6 @@ export default function MonthAnalysisPage({ renderActions }: MonthAnalysisPagePr
           </CardContent>
         </Card>
       </div>
-
-      {/* Page-wide Events Filter */}
-      {events.length > 0 && (
-        <div className="flex items-center gap-2">
-          <span className="text-muted-foreground text-sm">Events:</span>
-          <DataTableFacetedFilter
-            title="Include Events"
-            options={eventOptions}
-            selectedValues={selectedEventValues}
-            onFilterChange={handleEventFilterChange}
-          />
-          {selectedEventValues.size > 0 && (
-            <button
-              onClick={() => setSelectedEventValues(new Set())}
-              className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs"
-            >
-              Reset
-              <Icons.Close className="h-3 w-3" />
-            </button>
-          )}
-        </div>
-      )}
 
       {/* Spending Trends Chart */}
       <SpendingTrendsChart

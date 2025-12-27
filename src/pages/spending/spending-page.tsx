@@ -20,6 +20,7 @@ import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { Cell, Pie, PieChart } from "recharts";
 import { Eye, EyeOff } from "lucide-react";
 import { SpendingHistoryChart } from "./spending-history-chart";
+import { DataTableFacetedFilter } from "@/pages/activity/components/activity-datagrid/data-table-faceted-filter";
 
 const INCLUDE_ALL_EVENTS_VALUE = "__include_all_events__";
 
@@ -157,12 +158,20 @@ export default function SpendingPage({ renderActions }: SpendingPageProps) {
     queryFn: () => getSpendingSummary(includeEventIds, includeAllEvents),
   });
 
-  // Memoized period selector to pass to parent
+  // Memoized actions to pass to parent (events filter + period selector)
   const periodActions = useMemo(
     () => (
-      <SpendingPeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
+      <div className="flex items-center gap-2">
+        <DataTableFacetedFilter
+          title="Events"
+          options={eventOptions}
+          selectedValues={selectedEventValues}
+          onFilterChange={setSelectedEventValues}
+        />
+        <SpendingPeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
+      </div>
     ),
-    [selectedPeriod],
+    [selectedPeriod, eventOptions, selectedEventValues],
   );
 
   // Pass actions to parent component
@@ -419,9 +428,6 @@ export default function SpendingPage({ renderActions }: SpendingPageProps) {
           selectedPeriod={selectedPeriod}
           currency={currency}
           isBalanceHidden={isBalanceHidden}
-          eventOptions={eventOptions}
-          selectedEventValues={selectedEventValues}
-          onFilterChange={setSelectedEventValues}
         />
         <Card className="flex flex-col">
           <CardHeader>
@@ -510,6 +516,13 @@ export default function SpendingPage({ renderActions }: SpendingPageProps) {
                   const categoryId = cat.categoryId || "uncategorized";
                   const isHidden = hiddenCategories.has(categoryId);
 
+                  // Calculate monthly average for this category
+                  const monthsWithCategory = Object.entries(
+                    periodSummary.byMonthByCategory,
+                  ).filter(([, catMap]) => (catMap[key] || 0) > 0).length;
+                  const categoryMonthlyAvg =
+                    monthsWithCategory > 0 ? cat.amount / monthsWithCategory : 0;
+
                   return (
                     <div
                       key={key}
@@ -553,8 +566,14 @@ export default function SpendingPage({ renderActions }: SpendingPageProps) {
                         <span className="text-muted-foreground text-xs">
                           {percentage.toFixed(1)}%
                         </span>
-                        <div className="text-destructive text-sm">
-                          <PrivacyAmount value={cat.amount} currency={currency} />
+                        <div className="text-right">
+                          <div className="text-destructive text-sm">
+                            <PrivacyAmount value={cat.amount} currency={currency} />
+                          </div>
+                          <div className="text-muted-foreground text-xs">
+                            <PrivacyAmount value={categoryMonthlyAvg} currency={currency} />
+                            /mo
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -583,6 +602,13 @@ export default function SpendingPage({ renderActions }: SpendingPageProps) {
                 const isHidden = hiddenSubcategories.has(subcategoryId);
                 const parentCategoryId = sub.categoryId || "uncategorized";
                 const isParentHidden = hiddenCategories.has(parentCategoryId);
+
+                // Calculate monthly average for this subcategory
+                const monthsWithSubcategory = Object.entries(
+                  periodSummary.byMonthBySubcategory || {},
+                ).filter(([, subMap]) => (subMap[key] || 0) > 0).length;
+                const subcategoryMonthlyAvg =
+                  monthsWithSubcategory > 0 ? sub.amount / monthsWithSubcategory : 0;
 
                 return (
                   <div
@@ -629,8 +655,14 @@ export default function SpendingPage({ renderActions }: SpendingPageProps) {
                       <span className="text-muted-foreground text-xs">
                         {percentage.toFixed(1)}%
                       </span>
-                      <div className="text-destructive text-sm font-medium">
-                        <PrivacyAmount value={sub.amount} currency={currency} />
+                      <div className="text-right">
+                        <div className="text-destructive text-sm font-medium">
+                          <PrivacyAmount value={sub.amount} currency={currency} />
+                        </div>
+                        <div className="text-muted-foreground text-xs">
+                          <PrivacyAmount value={subcategoryMonthlyAvg} currency={currency} />
+                          /mo
+                        </div>
                       </div>
                     </div>
                   </div>

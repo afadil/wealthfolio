@@ -56,13 +56,16 @@ export const getHoldings = async (accountId: string): Promise<Holding[]> => {
   }
 };
 
-export const getIncomeSummary = async (): Promise<IncomeSummary[]> => {
+export const getIncomeSummary = async (
+  includeEventIds?: string[],
+  includeAllEvents?: boolean,
+): Promise<IncomeSummary[]> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri("get_income_summary");
+        return invokeTauri("get_income_summary", { includeEventIds, includeAllEvents });
       case RUN_ENV.WEB:
-        return invokeWeb("get_income_summary");
+        return invokeWeb("get_income_summary", { includeEventIds, includeAllEvents });
       default:
         throw new Error(`Unsupported`);
     }
