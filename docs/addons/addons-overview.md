@@ -115,7 +115,7 @@ const accounts = await ctx.api.accounts.getAll();
 | `performance` | Medium     | calculateHistory, calculateSummary          |
 | `goals`       | Medium     | getAll, create, update, updateAllocations   |
 | `settings`    | Medium     | get, update, backupDatabase                 |
-| `files`       | Medium     | openCsvDialog, openSaveDialog               |
+| `files`       | Medium     | openSaveDialog                              |
 | `events`      | Low        | onDrop, onUpdateComplete, onSyncStart       |
 | `secrets`     | High       | set, get, delete                            |
 

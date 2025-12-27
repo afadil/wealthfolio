@@ -152,7 +152,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     id: 'files',
     name: 'File Operations',
     description: 'Access to file dialogs and file system operations',
-    functions: ['openCsvDialog', 'openSaveDialog'],
+    functions: ['openSaveDialog'],
     riskLevel: 'medium',
   },
   {

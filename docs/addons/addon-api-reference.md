@@ -715,17 +715,6 @@ Handle file operations and dialogs.
 
 ### Methods
 
-#### `openCsvDialog(): Promise<null | string | string[]>`
-
-Opens a CSV file selection dialog.
-
-```typescript
-const files = await ctx.api.files.openCsvDialog();
-if (files) {
-  // Process selected files
-}
-```
-
 #### `openSaveDialog(fileContent: Uint8Array | Blob | string, fileName: string): Promise<any>`
 
 Opens a file save dialog.
