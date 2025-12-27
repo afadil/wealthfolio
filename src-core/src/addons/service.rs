@@ -175,11 +175,7 @@ pub fn detect_addon_permissions(addon_files: &[AddonFile]) -> Vec<AddonPermissio
             vec!["get", "update", "backupDatabase"],
             "Access to application settings",
         ),
-        (
-            "files",
-            vec!["openCsvDialog", "openSaveDialog"],
-            "Access to file dialogs",
-        ),
+        ("files", vec!["openSaveDialog"], "Access to file dialogs"),
         (
             "events",
             vec![

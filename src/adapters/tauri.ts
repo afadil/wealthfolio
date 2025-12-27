@@ -97,10 +97,6 @@ export const getEnabledAddonsOnStartup = async (): Promise<ExtractedAddon[]> => 
   return await invoke<ExtractedAddon[]>("get_enabled_addons_on_startup");
 };
 
-export const openCsvFileDialogTauri = async (): Promise<null | string | string[]> => {
-  return open({ filters: [{ name: "CSV", extensions: ["csv"] }] });
-};
-
 export const openFolderDialogTauri = async (): Promise<string | null> => {
   return open({ directory: true });
 };

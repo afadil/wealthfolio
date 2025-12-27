@@ -25,7 +25,7 @@ import {
   updateContributionLimit,
 } from "@/commands/contribution-limits";
 import { addExchangeRate, getExchangeRates, updateExchangeRate } from "@/commands/exchange-rates";
-import { openCsvFileDialog, openFileSaveDialog } from "@/commands/file";
+import { openFileSaveDialog } from "@/commands/file";
 import {
   createGoal,
   getGoals,
@@ -268,7 +268,6 @@ export function createAddonContext(addonId: string): AddonContext {
           saveActivities,
 
           // File operations
-          openCsvFileDialog,
           openFileSaveDialog,
 
           // Event listeners - Import

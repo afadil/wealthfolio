@@ -443,12 +443,6 @@ export interface SettingsAPI {
  */
 export interface FilesAPI {
   /**
-   * Open CSV file dialog
-   * @returns Promise resolving to file path(s) or null if cancelled
-   */
-  openCsvDialog(): Promise<null | string | string[]>;
-
-  /**
    * Open file save dialog
    * @param fileContent File content to save
    * @param fileName Default file name

@@ -138,7 +138,7 @@ Based on the actual code, these are the permission categories:
 | `goals`               | getAll, create, update, updateAllocations   | Medium     |
 | `contribution-limits` | getAll, create, update, calculateDeposits   | Medium     |
 | `settings`            | get, update, backupDatabase                 | Medium     |
-| `files`               | openCsvDialog, openSaveDialog               | Medium     |
+| `files`               | openSaveDialog                              | Medium     |
 | `events`              | onDrop, onUpdateComplete, onSyncStart       | Low        |
 | `ui`                  | sidebar.addItem, router.add                 | Low        |
 | `secrets`             | set, get, delete                            | High       |

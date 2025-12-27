@@ -1,29 +1,11 @@
 import {
   getRunEnv,
-  openCsvFileDialogTauri,
   openFolderDialogTauri,
   openDatabaseFileDialogTauri,
   openFileSaveDialogTauri,
   RUN_ENV,
   logger,
 } from "@/adapters";
-
-// openCsvFileDialog
-export const openCsvFileDialog = async (): Promise<null | string | string[]> => {
-  try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return openCsvFileDialogTauri();
-      case RUN_ENV.WEB:
-        throw new Error(`Unsupported in web`);
-      default:
-        throw new Error(`Unsupported`);
-    }
-  } catch (error) {
-    logger.error("Error open csv file.");
-    throw error;
-  }
-};
 
 // openFolderDialog
 export const openFolderDialog = async (): Promise<string | null> => {

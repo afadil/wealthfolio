@@ -124,7 +124,6 @@ export interface InternalHostAPI {
   saveActivities(request: ActivityBulkMutationRequest): Promise<ActivityBulkMutationResult>;
 
   // File operations
-  openCsvFileDialog(): Promise<null | string | string[]>;
   openFileSaveDialog(fileContent: Uint8Array | Blob | string, fileName: string): Promise<unknown>;
 
   // Event listeners - Import
@@ -252,7 +251,6 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: s
       backupDatabase: internalAPI.backupDatabase,
     },
     files: {
-      openCsvDialog: internalAPI.openCsvFileDialog,
       openSaveDialog: internalAPI.openFileSaveDialog,
     },
 
