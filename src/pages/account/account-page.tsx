@@ -426,10 +426,10 @@ const AccountPage = () => {
               </div>
             </div>
 
-            <AccountHoldings accountId={id} />
+            {account?.accountType !== "CASH" && <AccountHoldings accountId={id} />}
           </>
         ) : (
-          <AccountHoldings accountId={id} showEmptyState={true} />
+          account?.accountType !== "CASH" && <AccountHoldings accountId={id} showEmptyState={true} />
         )}
       </PageContent>
     </Page>
