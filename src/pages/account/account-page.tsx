@@ -415,6 +415,8 @@ const AccountPage = () => {
 
               <div className="flex flex-col space-y-4">
                 <AccountMetrics
+                  accountId={id}
+                  accountType={account?.accountType}
                   valuation={currentValuation}
                   performance={accountPerformance}
                   className="grow"
