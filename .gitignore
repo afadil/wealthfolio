@@ -65,6 +65,9 @@ target/
 # Ignore Cargo.lock for library crates only (keep for binaries like src-server and src-tauri)
 src-core/**/Cargo.lock
 
+# Tauri
+src-tauri/gen/schemas/
+
 
 # OS generated files
 .DS_Store
