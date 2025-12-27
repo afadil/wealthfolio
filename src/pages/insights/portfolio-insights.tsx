@@ -1,13 +1,20 @@
-import { SwipablePage, SwipablePageView } from "@/components/page";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import IncomePage from "@/pages/income/income-page";
-import PerformancePage from "@/pages/performance/performance-page";
-import { Icons } from "@wealthfolio/ui";
-import { Suspense, useMemo } from "react";
+import {
+  Icons,
+  Page,
+  PageContent,
+  PageHeader,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@wealthfolio/ui";
+import { Suspense, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import HoldingsInsightsPage from "../holdings/holdings-insights-page";
+import PerformancePage from "@/pages/performance/performance-page";
 
-// Loading skeleton to show while the dashboard is loading
 const DashboardLoader = () => (
   <div className="flex h-full w-full flex-col space-y-4 p-4">
     <Card>
@@ -30,43 +37,52 @@ const DashboardLoader = () => (
   </div>
 );
 
+type InsightsTab = "holdings" | "performance";
+
 export default function PortfolioInsightsPage() {
-  // Define the views with icons
-  const views: SwipablePageView[] = useMemo(
-    () => [
-      {
-        value: "holdings",
-        label: "Holdings",
-        icon: Icons.PieChart,
-        content: (
-          <Suspense fallback={<DashboardLoader />}>
-            <HoldingsInsightsPage />
-          </Suspense>
-        ),
-      },
-      {
-        value: "performance",
-        label: "Performance",
-        icon: Icons.TrendingUp,
-        content: (
-          <Suspense fallback={<DashboardLoader />}>
-            <PerformancePage />
-          </Suspense>
-        ),
-      },
-      {
-        value: "income",
-        label: "Income",
-        icon: Icons.HandCoins,
-        content: (
-          <Suspense fallback={<DashboardLoader />}>
-            <IncomePage />
-          </Suspense>
-        ),
-      },
-    ],
-    [],
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get("tab") as InsightsTab | null;
+  const currentTab: InsightsTab = tabFromUrl === "performance" ? "performance" : "holdings";
+
+  const handleTabChange = useCallback(
+    (value: string) => {
+      setSearchParams({ tab: value }, { replace: true });
+    },
+    [setSearchParams],
   );
 
-  return <SwipablePage views={views} defaultView="holdings" withPadding={true} />;
+  return (
+    <Page>
+      <Tabs value={currentTab} onValueChange={handleTabChange}>
+        <PageHeader>
+          <TabsList>
+            <TabsTrigger value="holdings">
+              <Icons.PieChart className="mr-2 size-4" />
+              Holdings
+            </TabsTrigger>
+            <TabsTrigger value="performance">
+              <Icons.TrendingUp className="mr-2 size-4" />
+              Performance
+            </TabsTrigger>
+          </TabsList>
+        </PageHeader>
+        <PageContent withPadding={false}>
+          <TabsContent value="holdings" className="mt-0">
+            <Suspense fallback={<DashboardLoader />}>
+              <div className="px-2 pt-2 pb-2 lg:px-4 lg:pb-4">
+                <HoldingsInsightsPage />
+              </div>
+            </Suspense>
+          </TabsContent>
+          <TabsContent value="performance" className="mt-0">
+            <Suspense fallback={<DashboardLoader />}>
+              <div className="px-2 pt-2 pb-2 lg:px-4 lg:pb-4">
+                <PerformancePage />
+              </div>
+            </Suspense>
+          </TabsContent>
+        </PageContent>
+      </Tabs>
+    </Page>
+  );
 }

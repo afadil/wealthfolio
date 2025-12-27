@@ -11,7 +11,9 @@ pub use activities_model::{
     Activity, ActivityBulkIdentifierMapping, ActivityBulkMutationError,
     ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityDB, ActivityDetails,
     ActivityImport, ActivitySearchResponse, ActivitySearchResponseMeta, ActivityType,
-    ActivityUpdate, ImportMapping, ImportMappingData, NewActivity, Sort,
+    ActivityUpdate, DailySpending, DailySpendingRow, ImportMapping, ImportMappingData,
+    MonthMetricsRequest, MonthMetricsResponse, MonthMetricsPrev, NewActivity, Sort,
+    SpendingTrendsRequest, SpendingTrendsResponse,
 };
 pub use activities_repository::ActivityRepository;
 pub use activities_service::ActivityService;

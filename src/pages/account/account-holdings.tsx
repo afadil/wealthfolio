@@ -59,9 +59,7 @@ const AccountHoldings = ({ accountId, showEmptyState = true }: AccountHoldingsPr
             <Button
               size="default"
               onClick={() =>
-                navigate(
-                  `/activities/manage?account=${accountId}&redirect-to=/accounts/${accountId}`,
-                )
+                navigate(`/activity/manage?account=${accountId}&redirect-to=/accounts/${accountId}`)
               }
             >
               <Icons.Plus className="mr-2 h-4 w-4" />
@@ -70,7 +68,7 @@ const AccountHoldings = ({ accountId, showEmptyState = true }: AccountHoldingsPr
             <Button
               size="default"
               variant="outline"
-              onClick={() => navigate(`/import?account=${accountId}`)}
+              onClick={() => navigate(`/activity/import?account=${accountId}`)}
             >
               <Icons.Import className="mr-2 h-4 w-4" />
               Import from CSV

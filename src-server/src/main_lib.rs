@@ -9,8 +9,13 @@ use wealthfolio_core::{
     activities::{
         ActivityRepository, ActivityService as CoreActivityService, ActivityServiceTrait,
     },
+    activity_rules::{ActivityRuleRepository, ActivityRuleService, ActivityRuleServiceTrait},
     assets::{AssetRepository, AssetService, AssetServiceTrait},
+    budget::{BudgetRepository, BudgetService, BudgetServiceTrait},
+    categories::{CategoryRepository, CategoryService, CategoryServiceTrait},
     db::{self, write_actor},
+    event_types::{EventTypeRepository, EventTypeService, EventTypeServiceTrait},
+    events::{EventRepository, EventService, EventServiceTrait},
     fx::{FxRepository, FxService, FxServiceTrait},
     goals::{GoalRepository, GoalService, GoalServiceTrait},
     limits::{
@@ -28,6 +33,7 @@ use wealthfolio_core::{
     },
     secrets::SecretStore,
     settings::{settings_repository::SettingsRepository, SettingsService, SettingsServiceTrait},
+    spending::{SpendingService, SpendingServiceTrait},
 };
 
 pub struct AppState {
@@ -41,11 +47,17 @@ pub struct AppState {
     pub performance_service:
         Arc<dyn wealthfolio_core::portfolio::performance::PerformanceServiceTrait + Send + Sync>,
     pub income_service: Arc<dyn IncomeServiceTrait + Send + Sync>,
+    pub spending_service: Arc<dyn SpendingServiceTrait + Send + Sync>,
     pub goal_service: Arc<dyn GoalServiceTrait + Send + Sync>,
+    pub budget_service: Arc<dyn BudgetServiceTrait + Send + Sync>,
     pub limits_service: Arc<dyn ContributionLimitServiceTrait + Send + Sync>,
     pub fx_service: Arc<dyn FxServiceTrait + Send + Sync>,
     pub activity_service: Arc<dyn ActivityServiceTrait + Send + Sync>,
     pub asset_service: Arc<dyn AssetServiceTrait + Send + Sync>,
+    pub category_service: Arc<dyn CategoryServiceTrait + Send + Sync>,
+    pub activity_rule_service: Arc<dyn ActivityRuleServiceTrait + Send + Sync>,
+    pub event_type_service: Arc<dyn EventTypeServiceTrait + Send + Sync>,
+    pub event_service: Arc<dyn EventServiceTrait + Send + Sync>,
     pub addons_root: String,
     pub data_root: String,
     pub db_path: String,
@@ -177,8 +189,25 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         base_currency.clone(),
     ));
 
+    let spending_service: Arc<dyn SpendingServiceTrait + Send + Sync> =
+        Arc::new(SpendingService::new(
+            fx_service.clone(),
+            activity_repository.clone(),
+            base_currency.clone(),
+        ));
+
     let goal_repository = Arc::new(GoalRepository::new(pool.clone(), writer.clone()));
-    let goal_service = Arc::new(GoalService::new(goal_repository));
+    let goal_service = Arc::new(GoalService::new(
+        goal_repository,
+        account_repo.clone(),
+        valuation_repository.clone(),
+    ));
+
+    let budget_repository = Arc::new(BudgetRepository::new(pool.clone(), writer.clone()));
+    let budget_service: Arc<dyn BudgetServiceTrait + Send + Sync> = Arc::new(BudgetService::new(
+        budget_repository,
+        spending_service.clone(),
+    ));
 
     let limits_repository = Arc::new(ContributionLimitRepository::new(
         pool.clone(),
@@ -191,12 +220,35 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             activity_repository.clone(),
         ));
 
+    let category_repository = Arc::new(CategoryRepository::new(pool.clone(), writer.clone()));
+    let category_service: Arc<dyn CategoryServiceTrait + Send + Sync> =
+        Arc::new(CategoryService::new(category_repository.clone()));
+
+    let activity_rule_repository =
+        Arc::new(ActivityRuleRepository::new(pool.clone(), writer.clone()));
+    let activity_rule_service: Arc<dyn ActivityRuleServiceTrait + Send + Sync> =
+        Arc::new(ActivityRuleService::new(
+            activity_rule_repository,
+            category_repository,
+        ));
+
+    let event_type_repository =
+        Arc::new(EventTypeRepository::new(pool.clone(), writer.clone()));
+    let event_type_service: Arc<dyn EventTypeServiceTrait + Send + Sync> =
+        Arc::new(EventTypeService::new(event_type_repository.clone()));
+
+    let event_repository = Arc::new(EventRepository::new(pool.clone(), writer.clone()));
+    let event_service: Arc<dyn EventServiceTrait + Send + Sync> =
+        Arc::new(EventService::new(event_repository, event_type_repository));
+
+    // Create activity service with event service for dynamic date recalculation
     let activity_service: Arc<dyn ActivityServiceTrait + Send + Sync> =
-        Arc::new(CoreActivityService::new(
+        Arc::new(CoreActivityService::with_event_service(
             activity_repository.clone(),
             account_service.clone(),
             asset_service.clone(),
             fx_service.clone(),
+            event_service.clone(),
         ));
 
     // Determine data root directory (parent of DB path)
@@ -221,11 +273,17 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         snapshot_service,
         performance_service,
         income_service,
+        spending_service,
         goal_service,
+        budget_service,
         limits_service,
         fx_service: fx_service.clone(),
         activity_service,
         asset_service,
+        category_service,
+        activity_rule_service,
+        event_type_service,
+        event_service,
         addons_root: config.addons_root.clone(),
         data_root,
         db_path,

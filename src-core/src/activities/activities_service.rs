@@ -1,5 +1,6 @@
 use chrono::Utc;
 use log::debug;
+use rust_decimal::Decimal;
 use std::sync::Arc;
 
 use crate::accounts::{Account, AccountServiceTrait};
@@ -7,6 +8,7 @@ use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
 use crate::activities::{ActivityRepositoryTrait, ActivityServiceTrait};
 use crate::assets::AssetServiceTrait;
+use crate::events::events_traits::EventServiceTrait;
 use crate::fx::FxServiceTrait;
 use crate::Result;
 use uuid::Uuid;
@@ -17,6 +19,7 @@ pub struct ActivityService {
     account_service: Arc<dyn AccountServiceTrait>,
     asset_service: Arc<dyn AssetServiceTrait>,
     fx_service: Arc<dyn FxServiceTrait>,
+    event_service: Option<Arc<dyn EventServiceTrait>>,
 }
 
 impl ActivityService {
@@ -32,6 +35,24 @@ impl ActivityService {
             account_service,
             asset_service,
             fx_service,
+            event_service: None,
+        }
+    }
+
+    /// Creates a new ActivityService with event service for dynamic date recalculation
+    pub fn with_event_service(
+        activity_repository: Arc<dyn ActivityRepositoryTrait>,
+        account_service: Arc<dyn AccountServiceTrait>,
+        asset_service: Arc<dyn AssetServiceTrait>,
+        fx_service: Arc<dyn FxServiceTrait>,
+        event_service: Arc<dyn EventServiceTrait>,
+    ) -> Self {
+        Self {
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            event_service: Some(event_service),
         }
     }
 }
@@ -153,16 +174,38 @@ impl ActivityServiceTrait for ActivityService {
         page_size: i64,
         account_id_filter: Option<Vec<String>>,
         activity_type_filter: Option<Vec<String>>,
+        category_id_filter: Option<Vec<String>>,
+        event_id_filter: Option<Vec<String>>,
         asset_id_keyword: Option<String>,
+        account_type_filter: Option<Vec<String>>,
+        is_categorized_filter: Option<bool>,
+        has_event_filter: Option<bool>,
+        amount_min_filter: Option<Decimal>,
+        amount_max_filter: Option<Decimal>,
+        start_date_filter: Option<String>,
+        end_date_filter: Option<String>,
         sort: Option<Sort>,
+        recurrence_filter: Option<Vec<String>>,
+        has_recurrence_filter: Option<bool>,
     ) -> Result<ActivitySearchResponse> {
         self.activity_repository.search_activities(
             page,
             page_size,
             account_id_filter,
             activity_type_filter,
+            category_id_filter,
+            event_id_filter,
             asset_id_keyword,
+            account_type_filter,
+            is_categorized_filter,
+            has_event_filter,
+            amount_min_filter,
+            amount_max_filter,
+            start_date_filter,
+            end_date_filter,
             sort,
+            recurrence_filter,
+            has_recurrence_filter,
         )
     }
 
@@ -375,6 +418,11 @@ impl ActivityServiceTrait for ActivityService {
                 amount: activity.amount,
                 is_draft: activity.is_draft,
                 comment: activity.comment.clone(),
+                name: activity.name.clone(),
+                category_id: activity.category_id.clone(),
+                sub_category_id: activity.sub_category_id.clone(),
+                event_id: activity.event_id.clone(),
+                recurrence: activity.recurrence.clone(),
             })
             .collect();
 
@@ -421,4 +469,227 @@ impl ActivityServiceTrait for ActivityService {
             .await?;
         Ok(mapping_data)
     }
+
+    /// Gets top spending transactions for a given month
+    fn get_top_spending_transactions(
+        &self,
+        month: String,
+        limit: i64,
+        include_event_ids: Option<Vec<String>>,
+        include_all_events: bool,
+        category_id: Option<String>,
+    ) -> Result<Vec<ActivityDetails>> {
+        self.activity_repository.get_top_spending_transactions(
+            &month,
+            limit,
+            include_event_ids.as_deref(),
+            include_all_events,
+            category_id.as_deref(),
+        )
+    }
+
+    /// Gets spending trends for a given month with comparison to historical averages
+    fn get_spending_trends(&self, request: SpendingTrendsRequest) -> Result<SpendingTrendsResponse> {
+        use chrono::{NaiveDate, Datelike};
+
+        // Parse the target month
+        let target_date = NaiveDate::parse_from_str(&format!("{}-01", request.month), "%Y-%m-%d")
+            .map_err(|e| crate::Error::from(ActivityError::InvalidData(format!("Invalid month format: {}", e))))?;
+
+        // Get number of days in the target month
+        let days_in_month = get_days_in_month(target_date.year(), target_date.month());
+
+        // Get daily spending for the current month
+        let current_daily = self.activity_repository.get_daily_spending_for_month(
+            &request.month,
+            request.category_ids.as_deref(),
+            request.subcategory_ids.as_deref(),
+            request.include_event_ids.as_deref(),
+            request.include_all_events,
+        )?;
+
+        // Convert to cumulative spending
+        let current_cumulative = daily_to_cumulative(&current_daily, days_in_month);
+
+        // Helper to compute average cumulative for N months
+        let compute_avg = |num_months: i32| -> Vec<f64> {
+            let mut cumulative_sum = vec![0.0f64; 31];
+            let mut valid_months = 0;
+
+            for i in 1..=num_months {
+                let prev_date = target_date
+                    .checked_sub_months(chrono::Months::new(i as u32))
+                    .unwrap_or(target_date);
+                let month = format!("{}-{:02}", prev_date.year(), prev_date.month());
+
+                if let Ok(daily) = self.activity_repository.get_daily_spending_for_month(
+                    &month,
+                    request.category_ids.as_deref(),
+                    request.subcategory_ids.as_deref(),
+                    request.include_event_ids.as_deref(),
+                    request.include_all_events,
+                ) {
+                    if let Ok(date) = NaiveDate::parse_from_str(&format!("{}-01", month), "%Y-%m-%d") {
+                        let days = get_days_in_month(date.year(), date.month());
+                        let cumulative = daily_to_cumulative(&daily, days);
+
+                        // Get the final cumulative value to carry forward for shorter months
+                        let final_value = cumulative.last().copied().unwrap_or(0.0);
+
+                        // Add to sum, carrying forward final value for shorter months
+                        for day_idx in 0..31 {
+                            if day_idx < cumulative.len() {
+                                cumulative_sum[day_idx] += cumulative[day_idx];
+                            } else {
+                                // Carry forward the final value for shorter months
+                                cumulative_sum[day_idx] += final_value;
+                            }
+                        }
+                        valid_months += 1;
+                    }
+                }
+            }
+
+            // Calculate average, trimmed to target month's days
+            if valid_months > 0 {
+                cumulative_sum
+                    .iter()
+                    .take(days_in_month as usize)
+                    .map(|v| v / valid_months as f64)
+                    .collect()
+            } else {
+                vec![0.0; days_in_month as usize]
+            }
+        };
+
+        // Compute all three averages
+        let avg_3_month = compute_avg(3);
+        let avg_6_month = compute_avg(6);
+        let avg_9_month = compute_avg(9);
+
+        Ok(SpendingTrendsResponse {
+            current_month: DailySpending {
+                month: request.month.clone(),
+                cumulative: current_cumulative,
+            },
+            avg_3_month: DailySpending {
+                month: "3-month avg".to_string(),
+                cumulative: avg_3_month,
+            },
+            avg_6_month: DailySpending {
+                month: "6-month avg".to_string(),
+                cumulative: avg_6_month,
+            },
+            avg_9_month: DailySpending {
+                month: "9-month avg".to_string(),
+                cumulative: avg_9_month,
+            },
+        })
+    }
+
+    /// Gets month metrics including average, median, count and comparisons
+    fn get_month_metrics(&self, request: MonthMetricsRequest) -> Result<MonthMetricsResponse> {
+        use chrono::{NaiveDate, Datelike};
+
+        // Parse the target month
+        let target_date = NaiveDate::parse_from_str(&format!("{}-01", request.month), "%Y-%m-%d")
+            .map_err(|e| crate::Error::from(ActivityError::InvalidData(format!("Invalid month format: {}", e))))?;
+
+        // Get transaction amounts for current month
+        let amounts = self.activity_repository.get_month_transaction_amounts(
+            &request.month,
+            request.include_event_ids.as_deref(),
+            request.include_all_events,
+        )?;
+
+        let count = amounts.len() as i64;
+        let total: f64 = amounts.iter().sum();
+        let avg = if count > 0 { total / count as f64 } else { 0.0 };
+
+        // Calculate median
+        let median = if amounts.is_empty() {
+            0.0
+        } else {
+            let mid = amounts.len() / 2;
+            if amounts.len() % 2 == 0 {
+                (amounts[mid - 1] + amounts[mid]) / 2.0
+            } else {
+                amounts[mid]
+            }
+        };
+
+        // Get previous month data for comparison
+        let prev_date = target_date
+            .checked_sub_months(chrono::Months::new(1))
+            .unwrap_or(target_date);
+        let prev_month = format!("{}-{:02}", prev_date.year(), prev_date.month());
+
+        let prev_amounts = self.activity_repository.get_month_transaction_amounts(
+            &prev_month,
+            request.include_event_ids.as_deref(),
+            request.include_all_events,
+        )?;
+        let prev_count = prev_amounts.len() as i64;
+        let prev_total: f64 = prev_amounts.iter().sum();
+        let prev_avg = if prev_count > 0 { prev_total / prev_count as f64 } else { 0.0 };
+
+        let prev_month_data = if prev_count > 0 {
+            Some(MonthMetricsPrev {
+                avg_change_percent: if prev_avg > 0.0 { Some(((avg - prev_avg) / prev_avg) * 100.0) } else { None },
+                count_change_percent: if prev_count > 0 { Some(((count as f64 - prev_count as f64) / prev_count as f64) * 100.0) } else { None },
+                total_change_percent: if prev_total > 0.0 { Some(((total - prev_total) / prev_total) * 100.0) } else { None },
+            })
+        } else {
+            None
+        };
+
+        let recurrence_breakdown = self.activity_repository.get_month_recurrence_totals(
+            &request.month,
+            request.include_event_ids.as_deref(),
+            request.include_all_events,
+        )?;
+
+        Ok(MonthMetricsResponse {
+            avg_transaction_size: avg,
+            transaction_count: count,
+            median_transaction: median,
+            total_spending: total,
+            prev_month: prev_month_data,
+            recurrence_breakdown,
+        })
+    }
+}
+
+/// Convert daily spending rows to cumulative spending array
+fn daily_to_cumulative(daily: &[DailySpendingRow], days_in_month: u32) -> Vec<f64> {
+    let mut cumulative = vec![0.0f64; days_in_month as usize];
+    let mut running_total = 0.0;
+
+    // Create a map of day -> amount
+    let day_amounts: std::collections::HashMap<i32, f64> = daily
+        .iter()
+        .map(|d| (d.day, d.amount))
+        .collect();
+
+    for day in 1..=days_in_month as i32 {
+        if let Some(&amount) = day_amounts.get(&day) {
+            running_total += amount;
+        }
+        cumulative[(day - 1) as usize] = running_total;
+    }
+
+    cumulative
+}
+
+/// Get number of days in a month
+fn get_days_in_month(year: i32, month: u32) -> u32 {
+    use chrono::{NaiveDate, Datelike};
+    if month == 12 {
+        NaiveDate::from_ymd_opt(year + 1, 1, 1)
+    } else {
+        NaiveDate::from_ymd_opt(year, month + 1, 1)
+    }
+    .and_then(|d| d.pred_opt())
+    .map(|d| Datelike::day(&d))
+    .unwrap_or(30)
 }

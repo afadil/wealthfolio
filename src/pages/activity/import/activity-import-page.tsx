@@ -2,8 +2,10 @@ import { logger } from "@/adapters";
 import { getAccounts } from "@/commands/account";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { usePlatform } from "@/hooks/use-platform";
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, ActivityImport, ImportMappingData } from "@/lib/types";
+import { AccountType } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { AlertFeedback, Page, PageContent, PageHeader } from "@wealthfolio/ui";
 import { AnimatePresence, motion } from "motion/react";
@@ -26,7 +28,7 @@ const STEPS = [
   { id: 4, title: "Import Results" },
 ];
 
-const ActivityImportPage = () => {
+function ActivityImportPage() {
   const navigate = useNavigate();
   const { isMobile } = usePlatform();
   const [currentStep, setCurrentStep] = useState(1);
@@ -38,7 +40,12 @@ const ActivityImportPage = () => {
     queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
   });
-  const accounts = accountsData ?? [];
+
+  // Filter to only show SECURITIES and CRYPTOCURRENCY accounts (investment accounts)
+  const accounts = (accountsData ?? []).filter(
+    (acc) =>
+      acc.accountType === AccountType.SECURITIES || acc.accountType === AccountType.CRYPTOCURRENCY,
+  );
 
   // Pre-select account from URL params
   React.useEffect(() => {
@@ -64,6 +71,16 @@ const ActivityImportPage = () => {
     parseCsvFile,
     resetParserStates,
   } = useCsvParser();
+
+  // Track if user has unsaved import progress (past step 1 with data, but not on results step)
+  const hasUnsavedChanges =
+    currentStep > 1 && currentStep < STEPS.length && (data.length > 0 || activities.length > 0);
+
+  const { UnsavedChangesDialog } = useUnsavedChanges({
+    hasUnsavedChanges,
+    message:
+      "You have an import in progress. Are you sure you want to leave? Your import progress will be lost.",
+  });
 
   // Reset the entire import process
   const resetImportProcess = () => {
@@ -181,15 +198,11 @@ const ActivityImportPage = () => {
 
   return (
     <Page>
+      <UnsavedChangesDialog />
       <PageHeader
-        heading="Import Activities"
-        onBack={isMobile ? () => navigate("/activities") : undefined}
-        actions={
-          <>
-            {isMobile && <ImportHelpPopover />}
-            {!isMobile && <ImportHelpPopover />}
-          </>
-        }
+        heading="Import Trades"
+        onBack={isMobile ? () => navigate("/activity") : undefined}
+        actions={<ImportHelpPopover />}
       />
       <PageContent withPadding={false}>
         <ErrorBoundary>
@@ -218,7 +231,7 @@ const ActivityImportPage = () => {
       </PageContent>
     </Page>
   );
-};
+}
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }> {
   override state = { hasError: false, error: null };

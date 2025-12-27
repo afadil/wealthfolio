@@ -34,19 +34,46 @@ export function tryParseDate(dateStr: string): Date | null {
     "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", // Added Standard ISO format with milliseconds
     "yyyy-MM-dd'T'HH:mm:ss.SSSSSSXXX", // Added Standard ISO timestamp with microsecond precision and timezone offset
 
-    // ISO and Technical Formats
+    // ISO and Technical Formats with Time
+    "yyyy-MM-dd HH:mm:ss", // "2024-05-01 14:30:00"
+    "yyyy-MM-dd HH:mm", // "2024-05-01 14:30"
+    "yyyy/MM/dd HH:mm:ss", // "2024/05/01 14:30:00"
+    "yyyy/MM/dd HH:mm", // "2024/05/01 14:30"
+    "yyyy/M/d HH:mm:ss", // "2024/5/1 14:30:00" - Relaxed
+    "yyyy/M/d HH:mm", // "2024/5/1 14:30" - Relaxed
+    "yyyy/M/d H:mm", // "2024/5/1 4:30" - Relaxed single digit hour
+
+    // ISO and Technical Formats (date only)
     "yyyy-MM-dd", // "2024-05-01" - ISO 8601
     "yyyyMMdd", // "20240501" - Compact ISO
     "yyyy/MM/dd", // "2024/05/01" - Modified ISO
+    "yyyy/M/d", // "2024/5/1" - Modified ISO Relaxed
     "yyyy.MM.dd", // "2024.05.01" - Modified ISO
 
-    // North American Banking Formats
+    // North American Banking Formats with Time
+    "MM/dd/yyyy HH:mm:ss", // "05/01/2024 14:30:00"
+    "MM/dd/yyyy HH:mm", // "05/01/2024 14:30"
+    "M/d/yyyy HH:mm:ss", // "5/1/2024 14:30:00"
+    "M/d/yyyy HH:mm", // "5/1/2024 14:30"
+    "M/d/yyyy H:mm", // "5/1/2024 4:30" - Single digit hour
+
+    // North American Banking Formats (date only)
     "MMM dd yyyy", // "MAY 01 2024" - Common in North American banks
     "MMMM dd yyyy", // "MAY 01 2024" (full month)
     "MM/dd/yyyy", // "05/01/2024" - US Standard
     "M/d/yyyy", // "5/1/2024" - US Relaxed
+    "MM/dd/yy", // "05/01/24" - US Short Year
+    "M/d/yy", // "5/1/24" - US Short Year Relaxed
 
-    // European Banking Formats
+    // European Banking Formats with Time
+    "dd/MM/yyyy HH:mm:ss", // "01/05/2024 14:30:00"
+    "dd/MM/yyyy HH:mm", // "01/05/2024 14:30"
+    "d/M/yyyy HH:mm:ss", // "1/5/2024 14:30:00"
+    "d/M/yyyy HH:mm", // "1/5/2024 14:30"
+    "dd.MM.yyyy HH:mm:ss", // "01.05.2024 14:30:00"
+    "dd.MM.yyyy HH:mm", // "01.05.2024 14:30"
+
+    // European Banking Formats (date only)
     "dd/MM/yyyy", // "01/05/2024" - UK/EU Standard
     "d/M/yyyy", // "1/5/2024" - UK/EU Relaxed
     "dd.MM.yyyy", // "01.05.2024" - German/Swiss/Russian

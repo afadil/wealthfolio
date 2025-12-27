@@ -1,6 +1,7 @@
 use std::sync::{Arc, RwLock};
 use wealthfolio_core::{
-    self, accounts, activities, assets, fx, goals, limits, market_data, portfolio, settings,
+    self, accounts, activities, activity_rules, assets, budget, categories, event_types, events,
+    fx, goals, limits, market_data, portfolio, settings, spending,
 };
 pub struct ServiceContext {
     pub base_currency: Arc<RwLock<String>>,
@@ -17,9 +18,15 @@ pub struct ServiceContext {
     pub fx_service: Arc<dyn fx::FxServiceTrait>,
     pub performance_service: Arc<dyn portfolio::performance::PerformanceServiceTrait>,
     pub income_service: Arc<dyn portfolio::income::IncomeServiceTrait>,
+    pub spending_service: Arc<dyn spending::SpendingServiceTrait>,
     pub snapshot_service: Arc<dyn portfolio::snapshot::SnapshotServiceTrait>,
     pub holdings_service: Arc<dyn portfolio::holdings::HoldingsServiceTrait>,
     pub valuation_service: Arc<dyn portfolio::valuation::ValuationServiceTrait>,
+    pub category_service: Arc<dyn categories::CategoryServiceTrait>,
+    pub activity_rule_service: Arc<dyn activity_rules::ActivityRuleServiceTrait>,
+    pub event_type_service: Arc<dyn event_types::EventTypeServiceTrait>,
+    pub event_service: Arc<dyn events::EventServiceTrait>,
+    pub budget_service: Arc<dyn budget::BudgetServiceTrait>,
 }
 
 impl ServiceContext {
@@ -71,6 +78,10 @@ impl ServiceContext {
         Arc::clone(&self.income_service)
     }
 
+    pub fn spending_service(&self) -> Arc<dyn spending::SpendingServiceTrait> {
+        Arc::clone(&self.spending_service)
+    }
+
     pub fn snapshot_service(&self) -> Arc<dyn portfolio::snapshot::SnapshotServiceTrait> {
         Arc::clone(&self.snapshot_service)
     }
@@ -81,5 +92,25 @@ impl ServiceContext {
 
     pub fn valuation_service(&self) -> Arc<dyn portfolio::valuation::ValuationServiceTrait> {
         Arc::clone(&self.valuation_service)
+    }
+
+    pub fn category_service(&self) -> Arc<dyn categories::CategoryServiceTrait> {
+        Arc::clone(&self.category_service)
+    }
+
+    pub fn activity_rule_service(&self) -> Arc<dyn activity_rules::ActivityRuleServiceTrait> {
+        Arc::clone(&self.activity_rule_service)
+    }
+
+    pub fn event_type_service(&self) -> Arc<dyn event_types::EventTypeServiceTrait> {
+        Arc::clone(&self.event_type_service)
+    }
+
+    pub fn event_service(&self) -> Arc<dyn events::EventServiceTrait> {
+        Arc::clone(&self.event_service)
+    }
+
+    pub fn budget_service(&self) -> Arc<dyn budget::BudgetServiceTrait> {
+        Arc::clone(&self.budget_service)
     }
 }

@@ -9,7 +9,7 @@ import { updateQuote } from "@/commands/market-data";
 import { toast } from "@/components/ui/use-toast";
 import { isCashActivity } from "@/lib/activity-utils";
 import { DataSource } from "@/lib/constants";
-import { QueryKeys } from "@/lib/query-keys";
+import { invalidateActivityQueries, QueryKeys } from "@/lib/query-keys";
 import {
   ActivityBulkMutationRequest,
   ActivityBulkMutationResult,
@@ -76,7 +76,7 @@ export function useActivityMutations(
 
   const createMutationOptions = (action: string) => ({
     onSuccess: (activity: { accountId?: string | null }) => {
-      queryClient.invalidateQueries();
+      invalidateActivityQueries(queryClient);
       if (onSuccess) onSuccess(activity);
     },
     onError: (error: string) => {
@@ -172,7 +172,7 @@ export function useActivityMutations(
       return result;
     },
     onSuccess: (_result: ActivityBulkMutationResult) => {
-      queryClient.invalidateQueries();
+      invalidateActivityQueries(queryClient);
     },
     onError: (error: string) => {
       logger.error(`Error saving activities: ${String(error)}`);

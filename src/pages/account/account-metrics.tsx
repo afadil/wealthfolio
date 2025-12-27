@@ -16,11 +16,15 @@ import {
   Separator,
   Skeleton,
 } from "@wealthfolio/ui";
-import { AccountValuation, PerformanceMetrics } from "@/lib/types";
+import { getAccountFreeCash } from "@/commands/goal";
+import { AccountFreeCash, AccountValuation, PerformanceMetrics } from "@/lib/types";
+import { AccountType } from "@/lib/constants";
 import { PerformanceGrid } from "@/pages/account/performance-grid";
 import { formatDate } from "@/lib/utils";
-
+import { QueryKeys } from "@/lib/query-keys";
+import { useQuery } from "@tanstack/react-query";
 import { useBalanceUpdate } from "./use-balance-update";
+import { Link } from "react-router-dom";
 
 interface EditableBalanceProps {
   account: AccountValuation;
@@ -85,6 +89,8 @@ const EditableBalance: React.FC<EditableBalanceProps> = ({ account, initialBalan
 };
 
 interface AccountMetricsProps {
+  accountId: string;
+  accountType?: AccountType;
   valuation?: AccountValuation | null;
   performance?: PerformanceMetrics | null;
   className?: string;
@@ -92,12 +98,25 @@ interface AccountMetricsProps {
 }
 
 const AccountMetrics: React.FC<AccountMetricsProps> = ({
+  accountId,
+  accountType,
   valuation,
   performance,
   className,
   isLoading,
 }) => {
-  if (isLoading || !performance || !valuation)
+  const isCashAccount = accountType === "CASH";
+
+  const { data: freeCashData } = useQuery<AccountFreeCash[], Error>({
+    queryKey: [QueryKeys.ACCOUNT_FREE_CASH, accountId],
+    queryFn: () => getAccountFreeCash([accountId]),
+    enabled: isCashAccount && !!accountId,
+  });
+
+  const accountFreeCash = freeCashData?.[0];
+  const hasContributions = accountFreeCash && accountFreeCash.totalContributions > 0;
+
+  if (isLoading || !valuation)
     return (
       <Card className={className}>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -120,8 +139,7 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
               <Skeleton className="h-4 w-24" />
             </div>
           </div>
-
-          <PerformanceGrid isLoading={true} />
+          {!isCashAccount && <PerformanceGrid isLoading={true} />}
         </CardContent>
         <CardFooter className="flex justify-end pb-0">
           <Skeleton className="h-3 w-48" />
@@ -131,6 +149,58 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
 
   const displayCurrency = valuation?.accountCurrency || valuation?.baseCurrency;
 
+  if (isCashAccount) {
+    return (
+      <Card className={className}>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-lg font-bold">Balance</CardTitle>
+          {valuation && (
+            <EditableBalance
+              account={valuation}
+              initialBalance={valuation?.cashBalance || 0}
+              currency={displayCurrency}
+            />
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Separator />
+          {hasContributions ? (
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Allocated to Goals</span>
+                <span className="font-medium text-primary">
+                  <PrivacyAmount
+                    value={accountFreeCash.totalContributions}
+                    currency={displayCurrency}
+                  />
+                </span>
+              </div>
+              <Separator />
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Available Balance</span>
+                <span className={`font-medium ${accountFreeCash.freeCash < 0 ? "text-destructive" : ""}`}>
+                  <PrivacyAmount value={accountFreeCash.freeCash} currency={displayCurrency} />
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="text-muted-foreground py-2 text-center text-sm">
+              <p>No savings goals allocated</p>
+              <Link
+                to="/settings/goals"
+                className="text-primary hover:text-primary/80 mt-1 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
+              >
+                Set up goals
+                <Icons.ChevronRight className="h-3 w-3" />
+              </Link>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Non-cash accounts: show investments/performance metrics
   const rows = [
     {
       label: "Investments",

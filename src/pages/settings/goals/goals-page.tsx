@@ -1,33 +1,43 @@
-import { getGoals, getGoalsAllocation } from "@/commands/goal";
+import { getGoalsWithContributions, getAccountFreeCash } from "@/commands/goal";
 import { useAccounts } from "@/hooks/use-accounts";
 import { QueryKeys } from "@/lib/query-keys";
-import type { Goal, GoalAllocation } from "@/lib/types";
+import type { Goal, GoalWithContributions, AccountFreeCash } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { Button, EmptyPlaceholder, Icons, Separator, Skeleton } from "@wealthfolio/ui";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { SettingsHeader } from "../settings-header";
-import GoalsAllocations from "./components/goal-allocations";
+import GoalContributions from "./components/goal-contributions";
 import { GoalEditModal } from "./components/goal-edit-modal";
-import { GoalItem } from "./components/goal-item";
 import { useGoalMutations } from "./use-goal-mutations";
 
 const SettingsGoalsPage = () => {
-  const { data: goals, isLoading } = useQuery<Goal[], Error>({
-    queryKey: [QueryKeys.GOALS],
-    queryFn: getGoals,
-  });
-
-  const { data: allocations } = useQuery<GoalAllocation[], Error>({
-    queryKey: [QueryKeys.GOALS_ALLOCATIONS],
-    queryFn: getGoalsAllocation,
+  const { data: goalsWithContributions, isLoading: isLoadingContributions } = useQuery<
+    GoalWithContributions[],
+    Error
+  >({
+    queryKey: [QueryKeys.GOALS_WITH_CONTRIBUTIONS],
+    queryFn: getGoalsWithContributions,
   });
 
   const { accounts } = useAccounts();
 
+  // Get account IDs for fetching free cash
+  const accountIds = useMemo(() => accounts?.map((a) => a.id) ?? [], [accounts]);
+
+  const { data: freeCashAccounts = [], isLoading: isLoadingFreeCash } = useQuery<
+    AccountFreeCash[],
+    Error
+  >({
+    queryKey: [QueryKeys.ACCOUNT_FREE_CASH, accountIds],
+    queryFn: () => getAccountFreeCash(accountIds),
+    enabled: accountIds.length > 0,
+  });
+
   const [visibleModal, setVisibleModal] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
 
-  const { deleteGoalMutation, saveAllocationsMutation } = useGoalMutations();
+  const { deleteGoalMutation, addContributionMutation, removeContributionMutation } =
+    useGoalMutations();
 
   const handleAddGoal = () => {
     setSelectedGoal(null);
@@ -43,23 +53,26 @@ const SettingsGoalsPage = () => {
     deleteGoalMutation.mutate(goal.id);
   };
 
-  const handleAddAllocation = (allocationData: GoalAllocation[]) => {
-    saveAllocationsMutation.mutate(allocationData);
-  };
+  const isLoading = isLoadingContributions || isLoadingFreeCash;
 
   if (isLoading) {
     return (
-      <div>
+      <div className="space-y-4">
         <Skeleton className="h-12" />
         <Skeleton className="h-12" />
+        <Skeleton className="h-32" />
       </div>
     );
   }
 
+  // Show all goals (both achieved and non-achieved)
+  const allGoalsWithContributions = goalsWithContributions ?? [];
+  const hasGoals = allGoalsWithContributions.length > 0;
+
   return (
     <>
       <div className="space-y-6">
-        <SettingsHeader heading="Goals" text=" Manage your investment and saving goals.">
+        <SettingsHeader heading="Goals" text="Manage your saving goals and contributions.">
           <>
             <Button
               size="icon"
@@ -76,39 +89,26 @@ const SettingsGoalsPage = () => {
           </>
         </SettingsHeader>
         <Separator />
-        <div className="w-full pt-8">
-          {goals?.length ? (
-            <>
-              <h3 className="p-2 text-xl font-bold">Goals</h3>
-
-              <div className="divide-border divide-y rounded-md border">
-                {goals.map((goal: Goal) => (
-                  <GoalItem
-                    key={goal.id}
-                    goal={goal}
-                    onEdit={handleEditGoal}
-                    onDelete={handleDeleteGoal}
-                  />
-                ))}
-              </div>
-              <h3 className="p-2 pt-12 text-xl font-bold">Allocations</h3>
-              <h5 className="text-muted-foreground p-2 pt-0 pb-4 text-sm font-light">
-                Click on a cell to specify the percentage of each account's allocation to your
-                goals.
-              </h5>
-              <GoalsAllocations
-                goals={goals}
-                existingAllocations={allocations || []}
-                accounts={accounts || []}
-                onSubmit={handleAddAllocation}
-              />
-            </>
+        <div className="w-full pt-4">
+          {hasGoals ? (
+            <GoalContributions
+              goalsWithContributions={allGoalsWithContributions}
+              freeCashAccounts={freeCashAccounts}
+              onAddContribution={(contribution) => addContributionMutation.mutate(contribution)}
+              onRemoveContribution={(contributionId) =>
+                removeContributionMutation.mutate(contributionId)
+              }
+              onEditGoal={handleEditGoal}
+              onDeleteGoal={handleDeleteGoal}
+              isAdding={addContributionMutation.isPending}
+              isRemoving={removeContributionMutation.isPending}
+            />
           ) : (
             <EmptyPlaceholder>
               <EmptyPlaceholder.Icon name="Goal" />
               <EmptyPlaceholder.Title>No goals added!</EmptyPlaceholder.Title>
               <EmptyPlaceholder.Description>
-                You don&apos;t have any goals yet. Start adding your investment goals.
+                You don&apos;t have any goals yet. Start adding your saving goals.
               </EmptyPlaceholder.Description>
               <Button onClick={() => handleAddGoal()}>
                 <Icons.Plus className="mr-2 h-4 w-4" />

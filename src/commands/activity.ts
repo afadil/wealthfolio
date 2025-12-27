@@ -7,6 +7,8 @@ import {
   ActivityDetails,
   ActivitySearchResponse,
   ActivityUpdate,
+  MonthMetricsResponse,
+  SpendingTrendsResponse,
 } from "@/lib/types";
 
 function normalizeStringArray(input?: string | string[]): string[] | undefined {
@@ -23,6 +25,11 @@ interface Filters {
   accountIds?: string | string[];
   activityTypes?: string | string[];
   symbol?: string;
+  accountType?: string[];
+  amountMin?: number;
+  amountMax?: number;
+  recurrence?: string[];
+  hasRecurrence?: boolean;
 }
 
 interface Sort {
@@ -72,16 +79,26 @@ export const searchActivities = async (
           pageSize,
           accountIdFilter,
           activityTypeFilter,
+          accountTypeFilter: filters?.accountType,
           assetIdKeyword,
+          amountMinFilter: filters?.amountMin,
+          amountMaxFilter: filters?.amountMax,
+          recurrenceFilter: filters?.recurrence,
+          hasRecurrenceFilter: filters?.hasRecurrence,
           sort: sortOption,
         });
       case RUN_ENV.WEB:
         return invokeWeb("search_activities", {
           page,
           pageSize,
-          accountIdFilter,
-          activityTypeFilter,
+          accountIdFilter: filters?.accountIds,
+          activityTypeFilter: filters?.activityTypes,
+          accountTypeFilter: filters?.accountType,
           assetIdKeyword,
+          amountMinFilter: filters?.amountMin,
+          amountMaxFilter: filters?.amountMax,
+          recurrenceFilter: filters?.recurrence,
+          hasRecurrenceFilter: filters?.hasRecurrence,
           sort: sortOption,
         });
       default:
@@ -160,6 +177,89 @@ export const deleteActivity = async (activityId: string): Promise<Activity> => {
     }
   } catch (error) {
     logger.error("Error deleting activity.");
+    throw error;
+  }
+};
+
+export const getTopSpendingTransactions = async (
+  month: string,
+  limit: number,
+  includeEventIds?: string[],
+  includeAllEvents?: boolean,
+  categoryId?: string,
+): Promise<ActivityDetails[]> => {
+  try {
+    const request = {
+      month,
+      limit,
+      includeEventIds,
+      includeAllEvents: includeAllEvents ?? false,
+      categoryId,
+    };
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri("get_top_spending_transactions", request);
+      case RUN_ENV.WEB:
+        return invokeWeb("get_top_spending_transactions", request);
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error("Error fetching top spending transactions.");
+    throw error;
+  }
+};
+
+export const getSpendingTrends = async (
+  month: string,
+  categoryIds?: string[],
+  subcategoryIds?: string[],
+  includeEventIds?: string[],
+  includeAllEvents?: boolean,
+): Promise<SpendingTrendsResponse> => {
+  try {
+    const request = {
+      month,
+      categoryIds,
+      subcategoryIds,
+      includeEventIds,
+      includeAllEvents: includeAllEvents ?? false,
+    };
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri("get_spending_trends", request);
+      case RUN_ENV.WEB:
+        return invokeWeb("get_spending_trends", request);
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error("Error fetching spending trends.");
+    throw error;
+  }
+};
+
+export const getMonthMetrics = async (
+  month: string,
+  includeEventIds?: string[],
+  includeAllEvents?: boolean,
+): Promise<MonthMetricsResponse> => {
+  try {
+    const request = {
+      month,
+      includeEventIds,
+      includeAllEvents: includeAllEvents ?? false,
+    };
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri("get_month_metrics", request);
+      case RUN_ENV.WEB:
+        return invokeWeb("get_month_metrics", request);
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error("Error fetching month metrics.");
     throw error;
   }
 };

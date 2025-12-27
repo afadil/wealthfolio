@@ -36,10 +36,34 @@ const sidebarNavItems = [
     icon: <Icons.Goal className="h-5 w-5" />,
   },
   {
+    title: "Budget",
+    href: "budget",
+    subtitle: "Monthly spending and income targets",
+    icon: <Icons.Wallet className="h-5 w-5" />,
+  },
+  {
     title: "Securities",
     href: "securities",
     subtitle: "Manage security definitions",
     icon: <Icons.BadgeDollarSign className="h-5 w-5" />,
+  },
+  {
+    title: "Categories",
+    href: "categories",
+    subtitle: "Manage transaction categories",
+    icon: <Icons.Tag className="h-5 w-5" />,
+  },
+  {
+    title: "Activity Rules",
+    href: "activity-rules",
+    subtitle: "Auto-assign categories and activity types",
+    icon: <Icons.ListFilter className="h-5 w-5" />,
+  },
+  {
+    title: "Events",
+    href: "events",
+    subtitle: "Track and manage transaction events",
+    icon: <Icons.Calendar className="h-5 w-5" />,
   },
   {
     title: "Market Data",

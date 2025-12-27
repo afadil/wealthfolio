@@ -6378,6 +6378,7 @@ dependencies = [
  "local-ip-address",
  "log",
  "reqwest",
+ "rust_decimal",
  "serde",
  "serde_json",
  "tauri",

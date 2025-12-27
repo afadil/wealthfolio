@@ -31,6 +31,11 @@ diesel::table! {
         comment -> Nullable<Text>,
         created_at -> Text,
         updated_at -> Text,
+        name -> Nullable<Text>,
+        category_id -> Nullable<Text>,
+        sub_category_id -> Nullable<Text>,
+        event_id -> Nullable<Text>,
+        recurrence -> Nullable<Text>,
     }
 }
 
@@ -78,6 +83,83 @@ diesel::table! {
 }
 
 diesel::table! {
+    budget_config (id) {
+        id -> Text,
+        monthly_spending_target -> Text,
+        monthly_income_target -> Text,
+        currency -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    budget_allocations (id) {
+        id -> Text,
+        budget_config_id -> Text,
+        category_id -> Text,
+        amount -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    categories (id) {
+        id -> Text,
+        name -> Text,
+        parent_id -> Nullable<Text>,
+        color -> Nullable<Text>,
+        icon -> Nullable<Text>,
+        is_income -> Integer,
+        sort_order -> Integer,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    activity_rules (id) {
+        id -> Text,
+        name -> Text,
+        pattern -> Text,
+        match_type -> Text,
+        category_id -> Nullable<Text>,
+        sub_category_id -> Nullable<Text>,
+        activity_type -> Nullable<Text>,
+        priority -> Integer,
+        is_global -> Nullable<Integer>,
+        account_id -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+        recurrence -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    event_types (id) {
+        id -> Text,
+        name -> Text,
+        color -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    events (id) {
+        id -> Text,
+        name -> Text,
+        description -> Nullable<Text>,
+        event_type_id -> Text,
+        start_date -> Text,
+        end_date -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
     contribution_limits (id) {
         id -> Text,
         group_name -> Text,
@@ -119,11 +201,12 @@ diesel::table! {
 }
 
 diesel::table! {
-    goals_allocation (id) {
+    goal_contributions (id) {
         id -> Text,
-        percent_allocation -> Integer,
         goal_id -> Text,
         account_id -> Text,
+        amount -> Double,
+        contributed_at -> Text,
     }
 }
 
@@ -183,20 +266,29 @@ diesel::table! {
 }
 
 diesel::joinable!(accounts -> platforms (platform_id));
-diesel::joinable!(goals_allocation -> accounts (account_id));
-diesel::joinable!(goals_allocation -> goals (goal_id));
+diesel::joinable!(activity_rules -> accounts (account_id));
+diesel::joinable!(budget_allocations -> budget_config (budget_config_id));
+diesel::joinable!(budget_allocations -> categories (category_id));
+diesel::joinable!(goal_contributions -> accounts (account_id));
+diesel::joinable!(goal_contributions -> goals (goal_id));
 diesel::joinable!(quotes -> assets (symbol));
 
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     activities,
     activity_import_profiles,
+    activity_rules,
     app_settings,
     assets,
+    budget_allocations,
+    budget_config,
+    categories,
     contribution_limits,
     daily_account_valuation,
+    event_types,
+    events,
+    goal_contributions,
     goals,
-    goals_allocation,
     holdings_snapshots,
     market_data_providers,
     platforms,

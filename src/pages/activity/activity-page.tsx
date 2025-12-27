@@ -1,7 +1,7 @@
 import { getAccounts } from "@/commands/account";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { useIsMobileViewport } from "@/hooks/use-platform";
-import { ActivityType } from "@/lib/constants";
+import { AccountType, ActivityType } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { Account, ActivityDetails } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
@@ -14,9 +14,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   Icons,
-  Page,
-  PageContent,
-  PageHeader,
 } from "@wealthfolio/ui";
 import { debounce } from "lodash";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -34,17 +31,24 @@ import { MobileActivityForm } from "./components/mobile-forms/mobile-activity-fo
 import { useActivityMutations } from "./hooks/use-activity-mutations";
 import { useActivitySearch } from "./hooks/use-activity-search";
 
-const ActivityPage = () => {
+interface ActivityPageProps {
+  renderActions?: (actions: React.ReactNode) => void;
+}
+
+const ActivityPage = ({ renderActions }: ActivityPageProps) => {
   const [showForm, setShowForm] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Partial<ActivityDetails> | undefined>();
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [showBulkHoldingsForm, setShowBulkHoldingsForm] = useState(false);
 
-  // Filter and search state
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [selectedActivityTypes, setSelectedActivityTypes] = useState<ActivityType[]>([]);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({
+    min: "",
+    max: "",
+  });
   const [viewMode, setViewMode] = usePersistentState<ActivityViewMode>(
     "activity-view-mode",
     "table",
@@ -57,7 +61,6 @@ const ActivityPage = () => {
 
   const isMobileViewport = useIsMobileViewport();
 
-  // Debounced search handler
   const debouncedUpdateSearch = useMemo(
     () =>
       debounce((value: string) => {
@@ -85,7 +88,12 @@ const ActivityPage = () => {
     queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
   });
-  const accounts = accountsData ?? [];
+
+  // Filter to only show SECURITIES and CRYPTOCURRENCY accounts (investment accounts)
+  const accounts = (accountsData ?? []).filter(
+    (acc) =>
+      acc.accountType === AccountType.SECURITIES || acc.accountType === AccountType.CRYPTOCURRENCY,
+  );
 
   const { deleteActivityMutation, duplicateActivityMutation } = useActivityMutations();
   const {
@@ -98,10 +106,17 @@ const ActivityPage = () => {
     hasNextPage,
     refetch,
   } = useActivitySearch({
-    filters: { accountIds: selectedAccounts, activityTypes: selectedActivityTypes },
+    filters: {
+      accountIds: selectedAccounts,
+      activityTypes: selectedActivityTypes,
+      accountTypes: [AccountType.SECURITIES, AccountType.CRYPTOCURRENCY],
+      amountMin: amountRange.min ? parseFloat(amountRange.min) : undefined,
+      amountMax: amountRange.max ? parseFloat(amountRange.max) : undefined,
+    },
     searchQuery,
     sorting,
   });
+
   const totalFetched = flatData.length;
 
   const isDatagridView = viewMode === "datagrid";
@@ -135,174 +150,180 @@ const ActivityPage = () => {
     setSelectedActivity(undefined);
   }, []);
 
-  const headerActions = (
-    <div className="flex flex-wrap items-center gap-2">
-      {/* Desktop dropdown menu */}
-      <div className="hidden sm:flex">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="sm">
-              <Icons.Plus className="mr-2 h-4 w-4" />
-              Add Activities
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem asChild>
-              <Link to={"/import"} className="flex cursor-pointer items-center py-2.5">
-                <Icons.Import className="mr-2 h-4 w-4" />
-                Import from CSV
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setShowBulkHoldingsForm(true)} className="py-2.5">
-              <Icons.Holdings className="mr-2 h-4 w-4" />
-              Add Holdings
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => handleEdit(undefined)} className="py-2.5">
-              <Icons.Activity className="mr-2 h-4 w-4" />
-              Add Transaction
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+  const headerActions = useMemo(
+    () => (
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Desktop dropdown menu */}
+        <div className="hidden sm:flex">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm">
+                <Icons.Plus className="mr-2 h-4 w-4" />
+                Add Activities
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem asChild>
+                <Link to={"/activity/import"} className="flex cursor-pointer items-center py-2.5">
+                  <Icons.Import className="mr-2 h-4 w-4" />
+                  Import from CSV
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setShowBulkHoldingsForm(true)} className="py-2.5">
+                <Icons.Holdings className="mr-2 h-4 w-4" />
+                Add Holdings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleEdit(undefined)} className="py-2.5">
+                <Icons.Activity className="mr-2 h-4 w-4" />
+                Add Transaction
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
 
-      {/* Mobile add button */}
-      <div className="flex items-center gap-2 sm:hidden">
-        <Button size="icon" title="Import" variant="outline" asChild>
-          <Link to={"/import"}>
-            <Icons.Import className="size-4" />
-          </Link>
-        </Button>
-        <Button size="icon" title="Add" onClick={() => handleEdit(undefined)}>
-          <Icons.Plus className="size-4" />
-        </Button>
+        {/* Mobile add button */}
+        <div className="flex items-center gap-2 sm:hidden">
+          <Button size="icon" title="Import" variant="outline" asChild>
+            <Link to={"/activity/import"}>
+              <Icons.Import className="size-4" />
+            </Link>
+          </Button>
+          <Button size="icon" title="Add" onClick={() => handleEdit(undefined)}>
+            <Icons.Plus className="size-4" />
+          </Button>
+        </div>
       </div>
-    </div>
+    ),
+    [handleEdit],
   );
 
+  // Pass actions to parent component
+  useEffect(() => {
+    renderActions?.(headerActions);
+  }, [renderActions, headerActions]);
+
   return (
-    <Page>
-      <PageHeader heading="Activity" actions={headerActions} />
-      <PageContent className="pb-2 md:pb-4 lg:pb-5">
-        <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-hidden">
-          {/* Unified Controls */}
-          {isMobileViewport ? (
-            <ActivityMobileControls
-              accounts={accounts}
-              searchQuery={searchInput}
-              onSearchQueryChange={handleSearchChange}
-              selectedAccountIds={selectedAccounts}
-              onAccountIdsChange={setSelectedAccounts}
-              selectedActivityTypes={selectedActivityTypes}
-              onActivityTypesChange={setSelectedActivityTypes}
-              isCompactView={isCompactView}
-              onCompactViewChange={setIsCompactView}
-            />
-          ) : (
-            <ActivityViewControls
-              accounts={accounts}
-              searchQuery={searchInput}
-              onSearchQueryChange={handleSearchChange}
-              selectedAccountIds={selectedAccounts}
-              onAccountIdsChange={setSelectedAccounts}
-              selectedActivityTypes={selectedActivityTypes}
-              onActivityTypesChange={setSelectedActivityTypes}
-              viewMode={viewMode}
-              onViewModeChange={setViewMode}
-              totalFetched={totalFetched}
-              totalRowCount={totalRowCount}
-              isFetching={isFetching}
-            />
-          )}
-
-          {/* View-Specific Renderers */}
-          {isMobileViewport ? (
-            <ActivityTableMobile
-              activities={flatData}
-              isCompactView={isCompactView}
-              handleEdit={handleEdit}
-              handleDelete={handleDelete}
-              onDuplicate={handleDuplicate}
-            />
-          ) : isDatagridView ? (
-            <ActivityDatagrid
-              accounts={accounts}
-              activities={flatData}
-              onRefetch={refetch}
-              onEditActivity={handleEdit}
-              sorting={sorting}
-              onSortingChange={setSorting}
-            />
-          ) : (
-            <ActivityTable
-              activities={flatData}
-              isLoading={isLoading}
-              sorting={sorting}
-              onSortingChange={setSorting}
-              handleEdit={handleEdit}
-              handleDelete={handleDelete}
-            />
-          )}
-
-          <ActivityPagination
-            hasMore={hasNextPage ?? false}
-            onLoadMore={fetchNextPage}
-            isFetching={isFetchingNextPage}
-            totalFetched={totalFetched}
-            totalCount={totalRowCount}
-          />
-        </div>
-        {isMobileViewport ? (
-          <MobileActivityForm
-            key={selectedActivity?.id ?? "new"}
-            accounts={
-              accounts
-                ?.filter((acc) => acc.isActive)
-                .map((account) => ({
-                  value: account.id,
-                  label: account.name,
-                  currency: account.currency,
-                })) ?? []
-            }
-            activity={selectedActivity}
-            open={showForm}
-            onClose={handleFormClose}
-          />
-        ) : (
-          <ActivityForm
-            accounts={
-              accounts
-                ?.filter((acc) => acc.isActive)
-                .map((account) => ({
-                  value: account.id,
-                  label: account.name,
-                  currency: account.currency,
-                })) || []
-            }
-            activity={selectedActivity}
-            open={showForm}
-            onClose={handleFormClose}
-          />
-        )}
-        <ActivityDeleteModal
-          isOpen={showDeleteAlert}
-          isDeleting={deleteActivityMutation.isPending}
-          onConfirm={handleDeleteConfirm}
-          onCancel={() => {
-            setShowDeleteAlert(false);
-            setSelectedActivity(undefined);
-          }}
+    <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-hidden px-2 pt-2 pb-2 md:pb-4 lg:px-4 lg:pb-5">
+      {isMobileViewport ? (
+        <ActivityMobileControls
+          accounts={accounts}
+          searchQuery={searchInput}
+          onSearchQueryChange={handleSearchChange}
+          selectedAccountIds={selectedAccounts}
+          onAccountIdsChange={setSelectedAccounts}
+          selectedActivityTypes={selectedActivityTypes}
+          onActivityTypesChange={setSelectedActivityTypes}
+          isCompactView={isCompactView}
+          onCompactViewChange={setIsCompactView}
         />
-        <BulkHoldingsModal
-          open={showBulkHoldingsForm}
-          onClose={() => setShowBulkHoldingsForm(false)}
-          onSuccess={() => {
-            setShowBulkHoldingsForm(false);
-          }}
+      ) : (
+        <ActivityViewControls
+          accounts={accounts}
+          searchQuery={searchInput}
+          onSearchQueryChange={handleSearchChange}
+          selectedAccountIds={selectedAccounts}
+          onAccountIdsChange={setSelectedAccounts}
+          selectedActivityTypes={selectedActivityTypes}
+          onActivityTypesChange={setSelectedActivityTypes}
+          amountRange={amountRange}
+          onAmountRangeChange={setAmountRange}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          totalFetched={totalFetched}
+          totalRowCount={totalRowCount}
+          isFetching={isFetching}
         />
-      </PageContent>
-    </Page>
+      )}
+
+      {isMobileViewport ? (
+        <ActivityTableMobile
+          activities={flatData}
+          isCompactView={isCompactView}
+          handleEdit={handleEdit}
+          handleDelete={handleDelete}
+          onDuplicate={handleDuplicate}
+        />
+      ) : isDatagridView ? (
+        <ActivityDatagrid
+          accounts={accounts}
+          activities={flatData}
+          onRefetch={refetch}
+          onEditActivity={handleEdit}
+          sorting={sorting}
+          onSortingChange={setSorting}
+        />
+      ) : (
+        <ActivityTable
+          activities={flatData}
+          isLoading={isLoading}
+          sorting={sorting}
+          onSortingChange={setSorting}
+          handleEdit={handleEdit}
+          handleDelete={handleDelete}
+        />
+      )}
+
+      <ActivityPagination
+        hasMore={hasNextPage ?? false}
+        onLoadMore={fetchNextPage}
+        isFetching={isFetchingNextPage}
+        totalFetched={totalFetched}
+        totalCount={totalRowCount}
+      />
+
+      {isMobileViewport ? (
+        <MobileActivityForm
+          key={selectedActivity?.id ?? "new"}
+          accounts={
+            accounts
+              ?.filter((acc) => acc.isActive)
+              .map((account) => ({
+                value: account.id,
+                label: account.name,
+                currency: account.currency,
+              })) ?? []
+          }
+          activity={selectedActivity}
+          open={showForm}
+          onClose={handleFormClose}
+        />
+      ) : (
+        <ActivityForm
+          accounts={
+            accounts
+              ?.filter((acc) => acc.isActive)
+              .map((account) => ({
+                value: account.id,
+                label: account.name,
+                currency: account.currency,
+              })) || []
+          }
+          activity={selectedActivity}
+          open={showForm}
+          onClose={handleFormClose}
+        />
+      )}
+
+      <ActivityDeleteModal
+        isOpen={showDeleteAlert}
+        isDeleting={deleteActivityMutation.isPending}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => {
+          setShowDeleteAlert(false);
+          setSelectedActivity(undefined);
+        }}
+      />
+
+      <BulkHoldingsModal
+        open={showBulkHoldingsForm}
+        onClose={() => setShowBulkHoldingsForm(false)}
+        onSuccess={() => {
+          setShowBulkHoldingsForm(false);
+        }}
+      />
+    </div>
   );
 };
 

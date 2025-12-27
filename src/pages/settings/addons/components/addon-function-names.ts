@@ -67,10 +67,12 @@ export const FUNCTION_DISPLAY_NAMES: Record<string, string> = {
 
   // GoalsAPI functions
   "financial-planning.getAll": "View financial goals",
+  "financial-planning.getWithContributions": "View goals with contributions",
   "financial-planning.create": "Create new goals",
   "financial-planning.update": "Modify goals",
-  "financial-planning.updateAllocations": "Update goal allocations",
-  "financial-planning.getAllocations": "View goal allocations",
+  "financial-planning.getAccountFreeCash": "View account free cash",
+  "financial-planning.addContribution": "Add goal contributions",
+  "financial-planning.removeContribution": "Remove goal contributions",
 
   // SettingsAPI functions
   "settings.get": "View app settings",

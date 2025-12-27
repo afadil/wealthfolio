@@ -189,7 +189,7 @@ export function AppLauncher() {
         }
       }
 
-      return `/activities/manage${params.toString() ? `?${params.toString()}` : ""}`;
+      return `/activity/manage${params.toString() ? `?${params.toString()}` : ""}`;
     };
 
     // Additional quick actions not in main navigation
@@ -331,7 +331,7 @@ export function AppLauncher() {
       },
       {
         title: "Import Activities",
-        href: "/import",
+        href: "/activity/import",
         icon: <Icons.Import className="size-6" />,
         keywords: ["import", "csv", "upload", "file", "bulk"],
         label: "Import Activities",

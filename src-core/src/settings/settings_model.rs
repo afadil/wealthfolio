@@ -13,6 +13,7 @@ pub struct Settings {
     pub auto_update_check_enabled: bool,
     pub menu_bar_visible: bool,
     pub sync_enabled: bool,
+    pub budget_variance_tolerance: i32,
 }
 
 impl Default for Settings {
@@ -26,6 +27,7 @@ impl Default for Settings {
             auto_update_check_enabled: true,
             menu_bar_visible: true,
             sync_enabled: true,
+            budget_variance_tolerance: 10,
         }
     }
 }
@@ -40,6 +42,7 @@ pub struct SettingsUpdate {
     pub auto_update_check_enabled: Option<bool>,
     pub menu_bar_visible: Option<bool>,
     pub sync_enabled: Option<bool>,
+    pub budget_variance_tolerance: Option<i32>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

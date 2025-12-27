@@ -29,9 +29,11 @@ import { openCsvFileDialog, openFileSaveDialog } from "@/commands/file";
 import {
   createGoal,
   getGoals,
-  getGoalsAllocation,
+  getGoalsWithContributions,
   updateGoal,
-  updateGoalsAllocations,
+  getAccountFreeCash,
+  addGoalContribution,
+  removeGoalContribution,
 } from "@/commands/goal";
 import {
   listenImportFileDrop,
@@ -225,10 +227,12 @@ export function createAddonContext(addonId: string): AddonContext {
 
           // Goals
           getGoals,
+          getGoalsWithContributions,
           createGoal,
           updateGoal,
-          updateGoalsAllocations,
-          getGoalsAllocation,
+          getAccountFreeCash,
+          addGoalContribution,
+          removeGoalContribution,
 
           // Market data
           searchTicker,

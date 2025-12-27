@@ -301,17 +301,6 @@ export const ActivityTable = ({
         },
       },
       {
-        id: "currency",
-        accessorKey: "currency",
-        enableSorting: false,
-        enableHiding: true,
-        meta: {
-          label: "Currency",
-        },
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Currency" />,
-        cell: ({ row }) => <div>{row.getValue("currency")}</div>,
-      },
-      {
         id: "assetName",
         accessorKey: "assetName",
         enableHiding: false,
@@ -319,6 +308,11 @@ export const ActivityTable = ({
       {
         id: "accountCurrency",
         accessorKey: "accountCurrency",
+        enableHiding: false,
+      },
+      {
+        id: "currency",
+        accessorKey: "currency",
         enableHiding: false,
       },
       {
@@ -454,7 +448,7 @@ export const ActivityTable = ({
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center">
-                  No activity found.
+                  No investment activity found.
                 </TableCell>
               </TableRow>
             )}

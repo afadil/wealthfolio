@@ -9,6 +9,9 @@ import { useMemo } from "react";
 export interface ActivitySearchFilters {
   accountIds: string[];
   activityTypes: ActivityType[];
+  accountTypes?: string[];
+  amountMin?: number;
+  amountMax?: number;
 }
 
 export interface UseActivitySearchOptions {
@@ -42,8 +45,18 @@ export function useActivitySearch({
     return {
       accountIds: filters.accountIds.length > 0 ? filters.accountIds : undefined,
       activityTypes: filters.activityTypes.length > 0 ? filters.activityTypes : undefined,
+      accountType:
+        filters.accountTypes && filters.accountTypes.length > 0 ? filters.accountTypes : undefined,
+      amountMin: filters.amountMin,
+      amountMax: filters.amountMax,
     } as Record<string, unknown>;
-  }, [filters.accountIds, filters.activityTypes]);
+  }, [
+    filters.accountIds,
+    filters.activityTypes,
+    filters.accountTypes,
+    filters.amountMin,
+    filters.amountMax,
+  ]);
 
   const primarySort =
     sorting.length > 0 && sorting[0]?.id

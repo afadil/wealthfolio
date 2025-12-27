@@ -10,9 +10,12 @@ use axum::{
     routing::{delete, get, post},
     Json, Router,
 };
+use rust_decimal::prelude::FromPrimitive;
 use wealthfolio_core::activities::{
-    Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityImport,
-    ActivitySearchResponse, ActivityUpdate, ImportMappingData, NewActivity,
+    Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityDetails,
+    ActivityImport, ActivitySearchResponse, ActivityUpdate, ImportMappingData,
+    MonthMetricsRequest, MonthMetricsResponse, NewActivity, SpendingTrendsRequest,
+    SpendingTrendsResponse,
 };
 
 #[derive(serde::Deserialize)]
@@ -38,17 +41,37 @@ struct ActivitySearchBody {
     account_id_filter: Option<StringOrVec>,
     #[serde(rename = "activityTypeFilter")]
     activity_type_filter: Option<StringOrVec>,
+    #[serde(rename = "categoryIdFilter")]
+    category_id_filter: Option<StringOrVec>,
+    #[serde(rename = "eventIdFilter")]
+    event_id_filter: Option<StringOrVec>,
     #[serde(rename = "assetIdKeyword")]
     asset_id_keyword: Option<String>,
-    // Allow addons to pass either a single sort or an array (we pick the first)
+    #[serde(rename = "accountTypeFilter")]
+    account_type_filter: Option<StringOrVec>,
+    #[serde(rename = "isCategorizedFilter")]
+    is_categorized_filter: Option<bool>,
+    #[serde(rename = "hasEventFilter")]
+    has_event_filter: Option<bool>,
+    #[serde(rename = "amountMinFilter")]
+    amount_min_filter: Option<f64>,
+    #[serde(rename = "amountMaxFilter")]
+    amount_max_filter: Option<f64>,
+    #[serde(rename = "startDateFilter")]
+    start_date_filter: Option<String>,
+    #[serde(rename = "endDateFilter")]
+    end_date_filter: Option<String>,
     sort: Option<SortWrapper>,
+    #[serde(rename = "recurrenceFilter")]
+    recurrence_filter: Option<StringOrVec>,
+    #[serde(rename = "hasRecurrenceFilter")]
+    has_recurrence_filter: Option<bool>,
 }
 
 async fn search_activities(
     State(state): State<Arc<AppState>>,
     Json(body): Json<ActivitySearchBody>,
 ) -> ApiResult<Json<ActivitySearchResponse>> {
-    // Normalize sort to a single value if provided
     let sort_normalized: Option<wealthfolio_core::activities::Sort> = match body.sort {
         Some(SortWrapper::One(s)) => Some(s),
         Some(SortWrapper::Many(v)) => v.into_iter().next(),
@@ -64,13 +87,48 @@ async fn search_activities(
         Some(StringOrVec::Many(v)) => Some(v),
         None => None,
     };
+    let category_ids: Option<Vec<String>> = match body.category_id_filter {
+        Some(StringOrVec::One(s)) => Some(vec![s]),
+        Some(StringOrVec::Many(v)) => Some(v),
+        None => None,
+    };
+    let event_ids: Option<Vec<String>> = match body.event_id_filter {
+        Some(StringOrVec::One(s)) => Some(vec![s]),
+        Some(StringOrVec::Many(v)) => Some(v),
+        None => None,
+    };
+    let account_types: Option<Vec<String>> = match body.account_type_filter {
+        Some(StringOrVec::One(s)) => Some(vec![s]),
+        Some(StringOrVec::Many(v)) => Some(v),
+        None => None,
+    };
+    let recurrence_values: Option<Vec<String>> = match body.recurrence_filter {
+        Some(StringOrVec::One(s)) => Some(vec![s]),
+        Some(StringOrVec::Many(v)) => Some(v),
+        None => None,
+    };
+
+    let amount_min = body.amount_min_filter.and_then(rust_decimal::Decimal::from_f64);
+    let amount_max = body.amount_max_filter.and_then(rust_decimal::Decimal::from_f64);
+
     let resp = state.activity_service.search_activities(
         body.page,
         body.page_size,
         account_ids,
         types,
+        category_ids,
+        event_ids,
         body.asset_id_keyword,
+        account_types,
+        body.is_categorized_filter,
+        body.has_event_filter,
+        amount_min,
+        amount_max,
+        body.start_date_filter,
+        body.end_date_filter,
         sort_normalized,
+        recurrence_values,
+        body.has_recurrence_filter,
     )?;
     Ok(Json(resp))
 }
@@ -203,9 +261,49 @@ async fn save_account_import_mapping(
     Ok(Json(res))
 }
 
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TopSpendingTransactionsBody {
+    month: String,
+    limit: i64,
+    include_event_ids: Option<Vec<String>>,
+    #[serde(default)]
+    include_all_events: bool,
+    category_id: Option<String>,
+}
+
+async fn get_top_spending_transactions(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<TopSpendingTransactionsBody>,
+) -> ApiResult<Json<Vec<ActivityDetails>>> {
+    let res = state
+        .activity_service
+        .get_top_spending_transactions(body.month, body.limit, body.include_event_ids, body.include_all_events, body.category_id)?;
+    Ok(Json(res))
+}
+
+async fn get_spending_trends(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<SpendingTrendsRequest>,
+) -> ApiResult<Json<SpendingTrendsResponse>> {
+    let res = state.activity_service.get_spending_trends(body)?;
+    Ok(Json(res))
+}
+
+async fn get_month_metrics(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<MonthMetricsRequest>,
+) -> ApiResult<Json<MonthMetricsResponse>> {
+    let res = state.activity_service.get_month_metrics(body)?;
+    Ok(Json(res))
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/activities/search", post(search_activities))
+        .route("/activities/top-spending", post(get_top_spending_transactions))
+        .route("/activities/spending-trends", post(get_spending_trends))
+        .route("/activities/month-metrics", post(get_month_metrics))
         .route("/activities", post(create_activity).put(update_activity))
         .route("/activities/bulk", post(save_activities))
         .route("/activities/{id}", delete(delete_activity))

@@ -14,6 +14,10 @@ export {
 
 export type { ImportRequiredField } from "./constants";
 
+// Recurrence type for transactions
+export const RECURRENCE_TYPES = ["fixed", "variable", "periodic"] as const;
+export type RecurrenceType = (typeof RECURRENCE_TYPES)[number];
+
 export interface Account {
   id: string;
   name: string;
@@ -56,6 +60,15 @@ export interface ActivityDetails {
   currency: string;
   isDraft: boolean;
   comment?: string;
+  name?: string;
+  categoryId?: string;
+  subCategoryId?: string;
+  eventId?: string;
+  recurrence?: RecurrenceType | null;
+  categoryName?: string;
+  categoryColor?: string;
+  subCategoryName?: string;
+  eventName?: string;
   createdAt: Date;
   assetId: string;
   updatedAt: Date;
@@ -89,6 +102,11 @@ export interface ActivityCreate {
   fee?: number;
   isDraft: boolean;
   comment?: string | null;
+  name?: string | null;
+  categoryId?: string | null;
+  subCategoryId?: string | null;
+  eventId?: string | null;
+  recurrence?: RecurrenceType | null;
 }
 
 export type ActivityUpdate = ActivityCreate & { id: string };
@@ -198,6 +216,54 @@ export interface ImportValidationResult {
     validCount: number;
     invalidCount: number;
   };
+}
+
+// Cash Import Types
+export type CashImportFormat =
+  | "date"
+  | "name"
+  | "amount"
+  | "activityType"
+  | "currency"
+  | "category"
+  | "subcategory"
+  | "description"
+  | "event"
+  | "account"
+  | "recurrence";
+
+export interface CashImportMappingData {
+  accountId: string; // Default account ID (selected in step 1)
+  fieldMappings: Partial<Record<CashImportFormat, string>>;
+  invertAmountSign?: boolean;
+  // Value mappings - map CSV values to app values
+  activityTypeMappings?: Partial<Record<ActivityType, string[]>>; // ActivityType -> list of CSV values
+  categoryMappings?: Record<string, { categoryId: string; subCategoryId?: string }>; // CSV value -> category
+  eventMappings?: Record<string, string>; // CSV value -> event ID
+  accountMappings?: Record<string, string>; // CSV account value -> account ID
+  recurrenceMappings?: Record<string, RecurrenceType>; // CSV value -> recurrence type
+}
+
+// Represents a row in the cash import process with rule matching info
+export interface CashImportRow {
+  lineNumber: number;
+  date: string;
+  name: string;
+  amount: number;
+  activityType: ActivityType; // Can be mapped or derived from amount sign
+  currency?: string; // Can be mapped or defaults to account currency
+  accountId?: string; // Can be mapped from CSV or uses default account
+  categoryId?: string;
+  subCategoryId?: string;
+  eventId?: string;
+  recurrence?: RecurrenceType; // Can be mapped or assigned via rules
+  description?: string;
+  // Rule match tracking
+  matchedRuleId?: string;
+  matchedRuleName?: string;
+  isManualOverride?: boolean; // User manually assigned category
+  isValid: boolean;
+  errors?: Record<string, string[]>;
 }
 
 export type ValidationResult = { status: "success" } | { status: "error"; errors: string[] };
@@ -346,6 +412,7 @@ export interface Settings {
   autoUpdateCheckEnabled: boolean;
   menuBarVisible: boolean;
   syncEnabled: boolean;
+  budgetVarianceTolerance: number;
 }
 
 export interface SettingsContextType {
@@ -363,14 +430,49 @@ export interface Goal {
   description?: string;
   targetAmount: number;
   isAchieved?: boolean;
-  allocations?: GoalAllocation[];
 }
 
-export interface GoalAllocation {
+export interface GoalContribution {
   id: string;
   goalId: string;
   accountId: string;
-  percentAllocation: number;
+  amount: number;
+  contributedAt: string;
+}
+
+export interface GoalContributionWithStatus {
+  id: string;
+  goalId: string;
+  accountId: string;
+  accountName: string;
+  accountCurrency: string;
+  amount: number;
+  contributedAt: string;
+  isAtRisk: boolean;
+  atRiskAmount?: number;
+}
+
+export interface AccountFreeCash {
+  accountId: string;
+  accountName: string;
+  accountCurrency: string;
+  cashBalance: number;
+  totalContributions: number;
+  freeCash: number;
+}
+
+export interface GoalWithContributions {
+  goal: Goal;
+  contributions: GoalContributionWithStatus[];
+  totalContributed: number;
+  progress: number;
+  hasAtRiskContributions: boolean;
+}
+
+export interface NewGoalContribution {
+  goalId: string;
+  accountId: string;
+  amount: number;
 }
 
 export interface GoalProgress {
@@ -379,6 +481,13 @@ export interface GoalProgress {
   currentValue: number;
   progress: number;
   currency: string;
+  hasAtRiskContributions?: boolean;
+}
+
+export interface SourceTypeBreakdown {
+  sourceType: string;
+  amount: number;
+  percentage: number;
 }
 
 export interface IncomeSummary {
@@ -387,10 +496,50 @@ export interface IncomeSummary {
   byType: Record<string, number>;
   bySymbol: Record<string, number>;
   byCurrency: Record<string, number>;
+  byMonthBySourceType: Record<string, Record<string, number>>; // Month -> SourceType -> Amount (for stacked bar charts)
+  byMonthBySymbol: Record<string, Record<string, number>>; // Month -> Symbol -> Amount (for filtering chart by symbol)
   totalIncome: number;
+  investmentIncome: number;
+  cashIncome: number;
+  capitalGains: number;
+  investmentDeposits: number;
   currency: string;
   monthlyAverage: number;
-  yoyGrowth: number | null; // Changed from optional to nullable
+  yoyGrowth: number | null;
+  bySourceType: SourceTypeBreakdown[];
+}
+
+export interface CategorySpending {
+  categoryId: string | null;
+  categoryName: string;
+  color: string | null;
+  amount: number;
+  transactionCount: number;
+}
+
+export interface SubcategorySpending {
+  subcategoryId: string | null;
+  subcategoryName: string;
+  categoryId: string | null;
+  categoryName: string;
+  color: string | null;
+  amount: number;
+  transactionCount: number;
+}
+
+export interface SpendingSummary {
+  period: string;
+  byMonth: Record<string, number>;
+  byCategory: Record<string, CategorySpending>;
+  bySubcategory: Record<string, SubcategorySpending>;
+  byAccount: Record<string, number>;
+  byMonthByCategory: Record<string, Record<string, number>>; // Month -> CategoryId -> Amount (for stacked bar charts)
+  byMonthBySubcategory: Record<string, Record<string, number>>; // Month -> SubcategoryId -> Amount (for filtering chart by subcategory)
+  totalSpending: number;
+  currency: string;
+  monthlyAverage: number;
+  transactionCount: number;
+  yoyGrowth: number | null;
 }
 
 // Define custom DateRange type matching react-day-picker's
@@ -560,4 +709,299 @@ export interface UpdateInfo {
   storeUrl?: string;
   changelogUrl?: string;
   screenshots?: string[];
+}
+
+// Categories
+export interface Category {
+  id: string;
+  name: string;
+  parentId?: string;
+  color?: string;
+  icon?: string;
+  isIncome: number; // Backend returns 0 or 1, use !!isIncome for boolean checks
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CategoryWithChildren extends Category {
+  children: Category[];
+}
+
+export interface NewCategory {
+  name: string;
+  parentId?: string;
+  color?: string;
+  icon?: string;
+  isIncome: boolean;
+}
+
+export interface UpdateCategory {
+  name?: string;
+  color?: string;
+  icon?: string;
+  sortOrder?: number;
+}
+
+export interface ActivityRule {
+  id: string;
+  name: string;
+  pattern: string;
+  matchType: MatchType;
+  categoryId?: string;
+  subCategoryId?: string;
+  activityType?: string;
+  recurrence?: RecurrenceType;
+  priority: number;
+  isGlobal?: boolean;
+  accountId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ActivityRuleWithNames extends ActivityRule {
+  categoryName?: string;
+  subCategoryName?: string;
+  accountName?: string;
+}
+
+export interface NewActivityRule {
+  name: string;
+  pattern: string;
+  matchType: MatchType;
+  categoryId?: string;
+  subCategoryId?: string;
+  activityType?: string;
+  recurrence?: RecurrenceType;
+  priority?: number;
+  isGlobal?: boolean;
+  accountId?: string;
+}
+
+export interface UpdateActivityRule {
+  name?: string;
+  pattern?: string;
+  matchType?: MatchType;
+  categoryId?: string;
+  subCategoryId?: string;
+  activityType?: string;
+  recurrence?: RecurrenceType;
+  priority?: number;
+  isGlobal?: boolean;
+  accountId?: string;
+}
+
+export type MatchType = "contains" | "starts_with" | "exact" | "regex";
+
+export interface ActivityRuleMatch {
+  categoryId?: string | null;
+  subCategoryId?: string | null;
+  activityType?: string | null;
+  recurrence?: RecurrenceType | null;
+  ruleName: string;
+  ruleId: string;
+}
+
+// Legacy aliases for backwards compatibility during migration
+export type CategoryRule = ActivityRule;
+export type CategoryRuleWithNames = ActivityRuleWithNames;
+export type NewCategoryRule = NewActivityRule;
+export type UpdateCategoryRule = UpdateActivityRule;
+export type CategoryMatch = ActivityRuleMatch;
+
+export interface EventType {
+  id: string;
+  name: string;
+  color?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NewEventType {
+  name: string;
+  color?: string;
+}
+
+export interface UpdateEventType {
+  name?: string;
+  color?: string;
+}
+
+export interface Event {
+  id: string;
+  name: string;
+  description?: string;
+  eventTypeId: string;
+  startDate: string;
+  endDate: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EventWithTypeName extends Event {
+  eventTypeName: string;
+}
+
+export interface NewEvent {
+  name: string;
+  description?: string;
+  eventTypeId: string;
+  startDate: string;
+  endDate: string;
+}
+
+export interface UpdateEvent {
+  name?: string;
+  description?: string;
+  eventTypeId?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface EventCategorySpending {
+  categoryId: string | null;
+  categoryName: string;
+  color: string | null;
+  amount: number;
+  transactionCount: number;
+}
+
+export interface EventSpendingSummary {
+  eventId: string;
+  eventName: string;
+  eventTypeId: string;
+  eventTypeName: string;
+  eventTypeColor: string | null;
+  startDate: string;
+  endDate: string;
+  totalSpending: number;
+  transactionCount: number;
+  currency: string;
+  byCategory: Record<string, EventCategorySpending>;
+  dailySpending: Record<string, number>;
+}
+
+// Spending Trends Types
+export interface SpendingTrendsRequest {
+  month: string;
+  categoryIds?: string[];
+  subcategoryIds?: string[];
+  excludeEventIds?: string[];
+  excludeAllEvents?: boolean;
+}
+
+export interface DailySpending {
+  month: string;
+  cumulative: number[];
+}
+
+export interface SpendingTrendsResponse {
+  currentMonth: DailySpending;
+  avg3Month: DailySpending;
+  avg6Month: DailySpending;
+  avg9Month: DailySpending;
+}
+
+export interface MonthMetricsPrev {
+  avgChangePercent: number | null;
+  countChangePercent: number | null;
+  totalChangePercent: number | null;
+}
+
+export interface RecurrenceBreakdown {
+  fixedPercent: number;
+  fixedAmount: number;
+  variablePercent: number;
+  variableAmount: number;
+  periodicPercent: number;
+  periodicAmount: number;
+  nonRecurringPercent: number;
+  nonRecurringAmount: number;
+}
+
+export interface MonthMetricsResponse {
+  avgTransactionSize: number;
+  transactionCount: number;
+  medianTransaction: number;
+  totalSpending: number;
+  prevMonth: MonthMetricsPrev | null;
+  recurrenceBreakdown: RecurrenceBreakdown;
+}
+
+// Budget Types
+export interface BudgetConfig {
+  id: string;
+  monthlySpendingTarget: string;
+  monthlyIncomeTarget: string;
+  currency: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NewBudgetConfig {
+  id?: string;
+  monthlySpendingTarget: string;
+  monthlyIncomeTarget: string;
+  currency: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface BudgetAllocation {
+  id: string;
+  budgetConfigId: string;
+  categoryId: string;
+  amount: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BudgetAllocationWithCategory {
+  id: string;
+  categoryId: string;
+  categoryName: string;
+  categoryColor?: string;
+  amount: number;
+  isIncome: boolean;
+}
+
+export interface BudgetConfigDto {
+  id: string;
+  monthlySpendingTarget: number;
+  monthlyIncomeTarget: number;
+  currency: string;
+}
+
+export interface BudgetSummary {
+  config: BudgetConfigDto | null;
+  expenseAllocations: BudgetAllocationWithCategory[];
+  incomeAllocations: BudgetAllocationWithCategory[];
+  unallocatedSpending: number;
+  unallocatedIncome: number;
+}
+
+export interface BudgetVsActualSummary {
+  budgeted: number;
+  actual: number;
+  difference: number;
+  percentUsed: number;
+}
+
+export interface CategoryBudgetVsActual {
+  categoryId: string;
+  categoryName: string;
+  categoryColor?: string;
+  budgeted: number;
+  actual: number;
+  difference: number;
+  percentUsed: number;
+  isOverBudget: boolean;
+}
+
+export interface BudgetVsActual {
+  month: string;
+  currency: string;
+  spending: BudgetVsActualSummary;
+  income: BudgetVsActualSummary;
+  byCategory: CategoryBudgetVsActual[];
 }

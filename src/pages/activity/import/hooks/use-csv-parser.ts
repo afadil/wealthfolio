@@ -123,6 +123,13 @@ export function useCsvParser() {
           // Start from index 1 to skip header row
           for (let i = 1; i < rawCsvLines.length; i++) {
             const rawRow = rawCsvLines[i];
+
+            // Skip rows where all values are empty or whitespace
+            const hasContent = rawRow.some((cell) => cell && cell.trim() !== "");
+            if (!hasContent) {
+              continue;
+            }
+
             const lineNumber = i + 1; // CSV line number (1-based)
             const rowData: CsvRowData = { lineNumber: lineNumber.toString() };
 

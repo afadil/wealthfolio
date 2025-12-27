@@ -1,22 +1,24 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
 import { Icons } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
 import { formatAmount } from "@wealthfolio/ui";
 import { format, parseISO } from "date-fns";
-import React from "react";
+import React, { useMemo } from "react";
 import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
+
+// Source type IDs for filtering
+const SOURCE_TYPE_IDS = ["Investment Income", "Cash Income", "Capital Gains"];
 
 interface IncomeHistoryChartProps {
   monthlyIncomeData: [string, number][];
   previousMonthlyIncomeData: [string, number][];
+  byMonthBySourceType: Record<string, Record<string, number>>;
+  byMonthBySymbol: Record<string, Record<string, number>>;
+  bySymbol: Record<string, number>;
+  hiddenSourceTypes: Set<string>;
+  hiddenSymbols: Set<string>;
   selectedPeriod: "TOTAL" | "YTD" | "LAST_YEAR";
   currency: string;
   isBalanceHidden: boolean;
@@ -25,6 +27,11 @@ interface IncomeHistoryChartProps {
 export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
   monthlyIncomeData,
   previousMonthlyIncomeData,
+  byMonthBySourceType,
+  byMonthBySymbol,
+  bySymbol,
+  hiddenSourceTypes,
+  hiddenSymbols,
   selectedPeriod,
   currency,
   isBalanceHidden,
@@ -40,21 +47,59 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  const chartData = monthlyIncomeData.map(([month, income], index) => {
-    const cumulative = monthlyIncomeData.slice(0, index + 1).reduce((sum, [, value]) => {
-      const numericValue = Number(value) || 0;
-      return sum + numericValue;
-    }, 0);
+  // Get all symbol IDs for filtering
+  const allSymbolIds = useMemo(() => {
+    return Object.keys(bySymbol || {});
+  }, [bySymbol]);
 
-    const dataPoint = {
-      month,
-      income: Number(income) || 0,
-      cumulative: cumulative,
-      previousIncome: Number(previousMonthlyIncomeData[index]?.[1]) || 0,
-    };
+  // Transform data for bar chart, filtering out hidden source types OR hidden symbols
+  const chartData = useMemo(() => {
+    let cumulativeTotal = 0;
 
-    return dataPoint;
-  });
+    return monthlyIncomeData.map(([month], index) => {
+      let filteredIncome = 0;
+
+      // If source types are hidden, use source type filtering
+      if (hiddenSourceTypes.size > 0) {
+        const monthSourceTypes = byMonthBySourceType?.[month] || {};
+        for (const sourceTypeId of SOURCE_TYPE_IDS) {
+          if (!hiddenSourceTypes.has(sourceTypeId)) {
+            filteredIncome += Number(monthSourceTypes[sourceTypeId]) || 0;
+          }
+        }
+      }
+      // If symbols are hidden (top 10 toggles), use symbol filtering
+      else if (hiddenSymbols.size > 0) {
+        const monthSymbols = byMonthBySymbol?.[month] || {};
+        for (const symbolId of allSymbolIds) {
+          if (!hiddenSymbols.has(symbolId)) {
+            filteredIncome += Number(monthSymbols[symbolId]) || 0;
+          }
+        }
+      }
+      // No filters - use original monthly data
+      else {
+        filteredIncome = Number(monthlyIncomeData.find(([m]) => m === month)?.[1]) || 0;
+      }
+
+      cumulativeTotal += filteredIncome;
+
+      return {
+        month,
+        income: filteredIncome,
+        cumulative: cumulativeTotal,
+        previousIncome: Number(previousMonthlyIncomeData[index]?.[1]) || 0,
+      };
+    });
+  }, [
+    monthlyIncomeData,
+    previousMonthlyIncomeData,
+    byMonthBySourceType,
+    byMonthBySymbol,
+    allSymbolIds,
+    hiddenSourceTypes,
+    hiddenSymbols,
+  ]);
 
   const periodDescription =
     selectedPeriod === "TOTAL"
@@ -81,8 +126,8 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
           <ChartContainer
             config={{
               income: {
-                label: "Monthly Income",
-                color: "var(--chart-1)",
+                label: "Income",
+                color: "var(--chart-2)",
               },
               cumulative: {
                 label: "Cumulative Income",
@@ -137,9 +182,19 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                   <ChartTooltipContent
                     className="min-w-[150px] md:min-w-[180px]"
                     formatter={(value, name, entry) => {
+                      // Skip zero values in tooltip
+                      if (Number(value) === 0) return null;
                       const formattedValue = isBalanceHidden
                         ? "••••"
                         : formatAmount(Number(value), currency);
+                      const displayName =
+                        name === "previousIncome"
+                          ? "Previous"
+                          : name === "cumulative"
+                            ? "Cumulative"
+                            : name === "income"
+                              ? "Income"
+                              : String(name);
                       return (
                         <>
                           <div
@@ -152,16 +207,8 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                             }
                           />
                           <div className="flex flex-1 items-center justify-between gap-2">
-                            <span className="text-muted-foreground text-xs md:text-sm">
-                              {name === "income"
-                                ? isMobile
-                                  ? "Monthly"
-                                  : "Monthly Income"
-                                : name === "previousIncome"
-                                  ? "Previous"
-                                  : name === "cumulative"
-                                    ? "Cumulative"
-                                    : name}
+                            <span className="text-muted-foreground max-w-[120px] truncate text-xs md:text-sm">
+                              {displayName}
                             </span>
                             <span className="text-foreground font-mono text-xs font-medium tabular-nums md:text-sm">
                               {formattedValue}
@@ -176,7 +223,6 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                   />
                 }
               />
-              {!isMobile && <ChartLegend content={<ChartLegendContent payload={[]} />} />}
               <Bar
                 yAxisId="left"
                 dataKey="income"
