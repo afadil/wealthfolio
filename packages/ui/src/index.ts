@@ -21,6 +21,7 @@ export * from "./components/ui/date-range-picker";
 export * from "./components/ui/dialog";
 export * from "./components/ui/dropdown-menu";
 export * from "./components/ui/empty-placeholder";
+export * from "./components/ui/faceted-filter";
 export * from "./components/ui/form";
 export * from "./components/ui/hover-card";
 export * from "./components/ui/icons";
