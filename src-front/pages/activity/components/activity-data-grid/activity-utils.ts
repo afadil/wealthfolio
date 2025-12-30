@@ -1,7 +1,7 @@
 import { isCashActivity, isIncomeActivity } from "@/lib/activity-utils";
 import { ActivityType } from "@/lib/constants";
 import type { Account } from "@/lib/types";
-import { parseDecimalInput, parseLocalDateTime, toPayloadNumber } from "@/lib/utils";
+import { parseDecimalInput, parseLocalDateTime } from "@/lib/utils";
 import type {
   ActivityCreatePayload,
   CurrencyResolutionOptions,
@@ -15,6 +15,24 @@ import { generateTempActivityId } from "./use-activity-grid-state";
  * Set of numeric field names for value comparison
  */
 const NUMERIC_FIELDS = new Set(["quantity", "unitPrice", "amount", "fee", "fxRate"]);
+
+/**
+ * Converts a number to a string for API payloads, preserving full precision.
+ * Returns undefined for null/undefined/NaN values.
+ */
+function toDecimalString(value: unknown): string | undefined {
+  if (value == null) return undefined;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return undefined;
+    return value.toString();
+  }
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value);
+    if (!Number.isFinite(parsed)) return undefined;
+    return value; // Keep original string to preserve precision
+  }
+  return undefined;
+}
 
 /**
  * Safely converts a value to a number for comparison
@@ -181,19 +199,34 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
       updated = { ...updated, date: value };
     }
   } else if (field === "quantity") {
-    updated = { ...updated, quantity: parseDecimalInput(value as string | number) };
-    updated = applySplitDefaults(updated);
-  } else if (field === "unitPrice") {
-    const newUnitPrice = parseDecimalInput(value as string | number);
-    updated = { ...updated, unitPrice: newUnitPrice };
-    if (isCashActivity(updated.activityType) || isIncomeActivity(updated.activityType)) {
-      updated = { ...updated, amount: newUnitPrice };
+    // Preserve original value if null/undefined (user cleared the field)
+    // Use high precision (18) to support crypto quantities like 0.000000099
+    if (value != null) {
+      updated = { ...updated, quantity: parseDecimalInput(value as string | number, 18) };
+      updated = applySplitDefaults(updated);
     }
-    updated = applySplitDefaults(updated);
+  } else if (field === "unitPrice") {
+    // Preserve original value if null/undefined (user cleared the field)
+    // Use high precision (18) to support crypto prices
+    if (value != null) {
+      const newUnitPrice = parseDecimalInput(value as string | number, 18);
+      updated = { ...updated, unitPrice: newUnitPrice };
+      if (isCashActivity(updated.activityType) || isIncomeActivity(updated.activityType)) {
+        updated = { ...updated, amount: newUnitPrice };
+      }
+      updated = applySplitDefaults(updated);
+    }
   } else if (field === "amount") {
-    updated = { ...updated, amount: parseDecimalInput(value as string | number) };
+    // Preserve original value if null/undefined (user cleared the field)
+    // Use high precision (18) to support crypto amounts
+    if (value != null) {
+      updated = { ...updated, amount: parseDecimalInput(value as string | number, 18) };
+    }
   } else if (field === "fee") {
-    updated = { ...updated, fee: parseDecimalInput(value as string | number) };
+    // Preserve original value if null/undefined (user cleared the field)
+    if (value != null) {
+      updated = { ...updated, fee: parseDecimalInput(value as string | number, 12) };
+    }
   } else if (field === "assetSymbol") {
     const upper = (typeof value === "string" ? value : "").trim().toUpperCase();
     updated = { ...updated, assetSymbol: upper, assetId: upper };
@@ -237,7 +270,8 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
   } else if (field === "comment") {
     updated = { ...updated, comment: typeof value === "string" ? value : "" };
   } else if (field === "fxRate") {
-    updated = { ...updated, fxRate: parseDecimalInput(value as string | number) };
+    // Use high precision for FX rates
+    updated = { ...updated, fxRate: parseDecimalInput(value as string | number, 12) };
   }
 
   return { ...updated, updatedAt: new Date() };
@@ -331,12 +365,12 @@ export function buildSavePayload(
           : new Date(transaction.date).toISOString(),
       assetId: resolveAssetIdForTransaction(transaction, fallbackCurrency),
       assetDataSource: transaction.assetDataSource,
-      quantity: toPayloadNumber(transaction.quantity),
-      unitPrice: toPayloadNumber(transaction.unitPrice),
-      amount: toPayloadNumber(transaction.amount),
+      quantity: toDecimalString(transaction.quantity),
+      unitPrice: toDecimalString(transaction.unitPrice),
+      amount: toDecimalString(transaction.amount),
       currency: currencyForPayload,
-      fee: toPayloadNumber(transaction.fee),
-      fxRate: transaction.fxRate != null ? toPayloadNumber(transaction.fxRate) : null,
+      fee: toDecimalString(transaction.fee),
+      fxRate: transaction.fxRate != null ? toDecimalString(transaction.fxRate) : null,
       isDraft: transaction.isDraft,
       comment: transaction.comment ?? undefined,
     };
