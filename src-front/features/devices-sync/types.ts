@@ -1,71 +1,264 @@
 // Device Sync Types
 // =================
+// Types matching the new REST API for device sync
 
-export type TrustState = "trusted" | "untrusted";
-export type Platform = "ios" | "android" | "mac" | "windows" | "linux" | "server";
+export type TrustState = "trusted" | "untrusted" | "revoked";
+export type DevicePlatform = "ios" | "android" | "macos" | "windows" | "linux" | "server";
 export type PairingRole = "issuer" | "claimer";
 export type PairingStatus = "open" | "claimed" | "approved" | "completed" | "cancelled" | "expired";
+export type KeyState = "ACTIVE" | "PENDING";
+export type EnrollmentMode = "BOOTSTRAP" | "PAIR" | "READY";
 
-// Sync status returned from the server
-export interface SyncStatus {
-  e2eeEnabled: boolean;
-  e2eeKeyVersion: number;
-  requireSas: boolean;
-  pairingTtlSeconds: number;
-  resetAt: string | null;
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Device Types
+// ─────────────────────────────────────────────────────────────────────────────
 
-// Device information
+// Device information from the API
 export interface Device {
   id: string;
   userId: string;
-  name: string;
-  platform: Platform;
-  appVersion: string | null;
-  osVersion: string | null;
+  displayName: string;
+  platform: DevicePlatform;
+  devicePublicKey: string | null;
   trustState: TrustState;
   trustedKeyVersion: number | null;
+  osVersion: string | null;
+  appVersion: string | null;
   lastSeenAt: string | null;
   createdAt: string;
-  isCurrent: boolean;
+  // Client-side flag
+  isCurrent?: boolean;
 }
 
 // Device registration request
-export interface DeviceRegistration {
-  name: string;
+export interface RegisterDeviceRequest {
+  displayName: string;
   platform: string;
-  appVersion: string;
+  instanceId: string;
   osVersion?: string;
+  appVersion?: string;
 }
 
-// Device registration response
-export interface DeviceRegistrationResponse {
-  deviceId: string;
-  trustState: TrustState;
-  trustedKeyVersion: number | null;
+// Summary of a trusted device (used in PAIR mode response)
+export interface TrustedDeviceSummary {
+  id: string;
+  name: string;
+  platform: string;
+  lastSeenAt: string | null;
 }
+
+// Discriminated union for device enrollment response
+export type EnrollDeviceResponse =
+  | { mode: "BOOTSTRAP"; deviceId: string; e2eeKeyVersion: number }
+  | {
+      mode: "PAIR";
+      deviceId: string;
+      e2eeKeyVersion: number;
+      requireSas: boolean;
+      pairingTtlSeconds: number;
+      trustedDevices: TrustedDeviceSummary[];
+    }
+  | { mode: "READY"; deviceId: string; e2eeKeyVersion: number; trustState: TrustState };
+
+// Device update request
+export interface UpdateDeviceRequest {
+  displayName?: string;
+  metadata?: Record<string, unknown>;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Team Keys Types (E2EE)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Discriminated union for initializing team keys response
+export type InitializeKeysResult =
+  | { mode: "BOOTSTRAP"; challenge: string; nonce: string; keyVersion: number }
+  | {
+      mode: "PAIRING_REQUIRED";
+      e2eeKeyVersion: number;
+      requireSas: boolean;
+      pairingTtlSeconds: number;
+      trustedDevices: TrustedDeviceSummary[];
+    }
+  | { mode: "READY"; e2eeKeyVersion: number };
+
+// Request to commit team key initialization (Phase 2)
+export interface CommitInitializeKeysRequest {
+  keyVersion: number;
+  deviceKeyEnvelope: string;
+  signature: string;
+  challengeResponse?: string;
+  recoveryEnvelope?: string;
+}
+
+// Response from committing team key initialization
+export interface CommitInitializeKeysResponse {
+  success: boolean;
+  keyState: KeyState;
+}
+
+// Response from starting key rotation (Phase 1)
+export interface RotateKeysResponse {
+  challenge: string;
+  nonce: string;
+  newKeyVersion: number;
+}
+
+// Envelope for a device during key rotation
+export interface DeviceKeyEnvelope {
+  deviceId: string;
+  deviceKeyEnvelope: string;
+}
+
+// Request to commit key rotation (Phase 2)
+export interface CommitRotateKeysRequest {
+  newKeyVersion: number;
+  envelopes: DeviceKeyEnvelope[];
+  signature: string;
+  challengeResponse?: string;
+}
+
+// Response from committing key rotation
+export interface CommitRotateKeysResponse {
+  success: boolean;
+  keyVersion: number;
+}
+
+// Response from resetting team sync
+export interface ResetTeamSyncResponse {
+  success: boolean;
+  keyVersion: number;
+  resetAt: string | null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pairing Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Request to create a new pairing session
+export interface CreatePairingRequest {
+  codeHash: string;
+  ephemeralPublicKey: string;
+}
+
+// Response from creating a pairing session
+export interface CreatePairingResponse {
+  pairingId: string;
+  expiresAt: string;
+  keyVersion: number;
+  requireSas: boolean;
+}
+
+// Response from getting a pairing session
+export interface GetPairingResponse {
+  pairingId: string;
+  status: PairingStatus;
+  claimerDeviceId: string | null;
+  claimerEphemeralPub: string | null;
+  expiresAt: string;
+}
+
+// Request to complete a pairing session
+export interface CompletePairingRequest {
+  encryptedKeyBundle: string;
+  sasProof: string | Record<string, unknown>;
+  signature: string;
+}
+
+// Generic success response
+export interface SuccessResponse {
+  success: boolean;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Claimer-Side Pairing Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Request to claim a pairing session (claimer side)
+export interface ClaimPairingRequest {
+  code: string;
+  ephemeralPublicKey: string;
+}
+
+// Response from claiming a pairing session
+export interface ClaimPairingResponse {
+  sessionId: string;
+  issuerEphemeralPub: string;
+  e2eeKeyVersion: number;
+  requireSas: boolean;
+  expiresAt: string;
+}
+
+// Message from the pairing mailbox
+export interface PairingMessage {
+  id: string;
+  payloadType: string;
+  payload: string;
+  createdAt: string;
+}
+
+// Response from getting pairing messages
+export interface PairingMessagesResponse {
+  sessionStatus: PairingStatus;
+  messages: PairingMessage[];
+}
+
+// Request to confirm pairing (claimer side)
+export interface ConfirmPairingRequest {
+  proof?: string;
+}
+
+// Response from confirming pairing
+export interface ConfirmPairingResponse {
+  success: boolean;
+  keyVersion: number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pairing Session State (Client-side)
+// ─────────────────────────────────────────────────────────────────────────────
 
 // Pairing session (issuer side)
 export interface PairingSession {
-  sessionId: string;
+  pairingId: string;
   code: string;
   ephemeralSecretKey: string; // base64
   ephemeralPublicKey: string; // base64
   claimerPublicKey?: string; // base64
   claimerDeviceId?: string;
   sessionKey?: string; // base64
+  keyVersion: number;
   expiresAt: Date;
   status: PairingStatus;
+  requireSas: boolean;
 }
 
-// Pairing claim result (claimer side)
+// Pairing claim result (claimer side - for new device joining via QR code)
 export interface ClaimResult {
-  sessionId: string;
+  pairingId: string;
   issuerPublicKey: string; // base64
   sessionKey: string; // base64
   requireSas: boolean;
   expiresAt: Date;
 }
+
+// Claimer session state (for new device being paired)
+export interface ClaimerSession {
+  pairingId: string;
+  code: string;
+  ephemeralSecretKey: string; // base64
+  ephemeralPublicKey: string; // base64
+  issuerPublicKey: string; // base64
+  sessionKey: string; // base64
+  e2eeKeyVersion: number;
+  requireSas: boolean;
+  expiresAt: Date;
+  status: PairingStatus;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sync State
+// ─────────────────────────────────────────────────────────────────────────────
 
 // Sync state managed by the provider
 export interface SyncState {
@@ -76,17 +269,28 @@ export interface SyncState {
 
   // Device
   deviceId: string | null;
-  trustState: TrustState | null;
+  device: Device | null;
+
+  // Enrollment
+  enrollmentMode: EnrollmentMode | null;
+  trustedDevicesForPairing: TrustedDeviceSummary[];
+
+  // Team keys
   localKeyVersion: number | null;
+  keysInitialized: boolean;
 
-  // Team sync
-  syncStatus: SyncStatus | null;
-
-  // Pairing
+  // Pairing (Issuer)
   pairingSession: PairingSession | null;
   pairingRole: PairingRole | null;
   claimResult: ClaimResult | null;
+
+  // Pairing (Claimer)
+  claimerSession: ClaimerSession | null;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Error Handling
+// ─────────────────────────────────────────────────────────────────────────────
 
 // Known error codes
 export const SyncErrorCodes = {
@@ -94,13 +298,15 @@ export const SyncErrorCodes = {
   LAST_TRUSTED_DEVICE: "LAST_TRUSTED_DEVICE",
   NO_DEVICE: "NO_DEVICE",
   INIT_FAILED: "INIT_FAILED",
-  E2EE_ENABLE_FAILED: "E2EE_ENABLE_FAILED",
+  KEYS_INIT_FAILED: "KEYS_INIT_FAILED",
   ROOT_KEY_NOT_FOUND: "ROOT_KEY_NOT_FOUND",
   NO_SESSION: "NO_SESSION",
   NO_CLAIM: "NO_CLAIM",
   INVALID_SESSION: "INVALID_SESSION",
   PAIRING_ENDED: "PAIRING_ENDED",
   CLAIMER_NOT_FOUND: "CLAIMER_NOT_FOUND",
+  KEYS_ALREADY_INITIALIZED: "KEYS_ALREADY_INITIALIZED",
+  REQUIRES_PAIRING: "REQUIRES_PAIRING",
 } as const;
 
 // Custom error class for sync operations
@@ -145,76 +351,30 @@ export class SyncError extends Error {
     }
     return false;
   }
+
+  static isKeysAlreadyInitialized(error: unknown): boolean {
+    if (error instanceof SyncError) {
+      return error.code === SyncErrorCodes.KEYS_ALREADY_INITIALIZED;
+    }
+    if (error instanceof Error) {
+      const msg = error.message.toLowerCase();
+      return (
+        msg.includes("keys already initialized") ||
+        msg.includes("409") ||
+        msg.includes("conflict")
+      );
+    }
+    return false;
+  }
 }
 
-// API request/response types for pairing
-export interface CreatePairingRequest {
-  codeHash: string;
-  ephemeralPublicKey: string; // base64
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Key Bundle Types (for E2EE key transfer during pairing)
+// ─────────────────────────────────────────────────────────────────────────────
 
-export interface CreatePairingResponse {
-  sessionId: string;
-  expiresAt: string;
-}
-
-export interface ClaimPairingRequest {
-  code: string;
-  ephemeralPublicKey: string; // base64
-}
-
-export interface ClaimPairingResponse {
-  sessionId: string;
-  issuerEphPub: string; // base64
-  requireSas: boolean;
-  expiresAt: string;
-}
-
-export interface PairingMessage {
-  id: string;
-  payloadType: string;
-  payload: string; // base64
-  createdAt: string;
-}
-
-export interface PollMessagesResponse {
-  sessionStatus: PairingStatus;
-  messages: PairingMessage[];
-}
-
-// Get session response (issuer polling)
-export interface GetSessionResponse {
-  sessionId: string;
-  status: PairingStatus;
-  claimerDeviceId: string | null;
-  claimerEphPub: string | null; // base64
-  expiresAt: string;
-}
-
-// Root key transfer payload (encrypted with session key)
-export interface RootKeyPayload {
+// Key bundle payload sent during pairing completion
+export interface KeyBundlePayload {
   version: number;
-  ciphertext: string; // base64 (includes nonce)
+  rootKey: string; // base64 encrypted root key
   keyVersion: number;
 }
-
-// Trusted device info (for pairing)
-export interface TrustedDeviceInfo {
-  id: string;
-  name: string;
-  platform: string;
-  lastSeenAt: string | null;
-}
-
-// E2EE enable response - discriminated union
-export type EnableE2EEResponse =
-  | {
-      status: "initialized";
-      e2eeKeyVersion: number;
-      bootstrapDeviceId: string;
-    }
-  | {
-      status: "requires_pairing";
-      e2eeKeyVersion: number;
-      trustedDevices: TrustedDeviceInfo[];
-    };

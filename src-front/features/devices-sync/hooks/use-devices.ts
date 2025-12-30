@@ -16,6 +16,17 @@ export function useCurrentDevice() {
 }
 
 /**
+ * Hook to fetch all devices
+ */
+export function useDevices(scope?: "my" | "team") {
+  return useQuery({
+    queryKey: ["sync", "devices", scope],
+    queryFn: () => syncService.listDevices(scope),
+    staleTime: 60_000,
+  });
+}
+
+/**
  * Hook to rename a device
  */
 export function useRenameDevice() {
@@ -25,7 +36,8 @@ export function useRenameDevice() {
     mutationFn: ({ deviceId, name }: { deviceId: string; name: string }) =>
       syncService.renameDevice(deviceId, name),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["sync", "device", "current"] });
+      queryClient.invalidateQueries({ queryKey: ["sync", "device"] });
+      queryClient.invalidateQueries({ queryKey: ["sync", "devices"] });
     },
   });
 }
@@ -34,7 +46,26 @@ export function useRenameDevice() {
  * Hook to revoke a device
  */
 export function useRevokeDevice() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (deviceId: string) => syncService.revokeDevice(deviceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sync", "devices"] });
+    },
+  });
+}
+
+/**
+ * Hook to delete a device
+ */
+export function useDeleteDevice() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (deviceId: string) => syncService.deleteDevice(deviceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sync", "devices"] });
+    },
   });
 }

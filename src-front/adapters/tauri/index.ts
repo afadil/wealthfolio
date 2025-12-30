@@ -48,7 +48,12 @@ export const isWeb = false;
  * Invoke a Tauri command
  */
 export const invoke = async <T>(command: string, payload?: Record<string, unknown>): Promise<T> => {
-  return await tauriInvoke<T>(command, payload);
+  try {
+    return await tauriInvoke<T>(command, payload);
+  } catch (err) {
+    error(`[Invoke] Command "${command}" failed: ${err}`);
+    throw err;
+  }
 };
 
 /**

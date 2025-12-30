@@ -25,8 +25,9 @@ const serverProxy = enableProxy
   : undefined;
 
 // Determine build target: "tauri" for desktop, "web" for browser
-// Default to "tauri" when TAURI_DEV_HOST is set (running via tauri dev)
-const buildTarget = process.env.BUILD_TARGET || (host ? "tauri" : "web");
+// Default to "tauri" for local development - use BUILD_TARGET=web for web builds
+// TAURI_DEV_HOST is only set for mobile/network dev, so we can't rely on it
+const buildTarget = process.env.BUILD_TARGET || "tauri";
 
 // https://vitejs.dev/config/
 export default defineConfig({

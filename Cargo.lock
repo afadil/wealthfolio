@@ -2693,7 +2693,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.6.1",
  "system-configuration",
  "tokio",
  "tower-service",
@@ -3998,7 +3998,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d8fae84b431384b68627d0f9b3b1245fcf9f46f6c0e3dc902e9dce64edd1967"
 dependencies = [
  "libc",
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4549,7 +4549,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls",
- "socket2 0.5.10",
+ "socket2 0.6.1",
  "thiserror 2.0.17",
  "tokio",
  "tracing",
@@ -4586,7 +4586,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.5.10",
+ "socket2 0.6.1",
  "tracing",
  "windows-sys 0.60.2",
 ]
@@ -7272,7 +7272,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-app"
-version = "2.1.0"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -7315,7 +7315,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-connect"
-version = "2.1.0"
+version = "3.0.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7328,7 +7328,6 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
- "urlencoding",
  "uuid",
  "wealthfolio-core",
  "wealthfolio-storage-sqlite",
@@ -7336,7 +7335,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-core"
-version = "2.1.0"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7369,7 +7368,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-device-sync"
-version = "2.1.0"
+version = "3.0.0"
 dependencies = [
  "async-trait",
  "log",
@@ -7383,7 +7382,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-server"
-version = "2.1.0"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "argon2",
@@ -7422,7 +7421,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-storage-sqlite"
-version = "2.1.0"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7574,7 +7573,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

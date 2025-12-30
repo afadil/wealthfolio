@@ -347,6 +347,7 @@ export interface Settings {
   theme: string;
   font: string;
   baseCurrency: string;
+  instanceId: string;
   onboardingCompleted: boolean;
   autoUpdateCheckEnabled: boolean;
   menuBarVisible: boolean;

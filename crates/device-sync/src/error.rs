@@ -20,10 +20,6 @@ pub enum DeviceSyncError {
     #[error("API error ({status}): {message}")]
     Api { status: u16, message: String },
 
-    /// tRPC protocol error
-    #[error("tRPC error: {0}")]
-    Trpc(String),
-
     /// Invalid request (missing required data, etc.)
     #[error("Invalid request: {0}")]
     InvalidRequest(String),
@@ -40,11 +36,6 @@ impl DeviceSyncError {
             status,
             message: message.into(),
         }
-    }
-
-    /// Create a tRPC error
-    pub fn trpc(message: impl Into<String>) -> Self {
-        Self::Trpc(message.into())
     }
 
     /// Create an invalid request error

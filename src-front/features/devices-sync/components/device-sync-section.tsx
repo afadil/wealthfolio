@@ -4,6 +4,7 @@
 
 import { useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   Card,
   CardContent,
@@ -43,19 +44,20 @@ import {
 } from "@wealthfolio/ui/components/ui/dropdown-menu";
 import { Icons, Skeleton } from "@wealthfolio/ui";
 import { useDeviceSync } from "../providers/device-sync-provider";
-import { useCurrentDevice, useRenameDevice, useRevokeDevice } from "../hooks";
+import { useCurrentDevice, useDevices, useRenameDevice, useRevokeDevice } from "../hooks";
 import { E2EESetupCard } from "./e2ee-setup-card";
 import { PairingFlow } from "./pairing-flow";
-import { SyncError } from "../types";
+import type { Device } from "../types";
 
 const PORTAL_DEVICES_URL = "https://connect.wealthfolio.app/settings/devices";
 
 const platformIcons: Record<string, typeof Icons.Monitor> = {
-  mac: Icons.Laptop,
+  macos: Icons.Monitor,
   windows: Icons.Monitor,
   linux: Icons.Monitor,
   ios: Icons.Smartphone,
   android: Icons.Smartphone,
+  server: Icons.Cloud,
 };
 
 export function DeviceSyncSection() {
@@ -114,32 +116,12 @@ export function DeviceSyncSection() {
     );
   }
 
-  // Not initialized yet
-  if (!state.isInitialized) {
-    return null;
-  }
-
-  // Still loading sync status
-  if (state.syncStatus === null) {
-    return (
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-5 w-32" />
-          <Skeleton className="mt-2 h-4 w-64" />
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-20 w-full" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // E2EE not enabled - show setup card
-  if (!state.syncStatus.e2eeEnabled) {
+  // Not initialized or E2EE not enabled - show setup card
+  if (!state.isInitialized || !state.keysInitialized) {
     return <E2EESetupCard />;
   }
 
-  const isTrusted = state.trustState === "trusted";
+  const isTrusted = state.device?.trustState === "trusted";
   const dialogTitle = isTrusted ? "Add New Device" : "Connect This Device";
   const dialogDescription = isTrusted
     ? "Use this code on the device you want to connect"
@@ -201,7 +183,7 @@ export function DeviceSyncSection() {
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-0">
-        {state.trustState === null ? (
+        {!state.device ? (
           <Skeleton className="h-20 w-full" />
         ) : !isTrusted ? (
           <UntrustedDevicePrompt onStartPairing={() => setIsPairingOpen(true)} />
@@ -258,6 +240,7 @@ function CurrentDeviceCard({
   onResetSync: () => Promise<void>;
 }) {
   const { data: device, isLoading, error, isRefetching } = useCurrentDevice();
+  const { data: allDevices } = useDevices("my");
   const renameDevice = useRenameDevice();
   const revokeDevice = useRevokeDevice();
   const { actions } = useDeviceSync();
@@ -265,9 +248,11 @@ function CurrentDeviceCard({
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState("");
   const [showUnpairAlert, setShowUnpairAlert] = useState(false);
-  const [showResetAlert, setShowResetAlert] = useState(false);
   const [isUnpairing, setIsUnpairing] = useState(false);
-  const [isResetting, setIsResetting] = useState(false);
+
+  // Check if this is the only trusted device
+  const trustedDevices = allDevices?.filter((d: Device) => d.trustState === "trusted") ?? [];
+  const isLastTrustedDevice = trustedDevices.length <= 1;
 
   if (isLoading) {
     return <Skeleton className="h-20 w-full rounded-xl" />;
@@ -275,8 +260,12 @@ function CurrentDeviceCard({
 
   if (error || !device) {
     return (
-      <div className="text-muted-foreground py-4 text-center text-sm">
-        Failed to load device info
+      <div className="flex flex-col items-center justify-center rounded-xl border p-6 text-center">
+        <Icons.AlertCircle className="text-destructive mb-2 h-8 w-8 opacity-70" />
+        <p className="text-sm font-medium">Failed to load device info</p>
+        <p className="text-muted-foreground mt-1 text-xs">
+          {error instanceof Error ? error.message : "Please try refreshing"}
+        </p>
       </div>
     );
   }
@@ -284,12 +273,12 @@ function CurrentDeviceCard({
   const Icon = platformIcons[device.platform] || Icons.Monitor;
 
   const handleStartRename = () => {
-    setNewName(device.name);
+    setNewName(device.displayName);
     setIsRenaming(true);
   };
 
   const handleRename = async () => {
-    if (newName.trim() && newName !== device.name) {
+    if (newName.trim() && newName !== device.displayName) {
       await renameDevice.mutateAsync({ deviceId: device.id, name: newName.trim() });
     }
     setIsRenaming(false);
@@ -303,29 +292,20 @@ function CurrentDeviceCard({
   const handleUnpair = async () => {
     setIsUnpairing(true);
     try {
-      await revokeDevice.mutateAsync(device.id);
-      // Clear local sync data after unpair
-      await actions.clearSyncData();
+      if (isLastTrustedDevice) {
+        // For last trusted device, call resetSync instead of revoke
+        await onResetSync();
+      } else {
+        // Normal unpair flow
+        await revokeDevice.mutateAsync(device.id);
+        await actions.clearSyncData();
+      }
       setShowUnpairAlert(false);
     } catch (err) {
-      // Check for LAST_TRUSTED_DEVICE error
-      if (SyncError.isLastTrustedDevice(err)) {
-        setShowUnpairAlert(false);
-        setShowResetAlert(true);
-      }
-      // Other errors are handled by react-query
+      const message = err instanceof Error ? err.message : "An unexpected error occurred";
+      toast.error("Failed to unpair device", { description: message });
     } finally {
       setIsUnpairing(false);
-    }
-  };
-
-  const handleReset = async () => {
-    setIsResetting(true);
-    try {
-      await onResetSync();
-      setShowResetAlert(false);
-    } finally {
-      setIsResetting(false);
     }
   };
 
@@ -381,7 +361,7 @@ function CurrentDeviceCard({
             ) : (
               <>
                 <div className="flex items-center gap-2">
-                  <span className="truncate font-medium">{device.name}</span>
+                  <span className="truncate font-medium">{device.displayName}</span>
                 </div>
                 <div className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-xs">
                   <Icons.ShieldCheck className="h-3.5 w-3.5 text-green-600 dark:text-green-500" />
@@ -423,13 +403,17 @@ function CurrentDeviceCard({
         )}
       </div>
 
-      {/* Unpair confirmation */}
+      {/* Unpair confirmation - different copy for last device vs other devices */}
       <AlertDialog open={showUnpairAlert} onOpenChange={setShowUnpairAlert}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Unpair This Device</AlertDialogTitle>
+            <AlertDialogTitle>
+              {isLastTrustedDevice ? "Unpair your last device?" : "Unpair device?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove the encryption key from this device. You'll need to pair again to sync data.
+              {isLastTrustedDevice
+                ? "This is your only paired device. You'll need to pair a device again to continue syncing your data."
+                : `This will remove "${device.displayName}" from your account. The device will need to be paired again to sync data.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -446,35 +430,6 @@ function CurrentDeviceCard({
                 </>
               ) : (
                 "Unpair"
-              )}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Reset confirmation (shown when last trusted device) */}
-      <AlertDialog open={showResetAlert} onOpenChange={setShowResetAlert}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Last Trusted Device</AlertDialogTitle>
-            <AlertDialogDescription>
-              This is your only trusted device. Unpairing it will reset device sync for your account. All other devices will need to pair again with a new key.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isResetting}>Cancel</AlertDialogCancel>
-            <Button
-              variant="destructive"
-              onClick={handleReset}
-              disabled={isResetting}
-            >
-              {isResetting ? (
-                <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                  Resetting...
-                </>
-              ) : (
-                "Reset Sync"
               )}
             </Button>
           </AlertDialogFooter>

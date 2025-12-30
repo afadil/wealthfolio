@@ -137,26 +137,29 @@ const COMMANDS: CommandMap = {
   download_addon_to_staging: { method: "POST", path: "/addons/store/staging/download" },
   install_addon_from_staging: { method: "POST", path: "/addons/store/install-from-staging" },
   clear_addon_staging: { method: "DELETE", path: "/addons/store/staging" },
-  // Device Sync
-  get_sync_status: { method: "GET", path: "/sync/status" },
-  get_device_id: { method: "GET", path: "/sync/device/id" },
-  set_device_id: { method: "POST", path: "/sync/device/id" },
-  clear_device_id: { method: "DELETE", path: "/sync/device/id" },
-  register_device: { method: "POST", path: "/sync/device/register" },
-  get_current_device: { method: "GET", path: "/sync/device/current" },
-  list_devices: { method: "GET", path: "/sync/devices" },
-  rename_device: { method: "PATCH", path: "/sync/device" },
-  revoke_device: { method: "DELETE", path: "/sync/device" },
-  mark_device_trusted: { method: "POST", path: "/sync/device" },
-  enable_e2ee: { method: "POST", path: "/sync/e2ee/enable" },
-  reset_sync: { method: "POST", path: "/sync/e2ee/reset" },
-  create_pairing: { method: "POST", path: "/sync/pairing/create" },
-  claim_pairing: { method: "POST", path: "/sync/pairing/claim" },
-  get_pairing_session: { method: "GET", path: "/sync/pairing" },
+  // Device Sync - Device management
+  register_device: { method: "POST", path: "/sync/team/devices" },
+  get_device: { method: "GET", path: "/sync/team/devices" },
+  list_devices: { method: "GET", path: "/sync/team/devices" },
+  update_device: { method: "PATCH", path: "/sync/team/devices" },
+  delete_device: { method: "DELETE", path: "/sync/team/devices" },
+  revoke_device: { method: "POST", path: "/sync/team/devices" },
+  // Device Sync - Team keys (E2EE)
+  initialize_team_keys: { method: "POST", path: "/sync/team/keys/initialize" },
+  commit_initialize_team_keys: { method: "POST", path: "/sync/team/keys/initialize/commit" },
+  rotate_team_keys: { method: "POST", path: "/sync/team/keys/rotate" },
+  commit_rotate_team_keys: { method: "POST", path: "/sync/team/keys/rotate/commit" },
+  reset_team_sync: { method: "POST", path: "/sync/team/reset" },
+  // Device Sync - Pairing (Issuer - Trusted Device)
+  create_pairing: { method: "POST", path: "/sync/pairing" },
+  get_pairing: { method: "GET", path: "/sync/pairing" },
   approve_pairing: { method: "POST", path: "/sync/pairing" },
+  complete_pairing: { method: "POST", path: "/sync/pairing" },
   cancel_pairing: { method: "POST", path: "/sync/pairing" },
-  poll_pairing_messages: { method: "GET", path: "/sync/pairing" },
-  send_pairing_message: { method: "POST", path: "/sync/pairing" },
+  // Device Sync - Pairing (Claimer - New Device)
+  claim_pairing: { method: "POST", path: "/sync/pairing/claim" },
+  get_pairing_messages: { method: "GET", path: "/sync/pairing" },
+  confirm_pairing: { method: "POST", path: "/sync/pairing" },
   // Wealthfolio Connect (Broker Sync)
   store_sync_session: { method: "POST", path: "/connect/session" },
   clear_sync_session: { method: "DELETE", path: "/connect/session" },
@@ -558,83 +561,131 @@ export const invoke = async <T>(
       url += `?${params.toString()}`;
       break;
     }
-    // Device Sync commands
-    case "set_device_id": {
-      const { device_id } = payload as { device_id: string };
-      body = JSON.stringify({ deviceId: device_id });
-      break;
-    }
+    // Device Sync commands - Device management
     case "register_device": {
-      const { device_info } = payload as { device_info: Record<string, unknown> };
-      body = JSON.stringify(device_info);
+      const { displayName, instanceId } = payload as {
+        displayName: string;
+        instanceId: string;
+      };
+      // Detect platform from browser user agent
+      const userAgent = navigator.userAgent.toLowerCase();
+      let platform = "server"; // default fallback
+      if (userAgent.includes("mac")) platform = "macos";
+      else if (userAgent.includes("win")) platform = "windows";
+      else if (userAgent.includes("linux") && !userAgent.includes("android")) platform = "linux";
+      else if (userAgent.includes("android")) platform = "android";
+      else if (userAgent.includes("iphone") || userAgent.includes("ipad")) platform = "ios";
+
+      body = JSON.stringify({ displayName, platform, instanceId });
       break;
     }
-    case "rename_device": {
-      const { device_id, name } = payload as { device_id: string; name: string };
-      url += `/${encodeURIComponent(device_id)}`;
-      body = JSON.stringify({ name });
+    case "get_device": {
+      const { deviceId } = (payload ?? {}) as { deviceId?: string };
+      if (deviceId) {
+        url += `/${encodeURIComponent(deviceId)}`;
+      } else {
+        url += "/current";
+      }
+      break;
+    }
+    case "update_device": {
+      const { deviceId, displayName } = payload as { deviceId: string; displayName: string };
+      url += `/${encodeURIComponent(deviceId)}`;
+      body = JSON.stringify({ displayName });
+      break;
+    }
+    case "delete_device": {
+      const { deviceId } = payload as { deviceId: string };
+      url += `/${encodeURIComponent(deviceId)}`;
       break;
     }
     case "revoke_device": {
-      const { device_id } = payload as { device_id: string };
-      url += `/${encodeURIComponent(device_id)}`;
+      const { deviceId } = payload as { deviceId: string };
+      url += `/${encodeURIComponent(deviceId)}/revoke`;
       break;
     }
-    case "mark_device_trusted": {
-      const { device_id, key_version } = payload as { device_id: string; key_version: number };
-      url += `/${encodeURIComponent(device_id)}/trust`;
-      body = JSON.stringify({ keyVersion: key_version });
+    // Device Sync commands - Team keys (E2EE)
+    case "commit_initialize_team_keys": {
+      const { keyVersion, deviceKeyEnvelope, signature, challengeResponse, recoveryEnvelope } = payload as {
+        keyVersion: number;
+        deviceKeyEnvelope: string;
+        signature: string;
+        challengeResponse?: string;
+        recoveryEnvelope?: string;
+      };
+      body = JSON.stringify({ keyVersion, deviceKeyEnvelope, signature, challengeResponse, recoveryEnvelope });
       break;
     }
+    case "commit_rotate_team_keys": {
+      const { newKeyVersion, envelopes, signature, challengeResponse } = payload as {
+        newKeyVersion: number;
+        envelopes: Array<{ deviceId: string; deviceKeyEnvelope: string }>;
+        signature: string;
+        challengeResponse?: string;
+      };
+      body = JSON.stringify({ newKeyVersion, envelopes, signature, challengeResponse });
+      break;
+    }
+    case "reset_team_sync": {
+      const { reason } = (payload ?? {}) as { reason?: string };
+      if (reason) {
+        body = JSON.stringify({ reason });
+      }
+      break;
+    }
+    // Device Sync commands - Pairing (Issuer - Trusted Device)
     case "create_pairing": {
-      const { code_hash, ephemeral_public_key } = payload as {
-        code_hash: string;
-        ephemeral_public_key: string;
+      const { codeHash, ephemeralPublicKey } = payload as {
+        codeHash: string;
+        ephemeralPublicKey: string;
       };
-      body = JSON.stringify({ codeHash: code_hash, ephemeralPublicKey: ephemeral_public_key });
+      body = JSON.stringify({ codeHash, ephemeralPublicKey });
       break;
     }
-    case "claim_pairing": {
-      const { code, ephemeral_public_key } = payload as {
-        code: string;
-        ephemeral_public_key: string;
-      };
-      body = JSON.stringify({ code, ephemeralPublicKey: ephemeral_public_key });
-      break;
-    }
-    case "get_pairing_session": {
-      const { session_id } = payload as { session_id: string };
-      url += `/${encodeURIComponent(session_id)}`;
+    case "get_pairing": {
+      const { pairingId } = payload as { pairingId: string };
+      url += `/${encodeURIComponent(pairingId)}`;
       break;
     }
     case "approve_pairing": {
-      const { session_id } = payload as { session_id: string };
-      url += `/${encodeURIComponent(session_id)}/approve`;
+      const { pairingId } = payload as { pairingId: string };
+      url += `/${encodeURIComponent(pairingId)}/approve`;
+      break;
+    }
+    case "complete_pairing": {
+      const { pairingId, encryptedKeyBundle, sasProof, signature } = payload as {
+        pairingId: string;
+        encryptedKeyBundle: string;
+        sasProof: string | Record<string, unknown>;
+        signature: string;
+      };
+      url += `/${encodeURIComponent(pairingId)}/complete`;
+      body = JSON.stringify({ encryptedKeyBundle, sasProof, signature });
       break;
     }
     case "cancel_pairing": {
-      const { session_id } = payload as { session_id: string };
-      url += `/${encodeURIComponent(session_id)}/cancel`;
+      const { pairingId } = payload as { pairingId: string };
+      url += `/${encodeURIComponent(pairingId)}/cancel`;
       break;
     }
-    case "poll_pairing_messages": {
-      const { session_id } = payload as { session_id: string };
-      url += `/${encodeURIComponent(session_id)}/messages`;
-      break;
-    }
-    case "send_pairing_message": {
-      const { session_id, to_device_id, payload_type, payload: msgPayload } = payload as {
-        session_id: string;
-        to_device_id: string;
-        payload_type: string;
-        payload: string;
+    // Claimer-side pairing commands
+    case "claim_pairing": {
+      const { code, ephemeralPublicKey } = payload as {
+        code: string;
+        ephemeralPublicKey: string;
       };
-      url += `/${encodeURIComponent(session_id)}/messages`;
-      body = JSON.stringify({
-        toDeviceId: to_device_id,
-        payloadType: payload_type,
-        payload: msgPayload,
-      });
+      body = JSON.stringify({ code, ephemeralPublicKey });
+      break;
+    }
+    case "get_pairing_messages": {
+      const { pairingId } = payload as { pairingId: string };
+      url += `/${encodeURIComponent(pairingId)}/messages`;
+      break;
+    }
+    case "confirm_pairing": {
+      const { pairingId, proof } = payload as { pairingId: string; proof?: string };
+      url += `/${encodeURIComponent(pairingId)}/confirm`;
+      body = JSON.stringify({ proof });
       break;
     }
     // Wealthfolio Connect commands
@@ -650,13 +701,9 @@ export const invoke = async <T>(
       body = JSON.stringify(payload);
       break;
     }
-    case "get_device_id":
-    case "clear_device_id":
-    case "get_current_device":
     case "list_devices":
-    case "get_sync_status":
-    case "enable_e2ee":
-    case "reset_sync":
+    case "initialize_team_keys":
+    case "rotate_team_keys":
     case "clear_sync_session":
     case "get_sync_session_status":
     case "sync_broker_connections":

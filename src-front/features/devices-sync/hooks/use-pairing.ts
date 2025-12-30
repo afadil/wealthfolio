@@ -1,6 +1,6 @@
 // Pairing flow hook
-// State machine for managing the pairing process
-// ===============================================
+// State machine for managing the pairing process (issuer side only for now)
+// =========================================================================
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useDeviceSync } from "../providers/device-sync-provider";
@@ -8,20 +8,17 @@ import { logger } from "@/adapters";
 
 export type PairingStep =
   | "idle"
-  | "select_mode"
   | "display_code"
-  | "enter_code"
   | "waiting_claim"
   | "verify_sas"
-  | "waiting_approval"
   | "transferring"
   | "success"
   | "error"
   | "expired";
 
 /**
- * Hook for managing the pairing flow
- * Handles both issuer (trusted device) and claimer (new device) roles
+ * Hook for managing the pairing flow (issuer/trusted device side)
+ * Creates a pairing session and waits for a claimer to connect
  */
 export function usePairing() {
   const { state, actions } = useDeviceSync();
@@ -45,7 +42,7 @@ export function usePairing() {
   }, []);
 
   // Compute SAS when session key is available
-  const sessionKey = state.pairingSession?.sessionKey || state.claimResult?.sessionKey;
+  const sessionKey = state.pairingSession?.sessionKey;
   useEffect(() => {
     if (!sessionKey) {
       setSas(null);
@@ -57,6 +54,15 @@ export function usePairing() {
   // Poll for claimer connection (issuer)
   const startPollingForClaimerConnection = useCallback(() => {
     pollRef.current = setInterval(async () => {
+      // Check if session has expired
+      const expiresAt = state.pairingSession?.expiresAt;
+      if (expiresAt && new Date() > expiresAt) {
+        if (pollRef.current) clearInterval(pollRef.current);
+        setError("Pairing session expired");
+        setStep("expired");
+        return;
+      }
+
       try {
         const claimed = await actionsRef.current.pollForClaimerConnection();
         if (claimed) {
@@ -70,10 +76,10 @@ export function usePairing() {
         setStep("error");
       }
     }, 2000); // Poll every 2 seconds
-  }, []);
+  }, [state.pairingSession?.expiresAt]);
 
-  // Start as issuer (trusted device)
-  const startAsIssuer = useCallback(async () => {
+  // Start pairing as issuer (trusted device)
+  const startPairing = useCallback(async () => {
     try {
       setError(null);
       setStep("display_code");
@@ -86,99 +92,34 @@ export function usePairing() {
     }
   }, [actions, startPollingForClaimerConnection]);
 
-  // Start as claimer (new device)
-  const startAsClaimer = useCallback(() => {
-    setError(null);
-    setStep("enter_code");
-  }, []);
-
-  // Poll for root key (claimer) - defined early so other callbacks can use it
-  const startPollingForRootKey = useCallback(() => {
-    // Prevent multiple polling intervals
-    if (pollRef.current) {
-      logger.info("[usePairing] startPollingForRootKey called but already polling, skipping");
-      return;
-    }
-    logger.info("[usePairing] startPollingForRootKey called, starting interval");
-    pollRef.current = setInterval(async () => {
-      try {
-        logger.info("[usePairing] Polling for root key...");
-        const received = await actionsRef.current.pollForRootKey();
-        logger.info(`[usePairing] Poll result: ${received}`);
-        if (received) {
-          if (pollRef.current) clearInterval(pollRef.current);
-          logger.info("[usePairing] Root key received! Setting success");
-          setStep("success");
-        }
-      } catch (err) {
-        logger.error(`[usePairing] Poll error: ${err}`);
-        if (pollRef.current) clearInterval(pollRef.current);
-        setError(err instanceof Error ? err.message : String(err));
-        setStep("error");
-      }
-    }, 1500);
-  }, []);
-
-  // Submit pairing code (claimer)
-  const submitCode = useCallback(
-    async (code: string) => {
-      try {
-        setError(null);
-        setIsSubmitting(true);
-        logger.info("[usePairing] Claiming pairing code...");
-        const result = await actions.claimPairing(code);
-        setIsSubmitting(false);
-
-        if (result.requireSas) {
-          setStep("verify_sas");
-        } else {
-          setStep("waiting_approval");
-        }
-        // Always start polling after successfully claiming
-        // Claimer polls while waiting for issuer to verify SAS and send root key
-        logger.info("[usePairing] Claim successful, starting to poll for root key");
-        startPollingForRootKey();
-      } catch (err) {
-        setIsSubmitting(false);
-        setError(err instanceof Error ? err.message : String(err));
-        setStep("error");
-      }
-    },
-    [actions, startPollingForRootKey],
-  );
-
-  // Confirm SAS (both issuer and claimer can confirm)
+  // Confirm SAS verification and complete pairing (issuer only)
   const confirmSAS = useCallback(async () => {
     try {
       setError(null);
+      setIsSubmitting(true);
+      logger.info("[usePairing] confirmSAS called");
 
-      // Check if we're the issuer (has pairingSession with code) or claimer
-      const isIssuer = state.pairingRole === "issuer";
-      logger.info(`[usePairing] confirmSAS called, isIssuer: ${isIssuer}`);
+      // Approve pairing first
+      logger.info("[usePairing] Approving pairing...");
+      await actions.approvePairing();
 
-      if (isIssuer) {
-        // Issuer: approve pairing and send root key
-        logger.info("[usePairing] Approving pairing...");
-        await actions.approvePairing();
-        setStep("transferring");
-        logger.info("[usePairing] Sending root key...");
-        await actions.sendRootKey();
-        logger.info("[usePairing] Root key sent, setting success");
-        setStep("success");
-      } else {
-        // Claimer: just approve and wait for root key
-        logger.info("[usePairing] Starting to poll for root key...");
-        setStep("waiting_approval");
-        startPollingForRootKey();
-      }
+      // Then complete pairing (sends encrypted key bundle)
+      setStep("transferring");
+      logger.info("[usePairing] Completing pairing...");
+      await actions.completePairing();
+
+      logger.info("[usePairing] Pairing completed successfully");
+      setStep("success");
     } catch (err) {
       logger.error(`[usePairing] confirmSAS error: ${err}`);
       setError(err instanceof Error ? err.message : String(err));
       setStep("error");
+    } finally {
+      setIsSubmitting(false);
     }
-  }, [actions, state.pairingRole, startPollingForRootKey]);
+  }, [actions]);
 
-  // Reject SAS
+  // Reject SAS verification
   const rejectSAS = useCallback(async () => {
     if (pollRef.current) clearInterval(pollRef.current);
     await actions.cancelPairing();
@@ -209,9 +150,7 @@ export function usePairing() {
     pairingCode: state.pairingSession?.code ?? null,
     expiresAt: state.pairingSession?.expiresAt ?? null,
     role: state.pairingRole,
-    startAsIssuer,
-    startAsClaimer,
-    submitCode,
+    startPairing,
     confirmSAS,
     rejectSAS,
     cancel,
