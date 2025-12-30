@@ -1,12 +1,11 @@
 // PairingFlow
-// Main component that orchestrates the pairing flow
-// =================================================
+// Main component that orchestrates the pairing flow (issuer side only)
+// =====================================================================
 
 import { useEffect, useRef, useCallback } from "react";
 import { usePairing } from "../../hooks";
 import { useDeviceSync } from "../../providers/device-sync-provider";
 import { DisplayCode } from "./display-code";
-import { EnterCode } from "./enter-code";
 import { SASVerification } from "./sas-verification";
 import { WaitingState } from "./waiting-state";
 import { PairingResult } from "./pairing-result";
@@ -22,32 +21,23 @@ export function PairingFlow({ onComplete, onCancel }: PairingFlowProps) {
     step,
     error,
     sas,
-    isSubmitting,
     pairingCode,
     expiresAt,
-    startAsIssuer,
-    startAsClaimer,
-    submitCode,
+    startPairing,
     confirmSAS,
     rejectSAS,
     cancel,
     reset,
   } = usePairing();
 
-  // Auto-start based on trust state (only once when component mounts at idle)
+  // Auto-start pairing when component mounts (issuer flow only)
   const hasAutoStarted = useRef(false);
   useEffect(() => {
-    if (step === "idle" && !hasAutoStarted.current) {
+    if (step === "idle" && !hasAutoStarted.current && state.device?.trustState === "trusted") {
       hasAutoStarted.current = true;
-      if (state.trustState === "trusted") {
-        // Trusted device: start as issuer (show code)
-        startAsIssuer();
-      } else {
-        // Untrusted device: start as claimer (enter code)
-        startAsClaimer();
-      }
+      startPairing();
     }
-  }, [step, state.trustState, startAsIssuer, startAsClaimer]);
+  }, [step, state.device?.trustState, startPairing]);
 
   const handleDone = useCallback(() => {
     reset();
@@ -65,7 +55,6 @@ export function PairingFlow({ onComplete, onCancel }: PairingFlowProps) {
 
   switch (step) {
     case "idle":
-    case "select_mode":
       return <WaitingState title="Starting..." onCancel={onCancel} />;
 
     case "display_code":
@@ -75,24 +64,18 @@ export function PairingFlow({ onComplete, onCancel }: PairingFlowProps) {
       }
       return <WaitingState title="Generating code..." onCancel={handleCancel} showQRSkeleton />;
 
-    case "enter_code":
-      return <EnterCode onSubmit={submitCode} onCancel={handleCancel} error={error} isLoading={isSubmitting} />;
-
     case "verify_sas":
       if (sas) {
         return (
           <SASVerification
             sas={sas}
-            role={state.pairingRole ?? "claimer"}
+            role={state.pairingRole ?? "issuer"}
             onConfirm={confirmSAS}
             onReject={rejectSAS}
           />
         );
       }
       return <WaitingState title="Computing security code..." onCancel={handleCancel} />;
-
-    case "waiting_approval":
-      return <WaitingState title="Waiting for other device..." onCancel={handleCancel} />;
 
     case "transferring":
       return <WaitingState title="Transferring key..." />;
@@ -113,7 +96,6 @@ export function PairingFlow({ onComplete, onCancel }: PairingFlowProps) {
 
 // Re-export sub-components for flexibility
 export { DisplayCode } from "./display-code";
-export { EnterCode } from "./enter-code";
 export { SASVerification } from "./sas-verification";
 export { WaitingState } from "./waiting-state";
 export { PairingResult } from "./pairing-result";

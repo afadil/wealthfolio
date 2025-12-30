@@ -11,14 +11,18 @@ use axum::{
     routing::{delete, get, post},
     Json, Router,
 };
+use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info};
 
 use crate::error::{ApiError, ApiResult};
 use crate::main_lib::AppState;
-use wealthfolio_connect::{
-    ConnectApiClient, ConnectPortalRequest, PlansResponse, SyncAccountsResponse,
-    SyncActivitiesResponse, SyncConnectionsResponse, UserInfo,
+use wealthfolio_connect::broker::{
+    AccountUniversalActivity, AccountUniversalActivityCurrency, AccountUniversalActivitySymbol,
+    BrokerAccount, BrokerAccountBalance, BrokerBalanceAmount, BrokerConnection,
+    BrokerConnectionBrokerage, ConnectPortalRequest, ConnectPortalResponse, PlansResponse,
+    PlanPricing, PlanPricingPeriods, SubscriptionPlan, SyncAccountsResponse, SyncActivitiesResponse,
+    SyncConnectionsResponse, UserInfo, UserTeam,
 };
 
 // Storage key for refresh token (without prefix - the SecretStore adds "wealthfolio_" prefix)
@@ -50,10 +54,163 @@ fn supabase_api_key() -> Option<String> {
     std::env::var("CONNECT_AUTH_PUBLISHABLE_KEY").ok()
 }
 
-/// Create a ConnectApiClient with a fresh access token
-async fn create_connect_client(state: &AppState) -> ApiResult<ConnectApiClient> {
+/// Simple REST client for Connect API
+struct ConnectClient {
+    client: reqwest::Client,
+    base_url: String,
+}
+
+impl ConnectClient {
+    fn new(base_url: &str, token: &str) -> Result<Self, ApiError> {
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        let auth_value = HeaderValue::from_str(&format!("Bearer {}", token))
+            .map_err(|e| ApiError::Internal(format!("Invalid token format: {}", e)))?;
+        headers.insert(AUTHORIZATION, auth_value);
+
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(30))
+            .default_headers(headers)
+            .build()
+            .map_err(|e| ApiError::Internal(format!("Failed to create HTTP client: {}", e)))?;
+
+        Ok(Self {
+            client,
+            base_url: base_url.trim_end_matches('/').to_string(),
+        })
+    }
+
+    async fn get<T: serde::de::DeserializeOwned>(&self, path: &str) -> ApiResult<T> {
+        let url = format!("{}{}", self.base_url, path);
+        let response = self
+            .client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+        let status = response.status();
+        let body = response
+            .text()
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+        if !status.is_success() {
+            return Err(ApiError::Internal(format!("API error {}: {}", status, body)));
+        }
+
+        serde_json::from_str(&body)
+            .map_err(|e| ApiError::Internal(format!("Failed to parse response: {}", e)))
+    }
+}
+
+/// Create a ConnectClient with a fresh access token
+async fn create_connect_client(state: &AppState) -> ApiResult<ConnectClient> {
     let token = mint_access_token(state).await?;
-    ConnectApiClient::new(cloud_api_base_url(), &token).map_err(|e| ApiError::Internal(e))
+    ConnectClient::new(&cloud_api_base_url(), &token)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// API Response Types (from REST API)
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+struct ApiConnectionsResponse {
+    connections: Vec<ApiConnection>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ApiConnection {
+    id: String,
+    brokerage_name: Option<String>,
+    brokerage_slug: Option<String>,
+    disabled: Option<bool>,
+    updated_at: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ApiAccount {
+    id: String,
+    connection_id: Option<String>,
+    account_number: Option<String>,
+    name: Option<String>,
+    account_type: Option<String>,
+    currency: Option<String>,
+    cash: Option<f64>,
+    meta: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ApiActivitiesResponse {
+    data: Vec<ApiActivity>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ApiActivity {
+    id: Option<String>,
+    account_id: Option<String>,
+    raw_description: Option<String>,
+    activity_type: Option<String>,
+    trade_date: Option<String>,
+    settle_date: Option<String>,
+    quantity: Option<f64>,
+    unit_price: Option<f64>,
+    net_amount: Option<f64>,
+    fee: Option<f64>,
+    currency: Option<String>,
+    symbol: Option<String>,
+    asset_name: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ApiPlansResponse {
+    plans: Vec<ApiPlan>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ApiPlan {
+    id: String,
+    name: String,
+    description: String,
+    features: Vec<String>,
+    pricing: ApiPlanPricing,
+}
+
+#[derive(Debug, Deserialize)]
+struct ApiPlanPricing {
+    monthly: f64,
+    yearly: f64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ApiUser {
+    id: String,
+    email: String,
+    full_name: Option<String>,
+    avatar_url: Option<String>,
+    locale: Option<String>,
+    week_starts_on_monday: Option<bool>,
+    timezone: Option<String>,
+    timezone_auto_sync: Option<bool>,
+    time_format: Option<i32>,
+    date_format: Option<String>,
+    team_id: Option<String>,
+    team_role: Option<String>,
+    team: Option<ApiTeam>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ApiTeam {
+    id: String,
+    name: String,
+    logo_url: String,
+    plan: String,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -178,12 +335,23 @@ async fn mint_access_token(state: &AppState) -> ApiResult<String> {
     if !status.is_success() {
         // Try to parse error response
         if let Ok(err) = serde_json::from_str::<SupabaseErrorResponse>(&body) {
-            let msg = err.error_description.or(err.error).unwrap_or_else(|| "Unknown error".to_string());
+            let msg = err
+                .error_description
+                .or(err.error)
+                .unwrap_or_else(|| "Unknown error".to_string());
             error!("[Connect] Token refresh failed: {}", msg);
-            return Err(ApiError::Unauthorized(format!("Session expired. Please sign in again. ({})", msg)));
+            return Err(ApiError::Unauthorized(format!(
+                "Session expired. Please sign in again. ({})",
+                msg
+            )));
         }
-        error!("[Connect] Token refresh failed with status {}: {}", status, body);
-        return Err(ApiError::Unauthorized("Session expired. Please sign in again.".to_string()));
+        error!(
+            "[Connect] Token refresh failed with status {}: {}",
+            status, body
+        );
+        return Err(ApiError::Unauthorized(
+            "Session expired. Please sign in again.".to_string(),
+        ));
     }
 
     let token_response: SupabaseTokenResponse = serde_json::from_str(&body)
@@ -205,12 +373,34 @@ async fn sync_broker_connections(
     let client = create_connect_client(&state).await?;
 
     // Fetch connections from cloud
-    let connections = client
-        .list_connections()
-        .await
-        .map_err(|e| ApiError::Internal(e))?;
+    let api_response: ApiConnectionsResponse =
+        client.get("/api/v1/brokerage/connections").await?;
 
-    info!("[Connect] Fetched {} connections from cloud", connections.len());
+    // Convert API response to broker module types
+    let connections: Vec<BrokerConnection> = api_response
+        .connections
+        .into_iter()
+        .map(|c| BrokerConnection {
+            id: c.id,
+            brokerage: Some(BrokerConnectionBrokerage {
+                id: None,
+                slug: c.brokerage_slug,
+                name: c.brokerage_name.clone(),
+                display_name: c.brokerage_name,
+                aws_s3_logo_url: None,
+                aws_s3_square_logo_url: None,
+            }),
+            connection_type: None,
+            disabled: c.disabled.unwrap_or(false),
+            disabled_date: None,
+            updated_at: c.updated_at,
+        })
+        .collect();
+
+    info!(
+        "[Connect] Fetched {} connections from cloud",
+        connections.len()
+    );
 
     // Sync to local database
     let result = state
@@ -235,10 +425,31 @@ async fn sync_broker_accounts(
     let client = create_connect_client(&state).await?;
 
     // Fetch accounts from cloud
-    let accounts = client
-        .list_accounts()
-        .await
-        .map_err(|e| ApiError::Internal(e))?;
+    let api_accounts: Vec<ApiAccount> = client.get("/api/v1/sync/brokers/accounts").await?;
+
+    // Convert API response to broker module types
+    let accounts: Vec<BrokerAccount> = api_accounts
+        .into_iter()
+        .map(|a| BrokerAccount {
+            id: a.id,
+            brokerage_authorization: a.connection_id.unwrap_or_default(),
+            name: a.name,
+            account_number: a.account_number.unwrap_or_default(),
+            institution_name: String::new(), // Will be filled from connection
+            created_date: None,
+            sync_status: None,
+            balance: Some(BrokerAccountBalance {
+                total: Some(BrokerBalanceAmount {
+                    amount: a.cash,
+                    currency: a.currency,
+                }),
+            }),
+            status: None,
+            raw_type: a.account_type,
+            is_paper: false,
+            meta: a.meta,
+        })
+        .collect();
 
     info!("[Connect] Fetched {} accounts from cloud", accounts.len());
 
@@ -300,13 +511,52 @@ async fn sync_broker_activities(
             .map_err(|e| ApiError::Internal(e.to_string()))?
             .and_then(|s| s.last_synced_date);
 
+        // Build URL with query params
+        let mut url = format!(
+            "/api/v1/sync/brokers/accounts/{}/activities",
+            external_id
+        );
+        if let Some(ref date) = start_date {
+            url = format!("{}?startDate={}", url, date);
+        }
+
         // Fetch activities from cloud
-        match client
-            .get_activities(external_id, start_date.as_deref())
-            .await
-        {
-            Ok(paginated) => {
-                let activities = paginated.data;
+        match client.get::<ApiActivitiesResponse>(&url).await {
+            Ok(api_response) => {
+                // Convert API response to broker module types
+                let activities: Vec<AccountUniversalActivity> = api_response
+                    .data
+                    .into_iter()
+                    .map(|a| AccountUniversalActivity {
+                        id: a.id.clone(),
+                        symbol: a.symbol.map(|s| AccountUniversalActivitySymbol {
+                            id: None,
+                            symbol: Some(s),
+                            raw_symbol: None,
+                            description: a.asset_name.clone(),
+                            symbol_type: None,
+                        }),
+                        option_symbol: None,
+                        price: a.unit_price,
+                        units: a.quantity,
+                        amount: a.net_amount,
+                        currency: a.currency.map(|c| AccountUniversalActivityCurrency {
+                            id: None,
+                            code: Some(c),
+                            name: None,
+                        }),
+                        activity_type: a.activity_type,
+                        option_type: None,
+                        description: a.raw_description,
+                        trade_date: a.trade_date,
+                        settlement_date: a.settle_date,
+                        fee: a.fee,
+                        fx_rate: None,
+                        institution: None,
+                        external_reference_id: a.id,
+                        provider_type: None,
+                    })
+                    .collect();
                 let count = activities.len();
 
                 if count > 0 {
@@ -356,7 +606,7 @@ async fn sync_broker_activities(
                 );
                 let _ = state
                     .connect_sync_service
-                    .finalize_activity_sync_failure(account.id.clone(), e.clone())
+                    .finalize_activity_sync_failure(account.id.clone(), e.to_string())
                     .await;
                 accounts_failed += 1;
             }
@@ -377,19 +627,14 @@ async fn sync_broker_activities(
 }
 
 async fn get_connect_portal(
-    State(state): State<Arc<AppState>>,
-    Json(request): Json<ConnectPortalRequest>,
-) -> ApiResult<Json<wealthfolio_connect::ConnectPortalResponse>> {
-    info!("[Connect] Getting connect portal URL...");
-
-    let client = create_connect_client(&state).await?;
-
-    let result = client
-        .get_connect_portal(&request)
-        .await
-        .map_err(|e| ApiError::Internal(e))?;
-
-    Ok(Json(result))
+    State(_state): State<Arc<AppState>>,
+    Json(_request): Json<ConnectPortalRequest>,
+) -> ApiResult<Json<ConnectPortalResponse>> {
+    // This endpoint is not available in the new REST API
+    // The portal URL should be constructed client-side or via a different mechanism
+    Err(ApiError::Internal(
+        "Connect portal endpoint not available in REST API".to_string(),
+    ))
 }
 
 async fn get_subscription_plans(
@@ -399,27 +644,69 @@ async fn get_subscription_plans(
 
     let client = create_connect_client(&state).await?;
 
-    let result = client
-        .get_subscription_plans()
-        .await
-        .map_err(|e| ApiError::Internal(e))?;
+    let api_response: ApiPlansResponse = client.get("/api/v1/subscription/plans").await?;
 
-    Ok(Json(result))
+    // Convert to PlansResponse
+    let plans = api_response
+        .plans
+        .into_iter()
+        .map(|p| SubscriptionPlan {
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            features: p.features,
+            pricing: PlanPricingPeriods {
+                monthly: PlanPricing {
+                    amount: p.pricing.monthly,
+                    currency: "USD".to_string(),
+                    price_id: None,
+                },
+                yearly: PlanPricing {
+                    amount: p.pricing.yearly,
+                    currency: "USD".to_string(),
+                    price_id: None,
+                },
+            },
+        })
+        .collect();
+
+    Ok(Json(PlansResponse { plans }))
 }
 
-async fn get_user_info(
-    State(state): State<Arc<AppState>>,
-) -> ApiResult<Json<UserInfo>> {
+async fn get_user_info(State(state): State<Arc<AppState>>) -> ApiResult<Json<UserInfo>> {
     info!("[Connect] Getting user info...");
 
     let client = create_connect_client(&state).await?;
 
-    let result = client
-        .get_user_info()
-        .await
-        .map_err(|e| ApiError::Internal(e))?;
+    let api_user: Option<ApiUser> = client.get("/api/v1/user/me").await?;
 
-    Ok(Json(result))
+    // Convert to UserInfo (handle nullable response)
+    let user = api_user.ok_or_else(|| ApiError::Internal("No user info returned".to_string()))?;
+
+    Ok(Json(UserInfo {
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name,
+        avatar_url: user.avatar_url,
+        locale: user.locale,
+        week_starts_on_monday: user.week_starts_on_monday,
+        timezone: user.timezone,
+        timezone_auto_sync: user.timezone_auto_sync,
+        time_format: user.time_format,
+        date_format: user.date_format,
+        team_id: user.team_id,
+        team_role: user.team_role,
+        team: user.team.map(|t| UserTeam {
+            id: t.id,
+            name: t.name,
+            logo_url: Some(t.logo_url),
+            plan: t.plan,
+            subscription_status: None,
+            subscription_current_period_end: None,
+            subscription_cancel_at_period_end: None,
+            trial_ends_at: None,
+        }),
+    }))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

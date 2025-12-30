@@ -24,7 +24,7 @@ export function E2EESetupCard() {
     setIsEnabling(true);
     setError(null);
     try {
-      await actions.enableE2EE();
+      await actions.initializeKeys();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to enable device sync");
     } finally {
@@ -33,7 +33,7 @@ export function E2EESetupCard() {
   };
 
   // Already enabled
-  if (state.syncStatus?.e2eeEnabled) {
+  if (state.keysInitialized) {
     return null;
   }
 

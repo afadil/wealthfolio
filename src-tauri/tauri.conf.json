@@ -1,7 +1,7 @@
 {
   "build": {
-    "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build",
+    "beforeDevCommand": "pnpm dev:tauri",
+    "beforeBuildCommand": "pnpm build:tauri",
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420"
   },
@@ -24,7 +24,7 @@
   },
   "productName": "Wealthfolio",
   "mainBinaryName": "Wealthfolio",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "identifier": "com.teymz.wealthfolio",
   "plugins": {
     "updater": {

@@ -1,5 +1,6 @@
 // Sync Service
 // Core service for device sync, E2EE, and pairing operations
+// Uses the new REST API via Tauri commands
 // ===========================================================
 
 import { invoke, logger } from "@/adapters";
@@ -7,110 +8,143 @@ import { syncStorage } from "../storage/keyring";
 import * as crypto from "../crypto";
 import type {
   Device,
-  SyncStatus,
   PairingSession,
-  ClaimResult,
-  DeviceRegistration,
-  DeviceRegistrationResponse,
-  EnableE2EEResponse,
-  TrustedDeviceInfo,
+  ClaimerSession,
+  EnrollDeviceResponse,
+  InitializeKeysResult,
+  CommitInitializeKeysResponse,
   CreatePairingResponse,
+  GetPairingResponse,
   ClaimPairingResponse,
-  PollMessagesResponse,
-  GetSessionResponse,
-  RootKeyPayload,
+  PairingMessagesResponse,
+  ConfirmPairingResponse,
+  SuccessResponse,
+  ResetTeamSyncResponse,
+  KeyBundlePayload,
+  TrustedDeviceSummary,
 } from "../types";
 import { SyncError, SyncErrorCodes } from "../types";
 
-// API command wrappers
+// ─────────────────────────────────────────────────────────────────────────────
+// API Command Wrappers (Tauri commands)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Device management
 async function registerDeviceApi(
-  deviceInfo: DeviceRegistration,
-): Promise<DeviceRegistrationResponse> {
-  return invoke("register_device", { deviceInfo });
+  displayName: string,
+  instanceId: string,
+): Promise<EnrollDeviceResponse> {
+  return invoke("register_device", {
+    displayName,
+    instanceId,
+  });
 }
 
-async function getCurrentDeviceApi(): Promise<Device> {
-  return invoke("get_current_device");
+async function getDeviceApi(deviceId?: string): Promise<Device> {
+  return invoke("get_device", { deviceId });
 }
 
-async function listDevicesApi(): Promise<Device[]> {
-  return invoke("list_devices");
+async function listDevicesApi(scope?: string): Promise<Device[]> {
+  return invoke("list_devices", { scope });
 }
 
-async function getSyncStatusApi(): Promise<SyncStatus> {
-  return invoke("get_sync_status");
+async function updateDeviceApi(deviceId: string, displayName: string): Promise<SuccessResponse> {
+  return invoke("update_device", { deviceId, displayName });
 }
 
-async function enableE2eeApi(): Promise<EnableE2EEResponse> {
-  return invoke("enable_e2ee");
+async function deleteDeviceApi(deviceId: string): Promise<SuccessResponse> {
+  return invoke("delete_device", { deviceId });
 }
 
+async function revokeDeviceApi(deviceId: string): Promise<SuccessResponse> {
+  return invoke("revoke_device", { deviceId });
+}
+
+// Team keys (E2EE)
+async function initializeTeamKeysApi(): Promise<InitializeKeysResult> {
+  return invoke("initialize_team_keys");
+}
+
+async function commitInitializeTeamKeysApi(
+  keyVersion: number,
+  deviceKeyEnvelope: string,
+  signature: string,
+  challengeResponse?: string,
+  recoveryEnvelope?: string,
+): Promise<CommitInitializeKeysResponse> {
+  return invoke("commit_initialize_team_keys", {
+    keyVersion,
+    deviceKeyEnvelope,
+    signature,
+    challengeResponse,
+    recoveryEnvelope,
+  });
+}
+
+async function resetTeamSyncApi(reason?: string): Promise<ResetTeamSyncResponse> {
+  return invoke("reset_team_sync", { reason });
+}
+
+// Pairing
 async function createPairingApi(
   codeHash: string,
   ephemeralPublicKey: string,
 ): Promise<CreatePairingResponse> {
-  return invoke("create_pairing", {
-    codeHash,
-    ephemeralPublicKey,
+  return invoke("create_pairing", { codeHash, ephemeralPublicKey });
+}
+
+async function getPairingApi(pairingId: string): Promise<GetPairingResponse> {
+  return invoke("get_pairing", { pairingId });
+}
+
+async function approvePairingApi(pairingId: string): Promise<SuccessResponse> {
+  return invoke("approve_pairing", { pairingId });
+}
+
+async function completePairingApi(
+  pairingId: string,
+  encryptedKeyBundle: string,
+  sasProof: string | Record<string, unknown>,
+  signature: string,
+): Promise<SuccessResponse> {
+  return invoke("complete_pairing", {
+    pairingId,
+    encryptedKeyBundle,
+    sasProof,
+    signature,
   });
 }
 
+async function cancelPairingApi(pairingId: string): Promise<SuccessResponse> {
+  return invoke("cancel_pairing", { pairingId });
+}
+
+// Claimer-side pairing
 async function claimPairingApi(
   code: string,
   ephemeralPublicKey: string,
 ): Promise<ClaimPairingResponse> {
-  return invoke("claim_pairing", {
-    code,
-    ephemeralPublicKey,
-  });
+  return invoke("claim_pairing", { code, ephemeralPublicKey });
 }
 
-async function approvePairingApi(sessionId: string): Promise<void> {
-  return invoke("approve_pairing", { sessionId });
+async function getPairingMessagesApi(pairingId: string): Promise<PairingMessagesResponse> {
+  return invoke("get_pairing_messages", { pairingId });
 }
 
-async function cancelPairingApi(sessionId: string): Promise<void> {
-  return invoke("cancel_pairing", { sessionId });
+async function confirmPairingApi(pairingId: string, proof?: string): Promise<ConfirmPairingResponse> {
+  return invoke("confirm_pairing", { pairingId, proof });
 }
 
-async function pollMessagesApi(sessionId: string): Promise<PollMessagesResponse> {
-  return invoke("poll_pairing_messages", { sessionId });
-}
 
-async function getSessionApi(sessionId: string): Promise<GetSessionResponse> {
-  return invoke("get_pairing_session", { sessionId });
-}
-
-async function sendMessageApi(
-  sessionId: string,
-  toDeviceId: string,
-  payloadType: string,
-  payload: string,
-): Promise<void> {
-  return invoke("send_pairing_message", { sessionId, toDeviceId, payloadType, payload });
-}
-
-async function markTrustedApi(deviceId: string, keyVersion: number): Promise<void> {
-  return invoke("mark_device_trusted", { deviceId, keyVersion });
-}
-
-async function renameDeviceApi(deviceId: string, name: string): Promise<void> {
-  return invoke("rename_device", { deviceId, name });
-}
-
-async function revokeDeviceApi(deviceId: string): Promise<void> {
-  return invoke("revoke_device", { deviceId });
-}
-
-async function resetSyncApi(): Promise<EnableE2EEResponse> {
-  return invoke("reset_sync");
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper Functions
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Get device information from the system
+ * Get device display name based on the system
  */
-async function getDeviceInfo(): Promise<DeviceRegistration> {
-  // Get platform info
+async function getDeviceDisplayName(): Promise<string> {
+  // Get platform info for display name
   const platformInfo = await invoke<{
     os: string;
     arch: string;
@@ -123,50 +157,83 @@ async function getDeviceInfo(): Promise<DeviceRegistration> {
     is_desktop: true,
   }));
 
-  // Get app info
-  const appInfo = await invoke<{
-    version: string;
-  }>("get_app_info").catch(() => ({ version: "1.0.0" }));
-
-  // Map OS to platform
-  const platformMap: Record<string, string> = {
-    macos: "mac",
-    darwin: "mac",
-    windows: "windows",
-    linux: "linux",
-    ios: "ios",
-    android: "android",
+  // Create a friendly display name
+  const displayNameMap: Record<string, string> = {
+    macos: "Mac",
+    darwin: "Mac",
+    windows: "Windows PC",
+    linux: "Linux",
+    ios: "iPhone",
+    android: "Android",
   };
+  const displayLabel = displayNameMap[platformInfo.os.toLowerCase()] || platformInfo.os;
 
-  const platform = platformMap[platformInfo.os.toLowerCase()] || platformInfo.os;
+  return `My ${displayLabel}`;
+}
 
-  return {
-    name: `My ${platform.charAt(0).toUpperCase() + platform.slice(1)}`,
-    platform,
-    appVersion: appInfo.version,
-    osVersion: platformInfo.os,
-  };
+/**
+ * Get the app's instance ID for device registration.
+ * Uses the persisted instanceId from settings for idempotency.
+ * Formats to UUID if needed (adds dashes to hex string).
+ */
+async function getInstanceId(): Promise<string> {
+  const settings = await invoke<{ instanceId: string }>("get_settings");
+  const id = settings.instanceId;
+
+  // If already in UUID format (has dashes), return as is
+  if (id.includes("-")) {
+    return id;
+  }
+
+  // Convert 32-char hex string to UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  if (id.length === 32 && /^[0-9a-fA-F]+$/.test(id)) {
+    return `${id.slice(0, 8)}-${id.slice(8, 12)}-${id.slice(12, 16)}-${id.slice(16, 20)}-${id.slice(20)}`.toLowerCase();
+  }
+
+  // Return as is if format is unexpected
+  return id;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sync Service Class
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Enrollment result with mode information
+export interface EnrollmentResult {
+  deviceId: string;
+  mode: "BOOTSTRAP" | "PAIR" | "READY";
+  e2eeKeyVersion: number;
+  trustedDevices?: TrustedDeviceSummary[];
+  requireSas?: boolean;
+  pairingTtlSeconds?: number;
+}
+
+// Result from key initialization attempt
+export interface InitializeKeysAttemptResult {
+  mode: "BOOTSTRAP" | "PAIRING_REQUIRED" | "READY";
+  keyVersion?: number;
+  trustedDevices?: TrustedDeviceSummary[];
+  requireSas?: boolean;
+  pairingTtlSeconds?: number;
 }
 
 /**
  * Sync Service
- * Manages device registration, E2EE, and pairing operations
+ * Manages device registration, E2EE key initialization, and pairing operations
  */
 class SyncService {
   private deviceId: string | null = null;
-  private initializationPromise: Promise<string> | null = null;
+  private initializationPromise: Promise<EnrollmentResult> | null = null;
+  private lastEnrollmentResult: EnrollmentResult | null = null;
 
   /**
    * Initialize the device (register if needed)
-   * Returns the device ID
-   * Throws DEVICE_NOT_FOUND if stored device no longer exists on server
-   *
-   * Uses a singleton lock to prevent concurrent initialization and double registration
+   * Returns enrollment result with mode information
    */
-  async initialize(): Promise<string> {
-    // If already initialized, return cached device ID
-    if (this.deviceId) {
-      return this.deviceId;
+  async initialize(): Promise<EnrollmentResult> {
+    // If already initialized and we have the result, return it
+    if (this.deviceId && this.lastEnrollmentResult) {
+      return this.lastEnrollmentResult;
     }
 
     // If initialization is in progress, wait for it
@@ -178,10 +245,9 @@ class SyncService {
     this.initializationPromise = this.doInitialize();
 
     try {
-      const deviceId = await this.initializationPromise;
-      return deviceId;
+      const result = await this.initializationPromise;
+      return result;
     } finally {
-      // Clear the promise after completion (success or failure)
       this.initializationPromise = null;
     }
   }
@@ -189,21 +255,23 @@ class SyncService {
   /**
    * Internal initialization logic
    */
-  private async doInitialize(): Promise<string> {
-    // Double-check keyring for existing device ID (in case of race condition)
+  private async doInitialize(): Promise<EnrollmentResult> {
+    // Check for existing device ID in local storage
     const existingDeviceId = await syncStorage.getDeviceId();
 
     if (existingDeviceId) {
-      // Store it in Tauri keyring as well (for API calls)
-      await invoke("set_device_id", { deviceId: existingDeviceId }).catch(() => {
-        // Ignore - may already be set
-      });
-
-      // Verify the device still exists on the server (may have been revoked)
+      // Verify the device still exists on the server
       try {
-        await getCurrentDeviceApi();
+        const device = await getDeviceApi(existingDeviceId);
         this.deviceId = existingDeviceId;
-        return this.deviceId;
+
+        // Create a synthetic enrollment result for existing devices
+        this.lastEnrollmentResult = {
+          deviceId: existingDeviceId,
+          mode: device.trustState === "trusted" ? "READY" : "PAIR",
+          e2eeKeyVersion: device.trustedKeyVersion ?? 0,
+        };
+        return this.lastEnrollmentResult;
       } catch (err) {
         // Device was revoked/deleted - clear local state and re-register
         logger.warn(`[SyncService] Stored device no longer exists on server, re-registering: ${err}`);
@@ -212,75 +280,48 @@ class SyncService {
       }
     }
 
-    // Register with cloud API - server generates the device ID
+    // Register a new device
     try {
-      const deviceInfo = await getDeviceInfo();
-      const result = await registerDeviceApi(deviceInfo);
+      const displayName = await getDeviceDisplayName();
+      const instanceId = await getInstanceId();
+
+      // Platform is auto-detected by the backend
+      const result = await registerDeviceApi(displayName, instanceId);
+
+      // Store device ID in local keychain
       this.deviceId = result.deviceId;
+      await syncStorage.setDeviceId(result.deviceId);
+
+      // Build enrollment result based on mode
+      if (result.mode === "BOOTSTRAP") {
+        this.lastEnrollmentResult = {
+          deviceId: result.deviceId,
+          mode: "BOOTSTRAP",
+          e2eeKeyVersion: result.e2eeKeyVersion,
+        };
+      } else if (result.mode === "PAIR") {
+        this.lastEnrollmentResult = {
+          deviceId: result.deviceId,
+          mode: "PAIR",
+          e2eeKeyVersion: result.e2eeKeyVersion,
+          trustedDevices: result.trustedDevices,
+          requireSas: result.requireSas,
+          pairingTtlSeconds: result.pairingTtlSeconds,
+        };
+      } else {
+        // READY mode
+        this.lastEnrollmentResult = {
+          deviceId: result.deviceId,
+          mode: "READY",
+          e2eeKeyVersion: result.e2eeKeyVersion,
+        };
+      }
+
+      logger.info(`[SyncService] Device enrolled: ${this.deviceId}, mode: ${result.mode}`);
+      return this.lastEnrollmentResult;
     } catch (err) {
       logger.error(`[SyncService] Device registration failed: ${err}`);
-      throw err;
-    }
-
-    // Store in keyring (both frontend storage and Tauri backend)
-    try {
-      await syncStorage.setDeviceId(this.deviceId);
-    } catch (err) {
-      logger.error(`[SyncService] Failed to store device ID in frontend keyring: ${err}`);
-      this.deviceId = null;
-      throw new SyncError(
-        SyncErrorCodes.INIT_FAILED,
-        `Failed to store device ID: ${err}`,
-      );
-    }
-
-    // Verify storage was successful
-    try {
-      const storedId = await syncStorage.getDeviceId();
-      if (storedId !== this.deviceId) {
-        logger.error(`[SyncService] Device ID verification failed. Expected: ${this.deviceId}, Got: ${storedId}`);
-        this.deviceId = null;
-        throw new SyncError(
-          SyncErrorCodes.INIT_FAILED,
-          "Device ID storage verification failed",
-        );
-      }
-    } catch (err) {
-      if (err instanceof SyncError) throw err;
-      logger.error(`[SyncService] Failed to verify device ID storage: ${err}`);
-      this.deviceId = null;
-      throw new SyncError(SyncErrorCodes.INIT_FAILED, `Failed to verify device ID: ${err}`);
-    }
-
-    // Store in Tauri backend keyring (for Rust API calls)
-    try {
-      await invoke("set_device_id", { deviceId: this.deviceId });
-    } catch (err) {
-      logger.error(`[SyncService] Failed to store device ID in Tauri keyring: ${err}`);
-      // Don't fail here - frontend storage succeeded, Tauri can use get_secret fallback
-    }
-
-    return this.deviceId;
-  }
-
-  /**
-   * Verify the device still exists on server
-   * If not, clear local data and throw DEVICE_NOT_FOUND
-   */
-  async verifyDeviceExists(): Promise<Device> {
-    try {
-      return await getCurrentDeviceApi();
-    } catch (error) {
-      if (SyncError.isDeviceNotFound(error)) {
-        // Device was revoked/deleted - clear local state
-        await this.clearSyncData();
-        throw new SyncError(
-          SyncErrorCodes.DEVICE_NOT_FOUND,
-          "This device was unpaired. Please re-register.",
-          true,
-        );
-      }
-      throw error;
+      throw new SyncError(SyncErrorCodes.INIT_FAILED, `Device registration failed: ${err}`);
     }
   }
 
@@ -292,25 +333,18 @@ class SyncService {
   }
 
   /**
-   * Fetch sync status from the server
-   */
-  async getSyncStatus(): Promise<SyncStatus> {
-    return getSyncStatusApi();
-  }
-
-  /**
    * Get the current device info from the server
    */
   async getCurrentDevice(): Promise<Device> {
-    const device = await getCurrentDeviceApi();
+    const device = await getDeviceApi();
     return { ...device, isCurrent: true };
   }
 
   /**
-   * Get all devices for the team (internal use for pairing)
+   * Get all devices for the user
    */
-  private async getDevices(): Promise<Device[]> {
-    const devices = await listDevicesApi();
+  async listDevices(scope?: "my" | "team"): Promise<Device[]> {
+    const devices = await listDevicesApi(scope);
     return devices.map((d) => ({
       ...d,
       isCurrent: d.id === this.deviceId,
@@ -318,80 +352,138 @@ class SyncService {
   }
 
   /**
-   * Enable E2EE for the team
-   * Returns either:
-   * - { status: "initialized", keyVersion } - first device, generates RK
-   * - { status: "requires_pairing", keyVersion, trustedDevices } - needs pairing
+   * Check if this device needs to initialize or receive E2EE keys
    */
-  async enableE2EE(): Promise<
-    | { status: "initialized"; keyVersion: number }
-    | { status: "requires_pairing"; keyVersion: number; trustedDevices: TrustedDeviceInfo[] }
-  > {
-    // Ensure device is registered first
-    if (!this.deviceId) {
-      throw new SyncError("NO_DEVICE", "Device not initialized. Call initialize() first.");
+  async checkKeyStatus(): Promise<{
+    needsInitialization: boolean;
+    needsPairing: boolean;
+    keyVersion: number | null;
+  }> {
+    const [localKeyVersion, rootKey, device] = await Promise.all([
+      syncStorage.getKeyVersion(),
+      syncStorage.getRootKey(),
+      this.getCurrentDevice().catch(() => null),
+    ]);
+
+    // No device registered
+    if (!device) {
+      return { needsInitialization: false, needsPairing: false, keyVersion: null };
     }
 
-    try {
-      const result = await enableE2eeApi();
+    // Device is trusted and has the correct key version
+    if (device.trustState === "trusted" && rootKey && localKeyVersion === device.trustedKeyVersion) {
+      return { needsInitialization: false, needsPairing: false, keyVersion: localKeyVersion };
+    }
 
-      if (result.status === "initialized") {
-        // Bootstrap device - generate and store Root Key locally
-        const rootKeyB64 = await crypto.generateRootKey();
-        await syncStorage.setRootKey(rootKeyB64);
-        await syncStorage.setKeyVersion(result.e2eeKeyVersion);
+    // Check if any trusted device exists (keys are initialized)
+    const devices = await this.listDevices("my");
+    const hasTrustedDevice = devices.some((d) => d.trustState === "trusted");
 
-        return { status: "initialized", keyVersion: result.e2eeKeyVersion };
-      } else {
-        // Secondary device - needs pairing
+    if (!hasTrustedDevice) {
+      // No trusted devices - this device can initialize keys
+      return { needsInitialization: true, needsPairing: false, keyVersion: null };
+    }
+
+    // Keys exist but this device doesn't have them - needs pairing
+    return { needsInitialization: false, needsPairing: true, keyVersion: device.trustedKeyVersion };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // E2EE KEY INITIALIZATION (First trusted device)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Attempt to initialize E2EE keys for the team
+   * Returns the result mode - caller decides what to do next
+   */
+  async attemptInitializeTeamKeys(): Promise<InitializeKeysAttemptResult> {
+    logger.info("[SyncService] Attempting to initialize team keys...");
+
+    const initResponse = await initializeTeamKeysApi();
+
+    if (initResponse.mode === "READY") {
+      // Already initialized
+      return {
+        mode: "READY",
+        keyVersion: initResponse.e2eeKeyVersion,
+      };
+    }
+
+    if (initResponse.mode === "PAIRING_REQUIRED") {
+      // Check if there are actually trusted devices to pair with
+      // If not, treat as BOOTSTRAP (edge case after reset with no trusted devices)
+      const hasTrustedDevices = initResponse.trustedDevices && initResponse.trustedDevices.length > 0;
+      if (!hasTrustedDevices) {
+        logger.info("[SyncService] PAIRING_REQUIRED but no trusted devices - treating as BOOTSTRAP");
         return {
-          status: "requires_pairing",
-          keyVersion: result.e2eeKeyVersion,
-          trustedDevices: result.trustedDevices,
+          mode: "BOOTSTRAP",
+          keyVersion: initResponse.e2eeKeyVersion,
         };
       }
-    } catch (err) {
-      logger.error(`[SyncService] Failed to enable E2EE: ${err}`);
-      throw err;
+
+      // Need to pair with a trusted device
+      return {
+        mode: "PAIRING_REQUIRED",
+        keyVersion: initResponse.e2eeKeyVersion,
+        trustedDevices: initResponse.trustedDevices,
+        requireSas: initResponse.requireSas,
+        pairingTtlSeconds: initResponse.pairingTtlSeconds,
+      };
     }
+
+    // BOOTSTRAP mode - we can initialize
+    return {
+      mode: "BOOTSTRAP",
+      keyVersion: initResponse.keyVersion,
+    };
   }
 
   /**
-   * Check if device needs pairing
-   *
-   * A device needs pairing if:
-   * 1. E2EE is enabled but device has no root key locally
-   * 2. The local key version doesn't match the server's key version (sync was reset)
-   *
-   * If the device has the correct root key, it's considered trusted regardless
-   * of the server-side trust state (which is just metadata for record-keeping).
+   * Initialize E2EE keys for the team (Phase 1 + Phase 2)
+   * Only works in BOOTSTRAP mode
    */
-  async checkTrustStatus(): Promise<{
-    needsPairing: boolean;
-    reason?: "no_key" | "version_mismatch";
-  }> {
-    const [syncStatus, localKeyVersion, rootKey] = await Promise.all([
-      this.getSyncStatus(),
-      syncStorage.getKeyVersion(),
-      syncStorage.getRootKey(),
-    ]);
+  async initializeTeamKeys(): Promise<{ keyVersion: number }> {
+    logger.info("[SyncService] Initializing team keys...");
 
-    if (!syncStatus.e2eeEnabled) {
-      return { needsPairing: false };
+    // Phase 1: Get challenge from server
+    const initResponse = await initializeTeamKeysApi();
+
+    if (initResponse.mode !== "BOOTSTRAP") {
+      throw new SyncError(
+        SyncErrorCodes.REQUIRES_PAIRING,
+        `Cannot initialize keys in ${initResponse.mode} mode`,
+      );
     }
 
-    if (!rootKey) {
-      return { needsPairing: true, reason: "no_key" };
+    // Generate root key
+    const rootKeyB64 = await crypto.generateRootKey();
+
+    // Create device key envelope (encrypted root key for this device)
+    // Use a derived key from the root key for the envelope
+    const envelopeKey = await crypto.deriveSessionKey(rootKeyB64, "envelope");
+    const deviceKeyEnvelope = await crypto.encrypt(envelopeKey, rootKeyB64);
+
+    // Create a simple signature by hashing the commitment data
+    const signatureData = `${initResponse.challenge}:${initResponse.keyVersion}:${deviceKeyEnvelope}`;
+    const signature = await crypto.hashPairingCode(signatureData);
+
+    // Phase 2: Commit the keys
+    const commitResponse = await commitInitializeTeamKeysApi(
+      initResponse.keyVersion,
+      deviceKeyEnvelope,
+      signature,
+    );
+
+    if (!commitResponse.success) {
+      throw new SyncError(SyncErrorCodes.KEYS_INIT_FAILED, "Failed to commit team keys");
     }
 
-    if (localKeyVersion !== syncStatus.e2eeKeyVersion) {
-      // Key version mismatch - sync was reset
-      await syncStorage.deleteRootKey();
-      return { needsPairing: true, reason: "version_mismatch" };
-    }
+    // Store root key locally
+    await syncStorage.setRootKey(rootKeyB64);
+    await syncStorage.setKeyVersion(initResponse.keyVersion);
 
-    // Device has the root key with correct version - it's trusted
-    return { needsPairing: false };
+    logger.info(`[SyncService] Team keys initialized, version: ${initResponse.keyVersion}`);
+    return { keyVersion: initResponse.keyVersion };
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -399,7 +491,7 @@ class SyncService {
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
-   * Create a new pairing session
+   * Create a new pairing session (trusted device side)
    */
   async createPairingSession(): Promise<PairingSession> {
     try {
@@ -407,19 +499,21 @@ class SyncService {
       const code = await crypto.generatePairingCode();
       const codeHash = await crypto.hashPairingCode(code);
 
-      // Generate ephemeral keypair (returns base64 strings)
+      // Generate ephemeral keypair for key exchange
       const keypair = await crypto.generateEphemeralKeypair();
 
       // Create session on server
       const result = await createPairingApi(codeHash, keypair.publicKey);
 
       return {
-        sessionId: result.sessionId,
+        pairingId: result.pairingId,
         code,
         ephemeralSecretKey: keypair.secretKey,
         ephemeralPublicKey: keypair.publicKey,
+        keyVersion: result.keyVersion,
         expiresAt: new Date(result.expiresAt),
         status: "open",
+        requireSas: result.requireSas,
       };
     } catch (err) {
       logger.error(`[SyncService] Failed to create pairing session: ${err}`);
@@ -428,66 +522,7 @@ class SyncService {
   }
 
   /**
-   * Approve a pairing session
-   */
-  async approvePairing(sessionId: string): Promise<void> {
-    await approvePairingApi(sessionId);
-  }
-
-  /**
-   * Send the root key to the claimer device
-   */
-  async sendRootKey(session: PairingSession): Promise<void> {
-    logger.info(`[SyncService] sendRootKey called with session: ${JSON.stringify({
-      sessionId: session.sessionId,
-      hasClaimerPublicKey: !!session.claimerPublicKey,
-      hasSessionKey: !!session.sessionKey,
-      claimerDeviceId: session.claimerDeviceId,
-    })}`);
-
-    if (!session.claimerPublicKey || !session.sessionKey || !session.claimerDeviceId) {
-      throw new SyncError("INVALID_SESSION", "Session not ready for key transfer");
-    }
-
-    // Load RK from keyring
-    const rootKeyB64 = await syncStorage.getRootKey();
-    if (!rootKeyB64) {
-      throw new SyncError("ROOT_KEY_NOT_FOUND", "Root key not found");
-    }
-
-    const keyVersion = await syncStorage.getKeyVersion();
-
-    // Encrypt RK with session key (returns base64 ciphertext with nonce)
-    const ciphertextB64 = await crypto.encrypt(session.sessionKey, rootKeyB64);
-
-    // Package payload
-    const payload: RootKeyPayload = {
-      version: 1,
-      ciphertext: ciphertextB64,
-      keyVersion: keyVersion ?? 1,
-    };
-
-    // Send to claimer device (base64 encode the JSON payload)
-    logger.info(`[SyncService] Sending root key to claimer device ${session.claimerDeviceId}...`);
-    await sendMessageApi(
-      session.sessionId,
-      session.claimerDeviceId,
-      "rk_transfer_v1",
-      btoa(JSON.stringify(payload)),
-    );
-    logger.info(`[SyncService] Root key sent successfully`);
-  }
-
-  /**
-   * Cancel a pairing session
-   */
-  async cancelPairing(sessionId: string): Promise<void> {
-    await cancelPairingApi(sessionId);
-  }
-
-  /**
    * Poll for claimer connection (issuer side)
-   * Returns claimer's public key when session is claimed
    */
   async pollForClaimerConnection(session: PairingSession): Promise<{
     claimed: boolean;
@@ -495,26 +530,24 @@ class SyncService {
     claimerDeviceId?: string;
     sessionKey?: string;
   }> {
-    const result = await getSessionApi(session.sessionId);
+    const result = await getPairingApi(session.pairingId);
 
     if (result.status === "cancelled" || result.status === "expired") {
-      throw new SyncError("PAIRING_ENDED", "Pairing session ended");
+      throw new SyncError(SyncErrorCodes.PAIRING_ENDED, "Pairing session ended");
     }
 
-    // Session is claimed when claimerEphPub is present
-    if (result.claimerEphPub && result.claimerDeviceId) {
-      const claimerPublicKey = result.claimerEphPub;
-
+    // Session is claimed when claimerEphemeralPub is present
+    if (result.claimerEphemeralPub && result.claimerDeviceId) {
       // Compute session key using ECDH
       const sharedSecretB64 = await crypto.computeSharedSecret(
         session.ephemeralSecretKey,
-        claimerPublicKey,
+        result.claimerEphemeralPub,
       );
       const sessionKeyB64 = await crypto.deriveSessionKey(sharedSecretB64, "pairing");
 
       return {
         claimed: true,
-        claimerPublicKey,
+        claimerPublicKey: result.claimerEphemeralPub,
         claimerDeviceId: result.claimerDeviceId,
         sessionKey: sessionKeyB64,
       };
@@ -523,96 +556,199 @@ class SyncService {
     return { claimed: false };
   }
 
+  /**
+   * Approve a pairing session
+   */
+  async approvePairing(pairingId: string): Promise<void> {
+    await approvePairingApi(pairingId);
+  }
+
+  /**
+   * Complete pairing by sending encrypted key bundle to claimer
+   */
+  async completePairing(session: PairingSession): Promise<void> {
+    // Check if session has expired
+    if (new Date() > session.expiresAt) {
+      throw new SyncError(SyncErrorCodes.PAIRING_ENDED, "Pairing session expired");
+    }
+
+    if (!session.claimerPublicKey || !session.sessionKey || !session.claimerDeviceId) {
+      throw new SyncError(SyncErrorCodes.INVALID_SESSION, "Session not ready for key transfer");
+    }
+
+    // Load root key
+    const rootKeyB64 = await syncStorage.getRootKey();
+    if (!rootKeyB64) {
+      throw new SyncError(SyncErrorCodes.ROOT_KEY_NOT_FOUND, "Root key not found");
+    }
+
+    const keyVersion = await syncStorage.getKeyVersion();
+
+    // Create key bundle
+    const keyBundle: KeyBundlePayload = {
+      version: 1,
+      rootKey: rootKeyB64,
+      keyVersion: keyVersion ?? 1,
+    };
+
+    // Encrypt key bundle with session key
+    const encryptedKeyBundle = await crypto.encrypt(
+      session.sessionKey,
+      JSON.stringify(keyBundle),
+    );
+
+    // Compute SAS for verification
+    const sas = await crypto.computeSAS(session.sessionKey);
+
+    // Create a simple signature by hashing the completion data
+    const signatureData = `complete:${session.pairingId}:${encryptedKeyBundle}`;
+    const signature = await crypto.hashPairingCode(signatureData);
+
+    // Complete on server
+    await completePairingApi(session.pairingId, encryptedKeyBundle, sas, signature);
+
+    logger.info("[SyncService] Pairing completed successfully");
+  }
+
+  /**
+   * Cancel a pairing session
+   */
+  async cancelPairing(pairingId: string): Promise<void> {
+    await cancelPairingApi(pairingId);
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // PAIRING: CLAIMER (New Device)
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
-   * Claim a pairing session
+   * Claim a pairing session using a code (claimer side)
+   * Returns the claimer session with session key derived
    */
-  async claimPairingSession(code: string): Promise<ClaimResult> {
-    // Generate ephemeral keypair (returns base64 strings)
-    const keypair = await crypto.generateEphemeralKeypair();
-
-    // Claim session
-    const result = await claimPairingApi(code, keypair.publicKey);
-
-    // Compute shared secret and session key (all base64)
-    const sharedSecretB64 = await crypto.computeSharedSecret(
-      keypair.secretKey,
-      result.issuerEphPub,
-    );
-    const sessionKeyB64 = await crypto.deriveSessionKey(sharedSecretB64, "pairing");
-
-    // Send our public key to the issuer so they can compute the session key
-    // This allows the issuer to verify SAS and send the root key
+  async claimPairingSession(code: string): Promise<ClaimerSession> {
     try {
-      // Find the issuer device (trusted device)
-      const devices = await this.getDevices();
-      const issuerDevice = devices.find((d) => d.trustState === "trusted");
-      if (issuerDevice) {
-        await sendMessageApi(
-          result.sessionId,
-          issuerDevice.id,
-          "claimer_eph_pub",
-          btoa(keypair.publicKey),
-        );
-      }
-    } catch (err) {
-      // Non-fatal: issuer may still get our key from session status
-      logger.error(`[SyncService] Failed to send claimer public key: ${err}`);
-    }
+      // Generate ephemeral keypair for key exchange
+      const keypair = await crypto.generateEphemeralKeypair();
 
-    return {
-      sessionId: result.sessionId,
-      issuerPublicKey: result.issuerEphPub,
-      sessionKey: sessionKeyB64,
-      requireSas: result.requireSas,
-      expiresAt: new Date(result.expiresAt),
-    };
+      // Claim the session
+      const result = await claimPairingApi(code, keypair.publicKey);
+
+      // Compute session key using ECDH
+      const sharedSecretB64 = await crypto.computeSharedSecret(
+        keypair.secretKey,
+        result.issuerEphemeralPub,
+      );
+      const sessionKeyB64 = await crypto.deriveSessionKey(sharedSecretB64, "pairing");
+
+      return {
+        pairingId: result.sessionId,
+        code,
+        ephemeralSecretKey: keypair.secretKey,
+        ephemeralPublicKey: keypair.publicKey,
+        issuerPublicKey: result.issuerEphemeralPub,
+        sessionKey: sessionKeyB64,
+        e2eeKeyVersion: result.e2eeKeyVersion,
+        requireSas: result.requireSas,
+        expiresAt: new Date(result.expiresAt),
+        status: "claimed",
+      };
+    } catch (err) {
+      logger.error(`[SyncService] Failed to claim pairing session: ${err}`);
+      throw err;
+    }
   }
 
   /**
-   * Poll for root key from issuer
+   * Poll for key bundle from issuer (claimer side)
+   * Returns the key bundle if available
    */
-  async pollForRootKey(claim: ClaimResult): Promise<boolean> {
-    logger.debug(`[SyncService] Polling for root key, sessionId: ${claim.sessionId}`);
-    const result = await pollMessagesApi(claim.sessionId);
-
-    logger.debug(`[SyncService] Poll result: status=${result.sessionStatus}, messages=${result.messages.length}`);
+  async pollForKeyBundle(session: ClaimerSession): Promise<{
+    received: boolean;
+    keyBundle?: KeyBundlePayload;
+    status: string;
+  }> {
+    const result = await getPairingMessagesApi(session.pairingId);
 
     if (result.sessionStatus === "cancelled" || result.sessionStatus === "expired") {
-      throw new SyncError("PAIRING_ENDED", "Pairing session ended");
+      throw new SyncError(SyncErrorCodes.PAIRING_ENDED, "Pairing session ended");
     }
 
-    const rkMessage = result.messages.find((m) => m.payloadType === "rk_transfer_v1");
-    if (!rkMessage) {
-      return false; // Keep polling
+    // Look for key_bundle message
+    const keyBundleMsg = result.messages.find((m) => m.payloadType === "key_bundle");
+
+    if (keyBundleMsg) {
+      try {
+        // Decrypt the key bundle
+        const decrypted = await crypto.decrypt(session.sessionKey, keyBundleMsg.payload);
+        const parsed = JSON.parse(decrypted);
+
+        // Validate key bundle structure
+        if (
+          typeof parsed !== "object" ||
+          parsed === null ||
+          typeof parsed.rootKey !== "string" ||
+          typeof parsed.keyVersion !== "number" ||
+          !parsed.rootKey
+        ) {
+          throw new Error("Invalid key bundle structure");
+        }
+
+        const keyBundle: KeyBundlePayload = {
+          version: typeof parsed.version === "number" ? parsed.version : 1,
+          rootKey: parsed.rootKey,
+          keyVersion: parsed.keyVersion,
+        };
+
+        return {
+          received: true,
+          keyBundle,
+          status: result.sessionStatus,
+        };
+      } catch (err) {
+        logger.error(`[SyncService] Failed to decrypt key bundle: ${err}`);
+        throw new SyncError(SyncErrorCodes.INVALID_SESSION, "Failed to decrypt key bundle");
+      }
     }
 
-    logger.info(`[SyncService] Received root key message, decrypting...`);
-    // Decrypt and store RK
-    await this.receiveRootKey(rkMessage.payload, claim.sessionKey);
-    logger.info(`[SyncService] Root key received and stored successfully`);
-    return true;
+    return { received: false, status: result.sessionStatus };
   }
 
   /**
-   * Receive and store the root key from pairing
+   * Confirm pairing and store root key (claimer side)
    */
-  private async receiveRootKey(payloadB64: string, sessionKeyB64: string): Promise<void> {
-    const payloadJson = atob(payloadB64);
-    const payload: RootKeyPayload = JSON.parse(payloadJson);
+  async confirmPairingAsClaimer(
+    session: ClaimerSession,
+    keyBundle: KeyBundlePayload,
+  ): Promise<{ keyVersion: number }> {
+    // Check if session has expired
+    if (new Date() > session.expiresAt) {
+      throw new SyncError(SyncErrorCodes.PAIRING_ENDED, "Pairing session expired");
+    }
 
-    // Decrypt RK (session key and ciphertext are base64)
-    const rootKeyB64 = await crypto.decrypt(sessionKeyB64, payload.ciphertext);
+    // Compute proof (HMAC of session data)
+    const proofData = `confirm:${session.pairingId}:${keyBundle.keyVersion}`;
+    const proof = await crypto.hashPairingCode(proofData);
 
-    // Store in keyring
-    await syncStorage.setRootKey(rootKeyB64);
-    await syncStorage.setKeyVersion(payload.keyVersion);
+    // Confirm with server
+    const result = await confirmPairingApi(session.pairingId, proof);
 
-    // Mark device as trusted
-    await markTrustedApi(this.deviceId!, payload.keyVersion);
+    if (!result.success) {
+      throw new SyncError(SyncErrorCodes.KEYS_INIT_FAILED, "Failed to confirm pairing");
+    }
+
+    // Store root key locally
+    await syncStorage.setRootKey(keyBundle.rootKey);
+    await syncStorage.setKeyVersion(keyBundle.keyVersion);
+
+    logger.info(`[SyncService] Pairing confirmed, key version: ${keyBundle.keyVersion}`);
+    return { keyVersion: keyBundle.keyVersion };
+  }
+
+  /**
+   * Get SAS (Short Authentication String) for verification
+   */
+  async getSASForSession(sessionKey: string): Promise<string> {
+    return crypto.computeSAS(sessionKey);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -623,14 +759,21 @@ class SyncService {
    * Rename a device
    */
   async renameDevice(deviceId: string, name: string): Promise<void> {
-    await renameDeviceApi(deviceId, name);
+    await updateDeviceApi(deviceId, name);
   }
 
   /**
-   * Revoke a device
+   * Revoke a device's trust
    */
   async revokeDevice(deviceId: string): Promise<void> {
     await revokeDeviceApi(deviceId);
+  }
+
+  /**
+   * Delete a device
+   */
+  async deleteDevice(deviceId: string): Promise<void> {
+    await deleteDeviceApi(deviceId);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -638,36 +781,27 @@ class SyncService {
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
-   * Reset sync - revokes all devices and requires new pairing
+   * Reset team sync - revokes all devices and requires new key initialization
    */
-  async resetSync(): Promise<{ keyVersion: number }> {
-    // Reset on server
-    const result = await resetSyncApi();
+  async resetSync(reason?: string): Promise<{ keyVersion: number }> {
+    const result = await resetTeamSyncApi(reason);
 
-    // Generate new RK (now returns base64 string)
-    const rootKeyB64 = await crypto.generateRootKey();
-    await syncStorage.setRootKey(rootKeyB64);
-    await syncStorage.setKeyVersion(result.e2eeKeyVersion);
+    // Clear local keys
+    await syncStorage.clearRootKey();
+    await syncStorage.setKeyVersion(result.keyVersion);
 
-    // Mark current device as trusted
-    await markTrustedApi(this.deviceId!, result.e2eeKeyVersion);
-
-    return { keyVersion: result.e2eeKeyVersion };
+    return { keyVersion: result.keyVersion };
   }
 
   /**
    * Clear all sync data (sign out)
    */
   async clearSyncData(): Promise<void> {
-    // Reset initialization state
     this.deviceId = null;
     this.initializationPromise = null;
+    this.lastEnrollmentResult = null;
 
-    // Clear storage
     await syncStorage.clearAll();
-    await invoke("clear_device_id").catch(() => {
-      // Ignore
-    });
   }
 }
 
