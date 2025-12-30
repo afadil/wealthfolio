@@ -3,9 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { ActivityType, ActivityTypeNames } from "@/lib/constants";
 import { Account } from "@/lib/types";
-import { AnimatedToggleGroup, Button, Icons, Input } from "@wealthfolio/ui";
-
-import { DataTableFacetedFilter } from "./activity-datagrid/data-table-faceted-filter";
+import { AnimatedToggleGroup, Button, FacetedFilter, Icons, Input } from "@wealthfolio/ui";
 import type { ActivityStatusFilter } from "../hooks/use-activity-search";
 
 export type ActivityViewMode = "table" | "datagrid";
@@ -129,14 +127,14 @@ export function ActivityViewControls({
           )}
         </div>
 
-        <DataTableFacetedFilter
+        <FacetedFilter
           title="Account"
           options={accountOptions}
           selectedValues={new Set(selectedAccountIds)}
           onFilterChange={(values: Set<string>) => onAccountIdsChange(Array.from(values))}
         />
 
-        <DataTableFacetedFilter
+        <FacetedFilter
           title="Type"
           options={activityOptions}
           selectedValues={new Set(selectedActivityTypes)}
@@ -145,7 +143,7 @@ export function ActivityViewControls({
           }
         />
 
-        <DataTableFacetedFilter
+        <FacetedFilter
           title="Status"
           options={statusOptions}
           selectedValues={new Set(statusFilter === "all" ? [] : [statusFilter])}
