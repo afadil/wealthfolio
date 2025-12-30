@@ -251,22 +251,16 @@ impl SyncServiceTrait for SyncService {
                 .filter(|c| !c.trim().is_empty())
                 .unwrap_or_else(|| "USD".to_string());
 
-            let raw_type = activity
+            // Use the activity type directly from the API (already converted to wealthfolio type)
+            let activity_type = activity
                 .activity_type
                 .clone()
+                .map(|t| t.trim().to_uppercase())
+                .filter(|t| !t.is_empty())
                 .unwrap_or_else(|| "UNKNOWN".to_string());
-            let Some(mapped_type) =
-                map_broker_activity_type(&raw_type, activity.amount, activity.units)
-            else {
-                warn!(
-                    "Skipping unmapped broker activity {} (type='{}') for account {}",
-                    activity_id, raw_type, account_id
-                );
-                continue;
-            };
 
             let is_cash_like = matches!(
-                mapped_type.as_str(),
+                activity_type.as_str(),
                 activities::ACTIVITY_TYPE_DEPOSIT
                     | activities::ACTIVITY_TYPE_WITHDRAWAL
                     | activities::ACTIVITY_TYPE_DIVIDEND
@@ -277,32 +271,32 @@ impl SyncServiceTrait for SyncService {
                     | activities::ACTIVITY_TYPE_TRANSFER_OUT
             );
 
+            // Resolve asset_id: option symbol > regular symbol > cash placeholder > unknown placeholder
             let asset_id = activity
                 .option_symbol
                 .as_ref()
                 .and_then(|s| s.ticker.clone())
                 .or_else(|| activity.symbol.as_ref().and_then(|s| s.symbol.clone()))
                 .filter(|s| !s.trim().is_empty())
-                .or_else(|| {
+                .unwrap_or_else(|| {
                     if is_cash_like {
-                        Some(format!("$CASH-{}", currency_code))
+                        format!("$CASH-{}", currency_code)
                     } else {
-                        None
+                        // Use a placeholder for activities without identifiable assets
+                        format!("$UNKNOWN-{}", currency_code)
                     }
                 });
 
-            let Some(asset_id) = asset_id else {
-                warn!(
-                    "Skipping broker activity {} (type='{}'): missing symbol/option symbol",
-                    activity_id, mapped_type
-                );
-                continue;
-            };
-
             if seen_assets.insert(asset_id.clone()) {
-                let asset_db = if asset_id.starts_with("$CASH-") {
+                let asset_db = if asset_id.starts_with("$CASH-") || asset_id.starts_with("$UNKNOWN-") {
                     let new_asset = NewAsset::new_cash_asset(&currency_code);
                     let mut db: AssetDB = new_asset.into();
+                    // For unknown assets, update the id/symbol to match the placeholder
+                    if asset_id.starts_with("$UNKNOWN-") {
+                        db.id = asset_id.clone();
+                        db.symbol = asset_id.clone();
+                        db.name = Some("Unknown Asset".to_string());
+                    }
                     db.created_at = now_naive;
                     db.updated_at = now_naive;
                     db
@@ -364,7 +358,7 @@ impl SyncServiceTrait for SyncService {
                 account_id: account_id.clone(),
                 asset_id,
                 asset_data_source: None,
-                activity_type: mapped_type,
+                activity_type,
                 activity_date,
                 quantity: Some(quantity),
                 unit_price: Some(unit_price),
@@ -559,101 +553,6 @@ impl SyncService {
             broker_account.institution_name
         );
         Ok(None)
-    }
-}
-
-fn map_broker_activity_type(
-    raw_type: &str,
-    amount: Option<f64>,
-    units: Option<f64>,
-) -> Option<String> {
-    let t = raw_type.trim().to_uppercase();
-    if t.is_empty() {
-        return None;
-    }
-
-    let is_finite = |v: f64| v.is_finite();
-    let is_nonzero = |v: f64| is_finite(v) && v != 0.0;
-
-    let infer_direction = || {
-        if let Some(a) = amount.filter(|a| is_nonzero(*a)) {
-            return Some(if a > 0.0 { "IN" } else { "OUT" });
-        }
-        if let Some(u) = units.filter(|u| is_nonzero(*u)) {
-            return Some(if u > 0.0 { "IN" } else { "OUT" });
-        }
-        None
-    };
-
-    let wealthfolio_passthrough = matches!(
-        t.as_str(),
-        activities::ACTIVITY_TYPE_BUY
-            | activities::ACTIVITY_TYPE_SELL
-            | activities::ACTIVITY_TYPE_DIVIDEND
-            | activities::ACTIVITY_TYPE_INTEREST
-            | activities::ACTIVITY_TYPE_DEPOSIT
-            | activities::ACTIVITY_TYPE_WITHDRAWAL
-            | activities::ACTIVITY_TYPE_ADD_HOLDING
-            | activities::ACTIVITY_TYPE_REMOVE_HOLDING
-            | activities::ACTIVITY_TYPE_TRANSFER_IN
-            | activities::ACTIVITY_TYPE_TRANSFER_OUT
-            | activities::ACTIVITY_TYPE_FEE
-            | activities::ACTIVITY_TYPE_TAX
-            | activities::ACTIVITY_TYPE_SPLIT
-    );
-    if wealthfolio_passthrough {
-        return Some(t);
-    }
-
-    match t.as_str() {
-        "BUY" => Some(activities::ACTIVITY_TYPE_BUY.to_string()),
-        "SELL" => Some(activities::ACTIVITY_TYPE_SELL.to_string()),
-        "DIVIDEND" => Some(activities::ACTIVITY_TYPE_DIVIDEND.to_string()),
-        "INTEREST" | "CRYPTO_STAKING_REWARD" => {
-            Some(activities::ACTIVITY_TYPE_INTEREST.to_string())
-        }
-        "CONTRIBUTION" | "DEPOSIT" => Some(activities::ACTIVITY_TYPE_DEPOSIT.to_string()),
-        "WITHDRAWAL" => Some(activities::ACTIVITY_TYPE_WITHDRAWAL.to_string()),
-        "REI" => Some(activities::ACTIVITY_TYPE_BUY.to_string()),
-        "STOCK_DIVIDEND" => Some(activities::ACTIVITY_TYPE_ADD_HOLDING.to_string()),
-        "FEE" => Some(activities::ACTIVITY_TYPE_FEE.to_string()),
-        "TAX" => Some(activities::ACTIVITY_TYPE_TAX.to_string()),
-        "SPLIT" => Some(activities::ACTIVITY_TYPE_SPLIT.to_string()),
-        "EXTERNAL_ASSET_TRANSFER_IN" => Some(activities::ACTIVITY_TYPE_ADD_HOLDING.to_string()),
-        "EXTERNAL_ASSET_TRANSFER_OUT" => Some(activities::ACTIVITY_TYPE_REMOVE_HOLDING.to_string()),
-        "TRANSFER" => match infer_direction() {
-            Some("IN") => Some(activities::ACTIVITY_TYPE_TRANSFER_IN.to_string()),
-            Some("OUT") => Some(activities::ACTIVITY_TYPE_TRANSFER_OUT.to_string()),
-            _ => None,
-        },
-        "ADJUSTMENT" => match infer_direction() {
-            Some("IN") => match amount.filter(|a| is_nonzero(*a)) {
-                Some(_) => Some(activities::ACTIVITY_TYPE_DEPOSIT.to_string()),
-                None => Some(activities::ACTIVITY_TYPE_ADD_HOLDING.to_string()),
-            },
-            Some("OUT") => match amount.filter(|a| is_nonzero(*a)) {
-                Some(_) => Some(activities::ACTIVITY_TYPE_WITHDRAWAL.to_string()),
-                None => Some(activities::ACTIVITY_TYPE_REMOVE_HOLDING.to_string()),
-            },
-            _ => None,
-        },
-        "OPTIONEXERCISE" | "OPTIONASSIGNMENT" => match infer_direction() {
-            Some("IN") => match amount.filter(|a| is_nonzero(*a)) {
-                Some(_) => Some(activities::ACTIVITY_TYPE_SELL.to_string()),
-                None => Some(activities::ACTIVITY_TYPE_BUY.to_string()),
-            },
-            Some("OUT") => match amount.filter(|a| is_nonzero(*a)) {
-                Some(_) => Some(activities::ACTIVITY_TYPE_BUY.to_string()),
-                None => Some(activities::ACTIVITY_TYPE_SELL.to_string()),
-            },
-            _ => None,
-        },
-        "OPTIONEXPIRATION" => match units.filter(|u| is_nonzero(*u)) {
-            Some(u) if u < 0.0 => Some(activities::ACTIVITY_TYPE_REMOVE_HOLDING.to_string()),
-            Some(_) => Some(activities::ACTIVITY_TYPE_ADD_HOLDING.to_string()),
-            None => Some(activities::ACTIVITY_TYPE_REMOVE_HOLDING.to_string()),
-        },
-        _ => None,
     }
 }
 
