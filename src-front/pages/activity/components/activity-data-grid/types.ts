@@ -92,6 +92,8 @@ export interface SavePayloadResult {
 
 /**
  * Payload for creating an activity
+ * Note: Decimal fields (quantity, unitPrice, amount, fee, fxRate) use strings
+ * to preserve precision for very small values like 0.000000099
  */
 export interface ActivityCreatePayload {
   id: string;
@@ -100,12 +102,12 @@ export interface ActivityCreatePayload {
   activityDate: string;
   assetId?: string;
   assetDataSource?: DataSource;
-  quantity?: number;
-  unitPrice?: number;
-  amount?: number;
+  quantity?: string;
+  unitPrice?: string;
+  amount?: string;
   currency?: string;
-  fee?: number;
-  fxRate?: number | null;
+  fee?: string;
+  fxRate?: string | null;
   isDraft: boolean;
   comment?: string;
 }

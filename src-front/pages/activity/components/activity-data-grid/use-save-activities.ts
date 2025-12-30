@@ -81,9 +81,11 @@ export function useSaveActivities({
       fallbackCurrency,
     );
 
+    // Note: payload uses string types for decimal fields to preserve precision
+    // (e.g., 0.000000099). Rust's Decimal type can deserialize from strings.
     const request: ActivityBulkMutationRequest = {
-      creates: payload.creates,
-      updates: payload.updates,
+      creates: payload.creates as unknown as ActivityBulkMutationRequest["creates"],
+      updates: payload.updates as unknown as ActivityBulkMutationRequest["updates"],
       deleteIds: payload.deleteIds,
     };
 
