@@ -750,6 +750,122 @@ function useDataGrid<TData>({
           if (!clipboardText) return;
         }
 
+        const selectedCells = currentState.selectionState.selectedCells;
+        const trimmedClipboard = clipboardText.trim();
+        const isSingleValue =
+          !trimmedClipboard.includes("\t") &&
+          !trimmedClipboard.includes("\n");
+
+        // Fill selected cells with single value
+        if (selectedCells.size > 1 && isSingleValue) {
+          const updates: Array<UpdateCell> = [];
+          const tableColumns = currentTable?.getAllColumns() ?? [];
+          const columnMap = new Map(tableColumns.map((c) => [c.id, c]));
+          let cellsUpdated = 0;
+          let cellsSkipped = 0;
+
+          for (const cellKey of selectedCells) {
+            const { rowIndex, columnId } = parseCellKey(cellKey);
+            const column = columnMap.get(columnId);
+            const cellOpts = column?.columnDef?.meta?.cell;
+            const cellVariant = cellOpts?.variant;
+
+            let processedValue: unknown = trimmedClipboard;
+            let shouldSkip = false;
+
+            switch (cellVariant) {
+              case "number": {
+                if (!trimmedClipboard) {
+                  processedValue = null;
+                } else {
+                  const num = Number.parseFloat(trimmedClipboard);
+                  if (Number.isNaN(num)) shouldSkip = true;
+                  else processedValue = num;
+                }
+                break;
+              }
+              case "checkbox": {
+                if (!trimmedClipboard) {
+                  processedValue = false;
+                } else {
+                  const lower = trimmedClipboard.toLowerCase();
+                  if (VALID_BOOLEANS.has(lower)) {
+                    processedValue = TRUTHY_BOOLEANS.has(lower);
+                  } else {
+                    shouldSkip = true;
+                  }
+                }
+                break;
+              }
+              case "date": {
+                if (!trimmedClipboard) {
+                  processedValue = null;
+                } else {
+                  const date = new Date(trimmedClipboard);
+                  if (Number.isNaN(date.getTime())) shouldSkip = true;
+                  else processedValue = date;
+                }
+                break;
+              }
+              case "select": {
+                const options = cellOpts?.options ?? [];
+                if (!trimmedClipboard) {
+                  processedValue = "";
+                } else {
+                  const matched = matchSelectOption(trimmedClipboard, options);
+                  if (matched) processedValue = matched;
+                  else shouldSkip = true;
+                }
+                break;
+              }
+              default: {
+                processedValue = trimmedClipboard;
+              }
+            }
+
+            if (shouldSkip) {
+              cellsSkipped++;
+              continue;
+            }
+
+            updates.push({ rowIndex, columnId, value: processedValue });
+            cellsUpdated++;
+          }
+
+          if (updates.length > 0) {
+            if (propsRef.current.onPaste) {
+              await propsRef.current.onPaste(updates);
+            }
+            onDataUpdate(updates);
+
+            if (cellsSkipped > 0) {
+              toast.success(
+                `${cellsUpdated} cell${cellsUpdated !== 1 ? "s" : ""} filled, ${cellsSkipped} skipped`,
+              );
+            } else {
+              toast.success(
+                `${cellsUpdated} cell${cellsUpdated !== 1 ? "s" : ""} filled`,
+              );
+            }
+
+            restoreFocus(dataGridRef.current);
+          } else if (cellsSkipped > 0) {
+            toast.error(
+              `${cellsSkipped} cell${cellsSkipped !== 1 ? "s" : ""} skipped for invalid data`,
+            );
+          }
+
+          if (currentState.pasteDialog.open) {
+            store.setState("pasteDialog", {
+              open: false,
+              rowsNeeded: 0,
+              clipboardText: "",
+            });
+          }
+
+          return;
+        }
+
         const pastedRows = clipboardText
           .split("\n")
           .filter((row) => row.length > 0);
