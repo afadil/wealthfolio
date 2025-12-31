@@ -837,22 +837,7 @@ function useDataGrid<TData>({
               await propsRef.current.onPaste(updates);
             }
             onDataUpdate(updates);
-
-            if (cellsSkipped > 0) {
-              toast.success(
-                `${cellsUpdated} cell${cellsUpdated !== 1 ? "s" : ""} filled, ${cellsSkipped} skipped`,
-              );
-            } else {
-              toast.success(
-                `${cellsUpdated} cell${cellsUpdated !== 1 ? "s" : ""} filled`,
-              );
-            }
-
             restoreFocus(dataGridRef.current);
-          } else if (cellsSkipped > 0) {
-            toast.error(
-              `${cellsSkipped} cell${cellsSkipped !== 1 ? "s" : ""} skipped for invalid data`,
-            );
           }
 
           if (currentState.pasteDialog.open) {
