@@ -1,0 +1,78 @@
+services:
+  wealthfolio:
+    # Builds from source if image doesn't exist, or use --build flag to force rebuild
+    # To use pre-built image: docker compose up -d
+    # To build from source: docker compose up -d --build
+    image: ${DOCKER_IMAGE:-afadil/wealthfolio:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wealthfolio
+    restart: unless-stopped
+    ports:
+      - "${WF_PORT:-8088}:8080"
+    volumes:
+      - wealthfolio-data:/data
+    environment:
+      # Server Configuration
+      - WF_LISTEN_ADDR=0.0.0.0:8080
+      - WF_DB_PATH=/data/wealthfolio.db
+      - WF_STATIC_DIR=dist
+      - WF_CORS_ALLOW_ORIGINS=${WF_CORS_ALLOW_ORIGINS:-*}
+      - WF_REQUEST_TIMEOUT_MS=${WF_REQUEST_TIMEOUT_MS:-30000}
+
+      # Security (required for production)
+      - WF_SECRET_KEY=${WF_SECRET_KEY:-}
+
+      # Authentication (optional)
+      - WF_AUTH_PASSWORD_HASH=${WF_AUTH_PASSWORD_HASH:-}
+      - WF_AUTH_TOKEN_TTL_MINUTES=${WF_AUTH_TOKEN_TTL_MINUTES:-60}
+
+      # Optional
+      - WF_SECRET_FILE=${WF_SECRET_FILE:-/data/secrets.json}
+      - WF_ADDONS_DIR=${WF_ADDONS_DIR:-}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8080/api/v1/healthz",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Development profile with CORS enabled for local Vite dev server
+  # Note: WF_SECRET_KEY must be provided via environment variable
+  # Use: export WF_SECRET_KEY=$(openssl rand -base64 32) && docker compose --profile dev up -d wealthfolio-dev
+  wealthfolio-dev:
+    # Builds from source if image doesn't exist, or use --build flag to force rebuild
+    # To use pre-built image: docker compose --profile dev up -d wealthfolio-dev
+    # To build from source: docker compose --profile dev up -d --build wealthfolio-dev
+    image: ${DOCKER_IMAGE:-afadil/wealthfolio:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wealthfolio-dev
+    restart: unless-stopped
+    ports:
+      - "${WF_PORT:-8088}:8080"
+    volumes:
+      - wealthfolio-data:/data
+    environment:
+      - WF_LISTEN_ADDR=0.0.0.0:8080
+      - WF_DB_PATH=/data/wealthfolio.db
+      - WF_STATIC_DIR=dist
+      - WF_CORS_ALLOW_ORIGINS=http://localhost:1420,http://localhost:3000
+      - WF_REQUEST_TIMEOUT_MS=30000
+      - WF_SECRET_KEY=${WF_SECRET_KEY}
+    profiles:
+      - dev
+
+volumes:
+  wealthfolio-data:
+    driver: local
