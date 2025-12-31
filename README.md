@@ -333,7 +333,9 @@ The easiest way to run Wealthfolio locally is using Docker Compose. A `docker-co
 
 #### Quick Start
 
-1. **Set the secret key** (required for production):
+**Option 1: Use pre-built image** (faster, recommended):
+
+1. **Set the secret key** (required):
 
 ```bash
 export WF_SECRET_KEY=$(openssl rand -base64 32)
@@ -345,6 +347,27 @@ export WF_SECRET_KEY=$(openssl rand -base64 32)
 docker compose up -d
 ```
 
+**Option 2: Build from source** (for development or custom builds):
+
+1. **Set the secret key**:
+
+```bash
+export WF_SECRET_KEY=$(openssl rand -base64 32)
+```
+
+2. **Build and start**:
+
+```bash
+docker compose build
+docker compose up -d
+```
+
+Or in a single command:
+
+```bash
+WF_SECRET_KEY=$(openssl rand -base64 32) docker compose up -d --build
+```
+
 3. **Access the application**:
 
 Open your browser at `http://localhost:8088`
@@ -353,15 +376,24 @@ Open your browser at `http://localhost:8088`
 
 For development with CORS enabled for local Vite dev server:
 
+**Using pre-built image:**
+
 ```bash
 # Generate secret key and start dev service
 export WF_SECRET_KEY=$(openssl rand -base64 32) && docker compose --profile dev up -d wealthfolio-dev
 ```
 
+**Building from source:**
+
+```bash
+# Build and start dev service
+export WF_SECRET_KEY=$(openssl rand -base64 32) && docker compose --profile dev build && docker compose --profile dev up -d wealthfolio-dev
+```
+
 Or as a single command:
 
 ```bash
-WF_SECRET_KEY=$(openssl rand -base64 32) docker compose --profile dev up -d wealthfolio-dev
+WF_SECRET_KEY=$(openssl rand -base64 32) docker compose --profile dev up -d --build wealthfolio-dev
 ```
 
 **Note:** The development profile requires `WF_SECRET_KEY` to be set. The service will not start without a valid base64-encoded 32-byte secret key.
@@ -383,6 +415,12 @@ docker compose restart
 
 # Check service status
 docker compose ps
+
+# Rebuild the image (if building from source)
+docker compose build
+
+# Rebuild and restart
+docker compose up -d --build
 ```
 
 #### Configuration

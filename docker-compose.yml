@@ -1,6 +1,12 @@
 services:
   wealthfolio:
-    image: afadil/wealthfolio:latest
+    # Builds from source if image doesn't exist, or use --build flag to force rebuild
+    # To use pre-built image: docker compose up -d
+    # To build from source: docker compose up -d --build
+    image: ${DOCKER_IMAGE:-afadil/wealthfolio:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: wealthfolio
     restart: unless-stopped
     ports:
@@ -44,7 +50,13 @@ services:
   # Note: WF_SECRET_KEY must be provided via environment variable
   # Use: export WF_SECRET_KEY=$(openssl rand -base64 32) && docker compose --profile dev up -d wealthfolio-dev
   wealthfolio-dev:
-    image: afadil/wealthfolio:latest
+    # Builds from source if image doesn't exist, or use --build flag to force rebuild
+    # To use pre-built image: docker compose --profile dev up -d wealthfolio-dev
+    # To build from source: docker compose --profile dev up -d --build wealthfolio-dev
+    image: ${DOCKER_IMAGE:-afadil/wealthfolio:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: wealthfolio-dev
     restart: unless-stopped
     ports:
