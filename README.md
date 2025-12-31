@@ -779,16 +779,6 @@ Contributions are welcome! Please follow these steps:
 5. Push to the branch (`git push origin feature-branch`).
 6. Open a pull request.
 
-Quick start:
-
-1. Fork the repository
-2. Create a new branch (`git checkout -b feature/your-feature-name`)
-3. Make your changes
-4. Ensure tests pass and code builds
-5. Submit a pull request
-
-For detailed information, please read [CONTRIBUTING.md](CONTRIBUTING.md).
-
 ## License
 
 This project is licensed under the AGPL-3.0 license. See the `LICENSE` file for
