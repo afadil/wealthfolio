@@ -1,10 +1,10 @@
-import { isDesktop, isWeb, logger } from "@/adapters";
+import { isDesktop, logger } from "@/adapters";
 import { isAutoUpdateCheckEnabled } from "@/commands/settings";
 import { checkForUpdates, installUpdate } from "@/commands/updater";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import type { UpdateInfo } from "@/lib/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 const UPDATE_QUERY_KEY = ["app-update"];
 
@@ -15,21 +15,6 @@ const UPDATE_QUERY_KEY = ["app-update"];
  */
 export function useCheckUpdateOnStartup() {
   const queryClient = useQueryClient();
-  const [isAutoCheckEnabled, setIsAutoCheckEnabled] = useState(false);
-
-  // Check if auto-update is enabled (desktop only setting, web always checks)
-  useEffect(() => {
-    if (isWeb) {
-      setIsAutoCheckEnabled(true);
-      return;
-    }
-
-    if (isDesktop) {
-      isAutoUpdateCheckEnabled()
-        .then(setIsAutoCheckEnabled)
-        .catch(() => setIsAutoCheckEnabled(false));
-    }
-  }, []);
 
   // Listen for menu-triggered update available events (desktop only)
   useEffect(() => {
@@ -51,10 +36,17 @@ export function useCheckUpdateOnStartup() {
 
   return useQuery({
     queryKey: UPDATE_QUERY_KEY,
-    queryFn: checkForUpdates,
-    enabled: isAutoCheckEnabled,
-    staleTime: Infinity, // Don't refetch automatically
-    retry: false, // Don't retry on failure (expected in dev/offline)
+    queryFn: async () => {
+      const enabled = await isAutoUpdateCheckEnabled();
+      if (!enabled) return null;
+      return checkForUpdates();
+    },
+    staleTime: Infinity,
+    gcTime: Infinity,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: false,
   });
 }
 
