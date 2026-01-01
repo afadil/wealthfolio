@@ -19,4 +19,4 @@ pub use broker::{
 };
 
 pub use platform::{Platform, PlatformDB, PlatformRepository};
-pub use state::{BrokersSyncState, BrokersSyncStateRepository};
+pub use state::{BrokerSyncState, BrokerSyncStateDB, BrokerSyncStateRepository};

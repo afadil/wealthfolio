@@ -3,5 +3,5 @@
 mod model;
 mod repository;
 
-pub use model::{BrokersSyncState, BrokersSyncStateDB};
-pub use repository::BrokersSyncStateRepository;
+pub use model::BrokerSyncStateDB;
+pub use repository::BrokerSyncStateRepository;

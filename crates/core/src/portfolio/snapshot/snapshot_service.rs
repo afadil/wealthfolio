@@ -124,9 +124,10 @@ impl SnapshotService {
             created_at: now,
             updated_at: now,
             platform_id: None,
-            external_id: None,
             account_number: None,
             meta: None,
+            provider: None,
+            provider_account_id: None,
         }
     }
 
@@ -764,6 +765,31 @@ impl SnapshotService {
             }
         }
 
+        // Compute cash totals for TOTAL snapshot (denominated in base currency)
+        let mut cash_total_base = Decimal::ZERO;
+        for (currency, &amount) in &aggregated_cash_balances {
+            if currency == base_portfolio_currency {
+                cash_total_base += amount;
+            } else {
+                // Convert to base currency
+                match self.holdings_calculator.fx_service.convert_currency_for_date(
+                    amount,
+                    currency,
+                    base_portfolio_currency,
+                    target_date,
+                ) {
+                    Ok(converted) => cash_total_base += converted,
+                    Err(e) => {
+                        warn!(
+                            "Failed to convert cash {} {} to base currency {}: {}. Using unconverted.",
+                            amount, currency, base_portfolio_currency, e
+                        );
+                        cash_total_base += amount;
+                    }
+                }
+            }
+        }
+
         Ok(AccountStateSnapshot {
             id: format!(
                 "{}_{}",
@@ -778,6 +804,9 @@ impl SnapshotService {
             cost_basis: overall_cost_basis_base_ccy.round_dp(DECIMAL_PRECISION),
             net_contribution: overall_net_contribution_base_ccy.round_dp(DECIMAL_PRECISION),
             net_contribution_base: overall_net_contribution_base_ccy.round_dp(DECIMAL_PRECISION),
+            // For TOTAL snapshot, account_currency == base_currency
+            cash_total_account_currency: cash_total_base.round_dp(DECIMAL_PRECISION),
+            cash_total_base_currency: cash_total_base.round_dp(DECIMAL_PRECISION),
             calculated_at: Utc::now().naive_utc(),
         })
     }
@@ -796,6 +825,8 @@ impl SnapshotService {
             cost_basis: Decimal::ZERO,
             net_contribution: Decimal::ZERO,
             net_contribution_base: Decimal::ZERO,
+            cash_total_account_currency: Decimal::ZERO,
+            cash_total_base_currency: Decimal::ZERO,
             calculated_at: Utc::now().naive_utc(),
         }
     }
@@ -816,11 +847,21 @@ impl SnapshotService {
                 && a.activity_date.naive_utc().date() <= end_date
         }) {
             // Check if the activity amount exists and represents a valid positive split ratio
+            let asset_id = match &activity.asset_id {
+                Some(id) => id,
+                None => {
+                    warn!(
+                        "Missing asset_id for Split activity {} on {}. Ignoring split.",
+                        activity.id, activity.activity_date
+                    );
+                    continue;
+                }
+            };
             if let Some(split_ratio) = activity.amount {
                 if split_ratio.is_sign_positive() && !split_ratio.is_zero() {
                     // Collect valid splits (date, ratio) for the asset
                     split_factors
-                        .entry(activity.asset_id.clone())
+                        .entry(asset_id.clone())
                         .or_default() // Get the Vec, create if needed
                         .push((activity.activity_date.naive_utc().date(), split_ratio));
                 // Push (date, ratio) tuple
@@ -835,7 +876,7 @@ impl SnapshotService {
                 // Log warning if amount is missing for a split activity
                 warn!(
                     "Missing amount for Split activity {} for asset {} on {}. Ignoring split.",
-                    activity.id, activity.asset_id, activity.activity_date
+                    activity.id, asset_id, activity.activity_date
                 );
             }
         }
@@ -855,7 +896,15 @@ impl SnapshotService {
         let mut adjusted_activities = Vec::with_capacity(activities.len());
         for activity in activities {
             let mut adj_activity = activity.clone();
-            if let Some(splits) = split_factors.get(&activity.asset_id) {
+            let asset_id = match &activity.asset_id {
+                Some(id) => id,
+                None => {
+                    // No asset_id, just push the activity as-is
+                    adjusted_activities.push(adj_activity);
+                    continue;
+                }
+            };
+            if let Some(splits) = split_factors.get(asset_id) {
                 // Do not adjust the SPLIT activity itself, only others
                 if adj_activity.activity_type != ACTIVITY_TYPE_SPLIT {
                     let mut cumulative_factor = Decimal::ONE;
@@ -871,25 +920,26 @@ impl SnapshotService {
                     if cumulative_factor != Decimal::ONE {
                         debug!(
                             "Adjusting activity {} on {} for asset {} due to future splits. Factor: {}",
-                            adj_activity.id, adj_activity.activity_date.naive_utc().date(), adj_activity.asset_id, cumulative_factor
+                            adj_activity.id, adj_activity.activity_date.naive_utc().date(), asset_id, cumulative_factor
                         );
                         // Adjust quantity
                         // Use correct field name 'quantity'
                         adj_activity.quantity =
-                            (activity.quantity * cumulative_factor).round_dp(DECIMAL_PRECISION);
+                            Some((activity.qty() * cumulative_factor).round_dp(DECIMAL_PRECISION));
 
                         // Adjust unit price (inverse factor)
                         // Use correct field name 'unit_price'
-                        if !activity.unit_price.is_zero() {
+                        let unit_price = activity.price();
+                        if !unit_price.is_zero() {
                             if !cumulative_factor.is_zero() {
                                 // Avoid division by zero
                                 // Use correct field name 'unit_price'
-                                adj_activity.unit_price = (activity.unit_price / cumulative_factor)
-                                    .round_dp(DECIMAL_PRECISION);
+                                adj_activity.unit_price = Some((unit_price / cumulative_factor)
+                                    .round_dp(DECIMAL_PRECISION));
                             } else {
                                 warn!("Cumulative split factor is zero for activity {}. Cannot adjust unit price.", adj_activity.id);
                                 // Use correct field name 'unit_price'
-                                adj_activity.unit_price = Decimal::ZERO; // Or handle as error?
+                                adj_activity.unit_price = Some(Decimal::ZERO); // Or handle as error?
                             }
                         }
                     }

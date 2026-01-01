@@ -83,6 +83,16 @@ pub struct AccountStateSnapshot {
     #[serde(default)]
     pub net_contribution_base: Decimal, // portfolio base currency
 
+    /// Cached total of all cash balances converted to account currency.
+    /// Computed once at end of daily holdings calculation.
+    #[serde(default)]
+    pub cash_total_account_currency: Decimal,
+
+    /// Cached total of all cash balances converted to base currency.
+    /// Computed once at end of daily holdings calculation.
+    #[serde(default)]
+    pub cash_total_base_currency: Decimal,
+
     pub calculated_at: NaiveDateTime, // When this snapshot was generated
 }
 
@@ -98,6 +108,8 @@ impl Default for AccountStateSnapshot {
             cost_basis: Decimal::ZERO,
             net_contribution: Decimal::ZERO,
             net_contribution_base: Decimal::ZERO,
+            cash_total_account_currency: Decimal::ZERO,
+            cash_total_base_currency: Decimal::ZERO,
             calculated_at: Utc::now().naive_utc(),
         }
     }

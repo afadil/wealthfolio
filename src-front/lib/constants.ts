@@ -105,23 +105,45 @@ export const exportedFileFormatSchema = z.enum([
   ExportedFileFormat.SQLITE,
 ]);
 
+// Canonical activity types (closed set of 15)
 export const ActivityType = {
   BUY: "BUY",
   SELL: "SELL",
+  SPLIT: "SPLIT",
+  ADD_HOLDING: "ADD_HOLDING",
+  REMOVE_HOLDING: "REMOVE_HOLDING",
   DIVIDEND: "DIVIDEND",
   INTEREST: "INTEREST",
   DEPOSIT: "DEPOSIT",
   WITHDRAWAL: "WITHDRAWAL",
-  ADD_HOLDING: "ADD_HOLDING",
-  REMOVE_HOLDING: "REMOVE_HOLDING",
   TRANSFER_IN: "TRANSFER_IN",
   TRANSFER_OUT: "TRANSFER_OUT",
   FEE: "FEE",
   TAX: "TAX",
-  SPLIT: "SPLIT",
+  CREDIT: "CREDIT",
+  UNKNOWN: "UNKNOWN",
 } as const;
 
 export type ActivityType = (typeof ActivityType)[keyof typeof ActivityType];
+
+// Array of all activity types for iteration
+export const ACTIVITY_TYPES = [
+  "BUY",
+  "SELL",
+  "SPLIT",
+  "ADD_HOLDING",
+  "REMOVE_HOLDING",
+  "DIVIDEND",
+  "INTEREST",
+  "DEPOSIT",
+  "WITHDRAWAL",
+  "TRANSFER_IN",
+  "TRANSFER_OUT",
+  "FEE",
+  "TAX",
+  "CREDIT",
+  "UNKNOWN",
+] as const;
 
 export const TRADING_ACTIVITY_TYPES = [
   ActivityType.BUY,
@@ -147,34 +169,150 @@ export const INCOME_ACTIVITY_TYPES = [ActivityType.DIVIDEND, ActivityType.INTERE
 export const activityTypeSchema = z.enum([
   ActivityType.BUY,
   ActivityType.SELL,
+  ActivityType.SPLIT,
+  ActivityType.ADD_HOLDING,
+  ActivityType.REMOVE_HOLDING,
   ActivityType.DIVIDEND,
   ActivityType.INTEREST,
   ActivityType.DEPOSIT,
   ActivityType.WITHDRAWAL,
   ActivityType.TRANSFER_IN,
   ActivityType.TRANSFER_OUT,
-  ActivityType.ADD_HOLDING,
-  ActivityType.REMOVE_HOLDING,
   ActivityType.FEE,
   ActivityType.TAX,
-  ActivityType.SPLIT,
+  ActivityType.CREDIT,
+  ActivityType.UNKNOWN,
 ]);
 
+// Display names for activity types
 export const ActivityTypeNames: Record<ActivityType, string> = {
   [ActivityType.BUY]: "Buy",
   [ActivityType.SELL]: "Sell",
+  [ActivityType.SPLIT]: "Split",
+  [ActivityType.ADD_HOLDING]: "Add Holding",
+  [ActivityType.REMOVE_HOLDING]: "Remove Holding",
   [ActivityType.DIVIDEND]: "Dividend",
   [ActivityType.INTEREST]: "Interest",
   [ActivityType.DEPOSIT]: "Deposit",
   [ActivityType.WITHDRAWAL]: "Withdrawal",
-  [ActivityType.ADD_HOLDING]: "Add Holding",
-  [ActivityType.REMOVE_HOLDING]: "Remove Holding",
   [ActivityType.TRANSFER_IN]: "Transfer In",
   [ActivityType.TRANSFER_OUT]: "Transfer Out",
   [ActivityType.FEE]: "Fee",
   [ActivityType.TAX]: "Tax",
-  [ActivityType.SPLIT]: "Split",
+  [ActivityType.CREDIT]: "Credit",
+  [ActivityType.UNKNOWN]: "Unknown",
 };
+
+// Alias for backward compatibility
+export const ACTIVITY_TYPE_DISPLAY_NAMES = ActivityTypeNames;
+
+// Activity status for lifecycle management
+export const ActivityStatus = {
+  POSTED: "POSTED",
+  PENDING: "PENDING",
+  DRAFT: "DRAFT",
+  VOID: "VOID",
+} as const;
+
+export type ActivityStatus = (typeof ActivityStatus)[keyof typeof ActivityStatus];
+
+// Known subtypes for UI
+export const ACTIVITY_SUBTYPES = {
+  // Dividend subtypes
+  DRIP: "DRIP",
+  QUALIFIED: "QUALIFIED",
+  ORDINARY: "ORDINARY",
+  RETURN_OF_CAPITAL: "RETURN_OF_CAPITAL",
+  DIVIDEND_IN_KIND: "DIVIDEND_IN_KIND",
+
+  // Interest subtypes
+  STAKING_REWARD: "STAKING_REWARD",
+  LENDING_INTEREST: "LENDING_INTEREST",
+  COUPON: "COUPON",
+
+  // Split subtypes
+  STOCK_DIVIDEND: "STOCK_DIVIDEND",
+  REVERSE_SPLIT: "REVERSE_SPLIT",
+
+  // Option subtypes
+  OPTION_OPEN: "OPTION_OPEN",
+  OPTION_CLOSE: "OPTION_CLOSE",
+  OPTION_EXPIRE: "OPTION_EXPIRE",
+  OPTION_ASSIGNMENT: "OPTION_ASSIGNMENT",
+  OPTION_EXERCISE: "OPTION_EXERCISE",
+
+  // Fee subtypes
+  MANAGEMENT_FEE: "MANAGEMENT_FEE",
+  ADR_FEE: "ADR_FEE",
+  INTEREST_CHARGE: "INTEREST_CHARGE",
+
+  // Tax subtypes
+  WITHHOLDING: "WITHHOLDING",
+  NRA_WITHHOLDING: "NRA_WITHHOLDING",
+
+  // Credit subtypes
+  FEE_REFUND: "FEE_REFUND",
+  TAX_REFUND: "TAX_REFUND",
+  BONUS: "BONUS",
+  ADJUSTMENT: "ADJUSTMENT",
+  REBATE: "REBATE",
+  REVERSAL: "REVERSAL",
+
+  // Liability subtypes
+  LIABILITY_INTEREST_ACCRUAL: "LIABILITY_INTEREST_ACCRUAL",
+  LIABILITY_PRINCIPAL_PAYMENT: "LIABILITY_PRINCIPAL_PAYMENT",
+} as const;
+
+export type ActivitySubtype = (typeof ACTIVITY_SUBTYPES)[keyof typeof ACTIVITY_SUBTYPES];
+
+// Display names for subtypes
+export const SUBTYPE_DISPLAY_NAMES: Record<string, string> = {
+  DRIP: "Dividend Reinvested",
+  STAKING_REWARD: "Staking Reward",
+  DIVIDEND_IN_KIND: "Dividend (In Kind)",
+  STOCK_DIVIDEND: "Stock Dividend",
+  OPTION_OPEN: "Option Open",
+  OPTION_CLOSE: "Option Close",
+  OPTION_EXPIRE: "Option Expired",
+  OPTION_ASSIGNMENT: "Option Assignment",
+  OPTION_EXERCISE: "Option Exercise",
+  QUALIFIED: "Qualified Dividend",
+  ORDINARY: "Ordinary Dividend",
+  RETURN_OF_CAPITAL: "Return of Capital",
+  COUPON: "Bond Coupon",
+  WITHHOLDING: "Withholding Tax",
+  NRA_WITHHOLDING: "NRA Withholding Tax",
+  FEE_REFUND: "Fee Refund",
+  TAX_REFUND: "Tax Refund",
+  BONUS: "Bonus",
+  ADJUSTMENT: "Adjustment",
+  REBATE: "Rebate",
+  REVERSAL: "Reversal",
+  MANAGEMENT_FEE: "Management Fee",
+  ADR_FEE: "ADR Fee",
+  INTEREST_CHARGE: "Interest Charge",
+  LENDING_INTEREST: "Lending Interest",
+  REVERSE_SPLIT: "Reverse Split",
+  LIABILITY_INTEREST_ACCRUAL: "Liability Interest Accrual",
+  LIABILITY_PRINCIPAL_PAYMENT: "Liability Principal Payment",
+};
+
+// Asset kinds for behavior classification
+export const ASSET_KINDS = [
+  "SECURITY",
+  "CRYPTO",
+  "CASH",
+  "FX_RATE",
+  "OPTION",
+  "COMMODITY",
+  "PRIVATE_EQUITY",
+  "PROPERTY",
+  "VEHICLE",
+  "LIABILITY",
+  "OTHER",
+] as const;
+
+export type AssetKind = (typeof ASSET_KINDS)[number];
 
 // Asset subclass types (from Rust AssetSubClass enum)
 export const ASSET_SUBCLASS_TYPES = [

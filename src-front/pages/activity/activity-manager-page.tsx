@@ -123,7 +123,6 @@ const ActivityManagerPage = () => {
     quantity: initialActivity?.quantity,
     unitPrice: initialActivity?.unitPrice,
     fee: initialActivity?.fee ?? 0,
-    isDraft: initialActivity?.isDraft ?? false,
     comment: initialActivity?.comment ?? null,
     assetId: initialActivity?.assetId,
     activityDate: initialActivity?.date
@@ -147,14 +146,7 @@ const ActivityManagerPage = () => {
 
   const onSubmit: SubmitHandler<NewActivityFormValues> = async (data) => {
     try {
-      const {
-        showCurrencySelect: _showCurrencySelect,
-        id,
-        ...submitData
-      } = {
-        ...data,
-        isDraft: false,
-      };
+      const { showCurrencySelect: _showCurrencySelect, id, ...submitData } = data;
       const account = accountOptions.find((a) => a.value === submitData.accountId);
 
       // For cash activities and fees, set assetId to $CASH-accountCurrency

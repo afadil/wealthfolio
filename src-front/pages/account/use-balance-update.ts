@@ -38,7 +38,6 @@ export const useBalanceUpdate = (account?: AccountValuation | null) => {
       assetId: `$CASH-${account.accountCurrency}`,
       currency: account.accountCurrency,
       amount: amount,
-      isDraft: false,
       comment: "Balance updated manually",
     };
 

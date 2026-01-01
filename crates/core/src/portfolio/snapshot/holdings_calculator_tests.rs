@@ -358,6 +358,8 @@ mod tests {
             cost_basis: Decimal::ZERO,
             net_contribution: Decimal::ZERO,
             net_contribution_base: Decimal::ZERO,
+            cash_total_account_currency: Decimal::ZERO,
+            cash_total_base_currency: Decimal::ZERO,
         }
     }
 
@@ -487,6 +489,7 @@ mod tests {
                 cost_basis: dec!(1500),
                 acquisition_price: dec!(150),
                 acquisition_fees: dec!(5),
+                fx_rate_to_position: None,
             }]),
             created_at: Utc::now(),
             last_updated: Utc::now(),
@@ -2487,6 +2490,7 @@ mod tests {
                 cost_basis: dec!(2000),
                 acquisition_price: dec!(100),
                 acquisition_fees: dec!(0),
+                fx_rate_to_position: None,
             }]),
             created_at: Utc::now(),
             last_updated: Utc::now(),
@@ -2936,6 +2940,7 @@ mod tests {
             cost_basis: dec!(1000),
             acquisition_price: dec!(100),
             acquisition_fees: dec!(0),
+            fx_rate_to_position: None,
         }]);
         previous_snapshot
             .positions
@@ -3053,6 +3058,7 @@ mod tests {
             cost_basis: dec!(2000),
             acquisition_price: dec!(100),
             acquisition_fees: dec!(0),
+            fx_rate_to_position: None,
         }]);
         previous_snapshot
             .positions

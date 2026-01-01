@@ -102,7 +102,7 @@ export function resolveAssetIdForTransaction(
 
 /**
  * Creates a new draft transaction with default values.
- * Note: isDraft is set to false because isDraft=true is reserved for
+ * Note: needsReview is set to false because needsReview=true is reserved for
  * activities created by the sync service that need user review.
  * The isNew flag is used to track locally created rows.
  */
@@ -122,7 +122,7 @@ export function createDraftTransaction(
     amount: 0,
     fee: 0,
     currency: defaultAccount?.currency ?? fallbackCurrency,
-    isDraft: false,
+    needsReview: false,
     comment: "",
     createdAt: now,
     assetId: "",
@@ -371,7 +371,6 @@ export function buildSavePayload(
       currency: currencyForPayload,
       fee: toDecimalString(transaction.fee),
       fxRate: transaction.fxRate != null ? toDecimalString(transaction.fxRate) : null,
-      isDraft: transaction.isDraft,
       comment: transaction.comment ?? undefined,
     };
 

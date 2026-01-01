@@ -14,7 +14,7 @@ const createMockActivity = (overrides: Partial<ActivityDetails> = {}): ActivityD
   amount: 1000,
   fee: 5,
   currency: "USD",
-  isDraft: false,
+  needsReview: false,
   comment: "",
   createdAt: new Date("2024-01-15T10:00:00Z"),
   assetId: "AAPL",

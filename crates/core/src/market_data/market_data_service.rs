@@ -744,7 +744,7 @@ impl MarketDataServiceTrait for MarketDataService {
         let activities = self.activity_repository.get_activities()?;
         let symbol_activities: Vec<_> = activities
             .iter()
-            .filter(|a| a.asset_id == symbol)
+            .filter(|a| a.asset_id.as_deref() == Some(symbol))
             .collect();
 
         if symbol_activities.is_empty() {
@@ -1647,7 +1647,10 @@ impl MarketDataService {
         let mut dates_map: HashMap<String, (Option<NaiveDate>, Option<NaiveDate>)> = HashMap::new();
 
         for activity in activities {
-            let symbol = &activity.asset_id;
+            let symbol = match &activity.asset_id {
+                Some(s) => s,
+                None => continue, // Skip activities without asset_id (pure cash movements)
+            };
             if symbol.is_empty() || symbol.starts_with("$CASH") {
                 continue;
             }

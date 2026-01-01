@@ -12,8 +12,8 @@ export interface AccountItemProps {
 }
 
 export function AccountItem({ account, onEdit, onDelete }: AccountItemProps) {
-  // Check if account is synced from broker
-  const isSynced = !!account.externalId;
+  // Check if account is synced from broker (has provider_account_id set)
+  const isSynced = !!account.providerAccountId;
 
   return (
     <div className="flex items-center justify-between p-4">

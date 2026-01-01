@@ -53,7 +53,7 @@ describe("Activity Utilities", () => {
       amount: 0,
       fee: 10,
       currency: "USD",
-      isDraft: false,
+      needsReview: false,
       createdAt: new Date(),
       assetId: "AAPL",
       updatedAt: new Date(),

@@ -292,9 +292,20 @@ export const AccountsSummary = React.memo(() => {
     if (isErrorAccounts) {
       return (
         <div className="border-destructive/30 bg-destructive/5 rounded-lg border p-4 md:p-5">
-          <p className="text-destructive text-sm font-medium">
-            Error loading accounts: {errorAccounts?.message}
-          </p>
+          <div className="flex items-start gap-3">
+            <div className="bg-destructive/10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
+              <Icons.AlertTriangle className="text-destructive h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-destructive text-sm font-medium">Failed to load accounts</p>
+              <p className="text-muted-foreground mt-1 text-xs break-words">
+                {errorAccounts?.message || "An unexpected error occurred"}
+              </p>
+              <p className="text-muted-foreground mt-2 text-xs">
+                Try restarting the app. If this persists, your database may need to be reset.
+              </p>
+            </div>
+          </div>
         </div>
       );
     }

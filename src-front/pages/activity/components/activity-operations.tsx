@@ -9,6 +9,8 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 
 import type { Activity, ActivityDetails } from "@/lib/types";
 import { Row } from "@tanstack/react-table";
+import { useState } from "react";
+import { ActivityDetailSheet } from "./activity-detail-sheet";
 
 export interface ActivityOperationsProps<TData> {
   row?: Row<TData>;
@@ -26,6 +28,7 @@ export function ActivityOperations<TData>({
   onDuplicate,
 }: ActivityOperationsProps<TData>) {
   const activity = activityProp ?? (row?.original as ActivityDetails);
+  const [detailSheetOpen, setDetailSheetOpen] = useState(false);
 
   return (
     <>
@@ -35,17 +38,35 @@ export function ActivityOperations<TData>({
           <span className="sr-only">Open</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => onEdit(activity)}>Edit</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => onDuplicate(activity)}>Duplicate</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setDetailSheetOpen(true)}>
+            <Icons.Info className="mr-2 h-4 w-4" />
+            More details
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => onEdit(activity)}>
+            <Icons.Pencil className="mr-2 h-4 w-4" />
+            Edit
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onDuplicate(activity)}>
+            <Icons.Copy className="mr-2 h-4 w-4" />
+            Duplicate
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="text-destructive focus:text-destructive flex cursor-pointer items-center"
             onSelect={() => onDelete(activity)}
           >
+            <Icons.Trash className="mr-2 h-4 w-4" />
             Delete
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <ActivityDetailSheet
+        activity={activity}
+        open={detailSheetOpen}
+        onOpenChange={setDetailSheetOpen}
+      />
     </>
   );
 }

@@ -760,9 +760,10 @@ mod tests {
             created_at: Utc::now().naive_utc(),
             updated_at: Utc::now().naive_utc(),
             platform_id: None,
-            external_id: None,
             account_number: None,
             meta: None,
+            provider: None,
+            provider_account_id: None,
         }
     }
 
@@ -1006,6 +1007,7 @@ mod tests {
             cost_basis: dec!(300),
             acquisition_price: dec!(100),
             acquisition_fees: dec!(0),
+            fx_rate_to_position: None,
         };
 
         let lot2 = Lot {
@@ -1023,6 +1025,7 @@ mod tests {
             cost_basis: dec!(220),
             acquisition_price: dec!(110),
             acquisition_fees: dec!(0),
+            fx_rate_to_position: None,
         };
 
         let mut snap1 = create_blank_snapshot(&acc1.id, &acc1.currency, target_date_str);

@@ -7,8 +7,7 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-use wealthfolio_core::activities::{Activity, ActivityUpdate, NewActivity};
-use wealthfolio_core::constants::CASH_ASSET_PREFIX;
+use wealthfolio_core::activities::{Activity, ActivityStatus, ActivityUpdate, NewActivity};
 
 /// Helper function to parse a string into a Decimal,
 /// with a fallback for scientific notation by parsing as f64 first.
@@ -41,7 +40,7 @@ fn parse_decimal_string_tolerant(value_str: &str, field_name: &str) -> Decimal {
     }
 }
 
-/// Database model for activities
+/// Database model for activities - COMPLETELY REDESIGNED
 #[derive(
     Queryable,
     Identifiable,
@@ -60,25 +59,49 @@ fn parse_decimal_string_tolerant(value_str: &str, field_name: &str) -> Decimal {
 pub struct ActivityDB {
     pub id: String,
     pub account_id: String,
-    pub asset_id: String,
+    pub asset_id: Option<String>, // NOW NULLABLE
+
+    // Classification
     pub activity_type: String,
+    pub activity_type_override: Option<String>,
+    pub source_type: Option<String>,
+    pub subtype: Option<String>,
+    pub status: String,
+
+    // Timing
     pub activity_date: String,
-    pub quantity: String,
-    pub unit_price: String,
-    pub currency: String,
-    pub fee: String,
+    pub settlement_date: Option<String>,
+
+    // Quantities - NOW ALL NULLABLE
+    pub quantity: Option<String>,
+    pub unit_price: Option<String>,
     pub amount: Option<String>,
-    pub is_draft: bool,
-    pub comment: Option<String>,
+    pub fee: Option<String>,
+    pub currency: String,
     pub fx_rate: Option<String>,
-    pub provider_type: Option<String>,
-    pub external_provider_id: Option<String>,
-    pub external_broker_id: Option<String>,
+
+    // Metadata
+    pub notes: Option<String>,
+    pub metadata: Option<String>,
+
+    // Source identity
+    pub source_system: Option<String>,
+    pub source_record_id: Option<String>,
+    pub source_group_id: Option<String>,
+    pub idempotency_key: Option<String>,
+    pub import_run_id: Option<String>,
+
+    // Sync flags (i32 for SQLite INTEGER)
+    pub is_user_modified: i32,
+    pub needs_review: i32,
+
+    // Audit
     pub created_at: String,
     pub updated_at: String,
 }
 
 /// Model for activity details including related data
+/// Field order MUST match the select() order in repository.rs
 #[derive(Queryable, QueryableByName, Serialize, Deserialize, Clone, Debug)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 #[serde(rename_all = "camelCase")]
@@ -87,28 +110,42 @@ pub struct ActivityDetailsDB {
     pub id: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub account_id: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub asset_id: String,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub asset_id: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub activity_type: String,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub subtype: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub status: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub date: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub quantity: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub unit_price: String,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub quantity: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub unit_price: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub currency: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub fee: String,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub fee: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub amount: Option<String>,
-    #[diesel(sql_type = diesel::sql_types::Bool)]
-    pub is_draft: bool,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
-    pub comment: Option<String>,
+    pub notes: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub fx_rate: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Integer)]
+    pub needs_review: i32,
+    #[diesel(sql_type = diesel::sql_types::Integer)]
+    pub is_user_modified: i32,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub source_system: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub source_record_id: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub idempotency_key: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub import_run_id: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub created_at: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
@@ -117,25 +154,34 @@ pub struct ActivityDetailsDB {
     pub account_name: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub account_currency: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub asset_symbol: String,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub asset_symbol: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub asset_name: Option<String>,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub asset_data_source: String,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub asset_data_source: Option<String>,
 }
 
 impl ActivityDetailsDB {
     pub fn get_quantity(&self) -> Decimal {
-        parse_decimal_string_tolerant(&self.quantity, "quantity")
+        self.quantity
+            .as_ref()
+            .map(|s| parse_decimal_string_tolerant(s, "quantity"))
+            .unwrap_or(Decimal::ZERO)
     }
 
     pub fn get_unit_price(&self) -> Decimal {
-        parse_decimal_string_tolerant(&self.unit_price, "unit_price")
+        self.unit_price
+            .as_ref()
+            .map(|s| parse_decimal_string_tolerant(s, "unit_price"))
+            .unwrap_or(Decimal::ZERO)
     }
 
     pub fn get_fee(&self) -> Decimal {
-        parse_decimal_string_tolerant(&self.fee, "fee")
+        self.fee
+            .as_ref()
+            .map(|s| parse_decimal_string_tolerant(s, "fee"))
+            .unwrap_or(Decimal::ZERO)
     }
 
     pub fn get_amount(&self) -> Option<Decimal> {
@@ -190,27 +236,45 @@ impl IncomeDataDB {
 
 impl From<ActivityDetailsDB> for wealthfolio_core::activities::ActivityDetails {
     fn from(db: ActivityDetailsDB) -> Self {
+        use wealthfolio_core::activities::ActivityStatus;
+
+        // Parse status string to ActivityStatus enum
+        let status = match db.status.as_str() {
+            "POSTED" => ActivityStatus::Posted,
+            "PENDING" => ActivityStatus::Pending,
+            "DRAFT" => ActivityStatus::Draft,
+            "VOID" => ActivityStatus::Void,
+            _ => ActivityStatus::Posted, // Default to Posted for unknown values
+        };
+
         Self {
             id: db.id,
             account_id: db.account_id,
-            asset_id: db.asset_id,
+            asset_id: db.asset_id.unwrap_or_default(),
             activity_type: db.activity_type,
+            subtype: db.subtype,
+            status,
             date: db.date,
-            quantity: db.quantity,
-            unit_price: db.unit_price,
+            quantity: db.quantity.unwrap_or_else(|| "0".to_string()),
+            unit_price: db.unit_price.unwrap_or_else(|| "0".to_string()),
             currency: db.currency,
-            fee: db.fee,
+            fee: db.fee.unwrap_or_else(|| "0".to_string()),
             amount: db.amount,
-            is_draft: db.is_draft,
-            comment: db.comment,
+            needs_review: db.needs_review != 0,
+            comment: db.notes,
             fx_rate: db.fx_rate,
             created_at: db.created_at,
             updated_at: db.updated_at,
             account_name: db.account_name,
             account_currency: db.account_currency,
-            asset_symbol: db.asset_symbol,
+            asset_symbol: db.asset_symbol.unwrap_or_default(),
             asset_name: db.asset_name,
-            asset_data_source: db.asset_data_source,
+            asset_data_source: db.asset_data_source.unwrap_or_else(|| "MANUAL".to_string()),
+            source_system: db.source_system,
+            source_record_id: db.source_record_id,
+            idempotency_key: db.idempotency_key,
+            import_run_id: db.import_run_id,
+            is_user_modified: db.is_user_modified != 0,
         }
     }
 }
@@ -249,11 +313,34 @@ impl From<ActivityDB> for Activity {
     fn from(db: ActivityDB) -> Self {
         use chrono::DateTime;
 
+        // Parse status string to ActivityStatus enum
+        let status = match db.status.as_str() {
+            "POSTED" => ActivityStatus::Posted,
+            "PENDING" => ActivityStatus::Pending,
+            "DRAFT" => ActivityStatus::Draft,
+            "VOID" => ActivityStatus::Void,
+            _ => ActivityStatus::Posted, // Default to Posted for unknown values
+        };
+
+        // Parse metadata JSON if present
+        let metadata = db
+            .metadata
+            .as_ref()
+            .and_then(|s| serde_json::from_str(s).ok());
+
         Self {
             id: db.id,
             account_id: db.account_id,
             asset_id: db.asset_id,
+
+            // Classification
             activity_type: db.activity_type,
+            activity_type_override: db.activity_type_override,
+            source_type: db.source_type,
+            subtype: db.subtype,
+            status,
+
+            // Timing
             activity_date: DateTime::parse_from_rfc3339(&db.activity_date)
                 .map(|dt| dt.with_timezone(&Utc))
                 .unwrap_or_else(|e| {
@@ -264,22 +351,51 @@ impl From<ActivityDB> for Activity {
                     );
                     Utc::now()
                 }),
-            quantity: parse_decimal_string_tolerant(&db.quantity, "quantity"),
-            unit_price: parse_decimal_string_tolerant(&db.unit_price, "unit_price"),
-            currency: db.currency,
-            fee: parse_decimal_string_tolerant(&db.fee, "fee"),
+            settlement_date: db.settlement_date.as_ref().and_then(|s| {
+                DateTime::parse_from_rfc3339(s)
+                    .map(|dt| dt.with_timezone(&Utc))
+                    .ok()
+            }),
+
+            // Quantities
+            quantity: db
+                .quantity
+                .as_ref()
+                .map(|s| parse_decimal_string_tolerant(s, "quantity")),
+            unit_price: db
+                .unit_price
+                .as_ref()
+                .map(|s| parse_decimal_string_tolerant(s, "unit_price")),
             amount: db
                 .amount
-                .map(|s| parse_decimal_string_tolerant(&s, "amount")),
-            is_draft: db.is_draft,
-            comment: db.comment,
+                .as_ref()
+                .map(|s| parse_decimal_string_tolerant(s, "amount")),
+            fee: db
+                .fee
+                .as_ref()
+                .map(|s| parse_decimal_string_tolerant(s, "fee")),
+            currency: db.currency,
             fx_rate: db
                 .fx_rate
-                .as_deref()
+                .as_ref()
                 .map(|s| parse_decimal_string_tolerant(s, "fx_rate")),
-            provider_type: db.provider_type,
-            external_provider_id: db.external_provider_id,
-            external_broker_id: db.external_broker_id,
+
+            // Metadata
+            notes: db.notes,
+            metadata,
+
+            // Source identity
+            source_system: db.source_system,
+            source_record_id: db.source_record_id,
+            source_group_id: db.source_group_id,
+            idempotency_key: db.idempotency_key,
+            import_run_id: db.import_run_id,
+
+            // Sync flags
+            is_user_modified: db.is_user_modified != 0,
+            needs_review: db.needs_review != 0,
+
+            // Audit
             created_at: chrono::DateTime::parse_from_rfc3339(&db.created_at)
                 .map(|dt| dt.with_timezone(&Utc))
                 .unwrap_or_else(|e| {
@@ -323,55 +439,59 @@ impl From<NewActivity> for ActivityDB {
                 )
             });
 
-        // Handle cash activities and splits
-        let activity_type = domain.activity_type.as_str();
-        let is_transfer = activity_type == "TRANSFER_IN" || activity_type == "TRANSFER_OUT";
-        let is_cash_asset = domain.asset_id.starts_with(CASH_ASSET_PREFIX);
-        let is_cash_or_split = activity_type == "DEPOSIT"
-            || activity_type == "WITHDRAWAL"
-            || activity_type == "FEE"
-            || activity_type == "INTEREST"
-            || activity_type == "DIVIDEND"
-            || activity_type == "SPLIT"
-            || (is_transfer && is_cash_asset);
-
-        let (quantity, unit_price, amount) = if is_cash_or_split {
-            let amount_str = match &domain.amount {
-                Some(amount) => amount.to_string(),
-                None => domain.quantity.unwrap_or(Decimal::ZERO).to_string(),
-            };
-            ("0".to_string(), "0".to_string(), Some(amount_str))
-        } else if is_transfer && !is_cash_asset {
-            (
-                domain.quantity.unwrap_or(Decimal::ZERO).to_string(),
-                domain.unit_price.unwrap_or(Decimal::ZERO).to_string(),
-                domain.amount.as_ref().map(|a| a.to_string()),
-            )
-        } else {
-            (
-                domain.quantity.unwrap_or(Decimal::ZERO).to_string(),
-                domain.unit_price.unwrap_or(Decimal::ZERO).to_string(),
-                domain.amount.as_ref().map(|a| a.to_string()),
-            )
-        };
+        // Convert ActivityStatus to string, defaulting to POSTED
+        let status = domain
+            .status
+            .as_ref()
+            .map(|s| match s {
+                ActivityStatus::Posted => "POSTED",
+                ActivityStatus::Pending => "PENDING",
+                ActivityStatus::Draft => "DRAFT",
+                ActivityStatus::Void => "VOID",
+            })
+            .unwrap_or("POSTED")
+            .to_string();
 
         Self {
             id: domain.id.unwrap_or_default(),
             account_id: domain.account_id,
             asset_id: domain.asset_id,
+
+            // Classification
             activity_type: domain.activity_type,
+            activity_type_override: None,
+            source_type: None,
+            subtype: None,
+            status,
+
+            // Timing
             activity_date: activity_datetime.to_rfc3339(),
-            quantity,
-            unit_price,
+            settlement_date: None,
+
+            // Quantities
+            quantity: domain.quantity.map(|d| d.to_string()),
+            unit_price: domain.unit_price.map(|d| d.to_string()),
+            amount: domain.amount.map(|d| d.to_string()),
+            fee: domain.fee.map(|d| d.to_string()),
             currency: domain.currency,
-            fee: domain.fee.unwrap_or(Decimal::ZERO).to_string(),
-            amount,
-            is_draft: domain.is_draft,
-            comment: domain.comment,
             fx_rate: domain.fx_rate.map(|d| d.to_string()),
-            provider_type: domain.provider_type,
-            external_provider_id: domain.external_provider_id,
-            external_broker_id: domain.external_broker_id,
+
+            // Metadata
+            notes: domain.notes,
+            metadata: None,
+
+            // Source identity
+            source_system: Some("MANUAL".to_string()),
+            source_record_id: None,
+            source_group_id: None,
+            idempotency_key: None,
+            import_run_id: None,
+
+            // Sync flags
+            is_user_modified: 0,
+            needs_review: 0,
+
+            // Audit
             created_at: now.to_rfc3339(),
             updated_at: now.to_rfc3339(),
         }
@@ -404,48 +524,59 @@ impl From<ActivityUpdate> for ActivityDB {
                 )
             });
 
-        // Handle cash activities and splits
-        let activity_type = domain.activity_type.as_str();
-        let is_cash_or_split = activity_type == "DEPOSIT"
-            || activity_type == "WITHDRAWAL"
-            || activity_type == "FEE"
-            || activity_type == "INTEREST"
-            || activity_type == "DIVIDEND"
-            || activity_type == "SPLIT"
-            || activity_type == "TRANSFER_IN"
-            || activity_type == "TRANSFER_OUT";
-
-        let (quantity, unit_price, amount) = if is_cash_or_split {
-            let amount_str = match &domain.amount {
-                Some(amount) => amount.to_string(),
-                None => domain.quantity.unwrap_or(Decimal::ZERO).to_string(),
-            };
-            ("0".to_string(), "0".to_string(), Some(amount_str))
-        } else {
-            (
-                domain.quantity.unwrap_or(Decimal::ZERO).to_string(),
-                domain.unit_price.unwrap_or(Decimal::ZERO).to_string(),
-                domain.amount.as_ref().map(|a| a.to_string()),
-            )
-        };
+        // Convert ActivityStatus to string, defaulting to POSTED
+        let status = domain
+            .status
+            .as_ref()
+            .map(|s| match s {
+                ActivityStatus::Posted => "POSTED",
+                ActivityStatus::Pending => "PENDING",
+                ActivityStatus::Draft => "DRAFT",
+                ActivityStatus::Void => "VOID",
+            })
+            .unwrap_or("POSTED")
+            .to_string();
 
         Self {
             id: domain.id,
             account_id: domain.account_id,
             asset_id: domain.asset_id,
+
+            // Classification
             activity_type: domain.activity_type,
+            activity_type_override: None,
+            source_type: None,
+            subtype: None,
+            status,
+
+            // Timing
             activity_date: activity_datetime.to_rfc3339(),
-            quantity,
-            unit_price,
+            settlement_date: None,
+
+            // Quantities
+            quantity: domain.quantity.map(|d| d.to_string()),
+            unit_price: domain.unit_price.map(|d| d.to_string()),
+            amount: domain.amount.map(|d| d.to_string()),
+            fee: domain.fee.map(|d| d.to_string()),
             currency: domain.currency,
-            fee: domain.fee.unwrap_or(Decimal::ZERO).to_string(),
-            amount,
-            is_draft: domain.is_draft,
-            comment: domain.comment,
             fx_rate: domain.fx_rate.map(|d| d.to_string()),
-            provider_type: domain.provider_type,
-            external_provider_id: domain.external_provider_id,
-            external_broker_id: domain.external_broker_id,
+
+            // Metadata
+            notes: domain.notes,
+            metadata: None,
+
+            // Source identity - these will be preserved from existing record in repository
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+            idempotency_key: None,
+            import_run_id: None,
+
+            // Sync flags - mark as user modified since this is an update
+            is_user_modified: 1,
+            needs_review: 0,
+
+            // Audit
             created_at: now.to_rfc3339(),
             updated_at: now.to_rfc3339(),
         }

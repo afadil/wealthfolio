@@ -69,6 +69,10 @@ pub struct Lot {
     pub acquisition_price: Decimal,
     /// Represents fees paid in the Position's currency associated with the acquisition.
     pub acquisition_fees: Decimal,
+    /// FX rate used to convert from activity currency to position currency.
+    /// Stored for audit trail when cross-currency purchases occur.
+    /// None when activity currency matches position currency.
+    pub fx_rate_to_position: Option<Decimal>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -156,10 +160,11 @@ impl Position {
     /// activity_id is used for the Lot ID.
     /// Returns the cost basis of the added lot in the position's currency.
     pub fn add_lot(&mut self, activity: &Activity) -> Result<Decimal> {
-        if !activity.quantity.is_sign_positive() {
+        let qty = activity.qty();
+        if !qty.is_sign_positive() {
             warn!(
                 "Skipping add_lot for activity {} with non-positive quantity: {}",
-                activity.id, activity.quantity
+                activity.id, qty
             );
             // Return zero cost basis if skipped
             return Ok(Decimal::ZERO);
@@ -188,9 +193,9 @@ impl Position {
         }
 
         // --- Cost Calculation (in Position/Activity Currency) ---
-        let acquisition_price = activity.unit_price;
-        let quantity = activity.quantity;
-        let acquisition_fees = activity.fee; // Store the fee in activity currency
+        let acquisition_price = activity.price();
+        let quantity = activity.qty();
+        let acquisition_fees = activity.fee_amt(); // Store the fee in activity currency
 
         // Cost basis ONLY includes fees for BUY activities
         let cost_basis = quantity * acquisition_price + acquisition_fees;
@@ -203,6 +208,7 @@ impl Position {
             cost_basis,        // Store unrounded in position currency
             acquisition_price, // Store unrounded in position currency
             acquisition_fees,  // Store unrounded in position currency
+            fx_rate_to_position: None, // No currency conversion in this method
         };
 
         self.lots.push_back(new_lot);
@@ -213,6 +219,69 @@ impl Position {
 
         self.recalculate_aggregates();
         // Return the calculated cost basis (in position currency)
+        Ok(cost_basis)
+    }
+
+    /// Adds a new lot from pre-converted values (avoids Activity clone).
+    /// This is the preferred method when the caller has already converted
+    /// unit_price and fee to the position's currency.
+    ///
+    /// # Arguments
+    /// * `lot_id` - Unique identifier for the lot (typically activity ID)
+    /// * `quantity` - Number of units to add (must be positive)
+    /// * `unit_price` - Price per unit, already in position currency
+    /// * `fee` - Transaction fee, already in position currency
+    /// * `acquisition_date` - When the position was acquired
+    /// * `fx_rate_used` - FX rate used for conversion (None if same currency)
+    ///
+    /// # Returns
+    /// The cost basis of the added lot in the position's currency.
+    pub fn add_lot_values(
+        &mut self,
+        lot_id: String,
+        quantity: Decimal,
+        unit_price: Decimal,
+        fee: Decimal,
+        acquisition_date: DateTime<Utc>,
+        fx_rate_used: Option<Decimal>,
+    ) -> Result<Decimal> {
+        if !quantity.is_sign_positive() {
+            warn!(
+                "Skipping add_lot_values for lot {} with non-positive quantity: {}",
+                lot_id, quantity
+            );
+            return Ok(Decimal::ZERO);
+        }
+
+        // Set currency if this is the first lot
+        if self.currency.is_empty() {
+            debug!(
+                "Position {} has empty currency on first add_lot_values. This should have been set by caller.",
+                self.id
+            );
+        }
+
+        let cost_basis = quantity * unit_price + fee;
+
+        let new_lot = Lot {
+            id: lot_id,
+            position_id: self.id.clone(),
+            acquisition_date,
+            quantity,
+            cost_basis,
+            acquisition_price: unit_price,
+            acquisition_fees: fee,
+            fx_rate_to_position: fx_rate_used,
+        };
+
+        self.lots.push_back(new_lot);
+
+        // Sort by acquisition_date
+        let mut vec_lots: Vec<_> = self.lots.drain(..).collect();
+        vec_lots.sort_by_key(|lot| lot.acquisition_date);
+        self.lots = vec_lots.into();
+
+        self.recalculate_aggregates();
         Ok(cost_basis)
     }
 

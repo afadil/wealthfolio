@@ -23,7 +23,7 @@ interface Filters {
   accountIds?: string | string[];
   activityTypes?: string | string[];
   symbol?: string;
-  isDraft?: boolean;
+  needsReview?: boolean;
 }
 
 interface Sort {
@@ -64,7 +64,7 @@ export const searchActivities = async (
   const sortOption = sort?.id
     ? { id: sort.id, desc: sort.desc ?? false }
     : { id: "date", desc: true };
-  const isDraftFilter = filters?.isDraft;
+  const needsReviewFilter = filters?.needsReview;
 
   try {
     return await invoke("search_activities", {
@@ -74,7 +74,7 @@ export const searchActivities = async (
       activityTypeFilter,
       assetIdKeyword,
       sort: sortOption,
-      isDraftFilter,
+      needsReviewFilter,
     });
   } catch (error) {
     logger.error("Error fetching activities.");

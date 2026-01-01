@@ -77,19 +77,19 @@ export function useActivitySearch(options: UseActivitySearchOptions): UseActivit
   const pageIndex = "pageIndex" in options ? options.pageIndex : 0;
 
   const normalizedFilters = useMemo(() => {
-    // Convert status filter to isDraft boolean
-    let isDraft: boolean | undefined;
+    // Convert status filter to needsReview boolean
+    let needsReview: boolean | undefined;
     if (filters.status === "pending") {
-      isDraft = true;
+      needsReview = true;
     } else if (filters.status === "validated") {
-      isDraft = false;
+      needsReview = false;
     }
     // "all" or undefined means no filter
 
     return {
       accountIds: filters.accountIds.length > 0 ? filters.accountIds : undefined,
       activityTypes: filters.activityTypes.length > 0 ? filters.activityTypes : undefined,
-      isDraft,
+      needsReview,
     } as Record<string, unknown>;
   }, [filters.accountIds, filters.activityTypes, filters.status]);
 

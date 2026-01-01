@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/compon
 import { DataSource } from "@/lib/constants";
 import type { ActivityDetails } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm, type Resolver, type SubmitHandler } from "react-hook-form";
 import { useActivityMutations } from "../hooks/use-activity-mutations";
 import { CashForm } from "./forms/cash-form";
@@ -44,11 +44,11 @@ const ACTIVITY_TYPE_TO_TAB: Record<string, string> = {
   SELL: "trade",
   DEPOSIT: "cash",
   WITHDRAWAL: "cash",
+  TRANSFER_IN: "cash",
+  TRANSFER_OUT: "cash",
   INTEREST: "income",
   DIVIDEND: "income",
   SPLIT: "other",
-  TRANSFER_IN: "cash",
-  TRANSFER_OUT: "cash",
   FEE: "other",
   TAX: "other",
   ADD_HOLDING: "holdings",
@@ -57,6 +57,7 @@ const ACTIVITY_TYPE_TO_TAB: Record<string, string> = {
 
 export function ActivityForm({ accounts, activity, open, onClose }: ActivityFormProps) {
   const { addActivityMutation, updateActivityMutation } = useActivityMutations(onClose);
+  const [isTransferMode, setIsTransferMode] = useState(false);
 
   const isValidActivityType = (
     type: string | undefined,
@@ -71,7 +72,6 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
     quantity: activity?.quantity,
     unitPrice: activity?.unitPrice,
     fee: activity?.fee ?? 0,
-    isDraft: activity?.isDraft ?? false,
     comment: activity?.comment ?? null,
     assetId: activity?.assetId,
     activityDate: activity?.date
@@ -101,6 +101,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
       form.reset(); // Reset to empty form
       addActivityMutation.reset();
       updateActivityMutation.reset();
+      setIsTransferMode(false); // Reset transfer mode
     } else {
       form.reset(defaultValues); // Reset to initial values
     }
@@ -110,14 +111,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
 
   const onSubmit: SubmitHandler<NewActivityFormValues> = async (data) => {
     try {
-      const {
-        showCurrencySelect: _showCurrencySelect,
-        id,
-        ...submitData
-      } = {
-        ...data,
-        isDraft: false,
-      };
+      const { showCurrencySelect: _showCurrencySelect, id, ...submitData } = data;
       const account = accounts.find((a) => a.value === submitData.accountId);
       // For cash activities and fees, set assetId to $CASH-accountCurrency
       if (
@@ -231,10 +225,10 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
                   <TradeForm accounts={accounts} />
                 </TabsContent>
                 <TabsContent value="holdings">
-                  <HoldingsForm accounts={accounts} />
+                  <HoldingsForm accounts={accounts} onSuccess={onClose} onTransferModeChange={setIsTransferMode} />
                 </TabsContent>
                 <TabsContent value="cash">
-                  <CashForm accounts={accounts} />
+                  <CashForm accounts={accounts} onSuccess={onClose} onTransferModeChange={setIsTransferMode} />
                 </TabsContent>
                 <TabsContent value="income">
                   <IncomeForm accounts={accounts} />
@@ -244,25 +238,27 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
                 </TabsContent>
               </div>
 
-              <SheetFooter>
-                <SheetTrigger asChild>
-                  <Button variant="outline" disabled={isLoading}>
-                    Cancel
+              {!isTransferMode && (
+                <SheetFooter>
+                  <SheetTrigger asChild>
+                    <Button variant="outline" disabled={isLoading}>
+                      Cancel
+                    </Button>
+                  </SheetTrigger>
+                  <Button type="submit" disabled={isLoading}>
+                    {isLoading ? (
+                      <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                    ) : activity?.id ? (
+                      <Icons.Check className="h-4 w-4" />
+                    ) : (
+                      <Icons.Plus className="h-4 w-4" />
+                    )}
+                    <span className="hidden sm:ml-2 sm:inline">
+                      {activity?.id ? "Update Activity" : "Add Activity"}
+                    </span>
                   </Button>
-                </SheetTrigger>
-                <Button type="submit" disabled={isLoading}>
-                  {isLoading ? (
-                    <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                  ) : activity?.id ? (
-                    <Icons.Check className="h-4 w-4" />
-                  ) : (
-                    <Icons.Plus className="h-4 w-4" />
-                  )}
-                  <span className="hidden sm:ml-2 sm:inline">
-                    {activity?.id ? "Update Activity" : "Add Activity"}
-                  </span>
-                </Button>
-              </SheetFooter>
+                </SheetFooter>
+              )}
             </form>
           </Form>
         </Tabs>

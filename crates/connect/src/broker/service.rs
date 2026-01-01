@@ -1,12 +1,12 @@
 //! Service for synchronizing broker data to the local database.
 
 use async_trait::async_trait;
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 use std::sync::Arc;
 
 use crate::platform::{Platform, PlatformRepository};
-use crate::state::BrokersSyncState;
-use crate::state::BrokersSyncStateRepository;
+use crate::state::BrokerSyncState;
+use crate::state::BrokerSyncStateRepository;
 use super::models::{
     AccountUniversalActivity, BrokerAccount, BrokerConnection, SyncAccountsResponse,
     SyncConnectionsResponse,
@@ -32,7 +32,7 @@ const DEFAULT_BROKERAGE_PROVIDER: &str = "snaptrade";
 pub struct SyncService {
     account_repository: Arc<dyn AccountRepositoryTrait>,
     platform_repository: Arc<PlatformRepository>,
-    brokers_sync_state_repository: Arc<BrokersSyncStateRepository>,
+    brokers_sync_state_repository: Arc<BrokerSyncStateRepository>,
     writer: WriteHandle,
 }
 
@@ -46,7 +46,7 @@ impl SyncService {
         Self {
             account_repository,
             platform_repository,
-            brokers_sync_state_repository: Arc::new(BrokersSyncStateRepository::new(
+            brokers_sync_state_repository: Arc::new(BrokerSyncStateRepository::new(
                 pool,
                 writer.clone(),
             )),
@@ -122,11 +122,11 @@ impl SyncServiceTrait for SyncService {
         let updated = 0; // Reserved for future use when we implement account updates
         let mut skipped = 0;
 
-        // Get all existing accounts with external_id to check for updates
+        // Get all existing accounts with provider_account_id to check for updates
         let existing_accounts = self.account_repository.list(None, None)?;
-        let external_id_map: std::collections::HashMap<String, Account> = existing_accounts
+        let provider_account_id_map: std::collections::HashMap<String, Account> = existing_accounts
             .into_iter()
-            .filter_map(|a| a.external_id.clone().map(|ext_id| (ext_id, a)))
+            .filter_map(|a| a.provider_account_id.clone().map(|id| (id, a)))
             .collect();
 
         for broker_account in &broker_accounts {
@@ -137,8 +137,8 @@ impl SyncServiceTrait for SyncService {
                 continue;
             }
 
-            // Check if account already exists by external_id
-            if let Some(_existing) = external_id_map.get(&broker_account.id) {
+            // Check if account already exists by provider_account_id
+            if let Some(_existing) = provider_account_id_map.get(&broker_account.id) {
                 // Account exists - for now we skip updates to preserve user customizations
                 // In the future, we might want to update certain fields selectively
                 debug!(
@@ -164,9 +164,10 @@ impl SyncServiceTrait for SyncService {
                 is_default: false,
                 is_active: broker_account.status.as_deref() != Some("closed"),
                 platform_id,
-                external_id: Some(broker_account.id.clone()),
                 account_number: Some(broker_account.account_number.clone()),
                 meta: broker_account.to_meta_json(),
+                provider: Some("SNAPTRADE".to_string()),
+                provider_account_id: Some(broker_account.id.clone()),
             };
 
             // Create the account
@@ -189,12 +190,12 @@ impl SyncServiceTrait for SyncService {
         })
     }
 
-    /// Get all synced accounts (accounts with external_id set)
+    /// Get all synced accounts (accounts with provider_account_id set)
     fn get_synced_accounts(&self) -> Result<Vec<Account>> {
         let all_accounts = self.account_repository.list(None, None)?;
         Ok(all_accounts
             .into_iter()
-            .filter(|a| a.external_id.is_some())
+            .filter(|a| a.provider_account_id.is_some())
             .collect())
     }
 
@@ -203,7 +204,7 @@ impl SyncServiceTrait for SyncService {
         self.platform_repository.list()
     }
 
-    fn get_activity_sync_state(&self, account_id: &str) -> Result<Option<BrokersSyncState>> {
+    fn get_activity_sync_state(&self, account_id: &str) -> Result<Option<BrokerSyncState>> {
         self.brokers_sync_state_repository
             .get_by_account_id(account_id)
     }
@@ -251,13 +252,19 @@ impl SyncServiceTrait for SyncService {
                 .filter(|c| !c.trim().is_empty())
                 .unwrap_or_else(|| "USD".to_string());
 
-            // Use the activity type directly from the API (already converted to wealthfolio type)
+            // Get activity type from API (should be mapped to canonical type on API side)
             let activity_type = activity
                 .activity_type
                 .clone()
                 .map(|t| t.trim().to_uppercase())
                 .filter(|t| !t.is_empty())
                 .unwrap_or_else(|| "UNKNOWN".to_string());
+
+            // Log for debugging
+            debug!(
+                "Activity from API: id={:?}, type={}, raw_type={:?}",
+                activity.id, activity_type, activity.activity_type
+            );
 
             let is_cash_like = matches!(
                 activity_type.as_str(),
@@ -356,7 +363,7 @@ impl SyncServiceTrait for SyncService {
             let new_activity = NewActivity {
                 id: Some(activity_id),
                 account_id: account_id.clone(),
-                asset_id,
+                asset_id: Some(asset_id), // Now Option<String>
                 asset_data_source: None,
                 activity_type,
                 activity_date,
@@ -365,23 +372,13 @@ impl SyncServiceTrait for SyncService {
                 currency: currency_code,
                 fee: Some(fee),
                 amount,
-                is_draft: true, // Synced activities need user review
-                comment: activity
+                status: Some(wealthfolio_core::activities::ActivityStatus::Draft), // Synced activities need user review
+                notes: activity
                     .description
                     .clone()
                     .filter(|d| !d.trim().is_empty())
                     .or(activity.external_reference_id.clone()),
                 fx_rate,
-                provider_type: activity
-                    .provider_type
-                    .clone()
-                    .filter(|t| !t.trim().is_empty()),
-                external_provider_id: Some(activity.id.clone().unwrap_or_default())
-                    .filter(|id| !id.trim().is_empty()),
-                external_broker_id: activity
-                    .external_reference_id
-                    .clone()
-                    .filter(|id| !id.trim().is_empty()),
             };
 
             activity_rows.push(new_activity.into());
@@ -390,11 +387,30 @@ impl SyncServiceTrait for SyncService {
         let writer = self.writer.clone();
         let account_id_for_log = account_id.clone();
         let activities_count = activity_rows.len();
+        let assets_count = asset_rows.len();
+
+        debug!(
+            "Preparing to upsert {} activities and {} assets for account {}",
+            activities_count, assets_count, account_id_for_log
+        );
+
+        // Log first activity for debugging if available
+        if let Some(first_activity) = activity_rows.first() {
+            debug!(
+                "First activity: id={}, type={}, date={}, asset_id={:?}, status={}",
+                first_activity.id,
+                first_activity.activity_type,
+                first_activity.activity_date,
+                first_activity.asset_id,
+                first_activity.status
+            );
+        }
 
         let (activities_upserted, assets_inserted) = writer
             .exec(move |conn| {
                 use diesel::upsert::excluded;
 
+                debug!("Starting asset inserts...");
                 let mut assets_inserted: usize = 0;
                 for asset_db in asset_rows {
                     let asset_id = asset_db.id.clone();
@@ -430,10 +446,14 @@ impl SyncServiceTrait for SyncService {
                     }
                 }
 
+                debug!("Starting activity inserts ({} activities)...", activity_rows.len());
                 let mut activities_upserted: usize = 0;
-                for activity_db in activity_rows {
+                for (idx, activity_db) in activity_rows.into_iter().enumerate() {
                     let now_update = chrono::Utc::now().to_rfc3339();
-                    activities_upserted += diesel::insert_into(schema::activities::table)
+                    let activity_id = activity_db.id.clone();
+                    let activity_type = activity_db.activity_type.clone();
+
+                    match diesel::insert_into(schema::activities::table)
                         .values(&activity_db)
                         .on_conflict(schema::activities::id)
                         .do_update()
@@ -451,21 +471,28 @@ impl SyncServiceTrait for SyncService {
                             schema::activities::currency.eq(excluded(schema::activities::currency)),
                             schema::activities::fee.eq(excluded(schema::activities::fee)),
                             schema::activities::amount.eq(excluded(schema::activities::amount)),
-                            schema::activities::is_draft.eq(excluded(schema::activities::is_draft)),
-                            schema::activities::comment.eq(excluded(schema::activities::comment)),
+                            schema::activities::status.eq(excluded(schema::activities::status)),
+                            schema::activities::notes.eq(excluded(schema::activities::notes)),
                             schema::activities::fx_rate.eq(excluded(schema::activities::fx_rate)),
-                            schema::activities::provider_type
-                                .eq(excluded(schema::activities::provider_type)),
-                            schema::activities::external_provider_id
-                                .eq(excluded(schema::activities::external_provider_id)),
-                            schema::activities::external_broker_id
-                                .eq(excluded(schema::activities::external_broker_id)),
+                            schema::activities::source_system
+                                .eq(excluded(schema::activities::source_system)),
+                            schema::activities::source_record_id
+                                .eq(excluded(schema::activities::source_record_id)),
                             schema::activities::updated_at.eq(now_update),
                         ))
-                        .execute(conn)
-                        .map_err(StorageError::from)?;
+                        .execute(conn) {
+                            Ok(count) => activities_upserted += count,
+                            Err(e) => {
+                                error!(
+                                    "Failed to upsert activity {} (idx={}, type={}): {:?}",
+                                    activity_id, idx, activity_type, e
+                                );
+                                return Err(StorageError::from(e).into());
+                            }
+                        }
                 }
 
+                debug!("Successfully upserted {} activities", activities_upserted);
                 Ok((activities_upserted, assets_inserted))
             })
             .await?;

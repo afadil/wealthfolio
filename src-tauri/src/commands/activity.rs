@@ -27,7 +27,7 @@ pub async fn search_activities(
     activity_type_filter: Option<Vec<String>>, // Optional activity_type filter
     asset_id_keyword: Option<String>,          // Optional asset_id keyword for search
     sort: Option<Sort>,
-    is_draft_filter: Option<bool>,             // Optional is_draft filter for pending review
+    needs_review_filter: Option<bool>,         // Optional needs_review filter for pending review
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ActivitySearchResponse, String> {
     debug!("Search activities... {}, {}", page, page_size);
@@ -38,7 +38,7 @@ pub async fn search_activities(
         activity_type_filter,
         asset_id_keyword,
         sort,
-        is_draft_filter,
+        needs_review_filter,
     )?)
 }
 

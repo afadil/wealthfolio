@@ -618,7 +618,7 @@ pub async fn sync_broker_data(state: State<'_, Arc<ServiceContext>>) -> Result<S
     let mut activity_errors: Vec<String> = Vec::new();
 
     for account in synced_accounts {
-        let Some(broker_account_id) = account.external_id.clone() else {
+        let Some(broker_account_id) = account.provider_account_id.clone() else {
             continue;
         };
 
@@ -719,17 +719,28 @@ pub async fn sync_broker_data(state: State<'_, Arc<ServiceContext>>) -> Result<S
                     last_page_first_id = Some(first_id);
                 }
 
+                debug!(
+                    "Upserting {} activities for account '{}'...",
+                    data.len(),
+                    account_name
+                );
+
                 match state
                     .sync_service()
                     .upsert_account_activities(account_id.clone(), data.clone())
                     .await
                 {
                     Ok((activities_upserted, assets_inserted)) => {
+                        info!(
+                            "Upserted {} activities, {} assets for '{}'",
+                            activities_upserted, assets_inserted, account_name
+                        );
                         activities_summary.activities_upserted += activities_upserted;
                         activities_summary.assets_inserted += assets_inserted;
                     }
                     Err(e) => {
                         let e = format!("Failed to upsert activities: {}", e);
+                        error!("{}: {}", account_name, e);
                         let _ = state
                             .sync_service()
                             .finalize_activity_sync_failure(account_id.clone(), e.clone())
@@ -798,15 +809,6 @@ pub async fn sync_broker_data(state: State<'_, Arc<ServiceContext>>) -> Result<S
     })
 }
 
-fn parse_naive_date(input: &str) -> Option<chrono::NaiveDate> {
-    if let Ok(d) = chrono::NaiveDate::parse_from_str(input, "%Y-%m-%d") {
-        return Some(d);
-    }
-    chrono::DateTime::parse_from_rfc3339(input)
-        .ok()
-        .map(|dt| dt.date_naive())
-}
-
 fn compute_activity_query_window(
     state: &State<'_, Arc<ServiceContext>>,
     account: &wealthfolio_core::accounts::Account,
@@ -818,8 +820,8 @@ fn compute_activity_query_window(
         .map_err(|e| format!("Failed to read activity sync state: {}", e))?;
 
     let from_state = sync_state
-        .and_then(|s| s.last_synced_date)
-        .and_then(|d| parse_naive_date(&d))
+        .and_then(|s| s.last_successful_at)
+        .map(|dt| dt.date_naive())
         .map(|d| (d - chrono::Days::new(1)).min(end_date));
 
     if let Some(d) = from_state {
