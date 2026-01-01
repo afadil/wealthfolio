@@ -120,7 +120,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
       const account = accounts.find((a) => a.value === submitData.accountId);
       // For cash activities and fees, set assetId to $CASH-accountCurrency
       if (
-        ["DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE", "TAX", "TRANSFER_IN", "TRANSFER_OUT"].includes(
+        ["DEPOSIT", "WITHDRAWAL", "FEE", "TAX", "TRANSFER_IN", "TRANSFER_OUT"].includes(
           submitData.activityType,
         )
       ) {
