@@ -560,6 +560,7 @@ mod tests {
                 cost_basis: dec!(3000),
                 acquisition_price: dec!(3000),
                 acquisition_fees: dec!(0),
+                fx_rate_to_position: None,
             }])),
             local_currency: "GBp".to_string(),
             base_currency: "GBP".to_string(),

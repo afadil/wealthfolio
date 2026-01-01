@@ -6,6 +6,7 @@ use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::str::FromStr;
 
 /// Helper function to parse a string into a Decimal,
@@ -43,31 +44,135 @@ pub fn parse_decimal_string_tolerant(value_str: &str, field_name: &str) -> Decim
     }
 }
 
+/// Activity status for lifecycle management
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ActivityStatus {
+    #[default]
+    Posted,  // Live, affects calculations
+    Pending, // Awaiting settlement/confirmation
+    Draft,   // User-created, not yet confirmed
+    Void,    // Cancelled/reversed (soft delete)
+}
+
 /// Domain model representing an activity in the system
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Activity {
+    // Identity
     pub id: String,
     pub account_id: String,
-    pub asset_id: String,
-    pub activity_type: String,
+    pub asset_id: Option<String>, // NOW OPTIONAL - NULL for pure cash movements
+
+    // Classification
+    pub activity_type: String,                   // Canonical type (closed set of 15)
+    pub activity_type_override: Option<String>,  // User override (never touched by sync)
+    pub source_type: Option<String>,             // Raw provider label (REI, DIV, etc.)
+    pub subtype: Option<String>,                 // Semantic variation (DRIP, STAKING_REWARD, etc.)
+    pub status: ActivityStatus,
+
+    // Timing
     #[serde(with = "timestamp_format")]
     pub activity_date: DateTime<Utc>,
-    pub quantity: Decimal,
-    pub unit_price: Decimal,
-    pub currency: String,
-    pub fee: Decimal,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub settlement_date: Option<DateTime<Utc>>,
+
+    // Quantities - NOW ALL OPTIONAL
+    #[serde(default)]
+    #[serde(with = "optional_decimal_format")]
+    pub quantity: Option<Decimal>,
+    #[serde(default)]
+    #[serde(with = "optional_decimal_format")]
+    pub unit_price: Option<Decimal>,
+    #[serde(default)]
+    #[serde(with = "optional_decimal_format")]
     pub amount: Option<Decimal>,
-    pub is_draft: bool,
-    pub comment: Option<String>,
+    #[serde(default)]
+    #[serde(with = "optional_decimal_format")]
+    pub fee: Option<Decimal>,
+    pub currency: String,
+    #[serde(default)]
+    #[serde(with = "optional_decimal_format")]
     pub fx_rate: Option<Decimal>,
-    pub provider_type: Option<String>,
-    pub external_provider_id: Option<String>,
-    pub external_broker_id: Option<String>,
+
+    // Metadata
+    pub notes: Option<String>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Value>, // JSON blob
+
+    // Source identity
+    pub source_system: Option<String>,     // SNAPTRADE, PLAID, MANUAL, CSV
+    pub source_record_id: Option<String>,  // Provider's record ID
+    pub source_group_id: Option<String>,   // Provider grouping key
+    pub idempotency_key: Option<String>,   // Stable hash for dedupe
+    pub import_run_id: Option<String>,     // Batch/run identifier
+
+    // Sync flags
+    #[serde(default)]
+    pub is_user_modified: bool, // User edited; sync protects economics
+    #[serde(default)]
+    pub needs_review: bool,     // Needs user review (low confidence, etc.)
+
+    // Audit
     #[serde(with = "timestamp_format")]
     pub created_at: DateTime<Utc>,
     #[serde(with = "timestamp_format")]
     pub updated_at: DateTime<Utc>,
+}
+
+impl Activity {
+    /// Returns the effective activity type, respecting user overrides.
+    /// This is what the compiler and calculator should use.
+    pub fn effective_type(&self) -> &str {
+        self.activity_type_override
+            .as_deref()
+            .unwrap_or(&self.activity_type)
+    }
+
+    /// Returns the effective date for this activity
+    pub fn effective_date(&self) -> NaiveDate {
+        self.activity_date.naive_utc().date()
+    }
+
+    /// Check if this activity is posted (should affect calculations)
+    pub fn is_posted(&self) -> bool {
+        self.status == ActivityStatus::Posted
+    }
+
+    /// Check if this activity has a user override
+    pub fn has_override(&self) -> bool {
+        self.activity_type_override.is_some()
+    }
+
+    /// Get quantity, defaulting to zero if not set
+    pub fn qty(&self) -> Decimal {
+        self.quantity.unwrap_or(Decimal::ZERO)
+    }
+
+    /// Get unit price, defaulting to zero if not set
+    pub fn price(&self) -> Decimal {
+        self.unit_price.unwrap_or(Decimal::ZERO)
+    }
+
+    /// Get amount, defaulting to zero if not set
+    pub fn amt(&self) -> Decimal {
+        self.amount.unwrap_or(Decimal::ZERO)
+    }
+
+    /// Get fee, defaulting to zero if not set
+    pub fn fee_amt(&self) -> Decimal {
+        self.fee.unwrap_or(Decimal::ZERO)
+    }
+
+    /// Get typed metadata value
+    pub fn get_meta<T: serde::de::DeserializeOwned>(&self, key: &str) -> Option<T> {
+        self.metadata
+            .as_ref()
+            .and_then(|v| v.get(key))
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+    }
 }
 
 /// Input model for creating a new activity
@@ -76,7 +181,7 @@ pub struct Activity {
 pub struct NewActivity {
     pub id: Option<String>,
     pub account_id: String,
-    pub asset_id: String,
+    pub asset_id: Option<String>, // NOW OPTIONAL - NULL for pure cash movements
     pub asset_data_source: Option<String>,
     pub activity_type: String,
     pub activity_date: String,
@@ -85,12 +190,9 @@ pub struct NewActivity {
     pub currency: String,
     pub fee: Option<Decimal>,
     pub amount: Option<Decimal>,
-    pub is_draft: bool,
-    pub comment: Option<String>,
+    pub status: Option<ActivityStatus>,
+    pub notes: Option<String>,
     pub fx_rate: Option<Decimal>,
-    pub provider_type: Option<String>,
-    pub external_provider_id: Option<String>,
-    pub external_broker_id: Option<String>,
 }
 
 impl NewActivity {
@@ -101,11 +203,7 @@ impl NewActivity {
                 "Account ID cannot be empty".to_string(),
             ));
         }
-        if self.asset_id.trim().is_empty() {
-            return Err(crate::activities::ActivityError::InvalidData(
-                "Asset ID cannot be empty".to_string(),
-            ));
-        }
+        // asset_id is now optional - no validation needed for empty asset_id
         if self.activity_type.trim().is_empty() {
             return Err(crate::activities::ActivityError::InvalidData(
                 "Activity type cannot be empty".to_string(),
@@ -131,7 +229,7 @@ impl NewActivity {
 pub struct ActivityUpdate {
     pub id: String,
     pub account_id: String,
-    pub asset_id: String,
+    pub asset_id: Option<String>, // NOW OPTIONAL - NULL for pure cash movements
     pub asset_data_source: Option<String>,
     pub activity_type: String,
     pub activity_date: String,
@@ -140,12 +238,9 @@ pub struct ActivityUpdate {
     pub currency: String,
     pub fee: Option<Decimal>,
     pub amount: Option<Decimal>,
-    pub is_draft: bool,
-    pub comment: Option<String>,
+    pub status: Option<ActivityStatus>,
+    pub notes: Option<String>,
     pub fx_rate: Option<Decimal>,
-    pub provider_type: Option<String>,
-    pub external_provider_id: Option<String>,
-    pub external_broker_id: Option<String>,
 }
 
 impl ActivityUpdate {
@@ -163,12 +258,7 @@ impl ActivityUpdate {
             )
             .into());
         }
-        if self.asset_id.trim().is_empty() {
-            return Err(crate::activities::ActivityError::InvalidData(
-                "Asset ID cannot be empty".to_string(),
-            )
-            .into());
-        }
+        // asset_id is now optional - no validation needed for empty asset_id
         if self.activity_type.trim().is_empty() {
             return Err(crate::activities::ActivityError::InvalidData(
                 "Activity type cannot be empty".to_string(),
@@ -229,13 +319,15 @@ pub struct ActivityDetails {
     pub account_id: String,
     pub asset_id: String,
     pub activity_type: String,
+    pub subtype: Option<String>,
+    pub status: ActivityStatus,
     pub date: String,
     pub quantity: String,
     pub unit_price: String,
     pub currency: String,
     pub fee: String,
     pub amount: Option<String>,
-    pub is_draft: bool,
+    pub needs_review: bool,
     pub comment: Option<String>,
     pub fx_rate: Option<String>,
     pub created_at: String,
@@ -245,6 +337,12 @@ pub struct ActivityDetails {
     pub asset_symbol: String,
     pub asset_name: Option<String>,
     pub asset_data_source: String,
+    // Sync/source metadata
+    pub source_system: Option<String>,
+    pub source_record_id: Option<String>,
+    pub idempotency_key: Option<String>,
+    pub import_run_id: Option<String>,
+    pub is_user_modified: bool,
 }
 
 impl ActivityDetails {
@@ -383,6 +481,7 @@ impl Default for ImportMappingData {
         activity_mappings.insert("SPLIT".to_string(), vec!["SPLIT".to_string()]);
         activity_mappings.insert("FEE".to_string(), vec!["FEE".to_string()]);
         activity_mappings.insert("TAX".to_string(), vec!["TAX".to_string()]);
+        activity_mappings.insert("CREDIT".to_string(), vec!["CREDIT".to_string()]);
 
         ImportMappingData {
             account_id: String::new(),
@@ -436,6 +535,8 @@ pub enum ActivityType {
     Split,
     AddHolding,
     RemoveHolding,
+    Credit,   // NEW: Generic credit/adjustment
+    Unknown,  // NEW: Unmapped/unknown activity types
 }
 
 impl ActivityType {
@@ -455,6 +556,8 @@ impl ActivityType {
             ActivityType::Split => ACTIVITY_TYPE_SPLIT,
             ActivityType::AddHolding => ACTIVITY_TYPE_ADD_HOLDING,
             ActivityType::RemoveHolding => ACTIVITY_TYPE_REMOVE_HOLDING,
+            ActivityType::Credit => ACTIVITY_TYPE_CREDIT,
+            ActivityType::Unknown => ACTIVITY_TYPE_UNKNOWN,
         }
     }
 }
@@ -478,6 +581,8 @@ impl FromStr for ActivityType {
             s if s == ACTIVITY_TYPE_SPLIT => Ok(ActivityType::Split),
             s if s == ACTIVITY_TYPE_ADD_HOLDING => Ok(ActivityType::AddHolding),
             s if s == ACTIVITY_TYPE_REMOVE_HOLDING => Ok(ActivityType::RemoveHolding),
+            s if s == ACTIVITY_TYPE_CREDIT => Ok(ActivityType::Credit),
+            s if s == ACTIVITY_TYPE_UNKNOWN => Ok(ActivityType::Unknown),
             _ => Err(format!("Unknown activity type: {}", s)),
         }
     }
@@ -517,6 +622,46 @@ mod timestamp_format {
             "Invalid timestamp format: {}. Expected ISO 8601/RFC3339 or YYYY-MM-DD",
             s
         )))
+    }
+}
+
+// Custom serialization for optional Decimal fields to handle string representation
+mod optional_decimal_format {
+    use rust_decimal::Decimal;
+    use serde::{self, Deserialize, Deserializer, Serializer};
+    use std::str::FromStr;
+
+    pub fn serialize<S>(value: &Option<Decimal>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match value {
+            Some(d) => serializer.serialize_str(&d.to_string()),
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Decimal>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // Use an untagged enum to handle both string and number representations
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum DecimalOrString {
+            Decimal(Decimal),
+            String(String),
+            Null,
+        }
+
+        match Option::<DecimalOrString>::deserialize(deserializer)? {
+            Some(DecimalOrString::Decimal(d)) => Ok(Some(d)),
+            Some(DecimalOrString::String(s)) if s.is_empty() => Ok(None),
+            Some(DecimalOrString::String(s)) => Decimal::from_str(&s)
+                .map(Some)
+                .map_err(serde::de::Error::custom),
+            Some(DecimalOrString::Null) | None => Ok(None),
+        }
     }
 }
 

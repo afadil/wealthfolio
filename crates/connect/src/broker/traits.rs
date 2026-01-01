@@ -7,7 +7,7 @@ use super::models::{
     SyncAccountsResponse, SyncConnectionsResponse,
 };
 use crate::platform::Platform;
-use crate::state::BrokersSyncState;
+use crate::state::BrokerSyncState;
 use wealthfolio_core::accounts::Account;
 use wealthfolio_core::errors::Result;
 
@@ -50,14 +50,14 @@ pub trait SyncServiceTrait: Send + Sync {
     async fn sync_accounts(&self, broker_accounts: Vec<BrokerAccount>)
         -> Result<SyncAccountsResponse>;
 
-    /// Get all synced accounts (accounts with external_id set)
+    /// Get all synced accounts (accounts with provider_account_id set)
     fn get_synced_accounts(&self) -> Result<Vec<Account>>;
 
     /// Get all platforms
     fn get_platforms(&self) -> Result<Vec<Platform>>;
 
     /// Get the stored activity sync state for an account, if any.
-    fn get_activity_sync_state(&self, account_id: &str) -> Result<Option<BrokersSyncState>>;
+    fn get_activity_sync_state(&self, account_id: &str) -> Result<Option<BrokerSyncState>>;
 
     /// Record an activity sync attempt for an account.
     async fn mark_activity_sync_attempt(&self, account_id: String) -> Result<()>;

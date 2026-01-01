@@ -43,6 +43,12 @@ pub const ACTIVITY_TYPE_ADD_HOLDING: &str = "ADD_HOLDING";
 /// Write-off, gift, or expire a position without recording a sale. Fee only, decreases quantity.
 pub const ACTIVITY_TYPE_REMOVE_HOLDING: &str = "REMOVE_HOLDING";
 
+/// Generic credit or adjustment. Increases cash.
+pub const ACTIVITY_TYPE_CREDIT: &str = "CREDIT";
+
+/// Unknown or unmapped activity type. Requires user review.
+pub const ACTIVITY_TYPE_UNKNOWN: &str = "UNKNOWN";
+
 /// Trading activity types
 pub const TRADING_ACTIVITY_TYPES: [&str; 5] = [
     ACTIVITY_TYPE_BUY,

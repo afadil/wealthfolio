@@ -17,6 +17,7 @@ pub mod market_data;
 pub mod portfolio;
 pub mod secrets;
 pub mod settings;
+pub mod sync;
 pub mod utils;
 
 // Re-export common types from asset and portfolio modules

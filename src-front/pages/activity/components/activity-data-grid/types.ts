@@ -29,10 +29,10 @@ export function toLocalTransaction(activity: ActivityDetails): LocalTransaction 
 
 /**
  * Checks if a transaction is pending review (synced but not yet approved)
- * A transaction is pending review if isDraft=true AND it's not a locally created new row
+ * A transaction is pending review if needsReview=true AND it's not a locally created new row
  */
 export function isPendingReview(transaction: LocalTransaction): boolean {
-  return transaction.isDraft === true && transaction.isNew !== true;
+  return transaction.needsReview === true && transaction.isNew !== true;
 }
 
 /**
@@ -108,7 +108,6 @@ export interface ActivityCreatePayload {
   currency?: string;
   fee?: string;
   fxRate?: string | null;
-  isDraft: boolean;
   comment?: string;
 }
 

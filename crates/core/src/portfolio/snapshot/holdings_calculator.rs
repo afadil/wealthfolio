@@ -11,8 +11,19 @@ use crate::portfolio::snapshot::Position;
 use chrono::{DateTime, NaiveDate, Utc};
 use log::{debug, error, warn};
 use rust_decimal::Decimal;
+use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
+
+/// Helper function for cash mutations.
+/// Books cash in the specified currency (should be activity.currency per design spec).
+#[inline]
+fn add_cash(state: &mut AccountStateSnapshot, currency: &str, delta: Decimal) {
+    *state
+        .cash_balances
+        .entry(currency.to_string())
+        .or_insert(Decimal::ZERO) += delta;
+}
 
 /// Calculates the holding state (positions, cash, cost basis, net deposits) based on activities.
 /// It does not calculate market values or base currency conversions related to valuation.
@@ -63,6 +74,9 @@ impl HoldingsCalculator {
         let account_currency = next_state.currency.clone();
         let mut warnings: Vec<HoldingsCalculationWarning> = Vec::new();
 
+        // Session-wide asset currency cache to avoid DB lookups per unique asset
+        let mut asset_currency_cache: HashMap<String, String> = HashMap::new();
+
         for activity in activities_today {
             if activity.activity_date.naive_utc().date() != target_date {
                 let warning = HoldingsCalculationWarning {
@@ -79,7 +93,12 @@ impl HoldingsCalculator {
                 warnings.push(warning);
                 continue;
             }
-            match self.process_single_activity(activity, &mut next_state, &account_currency) {
+            match self.process_single_activity(
+                activity,
+                &mut next_state,
+                &account_currency,
+                &mut asset_currency_cache,
+            ) {
                 Ok(_) => {} // Activity processed successfully
                 Err(e) => {
                     let warning = HoldingsCalculationWarning {
@@ -134,6 +153,9 @@ impl HoldingsCalculator {
         }
         next_state.cost_basis = final_cost_basis_acct;
 
+        // Compute cash totals (once at end of day per spec)
+        self.compute_cash_totals(&mut next_state, target_date);
+
         next_state.id = format!(
             "{}_{}",
             next_state.account_id,
@@ -144,275 +166,278 @@ impl HoldingsCalculator {
     }
 
     /// Processes a single activity, updating positions, cash, and net_deposit.
-    /// Uses fx rate cache only for converting activity amounts to account currency.
+    /// Books cash in ACTIVITY currency (not account currency) per design spec.
+    /// Uses asset_currency_cache to avoid repeated DB lookups for asset currencies.
     fn process_single_activity(
         &self,
         activity: &Activity,
         state: &mut AccountStateSnapshot,
         account_currency: &str,
+        asset_currency_cache: &mut HashMap<String, String>,
     ) -> Result<()> {
         let activity_type = ActivityType::from_str(&activity.activity_type).map_err(|_| {
             CalculatorError::UnsupportedActivityType(activity.activity_type.clone())
         })?;
 
-        // Convert activity amounts needed in account currency using ACTIVITY date
-        // If activity has a valid fx_rate (not None, not zero), use it directly
-        let amount_acct = self.convert_to_account_currency(
-            self.get_activity_amount(activity),
-            activity,
-            account_currency,
-            "Activity Amount",
-        );
-
-        let fee_acct = self.convert_to_account_currency(
-            activity.fee,
-            activity,
-            account_currency,
-            "Activity Fee",
-        );
-
-        // Dispatch to Specific Handlers (signatures updated)
+        // Dispatch to Specific Handlers
+        // NOTE: Removed precomputation of amount_acct/fee_acct - handlers convert when needed
         match activity_type {
-            ActivityType::Buy => self.handle_buy(activity, state, account_currency, fee_acct),
-            ActivityType::Sell => self.handle_sell(activity, state, account_currency, fee_acct),
-            ActivityType::Deposit => {
-                self.handle_deposit(activity, state, account_currency, amount_acct, fee_acct)
+            ActivityType::Buy => {
+                self.handle_buy(activity, state, account_currency, asset_currency_cache)
             }
-            ActivityType::Withdrawal => {
-                self.handle_withdrawal(activity, state, account_currency, amount_acct, fee_acct)
+            ActivityType::Sell => {
+                self.handle_sell(activity, state, account_currency, asset_currency_cache)
             }
-            ActivityType::Dividend | ActivityType::Interest => {
-                self.handle_income(state, account_currency, amount_acct, fee_acct)
+            ActivityType::Deposit => self.handle_deposit(activity, state, account_currency),
+            ActivityType::Withdrawal => self.handle_withdrawal(activity, state, account_currency),
+            ActivityType::Dividend | ActivityType::Interest | ActivityType::Credit => {
+                self.handle_income(activity, state)
             }
             ActivityType::Fee | ActivityType::Tax => {
-                self.handle_charge(activity, state, account_currency, &activity_type)
+                self.handle_charge(activity, state, &activity_type)
             }
             ActivityType::AddHolding => {
-                self.handle_add_holding(activity, state, account_currency, fee_acct)
+                self.handle_add_holding(activity, state, account_currency, asset_currency_cache)
             }
             ActivityType::RemoveHolding => {
-                self.handle_remove_holding(activity, state, account_currency, fee_acct)
+                self.handle_remove_holding(activity, state, account_currency, asset_currency_cache)
             }
             ActivityType::TransferIn => {
-                self.handle_transfer_in(activity, state, account_currency, amount_acct, fee_acct)
+                self.handle_transfer_in(activity, state, account_currency, asset_currency_cache)
             }
             ActivityType::TransferOut => {
-                self.handle_transfer_out(activity, state, account_currency, amount_acct, fee_acct)
+                self.handle_transfer_out(activity, state, account_currency, asset_currency_cache)
             }
             ActivityType::Split => Ok(()),
+            ActivityType::Unknown => {
+                warn!(
+                    "Unknown activity type for activity {}. Skipping.",
+                    activity.id
+                );
+                Ok(())
+            }
         }
     }
 
-    // --- Activity Type Handlers (Updated Signatures & Conversions) ---
+    // --- Activity Type Handlers ---
+    // Per design spec: Book cash in ACTIVITY currency, not account currency.
 
+    /// Handle BUY activity.
+    /// Books cash outflow in ACTIVITY currency.
     fn handle_buy(
         &self,
         activity: &Activity,
         state: &mut AccountStateSnapshot,
         account_currency: &str,
-        fee_acct: Decimal, // Already converted using activity date
+        asset_currency_cache: &mut HashMap<String, String>,
     ) -> Result<()> {
         let activity_currency = &activity.currency;
+        let asset_id = activity.asset_id.as_deref().unwrap_or("");
 
-        let position = self.get_or_create_position_mut(
+        let position = self.get_or_create_position_mut_cached(
             state,
-            &activity.asset_id,
+            asset_id,
             activity_currency,
             activity.activity_date,
+            asset_currency_cache,
         )?;
 
-        // Check if currency conversion is needed and handle accordingly
-        let converted_activity;
-        let activity_to_use =
-            if position.currency.is_empty() || position.currency == activity.currency {
-                // No conversion needed, use original activity directly
-                activity
-            } else {
-                // Conversion needed, convert and store in local variable
-                converted_activity = self.convert_activity_to_position_currency(
+        // Determine position currency and if conversion is needed
+        let position_currency = position.currency.clone();
+        let needs_conversion =
+            !position_currency.is_empty() && position_currency != activity.currency;
+
+        // Get values for lot, converting if needed
+        let (unit_price_for_lot, fee_for_lot, fx_rate_used) = if needs_conversion {
+            let (converted_price, converted_fee, fx_rate) = self
+                .convert_to_position_currency(
+                    activity.price(),
+                    activity.fee_amt(),
                     activity,
-                    position,
-                    &ActivityType::Buy,
+                    &position_currency,
                     account_currency,
                 )?;
-                &converted_activity
-            };
+            (converted_price, converted_fee, fx_rate)
+        } else {
+            (activity.price(), activity.fee_amt(), None)
+        };
 
-        let _cost_basis_asset_curr = position.add_lot(activity_to_use)?;
+        // Use add_lot_values to avoid cloning Activity
+        let _cost_basis_asset_curr = position.add_lot_values(
+            activity.id.clone(),
+            activity.qty(),
+            unit_price_for_lot,
+            fee_for_lot,
+            activity.activity_date,
+            fx_rate_used,
+        )?;
 
-        // Calculate total cost in Account Currency for cash adjustment
-        // Use activity's fx_rate if available, otherwise fall back to FxService
-        let unit_price_acct = self.convert_to_account_currency(
-            activity.unit_price,
-            activity,
-            account_currency,
-            "Buy Unit Price",
-        );
-
-        let total_cost_acct = (activity.quantity * unit_price_acct) + fee_acct;
-
-        *state
-            .cash_balances
-            .entry(account_currency.to_string())
-            .or_insert(Decimal::ZERO) -= total_cost_acct;
+        // Book cash outflow in ACTIVITY currency
+        let total_cost = (activity.qty() * activity.price()) + activity.fee_amt();
+        add_cash(state, activity_currency, -total_cost);
 
         Ok(())
     }
 
+    /// Handle SELL activity.
+    /// Books cash inflow in ACTIVITY currency.
     fn handle_sell(
         &self,
         activity: &Activity,
         state: &mut AccountStateSnapshot,
-        account_currency: &str,
-        fee_acct: Decimal, // Already converted using activity date
+        _account_currency: &str,
+        _asset_currency_cache: &mut HashMap<String, String>,
     ) -> Result<()> {
-        // Use activity's fx_rate if available, otherwise fall back to FxService
-        let unit_price_acct = self.convert_to_account_currency(
-            activity.unit_price,
-            activity,
-            account_currency,
-            "Sell Unit Price",
-        );
+        let activity_currency = &activity.currency;
+        let asset_id = activity.asset_id.as_deref().unwrap_or("");
 
-        let total_proceeds_acct = (activity.quantity * unit_price_acct) - fee_acct;
+        // Book cash inflow in ACTIVITY currency (proceeds = qty * price - fee)
+        let total_proceeds = (activity.qty() * activity.price()) - activity.fee_amt();
+        add_cash(state, activity_currency, total_proceeds);
 
-        if let Some(position) = state.positions.get_mut(&activity.asset_id) {
-            // Check if currency conversion is needed and handle accordingly
-            let converted_activity;
-            let activity_to_use =
-                if position.currency.is_empty() || position.currency == activity.currency {
-                    // No conversion needed, use original activity directly
-                    activity
-                } else {
-                    // Conversion needed, convert and store in local variable
-                    converted_activity = self.convert_activity_to_position_currency(
-                        activity,
-                        position,
-                        &ActivityType::Sell,
-                        account_currency,
-                    )?;
-                    &converted_activity
-                };
-
+        if let Some(position) = state.positions.get_mut(asset_id) {
+            // reduce_lots_fifo only needs quantity, not price
             let (_qty_reduced, _cost_basis_sold_asset_curr) =
-                position.reduce_lots_fifo(activity_to_use.quantity)?;
-
-            *state
-                .cash_balances
-                .entry(account_currency.to_string())
-                .or_insert(Decimal::ZERO) += total_proceeds_acct;
+                position.reduce_lots_fifo(activity.qty())?;
         } else {
-            warn!("Attempted to Sell non-existent/zero position {} via activity {}. Applying cash effect.",
-                     activity.asset_id, activity.id);
-            *state
-                .cash_balances
-                .entry(account_currency.to_string())
-                .or_insert(Decimal::ZERO) += total_proceeds_acct;
+            warn!(
+                "Attempted to Sell non-existent/zero position {} via activity {}. Applying cash effect only.",
+                asset_id, activity.id
+            );
         }
         Ok(())
     }
 
+    /// Handle DEPOSIT activity.
+    /// Books cash inflow in ACTIVITY currency.
+    /// Updates net_contribution in account currency.
     fn handle_deposit(
         &self,
         activity: &Activity,
         state: &mut AccountStateSnapshot,
         account_currency: &str,
-        amount_acct: Decimal, // Already converted using activity date
-        fee_acct: Decimal,    // Already converted using activity date
     ) -> Result<()> {
-        let base_ccy = self.base_currency.read().unwrap();
+        let activity_currency = &activity.currency;
         let activity_date = activity.activity_date.naive_utc().date();
-        let activity_amount = activity.amount.unwrap_or(Decimal::ZERO);
+        let activity_amount = activity.amt();
+
+        // Book cash in ACTIVITY currency (amount - fee)
+        let net_amount = activity_amount - activity.fee_amt();
+        add_cash(state, activity_currency, net_amount);
+
+        // Convert for net_contribution (pre-fee amount in account currency)
+        let amount_acct = self.convert_to_account_currency(
+            activity_amount,
+            activity,
+            account_currency,
+            "Deposit Amount",
+        );
+
+        // Convert for net_contribution_base
+        let base_ccy = self.base_currency.read().unwrap();
         let amount_base = match self.fx_service.convert_currency_for_date(
             activity_amount,
-            &activity.currency,
+            activity_currency,
             &base_ccy,
             activity_date,
         ) {
             Ok(c) => c,
             Err(e) => {
-                warn!("Holdings Calc (NetContrib Deposit {}): Failed conversion {} {}->{} on {}: {}. Base contribution not updated.", activity.id, activity_amount, &activity.currency, &base_ccy, activity_date, e);
+                warn!(
+                    "Holdings Calc (NetContrib Deposit {}): Failed conversion {} {}->{} on {}: {}. Base contribution not updated.",
+                    activity.id, activity_amount, activity_currency, &base_ccy, activity_date, e
+                );
                 Decimal::ZERO
             }
         };
 
-        let net_amount_acct = amount_acct - fee_acct;
-        *state
-            .cash_balances
-            .entry(account_currency.to_string())
-            .or_insert(Decimal::ZERO) += net_amount_acct;
-        // Net deposit uses pre-fee amount, already converted correctly
         state.net_contribution += amount_acct;
         state.net_contribution_base += amount_base;
         Ok(())
     }
 
+    /// Handle WITHDRAWAL activity.
+    /// Books cash outflow in ACTIVITY currency.
+    /// Updates net_contribution in account currency.
     fn handle_withdrawal(
         &self,
         activity: &Activity,
         state: &mut AccountStateSnapshot,
         account_currency: &str,
-        amount_acct: Decimal, // Already converted using activity date
-        fee_acct: Decimal,    // Already converted using activity date
     ) -> Result<()> {
-        let base_ccy = self.base_currency.read().unwrap();
+        let activity_currency = &activity.currency;
         let activity_date = activity.activity_date.naive_utc().date();
-        let activity_amount = activity.amount.unwrap_or(Decimal::ZERO);
+        let activity_amount = activity.amt();
+
+        // Book cash outflow in ACTIVITY currency (amount + fee)
+        let net_amount = activity_amount + activity.fee_amt();
+        add_cash(state, activity_currency, -net_amount);
+
+        // Convert for net_contribution (pre-fee amount in account currency)
+        let amount_acct = self.convert_to_account_currency(
+            activity_amount,
+            activity,
+            account_currency,
+            "Withdrawal Amount",
+        );
+
+        // Convert for net_contribution_base
+        let base_ccy = self.base_currency.read().unwrap();
         let amount_base = match self.fx_service.convert_currency_for_date(
             activity_amount,
-            &activity.currency,
+            activity_currency,
             &base_ccy,
             activity_date,
         ) {
             Ok(c) => c,
             Err(e) => {
-                warn!("Holdings Calc (NetContrib Withdrawal {}): Failed conversion {} {}->{} on {}: {}. Base contribution not updated.", activity.id, activity_amount, &activity.currency, &base_ccy, activity_date, e);
+                warn!(
+                    "Holdings Calc (NetContrib Withdrawal {}): Failed conversion {} {}->{} on {}: {}. Base contribution not updated.",
+                    activity.id, activity_amount, activity_currency, &base_ccy, activity_date, e
+                );
                 Decimal::ZERO
             }
         };
 
-        let net_amount_acct = amount_acct + fee_acct;
-        *state
-            .cash_balances
-            .entry(account_currency.to_string())
-            .or_insert(Decimal::ZERO) -= net_amount_acct;
-        // Net deposit uses pre-fee amount, already converted correctly
         state.net_contribution -= amount_acct;
         state.net_contribution_base -= amount_base;
         Ok(())
     }
 
-    fn handle_income(
-        &self,
-        state: &mut AccountStateSnapshot,
-        account_currency: &str,
-        amount_acct: Decimal, // Already converted using activity date
-        fee_acct: Decimal,    // Already converted using activity date
-    ) -> Result<()> {
-        let net_change = amount_acct - fee_acct;
-        *state
-            .cash_balances
-            .entry(account_currency.to_string())
-            .or_insert(Decimal::ZERO) += net_change;
-        // Income does not affect the net contribution.
+    /// Handle DIVIDEND/INTEREST/CREDIT activities.
+    /// Books cash inflow in ACTIVITY currency.
+    /// Income does NOT affect net_contribution.
+    fn handle_income(&self, activity: &Activity, state: &mut AccountStateSnapshot) -> Result<()> {
+        let activity_currency = &activity.currency;
+        let activity_amount = activity.amt();
+
+        // Book cash in ACTIVITY currency (amount - fee)
+        let net_amount = activity_amount - activity.fee_amt();
+        add_cash(state, activity_currency, net_amount);
+
+        // Income does not affect net_contribution
         Ok(())
     }
 
+    /// Handle FEE/TAX activities.
+    /// Books cash outflow in ACTIVITY currency.
+    /// Charges do NOT affect net_contribution.
     fn handle_charge(
         &self,
         activity: &Activity,
         state: &mut AccountStateSnapshot,
-        account_currency: &str,
         activity_type: &ActivityType,
     ) -> Result<()> {
-        // Determine charge amount from raw activity values first
-        let raw_charge = if activity.fee != Decimal::ZERO {
-            activity.fee
+        let activity_currency = &activity.currency;
+
+        // Determine charge amount: prefer fee field, fall back to amount
+        let charge = if activity.fee_amt() != Decimal::ZERO {
+            activity.fee_amt()
         } else {
-            activity.amount.unwrap_or(Decimal::ZERO)
+            activity.amt()
         };
 
-        if raw_charge == Decimal::ZERO {
+        if charge == Decimal::ZERO {
             warn!(
                 "Activity {} ({}): 'fee' and 'amount' are both zero. No cash change.",
                 activity.id,
@@ -421,70 +446,70 @@ impl HoldingsCalculator {
             return Ok(());
         }
 
-        // Convert the determined charge amount to account currency
-        // Use activity's fx_rate if available, otherwise fall back to FxService
-        let charge_acct = self.convert_to_account_currency(
-            raw_charge,
-            activity,
-            account_currency,
-            "Charge Activity",
-        );
+        // Book cash outflow in ACTIVITY currency
+        add_cash(state, activity_currency, -charge.abs());
 
-        if charge_acct != Decimal::ZERO {
-            *state
-                .cash_balances
-                .entry(account_currency.to_string())
-                .or_insert(Decimal::ZERO) -= charge_acct.abs();
-        }
-        // Charges do not affect net deposit
+        // Charges do not affect net_contribution
         Ok(())
     }
 
+    /// Handle ADD_HOLDING activity.
+    /// Books fee outflow in ACTIVITY currency.
+    /// Updates net_contribution with cost basis.
     fn handle_add_holding(
         &self,
         activity: &Activity,
         state: &mut AccountStateSnapshot,
         account_currency: &str,
-        fee_acct: Decimal, // Already converted using activity date
+        asset_currency_cache: &mut HashMap<String, String>,
     ) -> Result<()> {
         let activity_currency = &activity.currency;
         let activity_date = activity.activity_date.naive_utc().date();
+        let asset_id = activity.asset_id.as_deref().unwrap_or("");
 
-        let position = self.get_or_create_position_mut(
+        let position = self.get_or_create_position_mut_cached(
             state,
-            &activity.asset_id,
+            asset_id,
             activity_currency,
             activity.activity_date,
+            asset_currency_cache,
         )?;
 
-        // Check if currency conversion is needed and handle accordingly
-        let converted_activity;
-        let activity_to_use =
-            if position.currency.is_empty() || position.currency == activity.currency {
-                // No conversion needed, use original activity directly
-                activity
-            } else {
-                // Conversion needed, convert and store in local variable
-                converted_activity = self.convert_activity_to_position_currency(
+        // Determine position currency and if conversion is needed
+        let position_currency = position.currency.clone();
+        let needs_conversion =
+            !position_currency.is_empty() && position_currency != activity.currency;
+
+        // Get values for lot, converting if needed
+        let (unit_price_for_lot, fee_for_lot, fx_rate_used) = if needs_conversion {
+            let (converted_price, converted_fee, fx_rate) = self
+                .convert_to_position_currency(
+                    activity.price(),
+                    activity.fee_amt(),
                     activity,
-                    position,
-                    &ActivityType::AddHolding,
+                    &position_currency,
                     account_currency,
                 )?;
-                &converted_activity
-            };
+            (converted_price, converted_fee, fx_rate)
+        } else {
+            (activity.price(), activity.fee_amt(), None)
+        };
 
-        let cost_basis_asset_curr = position.add_lot(activity_to_use)?;
-        let position_currency = position.currency.clone();
+        // Use add_lot_values to avoid cloning Activity
+        let cost_basis_asset_curr = position.add_lot_values(
+            activity.id.clone(),
+            activity.qty(),
+            unit_price_for_lot,
+            fee_for_lot,
+            activity.activity_date,
+            fx_rate_used,
+        )?;
 
-        // Adjust cash for fee (already in account currency)
-        *state
-            .cash_balances
-            .entry(account_currency.to_string())
-            .or_insert(Decimal::ZERO) -= fee_acct;
+        // Book fee in ACTIVITY currency
+        add_cash(state, activity_currency, -activity.fee_amt());
 
-        // Convert asset cost basis (in position currency) to account currency
-        let cost_basis_acct_curr_for_deposit = self.convert_position_amount_to_account_currency(
+        // Convert cost basis (in position currency) to account currency for net_contribution
+        let cost_basis_acct_curr = self.convert_position_amount_to_account_currency(
             cost_basis_asset_curr,
             &position_currency,
             activity,
@@ -492,9 +517,9 @@ impl HoldingsCalculator {
             "Net Deposit AddHolding",
         );
 
-        // Convert asset cost basis (in position currency) to base currency
+        // Convert cost basis to base currency
         let base_ccy = self.base_currency.read().unwrap();
-        let cost_basis_base_for_deposit = match self.fx_service.convert_currency_for_date(
+        let cost_basis_base = match self.fx_service.convert_currency_for_date(
             cost_basis_asset_curr,
             &position_currency,
             &base_ccy,
@@ -506,189 +531,183 @@ impl HoldingsCalculator {
                     "Holdings Calc (NetContribBase AddHolding {}): Failed conversion {} {}->{} on {}: {}. Adding unconverted amount to base contribution.",
                     activity.id, cost_basis_asset_curr, position_currency, &base_ccy, activity_date, e
                 );
-                cost_basis_asset_curr // Fallback to unconverted amount
+                cost_basis_asset_curr
             }
         };
 
-        state.net_contribution += cost_basis_acct_curr_for_deposit;
-        state.net_contribution_base += cost_basis_base_for_deposit;
+        state.net_contribution += cost_basis_acct_curr;
+        state.net_contribution_base += cost_basis_base;
         Ok(())
     }
 
+    /// Handle REMOVE_HOLDING activity.
+    /// Books fee outflow in ACTIVITY currency.
+    /// Updates net_contribution with removed cost basis.
     fn handle_remove_holding(
         &self,
         activity: &Activity,
         state: &mut AccountStateSnapshot,
         account_currency: &str,
-        fee_acct: Decimal, // Already converted using activity date
+        _asset_currency_cache: &mut HashMap<String, String>,
     ) -> Result<()> {
-        let mut cost_basis_removed_asset_curr_opt: Option<Decimal> = None;
-        let mut position_currency_opt: Option<String> = None;
-        let mut position_found = false;
+        let activity_currency = &activity.currency;
         let activity_date = activity.activity_date.naive_utc().date();
+        let asset_id = activity.asset_id.as_deref().unwrap_or("");
 
-        {
-            // Block for position borrow
-            if let Some(position) = state.positions.get_mut(&activity.asset_id) {
-                position_found = true;
-                position_currency_opt = Some(position.currency.clone());
-                if position.currency.is_empty() {
-                    warn!("Position {} being removed has no currency set. Cannot calculate net deposit impact accurately.", position.id);
-                }
+        // Book fee in ACTIVITY currency
+        add_cash(state, activity_currency, -activity.fee_amt());
 
-                // Check if currency conversion is needed and handle accordingly
-                let converted_activity;
-                let activity_to_use =
-                    if position.currency.is_empty() || position.currency == activity.currency {
-                        // No conversion needed, use original activity directly
-                        activity
-                    } else {
-                        // Conversion needed, convert and store in local variable
-                        converted_activity = self.convert_activity_to_position_currency(
-                            activity,
-                            position,
-                            &ActivityType::RemoveHolding,
-                            account_currency,
-                        )?;
-                        &converted_activity
-                    };
-
-                let (_qty_reduced, cost_basis_removed) =
-                    position.reduce_lots_fifo(activity_to_use.quantity)?;
-                cost_basis_removed_asset_curr_opt = Some(cost_basis_removed);
+        if let Some(position) = state.positions.get_mut(asset_id) {
+            let position_currency = position.currency.clone();
+            if position_currency.is_empty() {
+                warn!(
+                    "Position {} being removed has no currency set. Cannot calculate net deposit impact accurately.",
+                    position.id
+                );
             }
-        } // Borrow ends
 
-        if position_found {
-            // Adjust cash for fee
-            *state
-                .cash_balances
-                .entry(account_currency.to_string())
-                .or_insert(Decimal::ZERO) -= fee_acct;
+            let (_qty_reduced, cost_basis_removed) =
+                position.reduce_lots_fifo(activity.qty())?;
 
-            // Adjust net deposit if cost basis was removed and currency is known
-            if let (Some(cost_basis_removed_asset_curr), Some(position_currency)) =
-                (cost_basis_removed_asset_curr_opt, position_currency_opt)
-            {
-                if !position_currency.is_empty() && cost_basis_removed_asset_curr != Decimal::ZERO {
-                    // Convert asset cost basis removed (in position currency) to account currency
-                    let cost_basis_removed_acct_curr = self
-                        .convert_position_amount_to_account_currency(
-                            cost_basis_removed_asset_curr,
-                            &position_currency,
-                            activity,
-                            account_currency,
-                            "Net Deposit RemoveHolding",
+            // Update net_contribution with removed cost basis
+            if !position_currency.is_empty() && cost_basis_removed != Decimal::ZERO {
+                let cost_basis_removed_acct = self.convert_position_amount_to_account_currency(
+                    cost_basis_removed,
+                    &position_currency,
+                    activity,
+                    account_currency,
+                    "Net Deposit RemoveHolding",
+                );
+
+                let base_ccy = self.base_currency.read().unwrap();
+                let cost_basis_removed_base = match self.fx_service.convert_currency_for_date(
+                    cost_basis_removed,
+                    &position_currency,
+                    &base_ccy,
+                    activity_date,
+                ) {
+                    Ok(converted) => converted,
+                    Err(e) => {
+                        warn!(
+                            "Holdings Calc (NetContribBase RemoveHolding {}): Failed conversion {} {}->{} on {}: {}. Using unconverted.",
+                            activity.id, cost_basis_removed, position_currency, &base_ccy, activity_date, e
                         );
+                        cost_basis_removed
+                    }
+                };
 
-                    let base_ccy = self.base_currency.read().unwrap();
-                    let cost_basis_removed_base = match self.fx_service.convert_currency_for_date(
-                        cost_basis_removed_asset_curr,
-                        &position_currency,
-                        &base_ccy,
-                        activity_date,
-                    ) {
-                        Ok(converted) => converted,
-                        Err(e) => {
-                            warn!(
-                                "Holdings Calc (NetContribBase RemoveHolding {}): Failed conversion {} {}->{} on {}: {}. Adding unconverted amount to base contribution.",
-                                activity.id, cost_basis_removed_asset_curr, position_currency, &base_ccy, activity_date, e
-                            );
-                            cost_basis_removed_asset_curr // Fallback to unconverted amount
-                        }
-                    };
-
-                    state.net_contribution -= cost_basis_removed_acct_curr;
-                    state.net_contribution_base -= cost_basis_removed_base;
-                } else if position_currency.is_empty() {
-                    // Warning already issued above if currency was empty
-                } // else cost_basis_removed_asset_curr is zero, no change needed
+                state.net_contribution -= cost_basis_removed_acct;
+                state.net_contribution_base -= cost_basis_removed_base;
             }
         } else {
-            warn!("Attempted to RemoveHolding non-existent/zero position {} via activity {}. Applying fee only.",
-                        activity.asset_id, activity.id);
-            *state
-                .cash_balances
-                .entry(account_currency.to_string())
-                .or_insert(Decimal::ZERO) -= fee_acct;
+            warn!(
+                "Attempted to RemoveHolding non-existent position {} via activity {}. Fee applied only.",
+                asset_id, activity.id
+            );
         }
         Ok(())
     }
 
+    /// Handle TRANSFER_IN activity.
+    /// Books cash/asset inflow in ACTIVITY currency.
+    /// Default: INTERNAL (no net_contribution change).
+    /// If metadata.kind == "EXTERNAL", treats as external deposit.
     fn handle_transfer_in(
         &self,
         activity: &Activity,
         state: &mut AccountStateSnapshot,
         account_currency: &str,
-        amount_acct: Decimal, // Already converted (if cash) using activity date
-        fee_acct: Decimal,    // Already converted using activity date
+        asset_currency_cache: &mut HashMap<String, String>,
     ) -> Result<()> {
-        if activity.asset_id.starts_with(CASH_ASSET_PREFIX) {
-            // Cash transfer
-            let base_ccy = self.base_currency.read().unwrap();
-            let activity_date = activity.activity_date.naive_utc().date();
-            let activity_amount = self.get_activity_amount(activity);
+        let activity_currency = &activity.currency;
+        let activity_amount = activity.amt();
+        let asset_id = activity.asset_id.as_deref().unwrap_or("");
 
-            let amount_base = match self.fx_service.convert_currency_for_date(
-                activity_amount,
-                &activity.currency,
-                &base_ccy,
-                activity_date,
-            ) {
-                Ok(c) => c,
-                Err(e) => {
-                    warn!("Holdings Calc (NetContrib TransferIn Cash {}): Failed conversion {} {}->{} on {}: {}. Base contribution not updated.", activity.id, activity_amount, &activity.currency, &base_ccy, activity_date, e);
-                    Decimal::ZERO
-                }
-            };
-            let net_amount_acct = amount_acct - fee_acct;
-            *state
-                .cash_balances
-                .entry(account_currency.to_string())
-                .or_insert(Decimal::ZERO) += net_amount_acct;
-            state.net_contribution += amount_acct; // Use pre-fee amount
-            state.net_contribution_base += amount_base;
-        } else {
-            // Asset transfer
-            let activity_currency = &activity.currency;
-            let activity_date = activity.activity_date.naive_utc().date();
+        // Check if this is an EXTERNAL transfer (affects net_contribution)
+        let is_external = self.is_external_transfer(activity);
 
-            let position = self.get_or_create_position_mut(
-                state,
-                &activity.asset_id,
-                activity_currency,
-                activity.activity_date,
-            )?;
+        if asset_id.starts_with(CASH_ASSET_PREFIX) || asset_id.is_empty() {
+            // Cash transfer: book in ACTIVITY currency
+            let net_amount = activity_amount - activity.fee_amt();
+            add_cash(state, activity_currency, net_amount);
 
-            // Check if currency conversion is needed and handle accordingly
-            let converted_activity;
-            let activity_to_use =
-                if position.currency.is_empty() || position.currency == activity.currency {
-                    // No conversion needed, use original activity directly
-                    activity
-                } else {
-                    // Conversion needed, convert and store in local variable
-                    converted_activity = self.convert_activity_to_position_currency(
-                        activity,
-                        position,
-                        &ActivityType::TransferIn,
-                        account_currency,
-                    )?;
-                    &converted_activity
+            // Only update net_contribution if EXTERNAL
+            if is_external {
+                let activity_date = activity.activity_date.naive_utc().date();
+                let amount_acct = self.convert_to_account_currency(
+                    activity_amount,
+                    activity,
+                    account_currency,
+                    "TransferIn Cash",
+                );
+
+                let base_ccy = self.base_currency.read().unwrap();
+                let amount_base = match self.fx_service.convert_currency_for_date(
+                    activity_amount,
+                    activity_currency,
+                    &base_ccy,
+                    activity_date,
+                ) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        warn!(
+                            "Holdings Calc (NetContrib TransferIn Cash {}): Failed conversion {}: {}.",
+                            activity.id, activity_currency, e
+                        );
+                        Decimal::ZERO
+                    }
                 };
 
-            let cost_basis_asset_curr = position.add_lot(activity_to_use)?;
+                state.net_contribution += amount_acct;
+                state.net_contribution_base += amount_base;
+            }
+        } else {
+            // Asset transfer
+            let activity_date = activity.activity_date.naive_utc().date();
+
+            let position = self.get_or_create_position_mut_cached(
+                state,
+                asset_id,
+                activity_currency,
+                activity.activity_date,
+                asset_currency_cache,
+            )?;
+
             let position_currency = position.currency.clone();
+            let needs_conversion =
+                !position_currency.is_empty() && position_currency != activity.currency;
 
-            // Adjust cash for fee (already in account currency)
-            *state
-                .cash_balances
-                .entry(account_currency.to_string())
-                .or_insert(Decimal::ZERO) -= fee_acct;
+            // Get values for lot, converting if needed
+            let (unit_price_for_lot, fee_for_lot, fx_rate_used) = if needs_conversion {
+                let (converted_price, converted_fee, fx_rate) = self
+                    .convert_to_position_currency(
+                        activity.price(),
+                        activity.fee_amt(),
+                        activity,
+                        &position_currency,
+                        account_currency,
+                    )?;
+                (converted_price, converted_fee, fx_rate)
+            } else {
+                (activity.price(), activity.fee_amt(), None)
+            };
 
-            // Convert asset cost basis (in position currency) to account currency
-            let cost_basis_acct_curr_for_deposit = self
-                .convert_position_amount_to_account_currency(
+            // Use add_lot_values to avoid cloning Activity
+            let cost_basis_asset_curr = position.add_lot_values(
+                activity.id.clone(),
+                activity.qty(),
+                unit_price_for_lot,
+                fee_for_lot,
+                activity.activity_date,
+                fx_rate_used,
+            )?;
+
+            // Book fee in ACTIVITY currency
+            add_cash(state, activity_currency, -activity.fee_amt());
+
+            // Only update net_contribution if EXTERNAL
+            if is_external {
+                let cost_basis_acct = self.convert_position_amount_to_account_currency(
                     cost_basis_asset_curr,
                     &position_currency,
                     activity,
@@ -696,166 +715,141 @@ impl HoldingsCalculator {
                     "Net Deposit TransferIn Asset",
                 );
 
-            // Convert asset cost basis (in position currency) to base currency
-            let base_ccy = self.base_currency.read().unwrap();
-            let cost_basis_base_for_deposit = match self.fx_service.convert_currency_for_date(
-                cost_basis_asset_curr,
-                &position_currency,
-                &base_ccy,
-                activity_date,
-            ) {
-                Ok(converted) => converted,
-                Err(e) => {
-                    warn!(
-                          "Holdings Calc (NetContribBase TransferIn Asset {}): Failed conversion {} {}->{} on {}: {}. Adding unconverted amount to base contribution.",
-                          activity.id, cost_basis_asset_curr, position_currency, &base_ccy, activity_date, e
-                      );
-                    cost_basis_asset_curr // Fallback to unconverted amount
-                }
-            };
-
-            state.net_contribution += cost_basis_acct_curr_for_deposit;
-            state.net_contribution_base += cost_basis_base_for_deposit;
-        }
-        Ok(())
-    }
-
-    fn handle_transfer_out(
-        &self,
-        activity: &Activity,
-        state: &mut AccountStateSnapshot,
-        account_currency: &str,
-        amount_acct: Decimal, // Already converted (if cash) using activity date
-        fee_acct: Decimal,    // Already converted using activity date
-    ) -> Result<()> {
-        if activity.asset_id.starts_with(CASH_ASSET_PREFIX) {
-            // Cash transfer
-            let base_ccy = self.base_currency.read().unwrap();
-            let activity_date = activity.activity_date.naive_utc().date();
-            let activity_amount = self.get_activity_amount(activity);
-
-            let amount_base = match self.fx_service.convert_currency_for_date(
-                activity_amount,
-                &activity.currency,
-                &base_ccy,
-                activity_date,
-            ) {
-                Ok(c) => c,
-                Err(e) => {
-                    warn!("Holdings Calc (NetContrib TransferOut Cash {}): Failed conversion {} {}->{} on {}: {}. Base contribution not updated.", activity.id, activity_amount, &activity.currency, &base_ccy, activity_date, e);
-                    Decimal::ZERO
-                }
-            };
-            let net_amount_acct = amount_acct + fee_acct;
-            *state
-                .cash_balances
-                .entry(account_currency.to_string())
-                .or_insert(Decimal::ZERO) -= net_amount_acct;
-            state.net_contribution -= amount_acct; // Use pre-fee amount
-            state.net_contribution_base -= amount_base;
-        } else {
-            // Asset transfer
-            let mut cost_basis_removed_asset_curr_opt: Option<Decimal> = None;
-            let mut position_currency_opt: Option<String> = None;
-            let mut position_found = false;
-            let activity_date = activity.activity_date.naive_utc().date();
-
-            {
-                // Block for position borrow
-                if let Some(position) = state.positions.get_mut(&activity.asset_id) {
-                    position_found = true;
-                    position_currency_opt = Some(position.currency.clone());
-                    if position.currency.is_empty() {
-                        warn!("Position {} being transferred out has no currency set. Cannot calculate net deposit impact accurately.", position.id);
+                let base_ccy = self.base_currency.read().unwrap();
+                let cost_basis_base = match self.fx_service.convert_currency_for_date(
+                    cost_basis_asset_curr,
+                    &position_currency,
+                    &base_ccy,
+                    activity_date,
+                ) {
+                    Ok(converted) => converted,
+                    Err(e) => {
+                        warn!(
+                            "Holdings Calc (NetContribBase TransferIn Asset {}): Failed conversion: {}.",
+                            activity.id, e
+                        );
+                        cost_basis_asset_curr
                     }
+                };
 
-                    // Check if currency conversion is needed and handle accordingly
-                    let converted_activity;
-                    let activity_to_use =
-                        if position.currency.is_empty() || position.currency == activity.currency {
-                            // No conversion needed, use original activity directly
-                            activity
-                        } else {
-                            // Conversion needed, convert and store in local variable
-                            converted_activity = self.convert_activity_to_position_currency(
-                                activity,
-                                position,
-                                &ActivityType::TransferOut,
-                                account_currency,
-                            )?;
-                            &converted_activity
-                        };
-
-                    let (_qty_reduced, cost_basis_removed) =
-                        position.reduce_lots_fifo(activity_to_use.quantity)?;
-                    cost_basis_removed_asset_curr_opt = Some(cost_basis_removed);
-                }
-            } // Borrow ends
-
-            if position_found {
-                // Adjust cash for fee
-                *state
-                    .cash_balances
-                    .entry(account_currency.to_string())
-                    .or_insert(Decimal::ZERO) -= fee_acct;
-
-                // Adjust net deposit if cost basis was removed and currency is known
-                if let (Some(cost_basis_removed_asset_curr), Some(position_currency)) =
-                    (cost_basis_removed_asset_curr_opt, position_currency_opt)
-                {
-                    if !position_currency.is_empty()
-                        && cost_basis_removed_asset_curr != Decimal::ZERO
-                    {
-                        // Convert asset cost basis removed (in position currency) to account currency
-                        let cost_basis_removed_acct_curr = self
-                            .convert_position_amount_to_account_currency(
-                                cost_basis_removed_asset_curr,
-                                &position_currency,
-                                activity,
-                                account_currency,
-                                "Net Deposit TransferOut Asset",
-                            );
-
-                        let base_ccy = self.base_currency.read().unwrap();
-                        let cost_basis_removed_base = match self
-                            .fx_service
-                            .convert_currency_for_date(
-                                cost_basis_removed_asset_curr,
-                                &position_currency,
-                                &base_ccy,
-                                activity_date,
-                            ) {
-                            Ok(converted) => converted,
-                            Err(e) => {
-                                warn!(
-                                    "Holdings Calc (NetContribBase TransferOut Asset {}): Failed conversion {} {}->{} on {}: {}. Adding unconverted amount to base contribution.",
-                                    activity.id, cost_basis_removed_asset_curr, position_currency, &base_ccy, activity_date, e
-                                );
-                                cost_basis_removed_asset_curr // Fallback to unconverted amount
-                            }
-                        };
-
-                        state.net_contribution -= cost_basis_removed_acct_curr;
-                        state.net_contribution_base -= cost_basis_removed_base;
-                    } else if position_currency.is_empty() {
-                        // Warning already issued above
-                    } // else cost_basis_removed_asset_curr is zero, no change needed
-                }
-            } else {
-                warn!("Attempted to TransferOut non-existent/zero position {} via activity {}. Applying fee only.",
-                             activity.asset_id, activity.id);
-                *state
-                    .cash_balances
-                    .entry(account_currency.to_string())
-                    .or_insert(Decimal::ZERO) -= fee_acct;
+                state.net_contribution += cost_basis_acct;
+                state.net_contribution_base += cost_basis_base;
             }
         }
         Ok(())
     }
 
-    /// Gets amount from activity, handling missing values. Returns ZERO if missing.
-    fn get_activity_amount(&self, activity: &Activity) -> Decimal {
-        activity.amount.unwrap_or(Decimal::ZERO)
+    /// Handle TRANSFER_OUT activity.
+    /// Books cash/asset outflow in ACTIVITY currency.
+    /// Default: INTERNAL (no net_contribution change).
+    /// If metadata.kind == "EXTERNAL", treats as external withdrawal.
+    fn handle_transfer_out(
+        &self,
+        activity: &Activity,
+        state: &mut AccountStateSnapshot,
+        account_currency: &str,
+        _asset_currency_cache: &mut HashMap<String, String>,
+    ) -> Result<()> {
+        let activity_currency = &activity.currency;
+        let activity_amount = activity.amt();
+        let asset_id = activity.asset_id.as_deref().unwrap_or("");
+
+        // Check if this is an EXTERNAL transfer (affects net_contribution)
+        let is_external = self.is_external_transfer(activity);
+
+        if asset_id.starts_with(CASH_ASSET_PREFIX) || asset_id.is_empty() {
+            // Cash transfer: book outflow in ACTIVITY currency (amount + fee)
+            let net_amount = activity_amount + activity.fee_amt();
+            add_cash(state, activity_currency, -net_amount);
+
+            // Only update net_contribution if EXTERNAL
+            if is_external {
+                let activity_date = activity.activity_date.naive_utc().date();
+                let amount_acct = self.convert_to_account_currency(
+                    activity_amount,
+                    activity,
+                    account_currency,
+                    "TransferOut Cash",
+                );
+
+                let base_ccy = self.base_currency.read().unwrap();
+                let amount_base = match self.fx_service.convert_currency_for_date(
+                    activity_amount,
+                    activity_currency,
+                    &base_ccy,
+                    activity_date,
+                ) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        warn!(
+                            "Holdings Calc (NetContrib TransferOut Cash {}): Failed conversion {}: {}.",
+                            activity.id, activity_currency, e
+                        );
+                        Decimal::ZERO
+                    }
+                };
+
+                state.net_contribution -= amount_acct;
+                state.net_contribution_base -= amount_base;
+            }
+        } else {
+            // Asset transfer
+            let activity_date = activity.activity_date.naive_utc().date();
+
+            // Book fee in ACTIVITY currency
+            add_cash(state, activity_currency, -activity.fee_amt());
+
+            if let Some(position) = state.positions.get_mut(asset_id) {
+                let position_currency = position.currency.clone();
+                if position_currency.is_empty() {
+                    warn!(
+                        "Position {} being transferred out has no currency set.",
+                        position.id
+                    );
+                }
+
+                let (_qty_reduced, cost_basis_removed) =
+                    position.reduce_lots_fifo(activity.qty())?;
+
+                // Only update net_contribution if EXTERNAL
+                if is_external && !position_currency.is_empty() && cost_basis_removed != Decimal::ZERO
+                {
+                    let cost_basis_removed_acct = self.convert_position_amount_to_account_currency(
+                        cost_basis_removed,
+                        &position_currency,
+                        activity,
+                        account_currency,
+                        "Net Deposit TransferOut Asset",
+                    );
+
+                    let base_ccy = self.base_currency.read().unwrap();
+                    let cost_basis_removed_base = match self.fx_service.convert_currency_for_date(
+                        cost_basis_removed,
+                        &position_currency,
+                        &base_ccy,
+                        activity_date,
+                    ) {
+                        Ok(converted) => converted,
+                        Err(e) => {
+                            warn!(
+                                "Holdings Calc (NetContribBase TransferOut Asset {}): Failed conversion: {}.",
+                                activity.id, e
+                            );
+                            cost_basis_removed
+                        }
+                    };
+
+                    state.net_contribution -= cost_basis_removed_acct;
+                    state.net_contribution_base -= cost_basis_removed_base;
+                }
+            } else {
+                warn!(
+                    "Attempted to TransferOut non-existent position {} via activity {}. Fee applied only.",
+                    asset_id, activity.id
+                );
+            }
+        }
+        Ok(())
     }
 
     /// Converts an amount from activity currency to account currency.
@@ -972,127 +966,15 @@ impl HoldingsCalculator {
         }
     }
 
-    /// Helper to convert unit_price and fee via FxService for position currency conversion.
-    fn convert_amounts_via_fx_service(
-        &self,
-        activity: &Activity,
-        position: &Position,
-        activity_type: &ActivityType,
-        activity_date: NaiveDate,
-    ) -> Result<(Decimal, Decimal)> {
-        let converted_unit_price = self
-            .fx_service
-            .convert_currency_for_date(
-                activity.unit_price,
-                &activity.currency,
-                &position.currency,
-                activity_date,
-            )
-            .map_err(|e| {
-                CalculatorError::CurrencyConversion(format!(
-                    "Failed to convert {:?} activity {} unit price from {} to position currency {}: {}",
-                    activity_type, activity.id, activity.currency, position.currency, e
-                ))
-            })?;
-
-        let converted_fee = self
-            .fx_service
-            .convert_currency_for_date(
-                activity.fee,
-                &activity.currency,
-                &position.currency,
-                activity_date,
-            )
-            .map_err(|e| {
-                CalculatorError::CurrencyConversion(format!(
-                    "Failed to convert {:?} activity {} fee from {} to position currency {}: {}",
-                    activity_type, activity.id, activity.currency, position.currency, e
-                ))
-            })?;
-
-        Ok((converted_unit_price, converted_fee))
-    }
-
-    /// Converts an activity to match the position's currency if needed.
-    /// Returns a converted activity only when conversion is actually required.
-    /// If the activity has a valid fx_rate and position currency matches account currency,
-    /// the fx_rate will be used for conversion instead of the FxService.
-    fn convert_activity_to_position_currency(
-        &self,
-        activity: &Activity,
-        position: &Position,
-        activity_type: &ActivityType,
-        account_currency: &str,
-    ) -> Result<Activity> {
-        // Early return without cloning if no conversion is needed
-        if position.currency.is_empty() || position.currency == activity.currency {
-            return Err(CalculatorError::InvalidActivity(
-                "convert_activity_to_position_currency should only be called when conversion is needed".to_string()
-            ).into());
-        }
-
-        let activity_date = activity.activity_date.naive_utc().date();
-
-        // Determine when we can use the activity's fx_rate for position currency conversion:
-        //
-        // The fx_rate field has contextual meaning:
-        // 1. If activity_currency != account_currency: fx_rate converts activity -> account
-        // 2. If activity_currency == account_currency: fx_rate converts activity -> position
-        //    (since no account conversion is needed, the rate must be for position conversion)
-        //
-        // Case 1: position_currency == account_currency AND activity_currency != account_currency
-        //         -> fx_rate converts activity -> account, which is the same as activity -> position
-        //         -> Can use fx_rate
-        //
-        // Case 2: activity_currency == account_currency AND position_currency != account_currency
-        //         -> fx_rate is specifically for converting activity -> position
-        //         -> Can use fx_rate
-        //
-        // Case 3: All three currencies are different
-        //         -> fx_rate converts activity -> account, but we need activity -> position
-        //         -> Cannot use fx_rate, must use FxService
-        let can_use_fx_rate =
-            position.currency == account_currency || activity.currency == account_currency;
-
-        let (converted_unit_price, converted_fee) = if can_use_fx_rate {
-            if let Some(fx_rate) = activity.fx_rate.filter(|r| *r != Decimal::ZERO) {
-                debug!(
-                    "Using activity fx_rate {} for {:?} activity {} conversion {} -> {}",
-                    fx_rate, activity_type, activity.id, activity.currency, position.currency
-                );
-                (activity.unit_price * fx_rate, activity.fee * fx_rate)
-            } else {
-                // Fall back to FxService
-                self.convert_amounts_via_fx_service(
-                    activity,
-                    position,
-                    activity_type,
-                    activity_date,
-                )?
-            }
-        } else {
-            // All three currencies differ - fx_rate is for account conversion, not position
-            // Must use FxService for activity -> position conversion
-            self.convert_amounts_via_fx_service(activity, position, activity_type, activity_date)?
-        };
-
-        // Create converted activity only when actually needed
-        let mut converted_activity = activity.clone();
-        converted_activity.unit_price = converted_unit_price;
-        converted_activity.fee = converted_fee;
-        converted_activity.currency = position.currency.clone();
-
-        Ok(converted_activity)
-    }
-
-    /// Helper method to get/create position. Sets Position currency based on the asset's listing currency.
-    /// Falls back to activity currency if asset listing currency cannot be determined.
-    fn get_or_create_position_mut<'a>(
+    /// Helper method to get/create position with asset currency caching.
+    /// Uses cache to avoid repeated DB lookups for the same asset.
+    fn get_or_create_position_mut_cached<'a>(
         &self,
         state: &'a mut AccountStateSnapshot,
         asset_id: &str,
-        activity_currency: &str, // Currency from the activity (used as fallback)
+        activity_currency: &str,
         date: DateTime<Utc>,
+        cache: &mut HashMap<String, String>,
     ) -> std::result::Result<&'a mut Position, CalculatorError> {
         if asset_id.is_empty() || asset_id.starts_with(CASH_ASSET_PREFIX) {
             return Err(CalculatorError::InvalidActivity(format!(
@@ -1100,18 +982,27 @@ impl HoldingsCalculator {
                 asset_id
             )));
         }
+
         Ok(state
             .positions
             .entry(asset_id.to_string())
             .or_insert_with(|| {
-                // Create new position using the asset's listing currency
-                let position_currency = self.get_position_currency(asset_id).unwrap_or_else(|_| {
-                    warn!(
-                        "Failed to get asset currency for {}, using activity currency {}",
-                        asset_id, activity_currency
-                    );
-                    activity_currency.to_string()
-                });
+                // Check cache first
+                let position_currency = if let Some(ccy) = cache.get(asset_id) {
+                    ccy.clone()
+                } else {
+                    // Lookup from asset repository
+                    let ccy = self.get_position_currency(asset_id).unwrap_or_else(|_| {
+                        warn!(
+                            "Failed to get asset currency for {}, using activity currency {}",
+                            asset_id, activity_currency
+                        );
+                        activity_currency.to_string()
+                    });
+                    cache.insert(asset_id.to_string(), ccy.clone());
+                    ccy
+                };
+
                 Position::new(
                     state.account_id.clone(),
                     asset_id.to_string(),
@@ -1119,5 +1010,138 @@ impl HoldingsCalculator {
                     date,
                 )
             }))
+    }
+
+    /// Converts unit_price and fee to position currency.
+    /// Returns (converted_price, converted_fee, fx_rate_used).
+    fn convert_to_position_currency(
+        &self,
+        unit_price: Decimal,
+        fee: Decimal,
+        activity: &Activity,
+        position_currency: &str,
+        account_currency: &str,
+    ) -> Result<(Decimal, Decimal, Option<Decimal>)> {
+        let activity_date = activity.activity_date.naive_utc().date();
+
+        // Determine when we can use the activity's fx_rate for position currency conversion
+        let can_use_fx_rate =
+            position_currency == account_currency || activity.currency == account_currency;
+
+        if can_use_fx_rate {
+            if let Some(fx_rate) = activity.fx_rate.filter(|r| *r != Decimal::ZERO) {
+                debug!(
+                    "Using activity fx_rate {} for position currency conversion {} -> {} (activity {})",
+                    fx_rate, activity.currency, position_currency, activity.id
+                );
+                return Ok((unit_price * fx_rate, fee * fx_rate, Some(fx_rate)));
+            }
+        }
+
+        // Fall back to FxService
+        let converted_price = self
+            .fx_service
+            .convert_currency_for_date(unit_price, &activity.currency, position_currency, activity_date)
+            .map_err(|e| {
+                CalculatorError::CurrencyConversion(format!(
+                    "Failed to convert unit_price from {} to {}: {}",
+                    activity.currency, position_currency, e
+                ))
+            })?;
+
+        let converted_fee = self
+            .fx_service
+            .convert_currency_for_date(fee, &activity.currency, position_currency, activity_date)
+            .map_err(|e| {
+                CalculatorError::CurrencyConversion(format!(
+                    "Failed to convert fee from {} to {}: {}",
+                    activity.currency, position_currency, e
+                ))
+            })?;
+
+        // Calculate implied fx_rate for audit trail
+        let fx_rate_used = if unit_price != Decimal::ZERO {
+            Some(converted_price / unit_price)
+        } else {
+            None
+        };
+
+        Ok((converted_price, converted_fee, fx_rate_used))
+    }
+
+    /// Checks if a transfer activity is marked as EXTERNAL in metadata.
+    /// EXTERNAL transfers affect net_contribution (like DEPOSIT/WITHDRAWAL).
+    /// Default is INTERNAL (no net_contribution effect).
+    ///
+    /// Metadata structure: `{"flow": {"is_external": true}}`
+    /// - If no `flow` key, or no `is_external` key, or `is_external` is false → INTERNAL
+    /// - If `flow.is_external` is true → EXTERNAL
+    fn is_external_transfer(&self, activity: &Activity) -> bool {
+        if let Some(ref metadata) = activity.metadata {
+            // Check for metadata.flow.is_external == true
+            if let Some(flow) = metadata.get("flow") {
+                if let Some(is_external) = flow.get("is_external").and_then(|v| v.as_bool()) {
+                    return is_external;
+                }
+            }
+        }
+        false // Default to INTERNAL
+    }
+
+    /// Computes cash totals in account and base currencies.
+    /// Called once at end of daily calculation per spec.
+    fn compute_cash_totals(&self, state: &mut AccountStateSnapshot, target_date: NaiveDate) {
+        let account_currency = &state.currency;
+        let base_ccy = self.base_currency.read().unwrap();
+
+        let mut total_acct = Decimal::ZERO;
+        let mut total_base = Decimal::ZERO;
+
+        for (currency, &amount) in &state.cash_balances {
+            // Convert to account currency
+            if currency == account_currency {
+                total_acct += amount;
+            } else {
+                match self.fx_service.convert_currency_for_date(
+                    amount,
+                    currency,
+                    account_currency,
+                    target_date,
+                ) {
+                    Ok(converted) => total_acct += converted,
+                    Err(e) => {
+                        warn!(
+                            "Failed to convert cash {} {} to account currency {}: {}. Using unconverted.",
+                            amount, currency, account_currency, e
+                        );
+                        total_acct += amount;
+                    }
+                }
+            }
+
+            // Convert to base currency
+            if currency == base_ccy.as_str() {
+                total_base += amount;
+            } else {
+                match self.fx_service.convert_currency_for_date(
+                    amount,
+                    currency,
+                    &base_ccy,
+                    target_date,
+                ) {
+                    Ok(converted) => total_base += converted,
+                    Err(e) => {
+                        warn!(
+                            "Failed to convert cash {} {} to base currency {}: {}. Using unconverted.",
+                            amount, currency, &base_ccy, e
+                        );
+                        total_base += amount;
+                    }
+                }
+            }
+        }
+
+        state.cash_total_account_currency = total_acct;
+        state.cash_total_base_currency = total_base;
     }
 }

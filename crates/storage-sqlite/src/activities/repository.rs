@@ -58,6 +58,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
             .filter(accounts::is_active.eq(true))
             .filter(activities::activity_type.eq_any(TRADING_ACTIVITY_TYPES))
+            .filter(activities::status.eq("POSTED")) // Only posted activities
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
             .load::<ActivityDB>(&mut conn)
@@ -73,6 +74,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
             .filter(accounts::is_active.eq(true))
             .filter(activities::activity_type.eq_any(INCOME_ACTIVITY_TYPES))
+            .filter(activities::status.eq("POSTED")) // Only posted activities
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
             .load::<ActivityDB>(&mut conn)
@@ -87,6 +89,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
         let activities_db = activities::table
             .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
             .filter(accounts::is_active.eq(true))
+            .filter(activities::status.eq("POSTED")) // Only posted activities
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
             .load::<ActivityDB>(&mut conn)
@@ -103,17 +106,17 @@ impl ActivityRepositoryTrait for ActivityRepository {
         activity_type_filter: Option<Vec<String>>, // Optional activity_type filter
         asset_id_keyword: Option<String>,          // Optional asset_id keyword for search
         sort: Option<Sort>,                        // Optional sort
-        is_draft_filter: Option<bool>,             // Optional is_draft filter
+        needs_review_filter: Option<bool>,           // Optional needs_review filter (maps to DRAFT status)
     ) -> Result<ActivitySearchResponse> {
         let mut conn = get_connection(&self.pool)?;
 
         let offset = page * page_size;
 
-        // Function to create base query
+        // Function to create base query - now using LEFT JOIN for assets since asset_id can be NULL
         let create_base_query = |_conn: &SqliteConnection| {
             let mut query = activities::table
                 .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
-                .inner_join(assets::table.on(activities::asset_id.eq(assets::id)))
+                .left_join(assets::table.on(activities::asset_id.eq(assets::id.nullable())))
                 .filter(accounts::is_active.eq(true))
                 .into_boxed();
 
@@ -126,8 +129,13 @@ impl ActivityRepositoryTrait for ActivityRepository {
             if let Some(ref keyword) = asset_id_keyword {
                 query = query.filter(assets::id.like(format!("%{}%", keyword)));
             }
-            if let Some(is_draft) = is_draft_filter {
-                query = query.filter(activities::is_draft.eq(is_draft));
+            // Map needs_review_filter to status filter (DRAFT status means needs review)
+            if let Some(needs_review) = needs_review_filter {
+                if needs_review {
+                    query = query.filter(activities::status.eq("DRAFT"));
+                } else {
+                    query = query.filter(activities::status.ne("DRAFT"));
+                }
             }
 
             // Apply sorting
@@ -190,29 +198,36 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .get_result::<i64>(&mut conn)
             .map_err(StorageError::from)?;
 
-        // Data fetching query
+        // Data fetching query - updated to match new schema fields
         let results_db = create_base_query(&conn)
             .select((
                 activities::id,
                 activities::account_id,
                 activities::asset_id,
                 activities::activity_type,
+                activities::subtype,
+                activities::status,
                 activities::activity_date,
                 activities::quantity,
                 activities::unit_price,
                 activities::currency,
                 activities::fee,
                 activities::amount,
-                activities::is_draft,
-                activities::comment,
+                activities::notes,
                 activities::fx_rate,
+                activities::needs_review,
+                activities::is_user_modified,
+                activities::source_system,
+                activities::source_record_id,
+                activities::idempotency_key,
+                activities::import_run_id,
                 activities::created_at,
                 activities::updated_at,
                 accounts::name,
                 accounts::currency,
-                assets::symbol,
-                assets::name,
-                assets::data_source,
+                assets::symbol.nullable(),
+                assets::name.nullable(),
+                assets::data_source.nullable(),
             ))
             .limit(page_size)
             .offset(offset)
@@ -258,12 +273,20 @@ impl ActivityRepositoryTrait for ActivityRepository {
                     .first::<ActivityDB>(conn)
                     .map_err(StorageError::from)?;
 
+                // Preserve fields from existing record that shouldn't be overwritten
                 let ActivityDB {
                     created_at,
                     fx_rate,
-                    provider_type,
-                    external_provider_id,
-                    external_broker_id,
+                    source_system,
+                    source_record_id,
+                    source_group_id,
+                    idempotency_key,
+                    import_run_id,
+                    activity_type_override,
+                    source_type,
+                    subtype,
+                    settlement_date,
+                    metadata,
                     ..
                 } = existing;
 
@@ -271,14 +294,37 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 if activity_to_update.fx_rate.is_none() {
                     activity_to_update.fx_rate = fx_rate;
                 }
-                if activity_to_update.provider_type.is_none() {
-                    activity_to_update.provider_type = provider_type;
+                // Preserve source identity fields
+                if activity_to_update.source_system.is_none() {
+                    activity_to_update.source_system = source_system;
                 }
-                if activity_to_update.external_provider_id.is_none() {
-                    activity_to_update.external_provider_id = external_provider_id;
+                if activity_to_update.source_record_id.is_none() {
+                    activity_to_update.source_record_id = source_record_id;
                 }
-                if activity_to_update.external_broker_id.is_none() {
-                    activity_to_update.external_broker_id = external_broker_id;
+                if activity_to_update.source_group_id.is_none() {
+                    activity_to_update.source_group_id = source_group_id;
+                }
+                if activity_to_update.idempotency_key.is_none() {
+                    activity_to_update.idempotency_key = idempotency_key;
+                }
+                if activity_to_update.import_run_id.is_none() {
+                    activity_to_update.import_run_id = import_run_id;
+                }
+                // Preserve classification fields
+                if activity_to_update.activity_type_override.is_none() {
+                    activity_to_update.activity_type_override = activity_type_override;
+                }
+                if activity_to_update.source_type.is_none() {
+                    activity_to_update.source_type = source_type;
+                }
+                if activity_to_update.subtype.is_none() {
+                    activity_to_update.subtype = subtype;
+                }
+                if activity_to_update.settlement_date.is_none() {
+                    activity_to_update.settlement_date = settlement_date;
+                }
+                if activity_to_update.metadata.is_none() {
+                    activity_to_update.metadata = metadata;
                 }
                 activity_to_update.updated_at = chrono::Utc::now().to_rfc3339();
 
@@ -340,12 +386,20 @@ impl ActivityRepositoryTrait for ActivityRepository {
                             .first::<ActivityDB>(conn)
                             .map_err(StorageError::from)?;
 
+                        // Preserve fields from existing record
                         let ActivityDB {
                             created_at,
                             fx_rate,
-                            provider_type,
-                            external_provider_id,
-                            external_broker_id,
+                            source_system,
+                            source_record_id,
+                            source_group_id,
+                            idempotency_key,
+                            import_run_id,
+                            activity_type_override,
+                            source_type,
+                            subtype,
+                            settlement_date,
+                            metadata,
                             ..
                         } = existing;
 
@@ -353,14 +407,35 @@ impl ActivityRepositoryTrait for ActivityRepository {
                         if activity_db.fx_rate.is_none() {
                             activity_db.fx_rate = fx_rate;
                         }
-                        if activity_db.provider_type.is_none() {
-                            activity_db.provider_type = provider_type;
+                        if activity_db.source_system.is_none() {
+                            activity_db.source_system = source_system;
                         }
-                        if activity_db.external_provider_id.is_none() {
-                            activity_db.external_provider_id = external_provider_id;
+                        if activity_db.source_record_id.is_none() {
+                            activity_db.source_record_id = source_record_id;
                         }
-                        if activity_db.external_broker_id.is_none() {
-                            activity_db.external_broker_id = external_broker_id;
+                        if activity_db.source_group_id.is_none() {
+                            activity_db.source_group_id = source_group_id;
+                        }
+                        if activity_db.idempotency_key.is_none() {
+                            activity_db.idempotency_key = idempotency_key;
+                        }
+                        if activity_db.import_run_id.is_none() {
+                            activity_db.import_run_id = import_run_id;
+                        }
+                        if activity_db.activity_type_override.is_none() {
+                            activity_db.activity_type_override = activity_type_override;
+                        }
+                        if activity_db.source_type.is_none() {
+                            activity_db.source_type = source_type;
+                        }
+                        if activity_db.subtype.is_none() {
+                            activity_db.subtype = subtype;
+                        }
+                        if activity_db.settlement_date.is_none() {
+                            activity_db.settlement_date = settlement_date;
+                        }
+                        if activity_db.metadata.is_none() {
+                            activity_db.metadata = metadata;
                         }
                         activity_db.updated_at = chrono::Utc::now().to_rfc3339();
 
@@ -408,6 +483,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
             .filter(accounts::is_active.eq(true))
             .filter(activities::account_id.eq(account_id))
+            .filter(activities::status.eq("POSTED")) // Only posted activities
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
             .load::<ActivityDB>(&mut conn)
@@ -424,6 +500,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
             .filter(accounts::is_active.eq(true))
             .filter(activities::account_id.eq_any(account_ids))
+            .filter(activities::status.eq("POSTED")) // Only posted activities
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
             .load::<ActivityDB>(&mut conn)
@@ -455,6 +532,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 FROM activities
                 WHERE account_id = ?1 AND asset_id = ?2
                   AND activity_type IN ('BUY', 'TRANSFER_IN')
+                  AND status = 'POSTED'
             )
             SELECT
                 CASE
@@ -546,6 +624,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .filter(accounts::id.eq_any(account_ids))
             .filter(accounts::is_active.eq(true))
             .filter(activities::activity_type.eq("DEPOSIT"))
+            .filter(activities::status.eq("POSTED")) // Only posted activities
             .filter(activities::activity_date.between(
                 Utc.from_utc_datetime(&start_date).to_rfc3339(),
                 Utc.from_utc_datetime(&end_date).to_rfc3339(),
@@ -557,7 +636,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 activities::currency,
                 activities::amount,
             ))
-            .load::<(String, String, String, String, Option<String>)>(&mut conn)
+            .load::<(String, Option<String>, Option<String>, String, Option<String>)>(&mut conn)
             .map_err(ActivityError::from)?;
 
         // Convert string values to Decimal
@@ -566,8 +645,14 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .map(|(account_id, quantity, unit_price, currency, amount)| {
                 Ok((
                     account_id,
-                    Decimal::from_str(&quantity)?,
-                    Decimal::from_str(&unit_price)?,
+                    quantity
+                        .map(|q| Decimal::from_str(&q))
+                        .transpose()?
+                        .unwrap_or(Decimal::ZERO),
+                    unit_price
+                        .map(|p| Decimal::from_str(&p))
+                        .transpose()?
+                        .unwrap_or(Decimal::ZERO),
                     currency,
                     amount.map(|a| Decimal::from_str(&a)).transpose()?,
                 ))
@@ -583,15 +668,16 @@ impl ActivityRepositoryTrait for ActivityRepository {
 
         let query = "SELECT strftime('%Y-%m', a.activity_date) as date,
              a.activity_type as income_type,
-             a.asset_id as symbol,
-             COALESCE(ast.name, 'Unknown') as symbol_name,
+             COALESCE(a.asset_id, 'CASH') as symbol,
+             COALESCE(ast.name, 'Cash') as symbol_name,
              a.currency,
-             a.amount
+             COALESCE(a.amount, '0') as amount
              FROM activities a
              LEFT JOIN assets ast ON a.asset_id = ast.id
              INNER JOIN accounts acc ON a.account_id = acc.id
              WHERE a.activity_type IN ('DIVIDEND', 'INTEREST', 'OTHER_INCOME')
              AND acc.is_active = 1
+             AND a.status = 'POSTED'
              ORDER BY a.activity_date";
 
         // Define a struct to hold the raw query results
@@ -640,6 +726,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
         let min_date_str = activities::table
             .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
             .filter(accounts::is_active.eq(true))
+            .filter(activities::status.eq("POSTED")) // Only posted activities
             .select(min(activities::activity_date))
             .first::<Option<String>>(&mut conn)
             .map_err(StorageError::from)?
@@ -661,6 +748,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
         let mut query = activities::table
             .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
             .filter(accounts::is_active.eq(true))
+            .filter(activities::status.eq("POSTED")) // Only posted activities
             .select(min(activities::activity_date))
             .into_boxed();
 

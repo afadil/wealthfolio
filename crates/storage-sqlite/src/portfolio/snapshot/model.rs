@@ -36,6 +36,10 @@ pub struct AccountStateSnapshotDB {
     pub calculated_at: String,
     #[diesel(sql_type = Text)]
     pub net_contribution_base: String,
+    #[diesel(sql_type = Text)]
+    pub cash_total_account_currency: String,
+    #[diesel(sql_type = Text)]
+    pub cash_total_base_currency: String,
 }
 
 // Conversion from DB model to Domain model
@@ -52,6 +56,10 @@ impl From<AccountStateSnapshotDB> for AccountStateSnapshot {
             cost_basis: Decimal::from_str(&db.cost_basis).unwrap_or_default(),
             net_contribution: Decimal::from_str(&db.net_contribution).unwrap_or_default(),
             net_contribution_base: Decimal::from_str(&db.net_contribution_base).unwrap_or_default(),
+            cash_total_account_currency: Decimal::from_str(&db.cash_total_account_currency)
+                .unwrap_or_default(),
+            cash_total_base_currency: Decimal::from_str(&db.cash_total_base_currency)
+                .unwrap_or_default(),
             calculated_at: NaiveDateTime::parse_from_str(
                 &db.calculated_at,
                 "%Y-%m-%dT%H:%M:%S%.fZ",
@@ -87,6 +95,14 @@ impl From<AccountStateSnapshot> for AccountStateSnapshotDB {
                 .to_string(),
             net_contribution_base: domain
                 .net_contribution_base
+                .round_dp(DECIMAL_PRECISION)
+                .to_string(),
+            cash_total_account_currency: domain
+                .cash_total_account_currency
+                .round_dp(DECIMAL_PRECISION)
+                .to_string(),
+            cash_total_base_currency: domain
+                .cash_total_base_currency
                 .round_dp(DECIMAL_PRECISION)
                 .to_string(),
             calculated_at: domain

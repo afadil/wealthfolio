@@ -1,5 +1,49 @@
-import { Button, Icons } from "@wealthfolio/ui";
-import type { ChangesSummary } from "./types";
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  Icons,
+} from "@wealthfolio/ui";
+import type { Table } from "@tanstack/react-table";
+import type { ChangesSummary, LocalTransaction } from "./types";
+
+// Column display names for the visibility menu
+const COLUMN_DISPLAY_NAMES: Record<string, string> = {
+  activityType: "Type",
+  subtype: "Subtype",
+  activityStatus: "Status",
+  date: "Date & Time",
+  assetSymbol: "Symbol",
+  quantity: "Quantity",
+  unitPrice: "Price",
+  amount: "Amount",
+  fee: "Fee",
+  fxRate: "FX Rate",
+  accountName: "Account",
+  currency: "Currency",
+  comment: "Comment",
+};
+
+// Columns that can be toggled (exclude select, status indicator, actions)
+const TOGGLEABLE_COLUMNS = [
+  "activityType",
+  "subtype",
+  "activityStatus",
+  "date",
+  "assetSymbol",
+  "quantity",
+  "unitPrice",
+  "amount",
+  "fee",
+  "fxRate",
+  "accountName",
+  "currency",
+  "comment",
+];
 
 interface ActivityDataGridToolbarProps {
   /** Number of rows currently selected */
@@ -12,6 +56,8 @@ interface ActivityDataGridToolbarProps {
   changesSummary: ChangesSummary;
   /** Whether a save operation is in progress */
   isSaving: boolean;
+  /** Table instance for column visibility */
+  table: Table<LocalTransaction>;
   /** Handler for adding a new row */
   onAddRow: () => void;
   /** Handler for deleting selected rows */
@@ -34,6 +80,7 @@ export function ActivityDataGridToolbar({
   hasUnsavedChanges,
   changesSummary,
   isSaving,
+  table,
   onAddRow,
   onDeleteSelected,
   onApproveSelected,
@@ -103,6 +150,38 @@ export function ActivityDataGridToolbar({
           <Icons.Plus className="h-3.5 w-3.5" />
           <span>Add</span>
         </Button>
+
+        {/* Column visibility dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="xs"
+              className="shrink-0 rounded-md px-2"
+              title="Toggle columns"
+              aria-label="Toggle columns"
+            >
+              <Icons.Settings2 className="h-3.5 w-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuLabel className="text-xs">Toggle columns</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {table
+              .getAllColumns()
+              .filter((column) => TOGGLEABLE_COLUMNS.includes(column.id))
+              .map((column) => (
+                <DropdownMenuCheckboxItem
+                  key={column.id}
+                  className="text-xs"
+                  checked={column.getIsVisible()}
+                  onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                >
+                  {COLUMN_DISPLAY_NAMES[column.id] || column.id}
+                </DropdownMenuCheckboxItem>
+              ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {selectedRowCount > 0 && (
           <>

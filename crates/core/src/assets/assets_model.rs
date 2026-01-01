@@ -1,7 +1,9 @@
 //! Asset domain models.
 
 use chrono::NaiveDateTime;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::errors::Result;
 use crate::errors::ValidationError;
@@ -9,6 +11,36 @@ use crate::market_data::DataSource;
 use crate::Error;
 
 use super::assets_constants::*;
+
+/// Asset behavior classification
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum AssetKind {
+    #[default]
+    Security, // Stocks, ETFs, bonds, funds
+    Crypto,        // Cryptocurrencies
+    Cash,          // Holdable cash position ($CASH-USD)
+    FxRate,        // Currency exchange rate (not holdable)
+    Option,        // Options contracts
+    Commodity,     // Physical commodities
+    PrivateEquity, // Private shares, startup equity
+    Property,      // Real estate
+    Vehicle,       // Vehicles
+    Liability,     // Debts (negative value)
+    Other,         // Anything else
+}
+
+/// Option contract specification stored in Asset.metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OptionSpec {
+    pub underlying_asset_id: String,
+    pub expiration: chrono::NaiveDate,
+    pub right: String, // CALL or PUT
+    pub strike: Decimal,
+    pub multiplier: Decimal,
+    pub occ_symbol: Option<String>,
+}
 
 /// Domain model representing an asset in the system
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -33,6 +65,50 @@ pub struct Asset {
     pub data_source: String,
     pub sectors: Option<String>,
     pub url: Option<String>,
+    // New fields for Activity System Redesign
+    pub kind: Option<AssetKind>, // Behavior classification (nullable for migration)
+    pub quote_symbol: Option<String>, // Symbol for pricing lookup
+    #[serde(default = "default_is_active")]
+    pub is_active: bool, // 1/0 for usability
+    pub metadata: Option<Value>, // JSON for extensions
+}
+
+fn default_is_active() -> bool {
+    true
+}
+
+impl Asset {
+    /// Check if this asset is holdable (can have positions)
+    pub fn is_holdable(&self) -> bool {
+        match self.kind {
+            Some(AssetKind::FxRate) => false,
+            _ => true,
+        }
+    }
+
+    /// Check if this asset needs pricing
+    pub fn needs_pricing(&self) -> bool {
+        match self.kind {
+            Some(AssetKind::Cash) => false, // Always 1:1 in its currency
+            _ => true,
+        }
+    }
+
+    /// Get option metadata if this is an option
+    pub fn option_spec(&self) -> Option<OptionSpec> {
+        if self.kind != Some(AssetKind::Option) {
+            return None;
+        }
+        self.metadata
+            .as_ref()
+            .and_then(|m| m.get("option"))
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+    }
+
+    /// Get the effective kind, defaulting to Security if not set
+    pub fn effective_kind(&self) -> AssetKind {
+        self.kind.clone().unwrap_or(AssetKind::Security)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -85,6 +161,12 @@ pub struct NewAsset {
     pub data_source: String,
     pub sectors: Option<String>,
     pub url: Option<String>,
+    // New fields for Activity System Redesign
+    pub kind: Option<AssetKind>,      // Behavior classification
+    pub quote_symbol: Option<String>, // Symbol for pricing lookup
+    #[serde(default = "default_is_active")]
+    pub is_active: bool, // 1/0 for usability
+    pub metadata: Option<Value>,      // JSON for extensions
 }
 
 impl NewAsset {
@@ -114,6 +196,8 @@ impl NewAsset {
             asset_class: Some(CASH_ASSET_CLASS.to_string()),
             asset_sub_class: Some(CASH_ASSET_CLASS.to_string()),
             data_source: DataSource::Manual.as_str().to_string(),
+            kind: Some(AssetKind::Cash),
+            is_active: true,
             ..Default::default()
         }
     }
@@ -137,6 +221,8 @@ impl NewAsset {
             asset_sub_class: Some(CASH_ASSET_CLASS.to_string()),
             notes: Some(notes),
             data_source: source.to_string(),
+            kind: Some(AssetKind::FxRate),
+            is_active: true,
             ..Default::default()
         }
     }
@@ -162,6 +248,11 @@ impl From<crate::market_data::providers::models::AssetProfile> for NewAsset {
             data_source: profile.data_source,
             sectors: profile.sectors,
             url: profile.url,
+            // New fields default to None/true for migration compatibility
+            kind: None,
+            quote_symbol: None,
+            is_active: true,
+            metadata: None,
         }
     }
 }

@@ -1,13 +1,21 @@
 import { searchTicker } from "@/commands/market-data";
-import { ActivityType, ActivityTypeNames } from "@/lib/constants";
+import { ActivityType, ActivityTypeNames, ActivityStatus, SUBTYPE_DISPLAY_NAMES } from "@/lib/constants";
 import type { Account, ActivityDetails } from "@/lib/types";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Checkbox, type SymbolSearchResult } from "@wealthfolio/ui";
+import { Badge, Checkbox, type SymbolSearchResult } from "@wealthfolio/ui";
 import { useCallback, useMemo } from "react";
 import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";
 import { StatusHeaderIndicator, StatusIndicator } from "./status-indicator";
 import { isPendingReview, type LocalTransaction } from "./types";
+
+// Status display names and colors
+const STATUS_DISPLAY: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
+  [ActivityStatus.POSTED]: { label: "Posted", variant: "default" },
+  [ActivityStatus.PENDING]: { label: "Pending", variant: "secondary" },
+  [ActivityStatus.DRAFT]: { label: "Draft", variant: "outline" },
+  [ActivityStatus.VOID]: { label: "Void", variant: "destructive" },
+};
 
 interface UseActivityColumnsOptions {
   accounts: Account[];
@@ -114,6 +122,38 @@ export function useActivityColumns({
               <ActivityTypeBadge type={value as ActivityType} className="text-xs font-normal" />
             ),
           },
+        },
+      },
+      {
+        id: "subtype",
+        accessorKey: "subtype",
+        header: "Subtype",
+        size: 140,
+        enableSorting: false,
+        enableHiding: true,
+        cell: ({ row }) => {
+          const subtype = row.original.subtype;
+          if (!subtype) return <span className="text-muted-foreground">—</span>;
+          const displayName = SUBTYPE_DISPLAY_NAMES[subtype] || subtype;
+          return <span className="text-xs">{displayName}</span>;
+        },
+      },
+      {
+        id: "activityStatus",
+        accessorKey: "status",
+        header: "Status",
+        size: 100,
+        enableSorting: false,
+        enableHiding: true,
+        cell: ({ row }) => {
+          const status = row.original.status;
+          if (!status) return <span className="text-muted-foreground">—</span>;
+          const displayInfo = STATUS_DISPLAY[status] || { label: status, variant: "default" as const };
+          return (
+            <Badge variant={displayInfo.variant} className="text-xs font-normal">
+              {displayInfo.label}
+            </Badge>
+          );
         },
       },
       {

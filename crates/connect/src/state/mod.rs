@@ -3,5 +3,5 @@
 //! Re-exports sync state types from storage-sqlite.
 
 pub use wealthfolio_storage_sqlite::sync::{
-    BrokersSyncState, BrokersSyncStateDB, BrokersSyncStateRepository,
+    BrokerSyncState, BrokerSyncStateDB, BrokerSyncStateRepository,
 };

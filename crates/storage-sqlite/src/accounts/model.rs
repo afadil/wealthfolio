@@ -35,9 +35,10 @@ pub struct AccountDB {
     #[diesel(skip_insertion)]
     pub updated_at: NaiveDateTime,
     pub platform_id: Option<String>,
-    pub external_id: Option<String>,
     pub account_number: Option<String>,
     pub meta: Option<String>,
+    pub provider: Option<String>,
+    pub provider_account_id: Option<String>,
 }
 
 // Conversion implementations
@@ -54,9 +55,10 @@ impl From<AccountDB> for Account {
             created_at: db.created_at,
             updated_at: db.updated_at,
             platform_id: db.platform_id,
-            external_id: db.external_id,
             account_number: db.account_number,
             meta: db.meta,
+            provider: db.provider,
+            provider_account_id: db.provider_account_id,
         }
     }
 }
@@ -75,9 +77,10 @@ impl From<NewAccount> for AccountDB {
             created_at: now,
             updated_at: now,
             platform_id: domain.platform_id,
-            external_id: domain.external_id,
             account_number: domain.account_number,
             meta: domain.meta,
+            provider: domain.provider,
+            provider_account_id: domain.provider_account_id,
         }
     }
 }
@@ -95,9 +98,10 @@ impl From<AccountUpdate> for AccountDB {
             created_at: NaiveDateTime::default(), // This will be filled from existing record
             updated_at: chrono::Utc::now().naive_utc(),
             platform_id: domain.platform_id,
-            external_id: domain.external_id,
             account_number: domain.account_number,
             meta: domain.meta,
+            provider: domain.provider,
+            provider_account_id: domain.provider_account_id,
         }
     }
 }

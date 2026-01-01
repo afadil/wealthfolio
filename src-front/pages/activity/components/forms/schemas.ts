@@ -7,7 +7,6 @@ export const baseActivitySchema = z.object({
   activityDate: z.union([z.date(), z.string().datetime()]).default(new Date()),
   currency: z.string().optional(),
   comment: z.string().optional().nullable(),
-  isDraft: z.boolean().optional().default(false),
   fxRate: z.coerce
     .number()
     .positive({ message: "FX rate must be a positive number." })

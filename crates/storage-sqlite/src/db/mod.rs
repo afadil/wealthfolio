@@ -9,6 +9,7 @@ use diesel::connection::{Connection, SimpleConnection};
 use diesel::r2d2;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 use diesel::sqlite::SqliteConnection;
+use diesel::RunQueryDsl;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
 use wealthfolio_core::errors::{DatabaseError, Error, Result};
@@ -58,6 +59,11 @@ pub fn run_migrations(pool: &DbPool) -> Result<()> {
     info!("Running database migrations");
     let mut connection = get_connection(pool)?;
 
+    // Disable foreign keys during migration to handle schema changes
+    diesel::sql_query("PRAGMA foreign_keys = OFF")
+        .execute(&mut connection)
+        .map_err(|e| Error::Database(DatabaseError::QueryFailed(e.to_string())))?;
+
     let result = connection.run_pending_migrations(MIGRATIONS).map_err(|e| {
         error!("Database migration failed: {}", e);
         Error::Database(DatabaseError::MigrationFailed(e.to_string()))
@@ -71,6 +77,11 @@ pub fn run_migrations(pool: &DbPool) -> Result<()> {
             info!("  - {}", migration_version);
         }
     }
+
+    // Re-enable foreign keys after migration
+    diesel::sql_query("PRAGMA foreign_keys = ON")
+        .execute(&mut connection)
+        .map_err(|e| Error::Database(DatabaseError::QueryFailed(e.to_string())))?;
 
     Ok(())
 }

@@ -5,18 +5,27 @@ mod activities_errors;
 mod activities_model;
 mod activities_service;
 mod activities_traits;
+mod compiler;
+mod idempotency;
 
 #[cfg(test)]
 mod activities_service_tests;
+
+#[cfg(test)]
+mod activities_model_tests;
 
 pub use activities_constants::*;
 pub use activities_errors::ActivityError;
 pub use activities_model::{
     Activity, ActivityBulkIdentifierMapping, ActivityBulkMutationError,
     ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityDetails,
-    ActivityImport, ActivitySearchResponse, ActivitySearchResponseMeta, ActivityType,
-    ActivityUpdate, ImportMapping, ImportMappingData, IncomeData, NewActivity, Sort,
-    parse_decimal_string_tolerant,
+    ActivityImport, ActivitySearchResponse, ActivitySearchResponseMeta, ActivityStatus,
+    ActivityType, ActivityUpdate, ImportMapping, ImportMappingData, IncomeData, NewActivity,
+    Sort, parse_decimal_string_tolerant,
 };
 pub use activities_service::ActivityService;
 pub use activities_traits::{ActivityRepositoryTrait, ActivityServiceTrait};
+pub use compiler::{ActivityCompiler, DefaultActivityCompiler};
+pub use idempotency::{
+    compute_activity_idempotency_key, compute_idempotency_key, generate_manual_idempotency_key,
+};

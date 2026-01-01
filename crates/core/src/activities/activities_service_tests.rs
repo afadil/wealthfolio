@@ -318,19 +318,33 @@ mod tests {
         }
 
         async fn create_activity(&self, new_activity: NewActivity) -> Result<Activity> {
+            use crate::activities::ActivityStatus;
             let activity = Activity {
                 id: new_activity.id.unwrap_or_else(|| "test-id".to_string()),
                 account_id: new_activity.account_id,
                 asset_id: new_activity.asset_id,
                 activity_type: new_activity.activity_type,
+                activity_type_override: None,
+                source_type: None,
+                subtype: None,
+                status: new_activity.status.unwrap_or(ActivityStatus::Posted),
                 activity_date: Utc::now(),
-                quantity: new_activity.quantity.unwrap_or(Decimal::ZERO),
-                unit_price: new_activity.unit_price.unwrap_or(Decimal::ZERO),
+                settlement_date: None,
+                quantity: new_activity.quantity,
+                unit_price: new_activity.unit_price,
+                amount: new_activity.amount,
+                fee: new_activity.fee,
                 currency: new_activity.currency,
-                fee: new_activity.fee.unwrap_or(Decimal::ZERO),
-                amount: new_activity.amount.unwrap_or(Decimal::ZERO),
-                is_draft: new_activity.is_draft,
-                comment: new_activity.comment,
+                fx_rate: new_activity.fx_rate,
+                notes: new_activity.notes,
+                metadata: None,
+                source_system: None,
+                source_record_id: None,
+                source_group_id: None,
+                idempotency_key: None,
+                import_run_id: None,
+                is_user_modified: false,
+                needs_review: false,
                 created_at: Utc::now(),
                 updated_at: Utc::now(),
             };
@@ -361,6 +375,7 @@ mod tests {
                 created,
                 updated: Vec::new(),
                 deleted: Vec::new(),
+                created_mappings: Vec::new(),
                 errors: Vec::new(),
             })
         }
@@ -461,7 +476,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset_id: "NESN".to_string(),
+            asset_id: Some("NESN".to_string()),
             asset_data_source: None,
             activity_type: "BUY".to_string(),
             activity_date: "2024-01-15".to_string(),
@@ -470,12 +485,9 @@ mod tests {
             currency: "USD".to_string(), // Same as account currency
             fee: Some(dec!(0)),
             amount: Some(dec!(1000)),
-            is_draft: false,
-            comment: None,
+            status: None,
+            notes: None,
             fx_rate: None,
-            provider_type: None,
-            external_provider_id: None,
-            external_broker_id: None,
         };
 
         // Execute
@@ -524,7 +536,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset_id: "NESN".to_string(),
+            asset_id: Some("NESN".to_string()),
             asset_data_source: None,
             activity_type: "BUY".to_string(),
             activity_date: "2024-01-15".to_string(),
@@ -533,12 +545,9 @@ mod tests {
             currency: "EUR".to_string(), // Different from account currency
             fee: Some(dec!(0)),
             amount: Some(dec!(1000)),
-            is_draft: false,
-            comment: None,
+            status: None,
+            notes: None,
             fx_rate: None,
-            provider_type: None,
-            external_provider_id: None,
-            external_broker_id: None,
         };
 
         // Execute
@@ -587,7 +596,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset_id: "AAPL".to_string(),
+            asset_id: Some("AAPL".to_string()),
             asset_data_source: None,
             activity_type: "BUY".to_string(),
             activity_date: "2024-01-15".to_string(),
@@ -596,12 +605,9 @@ mod tests {
             currency: "USD".to_string(),
             fee: Some(dec!(0)),
             amount: Some(dec!(1500)),
-            is_draft: false,
-            comment: None,
+            status: None,
+            notes: None,
             fx_rate: None,
-            provider_type: None,
-            external_provider_id: None,
-            external_broker_id: None,
         };
 
         // Execute
@@ -650,7 +656,7 @@ mod tests {
             creates: vec![NewActivity {
                 id: Some("activity-1".to_string()),
                 account_id: "acc-1".to_string(),
-                asset_id: "NESN".to_string(),
+                asset_id: Some("NESN".to_string()),
                 asset_data_source: None,
                 activity_type: "BUY".to_string(),
                 activity_date: "2024-01-15".to_string(),
@@ -659,12 +665,9 @@ mod tests {
                 currency: "USD".to_string(), // Same as account, different from asset
                 fee: Some(dec!(0)),
                 amount: Some(dec!(1000)),
-                is_draft: false,
-                comment: None,
+                status: None,
+                notes: None,
                 fx_rate: None,
-                provider_type: None,
-                external_provider_id: None,
-                external_broker_id: None,
             }],
             updates: vec![],
             delete_ids: vec![],

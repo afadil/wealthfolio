@@ -19,12 +19,14 @@ pub struct Account {
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
     pub platform_id: Option<String>,
-    /// External ID from broker/cloud sync (provider account UUID)
-    pub external_id: Option<String>,
     /// Account number from the broker
     pub account_number: Option<String>,
     /// Additional metadata as JSON string
     pub meta: Option<String>,
+    /// Provider name (e.g., 'SNAPTRADE', 'PLAID', 'MANUAL')
+    pub provider: Option<String>,
+    /// Account ID in the provider's system
+    pub provider_account_id: Option<String>,
 }
 
 /// Input model for creating a new account.
@@ -40,9 +42,10 @@ pub struct NewAccount {
     pub is_default: bool,
     pub is_active: bool,
     pub platform_id: Option<String>,
-    pub external_id: Option<String>,
     pub account_number: Option<String>,
     pub meta: Option<String>,
+    pub provider: Option<String>,
+    pub provider_account_id: Option<String>,
 }
 
 impl NewAccount {
@@ -73,9 +76,10 @@ pub struct AccountUpdate {
     pub is_default: bool,
     pub is_active: bool,
     pub platform_id: Option<String>,
-    pub external_id: Option<String>,
     pub account_number: Option<String>,
     pub meta: Option<String>,
+    pub provider: Option<String>,
+    pub provider_account_id: Option<String>,
 }
 
 impl AccountUpdate {

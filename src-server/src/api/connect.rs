@@ -475,7 +475,7 @@ async fn sync_broker_activities(
 
     let client = create_connect_client(&state).await?;
 
-    // Get synced accounts (those with external_id)
+    // Get synced accounts (those with provider_account_id)
     let synced_accounts = state
         .connect_sync_service
         .get_synced_accounts()
@@ -487,14 +487,14 @@ async fn sync_broker_activities(
     let mut accounts_failed = 0;
 
     for account in &synced_accounts {
-        let external_id = match &account.external_id {
+        let provider_account_id = match &account.provider_account_id {
             Some(id) => id,
             None => continue,
         };
 
         info!(
             "[Connect] Syncing activities for account: {} ({})",
-            account.name, external_id
+            account.name, provider_account_id
         );
 
         // Mark sync attempt
@@ -509,12 +509,13 @@ async fn sync_broker_activities(
             .connect_sync_service
             .get_activity_sync_state(&account.id)
             .map_err(|e| ApiError::Internal(e.to_string()))?
-            .and_then(|s| s.last_synced_date);
+            .and_then(|s| s.last_successful_at)
+            .map(|dt| dt.format("%Y-%m-%d").to_string());
 
         // Build URL with query params
         let mut url = format!(
             "/api/v1/sync/brokers/accounts/{}/activities",
-            external_id
+            provider_account_id
         );
         if let Some(ref date) = start_date {
             url = format!("{}?startDate={}", url, date);

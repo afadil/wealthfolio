@@ -33,7 +33,7 @@ impl PortfolioRequestBody {
         PortfolioJobConfig {
             account_ids: self.account_ids,
             symbols: self.symbols,
-            refetch_all_market_data: force_full_recalculation || self.refetch_all_market_data,
+            refetch_all_market_data: self.refetch_all_market_data,
             force_full_recalculation,
         }
     }
@@ -133,7 +133,7 @@ impl ActivityImpact {
         Self {
             account_id: activity.account_id.clone(),
             currency: Some(activity.currency.clone()),
-            asset_id: Some(activity.asset_id.clone()),
+            asset_id: activity.asset_id.clone(),
         }
     }
 

@@ -22,7 +22,7 @@ pub async fn recalculate_portfolio(handle: AppHandle) -> Result<(), String> {
     let payload = PortfolioRequestPayload::builder()
         .account_ids(None) // None signifies all accounts
         .symbols(None) // None signifies all relevant symbols
-        .refetch_all_market_data(true)
+        .refetch_all_market_data(false)
         .build();
     emit_portfolio_trigger_recalculate(&handle, payload);
     Ok(())

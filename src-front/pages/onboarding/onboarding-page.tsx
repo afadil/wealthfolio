@@ -4,15 +4,18 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { OnboardingStep1 } from "./onboarding-step1";
+import { OnboardingConnect } from "./onboarding-connect";
 import { OnboardingStep2, OnboardingStep2Handle } from "./onboarding-step2";
 import { OnboardingStep3 } from "./onboarding-step3";
+
+const CONNECT_PORTAL_URL = "https://connect.wealthfolio.app/";
 
 const OnboardingPage = () => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [isStepValid, setIsStepValid] = useState(true);
-  const step2Ref = useRef<OnboardingStep2Handle>(null);
-  const MAX_STEPS = 3;
+  const settingsStepRef = useRef<OnboardingStep2Handle>(null);
+  const MAX_STEPS = 4;
 
   const handleNext = () => {
     setCurrentStep((prevStep) => Math.min(prevStep + 1, MAX_STEPS));
@@ -26,9 +29,17 @@ const OnboardingPage = () => {
     navigate("/settings/accounts");
   };
 
+  const handleConnectSubscribe = () => {
+    window.open(CONNECT_PORTAL_URL, "_blank");
+  };
+
+  const handleConnectSkip = () => {
+    handleNext();
+  };
+
   const handleContinue = () => {
-    if (currentStep === 2 && step2Ref.current) {
-      step2Ref.current.submitForm();
+    if (currentStep === 3 && settingsStepRef.current) {
+      settingsStepRef.current.submitForm();
     } else if (currentStep === MAX_STEPS) {
       handleFinish();
     } else {
@@ -37,7 +48,7 @@ const OnboardingPage = () => {
   };
 
   useEffect(() => {
-    if (currentStep === 2) {
+    if (currentStep === 3) {
       setIsStepValid(false);
     } else {
       setIsStepValid(true);
@@ -50,9 +61,21 @@ const OnboardingPage = () => {
         return <OnboardingStep1 />;
       case 2:
         return (
-          <OnboardingStep2 ref={step2Ref} onNext={handleNext} onValidityChange={setIsStepValid} />
+          <OnboardingConnect
+            onSubscribe={handleConnectSubscribe}
+            onSkip={handleConnectSkip}
+            onBack={handleBack}
+          />
         );
       case 3:
+        return (
+          <OnboardingStep2
+            ref={settingsStepRef}
+            onNext={handleNext}
+            onValidityChange={setIsStepValid}
+          />
+        );
+      case 4:
         return <OnboardingStep3 />;
       default:
         return <OnboardingStep1 />;
@@ -114,36 +137,39 @@ const OnboardingPage = () => {
         </div>
 
         {/* Mobile: Fixed bottom navigation | Desktop: Normal bottom navigation */}
-        <div className="bg-background/95 supports-[backdrop-filter]:bg-background/80 fixed right-0 bottom-0 left-0 z-20 border-none backdrop-blur lg:relative lg:backdrop-blur-none">
-          <div className="mx-auto max-w-4xl px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-8 lg:py-6">
-            <div className="flex items-center justify-between gap-4">
-              {/* Left side - Back button */}
-              <div className="flex items-center gap-3">
-                {currentStep > 1 && (
-                  <Button variant="outline" onClick={handleBack} type="button" className="shrink-0">
-                    <Icons.ArrowLeft className="mr-2 h-4 w-4" />
-                    Back
-                  </Button>
-                )}
-              </div>
+        {/* Hide navigation on Connect step (step 2) as it has its own CTAs */}
+        {currentStep !== 2 && (
+          <div className="bg-background/95 supports-[backdrop-filter]:bg-background/80 fixed right-0 bottom-0 left-0 z-20 border-none backdrop-blur lg:relative lg:backdrop-blur-none">
+            <div className="mx-auto max-w-4xl px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-8 lg:py-6">
+              <div className="flex items-center justify-between gap-4">
+                {/* Left side - Back button */}
+                <div className="flex items-center gap-3">
+                  {currentStep > 1 && (
+                    <Button variant="outline" onClick={handleBack} type="button" className="shrink-0">
+                      <Icons.ArrowLeft className="mr-2 h-4 w-4" />
+                      Back
+                    </Button>
+                  )}
+                </div>
 
-              {/* Right side - Continue/Get Started button */}
-              <Button
-                onClick={handleContinue}
-                disabled={!isStepValid}
-                type="button"
-                className="group from-primary to-primary/90 bg-linear-to-r shadow-lg transition-all duration-300 hover:shadow-xl"
-              >
-                {currentStep === MAX_STEPS ? "Get Started" : "Continue"}
-                {currentStep === MAX_STEPS ? (
-                  <Icons.Check className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
-                ) : (
-                  <Icons.ArrowRight className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-                )}
-              </Button>
+                {/* Right side - Continue/Get Started button */}
+                <Button
+                  onClick={handleContinue}
+                  disabled={!isStepValid}
+                  type="button"
+                  className="group from-primary to-primary/90 bg-linear-to-r shadow-lg transition-all duration-300 hover:shadow-xl"
+                >
+                  {currentStep === MAX_STEPS ? "Get Started" : "Continue"}
+                  {currentStep === MAX_STEPS ? (
+                    <Icons.Check className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
+                  ) : (
+                    <Icons.ArrowRight className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </section>
   );

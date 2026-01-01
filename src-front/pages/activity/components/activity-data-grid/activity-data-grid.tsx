@@ -257,13 +257,17 @@ export function ActivityDataGrid({
     initialState: {
       sorting,
       columnPinning: { left: [...PINNED_COLUMNS.left], right: [...PINNED_COLUMNS.right] },
+      columnVisibility: {
+        subtype: false,
+        activityStatus: false,
+      },
     },
   });
 
   const selectedRows = dataGrid.table.getSelectedRowModel().rows;
   const selectedRowCount = selectedRows.length;
 
-  // Count selected rows that are pending review (isDraft=true and not new)
+  // Count selected rows that are pending review (needsReview=true and not new)
   const selectedPendingCount = useMemo(
     () => selectedRows.filter((row) => isPendingReview(row.original)).length,
     [selectedRows],
@@ -279,7 +283,7 @@ export function ActivityDataGrid({
     dataGrid.table.resetRowSelection();
   }, [dataGrid.table, onRowsDelete]);
 
-  // Approve selected synced activities (mark isDraft=false)
+  // Approve selected synced activities (mark needsReview=false)
   const approveSelectedRows = useCallback(() => {
     const selected = dataGrid.table.getSelectedRowModel().rows;
     const pendingToApprove = selected
@@ -288,12 +292,12 @@ export function ActivityDataGrid({
 
     if (pendingToApprove.length === 0) return;
 
-    // Mark all pending activities as approved (isDraft=false) and mark them as dirty
+    // Mark all pending activities as approved (needsReview=false) and mark them as dirty
     setLocalTransactions((prev) =>
       prev.map((transaction) => {
         const shouldApprove = pendingToApprove.some((p) => p.id === transaction.id);
         if (shouldApprove) {
-          return { ...transaction, isDraft: false };
+          return { ...transaction, needsReview: false };
         }
         return transaction;
       }),
@@ -346,6 +350,7 @@ export function ActivityDataGrid({
         hasUnsavedChanges={hasUnsavedChanges}
         changesSummary={changesSummary}
         isSaving={isSaving}
+        table={dataGrid.table}
         onAddRow={() => dataGrid.onRowAdd?.()}
         onDeleteSelected={deleteSelectedRows}
         onApproveSelected={approveSelectedRows}

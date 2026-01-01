@@ -61,7 +61,6 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
     quantity: activity?.quantity,
     unitPrice: activity?.unitPrice,
     fee: activity?.fee ?? 0,
-    isDraft: activity?.isDraft ?? false,
     comment: activity?.comment ?? null,
     assetId: activity?.assetId,
     activityDate: activity?.date
@@ -85,14 +84,7 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
 
   const onSubmit: SubmitHandler<NewActivityFormValues> = async (data) => {
     try {
-      const {
-        showCurrencySelect: _showCurrencySelect,
-        id,
-        ...submitData
-      } = {
-        ...data,
-        isDraft: false,
-      };
+      const { showCurrencySelect: _showCurrencySelect, id, ...submitData } = data;
       const account = accounts.find((a) => a.value === submitData.accountId);
 
       // For cash activities and fees, set assetId to $CASH-accountCurrency

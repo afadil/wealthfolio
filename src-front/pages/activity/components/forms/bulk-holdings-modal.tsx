@@ -38,7 +38,6 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
       accountId: "",
       activityDate: new Date(),
       currency: "USD",
-      isDraft: false,
       comment: "",
       holdings: [
         {
@@ -124,7 +123,6 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
         amount: Number(holding.sharesOwned) * Number(holding.averageCost),
         currency,
         fee: 0,
-        isDraft: data.isDraft ?? false,
         comment: data.comment?.trim() || undefined,
       }));
 

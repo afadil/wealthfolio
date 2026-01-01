@@ -35,7 +35,7 @@ const createMockTransaction = (overrides: Partial<LocalTransaction> = {}): Local
   amount: 1000,
   fee: 5,
   currency: "USD",
-  isDraft: false,
+  needsReview: false,
   comment: "",
   createdAt: new Date(),
   assetId: "AAPL",
@@ -134,8 +134,8 @@ describe("activity-utils", () => {
 
       expect(draft.id).toMatch(/^temp-/);
       expect(draft.isNew).toBe(true);
-      // isDraft should be false - it's reserved for sync service activities needing review
-      expect(draft.isDraft).toBe(false);
+      // needsReview should be false - it's reserved for sync service activities needing review
+      expect(draft.needsReview).toBe(false);
     });
 
     it("should use default account values", () => {

@@ -1,18 +1,33 @@
 import { importActivitySchema, importMappingSchema } from "@/lib/schemas";
 import * as z from "zod";
-import { AccountType, ActivityType, DataSource, HoldingType } from "./constants";
+import {
+  AccountType,
+  ActivityStatus,
+  ActivityType,
+  ACTIVITY_TYPE_DISPLAY_NAMES,
+  AssetKind,
+  DataSource,
+  HoldingType,
+  SUBTYPE_DISPLAY_NAMES,
+} from "./constants";
 
 export {
   AccountType,
+  ActivityStatus,
   ActivityType,
+  ACTIVITY_SUBTYPES,
+  ACTIVITY_TYPE_DISPLAY_NAMES,
+  ACTIVITY_TYPES,
+  ASSET_KINDS,
   DataSource,
   ExportDataType,
   ExportedFileFormat,
   HoldingType,
   ImportFormat,
+  SUBTYPE_DISPLAY_NAMES,
 } from "./constants";
 
-export type { ImportRequiredField } from "./constants";
+export type { ActivitySubtype, AssetKind, ImportRequiredField } from "./constants";
 
 export interface Account {
   id: string;
@@ -26,12 +41,17 @@ export interface Account {
   createdAt: Date;
   updatedAt: Date;
   platformId?: string; // Optional - links to platform/broker
-  externalId?: string; // Optional - broker account UUID for sync tracking
   accountNumber?: string; // Optional - account number from broker
   meta?: string; // Optional - additional metadata as JSON string
+  provider?: string; // Optional - sync provider (e.g., 'SNAPTRADE', 'PLAID', 'MANUAL')
+  providerAccountId?: string; // Optional - account ID in the provider's system
 }
 
-export interface Activity {
+/**
+ * Activity interface matching the new backend model
+ * @deprecated Use the new Activity interface with activityType field
+ */
+export interface ActivityLegacy {
   id: string;
   type: ActivityType;
   date: Date | string;
@@ -48,16 +68,95 @@ export interface Activity {
   assetDataSource?: DataSource;
 }
 
+/**
+ * Activity interface matching the new backend model
+ */
+export interface Activity {
+  // Identity
+  id: string;
+  accountId: string;
+  assetId?: string; // NOW OPTIONAL for pure cash events
+
+  // Classification
+  activityType: string; // Canonical type (closed set of 15)
+  activityTypeOverride?: string; // User override (never touched by sync)
+  sourceType?: string; // Raw provider label (REI, DIV, etc.)
+  subtype?: string; // Semantic variation (DRIP, STAKING_REWARD, etc.)
+  status: ActivityStatus;
+
+  // Timing
+  activityDate: string; // ISO timestamp (UTC)
+  settlementDate?: string;
+
+  // Quantities (strings to preserve decimal precision)
+  quantity?: string;
+  unitPrice?: string;
+  amount?: string;
+  fee?: string;
+  currency: string;
+  fxRate?: string;
+
+  // Metadata
+  notes?: string;
+  metadata?: Record<string, unknown>;
+
+  // Source identity
+  sourceSystem?: string; // SNAPTRADE, PLAID, MANUAL, CSV
+  sourceRecordId?: string;
+  sourceGroupId?: string;
+  idempotencyKey?: string;
+  importRunId?: string;
+
+  // Sync flags
+  isUserModified: boolean; // User edited; sync protects economics
+  needsReview: boolean; // Needs user review (low confidence, etc.)
+
+  // Audit
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Helper to get effective type (respects user override)
+ */
+export function getEffectiveType(activity: Activity): string {
+  return activity.activityTypeOverride ?? activity.activityType;
+}
+
+/**
+ * Check if activity has user override
+ */
+export function hasUserOverride(activity: Activity): boolean {
+  return activity.activityTypeOverride !== undefined && activity.activityTypeOverride !== null;
+}
+
+/**
+ * Get display name for an activity
+ */
+export function getActivityDisplayName(activity: Activity): string {
+  // Check subtype first (most specific)
+  if (activity.subtype && SUBTYPE_DISPLAY_NAMES[activity.subtype]) {
+    return SUBTYPE_DISPLAY_NAMES[activity.subtype];
+  }
+  // Use effective type (respects user override)
+  const effectiveType = getEffectiveType(activity);
+  return (
+    (ACTIVITY_TYPE_DISPLAY_NAMES as Record<string, string>)[effectiveType] || effectiveType
+  );
+}
+
 export interface ActivityDetails {
   id: string;
   activityType: ActivityType;
+  subtype?: string | null;
+  status?: ActivityStatus;
   date: Date;
   quantity: number;
   unitPrice: number;
   amount: number;
   fee: number;
   currency: string;
-  isDraft: boolean;
+  needsReview: boolean;
   comment?: string;
   fxRate?: number | null;
   createdAt: Date;
@@ -69,6 +168,12 @@ export interface ActivityDetails {
   assetSymbol: string;
   assetName?: string;
   assetDataSource?: DataSource;
+  // Sync/source metadata
+  sourceSystem?: string;
+  sourceRecordId?: string;
+  idempotencyKey?: string;
+  importRunId?: string;
+  isUserModified?: boolean;
   subRows?: ActivityDetails[];
 }
 
@@ -91,7 +196,6 @@ export interface ActivityCreate {
   amount?: number;
   currency?: string;
   fee?: number;
-  isDraft: boolean;
   comment?: string | null;
   fxRate?: number | null;
 }
@@ -297,24 +401,44 @@ export interface Holding {
 
 export interface Asset {
   id: string;
-  isin?: string | null;
-  name?: string | null;
-  assetType?: string | null;
   symbol: string;
-  symbolMapping?: string | null;
+  name?: string | null;
+
+  // Behavior classification
+  kind?: AssetKind;
+
+  // Provider/market taxonomy
+  assetType?: string | null;
   assetClass?: string | null;
   assetSubClass?: string | null;
+
+  // Identifiers
+  isin?: string | null;
+  currency: string;
+
+  // Pricing
+  dataSource: string;
+  quoteSymbol?: string | null;
+
+  // Legacy fields for backward compatibility
+  symbolMapping?: string | null;
   notes?: string | null;
   countries?: string | null;
   categories?: string | null;
   classes?: string | null;
   attributes?: string | null;
-  createdAt: string; // ISO date string
-  updatedAt: string; // ISO date string
-  currency: string;
-  dataSource: string;
   sectors?: string | null;
   url?: string | null;
+
+  // Status
+  isActive?: boolean;
+
+  // Extensions
+  metadata?: Record<string, unknown>;
+
+  // Audit
+  createdAt: string; // ISO date string
+  updatedAt: string; // ISO date string
 }
 
 export interface Quote {
@@ -575,4 +699,62 @@ export interface Platform {
   name: string | null;
   url: string;
   externalId: string | null;
+}
+
+// ============================================================================
+// Import Run Types
+// ============================================================================
+
+export type ImportRunType = "SYNC" | "IMPORT";
+export type ImportRunMode = "INITIAL" | "INCREMENTAL" | "BACKFILL" | "REPAIR";
+export type ImportRunStatus = "RUNNING" | "APPLIED" | "NEEDS_REVIEW" | "FAILED" | "CANCELLED";
+export type ReviewMode = "NEVER" | "ALWAYS" | "IF_WARNINGS";
+
+export interface ImportRunSummary {
+  fetched: number;
+  inserted: number;
+  updated: number;
+  skipped: number;
+  warnings: number;
+  errors: number;
+  removed: number;
+}
+
+export interface ImportRun {
+  id: string;
+  accountId: string;
+  sourceSystem: string;
+  runType: ImportRunType;
+  mode: ImportRunMode;
+  status: ImportRunStatus;
+  startedAt: string;
+  finishedAt?: string;
+  reviewMode: ReviewMode;
+  appliedAt?: string;
+  checkpointIn?: Record<string, unknown>;
+  checkpointOut?: Record<string, unknown>;
+  summary?: ImportRunSummary;
+  warnings?: string[];
+  error?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================================================
+// Sync State Types
+// ============================================================================
+
+export type SyncStatus = "IDLE" | "RUNNING" | "NEEDS_REVIEW" | "FAILED";
+
+export interface BrokerSyncState {
+  accountId: string;
+  provider: string;
+  checkpointJson?: Record<string, unknown>;
+  lastAttemptedAt?: string;
+  lastSuccessfulAt?: string;
+  lastError?: string;
+  lastRunId?: string;
+  syncStatus: SyncStatus;
+  createdAt: string;
+  updatedAt: string;
 }
