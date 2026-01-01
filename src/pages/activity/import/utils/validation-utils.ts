@@ -174,9 +174,10 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
         : Math.abs(calculateCashActivityAmount(activity.quantity, activity.unitPrice)),
     calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
   },
+
   [ActivityType.INTEREST]: {
     calculateSymbol: (activity, accountCurrency) =>
-      `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
+      activity.symbol || `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
     calculateAmount: (activity) =>
       activity.amount
         ? Math.abs(activity.amount)

@@ -159,7 +159,7 @@ const ActivityManagerPage = () => {
 
       // For cash activities and fees, set assetId to $CASH-accountCurrency
       if (
-        ["DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE", "TAX", "TRANSFER_IN", "TRANSFER_OUT"].includes(
+        ["DEPOSIT", "WITHDRAWAL", "FEE", "TAX", "TRANSFER_IN", "TRANSFER_OUT"].includes(
           submitData.activityType,
         )
       ) {
