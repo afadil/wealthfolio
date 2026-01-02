@@ -1,7 +1,8 @@
-import { useState, useCallback, useMemo } from "react";
-import Papa, { ParseResult } from "papaparse";
 import { logger } from "@/adapters";
 import { CsvRowData, CsvRowError } from "@/lib/types";
+import chardet from "chardet";
+import Papa, { ParseResult } from "papaparse";
+import { useCallback, useMemo, useState } from "react";
 
 // Validation function remains similar, checks if headers exist and are not empty
 export function validateHeaders(headers: string[]): boolean {
@@ -52,11 +53,20 @@ export function useCsvParser() {
         isParsing: true,
       }));
 
-      // Parse the file as raw CSV (without headers)
-      Papa.parse(file, {
-        header: false,
-        skipEmptyLines: true,
-        complete: (results: ParseResult<string[]>) => {
+      // Detect encoding before parsing
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const buffer = e.target?.result as ArrayBuffer;
+        const uint8Array = new Uint8Array(buffer);
+        const detectedEncoding = chardet.detect(uint8Array) ?? 'utf-8';
+        logger.debug(`Detected CSV file encoding: ${detectedEncoding}`, { file: file.name });
+
+        // Parse the file as raw CSV (without headers) with detected encoding
+        Papa.parse(file, {
+          encoding: detectedEncoding,
+          header: false,
+          skipEmptyLines: true,
+          complete: (results: ParseResult<string[]>) => {
           const rawCsvLines = results.data; // Keep as string[][]
 
           // Store the raw lines immediately
@@ -207,6 +217,8 @@ export function useCsvParser() {
           }));
         },
       });
+      };
+      reader.readAsArrayBuffer(file);
     },
     [resetParserStates], // Keep resetParserStates dependency
   );
