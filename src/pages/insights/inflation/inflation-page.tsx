@@ -77,6 +77,7 @@ export default function InflationPage() {
     useInflationRatesByCountry(effectiveCountryCode);
 
   // Extract year-end values from valuation history
+  // For each year, find the valuation closest to (but not after) December 31st
   const yearEndValues = useMemo(() => {
     if (!valuationHistory || valuationHistory.length === 0) return [];
 
@@ -88,8 +89,11 @@ export default function InflationPage() {
 
       const referenceDate = `${year}-${String(referenceMonth).padStart(2, "0")}-${String(referenceDay).padStart(2, "0")}`;
 
-      if (!yearValues.has(year) || v.valuationDate <= referenceDate) {
-        if (v.valuationDate <= referenceDate) {
+      // Only consider dates on or before the reference date (Dec 31)
+      if (v.valuationDate <= referenceDate) {
+        const existing = yearValues.get(year);
+        // Keep the latest date (closest to Dec 31)
+        if (!existing || v.valuationDate > existing.date) {
           yearValues.set(year, { value: v.totalValue, date: v.valuationDate });
         }
       }
