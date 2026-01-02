@@ -21,6 +21,7 @@ import AssetProfilePage from "./pages/asset/asset-profile-page";
 import OnboardingPage from "./pages/onboarding/onboarding-page";
 import AddonSettingsPage from "./pages/settings/addons/addon-settings";
 import ContributionLimitPage from "./pages/settings/contribution-limits/contribution-limits-page";
+import InflationRatesPage from "./pages/settings/inflation-rates/inflation-rates-page";
 import ExportSettingsPage from "./pages/settings/exports/exports-page";
 import GeneralSettingsPage from "./pages/settings/general/general-page";
 import SettingsGoalsPage from "./pages/settings/goals/goals-page";
@@ -104,6 +105,7 @@ export function AppRoutes() {
             <Route path="about" element={<AboutSettingsPage />} />
             <Route path="exports" element={<ExportSettingsPage />} />
             <Route path="contribution-limits" element={<ContributionLimitPage />} />
+            <Route path="inflation-rates" element={<InflationRatesPage />} />
             <Route path="market-data" element={<MarketDataSettingsPage />} />
             <Route path="market-data/import" element={<MarketDataImportPage />} />
             <Route path="securities" element={<AssetsPage />} />

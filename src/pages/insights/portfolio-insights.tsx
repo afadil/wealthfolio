@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import IncomePage from "@/pages/income/income-page";
 import PerformancePage from "@/pages/performance/performance-page";
+import InflationPage from "@/pages/insights/inflation/inflation-page";
 import { Icons } from "@wealthfolio/ui";
 import { Suspense, useMemo } from "react";
 import HoldingsInsightsPage from "../holdings/holdings-insights-page";
@@ -61,6 +62,16 @@ export default function PortfolioInsightsPage() {
         content: (
           <Suspense fallback={<DashboardLoader />}>
             <IncomePage />
+          </Suspense>
+        ),
+      },
+      {
+        value: "inflation",
+        label: "Inflation",
+        icon: Icons.TrendingDown,
+        content: (
+          <Suspense fallback={<DashboardLoader />}>
+            <InflationPage />
           </Suspense>
         ),
       },

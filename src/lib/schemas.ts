@@ -196,3 +196,15 @@ export const newContributionLimitSchema = z.object({
   startDate: z.union([z.date(), z.string().datetime(), z.null()]).optional(),
   endDate: z.union([z.date(), z.string().datetime(), z.null()]).optional(),
 });
+
+export const newInflationRateSchema = z.object({
+  id: z.string().optional(),
+  countryCode: z.string().min(2, "Country code is required").max(3),
+  year: z.number().int().min(1900, "Invalid year").max(2100),
+  rate: z.coerce.number({
+    required_error: "Please enter a valid inflation rate.",
+    invalid_type_error: "Rate must be a number.",
+  }),
+  referenceDate: z.string().nullable().optional(),
+  dataSource: z.string(),
+});

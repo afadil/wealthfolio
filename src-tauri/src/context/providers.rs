@@ -7,6 +7,7 @@ use wealthfolio_core::{
     db::{self, write_actor},
     fx::{FxRepository, FxService, FxServiceTrait},
     goals::{GoalRepository, GoalService},
+    inflation::{InflationRateRepository, InflationRateService},
     limits::{ContributionLimitRepository, ContributionLimitService},
     market_data::{MarketDataRepository, MarketDataService, MarketDataServiceTrait},
     portfolio::{
@@ -40,6 +41,10 @@ pub async fn initialize_context(
     let goal_repo = Arc::new(GoalRepository::new(pool.clone(), writer.clone()));
     let market_data_repo = Arc::new(MarketDataRepository::new(pool.clone(), writer.clone()));
     let limit_repository = Arc::new(ContributionLimitRepository::new(
+        pool.clone(),
+        writer.clone(),
+    ));
+    let inflation_repository = Arc::new(InflationRateRepository::new(
         pool.clone(),
         writer.clone(),
     ));
@@ -95,6 +100,8 @@ pub async fn initialize_context(
         activity_repository.clone(),
     ));
 
+    let inflation_service = Arc::new(InflationRateService::new(inflation_repository.clone()));
+
     let income_service = Arc::new(IncomeService::new(
         fx_service.clone(),
         activity_repository.clone(),
@@ -144,6 +151,7 @@ pub async fn initialize_context(
         goal_service,
         market_data_service,
         limits_service,
+        inflation_service,
         fx_service,
         performance_service,
         income_service,

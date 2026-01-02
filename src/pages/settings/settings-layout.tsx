@@ -30,6 +30,12 @@ const sidebarNavItems = [
     icon: <Icons.TrendingUp className="h-5 w-5" />,
   },
   {
+    title: "Inflation",
+    href: "inflation-rates",
+    subtitle: "Manage inflation rates (IPC)",
+    icon: <Icons.Percent className="h-5 w-5" />,
+  },
+  {
     title: "Goals",
     href: "goals",
     subtitle: "Plan and track objectives",
