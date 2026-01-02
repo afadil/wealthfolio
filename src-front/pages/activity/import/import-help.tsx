@@ -78,13 +78,13 @@ export function ImportHelpPopover() {
             <li>INTEREST</li>
             <li>DEPOSIT</li>
             <li>WITHDRAWAL</li>
-            <li>ADD_HOLDING (Increases quantity, cash not impacted)</li>
-            <li>REMOVE_HOLDING (Decreases quantity, cash not impacted)</li>
-            <li>TRANSFER_IN (Increases cash)</li>
-            <li>TRANSFER_OUT (Decreases cash)</li>
+            <li>TRANSFER_IN (Moves cash/assets in)</li>
+            <li>TRANSFER_OUT (Moves cash/assets out)</li>
             <li>FEE</li>
             <li>TAX</li>
             <li>SPLIT (Adjusts quantity & unit cost, no cash impact)</li>
+            <li>CREDIT (Cash credits: refunds, rebates, bonuses)</li>
+            <li>ADJUSTMENT (Non-trade corrections)</li>
           </ul>
         </pre>
       </div>

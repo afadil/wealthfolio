@@ -1,4 +1,6 @@
 import { LiquidGlass } from "@/components/liquid-glass";
+import { useAggregatedSyncStatus } from "@/features/wealthfolio-connect/hooks";
+import { SyncStatusIcon } from "@/features/wealthfolio-connect/components/sync-status-icon";
 import { useHapticFeedback } from "@/hooks/use-haptic-feedback";
 import { cn } from "@/lib/utils";
 import {
@@ -28,6 +30,7 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
   const hapticFeedback = useHapticFeedback();
   const uniqueId = useId();
   const triggerHaptic = useMemo(() => hapticFeedback, [hapticFeedback]);
+  const { status: syncStatus } = useAggregatedSyncStatus();
 
   const containerClassName = "pointer-events-none fixed inset-x-0 bottom-0 z-50 md:hidden";
 
@@ -199,6 +202,25 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
                       </LiquidGlass>
                     );
                   })}
+
+                  {/* Connect with status icon */}
+                  <LiquidGlass variant="floating" intensity="subtle">
+                    <Link
+                      to="/connect"
+                      onClick={() => {
+                        const isActive = isPathActive(location.pathname, "/connect");
+                        handleNavigation("/connect", isActive);
+                        setMobileMenuOpen(false);
+                      }}
+                      aria-current={isPathActive(location.pathname, "/connect") ? "page" : undefined}
+                      className="relative z-10 flex w-full items-center gap-3 rounded-full px-3 py-2 text-sm"
+                    >
+                      <span className="flex size-6 shrink-0 items-center justify-center">
+                        <SyncStatusIcon status={syncStatus} className="size-5" />
+                      </span>
+                      <span className="truncate text-left">Connect</span>
+                    </Link>
+                  </LiquidGlass>
 
                   {hasAddons && (
                     <LiquidGlass variant="floating" intensity="subtle">

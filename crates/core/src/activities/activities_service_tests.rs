@@ -421,10 +421,14 @@ mod tests {
             currency: currency.to_string(),
             is_default: false,
             is_active: true,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            created_at: Utc::now().naive_utc(),
+            updated_at: Utc::now().naive_utc(),
             platform_id: None,
             group: None,
+            account_number: None,
+            meta: None,
+            provider: None,
+            provider_account_id: None,
         }
     }
 
@@ -479,6 +483,7 @@ mod tests {
             asset_id: Some("NESN".to_string()),
             asset_data_source: None,
             activity_type: "BUY".to_string(),
+            subtype: None,
             activity_date: "2024-01-15".to_string(),
             quantity: Some(dec!(10)),
             unit_price: Some(dec!(100)),
@@ -488,6 +493,11 @@ mod tests {
             status: None,
             notes: None,
             fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
         };
 
         // Execute
@@ -539,6 +549,7 @@ mod tests {
             asset_id: Some("NESN".to_string()),
             asset_data_source: None,
             activity_type: "BUY".to_string(),
+            subtype: None,
             activity_date: "2024-01-15".to_string(),
             quantity: Some(dec!(10)),
             unit_price: Some(dec!(100)),
@@ -548,6 +559,11 @@ mod tests {
             status: None,
             notes: None,
             fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
         };
 
         // Execute
@@ -599,6 +615,7 @@ mod tests {
             asset_id: Some("AAPL".to_string()),
             asset_data_source: None,
             activity_type: "BUY".to_string(),
+            subtype: None,
             activity_date: "2024-01-15".to_string(),
             quantity: Some(dec!(10)),
             unit_price: Some(dec!(150)),
@@ -608,6 +625,11 @@ mod tests {
             status: None,
             notes: None,
             fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
         };
 
         // Execute
@@ -659,6 +681,7 @@ mod tests {
                 asset_id: Some("NESN".to_string()),
                 asset_data_source: None,
                 activity_type: "BUY".to_string(),
+                subtype: None,
                 activity_date: "2024-01-15".to_string(),
                 quantity: Some(dec!(10)),
                 unit_price: Some(dec!(100)),
@@ -668,6 +691,11 @@ mod tests {
                 status: None,
                 notes: None,
                 fx_rate: None,
+                metadata: None,
+                needs_review: None,
+                source_system: None,
+                source_record_id: None,
+                source_group_id: None,
             }],
             updates: vec![],
             delete_ids: vec![],

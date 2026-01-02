@@ -103,8 +103,6 @@ describe("validation-utils", () => {
         [ActivityType.FEE]: ["FEE"],
         [ActivityType.TRANSFER_IN]: ["TRANSFER_IN"],
         [ActivityType.TRANSFER_OUT]: ["TRANSFER_OUT"],
-        [ActivityType.ADD_HOLDING]: ["ADD_HOLDING"],
-        [ActivityType.REMOVE_HOLDING]: ["REMOVE_HOLDING"],
         [ActivityType.SPLIT]: ["SPLIT"],
       },
       symbolMappings: {},
@@ -261,32 +259,6 @@ describe("validation-utils", () => {
 
       expect(activity.amount).toBe(500.0); // converted to positive
       expect(activity.fee).toBe(0);
-    });
-
-    it("should handle ADD_HOLDING activities", () => {
-      const testData = [
-        {
-          lineNumber: "1",
-          date: "2024-01-01T00:00:00.000Z",
-          symbol: "TSLA",
-          activityType: "ADD_HOLDING",
-          quantity: "-5", // negative quantity
-          unitPrice: "-800.00", // negative price
-          amount: "",
-          fee: "-5.00",
-          currency: "USD",
-        },
-      ];
-
-      const result = validateActivityImport(testData, testMapping, "test-account", "USD");
-
-      expect(result.activities).toHaveLength(1);
-      const activity = result.activities[0];
-
-      expect(activity.quantity).toBe(5);
-      expect(activity.unitPrice).toBe(800.0);
-      expect(activity.amount).toBe(4000); // quantity * unitPrice (5 * 800)
-      expect(activity.fee).toBe(5.0);
     });
 
     it("should handle CSV values with currency symbols like real broker exports", () => {

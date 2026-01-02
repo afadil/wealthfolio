@@ -8,6 +8,7 @@ import { useFormContext } from "react-hook-form";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@wealthfolio/ui/components/ui/form";
 import { MoneyInput } from "@wealthfolio/ui";
 import { ConfigurationCheckbox, CommonFields, AssetSymbolInput } from "./common";
+import { SubtypeSelect } from "./subtype-select";
 
 export const IncomeForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
   const { control, watch } = useFormContext();
@@ -53,6 +54,7 @@ export const IncomeForm = ({ accounts }: { accounts: AccountSelectOption[] }) =>
                 <AssetSymbolInput field={field} isManualAsset={isManualAsset} />
               )}
             />
+            <SubtypeSelect activityType={activityType} />
             <div
               className={`grid ${activityType === "INTEREST" ? "grid-cols-2" : "grid-cols-1"} gap-4`}
             >

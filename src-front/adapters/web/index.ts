@@ -950,6 +950,11 @@ export const listenDeepLink = async <T>(_handler: EventCallback<T>): Promise<Unl
   return async () => {};
 };
 
+// Broker sync is desktop-only (requires keyring access)
+export const listenBrokerSyncComplete = async <T>(_handler: EventCallback<T>): Promise<UnlistenFn> => {
+  return async () => {};
+};
+
 // ============================================================================
 // File Dialogs - Web implementations using browser APIs
 // ============================================================================

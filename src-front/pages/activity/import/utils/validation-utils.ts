@@ -227,38 +227,6 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
     calculateAmount: (activity) => (activity.amount ? Math.abs(activity.amount) : 0), // Amount is mandatory for cash activities
     calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
   },
-  [ActivityType.ADD_HOLDING]: {
-    calculateSymbol: (activity) => activity.symbol,
-    calculateAmount: (activity) => {
-      // Calculate amount = quantity * price if both positive, using absolute values
-      if (
-        activity.quantity &&
-        Math.abs(activity.quantity) > 0 &&
-        activity.unitPrice &&
-        Math.abs(activity.unitPrice) > 0
-      ) {
-        return Math.abs(activity.quantity) * Math.abs(activity.unitPrice);
-      }
-      return activity.amount ? Math.abs(activity.amount) : activity.amount;
-    },
-    calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
-  },
-  [ActivityType.REMOVE_HOLDING]: {
-    calculateSymbol: (activity) => activity.symbol,
-    calculateAmount: (activity) => {
-      // Calculate amount = quantity * price if both positive, using absolute values
-      if (
-        activity.quantity &&
-        Math.abs(activity.quantity) > 0 &&
-        activity.unitPrice &&
-        Math.abs(activity.unitPrice) > 0
-      ) {
-        return Math.abs(activity.quantity) * Math.abs(activity.unitPrice);
-      }
-      return activity.amount ? Math.abs(activity.amount) : activity.amount;
-    },
-    calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
-  },
   [ActivityType.SPLIT]: {
     calculateSymbol: (activity) => activity.symbol,
     calculateAmount: () => 0, // SPLIT has no cash impact according to docs

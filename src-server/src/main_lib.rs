@@ -217,7 +217,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     // Connect sync service for broker data synchronization
     let platform_repository = Arc::new(PlatformRepository::new(pool.clone(), writer.clone()));
     let connect_sync_service: Arc<dyn SyncServiceTrait + Send + Sync> = Arc::new(SyncService::new(
-        account_repo.clone(),
+        account_service.clone(),
         platform_repository,
         pool.clone(),
         writer.clone(),

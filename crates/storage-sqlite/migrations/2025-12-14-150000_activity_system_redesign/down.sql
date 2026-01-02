@@ -54,14 +54,16 @@ ALTER TABLE platforms_backup RENAME TO platforms;
 
 -- ============================================================================
 -- STEP 3: RESTORE ASSETS TABLE
+-- Restores symbol_mapping from quote_symbol
 -- ============================================================================
 
 -- Drop new indexes
 DROP INDEX IF EXISTS ix_assets_kind;
 DROP INDEX IF EXISTS ix_assets_is_active;
 DROP INDEX IF EXISTS ux_assets_data_source_quote_symbol;
+DROP INDEX IF EXISTS assets_data_source_symbol_key;
 
--- Remove new columns from assets
+-- Create backup table with old schema (includes symbol_mapping)
 CREATE TABLE assets_backup (
     id TEXT NOT NULL PRIMARY KEY,
     isin TEXT,
@@ -84,8 +86,12 @@ CREATE TABLE assets_backup (
     url TEXT
 );
 
+-- Restore data, converting quote_symbol back to symbol_mapping
 INSERT INTO assets_backup (id, isin, name, asset_type, symbol, symbol_mapping, asset_class, asset_sub_class, notes, countries, categories, classes, attributes, created_at, updated_at, currency, data_source, sectors, url)
-SELECT id, isin, name, asset_type, symbol, symbol_mapping, asset_class, asset_sub_class, notes, countries, categories, classes, attributes, created_at, updated_at, currency, data_source, sectors, url
+SELECT
+    id, isin, name, asset_type, symbol,
+    quote_symbol, -- quote_symbol -> symbol_mapping
+    asset_class, asset_sub_class, notes, countries, categories, classes, attributes, created_at, updated_at, currency, data_source, sectors, url
 FROM assets;
 
 DROP TABLE assets;
@@ -162,6 +168,18 @@ SELECT
     account_id,
     COALESCE(asset_id, '$CASH-' || currency),  -- Restore $CASH- asset_id for null values
     CASE
+        -- Convert TRANSFER_IN with external flag back to ADD_HOLDING for non-cash assets
+        WHEN activity_type = 'TRANSFER_IN'
+             AND asset_id NOT LIKE '$CASH-%'
+             AND json_extract(metadata, '$.flow.is_external') = 1
+        THEN 'ADD_HOLDING'
+        -- Convert TRANSFER_OUT with external flag back to REMOVE_HOLDING for non-cash assets
+        WHEN activity_type = 'TRANSFER_OUT'
+             AND asset_id NOT LIKE '$CASH-%'
+             AND json_extract(metadata, '$.flow.is_external') = 1
+        THEN 'REMOVE_HOLDING'
+        -- ADJUSTMENT doesn't exist in old schema, convert to UNKNOWN
+        WHEN activity_type = 'ADJUSTMENT' THEN 'UNKNOWN'
         WHEN activity_type = 'UNKNOWN' THEN 'UNKNOWN'
         ELSE activity_type
     END,

@@ -24,23 +24,6 @@ const activityTypes = [
     ],
   },
   {
-    category: "Holdings",
-    types: [
-      {
-        value: "ADD_HOLDING",
-        label: "Add Holding",
-        icon: "PlusCircle" as const,
-        description: "Record existing holdings",
-      },
-      {
-        value: "REMOVE_HOLDING",
-        label: "Remove Holding",
-        icon: "MinusCircle" as const,
-        description: "Remove holdings from account",
-      },
-    ],
-  },
-  {
     category: "Cash",
     types: [
       {
@@ -106,6 +89,12 @@ const activityTypes = [
         label: "Stock Split",
         icon: "Split" as const,
         description: "Stock split adjustment",
+      },
+      {
+        value: "ADJUSTMENT",
+        label: "Adjustment",
+        icon: "RefreshCw" as const,
+        description: "Non-trade correction or adjustment",
       },
     ],
   },

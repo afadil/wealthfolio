@@ -106,8 +106,8 @@ impl AssetRepositoryTrait for AssetRepository {
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<Asset> {
-                let normalized_symbol_mapping = payload_owned
-                    .symbol_mapping
+                let normalized_quote_symbol = payload_owned
+                    .quote_symbol
                     .as_ref()
                     .map(|value| value.trim().to_string())
                     .filter(|value| !value.is_empty());
@@ -120,7 +120,7 @@ impl AssetRepositoryTrait for AssetRepository {
                         assets::notes.eq(&payload_owned.notes),
                         assets::asset_sub_class.eq(&payload_owned.asset_sub_class),
                         assets::asset_class.eq(&payload_owned.asset_class),
-                        assets::symbol_mapping.eq(normalized_symbol_mapping),
+                        assets::quote_symbol.eq(normalized_quote_symbol),
                     ))
                     .get_result::<AssetDB>(conn)
                     .map_err(StorageError::from)?;

@@ -1,11 +1,10 @@
 // Test cases for HoldingsCalculator will go here.
 #[cfg(test)]
 mod tests {
-    use crate::activities::{Activity, ActivityType};
+    use crate::activities::{Activity, ActivityStatus, ActivityType};
     use crate::assets::{Asset, AssetRepositoryTrait, NewAsset, UpdateAssetProfile};
     use crate::errors::Result;
-    use crate::fx::FxServiceTrait;
-    use crate::fx::FxError;
+    use crate::fx::{ExchangeRate, FxError, FxServiceTrait, NewExchangeRate};
     use crate::portfolio::snapshot::holdings_calculator::HoldingsCalculator;
     use crate::portfolio::snapshot::{AccountStateSnapshot, Lot, Position};
     use async_trait;
@@ -147,10 +146,7 @@ mod tests {
                 "MockFxService::initialize not implemented".to_string(),
             ))
         }
-        async fn add_exchange_rate(
-            &self,
-            _new_rate: crate::fx::fx_model::NewExchangeRate,
-        ) -> Result<crate::fx::fx_model::ExchangeRate> {
+        async fn add_exchange_rate(&self, _new_rate: NewExchangeRate) -> Result<ExchangeRate> {
             Err(crate::errors::Error::Unexpected(
                 "MockFxService::add_exchange_rate not implemented".to_string(),
             ))
@@ -160,7 +156,7 @@ mod tests {
             _from_currency: &str,
             _to_currency: &str,
             _days: i64,
-        ) -> Result<Vec<crate::fx::fx_model::ExchangeRate>> {
+        ) -> Result<Vec<ExchangeRate>> {
             Err(crate::errors::Error::Unexpected(
                 "MockFxService::get_historical_rates not implemented".to_string(),
             ))
@@ -170,7 +166,7 @@ mod tests {
             _from_currency: &str,
             _to_currency: &str,
             _rate: Decimal,
-        ) -> Result<crate::fx::fx_model::ExchangeRate> {
+        ) -> Result<ExchangeRate> {
             Err(crate::errors::Error::Unexpected(
                 "MockFxService::update_exchange_rate not implemented".to_string(),
             ))
@@ -236,7 +232,7 @@ mod tests {
                 )))),
             }
         }
-        fn get_latest_exchange_rates(&self) -> Result<Vec<crate::fx::fx_model::ExchangeRate>> {
+        fn get_latest_exchange_rates(&self) -> Result<Vec<ExchangeRate>> {
             Err(crate::errors::Error::Unexpected(
                 "MockFxService::get_exchange_rates not implemented".to_string(),
             ))
@@ -267,6 +263,63 @@ mod tests {
     }
 
     // --- Helper Functions ---
+
+    /// Creates an external transfer activity with metadata.flow.is_external = true
+    /// This is used to simulate transfers from/to outside the tracked portfolio (affects net_contribution)
+    #[allow(clippy::too_many_arguments)]
+    fn create_external_transfer_activity(
+        id: &str,
+        activity_type: ActivityType,
+        asset_id: &str,
+        quantity: Decimal,
+        unit_price: Decimal,
+        fee: Decimal,
+        currency: &str,
+        date_str: &str,
+    ) -> Activity {
+        let activity_date_naive = NaiveDate::from_str(date_str)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+        let activity_date_utc: DateTime<Utc> = Utc.from_utc_datetime(&activity_date_naive);
+
+        // Create metadata with flow.is_external = true
+        let mut flow_map = serde_json::Map::new();
+        flow_map.insert("is_external".to_string(), serde_json::Value::Bool(true));
+        let mut metadata = serde_json::Map::new();
+        metadata.insert("flow".to_string(), serde_json::Value::Object(flow_map));
+
+        Activity {
+            id: id.to_string(),
+            account_id: "acc_1".to_string(),
+            asset_id: Some(asset_id.to_string()),
+            activity_type: activity_type.as_str().to_string(),
+            activity_type_override: None,
+            source_type: None,
+            subtype: None,
+            status: ActivityStatus::Posted,
+            activity_date: activity_date_utc,
+            settlement_date: None,
+            quantity: Some(quantity),
+            unit_price: Some(unit_price),
+            amount: None,
+            fee: Some(fee),
+            currency: currency.to_string(),
+            fx_rate: None,
+            notes: None,
+            metadata: Some(serde_json::Value::Object(metadata)),
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+            idempotency_key: None,
+            import_run_id: None,
+            is_user_modified: false,
+            needs_review: false,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn create_default_activity(
         id: &str,
@@ -287,20 +340,29 @@ mod tests {
         Activity {
             id: id.to_string(),
             account_id: "acc_1".to_string(),
-            asset_id: asset_id.to_string(),
+            asset_id: Some(asset_id.to_string()),
             activity_type: activity_type.as_str().to_string(),
+            activity_type_override: None,
+            source_type: None,
+            subtype: None,
+            status: ActivityStatus::Posted,
             activity_date: activity_date_utc,
-            quantity,
-            unit_price,
-            fee,
-            currency: currency.to_string(),
+            settlement_date: None,
+            quantity: Some(quantity),
+            unit_price: Some(unit_price),
             amount: None,
-            is_draft: false,
-            comment: None,
+            fee: Some(fee),
+            currency: currency.to_string(),
             fx_rate: None,
-            provider_type: None,
-            external_provider_id: None,
-            external_broker_id: None,
+            notes: None,
+            metadata: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+            idempotency_key: None,
+            import_run_id: None,
+            is_user_modified: false,
+            needs_review: false,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }
@@ -322,20 +384,29 @@ mod tests {
         Activity {
             id: id.to_string(),
             account_id: "acc_1".to_string(),
-            asset_id: format!("$CASH-{}", currency),
+            asset_id: Some(format!("$CASH-{}", currency)),
             activity_type: activity_type.as_str().to_string(),
+            activity_type_override: None,
+            source_type: None,
+            subtype: None,
+            status: ActivityStatus::Posted,
             activity_date: activity_date_utc,
-            quantity: dec!(1),
-            unit_price: amount,
-            fee,
-            currency: currency.to_string(),
+            settlement_date: None,
+            quantity: Some(dec!(1)),
+            unit_price: Some(amount),
             amount: Some(amount),
-            is_draft: false,
-            comment: None,
+            fee: Some(fee),
+            currency: currency.to_string(),
             fx_rate: None,
-            provider_type: None,
-            external_provider_id: None,
-            external_broker_id: None,
+            notes: None,
+            metadata: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+            idempotency_key: None,
+            import_run_id: None,
+            is_user_modified: false,
+            needs_review: false,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }
@@ -438,7 +509,7 @@ mod tests {
 
         // Check cash balance (in account currency)
         let expected_cash =
-            dec!(0) - (buy_activity.quantity * buy_activity.unit_price + buy_activity.fee);
+            dec!(0) - (buy_activity.qty() * buy_activity.price() + buy_activity.fee_amt());
         assert_eq!(
             next_state.cash_balances.get(account_currency),
             Some(&expected_cash)
@@ -533,7 +604,7 @@ mod tests {
         // Sell fee: 2 CAD
         // Expected cash: -1505 + 800 - 2 = -707 CAD
         let expected_cash =
-            dec!(-1505) + (sell_activity.quantity * sell_activity.unit_price - sell_activity.fee);
+            dec!(-1505) + (sell_activity.qty() * sell_activity.price() - sell_activity.fee_amt());
         assert_eq!(
             next_state.cash_balances.get(account_currency),
             Some(&expected_cash)
@@ -591,22 +662,18 @@ mod tests {
         assert_eq!(position.total_cost_basis, dec!(1010)); // Expected: (10 * 100) + 10
         assert_eq!(position.currency, activity_currency); // USD
 
-        // Check cash balance (should be in account currency - CAD)
+        // Check cash balance (booked in ACTIVITY currency - USD, per design spec)
         // Cost in USD: (10 shares * 100 USD/share) + 10 USD fee = 1000 + 10 = 1010 USD
-        // Cost in CAD: 1010 USD * 1.25 CAD/USD = 1262.5 CAD
         let buy_cost_usd =
-            buy_activity_usd.quantity * buy_activity_usd.unit_price + buy_activity_usd.fee;
-        let expected_cash_change_cad = buy_cost_usd * rate_usd_cad;
-        let expected_cash_cad = previous_snapshot
-            .cash_balances
-            .get(account_currency)
-            .cloned()
-            .unwrap_or(Decimal::ZERO)
-            - expected_cash_change_cad;
+            buy_activity_usd.qty() * buy_activity_usd.price() + buy_activity_usd.fee_amt();
+        let expected_cash_usd = -buy_cost_usd; // -1010 USD
         assert_eq!(
-            next_state.cash_balances.get(account_currency),
-            Some(&expected_cash_cad) // -1262.5 CAD
+            next_state.cash_balances.get(activity_currency),
+            Some(&expected_cash_usd)
         );
+        // Verify cash_total_account_currency is computed correctly (converted to CAD)
+        let expected_cash_total_cad = expected_cash_usd * rate_usd_cad; // -1262.5 CAD
+        assert_eq!(next_state.cash_total_account_currency, expected_cash_total_cad);
 
         // Check overall cost_basis of the snapshot (should be in account currency - CAD)
         // Position cost basis is 1010 USD. Converted to CAD: 1010 USD * 1.25 CAD/USD = 1262.5 CAD
@@ -657,30 +724,30 @@ mod tests {
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
         let next_state = result.unwrap().snapshot;
 
-        // Check cash balance (in account currency - CAD)
+        // Check cash balance (booked in ACTIVITY currency - USD, per design spec)
         // Deposit amount in USD: 100 USD
         // Fee in USD: 1 USD
         // Net deposit amount in USD: 100 - 1 = 99 USD
-        // Net deposit amount in CAD: 99 USD * 1.25 CAD/USD = 123.75 CAD
-        // Expected cash CAD: 1000 (initial) + 123.75 (deposit) = 1123.75 CAD
-        let net_deposit_activity_ccy = deposit_usd_activity.unit_price - deposit_usd_activity.fee;
-        let expected_cash_change_cad = net_deposit_activity_ccy * rate_usd_cad;
-        let expected_cash_cad = previous_snapshot
-            .cash_balances
-            .get(account_currency)
-            .unwrap()
-            + expected_cash_change_cad;
+        let net_deposit_usd = deposit_usd_activity.price() - deposit_usd_activity.fee_amt();
+        assert_eq!(
+            next_state.cash_balances.get(activity_currency),
+            Some(&net_deposit_usd) // 99 USD
+        );
+        // CAD balance should be unchanged
         assert_eq!(
             next_state.cash_balances.get(account_currency),
-            Some(&expected_cash_cad) // 1123.75 CAD
+            Some(&dec!(1000)) // Still 1000 CAD
         );
+        // Verify cash_total_account_currency is computed correctly
+        let expected_cash_total_cad = dec!(1000) + (net_deposit_usd * rate_usd_cad); // 1000 + 123.75 = 1123.75 CAD
+        assert_eq!(next_state.cash_total_account_currency, expected_cash_total_cad);
 
         // Check net contribution (should be in account currency - CAD)
         // Net contribution change is based on the pre-fee deposit amount converted to account currency.
         // Deposit amount in USD: 100 USD
         // Deposit amount in CAD: 100 USD * 1.25 CAD/USD = 125 CAD
         // Expected net contribution: 500 (initial) + 125 (deposit) = 625 CAD
-        let deposit_amount_converted_cad = deposit_usd_activity.unit_price * rate_usd_cad;
+        let deposit_amount_converted_cad = deposit_usd_activity.price() * rate_usd_cad;
         let expected_net_contribution_cad =
             previous_snapshot.net_contribution + deposit_amount_converted_cad;
         assert_eq!(next_state.net_contribution, expected_net_contribution_cad); // 625 CAD
@@ -729,31 +796,31 @@ mod tests {
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
         let next_state = result.unwrap().snapshot;
 
-        // Check cash balance (in account currency - CAD)
+        // Check cash balance (booked in ACTIVITY currency - USD, per design spec)
         // Withdrawal amount in USD: 50 USD
         // Fee in USD: 2 USD
-        // Total withdrawal amount in USD: 50 + 2 = 52 USD
-        // Total withdrawal amount in CAD: 52 USD * 1.25 CAD/USD = 65 CAD
-        // Expected cash CAD: 2000 (initial) - 65 (withdrawal) = 1935 CAD
-        let total_withdrawal_activity_ccy =
-            withdrawal_usd_activity.unit_price + withdrawal_usd_activity.fee;
-        let expected_cash_change_cad = total_withdrawal_activity_ccy * rate_usd_cad;
-        let expected_cash_cad = previous_snapshot
-            .cash_balances
-            .get(account_currency)
-            .unwrap()
-            - expected_cash_change_cad;
+        // Total withdrawal in USD: 50 + 2 = 52 USD (outflow)
+        let total_withdrawal_usd =
+            withdrawal_usd_activity.price() + withdrawal_usd_activity.fee_amt();
+        assert_eq!(
+            next_state.cash_balances.get(activity_currency),
+            Some(&(-total_withdrawal_usd)) // -52 USD
+        );
+        // CAD balance should be unchanged
         assert_eq!(
             next_state.cash_balances.get(account_currency),
-            Some(&expected_cash_cad)
+            Some(&dec!(2000)) // Still 2000 CAD
         );
+        // Verify cash_total_account_currency is computed correctly
+        let expected_cash_total_cad = dec!(2000) + (-total_withdrawal_usd * rate_usd_cad); // 2000 - 65 = 1935 CAD
+        assert_eq!(next_state.cash_total_account_currency, expected_cash_total_cad);
 
         // Check net contribution (should be in account currency - CAD)
         // Net contribution change is based on the pre-fee withdrawal amount converted to account currency.
         // Withdrawal amount in USD: 50 USD
         // Withdrawal amount in CAD: 50 USD * 1.25 CAD/USD = 62.5 CAD
         // Expected net contribution: 1000 (initial) - 62.5 (withdrawal) = 937.5 CAD
-        let withdrawal_amount_converted_cad = withdrawal_usd_activity.unit_price * rate_usd_cad;
+        let withdrawal_amount_converted_cad = withdrawal_usd_activity.price() * rate_usd_cad;
         let expected_net_contribution_cad =
             previous_snapshot.net_contribution - withdrawal_amount_converted_cad;
         assert_eq!(next_state.net_contribution, expected_net_contribution_cad);
@@ -811,26 +878,29 @@ mod tests {
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
         let next_state = result.unwrap().snapshot;
 
-        // Check cash balance (in account currency - CAD)
+        // Check cash balances (booked in respective ACTIVITY currencies, per design spec)
         // Initial cash: 1000 CAD
-        // Dividend (CAD): +50 CAD
-        // Interest (USD): 20 USD gross - 1 USD fee = 19 USD net
-        // Interest (CAD): 19 USD * 1.30 CAD/USD = 24.7 CAD
-        // Expected cash CAD: 1000 + 50 + 24.7 = 1074.7 CAD
-        let net_dividend_cad = dividend_activity.unit_price - dividend_activity.fee;
-        let net_interest_usd = interest_activity_usd.unit_price - interest_activity_usd.fee;
-        let net_interest_cad = net_interest_usd * rate_usd_cad;
+        // Dividend (CAD): +50 CAD -> CAD balance = 1000 + 50 = 1050 CAD
+        // Interest (USD): 20 USD gross - 1 USD fee = 19 USD net -> USD balance = 19 USD
+        let net_dividend_cad = dividend_activity.price() - dividend_activity.fee_amt();
+        let net_interest_usd = interest_activity_usd.price() - interest_activity_usd.fee_amt();
 
         let expected_cash_cad = previous_snapshot
             .cash_balances
             .get(account_currency)
             .unwrap()
-            + net_dividend_cad
-            + net_interest_cad;
+            + net_dividend_cad;
         assert_eq!(
             next_state.cash_balances.get(account_currency),
-            Some(&expected_cash_cad) // 1074.7 CAD
+            Some(&expected_cash_cad) // 1050 CAD
         );
+        assert_eq!(
+            next_state.cash_balances.get(activity_currency_int),
+            Some(&net_interest_usd) // 19 USD
+        );
+        // Verify cash_total_account_currency is computed correctly
+        let expected_cash_total_cad = expected_cash_cad + (net_interest_usd * rate_usd_cad); // 1050 + 24.7 = 1074.7 CAD
+        assert_eq!(next_state.cash_total_account_currency, expected_cash_total_cad);
 
         // Check net contribution (should remain unchanged for income activities)
         assert_eq!(
@@ -894,24 +964,28 @@ mod tests {
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
         let next_state = result.unwrap().snapshot;
 
-        // Check cash balance (in account currency - CAD)
+        // Check cash balances (booked in respective ACTIVITY currencies, per design spec)
         // Initial cash: 1000 CAD
-        // Fee (CAD): -25 CAD
-        // Tax (USD): 50 USD. Converted to CAD: 50 USD * 1.30 CAD/USD = 65 CAD. So, -65 CAD
-        // Expected cash CAD: 1000 - 25 - 65 = 910 CAD
-        let fee_cad = fee_activity.fee;
-        let tax_usd = tax_activity_usd.unit_price; // create_cash_activity puts amount into unit_price
-        let tax_cad = tax_usd * rate_usd_cad;
+        // Fee (CAD): -25 CAD -> CAD balance = 1000 - 25 = 975 CAD
+        // Tax (USD): -50 USD -> USD balance = -50 USD
+        let fee_cad = fee_activity.fee_amt();
+        let tax_usd = tax_activity_usd.price(); // create_cash_activity puts amount into unit_price
         let expected_cash_cad = previous_snapshot
             .cash_balances
             .get(account_currency)
             .unwrap()
-            - fee_cad
-            - tax_cad;
+            - fee_cad;
         assert_eq!(
             next_state.cash_balances.get(account_currency),
-            Some(&expected_cash_cad) // 910 CAD
+            Some(&expected_cash_cad) // 975 CAD
         );
+        assert_eq!(
+            next_state.cash_balances.get(tax_activity_currency),
+            Some(&(-tax_usd)) // -50 USD
+        );
+        // Verify cash_total_account_currency is computed correctly
+        let expected_cash_total_cad = expected_cash_cad + (-tax_usd * rate_usd_cad); // 975 - 65 = 910 CAD
+        assert_eq!(next_state.cash_total_account_currency, expected_cash_total_cad);
 
         // Net contribution should remain unchanged for charges
         assert_eq!(next_state.net_contribution, initial_net_contribution); // 500 CAD
@@ -949,10 +1023,11 @@ mod tests {
         previous_snapshot_add.net_contribution = initial_net_contribution;
         previous_snapshot_add.net_contribution_base = initial_net_contribution;
 
-        // --- 1. AddHolding Activity ---
-        let add_holding_activity = create_default_activity(
+        // --- 1. External TransferIn Activity (replaces AddHolding) ---
+        // External transfers affect net_contribution (metadata.flow.is_external = true)
+        let add_holding_activity = create_external_transfer_activity(
             "act_add_tsla",
-            ActivityType::AddHolding,
+            ActivityType::TransferIn,
             "TSLA",         // Asset ID
             dec!(10),       // Quantity
             dec!(200),      // Unit price (cost basis per share in USD)
@@ -969,37 +1044,39 @@ mod tests {
         );
         assert!(
             result_add.is_ok(),
-            "AddHolding calculation failed: {:?}",
+            "External TransferIn calculation failed: {:?}",
             result_add.err()
         );
         let state_after_add = result_add.unwrap().snapshot;
 
-        // Check position after AddHolding (cost basis in USD)
+        // Check position after TransferIn (cost basis in USD)
         let position_tsla = state_after_add.positions.get("TSLA").unwrap();
         assert_eq!(position_tsla.quantity, dec!(10));
         assert_eq!(position_tsla.average_cost, dec!(200.5)); // Cost is (200*10 + 5) / 10
         assert_eq!(position_tsla.total_cost_basis, dec!(2005)); // (10 * 200) + 5 USD
         assert_eq!(position_tsla.currency, asset_currency); // USD
 
-        // Check cash after AddHolding (in CAD)
-        // Fee was 5 USD. Converted to CAD: 5 USD * 1.30 CAD/USD = 6.50 CAD
-        // Expected cash CAD: 1000 (initial) - 6.50 (fee) = 993.50 CAD
-        let fee_add_cad = add_holding_activity.fee * rate_add_date;
-        let expected_cash_after_add = previous_snapshot_add
-            .cash_balances
-            .get(account_currency)
-            .unwrap()
-            - fee_add_cad;
+        // Check cash after External TransferIn (fee booked in ACTIVITY currency - USD, per design spec)
+        // Fee was 5 USD -> USD balance = -5 USD
+        // CAD balance unchanged: 1000 CAD
+        let fee_add_usd = add_holding_activity.fee_amt();
+        assert_eq!(
+            state_after_add.cash_balances.get(asset_currency),
+            Some(&(-fee_add_usd)) // -5 USD
+        );
         assert_eq!(
             state_after_add.cash_balances.get(account_currency),
-            Some(&expected_cash_after_add)
+            Some(&dec!(1000)) // Unchanged 1000 CAD
         );
+        // Verify cash_total_account_currency
+        let expected_cash_total_add = dec!(1000) + (-fee_add_usd * rate_add_date); // 1000 - 6.5 = 993.5 CAD
+        assert_eq!(state_after_add.cash_total_account_currency, expected_cash_total_add);
 
-        // Check net contribution after AddHolding (in CAD)
+        // Check net contribution after External TransferIn (in CAD)
         // Cost basis added was 10 shares * 200 USD/share + 5 USD fee = 2005 USD.
         // Converted to CAD using ADD date rate: 2005 USD * 1.30 CAD/USD = 2606.50 CAD.
-        let added_basis_usd = (add_holding_activity.quantity * add_holding_activity.unit_price)
-            + add_holding_activity.fee;
+        let added_basis_usd = (add_holding_activity.qty() * add_holding_activity.price())
+            + add_holding_activity.fee_amt();
         let added_basis_cad = added_basis_usd * rate_add_date;
         let expected_net_contribution_after_add = initial_net_contribution + added_basis_cad;
         assert_eq!(
@@ -1011,13 +1088,14 @@ mod tests {
         // Position cost basis 2005 USD -> 2005 * 1.30 (snapshot date rate) = 2606.50 CAD
         assert_eq!(state_after_add.cost_basis, added_basis_cad); // 2606.50 CAD
 
-        // --- 2. RemoveHolding Activity ---
-        let remove_holding_activity = create_default_activity(
+        // --- 2. External TransferOut Activity (replaces RemoveHolding) ---
+        // External transfers affect net_contribution (metadata.flow.is_external = true)
+        let remove_holding_activity = create_external_transfer_activity(
             "act_remove_tsla",
-            ActivityType::RemoveHolding,
+            ActivityType::TransferOut,
             "TSLA",         // Asset ID
             dec!(4),        // Quantity to remove
-            dec!(0), // Unit price not used by RemoveHolding for cost basis reduction logic (uses FIFO from lots)
+            dec!(0), // Unit price not used by TransferOut for cost basis reduction logic (uses FIFO from lots)
             dec!(2), // Fee in USD
             asset_currency, // USD
             target_date_remove_str,
@@ -1031,29 +1109,37 @@ mod tests {
         );
         assert!(
             result_remove.is_ok(),
-            "RemoveHolding calculation failed: {:?}",
+            "External TransferOut calculation failed: {:?}",
             result_remove.err()
         );
         let state_after_remove = result_remove.unwrap().snapshot;
 
-        // Check position after RemoveHolding (cost basis in USD)
+        // Check position after External TransferOut (cost basis in USD)
         let position_tsla_after_remove = state_after_remove.positions.get("TSLA").unwrap();
         assert_eq!(position_tsla_after_remove.quantity, dec!(6)); // 10 - 4 = 6 shares left
         assert_eq!(position_tsla_after_remove.average_cost, dec!(200.5)); // Average cost remains
         assert_eq!(position_tsla_after_remove.total_cost_basis, dec!(1203)); // 6 * 200.5 USD
 
-        // Check cash after RemoveHolding (in CAD)
-        // Fee was 2 USD. Converted to CAD: 2 USD * 1.30 CAD/USD (rate for remove date) = 2.60 CAD
-        // Expected cash CAD: 993.50 (from after_add) - 2.60 (fee) = 990.90 CAD
-        let fee_remove_cad = remove_holding_activity.fee * rate_remove_date;
-        let expected_cash_after_remove =
-            state_after_add.cash_balances.get(account_currency).unwrap() - fee_remove_cad;
+        // Check cash after External TransferOut (fee booked in ACTIVITY currency - USD, per design spec)
+        // Previous USD balance: -5 USD (from TransferIn fee)
+        // TransferOut fee: -2 USD
+        // Expected USD balance: -5 - 2 = -7 USD
+        // CAD balance unchanged: 1000 CAD
+        let fee_remove_usd = remove_holding_activity.fee_amt();
+        let expected_usd_after_remove = -fee_add_usd - fee_remove_usd; // -5 - 2 = -7 USD
+        assert_eq!(
+            state_after_remove.cash_balances.get(asset_currency),
+            Some(&expected_usd_after_remove)
+        );
         assert_eq!(
             state_after_remove.cash_balances.get(account_currency),
-            Some(&expected_cash_after_remove)
+            Some(&dec!(1000)) // Unchanged 1000 CAD
         );
+        // Verify cash_total_account_currency
+        let expected_cash_total_remove = dec!(1000) + (expected_usd_after_remove * rate_remove_date); // 1000 - 9.1 = 990.9 CAD
+        assert_eq!(state_after_remove.cash_total_account_currency, expected_cash_total_remove);
 
-        // Check net contribution after RemoveHolding (in CAD)
+        // Check net contribution after External TransferOut (in CAD)
         // Cost basis removed was 4 shares * 200.5 USD/share (FIFO cost) = 802 USD.
         // Converted to CAD using REMOVE DATE rate: 802 USD * 1.30 CAD/USD = 1042.6 CAD
         let removed_basis_usd = dec!(4) * dec!(200.5);
@@ -1137,28 +1223,35 @@ mod tests {
         assert_eq!(position_testusd.average_cost, dec!(120.2)); // (120 * 50 + 10) / 50 USD
         assert_eq!(position_testusd.total_cost_basis, dec!(6010)); // (50 * 120) + 10 USD
 
-        // Cash checks (CAD)
-        let fee_in_asset_tx_in_cad = transfer_in_asset_activity.fee * rate_asset_date; // 10 * 1.30 = 13 CAD
-        let expected_cash_after_asset_tx_in = dec!(5000) - fee_in_asset_tx_in_cad; // 5000 - 13 = 4987 CAD
+        // Cash checks (fee booked in ACTIVITY currency - USD, per design spec)
+        // Fee was 10 USD -> USD balance = -10 USD
+        // CAD balance unchanged: 5000 CAD
+        let fee_in_asset_tx_in_usd = transfer_in_asset_activity.fee_amt(); // 10 USD
+        assert_eq!(
+            state_after_asset_tx_in.cash_balances.get(asset_currency),
+            Some(&(-fee_in_asset_tx_in_usd)) // -10 USD
+        );
         assert_eq!(
             state_after_asset_tx_in.cash_balances.get(account_currency),
-            Some(&expected_cash_after_asset_tx_in)
+            Some(&dec!(5000)) // Unchanged 5000 CAD
         );
+        // Verify cash_total_account_currency
+        let expected_cash_total_asset_tx_in = dec!(5000) + (-fee_in_asset_tx_in_usd * rate_asset_date); // 5000 - 13 = 4987 CAD
+        assert_eq!(state_after_asset_tx_in.cash_total_account_currency, expected_cash_total_asset_tx_in);
 
-        // Net Contribution (CAD)
-        let added_basis_usd = position_testusd.total_cost_basis; // 6010 USD
-        let added_basis_asset_tx_in_cad = added_basis_usd * rate_asset_date; // 6010 * 1.30 = 7813 CAD
-        let expected_net_contrib_asset_tx_in =
-            initial_net_contribution + added_basis_asset_tx_in_cad; // 2000 + 7813 = 9813 CAD
+        // Net Contribution (CAD) - INTERNAL transfer (default), no net_contribution change
         assert_eq!(
             state_after_asset_tx_in.net_contribution,
-            expected_net_contrib_asset_tx_in
+            initial_net_contribution // Unchanged for internal transfer
         );
 
         // Snapshot Cost Basis (CAD)
+        // Position cost basis 6010 USD -> 6010 * 1.30 = 7813 CAD
+        let added_basis_usd = position_testusd.total_cost_basis; // 6010 USD
+        let position_cost_basis_cad = added_basis_usd * rate_asset_date; // 7813 CAD
         assert_eq!(
             state_after_asset_tx_in.cost_basis,
-            added_basis_asset_tx_in_cad
+            position_cost_basis_cad
         ); // 7813 CAD
 
         // --- 2. Asset TransferOut ---
@@ -1191,23 +1284,29 @@ mod tests {
         assert_eq!(position_testusd_after_out.average_cost, dec!(120.2)); // Remains same
         assert_eq!(position_testusd_after_out.total_cost_basis, dec!(3606)); // 30 * 120.2 USD
 
-        // Cash checks (CAD)
-        let fee_out_asset_tx_cad = transfer_out_asset_activity.fee * rate_asset_date; // 5 * 1.30 = 6.5 CAD
-        let expected_cash_after_asset_tx_out =
-            expected_cash_after_asset_tx_in - fee_out_asset_tx_cad; // 4987 - 6.5 = 4980.5 CAD
+        // Cash checks (fee booked in ACTIVITY currency - USD, per design spec)
+        // Previous USD balance: -10 USD (from TransferIn fee)
+        // TransferOut fee: -5 USD
+        // Expected USD balance: -10 - 5 = -15 USD
+        // CAD balance unchanged: 5000 CAD
+        let fee_out_asset_tx_usd = transfer_out_asset_activity.fee_amt(); // 5 USD
+        let expected_usd_after_asset_tx_out = -fee_in_asset_tx_in_usd - fee_out_asset_tx_usd; // -10 - 5 = -15 USD
+        assert_eq!(
+            state_after_asset_tx_out.cash_balances.get(asset_currency),
+            Some(&expected_usd_after_asset_tx_out) // -15 USD
+        );
         assert_eq!(
             state_after_asset_tx_out.cash_balances.get(account_currency),
-            Some(&expected_cash_after_asset_tx_out)
+            Some(&dec!(5000)) // Unchanged 5000 CAD
         );
+        // Verify cash_total_account_currency
+        let expected_cash_total_asset_tx_out = dec!(5000) + (expected_usd_after_asset_tx_out * rate_asset_date); // 5000 - 19.5 = 4980.5 CAD
+        assert_eq!(state_after_asset_tx_out.cash_total_account_currency, expected_cash_total_asset_tx_out);
 
-        // Net Contribution (CAD)
-        let removed_basis_usd = dec!(20) * dec!(120.2); // 2404 USD
-        let removed_basis_asset_tx_out_cad = removed_basis_usd * rate_asset_date; // 2404 * 1.30 = 3125.2 CAD
-        let expected_net_contrib_asset_tx_out =
-            expected_net_contrib_asset_tx_in - removed_basis_asset_tx_out_cad; // 9813 - 3125.2 = 6687.8 CAD
+        // Net Contribution (CAD) - INTERNAL transfer (default), no net_contribution change
         assert_eq!(
             state_after_asset_tx_out.net_contribution,
-            expected_net_contrib_asset_tx_out
+            initial_net_contribution // Unchanged for internal transfer
         );
 
         // Snapshot Cost Basis (CAD)
@@ -1240,23 +1339,29 @@ mod tests {
         );
         let state_after_cash_tx_in = result_cash_tx_in.unwrap().snapshot;
 
-        // Cash checks (CAD)
-        let net_cash_in_usd = transfer_in_cash_activity.unit_price - transfer_in_cash_activity.fee; // 1000 - 8 = 992 USD
-        let cash_in_cad = net_cash_in_usd * rate_cash_date; // 992 * 1.30 = 1289.6 CAD
-        let expected_cash_after_cash_tx_in = expected_cash_after_asset_tx_out + cash_in_cad; // 4980.5 + 1289.6 = 6270.1 CAD
+        // Cash checks (booked in ACTIVITY currency - USD, per design spec)
+        // Previous USD balance: -15 USD (from asset transfer fees)
+        // Cash TransferIn: 1000 - 8 = 992 USD net
+        // Expected USD balance: -15 + 992 = 977 USD
+        // CAD balance unchanged: 5000 CAD
+        let net_cash_in_usd = transfer_in_cash_activity.price() - transfer_in_cash_activity.fee_amt(); // 1000 - 8 = 992 USD
+        let expected_usd_after_cash_tx_in = expected_usd_after_asset_tx_out + net_cash_in_usd; // -15 + 992 = 977 USD
+        assert_eq!(
+            state_after_cash_tx_in.cash_balances.get(cash_transfer_currency),
+            Some(&expected_usd_after_cash_tx_in) // 977 USD
+        );
         assert_eq!(
             state_after_cash_tx_in.cash_balances.get(account_currency),
-            Some(&expected_cash_after_cash_tx_in)
+            Some(&dec!(5000)) // Unchanged 5000 CAD
         );
+        // Verify cash_total_account_currency
+        let expected_cash_total_cash_tx_in = dec!(5000) + (expected_usd_after_cash_tx_in * rate_cash_date); // 5000 + 1270.1 = 6270.1 CAD
+        assert_eq!(state_after_cash_tx_in.cash_total_account_currency, expected_cash_total_cash_tx_in);
 
-        // Net Contribution (CAD)
-        let net_contrib_change_cash_tx_in_cad =
-            transfer_in_cash_activity.unit_price * rate_cash_date; // 1000 * 1.30 = 1300 CAD
-        let expected_net_contrib_cash_tx_in =
-            expected_net_contrib_asset_tx_out + net_contrib_change_cash_tx_in_cad; // 6687.8 + 1300 = 7987.8 CAD
+        // Net Contribution (CAD) - INTERNAL transfer (default), no net_contribution change
         assert_eq!(
             state_after_cash_tx_in.net_contribution,
-            expected_net_contrib_cash_tx_in
+            initial_net_contribution // Unchanged for internal transfer
         );
 
         // Snapshot Cost Basis (CAD) - unchanged from previous step
@@ -1287,24 +1392,30 @@ mod tests {
         );
         let state_after_cash_tx_out = result_cash_tx_out.unwrap().snapshot;
 
-        // Cash checks (CAD)
+        // Cash checks (booked in ACTIVITY currency - USD, per design spec)
+        // Previous USD balance: 977 USD
+        // Cash TransferOut: -(200 + 3) = -203 USD
+        // Expected USD balance: 977 - 203 = 774 USD
+        // CAD balance unchanged: 5000 CAD
         let total_cash_out_usd =
-            transfer_out_cash_activity.unit_price + transfer_out_cash_activity.fee; // 200 + 3 = 203 USD
-        let cash_out_cad = total_cash_out_usd * rate_cash_date; // 203 * 1.30 = 263.9 CAD
-        let expected_cash_after_cash_tx_out = expected_cash_after_cash_tx_in - cash_out_cad; // 6270.1 - 263.9 = 6006.2 CAD
+            transfer_out_cash_activity.price() + transfer_out_cash_activity.fee_amt(); // 200 + 3 = 203 USD
+        let expected_usd_after_cash_tx_out = expected_usd_after_cash_tx_in - total_cash_out_usd; // 977 - 203 = 774 USD
+        assert_eq!(
+            state_after_cash_tx_out.cash_balances.get(cash_transfer_currency),
+            Some(&expected_usd_after_cash_tx_out) // 774 USD
+        );
         assert_eq!(
             state_after_cash_tx_out.cash_balances.get(account_currency),
-            Some(&expected_cash_after_cash_tx_out)
+            Some(&dec!(5000)) // Unchanged 5000 CAD
         );
+        // Verify cash_total_account_currency
+        let expected_cash_total_cash_tx_out = dec!(5000) + (expected_usd_after_cash_tx_out * rate_cash_date); // 5000 + 1006.2 = 6006.2 CAD
+        assert_eq!(state_after_cash_tx_out.cash_total_account_currency, expected_cash_total_cash_tx_out);
 
-        // Net Contribution (CAD)
-        let net_contrib_change_cash_tx_out_cad =
-            transfer_out_cash_activity.unit_price * rate_cash_date; // 200 * 1.30 = 260 CAD
-        let expected_net_contrib_cash_tx_out =
-            expected_net_contrib_cash_tx_in - net_contrib_change_cash_tx_out_cad; // 7987.8 - 260 = 7727.8 CAD
+        // Net Contribution (CAD) - INTERNAL transfer (default), no net_contribution change
         assert_eq!(
             state_after_cash_tx_out.net_contribution,
-            expected_net_contrib_cash_tx_out
+            initial_net_contribution // Unchanged for internal transfer
         );
 
         // Snapshot Cost Basis (CAD) - unchanged from previous step
@@ -1377,32 +1488,29 @@ mod tests {
         assert_eq!(position_msft.average_cost, dec!(300.5)); // 300.5 USD
         assert_eq!(position_msft.total_cost_basis, dec!(4507.5)); // 15 shares * 300.5 USD
 
-        // --- Check Cash Balance (CAD) ---
-        // Initial cash: 1,000,000 CAD
+        // --- Check Cash Balance (booked in ACTIVITY currency - USD, per design spec) ---
         // Buy cost: (20 shares * 300 USD) + 10 USD fee = 6010 USD
-        // Buy cost in CAD: 6010 USD * 1.30 CAD/USD = 7813 CAD
         // Sell proceeds: (5 shares * 310 USD) - 5 USD fee = 1545 USD
-        // Sell proceeds in CAD: 1545 USD * 1.30 CAD/USD = 2008.5 CAD
-        // Expected cash CAD: 1,000,000 - 7813 + 2008.5 = 994195.5 CAD
+        // Net USD cash: -6010 + 1545 = -4465 USD
 
         let buy_cost_usd =
-            buy_activity_usd.quantity * buy_activity_usd.unit_price + buy_activity_usd.fee;
-        let buy_cost_cad = buy_cost_usd * rate_usd_cad;
-
+            buy_activity_usd.qty() * buy_activity_usd.price() + buy_activity_usd.fee_amt();
         let sell_proceeds_usd =
-            sell_activity_usd.quantity * sell_activity_usd.unit_price - sell_activity_usd.fee;
-        let sell_proceeds_cad = sell_proceeds_usd * rate_usd_cad;
+            sell_activity_usd.qty() * sell_activity_usd.price() - sell_activity_usd.fee_amt();
+        let expected_usd_cash = -buy_cost_usd + sell_proceeds_usd; // -6010 + 1545 = -4465 USD
 
-        let expected_cash_cad = previous_snapshot
-            .cash_balances
-            .get(account_currency)
-            .unwrap()
-            - buy_cost_cad
-            + sell_proceeds_cad;
+        assert_eq!(
+            next_state.cash_balances.get(asset_currency),
+            Some(&expected_usd_cash) // -4465 USD
+        );
+        // CAD balance unchanged
         assert_eq!(
             next_state.cash_balances.get(account_currency),
-            Some(&expected_cash_cad) // 994195.5 CAD
+            Some(&dec!(1000000)) // Initial 1,000,000 CAD unchanged
         );
+        // Verify cash_total_account_currency (consolidated to CAD)
+        let expected_cash_total_cad = dec!(1000000) + (expected_usd_cash * rate_usd_cad); // 1000000 - 5804.5 = 994195.5 CAD
+        assert_eq!(next_state.cash_total_account_currency, expected_cash_total_cad);
 
         // --- Check Snapshot Cost Basis (CAD) ---
         // Remaining position cost basis is 4507.5 USD.
@@ -1472,23 +1580,22 @@ mod tests {
         assert_eq!(position_ads.total_cost_basis, dec!(2015)); // Expected: (10 * 200) + 15 EUR
         assert_eq!(position_ads.currency, activity_currency); // EUR
 
-        // --- Check Cash Balance (CAD) ---
-        // FX conversion for activity amount (unit price) and fee to account currency (CAD) will fail.
-        // Calculator should use original EUR amounts for cash deduction from CAD balance (1:1 fallback).
-        // Cost in EUR: (10 shares * 200 EUR) + 15 EUR fee = 2015 EUR.
-        // Since conversion to CAD fails, this 2015 is treated as 2015 CAD for cash change.
-        // Expected cash CAD: 10000 (initial) - 2015 (EUR amount treated as CAD) = 7985 CAD.
-        let buy_cost_eur_val = buy_activity_eur.quantity * buy_activity_eur.unit_price; // 2000 EUR
-        let fee_eur_val = buy_activity_eur.fee; // 15 EUR
-                                                // The handler calls convert_currency_for_date separately for price and fee
-                                                // Both will fail and return original values
-        let expected_cash_cad = previous_snapshot.cash_balances.get(account_currency).unwrap()
-                                - buy_cost_eur_val // Fallback uses 2000 EUR as 2000 CAD
-                                - fee_eur_val; // Fallback uses 15 EUR as 15 CAD
+        // --- Check Cash Balance (booked in ACTIVITY currency - EUR, per design spec) ---
+        // Cash is booked in activity currency (EUR), not converted to account currency (CAD)
+        // Cost in EUR: (10 shares * 200 EUR) + 15 EUR fee = 2015 EUR
+        let buy_cost_eur = buy_activity_eur.qty() * buy_activity_eur.price() + buy_activity_eur.fee_amt(); // 2015 EUR
+        let expected_eur_cash = -buy_cost_eur; // -2015 EUR
+
+        assert_eq!(
+            next_state.cash_balances.get(activity_currency),
+            Some(&expected_eur_cash), // -2015 EUR
+            "EUR cash balance mismatch. Cash should be booked in activity currency."
+        );
+        // CAD balance should be unchanged
         assert_eq!(
             next_state.cash_balances.get(account_currency),
-            Some(&expected_cash_cad), // 7985 CAD
-            "Cash balance mismatch. Expected fallback to use unconverted activity currency values against account currency."
+            Some(&dec!(10000)), // 10000 CAD unchanged
+            "CAD balance should be unchanged when activity is in EUR."
         );
 
         // --- Check Snapshot Cost Basis (CAD) ---
@@ -1587,25 +1694,49 @@ mod tests {
         let next_state = result.unwrap().snapshot;
 
         // --- Assert Cash Balances ---
-        // For an individual account snapshot produced by HoldingsCalculator, cash should be consolidated
-        // into the account's primary currency.
+        // Cash is booked in ACTIVITY currency per design spec (multi-currency cash tracking)
+        // Each currency has its own balance, not consolidated into account currency
         assert_eq!(
             next_state.cash_balances.len(),
-            1,
-            "Should have cash balance in 1 currency (account's primary)"
+            3,
+            "Should have cash balances in 3 currencies (CAD, USD, EUR)"
         );
 
-        // CAD Balance
-        // Initial: 1000 CAD
-        // USD Deposit (Net 98 USD * 1.25 CAD/USD): +122.5 CAD
-        // USD Buy Stock (Cost 51 USD * 1.25 CAD/USD): -63.75 CAD
-        // EUR Deposit (Net 195 EUR * 1.50 CAD/EUR): +292.5 CAD
-        // Expected CAD: 1000 + 122.5 - 63.75 + 292.5 = 1351.25 CAD
-        let expected_cad_cash = dec!(1351.25);
+        // CAD Balance: Initial 1000 CAD (no CAD activities)
         assert_eq!(
-            next_state.cash_balances.get(account_currency), // account_currency is "CAD"
-            Some(&expected_cad_cash),
-            "Consolidated CAD cash balance mismatch"
+            next_state.cash_balances.get(account_currency),
+            Some(&dec!(1000)),
+            "CAD balance should be unchanged (no CAD activities)"
+        );
+
+        // USD Balance:
+        // USD Deposit: +98 USD (100 - 2 fee)
+        // USD Buy Stock: -51 USD (10*5 + 1 fee)
+        // Total: 98 - 51 = 47 USD
+        let expected_usd_cash = dec!(98) - dec!(51);
+        assert_eq!(
+            next_state.cash_balances.get(usd_currency),
+            Some(&expected_usd_cash), // 47 USD
+            "USD cash balance mismatch"
+        );
+
+        // EUR Balance: 195 EUR (200 - 5 fee)
+        let expected_eur_cash = dec!(195);
+        assert_eq!(
+            next_state.cash_balances.get(eur_currency),
+            Some(&expected_eur_cash), // 195 EUR
+            "EUR cash balance mismatch"
+        );
+
+        // Verify cash_total_account_currency is computed correctly (consolidated to CAD)
+        // CAD: 1000
+        // USD: 47 * 1.25 = 58.75
+        // EUR: 195 * 1.50 = 292.50
+        // Total: 1000 + 58.75 + 292.50 = 1351.25 CAD
+        let expected_cash_total_cad = dec!(1000) + (expected_usd_cash * rate_usd_cad) + (expected_eur_cash * rate_eur_cad);
+        assert_eq!(
+            next_state.cash_total_account_currency, expected_cash_total_cad,
+            "Consolidated CAD cash total mismatch"
         );
 
         // --- Assert Positions ---
@@ -1621,8 +1752,8 @@ mod tests {
         // USD Deposit (gross 100 USD): + (100 USD * 1.25 CAD/USD) = +125 CAD
         // EUR Deposit (gross 200 EUR): + (200 EUR * 1.50 CAD/USD) = +300 CAD
         // Buy/Sell of stock does not affect net contribution.
-        let net_contrib_change_usd_deposit = deposit_usd_activity.unit_price * rate_usd_cad;
-        let net_contrib_change_eur_deposit = deposit_eur_activity.unit_price * rate_eur_cad;
+        let net_contrib_change_usd_deposit = deposit_usd_activity.price() * rate_usd_cad;
+        let net_contrib_change_eur_deposit = deposit_eur_activity.price() * rate_eur_cad;
         let expected_net_contribution = initial_net_contribution
             + net_contrib_change_usd_deposit
             + net_contrib_change_eur_deposit; // 1000 + 125 + 300 = 1425 CAD
@@ -1741,16 +1872,16 @@ mod tests {
         );
         assert_eq!(position_after_first.lots.len(), 1, "Should have 1 lot");
 
-        // Verify cash was deducted in account currency (EUR)
-        let expected_cash_after_first = dec!(10000) - dec!(190);
+        // Verify cash was deducted in activity currency (EUR) per design spec
+        let expected_eur_after_first = dec!(10000) - dec!(190); // EUR activity deducts from EUR balance
         assert_eq!(
             snapshot_after_first
                 .cash_balances
-                .get(account_currency)
+                .get("EUR")
                 .copied()
                 .unwrap_or_default(),
-            expected_cash_after_first,
-            "Cash should be deducted by €190"
+            expected_eur_after_first,
+            "Cash should be deducted by €190 from EUR balance"
         );
 
         // Second activity: Buy 1 AMZN share at $222 USD on 2025-08-20
@@ -1847,18 +1978,27 @@ mod tests {
             "Average cost should be weighted average in USD"
         );
 
-        // Verify cash balance - second buy should deduct $222 worth of EUR from the balance
-        let usd_cost_in_account_eur = dec!(222) * rate_usd_eur_date2; // Convert USD to EUR for cash deduction
-        let expected_final_cash = expected_cash_after_first - usd_cost_in_account_eur;
+        // Verify cash balance - second buy deducts $222 from USD balance (not EUR)
+        // Per design spec, cash is booked in ACTIVITY currency
+        // First buy: EUR balance = 10000 - 190 = 9810 EUR
+        // Second buy: USD balance = -222 USD (new USD cash balance)
         assert_eq!(
             final_snapshot
                 .cash_balances
-                .get(account_currency)
+                .get("EUR")
                 .copied()
-                .unwrap_or_default()
-                .round_dp(6),
-            expected_final_cash.round_dp(6),
-            "Cash should be further deducted by converted USD amount"
+                .unwrap_or_default(),
+            expected_eur_after_first, // EUR unchanged at 9810
+            "EUR cash should remain at 9810 (unchanged by USD activity)"
+        );
+        assert_eq!(
+            final_snapshot
+                .cash_balances
+                .get("USD")
+                .copied()
+                .unwrap_or_default(),
+            dec!(-222), // USD deducted
+            "USD cash should be -222 (deducted for second buy)"
         );
     }
 
@@ -2142,20 +2282,29 @@ mod tests {
         Activity {
             id: id.to_string(),
             account_id: "acc_1".to_string(),
-            asset_id: asset_id.to_string(),
+            asset_id: Some(asset_id.to_string()),
             activity_type: activity_type.as_str().to_string(),
+            activity_type_override: None,
+            source_type: None,
+            subtype: None,
+            status: ActivityStatus::Posted,
             activity_date: activity_date_utc,
-            quantity,
-            unit_price,
-            fee,
-            currency: currency.to_string(),
+            settlement_date: None,
+            quantity: Some(quantity),
+            unit_price: Some(unit_price),
             amount: None,
-            is_draft: false,
-            comment: None,
+            fee: Some(fee),
+            currency: currency.to_string(),
             fx_rate,
-            provider_type: None,
-            external_provider_id: None,
-            external_broker_id: None,
+            notes: None,
+            metadata: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+            idempotency_key: None,
+            import_run_id: None,
+            is_user_modified: false,
+            needs_review: false,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }
@@ -2179,20 +2328,29 @@ mod tests {
         Activity {
             id: id.to_string(),
             account_id: "acc_1".to_string(),
-            asset_id: format!("$CASH-{}", currency),
+            asset_id: Some(format!("$CASH-{}", currency)),
             activity_type: activity_type.as_str().to_string(),
+            activity_type_override: None,
+            source_type: None,
+            subtype: None,
+            status: ActivityStatus::Posted,
             activity_date: activity_date_utc,
-            quantity: dec!(1),
-            unit_price: amount,
-            fee,
-            currency: currency.to_string(),
+            settlement_date: None,
+            quantity: Some(dec!(1)),
+            unit_price: Some(amount),
             amount: Some(amount),
-            is_draft: false,
-            comment: None,
+            fee: Some(fee),
+            currency: currency.to_string(),
             fx_rate,
-            provider_type: None,
-            external_provider_id: None,
-            external_broker_id: None,
+            notes: None,
+            metadata: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+            idempotency_key: None,
+            import_run_id: None,
+            is_user_modified: false,
+            needs_review: false,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }
@@ -2248,25 +2406,24 @@ mod tests {
         assert_eq!(position.quantity, dec!(10));
         assert_eq!(position.currency, "USD");
 
-        // Cash should be deducted using the activity's fx_rate (1.35), NOT the service rate (1.30)
+        // Cash is booked in ACTIVITY currency (USD) per design spec, not converted to account currency
         // Cost in USD: (10 * 100) + 5 = 1005 USD
-        // Cost in CAD using activity fx_rate: 1005 * 1.35 = 1356.75 CAD
         let expected_cost_usd = dec!(10) * dec!(100) + dec!(5);
-        let expected_cash_deduction_cad = expected_cost_usd * activity_fx_rate;
 
         assert_eq!(
-            next_state.cash_balances.get(account_currency),
-            Some(&(-expected_cash_deduction_cad)),
-            "Cash should be deducted using activity's fx_rate (1.35), not service rate (1.30)"
+            next_state.cash_balances.get(activity_currency),
+            Some(&(-expected_cost_usd)), // -1005 USD
+            "Cash should be booked in activity currency (USD)"
         );
 
-        // If the service rate (1.30) was used instead, cash would be 1005 * 1.30 = 1306.50 CAD
-        // This should NOT be the case
-        let wrong_cash_if_service_rate = expected_cost_usd * service_rate;
-        assert_ne!(
-            next_state.cash_balances.get(account_currency),
-            Some(&(-wrong_cash_if_service_rate)),
-            "Should NOT use the FxService rate when activity has fx_rate"
+        // cash_total_account_currency uses FxService rate for cash conversion
+        // Note: activity.fx_rate is used for position calculations, not cash total
+        // Total: -1005 USD * 1.30 (service rate) = -1306.50 CAD
+        let expected_cash_total_cad = -expected_cost_usd * service_rate;
+        assert_eq!(
+            next_state.cash_total_account_currency,
+            expected_cash_total_cad,
+            "cash_total_account_currency uses FxService rate"
         );
     }
 
@@ -2310,14 +2467,21 @@ mod tests {
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
         let next_state = result.unwrap().snapshot;
 
-        // Cash should be deducted using the FxService rate (1.30)
+        // Cash is booked in ACTIVITY currency (USD) per design spec
         let expected_cost_usd = dec!(10) * dec!(100) + dec!(5);
-        let expected_cash_deduction_cad = expected_cost_usd * service_rate;
 
         assert_eq!(
-            next_state.cash_balances.get(account_currency),
-            Some(&(-expected_cash_deduction_cad)),
-            "Cash should be deducted using FxService rate when fx_rate is None"
+            next_state.cash_balances.get(activity_currency),
+            Some(&(-expected_cost_usd)), // -1005 USD
+            "Cash should be booked in activity currency (USD)"
+        );
+
+        // Verify cash_total_account_currency uses FxService rate when fx_rate is None
+        let expected_cash_total_cad = -expected_cost_usd * service_rate;
+        assert_eq!(
+            next_state.cash_total_account_currency,
+            expected_cash_total_cad,
+            "cash_total_account_currency should use FxService rate when fx_rate is None"
         );
     }
 
@@ -2362,14 +2526,21 @@ mod tests {
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
         let next_state = result.unwrap().snapshot;
 
-        // Cash should be deducted using the FxService rate (1.30) since fx_rate=0 is invalid
+        // Cash is booked in ACTIVITY currency (USD) per design spec
         let expected_cost_usd = dec!(10) * dec!(100) + dec!(5);
-        let expected_cash_deduction_cad = expected_cost_usd * service_rate;
 
         assert_eq!(
-            next_state.cash_balances.get(account_currency),
-            Some(&(-expected_cash_deduction_cad)),
-            "Cash should be deducted using FxService rate when fx_rate is zero"
+            next_state.cash_balances.get(activity_currency),
+            Some(&(-expected_cost_usd)), // -1005 USD
+            "Cash should be booked in activity currency (USD)"
+        );
+
+        // Verify cash_total_account_currency uses FxService rate when fx_rate is zero
+        let expected_cash_total_cad = -expected_cost_usd * service_rate;
+        assert_eq!(
+            next_state.cash_total_account_currency,
+            expected_cash_total_cad,
+            "cash_total_account_currency should use FxService rate when fx_rate is zero"
         );
     }
 
@@ -2418,18 +2589,31 @@ mod tests {
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
         let next_state = result.unwrap().snapshot;
 
-        // Deposit amount should be converted using activity's fx_rate (1.40)
-        // $500 USD * 1.40 = 700 CAD
-        let deposit_in_cad = dec!(500) * activity_fx_rate;
-        let expected_cash = dec!(1000) + deposit_in_cad;
-
+        // Cash is booked in ACTIVITY currency (USD) per design spec
+        // Deposit: $500 USD -> USD balance = 500 USD
+        assert_eq!(
+            next_state.cash_balances.get(activity_currency),
+            Some(&dec!(500)), // 500 USD
+            "Deposit should be booked in activity currency (USD)"
+        );
+        // CAD balance unchanged
         assert_eq!(
             next_state.cash_balances.get(account_currency),
-            Some(&expected_cash),
-            "Deposit should use activity's fx_rate (1.40)"
+            Some(&dec!(1000)), // 1000 CAD unchanged
+            "CAD balance should be unchanged"
         );
 
-        // Net contribution should also use the activity's fx_rate
+        // cash_total_account_currency uses FxService rate for cash conversion
+        // 1000 CAD + (500 USD * 1.30) = 1000 + 650 = 1650 CAD
+        let deposit_in_cad_via_service = dec!(500) * service_rate;
+        let expected_cash_total_cad = dec!(1000) + deposit_in_cad_via_service;
+        assert_eq!(
+            next_state.cash_total_account_currency, expected_cash_total_cad,
+            "cash_total_account_currency uses FxService rate"
+        );
+
+        // Net contribution uses activity's fx_rate for conversion
+        let deposit_in_cad = dec!(500) * activity_fx_rate;
         let expected_net_contribution = dec!(1000) + deposit_in_cad;
         assert_eq!(
             next_state.net_contribution, expected_net_contribution,
@@ -2519,16 +2703,22 @@ mod tests {
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
         let next_state = result.unwrap().snapshot;
 
-        // Proceeds should be converted using activity's fx_rate (1.38)
+        // Cash is booked in ACTIVITY currency (USD) per design spec
         // Proceeds in USD: (10 * 120) - 5 = 1195 USD
-        // Proceeds in CAD: 1195 * 1.38 = 1649.10 CAD
         let proceeds_usd = dec!(10) * dec!(120) - dec!(5);
-        let expected_cash = proceeds_usd * activity_fx_rate;
 
         assert_eq!(
-            next_state.cash_balances.get(account_currency),
-            Some(&expected_cash),
-            "Sell proceeds should use activity's fx_rate (1.38)"
+            next_state.cash_balances.get(activity_currency),
+            Some(&proceeds_usd), // 1195 USD
+            "Sell proceeds should be booked in activity currency (USD)"
+        );
+
+        // cash_total_account_currency uses FxService rate for cash conversion
+        // 1195 USD * 1.30 = 1553.50 CAD
+        let expected_cash_total_cad = proceeds_usd * service_rate;
+        assert_eq!(
+            next_state.cash_total_account_currency, expected_cash_total_cad,
+            "cash_total_account_currency uses FxService rate"
         );
     }
 
@@ -2625,15 +2815,27 @@ mod tests {
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
         let next_state = result.unwrap().snapshot;
 
-        // Withdrawal should be converted using activity's fx_rate (1.42)
-        // $200 USD * 1.42 = 284 CAD
-        let withdrawal_in_cad = dec!(200) * activity_fx_rate;
-        let expected_cash = dec!(5000) - withdrawal_in_cad;
-
+        // Cash is booked in ACTIVITY currency (USD) per design spec
+        // Withdrawal: -$200 USD -> USD balance = -200 USD
+        assert_eq!(
+            next_state.cash_balances.get(activity_currency),
+            Some(&dec!(-200)), // -200 USD
+            "Withdrawal should be booked in activity currency (USD)"
+        );
+        // CAD balance unchanged
         assert_eq!(
             next_state.cash_balances.get(account_currency),
-            Some(&expected_cash),
-            "Withdrawal should use activity's fx_rate (1.42)"
+            Some(&dec!(5000)), // 5000 CAD unchanged
+            "CAD balance should be unchanged"
+        );
+
+        // cash_total_account_currency uses FxService rate for cash conversion
+        // 5000 CAD + (-200 USD * 1.30) = 5000 - 260 = 4740 CAD
+        let withdrawal_in_cad_via_service = dec!(200) * service_rate;
+        let expected_cash_total_cad = dec!(5000) - withdrawal_in_cad_via_service;
+        assert_eq!(
+            next_state.cash_total_account_currency, expected_cash_total_cad,
+            "cash_total_account_currency uses FxService rate"
         );
     }
 
@@ -2680,15 +2882,27 @@ mod tests {
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
         let next_state = result.unwrap().snapshot;
 
-        // Dividend should be converted using activity's fx_rate (1.33)
-        // $50 USD * 1.33 = 66.50 CAD
-        let dividend_in_cad = dec!(50) * activity_fx_rate;
-        let expected_cash = dec!(1000) + dividend_in_cad;
-
+        // Cash is booked in ACTIVITY currency (USD) per design spec
+        // Dividend: $50 USD -> USD balance = 50 USD
+        assert_eq!(
+            next_state.cash_balances.get(activity_currency),
+            Some(&dec!(50)), // 50 USD
+            "Dividend should be booked in activity currency (USD)"
+        );
+        // CAD balance unchanged
         assert_eq!(
             next_state.cash_balances.get(account_currency),
-            Some(&expected_cash),
-            "Dividend should use activity's fx_rate (1.33)"
+            Some(&dec!(1000)), // 1000 CAD unchanged
+            "CAD balance should be unchanged"
+        );
+
+        // cash_total_account_currency uses FxService rate for cash conversion
+        // 1000 CAD + (50 USD * 1.30) = 1000 + 65 = 1065 CAD
+        let dividend_in_cad_via_service = dec!(50) * service_rate;
+        let expected_cash_total_cad = dec!(1000) + dividend_in_cad_via_service;
+        assert_eq!(
+            next_state.cash_total_account_currency, expected_cash_total_cad,
+            "cash_total_account_currency uses FxService rate"
         );
     }
 
@@ -2740,26 +2954,34 @@ mod tests {
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
         let next_state = result.unwrap().snapshot;
 
-        // Fee should be deducted using activity's fx_rate
-        // Fee: $10 USD * 1.36 = 13.60 CAD
-        let fee_in_cad = dec!(10) * activity_fx_rate;
-        let expected_cash = dec!(1000) - fee_in_cad;
-
+        // Cash is booked in ACTIVITY currency (USD) per design spec
+        // Fee: -$10 USD -> USD balance = -10 USD
+        assert_eq!(
+            next_state.cash_balances.get(activity_currency),
+            Some(&dec!(-10)), // -10 USD
+            "Fee should be booked in activity currency (USD)"
+        );
+        // CAD balance unchanged
         assert_eq!(
             next_state.cash_balances.get(account_currency),
-            Some(&expected_cash),
-            "TransferIn fee should use activity's fx_rate (1.36)"
+            Some(&dec!(1000)), // 1000 CAD unchanged
+            "CAD balance should be unchanged"
         );
 
-        // Net contribution should be updated using activity's fx_rate
-        // Cost basis: (10 * 150 + 10) USD = 1510 USD
-        // In CAD: 1510 * 1.36 = 2053.60 CAD
-        let cost_basis_usd = dec!(10) * dec!(150) + dec!(10);
-        let expected_net_contribution = cost_basis_usd * activity_fx_rate;
-
+        // cash_total_account_currency uses FxService rate for cash conversion
+        // 1000 CAD + (-10 USD * 1.30) = 1000 - 13 = 987 CAD
+        let fee_in_cad_via_service = dec!(10) * service_rate;
+        let expected_cash_total_cad = dec!(1000) - fee_in_cad_via_service;
         assert_eq!(
-            next_state.net_contribution, expected_net_contribution,
-            "Net contribution should use activity's fx_rate"
+            next_state.cash_total_account_currency, expected_cash_total_cad,
+            "cash_total_account_currency uses FxService rate"
+        );
+
+        // Net contribution for INTERNAL transfer is unchanged (default is internal)
+        // This is an internal transfer so net_contribution should NOT change
+        assert_eq!(
+            next_state.net_contribution, dec!(0),
+            "Net contribution should not change for internal transfer"
         );
     }
 
@@ -2770,8 +2992,8 @@ mod tests {
     // ==================================================================================
 
     #[test]
-    fn test_add_holding_uses_fx_rate_when_activity_currency_differs_from_position_currency() {
-        // Scenario: User adds AAPL (USD asset) in a CAD account, entering price in CAD
+    fn test_transfer_in_uses_fx_rate_when_activity_currency_differs_from_position_currency() {
+        // Scenario: User transfers in AAPL (USD asset) in a CAD account, entering price in CAD
         // The fx_rate should be used to convert CAD -> USD for cost basis tracking
         // FxService has NO CAD/USD rate - this should NOT fail
 
@@ -2790,12 +3012,12 @@ mod tests {
         let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
 
         let previous_snapshot =
-            create_initial_snapshot("acc_add_holding_fx", account_currency, "2023-02-28");
+            create_initial_snapshot("acc_transfer_in_fx", account_currency, "2023-02-28");
 
-        // AddHolding: 10 shares of AAPL @ $150 CAD, fx_rate = 0.75 (CAD -> USD)
-        let add_holding_activity = create_activity_with_fx_rate(
-            "act_add_holding_cad_to_usd",
-            ActivityType::AddHolding,
+        // TransferIn: 10 shares of AAPL @ $150 CAD, fx_rate = 0.75 (CAD -> USD)
+        let transfer_in_activity = create_activity_with_fx_rate(
+            "act_transfer_in_cad_to_usd",
+            ActivityType::TransferIn,
             "AAPL",
             dec!(10),          // quantity
             dec!(150),         // unit_price in CAD
@@ -2805,7 +3027,7 @@ mod tests {
             Some(activity_fx_rate), // fx_rate to convert CAD -> position currency (USD)
         );
 
-        let activities = vec![add_holding_activity];
+        let activities = vec![transfer_in_activity];
         let result =
             calculator.calculate_next_holdings(&previous_snapshot, &activities, target_date);
 
@@ -2996,10 +3218,10 @@ mod tests {
         let previous_snapshot =
             create_initial_snapshot("acc_no_fx", account_currency, "2023-03-03");
 
-        // AddHolding WITHOUT fx_rate - this should fail since FxService has no CAD/USD rate
-        let add_holding_activity = create_activity_with_fx_rate(
+        // TransferIn WITHOUT fx_rate - this should fail since FxService has no CAD/USD rate
+        let transfer_in_activity = create_activity_with_fx_rate(
             "act_no_fx_rate",
-            ActivityType::AddHolding,
+            ActivityType::TransferIn,
             "AAPL",
             dec!(10),
             dec!(150),
@@ -3009,7 +3231,7 @@ mod tests {
             None, // No fx_rate provided
         );
 
-        let activities = vec![add_holding_activity];
+        let activities = vec![transfer_in_activity];
         let result =
             calculator.calculate_next_holdings(&previous_snapshot, &activities, target_date);
 
@@ -3023,8 +3245,8 @@ mod tests {
     }
 
     #[test]
-    fn test_remove_holding_uses_fx_rate_when_activity_currency_differs_from_position_currency() {
-        // Scenario: User removes AAPL (USD position) from a CAD account
+    fn test_transfer_out_uses_fx_rate_when_activity_currency_differs_from_position_currency() {
+        // Scenario: User transfers out AAPL (USD position) from a CAD account
 
         let mock_fx_service = MockFxService::new();
         let account_currency = "CAD";
@@ -3040,10 +3262,10 @@ mod tests {
 
         // Create snapshot with existing AAPL position
         let mut previous_snapshot =
-            create_initial_snapshot("acc_remove_holding", account_currency, "2023-03-04");
+            create_initial_snapshot("acc_transfer_out", account_currency, "2023-03-04");
 
         let mut position = Position::new(
-            "acc_remove_holding".to_string(),
+            "acc_transfer_out".to_string(),
             "AAPL".to_string(),
             "USD".to_string(),
             Utc::now(),
@@ -3064,26 +3286,26 @@ mod tests {
             .positions
             .insert("AAPL".to_string(), position);
 
-        // Remove 10 shares
-        let remove_activity = create_activity_with_fx_rate(
-            "act_remove_holding",
-            ActivityType::RemoveHolding,
+        // Transfer out 10 shares
+        let transfer_out_activity = create_activity_with_fx_rate(
+            "act_transfer_out",
+            ActivityType::TransferOut,
             "AAPL",
             dec!(10),
-            dec!(0), // unit_price not used for remove
+            dec!(0), // unit_price not used for transfer out
             dec!(0),
             activity_currency,
             target_date_str,
             Some(activity_fx_rate),
         );
 
-        let activities = vec![remove_activity];
+        let activities = vec![transfer_out_activity];
         let result =
             calculator.calculate_next_holdings(&previous_snapshot, &activities, target_date);
 
         assert!(
             result.is_ok(),
-            "RemoveHolding should succeed. Error: {:?}",
+            "TransferOut should succeed. Error: {:?}",
             result.err()
         );
 
@@ -3096,7 +3318,7 @@ mod tests {
     }
 
     #[test]
-    fn test_add_holding_activity_currency_equals_position_currency_with_fx_rate() {
+    fn test_external_transfer_in_activity_currency_equals_position_currency_with_fx_rate() {
         // Scenario from user bug report:
         // - Account currency: CAD
         // - Activity currency: USD (same as position currency for AAPL)
@@ -3124,20 +3346,51 @@ mod tests {
             "2023-03-09",
         );
 
-        // AddHolding: 1 share of AAPL @ $100 USD, fx_rate = 1.40 (USD -> CAD)
-        let add_holding_activity = create_activity_with_fx_rate(
-            "act_add_holding_usd_in_cad_account",
-            ActivityType::AddHolding,
-            "AAPL",
-            dec!(1),           // quantity
-            dec!(100),         // unit_price in USD
-            dec!(0),           // fee
-            activity_currency, // USD
-            target_date_str,
-            Some(activity_fx_rate), // fx_rate to convert USD -> CAD (account currency)
-        );
+        // External TransferIn: 1 share of AAPL @ $100 USD, fx_rate = 1.40 (USD -> CAD)
+        // Using create_external_transfer_activity_with_fx_rate which includes external metadata
+        let activity_date_naive = NaiveDate::from_str(target_date_str)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+        let activity_date_utc: DateTime<Utc> = Utc.from_utc_datetime(&activity_date_naive);
 
-        let activities = vec![add_holding_activity];
+        // Create metadata with flow.is_external = true
+        let mut flow_map = serde_json::Map::new();
+        flow_map.insert("is_external".to_string(), serde_json::Value::Bool(true));
+        let mut metadata = serde_json::Map::new();
+        metadata.insert("flow".to_string(), serde_json::Value::Object(flow_map));
+
+        let transfer_in_activity = Activity {
+            id: "act_transfer_in_usd_in_cad_account".to_string(),
+            account_id: "acc_1".to_string(),
+            asset_id: Some("AAPL".to_string()),
+            activity_type: ActivityType::TransferIn.as_str().to_string(),
+            activity_type_override: None,
+            source_type: None,
+            subtype: None,
+            status: ActivityStatus::Posted,
+            activity_date: activity_date_utc,
+            settlement_date: None,
+            quantity: Some(dec!(1)),
+            unit_price: Some(dec!(100)),
+            amount: None,
+            fee: Some(dec!(0)),
+            currency: activity_currency.to_string(),
+            fx_rate: Some(activity_fx_rate),
+            notes: None,
+            metadata: Some(serde_json::Value::Object(metadata)),
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+            idempotency_key: None,
+            import_run_id: None,
+            is_user_modified: false,
+            needs_review: false,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let activities = vec![transfer_in_activity];
         let result =
             calculator.calculate_next_holdings(&previous_snapshot, &activities, target_date);
 
@@ -3227,13 +3480,13 @@ mod tests {
         // Cost basis in position currency (USD): (10 * 150) + 5 = 1505 USD
         assert_eq!(position.total_cost_basis, dec!(1505));
 
-        // Cash deduction in account currency (CAD): (10 * 150 + 5) * 1.35 = 1505 * 1.35 = 2031.75 CAD
-        let expected_cash =
-            -((dec!(10) * dec!(150) * activity_fx_rate) + (dec!(5) * activity_fx_rate));
+        // Cash is booked in ACTIVITY currency (USD) per design spec
+        // Cost in USD: (10 * 150) + 5 = 1505 USD
+        let expected_usd_cash = -dec!(1505);
         assert_eq!(
-            next_state.cash_balances.get(account_currency),
-            Some(&expected_cash),
-            "Cash should be deducted using fx_rate"
+            next_state.cash_balances.get(activity_currency),
+            Some(&expected_usd_cash), // -1505 USD
+            "Cash should be booked in activity currency (USD)"
         );
     }
 }

@@ -3,16 +3,29 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Broker account balance information
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Broker account balance information (new API format)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BrokerAccountBalance {
-    pub total: Option<BrokerBalanceAmount>,
+    /// Currency code (e.g., "USD", "CAD")
+    pub currency: Option<String>,
+    /// Cash balance amount
+    pub cash: Option<f64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BrokerBalanceAmount {
-    pub amount: Option<f64>,
-    pub currency: Option<String>,
+/// Account owner information from the API
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AccountOwner {
+    /// User ID (UUID)
+    pub user_id: Option<String>,
+    /// Full name of the account owner
+    pub full_name: Option<String>,
+    /// Email address
+    pub email: Option<String>,
+    /// Avatar URL
+    pub avatar_url: Option<String>,
+    /// Whether this is the current user's own account
+    #[serde(default)]
+    pub is_own_account: bool,
 }
 
 /// Sync status for a broker account
@@ -28,46 +41,67 @@ pub struct BrokerSyncStatusDetail {
     pub last_successful_sync: Option<String>,
 }
 
-/// A broker account from the cloud API (mirrors the provider account payload)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// A broker account from the cloud API (new REST API format)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BrokerAccount {
-    /// Unique identifier for the connected brokerage account (UUID)
-    pub id: String,
-
-    /// Unique identifier for the connection (brokerage authorization UUID)
-    pub brokerage_authorization: String,
+    /// Unique identifier for the connected brokerage account (UUID) - NOW NULLABLE
+    pub id: Option<String>,
 
     /// Display name for the account
     pub name: Option<String>,
 
-    /// Account number from the broker (may be masked)
-    #[serde(rename = "number")]
-    pub account_number: String,
+    /// Account number from the broker (may be masked) - NOW NULLABLE
+    #[serde(alias = "number")]
+    pub account_number: Option<String>,
 
-    /// Name of the brokerage institution
-    pub institution_name: String,
+    /// Account type from the API (e.g., "TFSA", "RRSP", "MARGIN")
+    #[serde(rename = "type")]
+    pub account_type: Option<String>,
 
-    /// When the account was created in the broker system
-    pub created_date: Option<String>,
-
-    /// Sync status information
-    pub sync_status: Option<BrokerAccountSyncStatus>,
+    /// Account currency
+    pub currency: Option<String>,
 
     /// Account balance information
     pub balance: Option<BrokerAccountBalance>,
 
+    /// Additional metadata from the API
+    pub meta: Option<serde_json::Value>,
+
+    /// Account owner information (for shared/team accounts)
+    pub owner: Option<AccountOwner>,
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Legacy fields for backward compatibility with existing sync code
+    // These may not be present in the new API response
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// Unique identifier for the connection (brokerage authorization UUID)
+    #[serde(default)]
+    pub brokerage_authorization: Option<String>,
+
+    /// Name of the brokerage institution (legacy, may be in meta now)
+    #[serde(default)]
+    pub institution_name: Option<String>,
+
+    /// When the account was created in the broker system
+    #[serde(default)]
+    pub created_date: Option<String>,
+
+    /// Sync status information (not in new API)
+    #[serde(default)]
+    pub sync_status: Option<BrokerAccountSyncStatus>,
+
     /// Account status: "open", "closed", "archived", "unavailable"
+    #[serde(default)]
     pub status: Option<String>,
 
-    /// The account type as provided by the brokerage
+    /// The account type as provided by the brokerage (legacy, use account_type)
+    #[serde(default)]
     pub raw_type: Option<String>,
 
     /// Whether this is a paper (simulated) trading account
     #[serde(default)]
     pub is_paper: bool,
-
-    /// Additional metadata
-    pub meta: Option<serde_json::Value>,
 }
 
 /// A brokerage/institution from the cloud API
@@ -134,28 +168,6 @@ pub struct BrokerConnectionBrokerage {
     pub aws_s3_square_logo_url: Option<String>,
 }
 
-/// Response from the connect portal URL request
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ConnectPortalResponse {
-    pub redirect_uri: Option<String>,
-}
-
-/// Request body for removing a connection
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RemoveConnectionRequest {
-    pub authorization_id: String,
-}
-
-/// Request body for getting connect portal URL
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ConnectPortalRequest {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub reconnect_authorization_id: Option<String>,
-}
-
 /// Response from syncing accounts
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncAccountsResponse {
@@ -163,6 +175,10 @@ pub struct SyncAccountsResponse {
     pub created: usize,
     pub updated: usize,
     pub skipped: usize,
+    /// List of (account_id, currency) for newly created accounts
+    /// Used to trigger FX rate registration
+    #[serde(default)]
+    pub created_accounts: Vec<(String, String)>,
 }
 
 /// Response from syncing connections/platforms
@@ -182,6 +198,9 @@ pub struct PaginationDetails {
     pub limit: Option<i64>,
     #[serde(default)]
     pub total: Option<i64>,
+    /// Whether there are more results available (new API)
+    #[serde(default)]
+    pub has_more: bool,
 }
 
 /// A paginated list of universal activity objects.
@@ -231,33 +250,112 @@ pub struct AccountUniversalActivityOptionSymbol {
     pub ticker: Option<String>,
 }
 
+/// Flow metadata for transfer activities
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct FlowMetadata {
+    /// Whether the transfer is external (to/from outside the brokerage)
+    #[serde(default)]
+    pub is_external: bool,
+}
+
+/// Mapping metadata from the API describing how the activity was classified
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct MappingMetadata {
+    /// Flow information for transfer activities
+    pub flow: Option<FlowMetadata>,
+    /// Reasons/warnings from the mapping process
+    #[serde(default)]
+    pub reasons: Vec<String>,
+    /// Confidence score of the mapping (0.0 to 1.0)
+    pub confidence: Option<f64>,
+}
+
 /// A transaction or activity from an institution.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AccountUniversalActivity {
+    /// Unique identifier for this activity from the API
     pub id: Option<String>,
+
+    /// Symbol information for the security
     pub symbol: Option<AccountUniversalActivitySymbol>,
+
+    /// Option symbol information (for options trades)
     #[serde(rename = "option_symbol")]
     pub option_symbol: Option<AccountUniversalActivityOptionSymbol>,
+
+    /// Price per unit
     pub price: Option<f64>,
+
+    /// Number of units/shares
     pub units: Option<f64>,
+
+    /// Total amount of the transaction
     pub amount: Option<f64>,
+
+    /// Currency of the transaction
     pub currency: Option<AccountUniversalActivityCurrency>,
+
+    /// Canonical activity type (BUY, SELL, DIVIDEND, etc.)
     #[serde(rename = "type")]
     pub activity_type: Option<String>,
+
+    /// Subtype for semantic variations (DRIP, STAKING_REWARD, etc.)
+    pub subtype: Option<String>,
+
+    /// Provider's original activity type before mapping
+    pub raw_type: Option<String>,
+
+    /// Option type (CALL, PUT) for options trades
     #[serde(rename = "option_type")]
     pub option_type: Option<String>,
+
+    /// Description of the activity
     pub description: Option<String>,
+
+    /// Trade date (when the trade was executed)
     #[serde(rename = "trade_date")]
     pub trade_date: Option<String>,
+
+    /// Settlement date (when the trade settles)
     #[serde(rename = "settlement_date")]
     pub settlement_date: Option<String>,
+
+    /// Transaction fee
     pub fee: Option<f64>,
+
+    /// Foreign exchange rate (if applicable)
     pub fx_rate: Option<f64>,
+
+    /// Institution/brokerage name
     pub institution: Option<String>,
+
+    /// External reference ID from the provider
     #[serde(rename = "external_reference_id")]
     pub external_reference_id: Option<String>,
+
+    /// Provider type (e.g., "SNAPTRADE")
     #[serde(rename = "provider_type")]
     pub provider_type: Option<String>,
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // New fields for sync system
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// Source system that generated this activity (SNAPTRADE, MANUAL, CSV)
+    pub source_system: Option<String>,
+
+    /// Provider's unique ID for this record (for deduplication)
+    pub source_record_id: Option<String>,
+
+    /// Group ID for multi-leg transactions (e.g., options spreads)
+    pub source_group_id: Option<String>,
+
+    /// Mapping metadata with flow info, confidence, and reasons
+    pub mapping_metadata: Option<MappingMetadata>,
+
+    /// Whether this activity needs user review
+    #[serde(default)]
+    pub needs_review: bool,
 }
 
 /// Response from syncing activities.
@@ -270,17 +368,30 @@ pub struct SyncActivitiesResponse {
 }
 
 impl BrokerAccount {
-    /// Get the currency from the balance, defaulting to USD
-    pub fn currency(&self) -> String {
+    /// Get the currency, preferring the direct currency field, then balance currency, defaulting to USD
+    pub fn get_currency(&self) -> String {
+        // First try the direct currency field (new API)
+        if let Some(ref currency) = self.currency {
+            if !currency.is_empty() {
+                return currency.clone();
+            }
+        }
+        // Fall back to balance currency
         self.balance
             .as_ref()
-            .and_then(|b| b.total.as_ref())
-            .and_then(|t| t.currency.clone())
+            .and_then(|b| b.currency.clone())
             .unwrap_or_else(|| "USD".to_string())
     }
 
-    /// Map the broker's raw_type to a standardized account type
-    pub fn account_type(&self) -> String {
+    /// Get the account type, preferring the direct account_type field, then mapping raw_type
+    pub fn get_account_type(&self) -> String {
+        // First try the direct account_type field (new API)
+        if let Some(ref account_type) = self.account_type {
+            if !account_type.is_empty() {
+                return account_type.clone();
+            }
+        }
+        // Fall back to mapping raw_type (legacy)
         let raw = self.raw_type.as_deref().unwrap_or("").to_uppercase();
 
         // Map common broker account types to standardized types
@@ -329,10 +440,14 @@ impl BrokerAccount {
         self.name
             .clone()
             .filter(|n| !n.is_empty())
-            .unwrap_or_else(|| format!("{} - {}", self.institution_name, self.account_number))
+            .unwrap_or_else(|| {
+                let inst = self.institution_name.as_deref().unwrap_or("Unknown");
+                let acct = self.account_number.as_deref().unwrap_or("Account");
+                format!("{} - {}", inst, acct)
+            })
     }
 
-    /// Convert to JSON meta string
+    /// Convert to JSON meta string with all relevant broker metadata
     pub fn to_meta_json(&self) -> Option<String> {
         let meta = serde_json::json!({
             "institution_name": self.institution_name,
@@ -341,6 +456,12 @@ impl BrokerAccount {
             "status": self.status,
             "raw_type": self.raw_type,
             "is_paper": self.is_paper,
+            "owner": self.owner.as_ref().map(|o| serde_json::json!({
+                "user_id": o.user_id,
+                "full_name": o.full_name,
+                "email": o.email,
+                "is_own_account": o.is_own_account,
+            })),
         });
         serde_json::to_string(&meta).ok()
     }

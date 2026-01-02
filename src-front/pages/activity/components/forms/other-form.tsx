@@ -8,6 +8,7 @@ import { useFormContext } from "react-hook-form";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@wealthfolio/ui/components/ui/form";
 import { MoneyInput, QuantityInput } from "@wealthfolio/ui";
 import { ConfigurationCheckbox, CommonFields, AssetSymbolInput } from "./common";
+import { SubtypeSelect } from "./subtype-select";
 
 export const OtherForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
   const { control, watch } = useFormContext();
@@ -55,33 +56,39 @@ export const OtherForm = ({ accounts }: { accounts: AccountSelectOption[] }) => 
             shouldShowSymbolLookup={shouldShowSymbolLookup}
           />
           {activityType === "FEE" ? (
-            <FormField
-              control={control}
-              name="fee"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Fee Amount</FormLabel>
-                  <FormControl>
-                    <MoneyInput {...field} aria-label="Fee Amount" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <>
+              <FormField
+                control={control}
+                name="fee"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fee Amount</FormLabel>
+                    <FormControl>
+                      <MoneyInput {...field} aria-label="Fee Amount" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <SubtypeSelect activityType={activityType} />
+            </>
           ) : activityType === "TAX" ? (
-            <FormField
-              control={control}
-              name="amount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tax Amount</FormLabel>
-                  <FormControl>
-                    <MoneyInput {...field} aria-label="Tax Amount" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <>
+              <FormField
+                control={control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tax Amount</FormLabel>
+                    <FormControl>
+                      <MoneyInput {...field} aria-label="Tax Amount" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <SubtypeSelect activityType={activityType} />
+            </>
           ) : (
             <>
               <FormField
@@ -92,23 +99,26 @@ export const OtherForm = ({ accounts }: { accounts: AccountSelectOption[] }) => 
                 )}
               />
               {isSplitType && (
-                <FormField
-                  control={control}
-                  name="amount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Split Ratio</FormLabel>
-                      <FormControl>
-                        <QuantityInput
-                          placeholder="Ex. 2 for 2:1 split, 0.5 for 1:2 split"
-                          {...field}
-                          aria-label="Split Ratio"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <>
+                  <FormField
+                    control={control}
+                    name="amount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Split Ratio</FormLabel>
+                        <FormControl>
+                          <QuantityInput
+                            placeholder="Ex. 2 for 2:1 split, 0.5 for 1:2 split"
+                            {...field}
+                            aria-label="Split Ratio"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <SubtypeSelect activityType={activityType} />
+                </>
               )}
             </>
           )}

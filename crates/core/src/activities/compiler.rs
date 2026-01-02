@@ -6,6 +6,7 @@
 //! - Rich semantic variations via subtypes
 //! - Stable calculator that only understands primitives
 
+use crate::activities::activities_constants::*;
 use crate::activities::Activity;
 use crate::Result;
 use rust_decimal::Decimal;
@@ -46,16 +47,24 @@ impl ActivityCompiler for DefaultActivityCompiler {
 
         match (activity_type, subtype) {
             // DRIP: Dividend + Buy
-            ("DIVIDEND", Some("DRIP")) => Ok(self.compile_drip(activity)),
+            (ACTIVITY_TYPE_DIVIDEND, Some(ACTIVITY_SUBTYPE_DRIP)) => {
+                Ok(self.compile_drip(activity))
+            }
 
             // Staking Reward: Interest + Buy
-            ("INTEREST", Some("STAKING_REWARD")) => Ok(self.compile_staking_reward(activity)),
+            (ACTIVITY_TYPE_INTEREST, Some(ACTIVITY_SUBTYPE_STAKING_REWARD)) => {
+                Ok(self.compile_staking_reward(activity))
+            }
 
             // Dividend in Kind: Dividend + Add Holding (different asset)
-            ("DIVIDEND", Some("DIVIDEND_IN_KIND")) => Ok(self.compile_dividend_in_kind(activity)),
+            (ACTIVITY_TYPE_DIVIDEND, Some(ACTIVITY_SUBTYPE_DIVIDEND_IN_KIND)) => {
+                Ok(self.compile_dividend_in_kind(activity))
+            }
 
             // Stock Dividend: Pass through as SPLIT (more shares of same asset)
-            ("SPLIT", Some("STOCK_DIVIDEND")) => Ok(vec![activity.clone()]),
+            (ACTIVITY_TYPE_SPLIT, Some(ACTIVITY_SUBTYPE_STOCK_DIVIDEND)) => {
+                Ok(vec![activity.clone()])
+            }
 
             // Default: Pass through unchanged
             _ => Ok(vec![activity.clone()]),
@@ -94,7 +103,7 @@ impl DefaultActivityCompiler {
         // Leg 2: BUY (share acquisition)
         let mut buy_leg = activity.clone();
         buy_leg.id = format!("{}:buy", activity.id);
-        buy_leg.activity_type = "BUY".to_string();
+        buy_leg.activity_type = ACTIVITY_TYPE_BUY.to_string();
         buy_leg.activity_type_override = None;
         buy_leg.subtype = None;
         // quantity and unit_price stay as-is
@@ -130,7 +139,7 @@ impl DefaultActivityCompiler {
         // Leg 2: BUY (token acquisition)
         let mut buy_leg = activity.clone();
         buy_leg.id = format!("{}:buy", activity.id);
-        buy_leg.activity_type = "BUY".to_string();
+        buy_leg.activity_type = ACTIVITY_TYPE_BUY.to_string();
         buy_leg.activity_type_override = None;
         buy_leg.subtype = None;
         buy_leg.amount = None;
@@ -151,7 +160,7 @@ impl DefaultActivityCompiler {
     ///
     /// Compiled:
     ///   1. DIVIDEND: income recognition
-    ///   2. ADD_HOLDING: receive different asset (with cost basis from FMV)
+    ///   2. TRANSFER_IN (external): receive different asset (with cost basis from FMV)
     fn compile_dividend_in_kind(&self, activity: &Activity) -> Vec<Activity> {
         // Get the received asset ID from metadata
         let received_asset_id = activity
@@ -165,18 +174,24 @@ impl DefaultActivityCompiler {
         dividend_leg.quantity = None;
         dividend_leg.unit_price = None;
 
-        // Leg 2: ADD_HOLDING (receive the different asset)
-        let mut add_holding_leg = activity.clone();
-        add_holding_leg.id = format!("{}:add_holding", activity.id);
-        add_holding_leg.activity_type = "ADD_HOLDING".to_string();
-        add_holding_leg.activity_type_override = None;
-        add_holding_leg.subtype = None;
-        add_holding_leg.asset_id = received_asset_id;
+        // Leg 2: TRANSFER_IN with is_external=true (receive the different asset)
+        let mut transfer_in_leg = activity.clone();
+        transfer_in_leg.id = format!("{}:transfer_in", activity.id);
+        transfer_in_leg.activity_type = ACTIVITY_TYPE_TRANSFER_IN.to_string();
+        transfer_in_leg.activity_type_override = None;
+        transfer_in_leg.subtype = None;
+        transfer_in_leg.asset_id = received_asset_id;
         // quantity and unit_price define the cost basis
-        add_holding_leg.amount = None;
-        add_holding_leg.fee = Some(Decimal::ZERO);
+        transfer_in_leg.amount = None;
+        transfer_in_leg.fee = Some(Decimal::ZERO);
+        // Mark as external transfer so it affects net_contribution
+        transfer_in_leg.metadata = Some(serde_json::json!({
+            "flow": {
+                "is_external": true
+            }
+        }));
 
-        vec![dividend_leg, add_holding_leg]
+        vec![dividend_leg, transfer_in_leg]
     }
 }
 
@@ -198,7 +213,7 @@ mod tests {
             id: "test-1".to_string(),
             account_id: "account-1".to_string(),
             asset_id: Some("AAPL".to_string()),
-            activity_type: "DIVIDEND".to_string(),
+            activity_type: ACTIVITY_TYPE_DIVIDEND.to_string(),
             activity_type_override: None,
             source_type: None,
             subtype: None,
@@ -229,14 +244,14 @@ mod tests {
     fn test_compile_passthrough_for_simple_types() {
         let compiler = DefaultActivityCompiler::new();
         let mut activity = create_test_activity();
-        activity.activity_type = "BUY".to_string();
+        activity.activity_type = ACTIVITY_TYPE_BUY.to_string();
         activity.subtype = None;
 
         let result = compiler.compile(&activity).unwrap();
 
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].id, activity.id);
-        assert_eq!(result[0].activity_type, "BUY");
+        assert_eq!(result[0].activity_type, ACTIVITY_TYPE_BUY);
     }
 
     #[test]
@@ -276,8 +291,8 @@ mod tests {
     fn test_compile_drip_produces_two_legs() {
         let compiler = DefaultActivityCompiler::new();
         let mut activity = create_test_activity();
-        activity.activity_type = "DIVIDEND".to_string();
-        activity.subtype = Some("DRIP".to_string());
+        activity.activity_type = ACTIVITY_TYPE_DIVIDEND.to_string();
+        activity.subtype = Some(ACTIVITY_SUBTYPE_DRIP.to_string());
         activity.quantity = Some(dec!(5)); // shares received
         activity.unit_price = Some(dec!(20)); // reinvestment price
         activity.amount = Some(dec!(100)); // dividend amount
@@ -288,7 +303,7 @@ mod tests {
 
         // First leg: DIVIDEND
         assert_eq!(result[0].id, "test-1:dividend");
-        assert_eq!(result[0].activity_type, "DIVIDEND");
+        assert_eq!(result[0].activity_type, ACTIVITY_TYPE_DIVIDEND);
         assert!(result[0].subtype.is_none());
         assert_eq!(result[0].amount, Some(dec!(100)));
         assert!(result[0].quantity.is_none());
@@ -296,7 +311,7 @@ mod tests {
 
         // Second leg: BUY
         assert_eq!(result[1].id, "test-1:buy");
-        assert_eq!(result[1].activity_type, "BUY");
+        assert_eq!(result[1].activity_type, ACTIVITY_TYPE_BUY);
         assert!(result[1].subtype.is_none());
         assert_eq!(result[1].quantity, Some(dec!(5)));
         assert_eq!(result[1].unit_price, Some(dec!(20)));
@@ -308,8 +323,8 @@ mod tests {
     fn test_compile_drip_preserves_metadata() {
         let compiler = DefaultActivityCompiler::new();
         let mut activity = create_test_activity();
-        activity.activity_type = "DIVIDEND".to_string();
-        activity.subtype = Some("DRIP".to_string());
+        activity.activity_type = ACTIVITY_TYPE_DIVIDEND.to_string();
+        activity.subtype = Some(ACTIVITY_SUBTYPE_DRIP.to_string());
         activity.account_id = "my-account".to_string();
         activity.asset_id = Some("MSFT".to_string());
         activity.currency = "EUR".to_string();
@@ -328,8 +343,8 @@ mod tests {
     fn test_compile_staking_reward_produces_two_legs() {
         let compiler = DefaultActivityCompiler::new();
         let mut activity = create_test_activity();
-        activity.activity_type = "INTEREST".to_string();
-        activity.subtype = Some("STAKING_REWARD".to_string());
+        activity.activity_type = ACTIVITY_TYPE_INTEREST.to_string();
+        activity.subtype = Some(ACTIVITY_SUBTYPE_STAKING_REWARD.to_string());
         activity.asset_id = Some("ETH".to_string());
         activity.quantity = Some(dec!(0.01)); // ETH received
         activity.unit_price = Some(dec!(2000)); // FMV at receipt
@@ -341,7 +356,7 @@ mod tests {
 
         // First leg: INTEREST
         assert_eq!(result[0].id, "test-1:interest");
-        assert_eq!(result[0].activity_type, "INTEREST");
+        assert_eq!(result[0].activity_type, ACTIVITY_TYPE_INTEREST);
         assert!(result[0].subtype.is_none());
         assert_eq!(result[0].amount, Some(dec!(20)));
         assert!(result[0].quantity.is_none());
@@ -349,7 +364,7 @@ mod tests {
 
         // Second leg: BUY
         assert_eq!(result[1].id, "test-1:buy");
-        assert_eq!(result[1].activity_type, "BUY");
+        assert_eq!(result[1].activity_type, ACTIVITY_TYPE_BUY);
         assert!(result[1].subtype.is_none());
         assert_eq!(result[1].quantity, Some(dec!(0.01)));
         assert_eq!(result[1].unit_price, Some(dec!(2000)));
@@ -361,8 +376,8 @@ mod tests {
     fn test_compile_dividend_in_kind_produces_two_legs() {
         let compiler = DefaultActivityCompiler::new();
         let mut activity = create_test_activity();
-        activity.activity_type = "DIVIDEND".to_string();
-        activity.subtype = Some("DIVIDEND_IN_KIND".to_string());
+        activity.activity_type = ACTIVITY_TYPE_DIVIDEND.to_string();
+        activity.subtype = Some(ACTIVITY_SUBTYPE_DIVIDEND_IN_KIND.to_string());
         activity.asset_id = Some("PARENT_CO".to_string());
         activity.quantity = Some(dec!(10)); // shares of spinoff received
         activity.unit_price = Some(dec!(25)); // FMV at receipt
@@ -377,34 +392,37 @@ mod tests {
 
         // First leg: DIVIDEND
         assert_eq!(result[0].id, "test-1:dividend");
-        assert_eq!(result[0].activity_type, "DIVIDEND");
+        assert_eq!(result[0].activity_type, ACTIVITY_TYPE_DIVIDEND);
         assert!(result[0].subtype.is_none());
         assert_eq!(result[0].asset_id, Some("PARENT_CO".to_string()));
         assert_eq!(result[0].amount, Some(dec!(250)));
 
-        // Second leg: ADD_HOLDING
-        assert_eq!(result[1].id, "test-1:add_holding");
-        assert_eq!(result[1].activity_type, "ADD_HOLDING");
+        // Second leg: TRANSFER_IN with is_external=true
+        assert_eq!(result[1].id, "test-1:transfer_in");
+        assert_eq!(result[1].activity_type, ACTIVITY_TYPE_TRANSFER_IN);
         assert!(result[1].subtype.is_none());
         assert_eq!(result[1].asset_id, Some("SPINOFF_CO".to_string()));
         assert_eq!(result[1].quantity, Some(dec!(10)));
         assert_eq!(result[1].unit_price, Some(dec!(25)));
         assert!(result[1].amount.is_none());
+        // Verify is_external flag is set
+        let metadata = result[1].metadata.as_ref().unwrap();
+        assert_eq!(metadata["flow"]["is_external"], true);
     }
 
     #[test]
     fn test_compile_dividend_in_kind_fallback_to_same_asset() {
         let compiler = DefaultActivityCompiler::new();
         let mut activity = create_test_activity();
-        activity.activity_type = "DIVIDEND".to_string();
-        activity.subtype = Some("DIVIDEND_IN_KIND".to_string());
+        activity.activity_type = ACTIVITY_TYPE_DIVIDEND.to_string();
+        activity.subtype = Some(ACTIVITY_SUBTYPE_DIVIDEND_IN_KIND.to_string());
         activity.asset_id = Some("AAPL".to_string());
         // No metadata with received_asset_id
 
         let result = compiler.compile(&activity).unwrap();
 
         assert_eq!(result.len(), 2);
-        // ADD_HOLDING should fall back to the original asset_id
+        // TRANSFER_IN should fall back to the original asset_id
         assert_eq!(result[1].asset_id, Some("AAPL".to_string()));
     }
 
@@ -412,39 +430,45 @@ mod tests {
     fn test_compile_stock_dividend_passthrough() {
         let compiler = DefaultActivityCompiler::new();
         let mut activity = create_test_activity();
-        activity.activity_type = "SPLIT".to_string();
-        activity.subtype = Some("STOCK_DIVIDEND".to_string());
+        activity.activity_type = ACTIVITY_TYPE_SPLIT.to_string();
+        activity.subtype = Some(ACTIVITY_SUBTYPE_STOCK_DIVIDEND.to_string());
         activity.quantity = Some(dec!(10)); // additional shares
 
         let result = compiler.compile(&activity).unwrap();
 
         // Stock dividend passes through as SPLIT
         assert_eq!(result.len(), 1);
-        assert_eq!(result[0].activity_type, "SPLIT");
-        assert_eq!(result[0].subtype, Some("STOCK_DIVIDEND".to_string()));
+        assert_eq!(result[0].activity_type, ACTIVITY_TYPE_SPLIT);
+        assert_eq!(
+            result[0].subtype,
+            Some(ACTIVITY_SUBTYPE_STOCK_DIVIDEND.to_string())
+        );
     }
 
     #[test]
     fn test_compile_respects_override() {
         let compiler = DefaultActivityCompiler::new();
         let mut activity = create_test_activity();
-        activity.activity_type = "UNKNOWN".to_string();
-        activity.activity_type_override = Some("BUY".to_string());
+        activity.activity_type = ACTIVITY_TYPE_UNKNOWN.to_string();
+        activity.activity_type_override = Some(ACTIVITY_TYPE_BUY.to_string());
 
         let result = compiler.compile(&activity).unwrap();
 
         assert_eq!(result.len(), 1);
         // The override should be used by effective_type()
-        assert_eq!(result[0].activity_type_override, Some("BUY".to_string()));
+        assert_eq!(
+            result[0].activity_type_override,
+            Some(ACTIVITY_TYPE_BUY.to_string())
+        );
     }
 
     #[test]
     fn test_compile_drip_with_override_uses_override() {
         let compiler = DefaultActivityCompiler::new();
         let mut activity = create_test_activity();
-        activity.activity_type = "UNKNOWN".to_string();
-        activity.activity_type_override = Some("DIVIDEND".to_string());
-        activity.subtype = Some("DRIP".to_string());
+        activity.activity_type = ACTIVITY_TYPE_UNKNOWN.to_string();
+        activity.activity_type_override = Some(ACTIVITY_TYPE_DIVIDEND.to_string());
+        activity.subtype = Some(ACTIVITY_SUBTYPE_DRIP.to_string());
         activity.quantity = Some(dec!(5));
         activity.unit_price = Some(dec!(20));
         activity.amount = Some(dec!(100));
@@ -463,12 +487,12 @@ mod tests {
 
         let mut buy = create_test_activity();
         buy.id = "buy-1".to_string();
-        buy.activity_type = "BUY".to_string();
+        buy.activity_type = ACTIVITY_TYPE_BUY.to_string();
 
         let mut drip = create_test_activity();
         drip.id = "drip-1".to_string();
-        drip.activity_type = "DIVIDEND".to_string();
-        drip.subtype = Some("DRIP".to_string());
+        drip.activity_type = ACTIVITY_TYPE_DIVIDEND.to_string();
+        drip.subtype = Some(ACTIVITY_SUBTYPE_DRIP.to_string());
 
         let activities = vec![buy, drip];
         let result = compiler.compile_all(&activities).unwrap();
@@ -486,15 +510,15 @@ mod tests {
 
         let mut first = create_test_activity();
         first.id = "first".to_string();
-        first.activity_type = "BUY".to_string();
+        first.activity_type = ACTIVITY_TYPE_BUY.to_string();
 
         let mut second = create_test_activity();
         second.id = "second".to_string();
-        second.activity_type = "SELL".to_string();
+        second.activity_type = ACTIVITY_TYPE_SELL.to_string();
 
         let mut third = create_test_activity();
         third.id = "third".to_string();
-        third.activity_type = "DIVIDEND".to_string();
+        third.activity_type = ACTIVITY_TYPE_DIVIDEND.to_string();
 
         let activities = vec![first, second, third];
         let result = compiler.compile_all(&activities).unwrap();
@@ -511,12 +535,12 @@ mod tests {
 
         let mut posted = create_test_activity();
         posted.id = "posted".to_string();
-        posted.activity_type = "BUY".to_string();
+        posted.activity_type = ACTIVITY_TYPE_BUY.to_string();
         posted.status = ActivityStatus::Posted;
 
         let mut draft = create_test_activity();
         draft.id = "draft".to_string();
-        draft.activity_type = "BUY".to_string();
+        draft.activity_type = ACTIVITY_TYPE_BUY.to_string();
         draft.status = ActivityStatus::Draft;
 
         let activities = vec![posted, draft];
@@ -530,8 +554,8 @@ mod tests {
     fn test_compile_deterministic() {
         let compiler = DefaultActivityCompiler::new();
         let mut activity = create_test_activity();
-        activity.activity_type = "DIVIDEND".to_string();
-        activity.subtype = Some("DRIP".to_string());
+        activity.activity_type = ACTIVITY_TYPE_DIVIDEND.to_string();
+        activity.subtype = Some(ACTIVITY_SUBTYPE_DRIP.to_string());
         activity.quantity = Some(dec!(5));
         activity.unit_price = Some(dec!(20));
         activity.amount = Some(dec!(100));
@@ -557,8 +581,8 @@ mod tests {
         let compiler = DefaultActivityCompiler::new();
         let mut activity = create_test_activity();
         activity.id = "original-uuid-123".to_string();
-        activity.activity_type = "DIVIDEND".to_string();
-        activity.subtype = Some("DRIP".to_string());
+        activity.activity_type = ACTIVITY_TYPE_DIVIDEND.to_string();
+        activity.subtype = Some(ACTIVITY_SUBTYPE_DRIP.to_string());
 
         let result = compiler.compile(&activity).unwrap();
 
@@ -576,14 +600,14 @@ mod tests {
     fn test_buy_leg_clears_override() {
         let compiler = DefaultActivityCompiler::new();
         let mut activity = create_test_activity();
-        activity.activity_type = "DIVIDEND".to_string();
-        activity.activity_type_override = Some("DIVIDEND".to_string()); // Has an override
-        activity.subtype = Some("DRIP".to_string());
+        activity.activity_type = ACTIVITY_TYPE_DIVIDEND.to_string();
+        activity.activity_type_override = Some(ACTIVITY_TYPE_DIVIDEND.to_string()); // Has an override
+        activity.subtype = Some(ACTIVITY_SUBTYPE_DRIP.to_string());
 
         let result = compiler.compile(&activity).unwrap();
 
         // The BUY leg should have its override cleared
-        assert_eq!(result[1].activity_type, "BUY");
+        assert_eq!(result[1].activity_type, ACTIVITY_TYPE_BUY);
         assert!(result[1].activity_type_override.is_none());
     }
 }

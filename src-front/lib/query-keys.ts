@@ -71,6 +71,8 @@ export const QueryKeys = {
   SYNCED_ACCOUNTS: "syncedAccounts",
   SUBSCRIPTION_PLANS: "subscriptionPlans",
   USER_INFO: "userInfo",
+  BROKER_SYNC_STATES: "brokerSyncStates",
+  IMPORT_RUNS: "importRuns",
 
   secrets: {
     apiKey: (providerId: string) => ["secrets", "apiKey", providerId],

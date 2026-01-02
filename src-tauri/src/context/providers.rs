@@ -160,7 +160,7 @@ pub async fn initialize_context(
     ));
 
     let sync_service = Arc::new(SyncService::new(
-        account_repository.clone(),
+        account_service.clone(),
         platform_repository.clone(),
         pool.clone(),
         writer.clone(),

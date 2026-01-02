@@ -50,10 +50,6 @@ export interface BrokerConnection {
   updatedAt?: string;
 }
 
-export interface ConnectPortalResponse {
-  redirectUri?: string;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Subscription Plans Types
 // ─────────────────────────────────────────────────────────────────────────────
@@ -114,3 +110,72 @@ export interface UserInfo {
   teamRole: string | null;
   team: UserTeam | null;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Broker Sync State Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type SyncStatus = "IDLE" | "RUNNING" | "NEEDS_REVIEW" | "FAILED";
+
+export interface BrokerSyncState {
+  accountId: string;
+  provider: string;
+  checkpointJson: unknown | null;
+  lastAttemptedAt: string | null;
+  lastSuccessfulAt: string | null;
+  lastError: string | null;
+  lastRunId: string | null;
+  syncStatus: SyncStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Import Run Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ImportRunType = "SYNC" | "IMPORT";
+export type ImportRunMode = "INITIAL" | "INCREMENTAL" | "BACKFILL" | "REPAIR";
+export type ImportRunStatus = "RUNNING" | "APPLIED" | "NEEDS_REVIEW" | "FAILED" | "CANCELLED";
+export type ReviewMode = "NEVER" | "ALWAYS" | "IF_WARNINGS";
+
+export interface ImportRunSummary {
+  fetched: number;
+  inserted: number;
+  updated: number;
+  skipped: number;
+  warnings: number;
+  errors: number;
+  removed: number;
+}
+
+export interface ImportRun {
+  id: string;
+  accountId: string;
+  sourceSystem: string;
+  runType: ImportRunType;
+  mode: ImportRunMode;
+  status: ImportRunStatus;
+  startedAt: string;
+  finishedAt: string | null;
+  reviewMode: ReviewMode;
+  appliedAt: string | null;
+  checkpointIn: unknown | null;
+  checkpointOut: unknown | null;
+  summary: ImportRunSummary | null;
+  warnings: string[] | null;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Aggregated Sync Status (for navigation icon)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type AggregatedSyncStatus =
+  | "not_connected"
+  | "idle"
+  | "running"
+  | "needs_review"
+  | "failed";

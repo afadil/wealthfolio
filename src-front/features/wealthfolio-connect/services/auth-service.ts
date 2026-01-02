@@ -11,7 +11,7 @@ export const storeSyncSession = async (
 ): Promise<void> => {
   try {
     await invoke("store_sync_session", { refreshToken, accessToken });
-    logger.info("Sync session stored in backend");
+    logger.debug("Sync session stored in backend");
   } catch (error) {
     logger.error("Error storing sync session in backend");
     throw error;
@@ -25,7 +25,7 @@ export const storeSyncSession = async (
 export const clearSyncSession = async (): Promise<void> => {
   try {
     await invoke("clear_sync_session");
-    logger.info("Sync session cleared from backend");
+    logger.debug("Sync session cleared from backend");
   } catch (error) {
     logger.error("Error clearing sync session from backend");
     throw error;

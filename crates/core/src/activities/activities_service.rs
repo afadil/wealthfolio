@@ -417,6 +417,7 @@ impl ActivityServiceTrait for ActivityService {
                 asset_id: Some(activity.symbol.clone()),
                 asset_data_source: None,
                 activity_type: activity.activity_type.clone(),
+                subtype: None,
                 activity_date: activity.date.clone(),
                 quantity: Some(activity.quantity),
                 unit_price: Some(activity.unit_price),
@@ -430,6 +431,11 @@ impl ActivityServiceTrait for ActivityService {
                 },
                 notes: activity.comment.clone(),
                 fx_rate: None,
+                metadata: None,
+                needs_review: None,
+                source_system: Some("CSV".to_string()),
+                source_record_id: None,
+                source_group_id: None,
             })
             .collect();
 

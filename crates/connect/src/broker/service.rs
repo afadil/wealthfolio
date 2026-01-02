@@ -7,6 +7,8 @@ use std::sync::Arc;
 use crate::platform::{Platform, PlatformRepository};
 use crate::state::BrokerSyncState;
 use crate::state::BrokerSyncStateRepository;
+use wealthfolio_storage_sqlite::sync::ImportRunRepository;
+use super::mapping;
 use super::models::{
     AccountUniversalActivity, BrokerAccount, BrokerConnection, SyncAccountsResponse,
     SyncConnectionsResponse,
@@ -15,11 +17,12 @@ use super::traits::SyncServiceTrait;
 use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 use std::collections::HashSet;
-use wealthfolio_core::accounts::{Account, AccountRepositoryTrait, NewAccount};
+use wealthfolio_core::accounts::{Account, AccountServiceTrait, NewAccount};
 use wealthfolio_core::activities::{self, NewActivity};
-use wealthfolio_core::assets::NewAsset;
+use wealthfolio_core::assets::{AssetKind, NewAsset};
 use wealthfolio_core::errors::Result;
 use wealthfolio_core::market_data::DataSource;
+use wealthfolio_core::sync::ImportRun;
 use wealthfolio_storage_sqlite::activities::ActivityDB;
 use wealthfolio_storage_sqlite::assets::AssetDB;
 use wealthfolio_storage_sqlite::db::{DbPool, WriteHandle};
@@ -30,26 +33,28 @@ const DEFAULT_BROKERAGE_PROVIDER: &str = "snaptrade";
 
 /// Service for syncing broker data to the local database
 pub struct SyncService {
-    account_repository: Arc<dyn AccountRepositoryTrait>,
+    account_service: Arc<dyn AccountServiceTrait>,
     platform_repository: Arc<PlatformRepository>,
     brokers_sync_state_repository: Arc<BrokerSyncStateRepository>,
+    import_run_repository: Arc<ImportRunRepository>,
     writer: WriteHandle,
 }
 
 impl SyncService {
     pub fn new(
-        account_repository: Arc<dyn AccountRepositoryTrait>,
+        account_service: Arc<dyn AccountServiceTrait>,
         platform_repository: Arc<PlatformRepository>,
         pool: Arc<DbPool>,
         writer: WriteHandle,
     ) -> Self {
         Self {
-            account_repository,
+            account_service,
             platform_repository,
             brokers_sync_state_repository: Arc::new(BrokerSyncStateRepository::new(
-                pool,
+                pool.clone(),
                 writer.clone(),
             )),
+            import_run_repository: Arc::new(ImportRunRepository::new(pool, writer.clone())),
             writer,
         }
     }
@@ -121,9 +126,10 @@ impl SyncServiceTrait for SyncService {
         let mut created = 0;
         let updated = 0; // Reserved for future use when we implement account updates
         let mut skipped = 0;
+        let mut created_accounts: Vec<(String, String)> = Vec::new();
 
         // Get all existing accounts with provider_account_id to check for updates
-        let existing_accounts = self.account_repository.list(None, None)?;
+        let existing_accounts = self.account_service.get_all_accounts()?;
         let provider_account_id_map: std::collections::HashMap<String, Account> = existing_accounts
             .into_iter()
             .filter_map(|a| a.provider_account_id.clone().map(|id| (id, a)))
@@ -132,19 +138,29 @@ impl SyncServiceTrait for SyncService {
         for broker_account in &broker_accounts {
             // Skip paper/demo accounts
             if broker_account.is_paper {
-                debug!("Skipping paper account: {}", broker_account.id);
+                debug!("Skipping paper account: {:?}", broker_account.id);
                 skipped += 1;
                 continue;
             }
 
+            // Get the provider account ID - skip if missing
+            let provider_account_id = match &broker_account.id {
+                Some(id) if !id.is_empty() => id.clone(),
+                _ => {
+                    debug!("Skipping account with no provider ID: {}", broker_account.display_name());
+                    skipped += 1;
+                    continue;
+                }
+            };
+
             // Check if account already exists by provider_account_id
-            if let Some(_existing) = provider_account_id_map.get(&broker_account.id) {
+            if let Some(_existing) = provider_account_id_map.get(&provider_account_id) {
                 // Account exists - for now we skip updates to preserve user customizations
                 // In the future, we might want to update certain fields selectively
                 debug!(
                     "Account already synced, skipping: {} ({})",
                     broker_account.display_name(),
-                    broker_account.id
+                    provider_account_id
                 );
                 skipped += 1;
                 continue;
@@ -158,27 +174,28 @@ impl SyncServiceTrait for SyncService {
             let new_account = NewAccount {
                 id: None, // Let the repository generate a UUID
                 name: broker_account.display_name(),
-                account_type: broker_account.account_type(),
+                account_type: broker_account.get_account_type(),
                 group: None,
-                currency: broker_account.currency(),
+                currency: broker_account.get_currency(),
                 is_default: false,
                 is_active: broker_account.status.as_deref() != Some("closed"),
                 platform_id,
-                account_number: Some(broker_account.account_number.clone()),
+                account_number: broker_account.account_number.clone(),
                 meta: broker_account.to_meta_json(),
                 provider: Some("SNAPTRADE".to_string()),
-                provider_account_id: Some(broker_account.id.clone()),
+                provider_account_id: Some(provider_account_id.clone()),
             };
 
-            // Create the account
-            self.account_repository.create(new_account).await?;
+            // Create the account via AccountService (handles FX rate registration)
+            let account = self.account_service.create_account(new_account).await?;
+            created_accounts.push((account.id.clone(), account.currency.clone()));
 
             created += 1;
             info!(
                 "Created account: {} ({}) -> {}",
                 broker_account.display_name(),
-                broker_account.id,
-                broker_account.account_type()
+                provider_account_id,
+                broker_account.get_account_type()
             );
         }
 
@@ -187,12 +204,13 @@ impl SyncServiceTrait for SyncService {
             created,
             updated,
             skipped,
+            created_accounts,
         })
     }
 
     /// Get all synced accounts (accounts with provider_account_id set)
     fn get_synced_accounts(&self) -> Result<Vec<Account>> {
-        let all_accounts = self.account_repository.list(None, None)?;
+        let all_accounts = self.account_service.get_all_accounts()?;
         Ok(all_accounts
             .into_iter()
             .filter(|a| a.provider_account_id.is_some())
@@ -260,10 +278,19 @@ impl SyncServiceTrait for SyncService {
                 .filter(|t| !t.is_empty())
                 .unwrap_or_else(|| "UNKNOWN".to_string());
 
+            // Use subtype directly from the API (API does the mapping now)
+            let subtype = activity.subtype.clone();
+
+            // Calculate needs_review flag using mapping module
+            let needs_review = mapping::needs_review(&activity);
+
+            // Build metadata JSON with flow info, confidence, reasons, and raw_type
+            let metadata = mapping::build_activity_metadata(&activity);
+
             // Log for debugging
             debug!(
-                "Activity from API: id={:?}, type={}, raw_type={:?}",
-                activity.id, activity_type, activity.activity_type
+                "Activity from API: id={:?}, type={}, subtype={:?}, raw_type={:?}, needs_review={}",
+                activity.id, activity_type, subtype, activity.raw_type, needs_review
             );
 
             let is_cash_like = matches!(
@@ -308,13 +335,17 @@ impl SyncServiceTrait for SyncService {
                     db.updated_at = now_naive;
                     db
                 } else {
-                    let symbol_type_label = activity
+                    let symbol_type_ref = activity
                         .symbol
                         .as_ref()
-                        .and_then(|s| s.symbol_type.as_ref())
-                        .and_then(|t| {
-                            broker_symbol_type_label(t.code.as_deref(), t.description.as_deref())
-                        });
+                        .and_then(|s| s.symbol_type.as_ref());
+
+                    let symbol_type_label = symbol_type_ref.and_then(|t| {
+                        broker_symbol_type_label(t.code.as_deref(), t.description.as_deref())
+                    });
+
+                    let symbol_type_code = symbol_type_ref.and_then(|t| t.code.as_deref());
+                    let asset_kind = broker_symbol_type_to_kind(symbol_type_code);
 
                     AssetDB {
                         id: asset_id.clone(),
@@ -328,6 +359,7 @@ impl SyncServiceTrait for SyncService {
                         asset_class: symbol_type_label,
                         currency: currency_code.clone(),
                         data_source: DataSource::Yahoo.as_str().to_string(),
+                        kind: Some(asset_kind_to_string(&asset_kind)),
                         created_at: now_naive,
                         updated_at: now_naive,
                         ..Default::default()
@@ -360,25 +392,38 @@ impl SyncServiceTrait for SyncService {
             let amount = activity.amount.and_then(Decimal::from_f64).map(|d| d.abs());
             let fx_rate = activity.fx_rate.and_then(Decimal::from_f64);
 
+            // Determine status: needs_review -> Draft, otherwise Draft (synced activities start as Draft)
+            let status = if needs_review {
+                wealthfolio_core::activities::ActivityStatus::Draft
+            } else {
+                wealthfolio_core::activities::ActivityStatus::Draft // All synced activities start as Draft
+            };
+
             let new_activity = NewActivity {
                 id: Some(activity_id),
                 account_id: account_id.clone(),
                 asset_id: Some(asset_id), // Now Option<String>
                 asset_data_source: None,
                 activity_type,
+                subtype,
                 activity_date,
                 quantity: Some(quantity),
                 unit_price: Some(unit_price),
                 currency: currency_code,
                 fee: Some(fee),
                 amount,
-                status: Some(wealthfolio_core::activities::ActivityStatus::Draft), // Synced activities need user review
+                status: Some(status),
                 notes: activity
                     .description
                     .clone()
                     .filter(|d| !d.trim().is_empty())
                     .or(activity.external_reference_id.clone()),
                 fx_rate,
+                metadata,
+                needs_review: Some(needs_review),
+                source_system: activity.source_system.clone().or(Some("SNAPTRADE".to_string())),
+                source_record_id: activity.source_record_id.clone().or(activity.id.clone()),
+                source_group_id: activity.source_group_id.clone(),
             };
 
             activity_rows.push(new_activity.into());
@@ -463,6 +508,7 @@ impl SyncServiceTrait for SyncService {
                             schema::activities::asset_id.eq(excluded(schema::activities::asset_id)),
                             schema::activities::activity_type
                                 .eq(excluded(schema::activities::activity_type)),
+                            schema::activities::subtype.eq(excluded(schema::activities::subtype)),
                             schema::activities::activity_date
                                 .eq(excluded(schema::activities::activity_date)),
                             schema::activities::quantity.eq(excluded(schema::activities::quantity)),
@@ -474,10 +520,15 @@ impl SyncServiceTrait for SyncService {
                             schema::activities::status.eq(excluded(schema::activities::status)),
                             schema::activities::notes.eq(excluded(schema::activities::notes)),
                             schema::activities::fx_rate.eq(excluded(schema::activities::fx_rate)),
+                            schema::activities::metadata.eq(excluded(schema::activities::metadata)),
                             schema::activities::source_system
                                 .eq(excluded(schema::activities::source_system)),
                             schema::activities::source_record_id
                                 .eq(excluded(schema::activities::source_record_id)),
+                            schema::activities::source_group_id
+                                .eq(excluded(schema::activities::source_group_id)),
+                            schema::activities::needs_review
+                                .eq(excluded(schema::activities::needs_review)),
                             schema::activities::updated_at.eq(now_update),
                         ))
                         .execute(conn) {
@@ -528,6 +579,17 @@ impl SyncServiceTrait for SyncService {
             .upsert_failure(account_id, DEFAULT_BROKERAGE_PROVIDER.to_string(), error)
             .await
     }
+
+    fn get_all_sync_states(&self) -> Result<Vec<BrokerSyncState>> {
+        self.brokers_sync_state_repository.get_all()
+    }
+
+    fn get_import_runs(&self, run_type: Option<&str>, limit: i64) -> Result<Vec<ImportRun>> {
+        match run_type {
+            Some(rt) => self.import_run_repository.get_by_run_type(rt, limit),
+            None => self.import_run_repository.get_all(limit),
+        }
+    }
 }
 
 impl SyncService {
@@ -536,9 +598,17 @@ impl SyncService {
         // First, try to find platform by matching institution name
         let platforms = self.platform_repository.list()?;
 
+        // Get institution name, returning None if not available
+        let institution_name = match &broker_account.institution_name {
+            Some(name) if !name.is_empty() => name,
+            _ => {
+                warn!("No institution name for broker account, cannot find platform");
+                return Ok(None);
+            }
+        };
+
         // Normalize institution name for matching
-        let institution_normalized = broker_account
-            .institution_name
+        let institution_normalized = institution_name
             .to_uppercase()
             .replace(' ', "_")
             .replace('-', "_");
@@ -577,7 +647,7 @@ impl SyncService {
         // This ensures we always have a platform for the account
         warn!(
             "No existing platform found for institution: {}",
-            broker_account.institution_name
+            institution_name
         );
         Ok(None)
     }
@@ -620,4 +690,41 @@ fn capitalize_word(word: &str) -> String {
     out.extend(first.to_uppercase());
     out.push_str(&chars.as_str().to_lowercase());
     out
+}
+
+/// Map broker symbol type code to AssetKind.
+/// Returns None for unknown types (will default to Security).
+fn broker_symbol_type_to_kind(code: Option<&str>) -> AssetKind {
+    let code = match code {
+        Some(c) => c.to_uppercase(),
+        None => return AssetKind::Security,
+    };
+
+    match code.as_str() {
+        // Crypto
+        "CRYPTOCURRENCY" | "CRYPTO" => AssetKind::Crypto,
+        // Options
+        "EQUITY_OPTION" | "OPTION" | "OPTIONS" => AssetKind::Option,
+        // Commodities
+        "COMMODITY" | "COMMODITIES" => AssetKind::Commodity,
+        // Everything else is a security (stocks, ETFs, bonds, funds, etc.)
+        _ => AssetKind::Security,
+    }
+}
+
+/// Convert AssetKind to database string representation.
+fn asset_kind_to_string(kind: &AssetKind) -> String {
+    match kind {
+        AssetKind::Security => "SECURITY".to_string(),
+        AssetKind::Crypto => "CRYPTO".to_string(),
+        AssetKind::Cash => "CASH".to_string(),
+        AssetKind::FxRate => "FX_RATE".to_string(),
+        AssetKind::Option => "OPTION".to_string(),
+        AssetKind::Commodity => "COMMODITY".to_string(),
+        AssetKind::PrivateEquity => "PRIVATE_EQUITY".to_string(),
+        AssetKind::Property => "PROPERTY".to_string(),
+        AssetKind::Vehicle => "VEHICLE".to_string(),
+        AssetKind::Liability => "LIABILITY".to_string(),
+        AssetKind::Other => "OTHER".to_string(),
+    }
 }

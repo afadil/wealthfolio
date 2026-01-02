@@ -237,6 +237,11 @@ export async function listenMarketSyncStart<T>(handler: EventCallback<T>): Promi
   return adaptUnlisten(unlisten);
 }
 
+export async function listenBrokerSyncComplete<T>(handler: EventCallback<T>): Promise<UnlistenFn> {
+  const unlisten = await listen<T>("broker:sync-complete", adaptCallback(handler));
+  return adaptUnlisten(unlisten);
+}
+
 export async function listenNavigateToRoute<T>(handler: EventCallback<T>): Promise<UnlistenFn> {
   const unlisten = await listen<T>("navigate-to-route", adaptCallback(handler));
   return adaptUnlisten(unlisten);

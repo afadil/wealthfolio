@@ -364,7 +364,7 @@ impl DeviceSyncClient {
         let response = self
             .client
             .post(&url)
-            .headers(self.headers(token)?)
+            .headers(self.headers_with_device(token, Some(device_id))?)
             .json(&req)
             .send()
             .await?;
@@ -389,7 +389,7 @@ impl DeviceSyncClient {
         let response = self
             .client
             .get(&url)
-            .headers(self.headers(token)?)
+            .headers(self.headers_with_device(token, Some(device_id))?)
             .send()
             .await?;
 
@@ -413,7 +413,7 @@ impl DeviceSyncClient {
         let response = self
             .client
             .post(&url)
-            .headers(self.headers(token)?)
+            .headers(self.headers_with_device(token, Some(device_id))?)
             .send()
             .await?;
 
@@ -438,7 +438,7 @@ impl DeviceSyncClient {
         let response = self
             .client
             .post(&url)
-            .headers(self.headers(token)?)
+            .headers(self.headers_with_device(token, Some(device_id))?)
             .json(&req)
             .send()
             .await?;
@@ -463,7 +463,7 @@ impl DeviceSyncClient {
         let response = self
             .client
             .post(&url)
-            .headers(self.headers(token)?)
+            .headers(self.headers_with_device(token, Some(device_id))?)
             .send()
             .await?;
 

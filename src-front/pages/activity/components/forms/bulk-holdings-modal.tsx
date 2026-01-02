@@ -114,7 +114,7 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
 
       const creates: ActivityCreate[] = validHoldings.map((holding) => ({
         accountId: data.accountId,
-        activityType: ActivityType.ADD_HOLDING,
+        activityType: ActivityType.TRANSFER_IN,
         activityDate: activityDate.toISOString(),
         assetId: (holding.assetId || holding.ticker || "").toUpperCase().trim(),
         assetDataSource: holding.assetDataSource ?? DataSource.YAHOO,
@@ -124,6 +124,8 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
         currency,
         fee: 0,
         comment: data.comment?.trim() || undefined,
+        // Mark as external transfer (affects net_contribution like add holding)
+        metadata: { flow: { is_external: true } },
       }));
 
       const request: ActivityBulkMutationRequest = { creates };

@@ -15,6 +15,7 @@ import { AccountsSummary } from "./accounts-summary";
 import Balance from "./balance";
 import SavingGoals from "./goals";
 import TopHoldings from "./top-holdings";
+import { SyncButton } from "@/features/wealthfolio-connect/components/sync-button";
 
 // Helper function to get the initial date range for 3M
 const getInitialDateRange = (): DateRange => ({
@@ -89,6 +90,7 @@ export default function DashboardPage() {
                     displayCurrency={true}
                   />
                   <PrivacyToggle />
+                  <SyncButton />
                 </div>
                 <div className="text-md flex space-x-3">
                   {isValuationHistoryLoading && !valuationHistory ? (

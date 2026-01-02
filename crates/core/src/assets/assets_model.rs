@@ -51,7 +51,6 @@ pub struct Asset {
     pub name: Option<String>,
     pub asset_type: Option<String>,
     pub symbol: String,
-    pub symbol_mapping: Option<String>,
     pub asset_class: Option<String>,
     pub asset_sub_class: Option<String>,
     pub notes: Option<String>,
@@ -65,11 +64,10 @@ pub struct Asset {
     pub data_source: String,
     pub sectors: Option<String>,
     pub url: Option<String>,
-    // New fields for Activity System Redesign
     pub kind: Option<AssetKind>, // Behavior classification (nullable for migration)
-    pub quote_symbol: Option<String>, // Symbol for pricing lookup
+    pub quote_symbol: Option<String>, // Symbol for pricing lookup (replaces symbol_mapping)
     #[serde(default = "default_is_active")]
-    pub is_active: bool, // 1/0 for usability
+    pub is_active: bool,
     pub metadata: Option<Value>, // JSON for extensions
 }
 
@@ -149,7 +147,6 @@ pub struct NewAsset {
     pub name: Option<String>,
     pub asset_type: Option<String>,
     pub symbol: String,
-    pub symbol_mapping: Option<String>,
     pub asset_class: Option<String>,
     pub asset_sub_class: Option<String>,
     pub notes: Option<String>,
@@ -161,11 +158,10 @@ pub struct NewAsset {
     pub data_source: String,
     pub sectors: Option<String>,
     pub url: Option<String>,
-    // New fields for Activity System Redesign
     pub kind: Option<AssetKind>,      // Behavior classification
     pub quote_symbol: Option<String>, // Symbol for pricing lookup
     #[serde(default = "default_is_active")]
-    pub is_active: bool, // 1/0 for usability
+    pub is_active: bool,
     pub metadata: Option<Value>,      // JSON for extensions
 }
 
@@ -235,8 +231,7 @@ impl From<crate::market_data::providers::models::AssetProfile> for NewAsset {
             isin: profile.isin,
             name: profile.name,
             asset_type: profile.asset_type,
-            symbol: profile.symbol,
-            symbol_mapping: profile.symbol_mapping,
+            symbol: profile.symbol.clone(),
             asset_class: profile.asset_class,
             asset_sub_class: profile.asset_sub_class,
             notes: profile.notes,
@@ -248,9 +243,9 @@ impl From<crate::market_data::providers::models::AssetProfile> for NewAsset {
             data_source: profile.data_source,
             sectors: profile.sectors,
             url: profile.url,
-            // New fields default to None/true for migration compatibility
             kind: None,
-            quote_symbol: None,
+            // quote_symbol from provider profile, or default to symbol
+            quote_symbol: profile.quote_symbol.or(Some(profile.symbol)),
             is_active: true,
             metadata: None,
         }
@@ -262,7 +257,7 @@ impl From<crate::market_data::providers::models::AssetProfile> for NewAsset {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateAssetProfile {
     pub symbol: String,
-    pub symbol_mapping: Option<String>,
+    pub quote_symbol: Option<String>, // Symbol for pricing lookup
     pub name: Option<String>,
     pub sectors: Option<String>,
     pub countries: Option<String>,

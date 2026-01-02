@@ -56,7 +56,7 @@ pub fn classify_flow(activity: &Activity) -> FlowType {
         }
 
         // Everything else is internal
-        // BUY, SELL, DIVIDEND, INTEREST, TRANSFER_*, FEE, TAX, SPLIT, ADD_HOLDING, REMOVE_HOLDING
+        // BUY, SELL, DIVIDEND, INTEREST, TRANSFER_*, FEE, TAX, SPLIT, CREDIT, ADJUSTMENT
         _ => FlowType::Internal,
     }
 }

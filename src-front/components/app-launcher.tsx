@@ -310,7 +310,7 @@ export function AppLauncher() {
       },
       {
         title: "Add Holding",
-        href: buildTransactionUrl("ADD_HOLDING"),
+        href: "/activities/add?tab=holdings",
         icon: <Icons.Wallet className="size-6" />,
         keywords: ["holding", "add", "position", "import", "record"],
         label: "Add Holding",

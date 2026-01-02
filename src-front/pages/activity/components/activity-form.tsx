@@ -44,6 +44,8 @@ const ACTIVITY_TYPE_TO_TAB: Record<string, string> = {
   SELL: "trade",
   DEPOSIT: "cash",
   WITHDRAWAL: "cash",
+  // TRANSFER_IN/TRANSFER_OUT with metadata.flow.is_external=true are for add/remove holdings
+  // but we can't distinguish here without checking metadata, so they go to cash form
   TRANSFER_IN: "cash",
   TRANSFER_OUT: "cash",
   INTEREST: "income",
@@ -51,8 +53,7 @@ const ACTIVITY_TYPE_TO_TAB: Record<string, string> = {
   SPLIT: "other",
   FEE: "other",
   TAX: "other",
-  ADD_HOLDING: "holdings",
-  REMOVE_HOLDING: "holdings",
+  ADJUSTMENT: "other",
 };
 
 export function ActivityForm({ accounts, activity, open, onClose }: ActivityFormProps) {

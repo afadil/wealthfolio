@@ -188,6 +188,7 @@ export interface ActivityCreate {
   id?: string;
   accountId: string;
   activityType: string;
+  subtype?: string | null; // Semantic variation (DRIP, STAKING_REWARD, etc.)
   activityDate: string | Date;
   assetId?: string;
   assetDataSource?: DataSource;
@@ -198,6 +199,7 @@ export interface ActivityCreate {
   fee?: number;
   comment?: string | null;
   fxRate?: number | null;
+  metadata?: Record<string, unknown>; // Additional metadata (e.g., flow.is_external for external transfers)
 }
 
 export type ActivityUpdate = ActivityCreate & { id: string };

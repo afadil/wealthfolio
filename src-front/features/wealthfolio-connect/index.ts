@@ -19,8 +19,6 @@ export {
   getSyncedAccounts,
   getPlatforms,
   listBrokerConnections,
-  removeBrokerConnection,
-  getConnectPortalUrl,
   getSubscriptionPlans,
   getUserInfo,
 } from "./services/broker-service";
@@ -38,7 +36,6 @@ export type {
   SyncResult,
   BrokerConnectionBrokerage,
   BrokerConnection,
-  ConnectPortalResponse,
   PlanId,
   BillingPeriod,
   PlanPricing,

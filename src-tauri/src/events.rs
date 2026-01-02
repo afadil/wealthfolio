@@ -34,6 +34,12 @@ pub const MARKET_SYNC_ERROR: &str = "market:sync-error";
 /// Event emitted whenever an application resource changes (account, activity, etc.).
 pub const RESOURCE_CHANGED: &str = "resource:changed";
 
+/// Event emitted when the broker sync process starts.
+pub const BROKER_SYNC_START: &str = "broker:sync-start";
+
+/// Event emitted when the broker sync process completes (success or failure).
+pub const BROKER_SYNC_COMPLETE: &str = "broker:sync-complete";
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ResourceEventPayload {
     pub resource_type: String,
@@ -166,4 +172,44 @@ pub fn emit_app_ready(handle: &tauri::AppHandle) {
     handle.emit(APP_READY, &()).unwrap_or_else(|e| {
         log::error!("Failed to emit {} event: {}", APP_READY, e);
     });
+}
+
+/// Payload for broker sync completion events.
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct BrokerSyncEventPayload {
+    pub success: bool,
+    pub message: String,
+    /// Whether this was a scheduled (background) sync vs manual
+    pub is_scheduled: bool,
+}
+
+impl BrokerSyncEventPayload {
+    pub fn new(success: bool, message: impl Into<String>, is_scheduled: bool) -> Self {
+        Self {
+            success,
+            message: message.into(),
+            is_scheduled,
+        }
+    }
+}
+
+/// Emits the BROKER_SYNC_START event when broker sync begins.
+pub fn emit_broker_sync_start(handle: &tauri::AppHandle) {
+    handle.emit(BROKER_SYNC_START, &()).unwrap_or_else(|e| {
+        log::error!("Failed to emit {} event: {}", BROKER_SYNC_START, e);
+    });
+}
+
+/// Emits the BROKER_SYNC_COMPLETE event when broker sync finishes.
+pub fn emit_broker_sync_complete(handle: &tauri::AppHandle, payload: BrokerSyncEventPayload) {
+    handle
+        .emit(BROKER_SYNC_COMPLETE, &payload)
+        .unwrap_or_else(|e| {
+            log::error!(
+                "Failed to emit {} event for payload {:?}: {}",
+                BROKER_SYNC_COMPLETE,
+                payload,
+                e
+            );
+        });
 }

@@ -11,6 +11,7 @@ import {
   QuantityInput,
 } from "@wealthfolio/ui";
 import { ConfigurationCheckbox, CommonFields, AssetSymbolInput } from "./common";
+import { SubtypeSelect } from "./subtype-select";
 import { AccountSelectOption } from "../activity-form";
 import {
   ActivityTypeSelector,
@@ -20,6 +21,7 @@ import { CashBalanceWarning } from "../cash-balance-warning";
 
 export const TradeForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
   const { control, watch } = useFormContext();
+  const activityType = watch("activityType");
   const isManualAsset = watch("assetDataSource") === "MANUAL";
 
   const tradeTypes: ActivityTypeUI[] = [
@@ -55,6 +57,7 @@ export const TradeForm = ({ accounts }: { accounts: AccountSelectOption[] }) => 
             name="assetId"
             render={({ field }) => <AssetSymbolInput field={field} isManualAsset={isManualAsset} />}
           />
+          <SubtypeSelect activityType={activityType} />
           <div className="flex space-x-4">
             <FormField
               control={control}

@@ -1,13 +1,13 @@
+import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { OnboardingStep1 } from "./onboarding-step1";
 import { OnboardingConnect } from "./onboarding-connect";
+import { OnboardingStep1 } from "./onboarding-step1";
 import { OnboardingStep2, OnboardingStep2Handle } from "./onboarding-step2";
 
-const CONNECT_PORTAL_URL = "https://connect.wealthfolio.app/";
 const MAX_STEPS = 3;
 
 const OnboardingPage = () => {
@@ -49,7 +49,7 @@ const OnboardingPage = () => {
           <img
             alt="Wealthfolio"
             className="mb-3 h-16 w-16 sm:h-20 sm:w-20"
-            src="/illustration.png"
+            src="/logo-vantage.png"
           />
 
           {/* Progress indicators */}
@@ -96,7 +96,7 @@ const OnboardingPage = () => {
 
       {/* Fixed Footer */}
       <footer className="flex-none pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto max-w-4xl px-4 pb-8 pt-6 sm:px-6 sm:pb-12">
+        <div className="mx-auto max-w-4xl px-4 pt-6 pb-8 sm:px-6 sm:pb-12">
           <div className="flex items-center justify-between">
             <div>
               {currentStep > 1 && (
@@ -113,11 +113,12 @@ const OnboardingPage = () => {
                 </Button>
               )}
               {currentStep === 3 ? (
-                <Button
-                  asChild
-                  className="from-primary to-primary/90 bg-linear-to-r"
-                >
-                  <a href={CONNECT_PORTAL_URL} target="_blank" rel="noopener noreferrer">
+                <Button asChild className="from-primary to-primary/90 bg-linear-to-r">
+                  <a
+                    href={WEALTHFOLIO_CONNECT_PORTAL_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     Subscribe & Connect
                     <Icons.ExternalLink className="ml-1.5 h-4 w-4" />
                   </a>

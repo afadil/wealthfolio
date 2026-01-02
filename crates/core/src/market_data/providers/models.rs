@@ -201,7 +201,7 @@ pub struct AssetProfile {
     pub name: Option<String>,
     pub asset_type: Option<String>,
     pub symbol: String,
-    pub symbol_mapping: Option<String>,
+    pub quote_symbol: Option<String>, // Symbol for quote fetching (replaces symbol_mapping)
     pub asset_class: Option<String>,
     pub asset_sub_class: Option<String>,
     pub notes: Option<String>,

@@ -7,9 +7,10 @@ import type { Account, Platform } from "@/lib/types";
 import type {
   SyncResult,
   BrokerConnection,
-  ConnectPortalResponse,
   PlansResponse,
   UserInfo,
+  BrokerSyncState,
+  ImportRun,
 } from "../types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -74,27 +75,6 @@ export const listBrokerConnections = async (): Promise<BrokerConnection[]> => {
   }
 };
 
-export const removeBrokerConnection = async (authorizationId: string): Promise<void> => {
-  try {
-    await invokeDesktop<void>("remove_broker_connection", { authorizationId });
-  } catch (error) {
-    logger.error("Error removing broker connection.");
-    throw error;
-  }
-};
-
-export const getConnectPortalUrl = async (
-  reconnectAuthorizationId?: string,
-  redirectUrl?: string,
-): Promise<ConnectPortalResponse> => {
-  try {
-    return await invokeDesktop("get_connect_portal_url", { reconnectAuthorizationId, redirectUrl });
-  } catch (error) {
-    logger.error("Error getting connect portal URL.");
-    throw error;
-  }
-};
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Subscription Plans
 // ─────────────────────────────────────────────────────────────────────────────
@@ -117,6 +97,31 @@ export const getUserInfo = async (): Promise<UserInfo> => {
     return await invoke("get_user_info");
   } catch (error) {
     logger.error(`Error getting user info: ${error}`);
+    throw error;
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sync State & Import Runs
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const getBrokerSyncStates = async (): Promise<BrokerSyncState[]> => {
+  try {
+    return await invokeDesktop("get_broker_sync_states");
+  } catch (error) {
+    logger.error("Error getting broker sync states.");
+    throw error;
+  }
+};
+
+export const getImportRuns = async (
+  runType?: string,
+  limit?: number,
+): Promise<ImportRun[]> => {
+  try {
+    return await invokeDesktop("get_import_runs", { runType, limit });
+  } catch (error) {
+    logger.error("Error getting import runs.");
     throw error;
   }
 };

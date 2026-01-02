@@ -112,7 +112,6 @@ diesel::table! {
         name -> Nullable<Text>,
         asset_type -> Nullable<Text>,
         symbol -> Text,
-        symbol_mapping -> Nullable<Text>,
         asset_class -> Nullable<Text>,
         asset_sub_class -> Nullable<Text>,
         notes -> Nullable<Text>,
@@ -126,7 +125,6 @@ diesel::table! {
         data_source -> Text,
         sectors -> Nullable<Text>,
         url -> Nullable<Text>,
-        // NEW FIELDS
         kind -> Nullable<Text>,
         quote_symbol -> Nullable<Text>,
         is_active -> Integer,

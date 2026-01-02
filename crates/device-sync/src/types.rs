@@ -32,14 +32,14 @@ pub enum DevicePlatform {
     Ios,
     #[serde(rename = "android")]
     Android,
-    #[serde(rename = "macos")]
-    MacOS,
+    #[serde(rename = "mac", alias = "macos")]
+    Mac,
     #[serde(rename = "windows")]
     Windows,
     #[serde(rename = "linux")]
     Linux,
-    #[serde(rename = "server")]
-    Server,
+    #[serde(rename = "web", alias = "server")]
+    Web,
 }
 
 impl std::fmt::Display for DevicePlatform {
@@ -47,10 +47,10 @@ impl std::fmt::Display for DevicePlatform {
         match self {
             DevicePlatform::Ios => write!(f, "ios"),
             DevicePlatform::Android => write!(f, "android"),
-            DevicePlatform::MacOS => write!(f, "macos"),
+            DevicePlatform::Mac => write!(f, "mac"),
             DevicePlatform::Windows => write!(f, "windows"),
             DevicePlatform::Linux => write!(f, "linux"),
-            DevicePlatform::Server => write!(f, "server"),
+            DevicePlatform::Web => write!(f, "web"),
         }
     }
 }
@@ -60,12 +60,12 @@ impl DevicePlatform {
     /// Uses compile-time detection via target_os.
     pub fn detect() -> Self {
         match std::env::consts::OS {
-            "macos" => DevicePlatform::MacOS,
+            "macos" => DevicePlatform::Mac,
             "windows" => DevicePlatform::Windows,
             "linux" => DevicePlatform::Linux,
             "ios" => DevicePlatform::Ios,
             "android" => DevicePlatform::Android,
-            _ => DevicePlatform::Server,
+            _ => DevicePlatform::Web,
         }
     }
 }

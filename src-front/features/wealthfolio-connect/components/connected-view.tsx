@@ -1,21 +1,28 @@
 import { openUrlInBrowser } from "@/adapters";
-import { Badge } from "@wealthfolio/ui/components/ui/badge";
-import { Button } from "@wealthfolio/ui/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
-import { toast } from "@wealthfolio/ui/components/ui/use-toast";
-import { useWealthfolioConnect } from "../providers/wealthfolio-connect-provider";
-import { listBrokerConnections, syncBrokerData } from "../services/broker-service";
-import type { BrokerConnection, SyncResult } from "../types";
 import { DeviceSyncSection } from "@/features/devices-sync";
 import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ActionConfirm } from "@wealthfolio/ui";
+import { Avatar, AvatarFallback, AvatarImage } from "@wealthfolio/ui/components/ui/avatar";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@wealthfolio/ui/components/ui/card";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { useCallback, useState } from "react";
+import { useWealthfolioConnect } from "../providers/wealthfolio-connect-provider";
+import { listBrokerConnections, syncBrokerData } from "../services/broker-service";
+import type { BrokerConnection, SyncResult } from "../types";
 import { SubscriptionPlans } from "./subscription-plans";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -118,17 +125,12 @@ function ConnectionCard({ connection, onManage }: ConnectionCardProps) {
     >
       {/* Logo and info */}
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        {logoUrl ? (
-          <img
-            src={logoUrl}
-            alt={name}
-            className="h-9 w-9 shrink-0 rounded-lg bg-white object-contain p-1"
-          />
-        ) : (
-          <div className="bg-muted flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-semibold">
+        <Avatar className="h-9 w-9 rounded-lg">
+          <AvatarImage src={logoUrl} alt={name} className="bg-white object-contain p-1" />
+          <AvatarFallback className="rounded-lg text-sm font-semibold">
             {name.charAt(0)}
-          </div>
-        )}
+          </AvatarFallback>
+        </Avatar>
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -244,19 +246,17 @@ export function ConnectedView() {
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center gap-3">
-            {user?.user_metadata?.avatar_url ? (
-              <img
-                src={user.user_metadata.avatar_url}
+            <Avatar className="h-12 w-12">
+              <AvatarImage
+                src={user?.user_metadata?.avatar_url}
                 alt={user?.email ?? "User avatar"}
-                className="h-12 w-12 shrink-0 rounded-full object-cover"
               />
-            ) : (
-              <div className="bg-primary/10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full">
-                <span className="text-primary text-lg font-semibold">
+              <AvatarFallback className="bg-success/15">
+                <span className="text-success text-lg font-semibold">
                   {(userInfo?.fullName?.[0] ?? user?.email?.[0] ?? "U").toUpperCase()}
                 </span>
-              </div>
-            )}
+              </AvatarFallback>
+            </Avatar>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <h3 className="truncate text-base font-semibold">

@@ -3,6 +3,7 @@ import { MobileLoadingIndicator } from "@/components/mobile-loading-indicator";
 import { Toaster } from "@/components/sonner";
 import { UpdateDialog } from "@/components/update-dialog";
 import { PortfolioSyncProvider } from "@/context/portfolio-sync-context";
+import { useForegroundSync } from "@/features/wealthfolio-connect/hooks";
 import useNavigationEventListener from "@/hooks/use-navigation-event-listener";
 import { useIsMobileViewport, usePlatform } from "@/hooks/use-platform";
 import { useSettings } from "@/hooks/use-settings";
@@ -32,6 +33,7 @@ const AppLayoutContent = () => {
 
   useGlobalEventListener();
   useNavigationEventListener();
+  useForegroundSync();
 
   if (isSettingsLoading) return null;
 
