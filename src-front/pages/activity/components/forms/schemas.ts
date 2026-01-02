@@ -7,6 +7,7 @@ export const baseActivitySchema = z.object({
   activityDate: z.union([z.date(), z.string().datetime()]).default(new Date()),
   currency: z.string().optional(),
   comment: z.string().optional().nullable(),
+  subtype: z.string().optional().nullable(), // Semantic variation (DRIP, STAKING_REWARD, etc.)
   fxRate: z.coerce
     .number()
     .positive({ message: "FX rate must be a positive number." })
@@ -14,8 +15,9 @@ export const baseActivitySchema = z.object({
     .nullable(),
 });
 
+// Holdings schema: TRANSFER_IN/OUT with is_external=true represents add/remove holding
 export const holdingsActivitySchema = baseActivitySchema.extend({
-  activityType: z.enum([ActivityType.ADD_HOLDING, ActivityType.REMOVE_HOLDING]),
+  activityType: z.enum([ActivityType.TRANSFER_IN, ActivityType.TRANSFER_OUT]),
   assetId: z.string().min(1, { message: "Please select a security" }),
   quantity: z.coerce
     .number({
@@ -30,6 +32,14 @@ export const holdingsActivitySchema = baseActivitySchema.extend({
     })
     .positive(),
   assetDataSource: z.enum([DataSource.YAHOO, DataSource.MANUAL]).default(DataSource.YAHOO),
+  // Metadata to mark as external transfer (affects net_contribution)
+  metadata: z
+    .object({
+      flow: z.object({
+        is_external: z.boolean(),
+      }),
+    })
+    .optional(),
 });
 
 export const bulkHoldingRowSchema = z.object({
@@ -82,13 +92,10 @@ export const tradeActivitySchema = baseActivitySchema.extend({
   assetDataSource: z.enum([DataSource.YAHOO, DataSource.MANUAL]).default(DataSource.YAHOO),
 });
 
+// Cash activity schema - DEPOSIT/WITHDRAWAL only
+// TRANSFER_IN/TRANSFER_OUT are handled by holdingsActivitySchema with metadata
 export const cashActivitySchema = baseActivitySchema.extend({
-  activityType: z.enum([
-    ActivityType.DEPOSIT,
-    ActivityType.WITHDRAWAL,
-    ActivityType.TRANSFER_IN,
-    ActivityType.TRANSFER_OUT,
-  ]),
+  activityType: z.enum([ActivityType.DEPOSIT, ActivityType.WITHDRAWAL]),
   assetId: z.string().optional(),
   amount: z.coerce
     .number({

@@ -5,6 +5,7 @@ mod error;
 mod events;
 mod main_lib;
 mod models;
+mod scheduler;
 mod secrets;
 
 use api::app_router;
@@ -17,6 +18,10 @@ async fn main() -> anyhow::Result<()> {
     let config = Config::from_env();
     init_tracing();
     let state = build_state(&config).await?;
+
+    // Start background broker sync scheduler (4-hour interval)
+    scheduler::start_broker_sync_scheduler(state.clone());
+
     let static_dir = std::path::PathBuf::from(&config.static_dir);
     let index_file = static_dir.join("index.html");
     let static_service = ServeDir::new(static_dir).fallback(ServeFile::new(index_file));

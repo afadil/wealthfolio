@@ -184,6 +184,7 @@ pub struct NewActivity {
     pub asset_id: Option<String>, // NOW OPTIONAL - NULL for pure cash movements
     pub asset_data_source: Option<String>,
     pub activity_type: String,
+    pub subtype: Option<String>, // Semantic variation (DRIP, STAKING_REWARD, etc.)
     pub activity_date: String,
     pub quantity: Option<Decimal>,
     pub unit_price: Option<Decimal>,
@@ -193,6 +194,12 @@ pub struct NewActivity {
     pub status: Option<ActivityStatus>,
     pub notes: Option<String>,
     pub fx_rate: Option<Decimal>,
+    // Sync-related fields
+    pub metadata: Option<String>,       // JSON blob for sync metadata
+    pub needs_review: Option<bool>,     // Flag for activities needing user review
+    pub source_system: Option<String>,  // SNAPTRADE, PLAID, MANUAL, CSV
+    pub source_record_id: Option<String>, // Provider's record ID
+    pub source_group_id: Option<String>,  // Provider grouping key
 }
 
 impl NewActivity {
@@ -232,6 +239,7 @@ pub struct ActivityUpdate {
     pub asset_id: Option<String>, // NOW OPTIONAL - NULL for pure cash movements
     pub asset_data_source: Option<String>,
     pub activity_type: String,
+    pub subtype: Option<String>, // Semantic variation (DRIP, STAKING_REWARD, etc.)
     pub activity_date: String,
     pub quantity: Option<Decimal>,
     pub unit_price: Option<Decimal>,
@@ -473,15 +481,11 @@ impl Default for ImportMappingData {
         activity_mappings.insert("WITHDRAWAL".to_string(), vec!["WITHDRAWAL".to_string()]);
         activity_mappings.insert("TRANSFER_IN".to_string(), vec!["TRANSFER_IN".to_string()]);
         activity_mappings.insert("TRANSFER_OUT".to_string(), vec!["TRANSFER_OUT".to_string()]);
-        activity_mappings.insert("ADD_HOLDING".to_string(), vec!["ADD_HOLDING".to_string()]);
-        activity_mappings.insert(
-            "REMOVE_HOLDING".to_string(),
-            vec!["REMOVE_HOLDING".to_string()],
-        );
         activity_mappings.insert("SPLIT".to_string(), vec!["SPLIT".to_string()]);
         activity_mappings.insert("FEE".to_string(), vec!["FEE".to_string()]);
         activity_mappings.insert("TAX".to_string(), vec!["TAX".to_string()]);
         activity_mappings.insert("CREDIT".to_string(), vec!["CREDIT".to_string()]);
+        activity_mappings.insert("ADJUSTMENT".to_string(), vec!["ADJUSTMENT".to_string()]);
 
         ImportMappingData {
             account_id: String::new(),
@@ -533,10 +537,9 @@ pub enum ActivityType {
     Fee,
     Tax,
     Split,
-    AddHolding,
-    RemoveHolding,
-    Credit,   // NEW: Generic credit/adjustment
-    Unknown,  // NEW: Unmapped/unknown activity types
+    Credit,     // Cash-only credit: refunds, rebates, bonuses
+    Adjustment, // Non-trade correction / transformation (usually no cash)
+    Unknown,    // Unmapped/unknown activity types
 }
 
 impl ActivityType {
@@ -554,9 +557,8 @@ impl ActivityType {
             ActivityType::Fee => ACTIVITY_TYPE_FEE,
             ActivityType::Tax => ACTIVITY_TYPE_TAX,
             ActivityType::Split => ACTIVITY_TYPE_SPLIT,
-            ActivityType::AddHolding => ACTIVITY_TYPE_ADD_HOLDING,
-            ActivityType::RemoveHolding => ACTIVITY_TYPE_REMOVE_HOLDING,
             ActivityType::Credit => ACTIVITY_TYPE_CREDIT,
+            ActivityType::Adjustment => ACTIVITY_TYPE_ADJUSTMENT,
             ActivityType::Unknown => ACTIVITY_TYPE_UNKNOWN,
         }
     }
@@ -579,9 +581,8 @@ impl FromStr for ActivityType {
             s if s == ACTIVITY_TYPE_FEE => Ok(ActivityType::Fee),
             s if s == ACTIVITY_TYPE_TAX => Ok(ActivityType::Tax),
             s if s == ACTIVITY_TYPE_SPLIT => Ok(ActivityType::Split),
-            s if s == ACTIVITY_TYPE_ADD_HOLDING => Ok(ActivityType::AddHolding),
-            s if s == ACTIVITY_TYPE_REMOVE_HOLDING => Ok(ActivityType::RemoveHolding),
             s if s == ACTIVITY_TYPE_CREDIT => Ok(ActivityType::Credit),
+            s if s == ACTIVITY_TYPE_ADJUSTMENT => Ok(ActivityType::Adjustment),
             s if s == ACTIVITY_TYPE_UNKNOWN => Ok(ActivityType::Unknown),
             _ => Err(format!("Unknown activity type: {}", s)),
         }

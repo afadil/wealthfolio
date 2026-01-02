@@ -268,6 +268,7 @@ mod tests {
             asset_id: Some("AAPL".to_string()),
             asset_data_source: None,
             activity_type: "BUY".to_string(),
+            subtype: None,
             activity_date: "2024-01-15".to_string(),
             quantity: Some(dec!(10)),
             unit_price: Some(dec!(150)),
@@ -277,6 +278,11 @@ mod tests {
             status: None,
             notes: None,
             fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
         }
     }
 
@@ -370,6 +376,7 @@ mod tests {
             asset_id: Some("AAPL".to_string()),
             asset_data_source: None,
             activity_type: "BUY".to_string(),
+            subtype: None,
             activity_date: "2024-01-15".to_string(),
             quantity: Some(dec!(10)),
             unit_price: Some(dec!(150)),

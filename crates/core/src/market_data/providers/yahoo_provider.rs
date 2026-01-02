@@ -285,7 +285,7 @@ impl YahooProvider {
                     asset_class: Some(result.quote_type),
                     asset_sub_class: Some(result.type_display),
                     symbol: result.symbol.clone(),
-                    symbol_mapping: Some(result.symbol),
+                    quote_symbol: Some(result.symbol),
                     data_source: DataSource::Yahoo.as_str().to_string(),
                     // exchange: Some(result.exchange),
                     ..Default::default()
@@ -414,18 +414,22 @@ impl YahooProvider {
             _ => { /* ... */ }
         }
 
+        // Get currency from API or fall back to exchange suffix
+        let currency = asset_profile
+            .price
+            .as_ref()
+            .and_then(|p| p.currency.clone())
+            .or_else(|| get_currency_for_suffix(symbol).map(|s| s.to_string()))
+            .unwrap_or_default();
+
         let new_asset = AssetProfile {
             id: Some(symbol.to_string()),
             isin: None,
             name: Some(formatted_name),
             asset_type: Some(asset_class.to_string()), // Convert enum to String
             symbol: symbol.to_string(),
-            symbol_mapping: Some(symbol.to_string()),
-            currency: asset_profile
-                .price
-                .as_ref()
-                .and_then(|p| p.currency.clone())
-                .unwrap_or_default(),
+            quote_symbol: Some(symbol.to_string()),
+            currency,
             data_source: DataSource::Yahoo.as_str().to_string(),
             asset_class: Some(asset_class.to_string()), // Convert enum to String
             asset_sub_class: Some(asset_sub_class.to_string()), // Convert enum to String
@@ -715,5 +719,76 @@ impl MarketDataProvider for YahooProvider {
     ) -> Result<(Vec<ModelQuote>, Vec<(String, String)>), MarketDataError> {
         self.get_historical_quotes_bulk(symbols_with_currencies, start, end)
             .await
+    }
+}
+
+/// Get the currency for a Yahoo Finance symbol based on its exchange suffix.
+/// This is used as a fallback when the API doesn't return currency information.
+fn get_currency_for_suffix(symbol: &str) -> Option<&'static str> {
+    let symbol_upper = symbol.to_uppercase();
+    // Extract suffix after the last '.'
+    let suffix = symbol_upper.rsplit('.').next()?;
+
+    // Only process if there was actually a suffix (symbol contains '.')
+    if !symbol.contains('.') {
+        return None;
+    }
+
+    match suffix {
+        // European exchanges
+        "L" | "IL" => Some("GBP"),       // London Stock Exchange
+        "PA" => Some("EUR"),              // Euronext Paris
+        "AS" => Some("EUR"),              // Euronext Amsterdam
+        "BR" => Some("EUR"),              // Euronext Brussels
+        "DE" | "F" | "BE" | "DU" | "HM" | "HA" | "MU" | "SG" => Some("EUR"), // German exchanges
+        "MI" => Some("EUR"),              // Borsa Italiana (Milan)
+        "MC" => Some("EUR"),              // Bolsa de Madrid
+        "LS" => Some("EUR"),              // Euronext Lisbon
+        "VI" => Some("EUR"),              // Vienna Stock Exchange
+        "HE" => Some("EUR"),              // Helsinki Stock Exchange
+        "IR" => Some("EUR"),              // Euronext Dublin
+        "SW" => Some("CHF"),              // SIX Swiss Exchange
+        "OL" => Some("NOK"),              // Oslo Børs
+        "ST" => Some("SEK"),              // Nasdaq Stockholm
+        "CO" => Some("DKK"),              // Nasdaq Copenhagen
+        "IC" => Some("ISK"),              // Nasdaq Iceland
+
+        // Americas
+        "TO" | "V" | "CN" | "NE" => Some("CAD"), // Toronto, TSX Venture, CSE, NEO
+        "MX" => Some("MXN"),              // Bolsa Mexicana de Valores
+        "SA" => Some("BRL"),              // B3 (São Paulo)
+        "BA" => Some("ARS"),              // Buenos Aires Stock Exchange
+        "SN" => Some("CLP"),              // Santiago Stock Exchange
+
+        // Asia-Pacific
+        "AX" => Some("AUD"),              // Australian Securities Exchange
+        "NZ" => Some("NZD"),              // New Zealand Exchange
+        "HK" => Some("HKD"),              // Hong Kong Stock Exchange
+        "SS" | "SZ" => Some("CNY"),       // Shanghai, Shenzhen
+        "T" | "TYO" => Some("JPY"),       // Tokyo Stock Exchange
+        "KS" | "KQ" => Some("KRW"),       // Korea Stock Exchange, KOSDAQ
+        "TW" | "TWO" => Some("TWD"),      // Taiwan Stock Exchange
+        "SI" => Some("SGD"),              // Singapore Exchange
+        "BK" => Some("THB"),              // Stock Exchange of Thailand
+        "JK" => Some("IDR"),              // Indonesia Stock Exchange
+        "KL" => Some("MYR"),              // Bursa Malaysia
+        "BO" | "NS" => Some("INR"),       // BSE, NSE India
+
+        // Middle East & Africa
+        "TA" => Some("ILS"),              // Tel Aviv Stock Exchange
+        "CA" => Some("EGP"),              // Egyptian Exchange (Cairo)
+        "SAU" => Some("SAR"),             // Saudi Stock Exchange (Tadawul)
+        "QA" => Some("QAR"),              // Qatar Stock Exchange
+        "AE" => Some("AED"),              // Abu Dhabi Securities Exchange
+        "JO" => Some("JOD"),              // Amman Stock Exchange
+
+        // Other
+        "IS" => Some("TRY"),              // Borsa Istanbul
+        "PR" => Some("CZK"),              // Prague Stock Exchange
+        "WA" => Some("PLN"),              // Warsaw Stock Exchange
+        "BD" => Some("HUF"),              // Budapest Stock Exchange
+        "AT" => Some("EUR"),              // Athens Stock Exchange
+
+        _ => None,
     }
 }

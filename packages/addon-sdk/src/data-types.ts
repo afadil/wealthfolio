@@ -3,13 +3,11 @@
  * These types mirror the main application types to ensure compatibility
  */
 
-// Canonical activity types (closed set of 15)
+// Canonical activity types (closed set of 14)
 export const ActivityType = {
   BUY: 'BUY',
   SELL: 'SELL',
   SPLIT: 'SPLIT',
-  ADD_HOLDING: 'ADD_HOLDING',
-  REMOVE_HOLDING: 'REMOVE_HOLDING',
   DIVIDEND: 'DIVIDEND',
   INTEREST: 'INTEREST',
   DEPOSIT: 'DEPOSIT',
@@ -19,6 +17,7 @@ export const ActivityType = {
   FEE: 'FEE',
   TAX: 'TAX',
   CREDIT: 'CREDIT',
+  ADJUSTMENT: 'ADJUSTMENT',
   UNKNOWN: 'UNKNOWN',
 } as const;
 
@@ -29,8 +28,6 @@ export const ACTIVITY_TYPES = [
   'BUY',
   'SELL',
   'SPLIT',
-  'ADD_HOLDING',
-  'REMOVE_HOLDING',
   'DIVIDEND',
   'INTEREST',
   'DEPOSIT',
@@ -40,6 +37,7 @@ export const ACTIVITY_TYPES = [
   'FEE',
   'TAX',
   'CREDIT',
+  'ADJUSTMENT',
   'UNKNOWN',
 ] as const;
 

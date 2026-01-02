@@ -79,9 +79,10 @@ CREATE TABLE activities (
 
     -- Classification
     activity_type TEXT NOT NULL CHECK (activity_type IN (
-        'BUY', 'SELL', 'SPLIT', 'ADD_HOLDING', 'REMOVE_HOLDING',
+        'BUY', 'SELL', 'SPLIT',
         'DIVIDEND', 'INTEREST', 'DEPOSIT', 'WITHDRAWAL',
-        'TRANSFER_IN', 'TRANSFER_OUT', 'FEE', 'TAX', 'CREDIT', 'UNKNOWN'
+        'TRANSFER_IN', 'TRANSFER_OUT', 'FEE', 'TAX',
+        'CREDIT', 'ADJUSTMENT', 'UNKNOWN'
     )),
     activity_type_override TEXT,
     source_type TEXT,
@@ -135,9 +136,13 @@ SELECT
     account_id,
     asset_id,  -- Keep $CASH-* asset_ids for cash transfers
     CASE
-        WHEN activity_type IN ('BUY', 'SELL', 'SPLIT', 'ADD_HOLDING', 'REMOVE_HOLDING',
+        -- Convert ADD_HOLDING to TRANSFER_IN (will be marked external below)
+        WHEN activity_type = 'ADD_HOLDING' THEN 'TRANSFER_IN'
+        -- Convert REMOVE_HOLDING to TRANSFER_OUT (will be marked external below)
+        WHEN activity_type = 'REMOVE_HOLDING' THEN 'TRANSFER_OUT'
+        WHEN activity_type IN ('BUY', 'SELL', 'SPLIT',
                                'DIVIDEND', 'INTEREST', 'DEPOSIT', 'WITHDRAWAL',
-                               'TRANSFER_IN', 'TRANSFER_OUT', 'FEE', 'TAX')
+                               'TRANSFER_IN', 'TRANSFER_OUT', 'FEE', 'TAX', 'CREDIT')
         THEN activity_type
         ELSE 'UNKNOWN'
     END,
@@ -167,7 +172,11 @@ CREATE UNIQUE INDEX ux_activities_idempotency_key ON activities(idempotency_key)
 -- ============================================================================
 -- STEP 3.5: MIGRATE EXISTING TRANSFER_IN/OUT TO PRESERVE BEHAVIOR
 -- Mark existing transfers as external (affecting net_contribution) to maintain
--- backward compatibility. New transfers will default to internal (is_external = false).
+-- backward compatibility. This includes:
+-- 1. Original TRANSFER_IN/TRANSFER_OUT activities
+-- 2. Converted ADD_HOLDING -> TRANSFER_IN (from step 3 above)
+-- 3. Converted REMOVE_HOLDING -> TRANSFER_OUT (from step 3 above)
+-- New transfers will default to internal (is_external = false).
 -- ============================================================================
 
 UPDATE activities
@@ -181,23 +190,73 @@ WHERE activity_type IN ('TRANSFER_IN', 'TRANSFER_OUT')
 
 -- ============================================================================
 -- STEP 4: UPDATE ASSETS TABLE
+-- Replaces symbol_mapping with quote_symbol for pricing lookups
 -- ============================================================================
 
-ALTER TABLE assets ADD COLUMN kind TEXT;
-ALTER TABLE assets ADD COLUMN quote_symbol TEXT;
-ALTER TABLE assets ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1;
-ALTER TABLE assets ADD COLUMN metadata TEXT;
+-- Rename old table
+ALTER TABLE assets RENAME TO assets_old;
 
-UPDATE assets SET kind = CASE
-    WHEN asset_type IN ('Stock', 'Equity', 'ETF', 'Etf', 'Mutual Fund', 'MutualFund') THEN 'SECURITY'
-    WHEN asset_type IN ('Cryptocurrency', 'Crypto') THEN 'CRYPTO'
-    WHEN asset_type = 'Cash' THEN 'CASH'
-    WHEN asset_type IN ('Forex', 'Currency') THEN 'FX_RATE'
-    ELSE 'SECURITY'
-END;
+-- Create new table without symbol_mapping, with new columns
+CREATE TABLE assets (
+    id TEXT NOT NULL PRIMARY KEY,
+    isin TEXT,
+    name TEXT,
+    asset_type TEXT,
+    symbol TEXT NOT NULL,
+    asset_class TEXT,
+    asset_sub_class TEXT,
+    notes TEXT,
+    countries TEXT,
+    categories TEXT,
+    classes TEXT,
+    attributes TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    currency TEXT NOT NULL,
+    data_source TEXT NOT NULL,
+    sectors TEXT,
+    url TEXT,
+    -- New columns
+    kind TEXT,
+    quote_symbol TEXT,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    metadata TEXT
+);
 
-UPDATE assets SET quote_symbol = symbol WHERE data_source = 'YAHOO';
+-- Copy data, migrating symbol_mapping to quote_symbol
+-- Priority: symbol_mapping (if set and non-empty) > symbol (for YAHOO) > NULL
+INSERT INTO assets (
+    id, isin, name, asset_type, symbol, asset_class, asset_sub_class,
+    notes, countries, categories, classes, attributes, created_at, updated_at,
+    currency, data_source, sectors, url, kind, quote_symbol, is_active, metadata
+)
+SELECT
+    id, isin, name, asset_type, symbol, asset_class, asset_sub_class,
+    notes, countries, categories, classes, attributes, created_at, updated_at,
+    currency, data_source, sectors, url,
+    -- kind: derive from asset_type
+    CASE
+        WHEN asset_type IN ('Stock', 'Equity', 'ETF', 'Etf', 'Mutual Fund', 'MutualFund') THEN 'SECURITY'
+        WHEN asset_type IN ('Cryptocurrency', 'Crypto') THEN 'CRYPTO'
+        WHEN asset_type = 'Cash' THEN 'CASH'
+        WHEN asset_type IN ('Forex', 'Currency') THEN 'FX_RATE'
+        ELSE 'SECURITY'
+    END,
+    -- quote_symbol: migrate from symbol_mapping if set, otherwise use symbol for YAHOO
+    CASE
+        WHEN symbol_mapping IS NOT NULL AND symbol_mapping != '' THEN symbol_mapping
+        WHEN data_source = 'YAHOO' THEN symbol
+        ELSE NULL
+    END,
+    1, -- is_active
+    NULL -- metadata
+FROM assets_old;
 
+-- Drop old table
+DROP TABLE assets_old;
+
+-- Recreate indexes
+CREATE UNIQUE INDEX assets_data_source_symbol_key ON assets(data_source, symbol);
 CREATE INDEX ix_assets_kind ON assets(kind);
 
 -- ============================================================================

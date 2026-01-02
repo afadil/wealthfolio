@@ -99,7 +99,7 @@ impl AssetProfiler for MetalPriceApiProvider {
             name: Some(name.to_string()),
             asset_type: Some(asset_type.to_string()),
             symbol: symbol.to_string(),
-            symbol_mapping: None,
+            quote_symbol: Some(symbol.to_string()), // Use symbol for quote fetching
             asset_class: Some("Commodity".to_string()),
             asset_sub_class: Some("Precious Metal".to_string()),
             notes: Some(description.to_string()),

@@ -5,6 +5,7 @@
 
 #[cfg(feature = "broker")]
 pub mod broker;
+pub mod client;
 pub mod platform;
 pub mod state;
 
@@ -12,11 +13,13 @@ pub mod state;
 #[cfg(feature = "broker")]
 pub use broker::{
     AccountUniversalActivity, BrokerAccount, BrokerApiClient, BrokerBrokerage, BrokerConnection,
-    ConnectPortalRequest, ConnectPortalResponse, PaginatedUniversalActivity,
-    PlanPricing, PlanPricingPeriods, PlansResponse, PlatformRepositoryTrait,
-    RemoveConnectionRequest, SubscriptionPlan, SyncAccountsResponse, SyncActivitiesResponse,
+    PaginatedUniversalActivity, PlanPricing, PlanPricingPeriods, PlansResponse,
+    PlatformRepositoryTrait, SubscriptionPlan, SyncAccountsResponse, SyncActivitiesResponse,
     SyncConnectionsResponse, SyncService, SyncServiceTrait, UserInfo, UserTeam,
 };
+
+// Re-export the HTTP client
+pub use client::{ConnectApiClient, DEFAULT_CLOUD_API_URL};
 
 pub use platform::{Platform, PlatformDB, PlatformRepository};
 pub use state::{BrokerSyncState, BrokerSyncStateDB, BrokerSyncStateRepository};

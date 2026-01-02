@@ -31,7 +31,7 @@ mod performance;
 mod portfolio;
 mod secrets;
 mod settings;
-mod shared;
+pub mod shared;
 
 #[utoipa::path(get, path = "/api/v1/healthz", responses((status = 200, description = "Health")))]
 pub async fn healthz() -> &'static str {

@@ -45,14 +45,12 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
   const needsAssetSymbol = [
     "BUY",
     "SELL",
-    "ADD_HOLDING",
-    "REMOVE_HOLDING",
     "DIVIDEND",
     "INTEREST",
     "SPLIT",
   ].includes(activityType);
-  const needsQuantity = ["BUY", "SELL", "ADD_HOLDING", "REMOVE_HOLDING"].includes(activityType);
-  const needsUnitPrice = ["BUY", "SELL", "ADD_HOLDING", "REMOVE_HOLDING"].includes(activityType);
+  const needsQuantity = ["BUY", "SELL"].includes(activityType);
+  const needsUnitPrice = ["BUY", "SELL"].includes(activityType);
   const needsAmount = [
     "DEPOSIT",
     "WITHDRAWAL",
@@ -235,11 +233,7 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
                 name="unitPrice"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-base font-medium">
-                      {activityType === "ADD_HOLDING" || activityType === "REMOVE_HOLDING"
-                        ? "Avg Cost"
-                        : "Price"}
-                    </FormLabel>
+                    <FormLabel className="text-base font-medium">Price</FormLabel>
                     <FormControl>
                       <MoneyInput {...field} />
                     </FormControl>

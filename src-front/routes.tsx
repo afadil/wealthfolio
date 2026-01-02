@@ -33,6 +33,7 @@ import NotFoundPage from "@/pages/not-found";
 import AuthCallbackPage from "./pages/auth/auth-callback-page";
 import HoldingsInsightsPage from "./pages/holdings/holdings-insights-page";
 import AboutSettingsPage from "./pages/settings/about/about-page";
+import ConnectPage from "./pages/connect/connect-page";
 
 export function AppRoutes() {
   const [dynamicRoutes, setDynamicRoutes] = useState<
@@ -84,6 +85,7 @@ export function AppRoutes() {
           <Route path="income" element={<IncomePage />} />
           <Route path="performance" element={<PerformancePage />} />
           <Route path="insights" element={<PortfolioInsightsPage />} />
+          <Route path="connect" element={<ConnectPage />} />
           {/* Dynamic addon routes */}
           {dynamicRoutes.map(({ path, component: Component }) => (
             <Route

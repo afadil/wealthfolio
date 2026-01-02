@@ -43,7 +43,7 @@ pub struct QuoteSummary {
 #[derive(Debug, Clone)]
 pub struct QuoteRequest {
     pub symbol: String,
-    pub symbol_mapping: Option<String>,
+    pub quote_symbol: Option<String>, // Symbol used for quote fetching (replaces symbol_mapping)
     pub data_source: DataSource,
     pub currency: String,
 }

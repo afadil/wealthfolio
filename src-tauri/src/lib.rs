@@ -5,6 +5,7 @@ mod commands;
 mod context;
 mod events;
 mod listeners;
+mod scheduler;
 mod secret_store;
 
 #[cfg(desktop)]
@@ -15,7 +16,7 @@ mod updater;
 use std::sync::Arc;
 
 use dotenvy::dotenv;
-use log::error;
+use log::{error, info};
 use tauri::{AppHandle, Emitter, Manager};
 
 use events::emit_app_ready;
@@ -72,7 +73,25 @@ mod desktop {
         // The frontend will trigger the initial portfolio update and update check after it's mounted
         emit_app_ready(&handle);
 
+        // Setup window focus listener for foreground sync
+        setup_window_focus_listener(&handle);
+
         Ok(())
+    }
+
+    /// Sets up window focus listener to emit app:foreground event.
+    /// The frontend listens to this event to trigger sync checks.
+    fn setup_window_focus_listener(handle: &AppHandle) {
+        let focus_handle = handle.clone();
+        if let Some(window) = handle.get_webview_window("main") {
+            window.on_window_event(move |event| {
+                if let tauri::WindowEvent::Focused(true) = event {
+                    info!("Window focused, emitting app:foreground event");
+                    // Emit event to frontend to trigger sync check
+                    let _ = focus_handle.emit("app:foreground", ());
+                }
+            });
+        }
     }
 }
 
@@ -106,6 +125,7 @@ mod mobile {
 
                     // Notify frontend that app is ready
                     // The frontend will trigger the initial portfolio update after it's mounted
+                    // For mobile, foreground sync is triggered from frontend via app lifecycle events
                     emit_app_ready(&handle);
                 }
                 Err(e) => {
@@ -301,10 +321,11 @@ pub fn run() {
             commands::brokers_sync::get_synced_accounts,
             commands::brokers_sync::get_platforms,
             commands::brokers_sync::list_broker_connections,
-            commands::brokers_sync::remove_broker_connection,
-            commands::brokers_sync::get_connect_portal_url,
             commands::brokers_sync::get_subscription_plans,
             commands::brokers_sync::get_user_info,
+            commands::brokers_sync::get_broker_sync_states,
+            commands::brokers_sync::get_import_runs,
+            commands::brokers_sync::trigger_foreground_sync,
             // Device sync commands
             commands::device_sync::register_device,
             commands::device_sync::get_device,

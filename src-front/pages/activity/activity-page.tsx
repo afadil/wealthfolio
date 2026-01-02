@@ -33,6 +33,7 @@ import { BulkHoldingsModal } from "./components/forms/bulk-holdings-modal";
 import { MobileActivityForm } from "./components/mobile-forms/mobile-activity-form";
 import { useActivityMutations } from "./hooks/use-activity-mutations";
 import { useActivitySearch, type ActivityStatusFilter } from "./hooks/use-activity-search";
+import { SyncButton } from "@/features/wealthfolio-connect/components/sync-button";
 
 const ActivityPage = () => {
   const [showForm, setShowForm] = useState(false);
@@ -159,6 +160,7 @@ const ActivityPage = () => {
 
   const headerActions = (
     <div className="flex flex-wrap items-center gap-2">
+      <SyncButton />
       {/* Desktop dropdown menu */}
       <div className="hidden sm:flex">
         <DropdownMenu>

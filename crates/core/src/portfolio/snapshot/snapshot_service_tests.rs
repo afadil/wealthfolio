@@ -4,23 +4,22 @@ mod tests {
     use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
     use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
-    use std::collections::{HashMap, VecDeque};
+    use std::collections::{HashMap, HashSet, VecDeque};
     use std::sync::{Arc, RwLock};
 
     use crate::accounts::{Account, AccountRepositoryTrait, AccountUpdate, NewAccount};
     use crate::activities::{
-        activities_model::IncomeData as ActivityIncomeData, Activity, ActivityRepositoryTrait,
-        ActivitySearchResponse, ActivityUpdate, ImportMapping as ActivityImportMapping,
-        NewActivity, Sort as ActivitySort,
+        Activity, ActivityRepositoryTrait, ActivitySearchResponse, ActivityStatus, ActivityUpdate,
+        ImportMapping as ActivityImportMapping, IncomeData as ActivityIncomeData, NewActivity,
+        Sort as ActivitySort,
     };
     use crate::assets::{Asset, AssetRepositoryTrait, NewAsset, UpdateAssetProfile};
     use crate::constants::{DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
     use crate::errors::{Error, Result as AppResult};
-    use crate::fx::fx_model::{ExchangeRate, NewExchangeRate};
-    use crate::fx::FxServiceTrait;
+    use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
     use crate::portfolio::snapshot::{
-        snapshot_repository::SnapshotRepositoryTrait, AccountStateSnapshot, Lot, Position,
-        SnapshotService, SnapshotServiceTrait,
+        AccountStateSnapshot, Lot, Position, SnapshotRepositoryTrait, SnapshotService,
+        SnapshotServiceTrait,
     };
 
     #[derive(Clone, Debug)]
@@ -159,20 +158,19 @@ mod tests {
                     name: Some("Apple Inc.".to_string()),
                     asset_type: Some("STOCK".to_string()),
                     symbol: "AAPL".to_string(),
-                    symbol_mapping: Some("AAPL".to_string()),
+                    quote_symbol: Some("AAPL".to_string()),
                     asset_class: Some("EQUITY".to_string()),
                     asset_sub_class: Some("LARGE_CAP".to_string()),
-                    notes: None,
                     countries: Some("US".to_string()),
                     categories: Some("Technology".to_string()),
                     classes: Some("Equity".to_string()),
-                    attributes: None,
                     currency: "USD".to_string(), // USD listing
                     data_source: "MANUAL".to_string(),
                     sectors: Some("Technology".to_string()),
-                    url: None,
                     created_at: chrono::Utc::now().naive_utc(),
                     updated_at: chrono::Utc::now().naive_utc(),
+                    is_active: true,
+                    ..Default::default()
                 },
             );
 
@@ -184,20 +182,19 @@ mod tests {
                     name: Some("Shopify Inc.".to_string()),
                     asset_type: Some("STOCK".to_string()),
                     symbol: "SHOP".to_string(),
-                    symbol_mapping: Some("SHOP".to_string()),
+                    quote_symbol: Some("SHOP".to_string()),
                     asset_class: Some("EQUITY".to_string()),
                     asset_sub_class: Some("LARGE_CAP".to_string()),
-                    notes: None,
                     countries: Some("CA".to_string()),
                     categories: Some("Technology".to_string()),
                     classes: Some("Equity".to_string()),
-                    attributes: None,
                     currency: "CAD".to_string(), // CAD listing
                     data_source: "MANUAL".to_string(),
                     sectors: Some("Technology".to_string()),
-                    url: None,
                     created_at: chrono::Utc::now().naive_utc(),
                     updated_at: chrono::Utc::now().naive_utc(),
+                    is_active: true,
+                    ..Default::default()
                 },
             );
 
@@ -309,12 +306,8 @@ mod tests {
         async fn delete(&self, _id: &str) -> AppResult<usize> {
             unimplemented!("MockAccountRepository::delete");
         }
-        fn create_in_transaction(
-            &self,
-            _new_account: NewAccount,
-            _conn: &mut diesel::sqlite::SqliteConnection,
-        ) -> AppResult<Account> {
-            unimplemented!("MockAccountRepository::create_in_transaction not suitable for simple mock without DB instance")
+        async fn create(&self, _new_account: NewAccount) -> AppResult<Account> {
+            unimplemented!("MockAccountRepository::create not suitable for simple mock")
         }
     }
 
@@ -782,6 +775,52 @@ mod tests {
         }
     }
 
+    /// Helper to create test activities with the new Activity model
+    fn create_test_activity(
+        id: &str,
+        account_id: &str,
+        asset_id: Option<&str>,
+        activity_type: &str,
+        date: NaiveDate,
+        quantity: Option<Decimal>,
+        unit_price: Option<Decimal>,
+        amount: Option<Decimal>,
+        currency: &str,
+    ) -> Activity {
+        Activity {
+            id: id.to_string(),
+            account_id: account_id.to_string(),
+            asset_id: asset_id.map(String::from),
+            activity_type: activity_type.to_string(),
+            activity_type_override: None,
+            source_type: None,
+            subtype: None,
+            status: ActivityStatus::Posted,
+            activity_date: DateTime::from_naive_utc_and_offset(
+                date.and_hms_opt(0, 0, 0).unwrap(),
+                Utc,
+            ),
+            settlement_date: None,
+            quantity,
+            unit_price,
+            amount,
+            fee: Some(Decimal::ZERO),
+            currency: currency.to_string(),
+            fx_rate: None,
+            notes: None,
+            metadata: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+            idempotency_key: None,
+            import_run_id: None,
+            is_user_modified: false,
+            needs_review: false,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
     #[tokio::test]
     async fn test_calculate_total_portfolio_snapshots_aggregation() {
         let base_portfolio_currency = "CAD";
@@ -1120,38 +1159,28 @@ mod tests {
         // two deposit activities
         let d1 = NaiveDate::from_ymd_opt(2025, 5, 8).unwrap();
         let d2 = NaiveDate::from_ymd_opt(2025, 6, 1).unwrap();
-        let act1 = Activity {
-            id: "act1".into(),
-            account_id: acc.id.clone(),
-            asset_id: "$CASH-CAD".into(),
-            activity_type: "DEPOSIT".into(),
-            activity_date: DateTime::from_naive_utc_and_offset(
-                d1.and_hms_opt(0, 0, 0).unwrap(),
-                Utc,
-            ),
-            quantity: Decimal::ZERO,
-            unit_price: Decimal::ZERO,
-            currency: "CAD".into(),
-            fee: Decimal::ZERO,
-            amount: Some(dec!(5000)),
-            is_draft: false,
-            comment: None,
-            fx_rate: None,
-            provider_type: None,
-            external_provider_id: None,
-            external_broker_id: None,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-        };
-        let act2 = Activity {
-            id: "act2".into(),
-            activity_date: DateTime::from_naive_utc_and_offset(
-                d2.and_hms_opt(0, 0, 0).unwrap(),
-                Utc,
-            ),
-            amount: Some(dec!(10000)),
-            ..act1.clone()
-        };
+        let act1 = create_test_activity(
+            "act1",
+            &acc.id,
+            Some("$CASH-CAD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(5000)),
+            "CAD",
+        );
+        let act2 = create_test_activity(
+            "act2",
+            &acc.id,
+            Some("$CASH-CAD"),
+            "DEPOSIT",
+            d2,
+            None,
+            None,
+            Some(dec!(10000)),
+            "CAD",
+        );
         let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![act1, act2]));
 
         let fx = Arc::new(MockFxService::new());
@@ -1178,43 +1207,48 @@ mod tests {
 
         // one active CAD account
         let mut account_repo = MockAccountRepository::new();
-        let acc = create_test_account("acc1", "CAD", "Cash‑Only");
+        let acc = create_test_account("acc1", "CAD", "Cash-Only");
         account_repo.add_account(acc.clone());
 
         // two DEPOSIT activities + 1 DIVIDEND (dividend shouldn't alter net_contribution)
         let d1 = NaiveDate::from_ymd_opt(2025, 5, 8).unwrap();
         let d2 = NaiveDate::from_ymd_opt(2025, 6, 1).unwrap();
-        let ts = |d: NaiveDate| {
-            DateTime::from_naive_utc_and_offset(d.and_hms_opt(0, 0, 0).unwrap(), Utc)
-        };
-        let deposit = |id, date, amt| Activity {
-            id,
-            account_id: acc.id.clone(),
-            asset_id: "$CASH-CAD".into(),
-            activity_type: "DEPOSIT".into(),
-            activity_date: ts(date),
-            quantity: Decimal::ZERO,
-            unit_price: Decimal::ZERO,
-            currency: "CAD".into(),
-            fee: Decimal::ZERO,
-            amount: Some(amt),
-            is_draft: false,
-            comment: None,
-            fx_rate: None,
-            provider_type: None,
-            external_provider_id: None,
-            external_broker_id: None,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-        };
-        let mut dividend = deposit("div1".into(), d2, dec!(100000));
-        dividend.activity_type = "DIVIDEND".into();
 
-        let act_repo = Arc::new(MockActivityRepositoryWithData::new(vec![
-            deposit("dep1".into(), d1, dec!(5000)),
-            dividend,
-            deposit("dep2".into(), d2, dec!(10000)),
-        ]));
+        let dep1 = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("$CASH-CAD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(5000)),
+            "CAD",
+        );
+        let dividend = create_test_activity(
+            "div1",
+            &acc.id,
+            Some("$CASH-CAD"),
+            "DIVIDEND",
+            d2,
+            None,
+            None,
+            Some(dec!(100000)),
+            "CAD",
+        );
+        let dep2 = create_test_activity(
+            "dep2",
+            &acc.id,
+            Some("$CASH-CAD"),
+            "DEPOSIT",
+            d2,
+            None,
+            None,
+            Some(dec!(10000)),
+            "CAD",
+        );
+
+        let act_repo = Arc::new(MockActivityRepositoryWithData::new(vec![dep1, dividend, dep2]));
 
         let fx = Arc::new(MockFxService::new());
         let snaps = Arc::new(MockSnapshotRepository::new());
@@ -1229,7 +1263,7 @@ mod tests {
             fx,
         );
 
-        // should compile & run without type errors and save ≥ 1 frame
+        // should compile & run without type errors and save >= 1 frame
         let saved = svc.calculate_holdings_snapshots(None).await.unwrap();
         assert!(saved >= 1, "expected at least one keyframe saved");
 
@@ -1257,5 +1291,1685 @@ mod tests {
         let second_frame = &frames_sorted[1];
         assert_eq!(second_frame.net_contribution, dec!(15000), "Second keyframe should reflect both deposits, ignoring the dividend for net contribution calculation.");
         assert_eq!(second_frame.snapshot_date, d2);
+    }
+
+    // ==================== BUY ACTIVITY TESTS ====================
+
+    #[tokio::test]
+    async fn test_buy_activity_creates_position_and_updates_cash() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+
+        // Deposit first to have cash
+        let deposit = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(10000)),
+            "USD",
+        );
+
+        // Buy 10 shares of AAPL at $150
+        let buy = create_test_activity(
+            "buy1",
+            &acc.id,
+            Some("AAPL"),
+            "BUY",
+            d1,
+            Some(dec!(10)),
+            Some(dec!(150)),
+            Some(dec!(1500)),
+            "USD",
+        );
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![deposit, buy]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let saved = svc.calculate_holdings_snapshots(None).await.unwrap();
+        assert!(saved >= 1);
+
+        let frames = snapshot_repo.get_saved_snapshots();
+        assert!(!frames.is_empty());
+
+        let frame = &frames[0];
+        // Check position created
+        assert!(frame.positions.contains_key("AAPL"));
+        let pos = frame.positions.get("AAPL").unwrap();
+        assert_eq!(pos.quantity, dec!(10));
+        assert_eq!(pos.total_cost_basis, dec!(1500));
+        assert_eq!(pos.average_cost, dec!(150));
+
+        // Check cash balance reduced (10000 deposit - 1500 buy = 8500)
+        assert_eq!(frame.cash_balances.get("USD"), Some(&dec!(8500)));
+
+        // Net contribution should be 10000 (only deposit counts)
+        assert_eq!(frame.net_contribution, dec!(10000));
+    }
+
+    // ==================== SELL ACTIVITY TESTS ====================
+
+    #[tokio::test]
+    async fn test_sell_activity_reduces_position_and_increases_cash() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+
+        // Deposit and buy first
+        let deposit = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(10000)),
+            "USD",
+        );
+
+        let buy = create_test_activity(
+            "buy1",
+            &acc.id,
+            Some("AAPL"),
+            "BUY",
+            d1,
+            Some(dec!(10)),
+            Some(dec!(150)),
+            Some(dec!(1500)),
+            "USD",
+        );
+
+        // Sell 5 shares at $180
+        let sell = create_test_activity(
+            "sell1",
+            &acc.id,
+            Some("AAPL"),
+            "SELL",
+            d2,
+            Some(dec!(5)),
+            Some(dec!(180)),
+            Some(dec!(900)),
+            "USD",
+        );
+
+        let activity_repo =
+            Arc::new(MockActivityRepositoryWithData::new(vec![deposit, buy, sell]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+
+        let frames = snapshot_repo.get_saved_snapshots();
+        let mut sorted = frames.clone();
+        sorted.sort_by_key(|s| s.snapshot_date);
+
+        // Should have 2 keyframes (d1 and d2)
+        assert_eq!(sorted.len(), 2);
+
+        let frame_d2 = &sorted[1];
+        assert_eq!(frame_d2.snapshot_date, d2);
+
+        // Position should be reduced
+        let pos = frame_d2.positions.get("AAPL").unwrap();
+        assert_eq!(pos.quantity, dec!(5));
+        // Cost basis reduced proportionally (5 shares * $150 avg = $750)
+        assert_eq!(pos.total_cost_basis, dec!(750));
+
+        // Cash should be 8500 + 900 = 9400
+        assert_eq!(frame_d2.cash_balances.get("USD"), Some(&dec!(9400)));
+
+        // Net contribution unchanged by sell
+        assert_eq!(frame_d2.net_contribution, dec!(10000));
+    }
+
+    // ==================== WITHDRAWAL ACTIVITY TESTS ====================
+
+    #[tokio::test]
+    async fn test_withdrawal_reduces_cash_and_net_contribution() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+
+        let deposit = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(10000)),
+            "USD",
+        );
+
+        let withdrawal = create_test_activity(
+            "wd1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "WITHDRAWAL",
+            d2,
+            None,
+            None,
+            Some(dec!(3000)),
+            "USD",
+        );
+
+        let activity_repo =
+            Arc::new(MockActivityRepositoryWithData::new(vec![deposit, withdrawal]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+
+        let frames = snapshot_repo.get_saved_snapshots();
+        let mut sorted = frames.clone();
+        sorted.sort_by_key(|s| s.snapshot_date);
+
+        let frame_d2 = &sorted[1];
+        assert_eq!(frame_d2.snapshot_date, d2);
+
+        // Cash reduced
+        assert_eq!(frame_d2.cash_balances.get("USD"), Some(&dec!(7000)));
+
+        // Net contribution reduced by withdrawal
+        assert_eq!(frame_d2.net_contribution, dec!(7000));
+    }
+
+    // ==================== INCOME ACTIVITY TESTS (Dividend, Interest) ====================
+
+    #[tokio::test]
+    async fn test_dividend_increases_cash_but_not_net_contribution() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+
+        let deposit = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(5000)),
+            "USD",
+        );
+
+        let dividend = create_test_activity(
+            "div1",
+            &acc.id,
+            Some("AAPL"),
+            "DIVIDEND",
+            d2,
+            None,
+            None,
+            Some(dec!(100)),
+            "USD",
+        );
+
+        let activity_repo =
+            Arc::new(MockActivityRepositoryWithData::new(vec![deposit, dividend]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+
+        let frames = snapshot_repo.get_saved_snapshots();
+        let mut sorted = frames.clone();
+        sorted.sort_by_key(|s| s.snapshot_date);
+
+        let frame_d2 = &sorted[1];
+
+        // Cash increased by dividend
+        assert_eq!(frame_d2.cash_balances.get("USD"), Some(&dec!(5100)));
+
+        // Net contribution NOT affected by dividend
+        assert_eq!(frame_d2.net_contribution, dec!(5000));
+    }
+
+    #[tokio::test]
+    async fn test_interest_increases_cash_but_not_net_contribution() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+
+        let deposit = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(5000)),
+            "USD",
+        );
+
+        let interest = create_test_activity(
+            "int1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "INTEREST",
+            d2,
+            None,
+            None,
+            Some(dec!(50)),
+            "USD",
+        );
+
+        let activity_repo =
+            Arc::new(MockActivityRepositoryWithData::new(vec![deposit, interest]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+
+        let frames = snapshot_repo.get_saved_snapshots();
+        let mut sorted = frames.clone();
+        sorted.sort_by_key(|s| s.snapshot_date);
+
+        let frame_d2 = &sorted[1];
+
+        // Cash increased by interest
+        assert_eq!(frame_d2.cash_balances.get("USD"), Some(&dec!(5050)));
+
+        // Net contribution NOT affected by interest
+        assert_eq!(frame_d2.net_contribution, dec!(5000));
+    }
+
+    // ==================== FEE AND TAX ACTIVITY TESTS ====================
+
+    #[tokio::test]
+    async fn test_fee_reduces_cash_but_not_net_contribution() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+
+        let deposit = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(5000)),
+            "USD",
+        );
+
+        let fee = create_test_activity(
+            "fee1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "FEE",
+            d2,
+            None,
+            None,
+            Some(dec!(25)),
+            "USD",
+        );
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![deposit, fee]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+
+        let frames = snapshot_repo.get_saved_snapshots();
+        let mut sorted = frames.clone();
+        sorted.sort_by_key(|s| s.snapshot_date);
+
+        let frame_d2 = &sorted[1];
+
+        // Cash reduced by fee
+        assert_eq!(frame_d2.cash_balances.get("USD"), Some(&dec!(4975)));
+
+        // Net contribution NOT affected by fee
+        assert_eq!(frame_d2.net_contribution, dec!(5000));
+    }
+
+    #[tokio::test]
+    async fn test_tax_reduces_cash_but_not_net_contribution() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+
+        let deposit = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(5000)),
+            "USD",
+        );
+
+        let tax = create_test_activity(
+            "tax1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "TAX",
+            d2,
+            None,
+            None,
+            Some(dec!(100)),
+            "USD",
+        );
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![deposit, tax]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+
+        let frames = snapshot_repo.get_saved_snapshots();
+        let mut sorted = frames.clone();
+        sorted.sort_by_key(|s| s.snapshot_date);
+
+        let frame_d2 = &sorted[1];
+
+        // Cash reduced by tax
+        assert_eq!(frame_d2.cash_balances.get("USD"), Some(&dec!(4900)));
+
+        // Net contribution NOT affected by tax
+        assert_eq!(frame_d2.net_contribution, dec!(5000));
+    }
+
+    // ==================== TRANSFER ACTIVITY TESTS ====================
+
+    #[tokio::test]
+    async fn test_transfer_in_asset_adds_position() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+
+        // Transfer in 20 shares of AAPL valued at $160 each
+        let transfer_in = create_test_activity(
+            "tin1",
+            &acc.id,
+            Some("AAPL"),
+            "TRANSFER_IN",
+            d1,
+            Some(dec!(20)),
+            Some(dec!(160)),
+            Some(dec!(3200)),
+            "USD",
+        );
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![transfer_in]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+
+        let frames = snapshot_repo.get_saved_snapshots();
+        assert!(!frames.is_empty());
+
+        let frame = &frames[0];
+        let pos = frame.positions.get("AAPL").unwrap();
+        assert_eq!(pos.quantity, dec!(20));
+        assert_eq!(pos.total_cost_basis, dec!(3200));
+
+        // Internal transfer by default - no net contribution change
+        assert_eq!(frame.net_contribution, dec!(0));
+    }
+
+    #[tokio::test]
+    async fn test_transfer_out_asset_removes_position() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+
+        // Transfer in first
+        let transfer_in = create_test_activity(
+            "tin1",
+            &acc.id,
+            Some("AAPL"),
+            "TRANSFER_IN",
+            d1,
+            Some(dec!(20)),
+            Some(dec!(160)),
+            Some(dec!(3200)),
+            "USD",
+        );
+
+        // Transfer out 10 shares
+        let transfer_out = create_test_activity(
+            "tout1",
+            &acc.id,
+            Some("AAPL"),
+            "TRANSFER_OUT",
+            d2,
+            Some(dec!(10)),
+            Some(dec!(160)),
+            Some(dec!(1600)),
+            "USD",
+        );
+
+        let activity_repo =
+            Arc::new(MockActivityRepositoryWithData::new(vec![transfer_in, transfer_out]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+
+        let frames = snapshot_repo.get_saved_snapshots();
+        let mut sorted = frames.clone();
+        sorted.sort_by_key(|s| s.snapshot_date);
+
+        let frame_d2 = &sorted[1];
+        let pos = frame_d2.positions.get("AAPL").unwrap();
+        assert_eq!(pos.quantity, dec!(10));
+        assert_eq!(pos.total_cost_basis, dec!(1600));
+    }
+
+    // ==================== SPLIT ACTIVITY TESTS ====================
+
+    #[tokio::test]
+    async fn test_split_adjusts_historical_quantities() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2025, 1, 20).unwrap();
+
+        // Buy 10 shares at $200
+        let deposit = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(10000)),
+            "USD",
+        );
+
+        let buy = create_test_activity(
+            "buy1",
+            &acc.id,
+            Some("AAPL"),
+            "BUY",
+            d1,
+            Some(dec!(10)),
+            Some(dec!(200)),
+            Some(dec!(2000)),
+            "USD",
+        );
+
+        // 2:1 split (ratio = 2) - each share becomes 2 shares
+        let split = create_test_activity(
+            "split1",
+            &acc.id,
+            Some("AAPL"),
+            "SPLIT",
+            d2,
+            None,
+            None,
+            Some(dec!(2)), // Split ratio
+            "USD",
+        );
+
+        let activity_repo =
+            Arc::new(MockActivityRepositoryWithData::new(vec![deposit, buy, split]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+
+        let frames = snapshot_repo.get_saved_snapshots();
+        let mut sorted = frames.clone();
+        sorted.sort_by_key(|s| s.snapshot_date);
+
+        // After the split, position should have 20 shares (10 * 2)
+        // The buy activity was adjusted for the split
+        let frame_d2 = &sorted[1];
+        let pos = frame_d2.positions.get("AAPL").unwrap();
+        assert_eq!(pos.quantity, dec!(20), "Position should be split-adjusted");
+
+        // Cost basis stays the same
+        assert_eq!(pos.total_cost_basis, dec!(2000));
+
+        // Average cost should be halved (200 / 2 = 100)
+        assert_eq!(pos.average_cost, dec!(100));
+    }
+
+    // ==================== FX CONVERSION TESTS ====================
+
+    #[tokio::test]
+    async fn test_cross_currency_buy_with_fx_rate() {
+        let base = Arc::new(RwLock::new("CAD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "CAD", "CAD Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+
+        // Deposit CAD
+        let deposit = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("$CASH-CAD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(10000)),
+            "CAD",
+        );
+
+        // Buy AAPL (USD asset) with CAD account - activity has fx_rate
+        let mut buy = create_test_activity(
+            "buy1",
+            &acc.id,
+            Some("AAPL"),
+            "BUY",
+            d1,
+            Some(dec!(10)),
+            Some(dec!(150)), // USD price
+            Some(dec!(1500)), // USD amount
+            "USD",
+        );
+        buy.fx_rate = Some(dec!(1.35)); // 1 USD = 1.35 CAD
+
+        let mut fx = MockFxService::new();
+        fx.add_bidirectional_rate("USD", "CAD", d1, dec!(1.35));
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![deposit, buy]));
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            Arc::new(fx),
+        );
+
+        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+
+        let frames = snapshot_repo.get_saved_snapshots();
+        assert!(!frames.is_empty());
+
+        let frame = &frames[0];
+
+        // Position created in USD (asset currency)
+        let pos = frame.positions.get("AAPL").unwrap();
+        assert_eq!(pos.quantity, dec!(10));
+        assert_eq!(pos.currency, "USD");
+        assert_eq!(pos.total_cost_basis, dec!(1500)); // USD cost basis
+
+        // Cash is debited in activity currency (USD)
+        // CAD cash unchanged by USD activity, USD cash debited
+        assert_eq!(frame.cash_balances.get("CAD"), Some(&dec!(10000)));
+        assert_eq!(frame.cash_balances.get("USD"), Some(&dec!(-1500)));
+    }
+
+    // ==================== MULTI-ACCOUNT TESTS ====================
+
+    #[tokio::test]
+    async fn test_multiple_accounts_calculated_independently() {
+        let base = Arc::new(RwLock::new("CAD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc1 = create_test_account("acc1", "CAD", "CAD Account");
+        let acc2 = create_test_account("acc2", "USD", "USD Account");
+        account_repo.add_account(acc1.clone());
+        account_repo.add_account(acc2.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+
+        let dep1 = create_test_activity(
+            "dep1",
+            &acc1.id,
+            Some("$CASH-CAD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(5000)),
+            "CAD",
+        );
+
+        let dep2 = create_test_activity(
+            "dep2",
+            &acc2.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(3000)),
+            "USD",
+        );
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![dep1, dep2]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+
+        // Use get_snapshots_by_account instead of get_saved_snapshots since
+        // the mock clears saved_snapshots on each save operation
+        let acc1_frames = snapshot_repo.get_snapshots_by_account("acc1", None, None).unwrap();
+        let acc2_frames = snapshot_repo.get_snapshots_by_account("acc2", None, None).unwrap();
+
+        // Each account should have its own snapshot
+        assert!(!acc1_frames.is_empty(), "acc1 should have snapshots");
+        assert!(!acc2_frames.is_empty(), "acc2 should have snapshots");
+
+        let acc1_frame = &acc1_frames[0];
+        let acc2_frame = &acc2_frames[0];
+
+        assert_eq!(acc1_frame.cash_balances.get("CAD"), Some(&dec!(5000)));
+        assert_eq!(acc1_frame.currency, "CAD");
+
+        assert_eq!(acc2_frame.cash_balances.get("USD"), Some(&dec!(3000)));
+        assert_eq!(acc2_frame.currency, "USD");
+    }
+
+    // ==================== KEYFRAME TESTS ====================
+
+    #[tokio::test]
+    async fn test_keyframes_created_only_on_activity_days() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        // Activities on non-consecutive days
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap(); // 5 days gap
+        let d3 = NaiveDate::from_ymd_opt(2025, 1, 20).unwrap(); // 5 days gap
+
+        let dep1 = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(1000)),
+            "USD",
+        );
+
+        let dep2 = create_test_activity(
+            "dep2",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d2,
+            None,
+            None,
+            Some(dec!(2000)),
+            "USD",
+        );
+
+        let dep3 = create_test_activity(
+            "dep3",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d3,
+            None,
+            None,
+            Some(dec!(3000)),
+            "USD",
+        );
+
+        let activity_repo =
+            Arc::new(MockActivityRepositoryWithData::new(vec![dep1, dep2, dep3]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+
+        let frames = snapshot_repo.get_saved_snapshots();
+
+        // Should only have 3 keyframes (one per activity day)
+        assert_eq!(frames.len(), 3);
+
+        let dates: HashSet<NaiveDate> = frames.iter().map(|f| f.snapshot_date).collect();
+        assert!(dates.contains(&d1));
+        assert!(dates.contains(&d2));
+        assert!(dates.contains(&d3));
+
+        // No keyframes for days in between
+        let d_between = NaiveDate::from_ymd_opt(2025, 1, 12).unwrap();
+        assert!(!dates.contains(&d_between));
+    }
+
+    // ==================== GET DAILY HOLDINGS SNAPSHOTS TESTS ====================
+
+    #[tokio::test]
+    async fn test_get_daily_holdings_snapshots_fills_gaps() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+
+        let dep1 = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(5000)),
+            "USD",
+        );
+
+        let dep2 = create_test_activity(
+            "dep2",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d2,
+            None,
+            None,
+            Some(dec!(2000)),
+            "USD",
+        );
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![dep1, dep2]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        // First calculate to create keyframes
+        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+
+        // Now get daily snapshots with gap filling
+        let daily = svc
+            .get_daily_holdings_snapshots(&acc.id, Some(d1), Some(d2))
+            .unwrap();
+
+        // Should have 6 days (Jan 10-15 inclusive)
+        assert_eq!(daily.len(), 6);
+
+        // All days should be present
+        let dates: Vec<NaiveDate> = daily.iter().map(|s| s.snapshot_date).collect();
+        assert_eq!(dates[0], d1);
+        assert_eq!(dates[5], d2);
+
+        // Gap days (Jan 11-14) should carry forward d1's value
+        for i in 1..5 {
+            assert_eq!(
+                daily[i].cash_balances.get("USD"),
+                Some(&dec!(5000)),
+                "Day {} should carry forward",
+                i
+            );
+        }
+
+        // Final day should have cumulative deposits
+        assert_eq!(daily[5].cash_balances.get("USD"), Some(&dec!(7000)));
+    }
+
+    // ==================== GET HOLDINGS KEYFRAMES TESTS ====================
+
+    #[tokio::test]
+    async fn test_get_holdings_keyframes_returns_only_saved() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+
+        let dep1 = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(5000)),
+            "USD",
+        );
+
+        let dep2 = create_test_activity(
+            "dep2",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d2,
+            None,
+            None,
+            Some(dec!(2000)),
+            "USD",
+        );
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![dep1, dep2]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+
+        // Get keyframes only (no gap filling)
+        let keyframes = svc
+            .get_holdings_keyframes(&acc.id, Some(d1), Some(d2))
+            .unwrap();
+
+        // Should have exactly 2 keyframes (activity days only)
+        assert_eq!(keyframes.len(), 2);
+        assert_eq!(keyframes[0].snapshot_date, d1);
+        assert_eq!(keyframes[1].snapshot_date, d2);
+    }
+
+    // ==================== FORCE RECALCULATE TESTS ====================
+
+    #[tokio::test]
+    async fn test_force_recalculate_clears_and_rebuilds() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+
+        let dep1 = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(5000)),
+            "USD",
+        );
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![dep1]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        // First calculation
+        let first_count = svc.calculate_holdings_snapshots(None).await.unwrap();
+        assert!(first_count >= 1);
+
+        // Force recalculation
+        let second_count = svc
+            .force_recalculate_holdings_snapshots(None)
+            .await
+            .unwrap();
+        assert!(second_count >= 1);
+
+        // Should still have same number of keyframes
+        let frames = snapshot_repo.get_saved_snapshots();
+        assert!(!frames.is_empty());
+        assert_eq!(frames[0].cash_balances.get("USD"), Some(&dec!(5000)));
+    }
+
+    // ==================== EDGE CASE TESTS ====================
+
+    #[tokio::test]
+    async fn test_empty_account_no_activities() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Empty Account");
+        account_repo.add_account(acc.clone());
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let count = svc.calculate_holdings_snapshots(None).await.unwrap();
+        assert_eq!(count, 0, "Empty account should create no keyframes");
+    }
+
+    #[tokio::test]
+    async fn test_multiple_activities_same_day_processed_correctly() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+
+        // Multiple activities on same day
+        let dep = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(10000)),
+            "USD",
+        );
+
+        let buy = create_test_activity(
+            "buy1",
+            &acc.id,
+            Some("AAPL"),
+            "BUY",
+            d1,
+            Some(dec!(10)),
+            Some(dec!(150)),
+            Some(dec!(1500)),
+            "USD",
+        );
+
+        let fee = create_test_activity(
+            "fee1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "FEE",
+            d1,
+            None,
+            None,
+            Some(dec!(10)),
+            "USD",
+        );
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![dep, buy, fee]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+
+        let frames = snapshot_repo.get_saved_snapshots();
+        assert_eq!(frames.len(), 1); // Single keyframe for the day
+
+        let frame = &frames[0];
+        // All activities processed: 10000 - 1500 - 10 = 8490
+        assert_eq!(frame.cash_balances.get("USD"), Some(&dec!(8490)));
+        assert_eq!(frame.positions.get("AAPL").unwrap().quantity, dec!(10));
+        assert_eq!(frame.net_contribution, dec!(10000)); // Only deposit counts
+    }
+
+    #[tokio::test]
+    async fn test_get_latest_holdings_snapshot() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+
+        let dep1 = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(5000)),
+            "USD",
+        );
+
+        let dep2 = create_test_activity(
+            "dep2",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d2,
+            None,
+            None,
+            Some(dec!(3000)),
+            "USD",
+        );
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![dep1, dep2]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+
+        let latest = svc.get_latest_holdings_snapshot(&acc.id).unwrap();
+        assert!(latest.is_some());
+
+        let snapshot = latest.unwrap();
+        // Should be the most recent snapshot (d2)
+        assert_eq!(snapshot.snapshot_date, d2);
+        assert_eq!(snapshot.cash_balances.get("USD"), Some(&dec!(8000)));
+    }
+
+    #[tokio::test]
+    async fn test_no_account_returns_empty() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+        let account_repo = MockAccountRepository::new(); // Empty
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let count = svc.calculate_holdings_snapshots(None).await.unwrap();
+        assert_eq!(count, 0);
+    }
+
+    // ==================== CASH TOTAL CALCULATION TESTS ====================
+
+    #[tokio::test]
+    async fn test_cash_total_account_currency_calculated() {
+        let base = Arc::new(RwLock::new("CAD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "CAD", "CAD Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+
+        // Deposit in CAD (account currency)
+        let dep_cad = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("$CASH-CAD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(5000)),
+            "CAD",
+        );
+
+        // Deposit in USD (different from account currency)
+        let dep_usd = create_test_activity(
+            "dep2",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(1000)),
+            "USD",
+        );
+
+        let mut fx = MockFxService::new();
+        fx.add_bidirectional_rate("USD", "CAD", d1, dec!(1.35));
+
+        let activity_repo =
+            Arc::new(MockActivityRepositoryWithData::new(vec![dep_cad, dep_usd]));
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            Arc::new(fx),
+        );
+
+        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+
+        let frames = snapshot_repo.get_saved_snapshots();
+        let frame = &frames[0];
+
+        // cash_balances should have both currencies
+        assert_eq!(frame.cash_balances.get("CAD"), Some(&dec!(5000)));
+        assert_eq!(frame.cash_balances.get("USD"), Some(&dec!(1000)));
+
+        // cash_total_account_currency should be sum converted to CAD
+        // 5000 CAD + 1000 USD * 1.35 = 5000 + 1350 = 6350
+        assert_eq!(
+            frame.cash_total_account_currency.round_dp(2),
+            dec!(6350).round_dp(2)
+        );
+    }
+
+    // ==================== POSITION LOT TESTS ====================
+
+    #[tokio::test]
+    async fn test_buy_creates_lot_with_correct_details() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+
+        let deposit = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(10000)),
+            "USD",
+        );
+
+        let buy = create_test_activity(
+            "buy1",
+            &acc.id,
+            Some("AAPL"),
+            "BUY",
+            d1,
+            Some(dec!(10)),
+            Some(dec!(150)),
+            Some(dec!(1500)),
+            "USD",
+        );
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![deposit, buy]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+
+        let frames = snapshot_repo.get_saved_snapshots();
+        let frame = &frames[0];
+        let pos = frame.positions.get("AAPL").unwrap();
+
+        // Should have exactly one lot
+        assert_eq!(pos.lots.len(), 1);
+
+        let lot = &pos.lots[0];
+        assert_eq!(lot.quantity, dec!(10));
+        assert_eq!(lot.cost_basis, dec!(1500));
+        assert_eq!(lot.acquisition_price, dec!(150));
+    }
+
+    #[tokio::test]
+    async fn test_multiple_buys_create_multiple_lots() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+
+        let deposit = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(20000)),
+            "USD",
+        );
+
+        let buy1 = create_test_activity(
+            "buy1",
+            &acc.id,
+            Some("AAPL"),
+            "BUY",
+            d1,
+            Some(dec!(10)),
+            Some(dec!(150)),
+            Some(dec!(1500)),
+            "USD",
+        );
+
+        let buy2 = create_test_activity(
+            "buy2",
+            &acc.id,
+            Some("AAPL"),
+            "BUY",
+            d2,
+            Some(dec!(5)),
+            Some(dec!(160)),
+            Some(dec!(800)),
+            "USD",
+        );
+
+        let activity_repo =
+            Arc::new(MockActivityRepositoryWithData::new(vec![deposit, buy1, buy2]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+
+        let frames = snapshot_repo.get_saved_snapshots();
+        let mut sorted = frames.clone();
+        sorted.sort_by_key(|s| s.snapshot_date);
+
+        let frame_d2 = &sorted[1];
+        let pos = frame_d2.positions.get("AAPL").unwrap();
+
+        // Should have two lots
+        assert_eq!(pos.lots.len(), 2);
+        assert_eq!(pos.quantity, dec!(15));
+        assert_eq!(pos.total_cost_basis, dec!(2300)); // 1500 + 800
+
+        // Average cost: 2300 / 15 = 153.33...
+        // Round both sides to same precision for comparison
+        let expected_avg = (dec!(2300) / dec!(15)).round_dp(DECIMAL_PRECISION);
+        assert_eq!(pos.average_cost.round_dp(DECIMAL_PRECISION), expected_avg);
+    }
+
+    // ==================== SPECIFIC ACCOUNT CALCULATION TESTS ====================
+
+    #[tokio::test]
+    async fn test_calculate_specific_accounts_only() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc1 = create_test_account("acc1", "USD", "Account 1");
+        let acc2 = create_test_account("acc2", "USD", "Account 2");
+        account_repo.add_account(acc1.clone());
+        account_repo.add_account(acc2.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+
+        let dep1 = create_test_activity(
+            "dep1",
+            &acc1.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(5000)),
+            "USD",
+        );
+
+        let dep2 = create_test_activity(
+            "dep2",
+            &acc2.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(3000)),
+            "USD",
+        );
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![dep1, dep2]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        // Calculate only for acc1
+        let _ = svc
+            .calculate_holdings_snapshots(Some(&["acc1".to_string()]))
+            .await
+            .unwrap();
+
+        let frames = snapshot_repo.get_saved_snapshots();
+
+        // Should only have snapshot for acc1
+        assert_eq!(frames.len(), 1);
+        assert_eq!(frames[0].account_id, "acc1");
+        assert_eq!(frames[0].cash_balances.get("USD"), Some(&dec!(5000)));
+    }
+
+    // ==================== COST BASIS TESTS ====================
+
+    #[tokio::test]
+    async fn test_cost_basis_aggregated_correctly() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+
+        let deposit = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(50000)),
+            "USD",
+        );
+
+        // Buy first lot of AAPL
+        let buy_aapl1 = create_test_activity(
+            "buy1",
+            &acc.id,
+            Some("AAPL"),
+            "BUY",
+            d1,
+            Some(dec!(10)),
+            Some(dec!(150)),
+            Some(dec!(1500)),
+            "USD",
+        );
+
+        // Buy second lot of AAPL at different price
+        let buy_aapl2 = create_test_activity(
+            "buy2",
+            &acc.id,
+            Some("AAPL"),
+            "BUY",
+            d2,
+            Some(dec!(20)),
+            Some(dec!(100)),
+            Some(dec!(2000)),
+            "USD",
+        );
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![
+            deposit, buy_aapl1, buy_aapl2,
+        ]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+
+        let frames = snapshot_repo.get_snapshots_by_account("acc1", None, None).unwrap();
+        let mut sorted = frames.clone();
+        sorted.sort_by_key(|s| s.snapshot_date);
+
+        // Check final snapshot (d2) has correct total cost basis
+        let frame_d2 = &sorted[1];
+
+        // Total cost basis should be sum of both lots
+        // 1500 (first AAPL buy) + 2000 (second AAPL buy) = 3500
+        assert_eq!(frame_d2.cost_basis, dec!(3500));
+
+        // Verify the position details
+        let pos = frame_d2.positions.get("AAPL").unwrap();
+        assert_eq!(pos.quantity, dec!(30)); // 10 + 20
+        assert_eq!(pos.total_cost_basis, dec!(3500)); // 1500 + 2000
     }
 }

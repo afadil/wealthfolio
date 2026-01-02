@@ -105,13 +105,11 @@ export const exportedFileFormatSchema = z.enum([
   ExportedFileFormat.SQLITE,
 ]);
 
-// Canonical activity types (closed set of 15)
+// Canonical activity types (closed set of 14)
 export const ActivityType = {
   BUY: "BUY",
   SELL: "SELL",
   SPLIT: "SPLIT",
-  ADD_HOLDING: "ADD_HOLDING",
-  REMOVE_HOLDING: "REMOVE_HOLDING",
   DIVIDEND: "DIVIDEND",
   INTEREST: "INTEREST",
   DEPOSIT: "DEPOSIT",
@@ -121,6 +119,7 @@ export const ActivityType = {
   FEE: "FEE",
   TAX: "TAX",
   CREDIT: "CREDIT",
+  ADJUSTMENT: "ADJUSTMENT",
   UNKNOWN: "UNKNOWN",
 } as const;
 
@@ -131,8 +130,6 @@ export const ACTIVITY_TYPES = [
   "BUY",
   "SELL",
   "SPLIT",
-  "ADD_HOLDING",
-  "REMOVE_HOLDING",
   "DIVIDEND",
   "INTEREST",
   "DEPOSIT",
@@ -142,6 +139,7 @@ export const ACTIVITY_TYPES = [
   "FEE",
   "TAX",
   "CREDIT",
+  "ADJUSTMENT",
   "UNKNOWN",
 ] as const;
 
@@ -149,8 +147,6 @@ export const TRADING_ACTIVITY_TYPES = [
   ActivityType.BUY,
   ActivityType.SELL,
   ActivityType.SPLIT,
-  ActivityType.ADD_HOLDING,
-  ActivityType.REMOVE_HOLDING,
 ] as const;
 
 export const CASH_ACTIVITY_TYPES = [
@@ -170,8 +166,6 @@ export const activityTypeSchema = z.enum([
   ActivityType.BUY,
   ActivityType.SELL,
   ActivityType.SPLIT,
-  ActivityType.ADD_HOLDING,
-  ActivityType.REMOVE_HOLDING,
   ActivityType.DIVIDEND,
   ActivityType.INTEREST,
   ActivityType.DEPOSIT,
@@ -181,6 +175,7 @@ export const activityTypeSchema = z.enum([
   ActivityType.FEE,
   ActivityType.TAX,
   ActivityType.CREDIT,
+  ActivityType.ADJUSTMENT,
   ActivityType.UNKNOWN,
 ]);
 
@@ -189,8 +184,6 @@ export const ActivityTypeNames: Record<ActivityType, string> = {
   [ActivityType.BUY]: "Buy",
   [ActivityType.SELL]: "Sell",
   [ActivityType.SPLIT]: "Split",
-  [ActivityType.ADD_HOLDING]: "Add Holding",
-  [ActivityType.REMOVE_HOLDING]: "Remove Holding",
   [ActivityType.DIVIDEND]: "Dividend",
   [ActivityType.INTEREST]: "Interest",
   [ActivityType.DEPOSIT]: "Deposit",
@@ -200,6 +193,7 @@ export const ActivityTypeNames: Record<ActivityType, string> = {
   [ActivityType.FEE]: "Fee",
   [ActivityType.TAX]: "Tax",
   [ActivityType.CREDIT]: "Credit",
+  [ActivityType.ADJUSTMENT]: "Adjustment",
   [ActivityType.UNKNOWN]: "Unknown",
 };
 
@@ -295,6 +289,39 @@ export const SUBTYPE_DISPLAY_NAMES: Record<string, string> = {
   REVERSE_SPLIT: "Reverse Split",
   LIABILITY_INTEREST_ACCRUAL: "Liability Interest Accrual",
   LIABILITY_PRINCIPAL_PAYMENT: "Liability Principal Payment",
+};
+
+// Suggested subtypes per activity type
+export const SUBTYPES_BY_ACTIVITY_TYPE: Record<string, string[]> = {
+  [ActivityType.DIVIDEND]: [
+    ACTIVITY_SUBTYPES.DRIP,
+    ACTIVITY_SUBTYPES.QUALIFIED,
+    ACTIVITY_SUBTYPES.ORDINARY,
+    ACTIVITY_SUBTYPES.RETURN_OF_CAPITAL,
+    ACTIVITY_SUBTYPES.DIVIDEND_IN_KIND,
+  ],
+  [ActivityType.INTEREST]: [
+    ACTIVITY_SUBTYPES.STAKING_REWARD,
+    ACTIVITY_SUBTYPES.LENDING_INTEREST,
+    ACTIVITY_SUBTYPES.COUPON,
+  ],
+  [ActivityType.SPLIT]: [ACTIVITY_SUBTYPES.STOCK_DIVIDEND, ACTIVITY_SUBTYPES.REVERSE_SPLIT],
+  [ActivityType.SELL]: [ACTIVITY_SUBTYPES.OPTION_ASSIGNMENT, ACTIVITY_SUBTYPES.OPTION_EXERCISE],
+  [ActivityType.BUY]: [ACTIVITY_SUBTYPES.OPTION_ASSIGNMENT, ACTIVITY_SUBTYPES.OPTION_EXERCISE],
+  [ActivityType.FEE]: [
+    ACTIVITY_SUBTYPES.MANAGEMENT_FEE,
+    ACTIVITY_SUBTYPES.ADR_FEE,
+    ACTIVITY_SUBTYPES.INTEREST_CHARGE,
+  ],
+  [ActivityType.TAX]: [ACTIVITY_SUBTYPES.WITHHOLDING, ACTIVITY_SUBTYPES.NRA_WITHHOLDING],
+  [ActivityType.CREDIT]: [
+    ACTIVITY_SUBTYPES.FEE_REFUND,
+    ACTIVITY_SUBTYPES.TAX_REFUND,
+    ACTIVITY_SUBTYPES.BONUS,
+    ACTIVITY_SUBTYPES.ADJUSTMENT,
+    ACTIVITY_SUBTYPES.REBATE,
+    ACTIVITY_SUBTYPES.REVERSAL,
+  ],
 };
 
 // Asset kinds for behavior classification

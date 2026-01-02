@@ -3,7 +3,7 @@
 // Types matching the new REST API for device sync
 
 export type TrustState = "trusted" | "untrusted" | "revoked";
-export type DevicePlatform = "ios" | "android" | "macos" | "windows" | "linux" | "server";
+export type DevicePlatform = "ios" | "android" | "mac" | "macos" | "windows" | "linux" | "web" | "server";
 export type PairingRole = "issuer" | "claimer";
 export type PairingStatus = "open" | "claimed" | "approved" | "completed" | "cancelled" | "expired";
 export type KeyState = "ACTIVE" | "PENDING";
@@ -84,6 +84,7 @@ export type InitializeKeysResult =
 
 // Request to commit team key initialization (Phase 2)
 export interface CommitInitializeKeysRequest {
+  deviceId: string;
   keyVersion: number;
   deviceKeyEnvelope: string;
   signature: string;

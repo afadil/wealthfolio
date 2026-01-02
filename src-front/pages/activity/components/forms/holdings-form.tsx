@@ -19,8 +19,12 @@ import { cn } from "@/lib/utils";
 import { useFormContext } from "react-hook-form";
 import { AccountSelectOption } from "../activity-form";
 import { AssetSymbolInput, CommonFields, ConfigurationCheckbox } from "./common";
+import { SubtypeSelect } from "./subtype-select";
 import { TransferHoldingSection } from "./transfer-holding-section";
+import { ActivityType } from "@/lib/constants";
 
+// UI modes for the holdings form
+// ADD_HOLDING and REMOVE_HOLDING are UI modes that map to TRANSFER_IN/TRANSFER_OUT with is_external=true
 type HoldingsMode = "ADD_HOLDING" | "REMOVE_HOLDING" | "TRANSFER";
 
 interface HoldingOption {
@@ -64,20 +68,33 @@ export const HoldingsForm = ({ accounts, onSuccess, onTransferModeChange }: Hold
   const { control, watch, setValue } = useFormContext();
   const isManualAsset = watch("assetDataSource") === "MANUAL";
   const currentActivityType = watch("activityType");
+  const currentMetadata = watch("metadata");
 
-  // Determine initial mode from current activity type
+  // Determine initial mode from current activity type and metadata
   const getInitialMode = (): HoldingsMode => {
-    if (currentActivityType === "ADD_HOLDING") return "ADD_HOLDING";
-    if (currentActivityType === "REMOVE_HOLDING") return "REMOVE_HOLDING";
+    // Check if this is an external transfer (used for add/remove holding)
+    const isExternal = currentMetadata?.flow?.is_external === true;
+
+    if (currentActivityType === ActivityType.TRANSFER_IN && isExternal) {
+      return "ADD_HOLDING";
+    }
+    if (currentActivityType === ActivityType.TRANSFER_OUT && isExternal) {
+      return "REMOVE_HOLDING";
+    }
+    // Default to ADD_HOLDING for new forms
     return "ADD_HOLDING";
   };
 
   const [mode, setMode] = useState<HoldingsMode>(getInitialMode);
 
-  // Sync form's activityType when mode changes (except for Transfer)
+  // Sync form's activityType and metadata when mode changes (except for Transfer)
   useEffect(() => {
-    if (mode === "ADD_HOLDING" || mode === "REMOVE_HOLDING") {
-      setValue("activityType", mode);
+    if (mode === "ADD_HOLDING") {
+      setValue("activityType", ActivityType.TRANSFER_IN);
+      setValue("metadata", { flow: { is_external: true } });
+    } else if (mode === "REMOVE_HOLDING") {
+      setValue("activityType", ActivityType.TRANSFER_OUT);
+      setValue("metadata", { flow: { is_external: true } });
     }
     // Notify parent about transfer mode
     onTransferModeChange?.(mode === "TRANSFER");
@@ -169,6 +186,7 @@ export const HoldingsForm = ({ accounts, onSuccess, onTransferModeChange }: Hold
                 )}
               />
             </div>
+            <SubtypeSelect activityType={mode === "ADD_HOLDING" ? ActivityType.TRANSFER_IN : ActivityType.TRANSFER_OUT} />
             <CommonFields accounts={accounts} />
           </CardContent>
         </Card>

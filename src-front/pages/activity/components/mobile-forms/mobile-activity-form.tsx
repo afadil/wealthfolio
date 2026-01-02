@@ -47,8 +47,7 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
           "TRANSFER_OUT",
           "FEE",
           "TAX",
-          "ADD_HOLDING",
-          "REMOVE_HOLDING",
+          "ADJUSTMENT",
         ].includes(type)
       : false;
   };
@@ -146,9 +145,6 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
         const baseFields = ["accountId", "activityDate"];
         if (["BUY", "SELL"].includes(activityType ?? "")) {
           return [...baseFields, "assetId", "quantity", "unitPrice", "fee"];
-        }
-        if (["ADD_HOLDING", "REMOVE_HOLDING"].includes(activityType ?? "")) {
-          return [...baseFields, "assetId", "quantity", "unitPrice"];
         }
         if (["DEPOSIT", "WITHDRAWAL", "TRANSFER_IN", "TRANSFER_OUT"].includes(activityType ?? "")) {
           return [...baseFields, "amount", "fee"];

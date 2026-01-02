@@ -129,7 +129,7 @@ impl MarketDataServiceTrait for MarketDataService {
             .asset_repository
             .get_by_id(symbol)
             .ok()
-            .and_then(|asset| asset.symbol_mapping)
+            .and_then(|asset| asset.quote_symbol)
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty())
             .unwrap_or_else(|| symbol.to_string());
@@ -225,7 +225,7 @@ impl MarketDataServiceTrait for MarketDataService {
             })
             .map(|asset| QuoteRequest {
                 symbol: asset.symbol.clone(),
-                symbol_mapping: asset.symbol_mapping.clone(),
+                quote_symbol: asset.quote_symbol.clone(),
                 data_source: asset.data_source.as_str().into(),
                 currency: asset.currency.clone(),
             })
@@ -508,7 +508,7 @@ impl MarketDataServiceTrait for MarketDataService {
             .map(|a| {
                 (
                     a.symbol.clone(),
-                    (a.symbol_mapping.clone(), a.currency.clone()),
+                    (a.quote_symbol.clone(), a.currency.clone()),
                 )
             })
             .collect();
@@ -523,7 +523,7 @@ impl MarketDataServiceTrait for MarketDataService {
                 continue;
             }
 
-            let (symbol_mapping, currency) = asset_info
+            let (quote_symbol, currency) = asset_info
                 .get(&state.symbol)
                 .cloned()
                 .unwrap_or((None, "USD".to_string()));
@@ -586,7 +586,7 @@ impl MarketDataServiceTrait for MarketDataService {
                 end_date,
                 priority: state.sync_priority,
                 data_source: state.data_source.clone(),
-                symbol_mapping,
+                quote_symbol,
                 currency,
             });
         }
@@ -866,7 +866,7 @@ impl MarketDataService {
             })
             .map(|asset| QuoteRequest {
                 symbol: asset.symbol.clone(),
-                symbol_mapping: asset.symbol_mapping.clone(),
+                quote_symbol: asset.quote_symbol.clone(),
                 data_source: asset.data_source.as_str().into(),
                 currency: asset.currency.clone(),
             })
@@ -895,7 +895,7 @@ impl MarketDataService {
             .iter()
             .map(|plan| QuoteRequest {
                 symbol: plan.symbol.clone(),
-                symbol_mapping: plan.symbol_mapping.clone(),
+                quote_symbol: plan.quote_symbol.clone(),
                 data_source: plan.data_source.as_str().into(),
                 currency: plan.currency.clone(),
             })
@@ -936,7 +936,7 @@ impl MarketDataService {
             .iter()
             .map(|req| {
                 let fetch_symbol = req
-                    .symbol_mapping
+                    .quote_symbol
                     .as_ref()
                     .map(|value| value.trim())
                     .filter(|value| !value.is_empty())
@@ -1239,7 +1239,7 @@ impl MarketDataService {
             .iter()
             .map(|req| {
                 let fetch_symbol = req
-                    .symbol_mapping
+                    .quote_symbol
                     .as_ref()
                     .map(|value| value.trim())
                     .filter(|value| !value.is_empty())

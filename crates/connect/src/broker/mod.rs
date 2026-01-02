@@ -1,3 +1,4 @@
+pub mod mapping;
 mod models;
 mod service;
 mod traits;

@@ -13,7 +13,7 @@ import {
   listenPortfolioUpdateError,
   listenPortfolioUpdateStart,
 } from "@/commands/portfolio-listener";
-import { isDesktop, listenDatabaseRestored, logger } from "@/adapters";
+import { isDesktop, listenBrokerSyncComplete, listenDatabaseRestored, logger } from "@/adapters";
 
 const TOAST_IDS = {
   marketSyncStart: "market-sync-start",
@@ -125,6 +125,34 @@ const useGlobalEventListener = () => {
       });
     };
 
+    const handleBrokerSyncComplete = (event: {
+      payload: { success: boolean; message: string; is_scheduled: boolean };
+    }) => {
+      const { success, message, is_scheduled } = event.payload || {
+        success: false,
+        message: "Unknown error",
+        is_scheduled: false,
+      };
+
+      // Only show toast for scheduled (background) syncs
+      // Manual syncs show their own toast via the mutation handler
+      if (!is_scheduled) {
+        return;
+      }
+
+      if (success) {
+        toast.success("Background Sync Complete", {
+          description: message,
+          duration: 5000,
+        });
+      } else {
+        toast.error("Background Sync Failed", {
+          description: message,
+          duration: 10000,
+        });
+      }
+    };
+
     const setupListeners = async () => {
       const unlistenPortfolioSyncStart =
         await listenPortfolioUpdateStart(handlePortfolioUpdateStart);
@@ -137,6 +165,7 @@ const useGlobalEventListener = () => {
       const unlistenMarketStart = await listenMarketSyncStart(handleMarketSyncStart);
       const unlistenMarketComplete = await listenMarketSyncComplete(handleMarketSyncComplete);
       const unlistenDatabaseRestored = await listenDatabaseRestored(handleDatabaseRestored);
+      const unlistenBrokerSyncComplete = await listenBrokerSyncComplete(handleBrokerSyncComplete);
 
       const cleanup = () => {
         unlistenPortfolioSyncStart();
@@ -145,6 +174,7 @@ const useGlobalEventListener = () => {
         unlistenMarketStart();
         unlistenMarketComplete();
         unlistenDatabaseRestored();
+        unlistenBrokerSyncComplete();
       };
 
       // If unmounted while setting up, clean up immediately

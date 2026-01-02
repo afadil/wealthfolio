@@ -227,7 +227,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
 
   // Store tokens: refresh token goes to backend (for cloud API calls) and locally (for session restoration)
   const storeTokens = useCallback(async (session: Session | null) => {
-    logger.info(`storeTokens called, isDesktop=${isDesktop}, hasSession=${!!session}`);
+    logger.debug(`storeTokens called, isDesktop=${isDesktop}, hasSession=${!!session}`);
 
     if (!session) {
       // Clear from backend
@@ -355,7 +355,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
           });
 
           if (refreshError) {
-            logger.warn("Failed to refresh session.");
+            logger.debug("Failed to refresh session.");
             // Clear invalid tokens
             await storeTokens(null);
           } else if (data.session && !cancelled) {

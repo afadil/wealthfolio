@@ -292,6 +292,18 @@ impl BrokerSyncStateRepository {
         Ok(results.into_iter().map(Into::into).collect())
     }
 
+    /// Get all broker sync states
+    pub fn get_all(&self) -> Result<Vec<BrokerSyncState>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let results = brokers_sync_state::table
+            .order(brokers_sync_state::updated_at.desc())
+            .load::<BrokerSyncStateDB>(&mut conn)
+            .map_err(StorageError::from)?;
+
+        Ok(results.into_iter().map(Into::into).collect())
+    }
+
     /// Delete sync state
     pub async fn delete(&self, account_id: String, provider: String) -> Result<()> {
         self.writer

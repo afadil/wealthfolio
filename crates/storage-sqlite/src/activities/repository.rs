@@ -58,7 +58,6 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
             .filter(accounts::is_active.eq(true))
             .filter(activities::activity_type.eq_any(TRADING_ACTIVITY_TYPES))
-            .filter(activities::status.eq("POSTED")) // Only posted activities
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
             .load::<ActivityDB>(&mut conn)
@@ -74,7 +73,6 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
             .filter(accounts::is_active.eq(true))
             .filter(activities::activity_type.eq_any(INCOME_ACTIVITY_TYPES))
-            .filter(activities::status.eq("POSTED")) // Only posted activities
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
             .load::<ActivityDB>(&mut conn)
@@ -89,7 +87,6 @@ impl ActivityRepositoryTrait for ActivityRepository {
         let activities_db = activities::table
             .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
             .filter(accounts::is_active.eq(true))
-            .filter(activities::status.eq("POSTED")) // Only posted activities
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
             .load::<ActivityDB>(&mut conn)
@@ -483,7 +480,6 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
             .filter(accounts::is_active.eq(true))
             .filter(activities::account_id.eq(account_id))
-            .filter(activities::status.eq("POSTED")) // Only posted activities
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
             .load::<ActivityDB>(&mut conn)
@@ -500,7 +496,6 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
             .filter(accounts::is_active.eq(true))
             .filter(activities::account_id.eq_any(account_ids))
-            .filter(activities::status.eq("POSTED")) // Only posted activities
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
             .load::<ActivityDB>(&mut conn)
@@ -532,7 +527,6 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 FROM activities
                 WHERE account_id = ?1 AND asset_id = ?2
                   AND activity_type IN ('BUY', 'TRANSFER_IN')
-                  AND status = 'POSTED'
             )
             SELECT
                 CASE
@@ -624,7 +618,6 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .filter(accounts::id.eq_any(account_ids))
             .filter(accounts::is_active.eq(true))
             .filter(activities::activity_type.eq("DEPOSIT"))
-            .filter(activities::status.eq("POSTED")) // Only posted activities
             .filter(activities::activity_date.between(
                 Utc.from_utc_datetime(&start_date).to_rfc3339(),
                 Utc.from_utc_datetime(&end_date).to_rfc3339(),
@@ -677,7 +670,6 @@ impl ActivityRepositoryTrait for ActivityRepository {
              INNER JOIN accounts acc ON a.account_id = acc.id
              WHERE a.activity_type IN ('DIVIDEND', 'INTEREST', 'OTHER_INCOME')
              AND acc.is_active = 1
-             AND a.status = 'POSTED'
              ORDER BY a.activity_date";
 
         // Define a struct to hold the raw query results
@@ -726,7 +718,6 @@ impl ActivityRepositoryTrait for ActivityRepository {
         let min_date_str = activities::table
             .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
             .filter(accounts::is_active.eq(true))
-            .filter(activities::status.eq("POSTED")) // Only posted activities
             .select(min(activities::activity_date))
             .first::<Option<String>>(&mut conn)
             .map_err(StorageError::from)?
@@ -748,7 +739,6 @@ impl ActivityRepositoryTrait for ActivityRepository {
         let mut query = activities::table
             .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
             .filter(accounts::is_active.eq(true))
-            .filter(activities::status.eq("POSTED")) // Only posted activities
             .select(min(activities::activity_date))
             .into_boxed();
 

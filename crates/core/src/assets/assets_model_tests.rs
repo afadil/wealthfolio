@@ -251,7 +251,6 @@ mod tests {
             name: Some("Test Asset".to_string()),
             asset_type: Some("Stock".to_string()),
             symbol: "TEST".to_string(),
-            symbol_mapping: None,
             asset_class: Some("Equity".to_string()),
             asset_sub_class: None,
             notes: None,

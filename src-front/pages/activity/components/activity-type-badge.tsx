@@ -14,16 +14,15 @@ function getActivityBadgeVariant(type: ActivityType) {
     case ActivityType.BUY:
     case ActivityType.DEPOSIT:
     case ActivityType.TRANSFER_IN:
-    case ActivityType.ADD_HOLDING:
       return "success";
     case ActivityType.SELL:
     case ActivityType.WITHDRAWAL:
     case ActivityType.TRANSFER_OUT:
-    case ActivityType.REMOVE_HOLDING:
     case ActivityType.FEE:
     case ActivityType.TAX:
       return "destructive";
     case ActivityType.SPLIT:
+    case ActivityType.ADJUSTMENT:
       return "secondary";
     default:
       return "default";

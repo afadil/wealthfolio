@@ -2,13 +2,13 @@
 #[cfg(test)]
 mod tests {
     use crate::errors::{Error, Result};
-    use crate::fx::fx_model::*;
-    use crate::fx::FxServiceTrait;
-    use crate::market_data::market_data_model::DataSource;
-    use crate::market_data::market_data_model::*;
-    use crate::market_data::market_data_traits::MarketDataServiceTrait;
+    use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
+    use crate::market_data::{
+        DataSource, LatestQuotePair, MarketDataError, MarketDataProviderInfo,
+        MarketDataProviderSetting, MarketDataServiceTrait, Quote, QuoteImport, QuoteSummary,
+        QuoteSyncState, SymbolSyncPlan,
+    };
     use crate::market_data::providers::models::AssetProfile;
-    use crate::market_data::MarketDataError;
     use crate::portfolio::holdings::holdings_model::{
         Holding, HoldingType, Instrument, MonetaryValue,
     };
@@ -240,9 +240,9 @@ mod tests {
         }
         async fn import_quotes_from_csv(
             &self,
-            _quotes: Vec<crate::market_data::market_data_model::QuoteImport>,
+            _quotes: Vec<QuoteImport>,
             _overwrite: bool,
-        ) -> Result<Vec<crate::market_data::market_data_model::QuoteImport>> {
+        ) -> Result<Vec<QuoteImport>> {
             unimplemented!()
         }
         async fn bulk_upsert_quotes(&self, _quotes: Vec<Quote>) -> Result<usize> {
@@ -254,9 +254,7 @@ mod tests {
             Ok(())
         }
 
-        fn get_sync_plan(
-            &self,
-        ) -> Result<Vec<crate::market_data::quote_sync_state_model::SymbolSyncPlan>> {
+        fn get_sync_plan(&self) -> Result<Vec<SymbolSyncPlan>> {
             Ok(Vec::new())
         }
 
@@ -285,9 +283,7 @@ mod tests {
             Ok(())
         }
 
-        fn get_symbols_needing_sync(
-            &self,
-        ) -> Result<Vec<crate::market_data::quote_sync_state_model::QuoteSyncState>> {
+        fn get_symbols_needing_sync(&self) -> Result<Vec<QuoteSyncState>> {
             Ok(Vec::new())
         }
 

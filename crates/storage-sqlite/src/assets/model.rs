@@ -28,7 +28,6 @@ pub struct AssetDB {
     pub name: Option<String>,
     pub asset_type: Option<String>,
     pub symbol: String,
-    pub symbol_mapping: Option<String>,
     pub asset_class: Option<String>,
     pub asset_sub_class: Option<String>,
     pub notes: Option<String>,
@@ -42,9 +41,8 @@ pub struct AssetDB {
     pub data_source: String,
     pub sectors: Option<String>,
     pub url: Option<String>,
-    // New fields for Activity System Redesign
     pub kind: Option<String>,         // Behavior classification (stored as string)
-    pub quote_symbol: Option<String>, // Symbol for pricing lookup
+    pub quote_symbol: Option<String>, // Symbol for pricing lookup (replaces symbol_mapping)
     pub is_active: i32,               // 1/0 for usability (SQLite INTEGER)
     pub metadata: Option<String>,     // JSON for extensions (stored as text)
 }
@@ -80,7 +78,6 @@ impl From<AssetDB> for Asset {
             name: db.name,
             asset_type: db.asset_type,
             symbol: db.symbol,
-            symbol_mapping: db.symbol_mapping,
             asset_class: db.asset_class,
             asset_sub_class: db.asset_sub_class,
             notes: db.notes,
@@ -133,7 +130,6 @@ impl From<NewAsset> for AssetDB {
             name: domain.name,
             asset_type: domain.asset_type,
             symbol: domain.symbol,
-            symbol_mapping: domain.symbol_mapping,
             asset_class: domain.asset_class,
             asset_sub_class: domain.asset_sub_class,
             notes: domain.notes,

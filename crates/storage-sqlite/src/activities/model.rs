@@ -461,7 +461,7 @@ impl From<NewActivity> for ActivityDB {
             activity_type: domain.activity_type,
             activity_type_override: None,
             source_type: None,
-            subtype: None,
+            subtype: domain.subtype,
             status,
 
             // Timing
@@ -478,18 +478,18 @@ impl From<NewActivity> for ActivityDB {
 
             // Metadata
             notes: domain.notes,
-            metadata: None,
+            metadata: domain.metadata,
 
             // Source identity
-            source_system: Some("MANUAL".to_string()),
-            source_record_id: None,
-            source_group_id: None,
+            source_system: domain.source_system.or(Some("MANUAL".to_string())),
+            source_record_id: domain.source_record_id,
+            source_group_id: domain.source_group_id,
             idempotency_key: None,
             import_run_id: None,
 
             // Sync flags
             is_user_modified: 0,
-            needs_review: 0,
+            needs_review: domain.needs_review.map(|b| b as i32).unwrap_or(0),
 
             // Audit
             created_at: now.to_rfc3339(),
@@ -546,7 +546,7 @@ impl From<ActivityUpdate> for ActivityDB {
             activity_type: domain.activity_type,
             activity_type_override: None,
             source_type: None,
-            subtype: None,
+            subtype: domain.subtype,
             status,
 
             // Timing

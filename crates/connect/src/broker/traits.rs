@@ -10,6 +10,7 @@ use crate::platform::Platform;
 use crate::state::BrokerSyncState;
 use wealthfolio_core::accounts::Account;
 use wealthfolio_core::errors::Result;
+use wealthfolio_core::sync::ImportRun;
 
 /// Trait for fetching data from the cloud broker API
 #[async_trait]
@@ -79,4 +80,10 @@ pub trait SyncServiceTrait: Send + Sync {
     /// Finalize an activity sync as failed for an account.
     async fn finalize_activity_sync_failure(&self, account_id: String, error: String)
         -> Result<()>;
+
+    /// Get all broker sync states.
+    fn get_all_sync_states(&self) -> Result<Vec<BrokerSyncState>>;
+
+    /// Get import runs by type (SYNC or IMPORT) with a limit.
+    fn get_import_runs(&self, run_type: Option<&str>, limit: i64) -> Result<Vec<ImportRun>>;
 }

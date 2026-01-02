@@ -40,7 +40,7 @@ pub struct SymbolSyncPlan {
     pub end_date: NaiveDate,
     pub priority: i32,
     pub data_source: String,
-    pub symbol_mapping: Option<String>,
+    pub quote_symbol: Option<String>, // Symbol for quote fetching (replaces symbol_mapping)
     pub currency: String,
 }
 

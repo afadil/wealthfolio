@@ -10,7 +10,7 @@ import { Account, ActivityDetails } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, Icons, Page, PageContent, PageHeader } from "@wealthfolio/ui";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useForm, type Resolver, type SubmitHandler } from "react-hook-form";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { AccountSelectOption } from "./components/activity-form";
@@ -35,14 +35,14 @@ const ACTIVITY_TYPE_TO_TAB: Record<string, string> = {
   TRANSFER_OUT: "cash",
   FEE: "other",
   TAX: "other",
-  ADD_HOLDING: "holdings",
-  REMOVE_HOLDING: "holdings",
+  ADJUSTMENT: "other",
 };
 
 const ActivityManagerPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isMobileViewport = useIsMobileViewport();
+  const [isTransferMode, setIsTransferMode] = useState(false);
 
   // Parse URL parameters
   const typeParam = searchParams.get("type") as ActivityType | null;
@@ -308,10 +308,10 @@ const ActivityManagerPage = () => {
                       <TradeForm accounts={accountOptions} />
                     </TabsContent>
                     <TabsContent value="holdings" className="mt-0">
-                      <HoldingsForm accounts={accountOptions} />
+                      <HoldingsForm accounts={accountOptions} onSuccess={handleClose} onTransferModeChange={setIsTransferMode} />
                     </TabsContent>
                     <TabsContent value="cash" className="mt-0">
-                      <CashForm accounts={accountOptions} />
+                      <CashForm accounts={accountOptions} onSuccess={handleClose} onTransferModeChange={setIsTransferMode} />
                     </TabsContent>
                     <TabsContent value="income" className="mt-0">
                       <IncomeForm accounts={accountOptions} />
@@ -320,43 +320,45 @@ const ActivityManagerPage = () => {
                       <OtherForm accounts={accountOptions} />
                     </TabsContent>
 
-                    {/* Action Footer */}
-                    <div className="border-border flex items-center justify-between border-t pt-6">
-                      <p className="text-muted-foreground text-sm">
-                        {initialActivity?.id
-                          ? "Update your transaction details"
-                          : "All fields are required unless marked as optional"}
-                      </p>
-                      <div className="flex gap-3">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handleClose}
-                          disabled={isLoading}
-                          size="lg"
-                        >
-                          Cancel
-                        </Button>
-                        <Button type="submit" disabled={isLoading} size="lg">
-                          {isLoading ? (
-                            <>
-                              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                              Saving...
-                            </>
-                          ) : initialActivity?.id ? (
-                            <>
-                              <Icons.Check className="mr-2 h-4 w-4" />
-                              Update Transaction
-                            </>
-                          ) : (
-                            <>
-                              <Icons.Plus className="mr-2 h-4 w-4" />
-                              Add Transaction
-                            </>
-                          )}
-                        </Button>
+                    {/* Action Footer - hidden when in transfer mode since transfer forms have their own submit */}
+                    {!isTransferMode && (
+                      <div className="border-border flex items-center justify-between border-t pt-6">
+                        <p className="text-muted-foreground text-sm">
+                          {initialActivity?.id
+                            ? "Update your transaction details"
+                            : "All fields are required unless marked as optional"}
+                        </p>
+                        <div className="flex gap-3">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleClose}
+                            disabled={isLoading}
+                            size="lg"
+                          >
+                            Cancel
+                          </Button>
+                          <Button type="submit" disabled={isLoading} size="lg">
+                            {isLoading ? (
+                              <>
+                                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                                Saving...
+                              </>
+                            ) : initialActivity?.id ? (
+                              <>
+                                <Icons.Check className="mr-2 h-4 w-4" />
+                                Update Transaction
+                              </>
+                            ) : (
+                              <>
+                                <Icons.Plus className="mr-2 h-4 w-4" />
+                                Add Transaction
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </form>
                 </Form>
               </Tabs>

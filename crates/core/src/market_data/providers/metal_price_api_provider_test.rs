@@ -40,7 +40,7 @@ mod tests {
         assert!(profile.url.is_some());
         assert!(profile.url.as_ref().unwrap().contains("metalpriceapi.com"));
         assert_eq!(profile.isin, None); // Precious metals don't have ISIN codes
-        assert_eq!(profile.symbol_mapping, None);
+        assert_eq!(profile.quote_symbol, Some("XAU".to_string()));
     }
 
     #[tokio::test]
