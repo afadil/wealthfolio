@@ -6,172 +6,137 @@ import { useNavigate } from "react-router-dom";
 import { OnboardingStep1 } from "./onboarding-step1";
 import { OnboardingConnect } from "./onboarding-connect";
 import { OnboardingStep2, OnboardingStep2Handle } from "./onboarding-step2";
-import { OnboardingStep3 } from "./onboarding-step3";
 
 const CONNECT_PORTAL_URL = "https://connect.wealthfolio.app/";
+const MAX_STEPS = 3;
 
 const OnboardingPage = () => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [isStepValid, setIsStepValid] = useState(true);
   const settingsStepRef = useRef<OnboardingStep2Handle>(null);
-  const MAX_STEPS = 4;
 
   const handleNext = () => {
-    setCurrentStep((prevStep) => Math.min(prevStep + 1, MAX_STEPS));
+    setCurrentStep((prev) => Math.min(prev + 1, MAX_STEPS));
   };
 
   const handleBack = () => {
-    setCurrentStep((prevStep) => Math.max(prevStep - 1, 1));
+    setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
   const handleFinish = () => {
     navigate("/settings/accounts");
   };
 
-  const handleConnectSubscribe = () => {
-    window.open(CONNECT_PORTAL_URL, "_blank");
-  };
-
-  const handleConnectSkip = () => {
-    handleNext();
-  };
-
   const handleContinue = () => {
-    if (currentStep === 3 && settingsStepRef.current) {
+    if (currentStep === 2 && settingsStepRef.current) {
       settingsStepRef.current.submitForm();
-    } else if (currentStep === MAX_STEPS) {
-      handleFinish();
     } else {
       handleNext();
     }
   };
 
   useEffect(() => {
-    if (currentStep === 3) {
-      setIsStepValid(false);
-    } else {
-      setIsStepValid(true);
-    }
+    setIsStepValid(currentStep !== 2);
   }, [currentStep]);
 
-  const renderCurrentStep = () => {
-    switch (currentStep) {
-      case 1:
-        return <OnboardingStep1 />;
-      case 2:
-        return (
-          <OnboardingConnect
-            onSubscribe={handleConnectSubscribe}
-            onSkip={handleConnectSkip}
-            onBack={handleBack}
-          />
-        );
-      case 3:
-        return (
-          <OnboardingStep2
-            ref={settingsStepRef}
-            onNext={handleNext}
-            onValidityChange={setIsStepValid}
-          />
-        );
-      case 4:
-        return <OnboardingStep3 />;
-      default:
-        return <OnboardingStep1 />;
-    }
-  };
-
   return (
-    <section className="scan-hide-target bg-background relative flex min-h-screen flex-col lg:items-center lg:justify-center">
-      {/* Desktop: All content in centered wrapper | Mobile: Stacked layout */}
-      <div className="flex min-h-screen flex-col lg:min-h-0">
-        {/* Mobile: Sticky header | Desktop: Normal header */}
-        <div className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-20 pt-[env(safe-area-inset-top)] backdrop-blur lg:relative lg:backdrop-blur-none">
-          <div className="flex flex-col items-center">
-            <img
-              alt="Wealthfolio Illustration"
-              className="h-20 w-20 sm:h-24 sm:w-24"
-              src="/illustration.png"
-              style={{
-                aspectRatio: "1 / 1",
-                objectFit: "cover",
-              }}
-            />
-            {/* Progress indicators */}
-            <div className="flex justify-center gap-2">
-              {Array.from({ length: MAX_STEPS }).map((_, index) => (
-                <div
-                  key={index}
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    index === currentStep - 1
-                      ? "bg-primary w-12"
-                      : index < currentStep - 1
-                        ? "bg-primary/60 w-2"
-                        : "bg-muted w-2"
-                  }`}
-                />
-              ))}
+    <div className="bg-background flex h-screen flex-col pt-[env(safe-area-inset-top)]">
+      {/* Fixed Header with Logo and Steppers */}
+      <header className="flex-none px-4 pt-8 sm:px-6 sm:pt-12">
+        <div className="flex flex-col items-center">
+          {/* Logo */}
+          <img
+            alt="Wealthfolio"
+            className="mb-3 h-16 w-16 sm:h-20 sm:w-20"
+            src="/illustration.png"
+          />
+
+          {/* Progress indicators */}
+          <div className="flex gap-2">
+            {Array.from({ length: MAX_STEPS }).map((_, index) => (
+              <div
+                key={index}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  index === currentStep - 1
+                    ? "bg-primary w-8"
+                    : index < currentStep - 1
+                      ? "bg-primary/50 w-1.5"
+                      : "bg-muted w-1.5"
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      </header>
+
+      {/* Main content - centered vertically in remaining space */}
+      <main className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 sm:px-6">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={currentStep}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="flex w-full max-w-4xl justify-center"
+          >
+            {currentStep === 1 && <OnboardingStep1 />}
+            {currentStep === 2 && (
+              <OnboardingStep2
+                ref={settingsStepRef}
+                onNext={handleNext}
+                onValidityChange={setIsStepValid}
+              />
+            )}
+            {currentStep === 3 && <OnboardingConnect />}
+          </motion.div>
+        </AnimatePresence>
+      </main>
+
+      {/* Fixed Footer */}
+      <footer className="flex-none pb-[env(safe-area-inset-bottom)]">
+        <div className="mx-auto max-w-4xl px-4 pb-8 pt-6 sm:px-6 sm:pb-12">
+          <div className="flex items-center justify-between">
+            <div>
+              {currentStep > 1 && (
+                <Button variant="ghost" onClick={handleBack} size="sm">
+                  <Icons.ArrowLeft className="mr-1.5 h-4 w-4" />
+                  Back
+                </Button>
+              )}
             </div>
-          </div>
-        </div>
-
-        {/* Main content */}
-        <div className="flex-1 overflow-y-auto pb-20 sm:pb-24 lg:flex-none lg:overflow-visible lg:pb-0">
-          <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={currentStep}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{
-                  duration: 0.3,
-                  ease: "easeInOut",
-                }}
-              >
-                {renderCurrentStep()}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        </div>
-
-        {/* Mobile: Fixed bottom navigation | Desktop: Normal bottom navigation */}
-        {/* Hide navigation on Connect step (step 2) as it has its own CTAs */}
-        {currentStep !== 2 && (
-          <div className="bg-background/95 supports-[backdrop-filter]:bg-background/80 fixed right-0 bottom-0 left-0 z-20 border-none backdrop-blur lg:relative lg:backdrop-blur-none">
-            <div className="mx-auto max-w-4xl px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-8 lg:py-6">
-              <div className="flex items-center justify-between gap-4">
-                {/* Left side - Back button */}
-                <div className="flex items-center gap-3">
-                  {currentStep > 1 && (
-                    <Button variant="outline" onClick={handleBack} type="button" className="shrink-0">
-                      <Icons.ArrowLeft className="mr-2 h-4 w-4" />
-                      Back
-                    </Button>
-                  )}
-                </div>
-
-                {/* Right side - Continue/Get Started button */}
+            <div className="flex items-center gap-3">
+              {currentStep === 3 && (
+                <Button variant="ghost" onClick={handleFinish} size="sm">
+                  Skip, I'll manage manually
+                </Button>
+              )}
+              {currentStep === 3 ? (
+                <Button
+                  asChild
+                  className="from-primary to-primary/90 bg-linear-to-r"
+                >
+                  <a href={CONNECT_PORTAL_URL} target="_blank" rel="noopener noreferrer">
+                    Subscribe & Connect
+                    <Icons.ExternalLink className="ml-1.5 h-4 w-4" />
+                  </a>
+                </Button>
+              ) : (
                 <Button
                   onClick={handleContinue}
                   disabled={!isStepValid}
-                  type="button"
-                  className="group from-primary to-primary/90 bg-linear-to-r shadow-lg transition-all duration-300 hover:shadow-xl"
+                  className="from-primary to-primary/90 bg-linear-to-r"
                 >
-                  {currentStep === MAX_STEPS ? "Get Started" : "Continue"}
-                  {currentStep === MAX_STEPS ? (
-                    <Icons.Check className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
-                  ) : (
-                    <Icons.ArrowRight className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-                  )}
+                  Continue
+                  <Icons.ArrowRight className="ml-1.5 h-4 w-4" />
                 </Button>
-              </div>
+              )}
             </div>
           </div>
-        )}
-      </div>
-    </section>
+        </div>
+      </footer>
+    </div>
   );
 };
 
