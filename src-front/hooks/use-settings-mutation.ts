@@ -12,16 +12,19 @@ export function useSettingsMutation(
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: updateSettings,
-    onSuccess: (updatedSettings) => {
+    onSuccess: (updatedSettings, variables) => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.SETTINGS] });
       setSettings(updatedSettings);
       applySettingsToDocument(updatedSettings);
-      toast({
-        title: "Settings updated",
-        description: "Your settings have been updated successfully.",
-        variant: "success",
-        duration: 1000,
-      });
+      // Don't show toast during onboarding (when onboardingCompleted is being set)
+      if (!("onboardingCompleted" in variables)) {
+        toast({
+          title: "Settings updated",
+          description: "Your settings have been updated successfully.",
+          variant: "success",
+          duration: 1000,
+        });
+      }
     },
     onError: (error) => {
       logger.error(`Error updating settings: ${error}`);
