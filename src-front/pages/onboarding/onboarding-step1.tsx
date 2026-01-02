@@ -4,13 +4,10 @@ import React from "react";
 
 export const OnboardingStep1: React.FC = () => {
   return (
-    <div className="flex min-h-full items-center justify-center px-4 md:px-6 lg:px-8">
-      <div className="w-full max-w-5xl space-y-4 md:space-y-8">
-        <div className="text-center">
-          <p className="text-muted-foreground text-sm md:text-base">
-            Two ways to track your portfolio.
-          </p>
-        </div>
+    <div className="w-full max-w-4xl space-y-4 md:space-y-6">
+      <div className="text-center">
+        <p className="text-muted-foreground text-sm">Two ways to track your portfolio.</p>
+      </div>
 
         <div className="mx-auto grid gap-5 md:grid-cols-2 md:gap-6 lg:gap-8">
           <Card className="group border-border/50 from-card to-card/80 hover:border-primary/50 relative flex flex-col overflow-hidden border-2 bg-linear-to-br p-5 transition-all duration-300 hover:shadow-lg md:p-6">
@@ -84,19 +81,18 @@ export const OnboardingStep1: React.FC = () => {
           </Card>
         </div>
 
-        <div className="text-center">
-          <p className="text-muted-foreground text-xs md:text-sm">
-            Mix both types as needed.{" "}
-            <a
-              href="https://wealthfolio.app/docs/concepts/activity-types"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-foreground underline transition-colors"
-            >
-              Learn more
-            </a>
-          </p>
-        </div>
+      <div className="text-center">
+        <p className="text-muted-foreground text-xs">
+          Mix both types as needed.{" "}
+          <a
+            href="https://wealthfolio.app/docs/concepts/activity-types"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-foreground underline transition-colors"
+          >
+            Learn more
+          </a>
+        </p>
       </div>
     </div>
   );

@@ -126,16 +126,16 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
 
     return (
       <>
-        <div className="space-y-3 sm:space-y-4">
+        <div className="w-full max-w-2xl space-y-4">
           <div className="text-center">
-            <p className="text-muted-foreground text-sm sm:text-base">
+            <p className="text-muted-foreground text-sm">
               Just a couple preferences to get you started
             </p>
           </div>
           <Card className="border-none bg-transparent">
-            <CardContent>
+            <CardContent className="p-0 sm:p-6">
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-16">
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-10">
                   <FormField
                     control={form.control}
                     name="baseCurrency"
