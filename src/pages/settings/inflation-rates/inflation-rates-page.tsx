@@ -101,36 +101,11 @@ const SettingsInflationRatesPage = () => {
         <SettingsHeader
           heading="Inflation Rates"
           text="Manage inflation rates for real value calculations."
-        >
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleFetchFromWorldBank}
-              disabled={fetchFromWorldBankMutation.isPending}
-              className="hidden sm:inline-flex"
-            >
-              {fetchFromWorldBankMutation.isPending ? (
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Icons.Download className="mr-2 h-4 w-4" />
-              )}
-              Fetch from World Bank
-            </Button>
-            <Button size="icon" className="sm:hidden" onClick={handleAddRate}>
-              <Icons.Plus className="h-4 w-4" />
-            </Button>
-            <Button size="sm" className="hidden sm:inline-flex" onClick={handleAddRate}>
-              <Icons.Plus className="mr-2 h-4 w-4" />
-              Add Rate
-            </Button>
-          </div>
-        </SettingsHeader>
+        />
         <Separator />
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-muted-foreground text-sm">Country:</span>
             <Select value={countryCode} onValueChange={setCountryCode}>
               <SelectTrigger className="w-48">
                 <SelectValue />
@@ -143,21 +118,26 @@ const SettingsInflationRatesPage = () => {
                 ))}
               </SelectContent>
             </Select>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleFetchFromWorldBank}
+              disabled={fetchFromWorldBankMutation.isPending}
+            >
+              {fetchFromWorldBankMutation.isPending ? (
+                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Icons.Download className="mr-2 h-4 w-4" />
+              )}
+              <span className="hidden sm:inline">Fetch from World Bank</span>
+              <span className="sm:hidden">Fetch</span>
+            </Button>
+            <Button size="sm" onClick={handleAddRate}>
+              <Icons.Plus className="mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Add Rate</span>
+              <span className="sm:hidden">Add</span>
+            </Button>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleFetchFromWorldBank}
-            disabled={fetchFromWorldBankMutation.isPending}
-            className="sm:hidden"
-          >
-            {fetchFromWorldBankMutation.isPending ? (
-              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Icons.Download className="mr-2 h-4 w-4" />
-            )}
-            Fetch from World Bank
-          </Button>
         </div>
 
         <div className="w-full pt-4">
@@ -182,18 +162,9 @@ const SettingsInflationRatesPage = () => {
                 No inflation rate for {currentYear} ({countryCode})
               </EmptyPlaceholder.Title>
               <EmptyPlaceholder.Description>
-                Add an inflation rate manually or fetch historical data from World Bank.
+                Use the buttons above to add an inflation rate manually or fetch historical data
+                from World Bank.
               </EmptyPlaceholder.Description>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={handleFetchFromWorldBank}>
-                  <Icons.Download className="mr-2 h-4 w-4" />
-                  Fetch from World Bank
-                </Button>
-                <Button onClick={handleAddRate}>
-                  <Icons.Plus className="mr-2 h-4 w-4" />
-                  Add Rate
-                </Button>
-              </div>
             </EmptyPlaceholder>
           )}
 

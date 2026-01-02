@@ -30,12 +30,12 @@ export function InflationChart({ data, isLoading, baseYear, currency }: Inflatio
 
   const chartConfig = {
     nominal: {
-      label: "Nominal Value",
-      color: "hsl(var(--chart-1))",
+      label: "Nominal",
+      color: "hsl(221 83% 53%)", // Blue
     },
     real: {
-      label: `Real Value (${baseYear})`,
-      color: "hsl(var(--chart-2))",
+      label: `Real (${baseYear})`,
+      color: "hsl(142 71% 45%)", // Green
     },
   } satisfies ChartConfig;
 
@@ -88,8 +88,8 @@ export function InflationChart({ data, isLoading, baseYear, currency }: Inflatio
                       style={{
                         backgroundColor:
                           name === "nominal"
-                            ? "hsl(var(--chart-1))"
-                            : "hsl(var(--chart-2))",
+                            ? "hsl(221 83% 53%)"
+                            : "hsl(142 71% 45%)",
                       }}
                     />
                     <div className="flex flex-1 items-center justify-between gap-2">

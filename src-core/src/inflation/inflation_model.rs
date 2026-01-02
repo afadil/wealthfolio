@@ -40,10 +40,13 @@ pub struct InflationAdjustedValue {
 }
 
 // World Bank API response structures
+// These fields are used for JSON deserialization even though they're not directly accessed
 #[derive(Deserialize, Debug)]
+#[allow(dead_code)]
 pub struct WorldBankResponse(pub WorldBankMeta, pub Option<Vec<WorldBankDataPoint>>);
 
 #[derive(Deserialize, Debug)]
+#[allow(dead_code)]
 pub struct WorldBankMeta {
     pub page: i32,
     pub pages: i32,
@@ -51,6 +54,7 @@ pub struct WorldBankMeta {
 }
 
 #[derive(Deserialize, Debug)]
+#[allow(dead_code)]
 pub struct WorldBankDataPoint {
     pub date: String,
     pub value: Option<f64>,
@@ -58,6 +62,7 @@ pub struct WorldBankDataPoint {
 }
 
 #[derive(Deserialize, Debug)]
+#[allow(dead_code)]
 pub struct WorldBankCountry {
     pub id: String,
     pub value: String,

@@ -15,8 +15,28 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { InflationChart } from "./components/inflation-chart";
 import { parseISO } from "date-fns";
-import { Button, EmptyPlaceholder, Icons, Skeleton } from "@wealthfolio/ui";
+import { EmptyPlaceholder, Skeleton } from "@wealthfolio/ui";
 import { Link } from "react-router-dom";
+
+const MONTHS = [
+  { value: 1, label: "January" },
+  { value: 2, label: "February" },
+  { value: 3, label: "March" },
+  { value: 4, label: "April" },
+  { value: 5, label: "May" },
+  { value: 6, label: "June" },
+  { value: 7, label: "July" },
+  { value: 8, label: "August" },
+  { value: 9, label: "September" },
+  { value: 10, label: "October" },
+  { value: 11, label: "November" },
+  { value: 12, label: "December" },
+];
+
+const getDaysInMonth = (month: number): number[] => {
+  const days = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return Array.from({ length: days[month - 1] }, (_, i) => i + 1);
+};
 
 const CURRENCY_TO_COUNTRY: Record<string, string> = {
   USD: "US",
@@ -63,8 +83,8 @@ export default function InflationPage() {
 
   const [baseYear, setBaseYear] = useState<number | null>(null);
   const [countryCode, setCountryCode] = useState<string | undefined>(undefined);
-  const [referenceMonth] = useState(12); // December
-  const [referenceDay] = useState(31);
+  const [referenceMonth, setReferenceMonth] = useState(12); // December
+  const [referenceDay, setReferenceDay] = useState(31);
 
   // Use detected country if not manually set
   const effectiveCountryCode = countryCode || defaultCountry;
@@ -81,7 +101,7 @@ export default function InflationPage() {
   const yearEndValues = useMemo(() => {
     if (!valuationHistory || valuationHistory.length === 0) return [];
 
-    const yearValues: Map<number, { value: number; date: string }> = new Map();
+    const yearValues = new Map<number, { value: number; date: string }>();
 
     valuationHistory.forEach((v) => {
       const date = parseISO(v.valuationDate);
@@ -104,12 +124,19 @@ export default function InflationPage() {
       .sort((a, b) => a[0] - b[0]);
   }, [valuationHistory, referenceMonth, referenceDay]);
 
-  // Set default base year to first year of portfolio data (only once when data loads)
+  // Get available years from inflation rates (IPC data)
+  const ipcYearOptions = useMemo(() => {
+    if (!inflationRates || inflationRates.length === 0) return [];
+    const years = [...new Set(inflationRates.map((r) => r.year))].sort((a, b) => b - a);
+    return years;
+  }, [inflationRates]);
+
+  // Set default base year to latest IPC year (only once when data loads)
   useEffect(() => {
-    if (baseYear === null && yearEndValues.length > 0) {
-      setBaseYear(yearEndValues[0][0]); // First year of portfolio data
+    if (baseYear === null && ipcYearOptions.length > 0) {
+      setBaseYear(ipcYearOptions[0]); // Latest year with IPC data
     }
-  }, [yearEndValues, baseYear]);
+  }, [ipcYearOptions, baseYear]);
 
   // Effective base year (fallback to current year if not set)
   const effectiveBaseYear = baseYear ?? currentYear;
@@ -134,11 +161,6 @@ export default function InflationPage() {
     }));
   }, [adjustedValues]);
 
-  // Generate year options from available data
-  const yearOptions = useMemo(() => {
-    const years = yearEndValues.map(([year]) => year);
-    return years.length > 0 ? years : [currentYear];
-  }, [yearEndValues, currentYear]);
 
   const isLoading = isValuationLoading || isRatesLoading || isAdjustedLoading || isSettingsLoading;
   const hasNoInflationData = !inflationRates || inflationRates.length === 0;
@@ -180,24 +202,69 @@ export default function InflationPage() {
 
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium">Base Year</label>
-            <Select value={effectiveBaseYear.toString()} onValueChange={(v) => setBaseYear(parseInt(v))}>
+            <Select
+              value={effectiveBaseYear.toString()}
+              onValueChange={(v) => setBaseYear(parseInt(v))}
+              disabled={ipcYearOptions.length === 0}
+            >
               <SelectTrigger className="w-28">
-                <SelectValue />
+                <SelectValue placeholder="Select year" />
               </SelectTrigger>
               <SelectContent>
-                {yearOptions.map((year) => (
-                  <SelectItem key={year} value={year.toString()}>
-                    {year}
-                  </SelectItem>
-                ))}
+                {ipcYearOptions.length > 0 ? (
+                  ipcYearOptions.map((year) => (
+                    <SelectItem key={year} value={year.toString()}>
+                      {year}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value={currentYear.toString()}>{currentYear}</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>
 
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium">Reference Date</label>
-            <div className="text-muted-foreground flex h-10 items-center text-sm">
-              December 31st
+            <div className="flex gap-2">
+              <Select
+                value={referenceMonth.toString()}
+                onValueChange={(v) => {
+                  const newMonth = parseInt(v);
+                  setReferenceMonth(newMonth);
+                  // Adjust day if it exceeds days in new month
+                  const maxDays = getDaysInMonth(newMonth).length;
+                  if (referenceDay > maxDays) {
+                    setReferenceDay(maxDays);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MONTHS.map((month) => (
+                    <SelectItem key={month.value} value={month.value.toString()}>
+                      {month.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={referenceDay.toString()}
+                onValueChange={(v) => setReferenceDay(parseInt(v))}
+              >
+                <SelectTrigger className="w-20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {getDaysInMonth(referenceMonth).map((day) => (
+                    <SelectItem key={day} value={day.toString()}>
+                      {day}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>
@@ -206,7 +273,7 @@ export default function InflationPage() {
       {/* Chart Card */}
       <Card>
         <CardHeader>
-          <CardTitle>Portfolio Value: Nominal vs Real</CardTitle>
+          <CardTitle>Nominal vs Real</CardTitle>
           <CardDescription>
             Comparing nominal portfolio value with inflation-adjusted value (base year: {effectiveBaseYear})
           </CardDescription>
@@ -225,14 +292,15 @@ export default function InflationPage() {
               <EmptyPlaceholder.Icon name="TrendingUp" />
               <EmptyPlaceholder.Title>No Inflation Data</EmptyPlaceholder.Title>
               <EmptyPlaceholder.Description>
-                Add inflation rates for {effectiveCountryCode} to see real values.
+                Add inflation rates for {effectiveCountryCode} in{" "}
+                <Link
+                  to="/settings/inflation-rates"
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  Settings
+                </Link>{" "}
+                to see real values.
               </EmptyPlaceholder.Description>
-              <Link to="/settings/inflation-rates">
-                <Button>
-                  <Icons.Settings className="mr-2 h-4 w-4" />
-                  Configure Inflation Rates
-                </Button>
-              </Link>
             </EmptyPlaceholder>
           ) : (
             <InflationChart
