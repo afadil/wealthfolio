@@ -124,19 +124,19 @@ export default function InflationPage() {
       .sort((a, b) => a[0] - b[0]);
   }, [valuationHistory, referenceMonth, referenceDay]);
 
-  // Get available years from inflation rates (IPC data)
-  const ipcYearOptions = useMemo(() => {
+  // Get available years from inflation rates (CPI data)
+  const cpiYearOptions = useMemo(() => {
     if (!inflationRates || inflationRates.length === 0) return [];
     const years = [...new Set(inflationRates.map((r) => r.year))].sort((a, b) => b - a);
     return years;
   }, [inflationRates]);
 
-  // Set default base year to latest IPC year (only once when data loads)
+  // Set default base year to latest CPI year (only once when data loads)
   useEffect(() => {
-    if (baseYear === null && ipcYearOptions.length > 0) {
-      setBaseYear(ipcYearOptions[0]); // Latest year with IPC data
+    if (baseYear === null && cpiYearOptions.length > 0) {
+      setBaseYear(cpiYearOptions[0]); // Latest year with CPI data
     }
-  }, [ipcYearOptions, baseYear]);
+  }, [cpiYearOptions, baseYear]);
 
   // Effective base year (fallback to current year if not set)
   const effectiveBaseYear = baseYear ?? currentYear;
