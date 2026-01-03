@@ -109,7 +109,7 @@ export default function InflationPage() {
 
       const referenceDate = `${year}-${String(referenceMonth).padStart(2, "0")}-${String(referenceDay).padStart(2, "0")}`;
 
-      // Only consider dates on or before the reference date (Dec 31)
+      // Only consider dates on or before the selected reference date (e.g., Dec 31, or user-chosen)
       if (v.valuationDate <= referenceDate) {
         const existing = yearValues.get(year);
         // Keep the latest date (closest to Dec 31)
