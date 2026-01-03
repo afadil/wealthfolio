@@ -74,7 +74,6 @@ pub struct BrokerAccount {
     // Legacy fields for backward compatibility with existing sync code
     // These may not be present in the new API response
     // ─────────────────────────────────────────────────────────────────────────
-
     /// Unique identifier for the connection (brokerage authorization UUID)
     #[serde(default)]
     pub brokerage_authorization: Option<String>,
@@ -340,7 +339,6 @@ pub struct AccountUniversalActivity {
     // ─────────────────────────────────────────────────────────────────────────
     // New fields for sync system
     // ─────────────────────────────────────────────────────────────────────────
-
     /// Source system that generated this activity (SNAPTRADE, MANUAL, CSV)
     pub source_system: Option<String>,
 

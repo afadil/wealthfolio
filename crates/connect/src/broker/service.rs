@@ -4,16 +4,15 @@ use async_trait::async_trait;
 use log::{debug, error, info, warn};
 use std::sync::Arc;
 
-use crate::platform::{Platform, PlatformRepository};
-use crate::state::BrokerSyncState;
-use crate::state::BrokerSyncStateRepository;
-use wealthfolio_storage_sqlite::sync::ImportRunRepository;
 use super::mapping;
 use super::models::{
     AccountUniversalActivity, BrokerAccount, BrokerConnection, SyncAccountsResponse,
     SyncConnectionsResponse,
 };
 use super::traits::SyncServiceTrait;
+use crate::platform::{Platform, PlatformRepository};
+use crate::state::BrokerSyncState;
+use crate::state::BrokerSyncStateRepository;
 use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 use std::collections::HashSet;
@@ -28,6 +27,7 @@ use wealthfolio_storage_sqlite::assets::AssetDB;
 use wealthfolio_storage_sqlite::db::{DbPool, WriteHandle};
 use wealthfolio_storage_sqlite::errors::StorageError;
 use wealthfolio_storage_sqlite::schema;
+use wealthfolio_storage_sqlite::sync::ImportRunRepository;
 
 const DEFAULT_BROKERAGE_PROVIDER: &str = "snaptrade";
 
@@ -147,7 +147,10 @@ impl SyncServiceTrait for SyncService {
             let provider_account_id = match &broker_account.id {
                 Some(id) if !id.is_empty() => id.clone(),
                 _ => {
-                    debug!("Skipping account with no provider ID: {}", broker_account.display_name());
+                    debug!(
+                        "Skipping account with no provider ID: {}",
+                        broker_account.display_name()
+                    );
                     skipped += 1;
                     continue;
                 }
@@ -250,8 +253,7 @@ impl SyncServiceTrait for SyncService {
         let mut asset_rows: Vec<AssetDB> = Vec::new();
         let mut seen_assets: HashSet<String> = HashSet::new();
 
-        let mut activity_rows: Vec<ActivityDB> =
-            Vec::new();
+        let mut activity_rows: Vec<ActivityDB> = Vec::new();
         let mut seen_activity_ids: HashSet<String> = HashSet::new();
 
         for activity in activities_data {
@@ -322,49 +324,50 @@ impl SyncServiceTrait for SyncService {
                 });
 
             if seen_assets.insert(asset_id.clone()) {
-                let asset_db = if asset_id.starts_with("$CASH-") || asset_id.starts_with("$UNKNOWN-") {
-                    let new_asset = NewAsset::new_cash_asset(&currency_code);
-                    let mut db: AssetDB = new_asset.into();
-                    // For unknown assets, update the id/symbol to match the placeholder
-                    if asset_id.starts_with("$UNKNOWN-") {
-                        db.id = asset_id.clone();
-                        db.symbol = asset_id.clone();
-                        db.name = Some("Unknown Asset".to_string());
-                    }
-                    db.created_at = now_naive;
-                    db.updated_at = now_naive;
-                    db
-                } else {
-                    let symbol_type_ref = activity
-                        .symbol
-                        .as_ref()
-                        .and_then(|s| s.symbol_type.as_ref());
-
-                    let symbol_type_label = symbol_type_ref.and_then(|t| {
-                        broker_symbol_type_label(t.code.as_deref(), t.description.as_deref())
-                    });
-
-                    let symbol_type_code = symbol_type_ref.and_then(|t| t.code.as_deref());
-                    let asset_kind = broker_symbol_type_to_kind(symbol_type_code);
-
-                    AssetDB {
-                        id: asset_id.clone(),
-                        symbol: asset_id.clone(),
-                        name: activity
+                let asset_db =
+                    if asset_id.starts_with("$CASH-") || asset_id.starts_with("$UNKNOWN-") {
+                        let new_asset = NewAsset::new_cash_asset(&currency_code);
+                        let mut db: AssetDB = new_asset.into();
+                        // For unknown assets, update the id/symbol to match the placeholder
+                        if asset_id.starts_with("$UNKNOWN-") {
+                            db.id = asset_id.clone();
+                            db.symbol = asset_id.clone();
+                            db.name = Some("Unknown Asset".to_string());
+                        }
+                        db.created_at = now_naive;
+                        db.updated_at = now_naive;
+                        db
+                    } else {
+                        let symbol_type_ref = activity
                             .symbol
                             .as_ref()
-                            .and_then(|s| s.description.clone())
-                            .filter(|d| !d.trim().is_empty()),
-                        asset_type: symbol_type_label.clone(),
-                        asset_class: symbol_type_label,
-                        currency: currency_code.clone(),
-                        data_source: DataSource::Yahoo.as_str().to_string(),
-                        kind: Some(asset_kind_to_string(&asset_kind)),
-                        created_at: now_naive,
-                        updated_at: now_naive,
-                        ..Default::default()
-                    }
-                };
+                            .and_then(|s| s.symbol_type.as_ref());
+
+                        let symbol_type_label = symbol_type_ref.and_then(|t| {
+                            broker_symbol_type_label(t.code.as_deref(), t.description.as_deref())
+                        });
+
+                        let symbol_type_code = symbol_type_ref.and_then(|t| t.code.as_deref());
+                        let asset_kind = broker_symbol_type_to_kind(symbol_type_code);
+
+                        AssetDB {
+                            id: asset_id.clone(),
+                            symbol: asset_id.clone(),
+                            name: activity
+                                .symbol
+                                .as_ref()
+                                .and_then(|s| s.description.clone())
+                                .filter(|d| !d.trim().is_empty()),
+                            asset_type: symbol_type_label.clone(),
+                            asset_class: symbol_type_label,
+                            currency: currency_code.clone(),
+                            data_source: DataSource::Yahoo.as_str().to_string(),
+                            kind: Some(asset_kind_to_string(&asset_kind)),
+                            created_at: now_naive,
+                            updated_at: now_naive,
+                            ..Default::default()
+                        }
+                    };
                 asset_rows.push(asset_db);
             }
 
@@ -421,7 +424,10 @@ impl SyncServiceTrait for SyncService {
                 fx_rate,
                 metadata,
                 needs_review: Some(needs_review),
-                source_system: activity.source_system.clone().or(Some("SNAPTRADE".to_string())),
+                source_system: activity
+                    .source_system
+                    .clone()
+                    .or(Some("SNAPTRADE".to_string())),
                 source_record_id: activity.source_record_id.clone().or(activity.id.clone()),
                 source_group_id: activity.source_group_id.clone(),
             };
@@ -491,7 +497,10 @@ impl SyncServiceTrait for SyncService {
                     }
                 }
 
-                debug!("Starting activity inserts ({} activities)...", activity_rows.len());
+                debug!(
+                    "Starting activity inserts ({} activities)...",
+                    activity_rows.len()
+                );
                 let mut activities_upserted: usize = 0;
                 for (idx, activity_db) in activity_rows.into_iter().enumerate() {
                     let now_update = chrono::Utc::now().to_rfc3339();
@@ -531,16 +540,17 @@ impl SyncServiceTrait for SyncService {
                                 .eq(excluded(schema::activities::needs_review)),
                             schema::activities::updated_at.eq(now_update),
                         ))
-                        .execute(conn) {
-                            Ok(count) => activities_upserted += count,
-                            Err(e) => {
-                                error!(
-                                    "Failed to upsert activity {} (idx={}, type={}): {:?}",
-                                    activity_id, idx, activity_type, e
-                                );
-                                return Err(StorageError::from(e).into());
-                            }
+                        .execute(conn)
+                    {
+                        Ok(count) => activities_upserted += count,
+                        Err(e) => {
+                            error!(
+                                "Failed to upsert activity {} (idx={}, type={}): {:?}",
+                                activity_id, idx, activity_type, e
+                            );
+                            return Err(StorageError::from(e).into());
                         }
+                    }
                 }
 
                 debug!("Successfully upserted {} activities", activities_upserted);
@@ -724,6 +734,8 @@ fn asset_kind_to_string(kind: &AssetKind) -> String {
         AssetKind::PrivateEquity => "PRIVATE_EQUITY".to_string(),
         AssetKind::Property => "PROPERTY".to_string(),
         AssetKind::Vehicle => "VEHICLE".to_string(),
+        AssetKind::Collectible => "COLLECTIBLE".to_string(),
+        AssetKind::PhysicalPrecious => "PHYSICAL_PRECIOUS".to_string(),
         AssetKind::Liability => "LIABILITY".to_string(),
         AssetKind::Other => "OTHER".to_string(),
     }

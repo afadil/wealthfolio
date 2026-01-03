@@ -319,7 +319,8 @@ impl ConnectApiClient {
     pub async fn get_user_info(&self) -> Result<UserInfo> {
         let api_user: Option<ApiUser> = self.get("/api/v1/user/me").await?;
 
-        let user = api_user.ok_or_else(|| Error::Unexpected("No user info returned".to_string()))?;
+        let user =
+            api_user.ok_or_else(|| Error::Unexpected("No user info returned".to_string()))?;
 
         Ok(UserInfo {
             id: user.id,
@@ -460,8 +461,7 @@ impl BrokerApiClient for ConnectApiClient {
         &self,
         _authorization_ids: Option<Vec<String>>,
     ) -> Result<Vec<BrokerAccount>> {
-        let api_response: ApiAccountsResponse =
-            self.get("/api/v1/sync/brokerage/accounts").await?;
+        let api_response: ApiAccountsResponse = self.get("/api/v1/sync/brokerage/accounts").await?;
 
         info!(
             "[ConnectApi] Fetched {} broker accounts",
@@ -490,8 +490,7 @@ mod tests {
 
     #[test]
     fn test_client_url_normalization() {
-        let client =
-            ConnectApiClient::new("https://api.wealthfolio.app/", "test-token").unwrap();
+        let client = ConnectApiClient::new("https://api.wealthfolio.app/", "test-token").unwrap();
         assert_eq!(client.base_url, "https://api.wealthfolio.app");
     }
 }
