@@ -154,7 +154,10 @@ pub enum CalculatorError {
     MissingFxRate(String, String, NaiveDate),
 
     #[error("Position not found for asset {asset_id} in account {account_id} during operation")]
-    PositionNotFound { asset_id: String, account_id: String },
+    PositionNotFound {
+        asset_id: String,
+        account_id: String,
+    },
 
     #[error("Lot not found during operation (this should not happen): Lot ID {lot_id}")]
     LotNotFound { lot_id: String },

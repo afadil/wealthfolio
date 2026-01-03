@@ -48,8 +48,10 @@ pub trait SyncServiceTrait: Send + Sync {
     ) -> Result<SyncConnectionsResponse>;
 
     /// Sync accounts from the broker API to local accounts table
-    async fn sync_accounts(&self, broker_accounts: Vec<BrokerAccount>)
-        -> Result<SyncAccountsResponse>;
+    async fn sync_accounts(
+        &self,
+        broker_accounts: Vec<BrokerAccount>,
+    ) -> Result<SyncAccountsResponse>;
 
     /// Get all synced accounts (accounts with provider_account_id set)
     fn get_synced_accounts(&self) -> Result<Vec<Account>>;

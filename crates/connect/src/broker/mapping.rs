@@ -114,7 +114,10 @@ pub fn build_activity_metadata(activity: &AccountUniversalActivity) -> Option<St
 
     // Add source system info
     if let Some(ref source_system) = activity.source_system {
-        metadata.insert("source_system".to_string(), serde_json::json!(source_system));
+        metadata.insert(
+            "source_system".to_string(),
+            serde_json::json!(source_system),
+        );
     }
 
     if let Some(ref source_record_id) = activity.source_record_id {
@@ -244,7 +247,9 @@ mod tests {
 
     #[test]
     fn test_warning_reasons() {
-        assert!(has_warning_reasons(&["Unknown transaction type".to_string()]));
+        assert!(has_warning_reasons(&[
+            "Unknown transaction type".to_string()
+        ]));
         assert!(has_warning_reasons(&["Ambiguous mapping".to_string()]));
         assert!(!has_warning_reasons(&["Matched by symbol".to_string()]));
         assert!(!has_warning_reasons(&[]));
