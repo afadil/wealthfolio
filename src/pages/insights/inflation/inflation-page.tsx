@@ -6,17 +6,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useValuationHistory } from "@/hooks/use-valuation-history";
 import { useSettings } from "@/hooks/use-settings";
+import { useValuationHistory } from "@/hooks/use-valuation-history";
 import {
-  useInflationRatesByCountry,
   useInflationAdjustedPortfolio,
+  useInflationRatesByCountry,
 } from "@/pages/settings/inflation-rates/use-inflation-rate-mutations";
-import { useEffect, useMemo, useState } from "react";
-import { InflationChart } from "./components/inflation-chart";
-import { parseISO } from "date-fns";
 import { EmptyPlaceholder, Skeleton } from "@wealthfolio/ui";
+import { parseISO } from "date-fns";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { InflationChart } from "./components/inflation-chart";
 
 const MONTHS = [
   { value: 1, label: "January" },
@@ -205,14 +205,14 @@ export default function InflationPage() {
             <Select
               value={effectiveBaseYear.toString()}
               onValueChange={(v) => setBaseYear(parseInt(v))}
-              disabled={ipcYearOptions.length === 0}
+              disabled={cpiYearOptions.length === 0}
             >
               <SelectTrigger className="w-28">
                 <SelectValue placeholder="Select year" />
               </SelectTrigger>
               <SelectContent>
-                {ipcYearOptions.length > 0 ? (
-                  ipcYearOptions.map((year) => (
+                {cpiYearOptions.length > 0 ? (
+                  cpiYearOptions.map((year) => (
                     <SelectItem key={year} value={year.toString()}>
                       {year}
                     </SelectItem>
