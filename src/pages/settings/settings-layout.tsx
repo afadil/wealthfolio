@@ -32,7 +32,7 @@ const sidebarNavItems = [
   {
     title: "Inflation",
     href: "inflation-rates",
-    subtitle: "Manage inflation rates (IPC)",
+    subtitle: "Manage inflation rates (CPI)",
     icon: <Icons.Percent className="h-5 w-5" />,
   },
   {
