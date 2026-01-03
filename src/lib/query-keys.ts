@@ -29,6 +29,10 @@ export const QueryKeys = {
   CONTRIBUTION_LIMITS: "contributionLimits",
   CONTRIBUTION_LIMIT_PROGRESS: "contributionLimitProgress",
 
+  INFLATION_RATES: "inflationRates",
+  INFLATION_RATES_BY_COUNTRY: "inflationRatesByCountry",
+  INFLATION_ADJUSTED_PORTFOLIO: "inflationAdjustedPortfolio",
+
   ASSET_DATA: "asset_data",
   ASSETS: "assets",
   LATEST_QUOTES: "latest_quotes",

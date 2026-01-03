@@ -218,6 +218,14 @@ pub fn run() {
             commands::limits::update_contribution_limit,
             commands::limits::delete_contribution_limit,
             commands::limits::calculate_deposits_for_contribution_limit,
+            // Inflation rate commands
+            commands::inflation::get_inflation_rates,
+            commands::inflation::get_inflation_rates_by_country,
+            commands::inflation::create_inflation_rate,
+            commands::inflation::update_inflation_rate,
+            commands::inflation::delete_inflation_rate,
+            commands::inflation::fetch_inflation_rates_from_world_bank,
+            commands::inflation::calculate_inflation_adjusted_portfolio,
             // Utility commands
             commands::utilities::get_app_info,
             commands::utilities::check_for_updates,

@@ -476,6 +476,28 @@ export interface ContributionLimit {
 
 export type NewContributionLimit = Omit<ContributionLimit, "id" | "createdAt" | "updatedAt">;
 
+export interface InflationRate {
+  id: string;
+  countryCode: string;
+  year: number;
+  rate: number;
+  referenceDate?: string | null;
+  dataSource: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type NewInflationRate = Omit<InflationRate, "id" | "createdAt" | "updatedAt">;
+
+export interface InflationAdjustedValue {
+  year: number;
+  nominalValue: number;
+  realValue: number;
+  inflationRate: number | null;
+  cumulativeInflation: number;
+  referenceDate: string;
+}
+
 export interface AccountDeposit {
   amount: number;
   currency: string;

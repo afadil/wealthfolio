@@ -4,6 +4,7 @@ pub mod addon;
 pub mod asset;
 pub mod error;
 pub mod goal;
+pub mod inflation;
 pub mod limits;
 pub mod market_data;
 pub mod platform;

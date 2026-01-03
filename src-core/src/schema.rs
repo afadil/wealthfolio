@@ -143,6 +143,19 @@ diesel::table! {
 }
 
 diesel::table! {
+    inflation_rates (id) {
+        id -> Text,
+        country_code -> Text,
+        year -> Integer,
+        rate -> Double,
+        reference_date -> Nullable<Text>,
+        data_source -> Text,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     market_data_providers (id) {
         id -> Text,
         name -> Text,
@@ -198,6 +211,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     goals,
     goals_allocation,
     holdings_snapshots,
+    inflation_rates,
     market_data_providers,
     platforms,
     quotes,
