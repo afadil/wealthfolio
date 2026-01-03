@@ -66,12 +66,10 @@ impl InflationRateServiceTrait for InflationRateService {
             country_code.to_uppercase()
         );
 
-        let response = self
-            .http_client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| Error::Unexpected(format!("Failed to fetch from World Bank: {}", e)))?;
+        let response =
+            self.http_client.get(&url).send().await.map_err(|e| {
+                Error::Unexpected(format!("Failed to fetch from World Bank: {}", e))
+            })?;
 
         if !response.status().is_success() {
             return Err(Error::Unexpected(format!(
@@ -80,10 +78,9 @@ impl InflationRateServiceTrait for InflationRateService {
             )));
         }
 
-        let data: WorldBankResponse = response
-            .json()
-            .await
-            .map_err(|e| Error::Unexpected(format!("Failed to parse World Bank response: {}", e)))?;
+        let data: WorldBankResponse = response.json().await.map_err(|e| {
+            Error::Unexpected(format!("Failed to parse World Bank response: {}", e))
+        })?;
 
         let mut results = Vec::new();
 
@@ -126,7 +123,9 @@ impl InflationRateServiceTrait for InflationRateService {
         country_code: &str,
         base_year: i32,
     ) -> Result<Vec<InflationAdjustedValue>> {
-        let rates = self.repository.get_inflation_rates_by_country(country_code)?;
+        let rates = self
+            .repository
+            .get_inflation_rates_by_country(country_code)?;
         let rates_map: HashMap<i32, f64> = rates.into_iter().map(|r| (r.year, r.rate)).collect();
 
         let mut results = Vec::new();
@@ -143,7 +142,7 @@ impl InflationRateServiceTrait for InflationRateService {
                 };
 
                 let mut cumulative = 1.0;
-                for y in start..end {
+                for y in start..=end {
                     if let Some(&rate) = rates_map.get(&y) {
                         cumulative *= 1.0 + (rate / 100.0);
                     }
