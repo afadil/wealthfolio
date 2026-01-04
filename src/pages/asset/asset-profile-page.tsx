@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { InputTags } from "@/components/ui/tag-input";
+import { toast } from "@/components/ui/use-toast";
 import { useHapticFeedback } from "@/hooks";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { useQuoteHistory } from "@/hooks/use-quote-history";
@@ -747,7 +748,7 @@ export const AssetProfilePage = () => {
               className="size-8"
             />
           )}
-          <div className="flex min-w-0 flex-col">
+          <div className="flex min-w-0 flex-1 flex-col">
             {isEditingTitle ? (
               <Input
                 value={formData.name}
@@ -786,6 +787,22 @@ export const AssetProfilePage = () => {
               </>
             )}
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={async () => {
+              await navigator.clipboard.writeText(symbol);
+              triggerHaptic();
+              toast({
+                title: "Symbol copied",
+                description: `${symbol} copied to clipboard`,
+              });
+            }}
+            title="Copy symbol"
+            className="h-8 w-8 shrink-0"
+          >
+            <Icons.Copy className="h-4 w-4" />
+          </Button>
         </div>
       </PageHeader>
       <PageContent>
