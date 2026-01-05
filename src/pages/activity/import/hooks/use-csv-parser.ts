@@ -229,7 +229,7 @@ export function useCsvParser() {
 
         const fileReadError: CsvRowError = {
           type: "FieldMismatch",
-          code: "TooFewFields",
+          code: "FileReadError",
           message: errorMessage,
           row: 0,
         };
