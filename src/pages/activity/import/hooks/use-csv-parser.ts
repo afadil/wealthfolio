@@ -1,7 +1,8 @@
-import { useState, useCallback, useMemo } from "react";
-import Papa, { ParseResult } from "papaparse";
 import { logger } from "@/adapters";
 import { CsvRowData, CsvRowError } from "@/lib/types";
+import chardet from "chardet";
+import Papa, { ParseResult } from "papaparse";
+import { useCallback, useMemo, useState } from "react";
 
 // Validation function remains similar, checks if headers exist and are not empty
 export function validateHeaders(headers: string[]): boolean {
@@ -52,11 +53,23 @@ export function useCsvParser() {
         isParsing: true,
       }));
 
-      // Parse the file as raw CSV (without headers)
-      Papa.parse(file, {
-        header: false,
-        skipEmptyLines: true,
-        complete: (results: ParseResult<string[]>) => {
+      // Detect encoding before parsing
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const buffer = e.target?.result as ArrayBuffer;
+        const uint8Array = new Uint8Array(buffer);
+        const detectedEncoding = chardet.detect(uint8Array) ?? 'utf-8';
+        logger.debug(`Detected CSV file encoding: ${detectedEncoding}`, { file: file.name });
+
+        // Decode the buffer to text using detected encoding
+        const decoder = new TextDecoder(detectedEncoding);
+        const text = decoder.decode(uint8Array);
+
+        // Parse the text directly (not the file)
+        Papa.parse(text, {
+          header: false,
+          skipEmptyLines: true,
+          complete: (results: ParseResult<string[]>) => {
           const rawCsvLines = results.data; // Keep as string[][]
 
           // Store the raw lines immediately
@@ -207,6 +220,29 @@ export function useCsvParser() {
           }));
         },
       });
+      };
+
+      reader.onerror = () => {
+        const error = reader.error;
+        const errorMessage = `Failed to read file: ${error?.message ?? 'Unknown error'}`;
+        logger.error(errorMessage, { file: file.name });
+
+        const fileReadError: CsvRowError = {
+          type: "FieldMismatch",
+          code: "FileReadError",
+          message: errorMessage,
+          row: 0,
+        };
+
+        setState((prev) => ({
+          ...initialState,
+          selectedFile: prev.selectedFile,
+          isParsing: false,
+          errors: [fileReadError],
+        }));
+      };
+
+      reader.readAsArrayBuffer(file);
     },
     [resetParserStates], // Keep resetParserStates dependency
   );
