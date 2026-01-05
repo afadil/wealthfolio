@@ -218,6 +218,25 @@ export function useCsvParser() {
         },
       });
       };
+
+      reader.onerror = () => {
+        const errorMessage = 'Failed to read file for encoding detection';
+        logger.error(errorMessage, { file: file.name });
+
+        const fileReadError: CsvRowError = {
+          type: "FieldMismatch",
+          code: "UndetectableDelimiter",
+          message: errorMessage,
+          row: 0,
+        };
+
+        setState((prev) => ({
+          ...prev,
+          isParsing: false,
+          errors: [fileReadError],
+        }));
+      };
+
       reader.readAsArrayBuffer(file);
     },
     [resetParserStates], // Keep resetParserStates dependency
