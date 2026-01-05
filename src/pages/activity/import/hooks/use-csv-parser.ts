@@ -61,9 +61,12 @@ export function useCsvParser() {
         const detectedEncoding = chardet.detect(uint8Array) ?? 'utf-8';
         logger.debug(`Detected CSV file encoding: ${detectedEncoding}`, { file: file.name });
 
-        // Parse the file as raw CSV (without headers) with detected encoding
-        Papa.parse(file, {
-          encoding: detectedEncoding,
+        // Decode the buffer to text using detected encoding
+        const decoder = new TextDecoder(detectedEncoding);
+        const text = decoder.decode(uint8Array);
+
+        // Parse the text directly (not the file)
+        Papa.parse(text, {
           header: false,
           skipEmptyLines: true,
           complete: (results: ParseResult<string[]>) => {
@@ -220,18 +223,20 @@ export function useCsvParser() {
       };
 
       reader.onerror = () => {
-        const errorMessage = 'Failed to read file for encoding detection';
+        const error = reader.error;
+        const errorMessage = `Failed to read file: ${error?.message ?? 'Unknown error'}`;
         logger.error(errorMessage, { file: file.name });
 
         const fileReadError: CsvRowError = {
           type: "FieldMismatch",
-          code: "UndetectableDelimiter",
+          code: "TooFewFields",
           message: errorMessage,
           row: 0,
         };
 
         setState((prev) => ({
-          ...prev,
+          ...initialState,
+          selectedFile: prev.selectedFile,
           isParsing: false,
           errors: [fileReadError],
         }));
