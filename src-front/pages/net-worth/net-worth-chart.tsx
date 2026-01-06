@@ -3,7 +3,6 @@ import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { formatDate } from "@/lib/utils";
 import { AmountDisplay } from "@wealthfolio/ui";
-import { useState } from "react";
 import { Area, AreaChart, Tooltip, YAxis } from "recharts";
 import type { NetWorthHistoryPoint } from "@/lib/types";
 
@@ -30,15 +29,9 @@ interface TooltipBaseProps {
 
 interface CustomTooltipProps extends TooltipBaseProps {
   isBalanceHidden: boolean;
-  showDetails: boolean;
 }
 
-const CustomTooltip = ({
-  active,
-  payload,
-  isBalanceHidden,
-  showDetails,
-}: CustomTooltipProps) => {
+const CustomTooltip = ({ active, payload, isBalanceHidden }: CustomTooltipProps) => {
   if (!active || !payload?.length) {
     return null;
   }
@@ -48,11 +41,14 @@ const CustomTooltip = ({
     return null;
   }
 
+  const hasLiabilities = entry.totalLiabilities > 0;
+
   return (
     <div className="bg-popover grid grid-cols-1 gap-1.5 rounded-md border p-2 shadow-md">
       <p className="text-muted-foreground text-xs">{formatDate(entry.date)}</p>
 
-      <div className="flex items-center justify-between space-x-2">
+      {/* Net Worth - primary value */}
+      <div className="flex items-center justify-between space-x-4">
         <div className="flex items-center space-x-1.5">
           <span className="block h-0.5 w-3" style={{ backgroundColor: CHART_COLOR }} />
           <span className="text-muted-foreground text-xs">Net Worth:</span>
@@ -65,36 +61,31 @@ const CustomTooltip = ({
         />
       </div>
 
-      {showDetails && (
-        <>
-          <div className="flex items-center justify-between space-x-2">
-            <div className="flex items-center space-x-1.5">
-              <span className="block h-0 w-3 border-b-2 border-dashed border-[var(--success)]" />
-              <span className="text-muted-foreground text-xs">Assets:</span>
-            </div>
+      {/* Show breakdown only if there are liabilities (otherwise net worth = assets) */}
+      {hasLiabilities && (
+        <div className="border-border mt-1 border-t pt-1.5">
+          <div className="flex items-center justify-between space-x-4">
+            <span className="text-muted-foreground/70 text-xs">Assets:</span>
             <AmountDisplay
               value={entry.totalAssets}
               currency={entry.currency}
               isHidden={isBalanceHidden}
-              className="text-success text-xs font-semibold"
+              className="text-muted-foreground text-xs"
             />
           </div>
-
-          {entry.totalLiabilities > 0 && (
-            <div className="flex items-center justify-between space-x-2">
-              <div className="flex items-center space-x-1.5">
-                <span className="block h-0 w-3 border-b-2 border-dashed border-[var(--destructive)]" />
-                <span className="text-muted-foreground text-xs">Liabilities:</span>
-              </div>
+          <div className="flex items-center justify-between space-x-4">
+            <span className="text-muted-foreground/70 text-xs">Liabilities:</span>
+            <span className="text-muted-foreground text-xs">
+              -
               <AmountDisplay
                 value={entry.totalLiabilities}
                 currency={entry.currency}
                 isHidden={isBalanceHidden}
-                className="text-destructive text-xs font-semibold"
+                className="inline text-xs"
               />
-            </div>
-          )}
-        </>
+            </span>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -120,7 +111,6 @@ interface NetWorthChartProps {
 
 export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
   const { isBalanceHidden } = useBalancePrivacy();
-  const [isChartHovered, setIsChartHovered] = useState(false);
   const isMobile = useIsMobileViewport();
 
   const chartData = transformData(data);
@@ -128,12 +118,6 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
   const chartConfig = {
     netWorth: {
       label: "Net Worth",
-    },
-    totalAssets: {
-      label: "Total Assets",
-    },
-    totalLiabilities: {
-      label: "Total Liabilities",
     },
   } satisfies ChartConfig;
 
@@ -151,12 +135,10 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
           left: 0,
           bottom: 0,
         }}
-        onMouseEnter={() => setIsChartHovered(true)}
-        onMouseLeave={() => setIsChartHovered(false)}
       >
         <defs>
           <linearGradient id="netWorthGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={CHART_COLOR} stopOpacity={0.3} />
+            <stop offset="5%" stopColor={CHART_COLOR} stopOpacity={0.2} />
             <stop offset="95%" stopColor={CHART_COLOR} stopOpacity={0.1} />
           </linearGradient>
         </defs>
@@ -166,41 +148,12 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
             <CustomTooltip
               {...(props as unknown as TooltipBaseProps)}
               isBalanceHidden={isBalanceHidden}
-              showDetails={isChartHovered}
             />
           )}
         />
         <YAxis hide type="number" domain={["auto", "auto"]} />
 
-        {/* Assets line (dashed, shown on hover) */}
-        <Area
-          isAnimationActive={true}
-          animationDuration={300}
-          animationEasing="ease-out"
-          connectNulls={true}
-          type="monotone"
-          dataKey="totalAssets"
-          stroke="var(--success)"
-          fill="transparent"
-          strokeDasharray="5 5"
-          strokeOpacity={isChartHovered ? 0.6 : 0}
-        />
-
-        {/* Liabilities line (dashed, shown on hover) */}
-        <Area
-          isAnimationActive={true}
-          animationDuration={300}
-          animationEasing="ease-out"
-          connectNulls={true}
-          type="monotone"
-          dataKey="totalLiabilities"
-          stroke="var(--destructive)"
-          fill="transparent"
-          strokeDasharray="5 5"
-          strokeOpacity={isChartHovered ? 0.6 : 0}
-        />
-
-        {/* Net Worth (main filled area) - orange color */}
+        {/* Net Worth (main filled area) */}
         <Area
           isAnimationActive={true}
           animationDuration={300}

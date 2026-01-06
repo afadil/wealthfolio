@@ -111,12 +111,8 @@ export function AssetDetailsSheet({
     }
   }, [open, asset, form]);
 
-  // Early return if no asset (after hooks are called)
-  if (!asset) {
-    return null;
-  }
-
   // Build linkable assets options for liability linking
+  // NOTE: This must be called before any early returns to maintain hook order
   const linkableAssetOptions: ResponsiveSelectOption[] = useMemo(() => {
     return [
       { value: "", label: "None (standalone liability)" },
@@ -126,6 +122,11 @@ export function AssetDetailsSheet({
       })),
     ];
   }, [linkableAssets]);
+
+  // Early return if no asset (after all hooks are called)
+  if (!asset) {
+    return null;
+  }
 
   const handleSubmit = async (values: AssetDetailsFormValues) => {
     try {
