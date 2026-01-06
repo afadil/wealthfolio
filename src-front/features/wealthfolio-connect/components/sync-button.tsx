@@ -34,8 +34,8 @@ export function SyncButton({ className, showLabel = false, size = "icon" }: Sync
 
   // Check if user has an active subscription
   const hasSubscription =
-    userInfo?.team?.subscriptionStatus === "active" ||
-    userInfo?.team?.subscriptionStatus === "trialing";
+    userInfo?.team?.subscription_status === "active" ||
+    userInfo?.team?.subscription_status === "trialing";
 
   // Only show when Connect is enabled and user has subscription
   if (!isEnabled || !isConnected || !hasSubscription) {

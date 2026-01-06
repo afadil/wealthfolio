@@ -2,7 +2,6 @@ use async_trait::async_trait;
 use diesel::prelude::*;
 use diesel::r2d2::{self, Pool};
 use diesel::sqlite::SqliteConnection;
-use log::debug;
 use std::sync::Arc;
 
 use wealthfolio_core::assets::{Asset, AssetRepositoryTrait, NewAsset, UpdateAssetProfile};
@@ -59,7 +58,7 @@ impl AssetRepository {
 
         let results = assets::table
             .select(AssetDB::as_select())
-            .filter(assets::asset_type.eq("CASH"))
+            .filter(assets::kind.eq("CASH"))
             .filter(assets::symbol.like(format!("{}%", base_currency)))
             .load::<AssetDB>(&mut conn)
             .map_err(StorageError::from)?;
@@ -106,40 +105,79 @@ impl AssetRepositoryTrait for AssetRepository {
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<Asset> {
-                let normalized_quote_symbol = payload_owned
-                    .quote_symbol
-                    .as_ref()
-                    .map(|value| value.trim().to_string())
-                    .filter(|value| !value.is_empty());
+                // Serialize kind to string if present
+                let kind_str = payload_owned.kind.as_ref().map(|k| k.as_db_str().to_string());
 
-                let result_db = diesel::update(assets::table.filter(assets::id.eq(asset_id_owned)))
-                    .set((
-                        assets::name.eq(&payload_owned.name),
-                        assets::sectors.eq(&payload_owned.sectors),
-                        assets::countries.eq(&payload_owned.countries),
-                        assets::notes.eq(&payload_owned.notes),
-                        assets::asset_sub_class.eq(&payload_owned.asset_sub_class),
-                        assets::asset_class.eq(&payload_owned.asset_class),
-                        assets::quote_symbol.eq(normalized_quote_symbol),
-                    ))
-                    .get_result::<AssetDB>(conn)
-                    .map_err(StorageError::from)?;
+                // Serialize pricing_mode to string if present
+                let pricing_mode_str = payload_owned
+                    .pricing_mode
+                    .as_ref()
+                    .map(|pm| serde_json::to_string(pm).unwrap_or_default().trim_matches('"').to_string());
+
+                // Serialize provider_overrides to JSON string if present
+                let provider_overrides_str = payload_owned
+                    .provider_overrides
+                    .as_ref()
+                    .map(|po| serde_json::to_string(po).unwrap_or_default());
+
+                // Build profile JSON from sectors, countries if present
+                let profile_json = {
+                    let mut obj = serde_json::Map::new();
+                    if let Some(ref s) = payload_owned.sectors {
+                        obj.insert("sectors".to_string(), serde_json::Value::String(s.clone()));
+                    }
+                    if let Some(ref c) = payload_owned.countries {
+                        obj.insert("countries".to_string(), serde_json::Value::String(c.clone()));
+                    }
+                    if obj.is_empty() {
+                        None
+                    } else {
+                        Some(serde_json::to_string(&serde_json::Value::Object(obj)).unwrap_or_default())
+                    }
+                };
+
+                // Build the update query - only include kind if it's provided
+                let result_db = if let Some(kind_value) = kind_str {
+                    diesel::update(assets::table.filter(assets::id.eq(&asset_id_owned)))
+                        .set((
+                            assets::name.eq(&payload_owned.name),
+                            assets::kind.eq(kind_value),
+                            assets::profile.eq(&profile_json),
+                            assets::notes.eq(&payload_owned.notes),
+                            assets::asset_sub_class.eq(&payload_owned.asset_sub_class),
+                            assets::asset_class.eq(&payload_owned.asset_class),
+                            assets::pricing_mode.eq(pricing_mode_str.clone().unwrap_or_else(|| "MARKET".to_string())),
+                            assets::provider_overrides.eq(&provider_overrides_str),
+                        ))
+                        .get_result::<AssetDB>(conn)
+                        .map_err(StorageError::from)?
+                } else {
+                    diesel::update(assets::table.filter(assets::id.eq(&asset_id_owned)))
+                        .set((
+                            assets::name.eq(&payload_owned.name),
+                            assets::profile.eq(&profile_json),
+                            assets::notes.eq(&payload_owned.notes),
+                            assets::asset_sub_class.eq(&payload_owned.asset_sub_class),
+                            assets::asset_class.eq(&payload_owned.asset_class),
+                            assets::pricing_mode.eq(pricing_mode_str.unwrap_or_else(|| "MARKET".to_string())),
+                            assets::provider_overrides.eq(&provider_overrides_str),
+                        ))
+                        .get_result::<AssetDB>(conn)
+                        .map_err(StorageError::from)?
+                };
                 Ok(result_db.into())
             })
             .await
     }
 
-    /// Updates the data source of an asset
+    /// Updates the preferred provider of an asset
+    /// Note: data_source column no longer exists; this now updates preferred_provider
     async fn update_data_source(&self, asset_id: &str, data_source: String) -> Result<Asset> {
-        debug!(
-            "Updating data source for asset {} to {}",
-            asset_id, data_source
-        );
         let asset_id_owned = asset_id.to_string();
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<Asset> {
                 let result_db = diesel::update(assets::table.filter(assets::id.eq(asset_id_owned)))
-                    .set(assets::data_source.eq(data_source))
+                    .set(assets::preferred_provider.eq(Some(data_source)))
                     .get_result::<AssetDB>(conn)
                     .map_err(StorageError::from)?;
                 Ok(result_db.into())

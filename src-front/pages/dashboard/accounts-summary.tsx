@@ -7,11 +7,23 @@ import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useLatestValuations } from "@/hooks/use-latest-valuations";
 import { useSettingsContext } from "@/lib/settings-provider";
-import type { AccountValuation } from "@/lib/types";
+import type { Account, AccountValuation } from "@/lib/types";
 import { calculatePerformanceMetrics } from "@/lib/utils";
+import { isAlternativeAssetType, isLiabilityType, AccountType } from "@/lib/constants";
 import { GainAmount, GainPercent, PrivacyAmount } from "@wealthfolio/ui";
 import React, { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+
+/**
+ * Filter accounts to only include investment/savings accounts.
+ * Excludes: Property, Vehicle, Collectible, Precious Metals, Liability, Other
+ */
+function filterInvestmentAccounts(accounts: Account[]): Account[] {
+  return accounts.filter((acc) => {
+    const accountType = acc.accountType as AccountType;
+    return !isAlternativeAssetType(accountType) && !isLiabilityType(accountType);
+  });
+}
 
 interface AccountSummaryDisplayData {
   accountName: string;
@@ -210,18 +222,24 @@ export const AccountsSummary = React.memo(() => {
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   const {
-    accounts,
+    accounts: allAccounts,
     isLoading: isLoadingAccounts,
     isError: isErrorAccounts,
     error: errorAccounts,
   } = useAccounts();
+
+  // Filter to only investment/savings accounts (exclude alternative assets and liabilities)
+  const accounts = useMemo(
+    () => (allAccounts ? filterInvestmentAccounts(allAccounts) : []),
+    [allAccounts],
+  );
 
   const accountIds = useMemo(() => accounts?.map((acc) => acc.id) ?? [], [accounts]);
 
   const { latestValuations, isLoading: isLoadingValuations } = useLatestValuations(accountIds);
 
   const combinedAccountViews = useMemo((): AccountSummaryDisplayData[] => {
-    if (!accounts) return [];
+    if (!accounts || accounts.length === 0) return [];
     const valuationMap = new Map<string, AccountValuation>();
     if (latestValuations) {
       latestValuations.forEach((val: AccountValuation) => valuationMap.set(val.accountId, val));

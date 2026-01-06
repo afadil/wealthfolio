@@ -54,24 +54,28 @@ fn get_device_id_from_store() -> Option<String> {
     const SYNC_IDENTITY_KEY: &str = "sync_identity";
 
     match KeyringSecretStore.get_secret(SYNC_IDENTITY_KEY) {
-        Ok(Some(json)) => {
-            match serde_json::from_str::<SyncIdentity>(&json) {
-                Ok(identity) => {
-                    debug!("[DeviceSync] Using device ID from sync_identity: {}", identity.device_id);
-                    Some(identity.device_id)
-                }
-                Err(e) => {
-                    log::warn!("[DeviceSync] Failed to parse sync_identity: {}", e);
-                    None
-                }
+        Ok(Some(json)) => match serde_json::from_str::<SyncIdentity>(&json) {
+            Ok(identity) => {
+                debug!(
+                    "[DeviceSync] Using device ID from sync_identity: {}",
+                    identity.device_id
+                );
+                Some(identity.device_id)
             }
-        }
+            Err(e) => {
+                log::warn!("[DeviceSync] Failed to parse sync_identity: {}", e);
+                None
+            }
+        },
         Ok(None) => {
             debug!("[DeviceSync] No sync_identity in keyring");
             None
         }
         Err(e) => {
-            log::warn!("[DeviceSync] Failed to read sync_identity from keyring: {}", e);
+            log::warn!(
+                "[DeviceSync] Failed to read sync_identity from keyring: {}",
+                e
+            );
             None
         }
     }
@@ -113,7 +117,11 @@ fn get_os_version_impl() -> Option<String> {
 fn get_os_version_impl() -> Option<String> {
     // Use PowerShell to get OS version reliably (works across locales)
     Command::new("powershell")
-        .args(["-NoProfile", "-Command", "[System.Environment]::OSVersion.Version.ToString()"])
+        .args([
+            "-NoProfile",
+            "-Command",
+            "[System.Environment]::OSVersion.Version.ToString()",
+        ])
         .output()
         .ok()
         .and_then(|o| {
@@ -137,7 +145,11 @@ fn get_os_version_impl() -> Option<String> {
             content
                 .lines()
                 .find(|l| l.starts_with("VERSION_ID="))
-                .map(|l| l.trim_start_matches("VERSION_ID=").trim_matches('"').to_string())
+                .map(|l| {
+                    l.trim_start_matches("VERSION_ID=")
+                        .trim_matches('"')
+                        .to_string()
+                })
         })
         .or_else(|| {
             // Fallback: try /etc/lsb-release
@@ -147,7 +159,11 @@ fn get_os_version_impl() -> Option<String> {
                     content
                         .lines()
                         .find(|l| l.starts_with("DISTRIB_RELEASE="))
-                        .map(|l| l.trim_start_matches("DISTRIB_RELEASE=").trim_matches('"').to_string())
+                        .map(|l| {
+                            l.trim_start_matches("DISTRIB_RELEASE=")
+                                .trim_matches('"')
+                                .to_string()
+                        })
                 })
         })
         .or_else(|| {
@@ -176,7 +192,13 @@ fn get_os_version_impl() -> Option<String> {
     None
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux", target_os = "ios", target_os = "android")))]
+#[cfg(not(any(
+    target_os = "macos",
+    target_os = "windows",
+    target_os = "linux",
+    target_os = "ios",
+    target_os = "android"
+)))]
 fn get_os_version_impl() -> Option<String> {
     None
 }

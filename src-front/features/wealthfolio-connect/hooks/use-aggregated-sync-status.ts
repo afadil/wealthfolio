@@ -45,7 +45,7 @@ export function useAggregatedSyncStatus() {
   // Determine if user has an active subscription
   const hasSubscription = useMemo(() => {
     if (!userInfo?.team) return false;
-    const status = userInfo.team.subscriptionStatus;
+    const status = userInfo.team.subscription_status;
     return status === "active" || status === "trialing";
   }, [userInfo]);
 

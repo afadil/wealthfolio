@@ -237,7 +237,10 @@ async fn update_device_endpoint(
     Path(device_id): Path<String>,
     Json(body): Json<UpdateDeviceBody>,
 ) -> ApiResult<Json<SuccessResponse>> {
-    info!("Updating device {}: name={:?}", device_id, body.display_name);
+    info!(
+        "Updating device {}: name={:?}",
+        device_id, body.display_name
+    );
 
     let token = get_access_token(&state)?;
 

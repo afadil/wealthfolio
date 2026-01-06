@@ -66,11 +66,12 @@ pub trait SyncServiceTrait: Send + Sync {
     async fn mark_activity_sync_attempt(&self, account_id: String) -> Result<()>;
 
     /// Upsert a batch/page of broker activities for a local account.
+    /// Returns (activities_upserted, assets_inserted, new_asset_ids).
     async fn upsert_account_activities(
         &self,
         account_id: String,
         activities: Vec<AccountUniversalActivity>,
-    ) -> Result<(usize, usize)>;
+    ) -> Result<(usize, usize, Vec<String>)>;
 
     /// Finalize an activity sync as successful for an account.
     async fn finalize_activity_sync_success(

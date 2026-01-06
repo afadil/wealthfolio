@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use chrono::NaiveDate;
 use std::collections::HashMap;
 
-use crate::errors::Result;
 use super::AccountStateSnapshot;
+use crate::errors::Result;
 
 /// Repository trait for managing account state snapshots.
 #[async_trait]

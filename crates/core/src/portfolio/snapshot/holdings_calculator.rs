@@ -74,8 +74,9 @@ impl HoldingsCalculator {
         let account_currency = next_state.currency.clone();
         let mut warnings: Vec<HoldingsCalculationWarning> = Vec::new();
 
-        // Session-wide asset currency cache to avoid DB lookups per unique asset
-        let mut asset_currency_cache: HashMap<String, String> = HashMap::new();
+        // Session-wide asset info cache to avoid DB lookups per unique asset.
+        // Stores (currency, is_alternative) for each asset.
+        let mut asset_currency_cache: HashMap<String, (String, bool)> = HashMap::new();
 
         for activity in activities_today {
             if activity.activity_date.naive_utc().date() != target_date {
@@ -162,18 +163,20 @@ impl HoldingsCalculator {
             target_date.format("%Y-%m-%d")
         );
 
-        Ok(HoldingsCalculationResult::with_warnings(next_state, warnings))
+        Ok(HoldingsCalculationResult::with_warnings(
+            next_state, warnings,
+        ))
     }
 
     /// Processes a single activity, updating positions, cash, and net_deposit.
     /// Books cash in ACTIVITY currency (not account currency) per design spec.
-    /// Uses asset_currency_cache to avoid repeated DB lookups for asset currencies.
+    /// Uses asset_currency_cache to avoid repeated DB lookups for asset currencies and kind info.
     fn process_single_activity(
         &self,
         activity: &Activity,
         state: &mut AccountStateSnapshot,
         account_currency: &str,
-        asset_currency_cache: &mut HashMap<String, String>,
+        asset_currency_cache: &mut HashMap<String, (String, bool)>,
     ) -> Result<()> {
         let activity_type = ActivityType::from_str(&activity.activity_type).map_err(|_| {
             CalculatorError::UnsupportedActivityType(activity.activity_type.clone())
@@ -233,7 +236,7 @@ impl HoldingsCalculator {
         activity: &Activity,
         state: &mut AccountStateSnapshot,
         account_currency: &str,
-        asset_currency_cache: &mut HashMap<String, String>,
+        asset_currency_cache: &mut HashMap<String, (String, bool)>,
     ) -> Result<()> {
         let activity_currency = &activity.currency;
         let asset_id = activity.asset_id.as_deref().unwrap_or("");
@@ -253,14 +256,13 @@ impl HoldingsCalculator {
 
         // Get values for lot, converting if needed
         let (unit_price_for_lot, fee_for_lot, fx_rate_used) = if needs_conversion {
-            let (converted_price, converted_fee, fx_rate) = self
-                .convert_to_position_currency(
-                    activity.price(),
-                    activity.fee_amt(),
-                    activity,
-                    &position_currency,
-                    account_currency,
-                )?;
+            let (converted_price, converted_fee, fx_rate) = self.convert_to_position_currency(
+                activity.price(),
+                activity.fee_amt(),
+                activity,
+                &position_currency,
+                account_currency,
+            )?;
             (converted_price, converted_fee, fx_rate)
         } else {
             (activity.price(), activity.fee_amt(), None)
@@ -290,7 +292,7 @@ impl HoldingsCalculator {
         activity: &Activity,
         state: &mut AccountStateSnapshot,
         _account_currency: &str,
-        _asset_currency_cache: &mut HashMap<String, String>,
+        _asset_currency_cache: &mut HashMap<String, (String, bool)>,
     ) -> Result<()> {
         let activity_currency = &activity.currency;
         let asset_id = activity.asset_id.as_deref().unwrap_or("");
@@ -466,7 +468,7 @@ impl HoldingsCalculator {
         activity: &Activity,
         state: &mut AccountStateSnapshot,
         account_currency: &str,
-        asset_currency_cache: &mut HashMap<String, String>,
+        asset_currency_cache: &mut HashMap<String, (String, bool)>,
     ) -> Result<()> {
         let activity_currency = &activity.currency;
         let activity_amount = activity.amt();
@@ -528,14 +530,13 @@ impl HoldingsCalculator {
 
             // Get values for lot, converting if needed
             let (unit_price_for_lot, fee_for_lot, fx_rate_used) = if needs_conversion {
-                let (converted_price, converted_fee, fx_rate) = self
-                    .convert_to_position_currency(
-                        activity.price(),
-                        activity.fee_amt(),
-                        activity,
-                        &position_currency,
-                        account_currency,
-                    )?;
+                let (converted_price, converted_fee, fx_rate) = self.convert_to_position_currency(
+                    activity.price(),
+                    activity.fee_amt(),
+                    activity,
+                    &position_currency,
+                    account_currency,
+                )?;
                 (converted_price, converted_fee, fx_rate)
             } else {
                 (activity.price(), activity.fee_amt(), None)
@@ -597,7 +598,7 @@ impl HoldingsCalculator {
         activity: &Activity,
         state: &mut AccountStateSnapshot,
         account_currency: &str,
-        _asset_currency_cache: &mut HashMap<String, String>,
+        _asset_currency_cache: &mut HashMap<String, (String, bool)>,
     ) -> Result<()> {
         let activity_currency = &activity.currency;
         let activity_amount = activity.amt();
@@ -661,7 +662,9 @@ impl HoldingsCalculator {
                     position.reduce_lots_fifo(activity.qty())?;
 
                 // Only update net_contribution if EXTERNAL
-                if is_external && !position_currency.is_empty() && cost_basis_removed != Decimal::ZERO
+                if is_external
+                    && !position_currency.is_empty()
+                    && cost_basis_removed != Decimal::ZERO
                 {
                     let cost_basis_removed_acct = self.convert_position_amount_to_account_currency(
                         cost_basis_removed,
@@ -750,12 +753,15 @@ impl HoldingsCalculator {
         }
     }
 
-    /// Determines the correct currency for a position based on the asset's listing currency.
-    /// If the asset's listing currency cannot be determined, falls back to the activity currency.
-    fn get_position_currency(&self, asset_id: &str) -> Result<String> {
-        debug!("Getting position currency for asset_id: {}", asset_id);
+    /// Determines the currency and alternative asset flag for a position.
+    /// Returns (currency, is_alternative).
+    fn get_position_info(&self, asset_id: &str) -> Result<(String, bool)> {
+        debug!("Getting position info for asset_id: {}", asset_id);
         match self.asset_repository.get_by_id(asset_id) {
-            Ok(asset) => Ok(asset.currency),
+            Ok(asset) => {
+                let is_alternative = asset.is_alternative();
+                Ok((asset.currency, is_alternative))
+            }
             Err(e) => {
                 error!("Failed to get asset for asset_id '{}': {}", asset_id, e);
                 Err(Error::Calculation(CalculatorError::Calculation(format!(
@@ -817,13 +823,14 @@ impl HoldingsCalculator {
 
     /// Helper method to get/create position with asset currency caching.
     /// Uses cache to avoid repeated DB lookups for the same asset.
+    /// Cache stores (currency, is_alternative) tuple for each asset.
     fn get_or_create_position_mut_cached<'a>(
         &self,
         state: &'a mut AccountStateSnapshot,
         asset_id: &str,
         activity_currency: &str,
         date: DateTime<Utc>,
-        cache: &mut HashMap<String, String>,
+        cache: &mut HashMap<String, (String, bool)>,
     ) -> std::result::Result<&'a mut Position, CalculatorError> {
         if asset_id.is_empty() || asset_id.starts_with(CASH_ASSET_PREFIX) {
             return Err(CalculatorError::InvalidActivity(format!(
@@ -836,27 +843,28 @@ impl HoldingsCalculator {
             .positions
             .entry(asset_id.to_string())
             .or_insert_with(|| {
-                // Check cache first
-                let position_currency = if let Some(ccy) = cache.get(asset_id) {
-                    ccy.clone()
+                // Check cache first for (currency, is_alternative) tuple
+                let (position_currency, is_alternative) = if let Some((ccy, is_alt)) = cache.get(asset_id) {
+                    (ccy.clone(), *is_alt)
                 } else {
                     // Lookup from asset repository
-                    let ccy = self.get_position_currency(asset_id).unwrap_or_else(|_| {
+                    let (ccy, is_alt) = self.get_position_info(asset_id).unwrap_or_else(|_| {
                         warn!(
-                            "Failed to get asset currency for {}, using activity currency {}",
+                            "Failed to get asset info for {}, using activity currency {} and is_alternative=false",
                             asset_id, activity_currency
                         );
-                        activity_currency.to_string()
+                        (activity_currency.to_string(), false)
                     });
-                    cache.insert(asset_id.to_string(), ccy.clone());
-                    ccy
+                    cache.insert(asset_id.to_string(), (ccy.clone(), is_alt));
+                    (ccy, is_alt)
                 };
 
-                Position::new(
+                Position::new_with_alternative_flag(
                     state.account_id.clone(),
                     asset_id.to_string(),
                     position_currency,
                     date,
+                    is_alternative,
                 )
             }))
     }
@@ -890,7 +898,12 @@ impl HoldingsCalculator {
         // Fall back to FxService
         let converted_price = self
             .fx_service
-            .convert_currency_for_date(unit_price, &activity.currency, position_currency, activity_date)
+            .convert_currency_for_date(
+                unit_price,
+                &activity.currency,
+                position_currency,
+                activity_date,
+            )
             .map_err(|e| {
                 CalculatorError::CurrencyConversion(format!(
                     "Failed to convert unit_price from {} to {}: {}",

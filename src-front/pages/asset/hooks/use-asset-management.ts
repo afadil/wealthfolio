@@ -9,7 +9,7 @@ import { UpdateAssetProfile } from "@/lib/types";
 interface UpdateAssetArgs {
   assetId: string;
   payload: UpdateAssetProfile;
-  dataSource?: string;
+  preferredProvider?: string;
 }
 
 export const useAssetManagement = () => {
@@ -23,10 +23,10 @@ export const useAssetManagement = () => {
   };
 
   const updateAssetMutation = useMutation({
-    mutationFn: async ({ assetId, payload, dataSource }: UpdateAssetArgs) => {
+    mutationFn: async ({ assetId, payload, preferredProvider }: UpdateAssetArgs) => {
       let updated = await updateAssetProfile(payload);
-      if (dataSource && dataSource !== updated.dataSource) {
-        updated = await updateAssetDataSource(assetId, dataSource);
+      if (preferredProvider && preferredProvider !== updated.preferredProvider) {
+        updated = await updateAssetDataSource(assetId, preferredProvider);
       }
       return updated;
     },

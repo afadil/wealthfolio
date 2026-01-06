@@ -16,10 +16,10 @@ export function useAssets() {
   });
 
   const filteredAssets = assets.filter((asset) => {
-    const type = asset.assetType?.toLowerCase();
     const assetClass = asset.assetClass?.toLowerCase();
 
-    if (type === "forex" || type === "cash") {
+    // Filter out FX_RATE and CASH kinds
+    if (asset.kind === "FX_RATE" || asset.kind === "CASH") {
       return false;
     }
 

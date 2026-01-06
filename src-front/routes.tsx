@@ -34,6 +34,7 @@ import AuthCallbackPage from "./pages/auth/auth-callback-page";
 import HoldingsInsightsPage from "./pages/holdings/holdings-insights-page";
 import AboutSettingsPage from "./pages/settings/about/about-page";
 import ConnectPage from "./pages/connect/connect-page";
+import NetWorthPage from "./pages/net-worth/net-worth-page";
 
 export function AppRoutes() {
   const [dynamicRoutes, setDynamicRoutes] = useState<
@@ -75,6 +76,7 @@ export function AppRoutes() {
         <Route path="/" element={<AppLayout />}>
           <Route index element={<DashboardPage />} />
           <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="net-worth" element={<NetWorthPage />} />
           <Route path="activities" element={<ActivityPage />} />
           <Route path="activities/manage" element={<ActivityManagerPage />} />
           <Route path="holdings" element={<HoldingsPage />} />

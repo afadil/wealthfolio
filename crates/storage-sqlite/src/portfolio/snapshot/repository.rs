@@ -51,7 +51,8 @@ impl SnapshotRepository {
             .exec(move |conn| {
                 diesel::replace_into(holdings_snapshots)
                     .values(&db_models)
-                    .execute(conn).map_err(StorageError::from)?;
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
                 Ok(())
             })
             .await
@@ -154,8 +155,8 @@ impl SnapshotRepository {
         // Bind the target_date_str as the last parameter
         query_builder = query_builder.bind::<Text, _>(target_date_str); // SQLite uses TEXT for dates
 
-        let latest_snapshots_db: Vec<AccountStateSnapshotDB> =
-            query_builder.load::<AccountStateSnapshotDB>(&mut conn)
+        let latest_snapshots_db: Vec<AccountStateSnapshotDB> = query_builder
+            .load::<AccountStateSnapshotDB>(&mut conn)
             .map_err(StorageError::from)?;
 
         let results_map: HashMap<String, AccountStateSnapshot> = latest_snapshots_db
@@ -214,8 +215,8 @@ impl SnapshotRepository {
             query_builder = query_builder.bind::<Text, _>(acc_id_str);
         }
 
-        let latest_snapshots_db: Vec<AccountStateSnapshotDB> =
-            query_builder.load::<AccountStateSnapshotDB>(&mut conn)
+        let latest_snapshots_db: Vec<AccountStateSnapshotDB> = query_builder
+            .load::<AccountStateSnapshotDB>(&mut conn)
             .map_err(StorageError::from)?;
 
         let results_map: HashMap<String, AccountStateSnapshot> = latest_snapshots_db
@@ -247,7 +248,8 @@ impl SnapshotRepository {
             .exec(move |conn| {
                 let deleted_count =
                     diesel::delete(holdings_snapshots.filter(account_id.eq_any(final_ids)))
-                        .execute(conn).map_err(StorageError::from)?;
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
                 Ok(deleted_count)
             })
             .await
@@ -282,7 +284,8 @@ impl SnapshotRepository {
                         .filter(account_id.eq(account_id_owned))
                         .filter(snapshot_date.eq_any(date_strings)),
                 )
-                .execute(conn).map_err(StorageError::from)?;
+                .execute(conn)
+                .map_err(StorageError::from)?;
                 Ok(())
             })
             .await
@@ -308,7 +311,8 @@ impl SnapshotRepository {
                         .filter(snapshot_date.ge(start_date_str))
                         .filter(snapshot_date.le(end_date_str)),
                 )
-                .execute(conn).map_err(StorageError::from)?;
+                .execute(conn)
+                .map_err(StorageError::from)?;
                 Ok(())
             })
             .await
@@ -499,13 +503,15 @@ impl SnapshotRepository {
             .exec(move |conn| {
                 // Delete all for this account
                 diesel::delete(holdings_snapshots.filter(account_id.eq(&account_id_owned)))
-                    .execute(conn).map_err(StorageError::from)?;
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
 
                 // Save new ones
                 if !db_models.is_empty() {
                     diesel::replace_into(holdings_snapshots)
                         .values(&db_models)
-                        .execute(conn).map_err(StorageError::from)?;
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
                 }
                 Ok(())
             })

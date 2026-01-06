@@ -65,6 +65,6 @@ export const tagsToBreakdown = (values: string[]): WeightedBreakdown[] =>
 
 export const toParsedAsset = (asset: Asset): ParsedAsset => ({
   ...asset,
-  sectorsList: parseJsonBreakdown(asset.sectors),
-  countriesList: parseJsonBreakdown(asset.countries),
+  sectorsList: parseJsonBreakdown(asset.profile?.sectors ?? null),
+  countriesList: parseJsonBreakdown(asset.profile?.countries ?? null),
 });

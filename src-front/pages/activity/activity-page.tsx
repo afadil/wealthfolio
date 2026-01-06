@@ -34,12 +34,14 @@ import { MobileActivityForm } from "./components/mobile-forms/mobile-activity-fo
 import { useActivityMutations } from "./hooks/use-activity-mutations";
 import { useActivitySearch, type ActivityStatusFilter } from "./hooks/use-activity-search";
 import { SyncButton } from "@/features/wealthfolio-connect/components/sync-button";
+import { AlternativeAssetQuickAddModal } from "@/features/alternative-assets";
 
 const ActivityPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Partial<ActivityDetails> | undefined>();
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [showBulkHoldingsForm, setShowBulkHoldingsForm] = useState(false);
+  const [showAlternativeAssetModal, setShowAlternativeAssetModal] = useState(false);
 
   // Filter and search state
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
@@ -181,6 +183,10 @@ const ActivityPage = () => {
             <DropdownMenuItem onClick={() => setShowBulkHoldingsForm(true)} className="py-2.5">
               <Icons.Holdings className="mr-2 h-4 w-4" />
               Add Holdings
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setShowAlternativeAssetModal(true)} className="py-2.5">
+              <Icons.Building className="mr-2 h-4 w-4" />
+              Add Alternative Asset
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => handleEdit(undefined)} className="py-2.5">
@@ -336,6 +342,10 @@ const ActivityPage = () => {
           onSuccess={() => {
             setShowBulkHoldingsForm(false);
           }}
+        />
+        <AlternativeAssetQuickAddModal
+          open={showAlternativeAssetModal}
+          onOpenChange={setShowAlternativeAssetModal}
         />
       </PageContent>
     </Page>

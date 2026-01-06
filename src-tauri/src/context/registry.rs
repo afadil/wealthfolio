@@ -3,6 +3,7 @@ use wealthfolio_connect::SyncServiceTrait;
 use wealthfolio_core::{
     self, accounts, activities, assets, fx, goals, limits, market_data, portfolio, settings,
 };
+use wealthfolio_storage_sqlite::assets::AlternativeAssetRepository;
 
 pub struct ServiceContext {
     pub base_currency: Arc<RwLock<String>>,
@@ -22,7 +23,9 @@ pub struct ServiceContext {
     pub snapshot_service: Arc<dyn portfolio::snapshot::SnapshotServiceTrait>,
     pub holdings_service: Arc<dyn portfolio::holdings::HoldingsServiceTrait>,
     pub valuation_service: Arc<dyn portfolio::valuation::ValuationServiceTrait>,
+    pub net_worth_service: Arc<dyn portfolio::net_worth::NetWorthServiceTrait>,
     pub sync_service: Arc<dyn SyncServiceTrait>,
+    pub alternative_asset_repository: Arc<AlternativeAssetRepository>,
 }
 
 impl ServiceContext {
@@ -88,5 +91,13 @@ impl ServiceContext {
 
     pub fn sync_service(&self) -> Arc<dyn SyncServiceTrait> {
         Arc::clone(&self.sync_service)
+    }
+
+    pub fn net_worth_service(&self) -> Arc<dyn portfolio::net_worth::NetWorthServiceTrait> {
+        Arc::clone(&self.net_worth_service)
+    }
+
+    pub fn alternative_asset_repository(&self) -> Arc<AlternativeAssetRepository> {
+        Arc::clone(&self.alternative_asset_repository)
     }
 }

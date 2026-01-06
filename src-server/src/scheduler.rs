@@ -120,7 +120,10 @@ async fn has_active_subscription(state: &Arc<AppState>) -> Result<bool, String> 
 
     let user_response = client
         .get(&user_url)
-        .header("Authorization", format!("Bearer {}", token_data.access_token))
+        .header(
+            "Authorization",
+            format!("Bearer {}", token_data.access_token),
+        )
         .header("Content-Type", "application/json")
         .send()
         .await
@@ -188,7 +191,10 @@ async fn run_scheduled_sync(state: &Arc<AppState>) {
         }
         Err(e) => {
             // If we can't check subscription (no token, network error, etc.), skip silently
-            debug!("Scheduled sync skipped: could not verify subscription ({})", e);
+            debug!(
+                "Scheduled sync skipped: could not verify subscription ({})",
+                e
+            );
             return;
         }
     }
@@ -267,7 +273,9 @@ async fn perform_broker_sync(state: &Arc<AppState>) -> Result<SyncResult, String
         .map_err(|e| e.to_string())?;
 
     if synced_accounts.is_empty() {
-        return Ok(SyncResult { activities_synced: 0 });
+        return Ok(SyncResult {
+            activities_synced: 0,
+        });
     }
 
     // For now, just return success - the actual sync logic should call
@@ -275,5 +283,7 @@ async fn perform_broker_sync(state: &Arc<AppState>) -> Result<SyncResult, String
     // This is a placeholder - the actual implementation should reuse
     // the sync logic from src-server/src/api/connect.rs
 
-    Ok(SyncResult { activities_synced: 0 })
+    Ok(SyncResult {
+        activities_synced: 0,
+    })
 }

@@ -44,7 +44,10 @@ impl GoalRepository {
             .select(GoalsAllocationDB::as_select())
             .load::<GoalsAllocationDB>(&mut conn)
             .map_err(StorageError::from)?;
-        Ok(allocations_db.into_iter().map(GoalsAllocation::from).collect())
+        Ok(allocations_db
+            .into_iter()
+            .map(GoalsAllocation::from)
+            .collect())
     }
 }
 

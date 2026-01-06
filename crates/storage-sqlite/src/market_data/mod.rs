@@ -11,5 +11,5 @@ pub use model::{
 pub use quote_sync_state_repository::QuoteSyncStateRepository;
 
 // Re-export trait from core for convenience
-pub use wealthfolio_core::market_data::QuoteSyncStateRepositoryTrait;
 pub use repository::MarketDataRepository;
+pub use wealthfolio_core::market_data::QuoteSyncStateRepositoryTrait;

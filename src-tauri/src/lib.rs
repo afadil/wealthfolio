@@ -16,7 +16,7 @@ mod updater;
 use std::sync::Arc;
 
 use dotenvy::dotenv;
-use log::{error, info};
+use log::error;
 use tauri::{AppHandle, Emitter, Manager};
 
 use events::emit_app_ready;
@@ -73,25 +73,15 @@ mod desktop {
         // The frontend will trigger the initial portfolio update and update check after it's mounted
         emit_app_ready(&handle);
 
-        // Setup window focus listener for foreground sync
-        setup_window_focus_listener(&handle);
+        // Trigger startup sync (async, non-blocking)
+        // After this, user manually triggers sync via button
+        let startup_handle = handle.clone();
+        let startup_context = Arc::clone(&context);
+        tauri::async_runtime::spawn(async move {
+            scheduler::run_startup_sync(&startup_handle, &startup_context).await;
+        });
 
         Ok(())
-    }
-
-    /// Sets up window focus listener to emit app:foreground event.
-    /// The frontend listens to this event to trigger sync checks.
-    fn setup_window_focus_listener(handle: &AppHandle) {
-        let focus_handle = handle.clone();
-        if let Some(window) = handle.get_webview_window("main") {
-            window.on_window_event(move |event| {
-                if let tauri::WindowEvent::Focused(true) = event {
-                    info!("Window focused, emitting app:foreground event");
-                    // Emit event to frontend to trigger sync check
-                    let _ = focus_handle.emit("app:foreground", ());
-                }
-            });
-        }
     }
 }
 
@@ -275,6 +265,16 @@ pub fn run() {
             commands::asset::update_asset_profile,
             commands::asset::update_asset_data_source,
             commands::asset::delete_asset,
+            // Alternative asset commands
+            commands::alternative_assets::create_alternative_asset,
+            commands::alternative_assets::update_alternative_asset_valuation,
+            commands::alternative_assets::update_alternative_asset_metadata,
+            commands::alternative_assets::delete_alternative_asset,
+            commands::alternative_assets::link_liability,
+            commands::alternative_assets::unlink_liability,
+            commands::alternative_assets::get_net_worth,
+            commands::alternative_assets::get_net_worth_history,
+            commands::alternative_assets::get_alternative_holdings,
             // Market data commands
             commands::market_data::search_symbol,
             commands::market_data::sync_market_data,
@@ -321,11 +321,11 @@ pub fn run() {
             commands::brokers_sync::get_synced_accounts,
             commands::brokers_sync::get_platforms,
             commands::brokers_sync::list_broker_connections,
+            commands::brokers_sync::list_broker_accounts,
             commands::brokers_sync::get_subscription_plans,
             commands::brokers_sync::get_user_info,
             commands::brokers_sync::get_broker_sync_states,
             commands::brokers_sync::get_import_runs,
-            commands::brokers_sync::trigger_foreground_sync,
             // Device sync commands
             commands::device_sync::register_device,
             commands::device_sync::get_device,

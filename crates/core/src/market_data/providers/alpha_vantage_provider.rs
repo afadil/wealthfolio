@@ -4,7 +4,6 @@ use crate::market_data::providers::models::AssetProfile;
 use crate::market_data::{AssetProfiler, MarketDataError, Quote as ModelQuote, QuoteSummary};
 use async_trait::async_trait;
 use chrono::{NaiveDate, Utc};
-use futures;
 use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -23,6 +22,63 @@ impl AlphaVantageProvider {
     pub fn new(token: String) -> Self {
         let client = Client::new();
         AlphaVantageProvider { client, token }
+    }
+
+    /// Check if a symbol is an FX pair
+    /// Supports multiple formats:
+    /// - "USD/CAD" (canonical format)
+    /// - "USDCAD=X" (Yahoo format)
+    /// - "USDCAD" (simple concatenation)
+    fn is_fx_symbol(symbol: &str) -> bool {
+        // Format: USD/CAD (canonical)
+        if symbol.contains('/')
+            && symbol.len() == 7
+            && symbol.chars().filter(|&c| c == '/').count() == 1
+        {
+            return true;
+        }
+
+        // Format: USDCAD=X (Yahoo FX format)
+        if symbol.len() == 8 && symbol.ends_with("=X") {
+            let base = &symbol[..6];
+            return base.chars().all(|c| c.is_ascii_uppercase());
+        }
+
+        // Format: USDCAD (6 uppercase letters, both parts are valid currency codes)
+        if symbol.len() == 6 && symbol.chars().all(|c| c.is_ascii_uppercase()) {
+            return true;
+        }
+
+        false
+    }
+
+    /// Parse an FX symbol into (from_currency, to_currency)
+    /// Supports multiple formats:
+    /// - "USD/CAD" -> ("USD", "CAD")
+    /// - "USDCAD=X" -> ("USD", "CAD")
+    /// - "USDCAD" -> ("USD", "CAD")
+    fn parse_fx_symbol(symbol: &str) -> Option<(String, String)> {
+        // Format: USD/CAD
+        if let Some((from, to)) = symbol.split_once('/') {
+            if from.len() == 3 && to.len() == 3 {
+                return Some((from.to_string(), to.to_string()));
+            }
+        }
+
+        // Format: USDCAD=X (Yahoo format)
+        if symbol.len() == 8 && symbol.ends_with("=X") {
+            let base = &symbol[..6];
+            if base.chars().all(|c| c.is_ascii_uppercase()) {
+                return Some((base[..3].to_string(), base[3..6].to_string()));
+            }
+        }
+
+        // Format: USDCAD (6 chars)
+        if symbol.len() == 6 && symbol.chars().all(|c| c.is_ascii_uppercase()) {
+            return Some((symbol[..3].to_string(), symbol[3..6].to_string()));
+        }
+
+        None
     }
 
     async fn fetch_data(
@@ -59,7 +115,166 @@ impl AlphaVantageProvider {
             .text()
             .await
             .map_err(|e| MarketDataError::ProviderError(e.to_string()))?;
+
+        // Check for rate limit or API key errors in the response
+        // Alpha Vantage uses both "Note" and "Information" fields for various messages
+        if text.contains("\"Note\"") || text.contains("\"Information\"") {
+            // Rate limit messages contain these phrases
+            if text.contains("API call frequency")
+                || text.contains("rate limit")
+                || text.contains("25 requests per day")
+                || text.contains("calls per minute")
+            {
+                log::warn!("AlphaVantage rate limit hit: {}", text);
+                return Err(MarketDataError::ProviderError(
+                    "Alpha Vantage rate limit exceeded (25 requests/day for free tier). Please wait and try again tomorrow.".to_string(),
+                ));
+            }
+            // Log the full message for debugging
+            log::warn!("AlphaVantage returned Note/Information message: {}", text);
+            return Err(MarketDataError::ProviderError(format!(
+                "Alpha Vantage API message: {}",
+                text.chars().take(200).collect::<String>()
+            )));
+        }
+
+        // Check for error messages
+        if text.contains("\"Error Message\"") {
+            log::error!("AlphaVantage API error: {}", text);
+            return Err(MarketDataError::ProviderError(format!(
+                "Alpha Vantage API error: {}",
+                text.chars().take(200).collect::<String>()
+            )));
+        }
+
         Ok(text)
+    }
+
+    async fn get_latest_fx_quote(
+        &self,
+        symbol: &str,
+        fallback_currency: String,
+    ) -> Result<ModelQuote, MarketDataError> {
+        let (from_currency, to_currency) = Self::parse_fx_symbol(symbol).ok_or_else(|| {
+            MarketDataError::ProviderError(format!("Invalid FX symbol format: {}", symbol))
+        })?;
+
+        log::info!(
+            "AlphaVantage: Fetching FX rate for {}/{} (symbol: {})",
+            from_currency,
+            to_currency,
+            symbol
+        );
+
+        let params = vec![
+            ("from_symbol", from_currency.as_str()),
+            ("to_symbol", to_currency.as_str()),
+            ("outputsize", "compact"),
+        ];
+        let response_text = self.fetch_data("FX_DAILY", params).await?;
+        let response_json: FxTimeSeries = serde_json::from_str(&response_text).map_err(|e| {
+            MarketDataError::ProviderError(format!("Failed to parse FX quote: {}", e))
+        })?;
+
+        let (date, quote) = response_json.time_series.iter().next().ok_or_else(|| {
+            MarketDataError::ProviderError("No FX time series data found".to_string())
+        })?;
+
+        let quote_timestamp = NaiveDate::parse_from_str(date, "%Y-%m-%d")
+            .map_err(|_| MarketDataError::ProviderError("Invalid date format".to_string()))?
+            .and_hms_opt(0, 0, 0)
+            .unwrap()
+            .and_local_timezone(Utc)
+            .unwrap();
+
+        let model_quote = ModelQuote {
+            id: format!("{}_{}", quote_timestamp.format("%Y%m%d"), symbol),
+            created_at: Utc::now(),
+            data_source: DataSource::AlphaVantage,
+            timestamp: quote_timestamp,
+            symbol: symbol.to_string(),
+            open: quote.open.parse::<Decimal>().unwrap_or_default(),
+            high: quote.high.parse::<Decimal>().unwrap_or_default(),
+            low: quote.low.parse::<Decimal>().unwrap_or_default(),
+            volume: Decimal::ZERO, // FX quotes don't have volume
+            close: quote.close.parse::<Decimal>().unwrap_or_default(),
+            adjclose: quote.close.parse::<Decimal>().unwrap_or_default(),
+            currency: fallback_currency,
+            notes: None,
+        };
+        Ok(model_quote)
+    }
+
+    async fn get_historical_fx_quotes(
+        &self,
+        symbol: &str,
+        fallback_currency: String,
+    ) -> Result<Vec<ModelQuote>, MarketDataError> {
+        let (from_currency, to_currency) = Self::parse_fx_symbol(symbol).ok_or_else(|| {
+            MarketDataError::ProviderError(format!("Invalid FX symbol format: {}", symbol))
+        })?;
+
+        log::info!(
+            "AlphaVantage: Fetching historical FX rates for {}/{} (symbol: {})",
+            from_currency,
+            to_currency,
+            symbol
+        );
+
+        // Use "compact" for free tier (returns last 100 data points)
+        // "full" requires premium subscription
+        let params = vec![
+            ("from_symbol", from_currency.as_str()),
+            ("to_symbol", to_currency.as_str()),
+            ("outputsize", "compact"),
+        ];
+        let response_text = self.fetch_data("FX_DAILY", params).await?;
+
+        log::debug!(
+            "AlphaVantage FX_DAILY response (first 500 chars): {}",
+            &response_text.chars().take(500).collect::<String>()
+        );
+
+        let response_json: FxTimeSeries = serde_json::from_str(&response_text).map_err(|e| {
+            log::error!(
+                "AlphaVantage: Failed to parse FX response for {}: {}. Response: {}",
+                symbol,
+                e,
+                &response_text.chars().take(1000).collect::<String>()
+            );
+            MarketDataError::ProviderError(format!("Failed to parse FX historical quotes: {}", e))
+        })?;
+
+        let quotes = response_json
+            .time_series
+            .into_iter()
+            .map(|(date, quote)| {
+                let quote_timestamp = NaiveDate::parse_from_str(&date, "%Y-%m-%d")
+                    .unwrap()
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap()
+                    .and_local_timezone(Utc)
+                    .unwrap();
+
+                ModelQuote {
+                    id: format!("{}_{}", quote_timestamp.format("%Y%m%d"), symbol),
+                    created_at: Utc::now(),
+                    data_source: DataSource::AlphaVantage,
+                    timestamp: quote_timestamp,
+                    symbol: symbol.to_string(),
+                    open: quote.open.parse::<Decimal>().unwrap_or_default(),
+                    high: quote.high.parse::<Decimal>().unwrap_or_default(),
+                    low: quote.low.parse::<Decimal>().unwrap_or_default(),
+                    volume: Decimal::ZERO, // FX quotes don't have volume
+                    close: quote.close.parse::<Decimal>().unwrap_or_default(),
+                    adjclose: quote.close.parse::<Decimal>().unwrap_or_default(),
+                    currency: fallback_currency.clone(),
+                    notes: None,
+                }
+            })
+            .collect();
+
+        Ok(quotes)
     }
 }
 
@@ -83,6 +298,25 @@ struct TimeSeriesDaily {
     time_series: HashMap<String, AlphaVantageQuote>,
 }
 
+// FX-specific response structures
+#[derive(Debug, Deserialize)]
+struct FxDailyQuote {
+    #[serde(rename = "1. open")]
+    open: String,
+    #[serde(rename = "2. high")]
+    high: String,
+    #[serde(rename = "3. low")]
+    low: String,
+    #[serde(rename = "4. close")]
+    close: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct FxTimeSeries {
+    #[serde(rename = "Time Series FX (Daily)")]
+    time_series: HashMap<String, FxDailyQuote>,
+}
+
 #[async_trait]
 impl MarketDataProvider for AlphaVantageProvider {
     fn name(&self) -> &'static str {
@@ -98,6 +332,11 @@ impl MarketDataProvider for AlphaVantageProvider {
         symbol: &str,
         fallback_currency: String,
     ) -> Result<ModelQuote, MarketDataError> {
+        // Check if this is an FX symbol
+        if Self::is_fx_symbol(symbol) {
+            return self.get_latest_fx_quote(symbol, fallback_currency).await;
+        }
+
         let params = vec![("symbol", symbol), ("outputsize", "compact")];
         let response_text = self.fetch_data("TIME_SERIES_DAILY", params).await?;
         let response_json: TimeSeriesDaily = serde_json::from_str(&response_text).map_err(|e| {
@@ -128,6 +367,7 @@ impl MarketDataProvider for AlphaVantageProvider {
             close: quote.close.parse::<Decimal>().unwrap_or_default(),
             adjclose: quote.close.parse::<Decimal>().unwrap_or_default(),
             currency: fallback_currency,
+            notes: None,
         };
         Ok(model_quote)
     }
@@ -139,7 +379,22 @@ impl MarketDataProvider for AlphaVantageProvider {
         _end: SystemTime,
         fallback_currency: String,
     ) -> Result<Vec<ModelQuote>, MarketDataError> {
-        let params = vec![("symbol", symbol), ("outputsize", "full")];
+        log::debug!(
+            "AlphaVantage: get_historical_quotes called for symbol='{}', is_fx={}",
+            symbol,
+            Self::is_fx_symbol(symbol)
+        );
+
+        // Check if this is an FX symbol
+        if Self::is_fx_symbol(symbol) {
+            return self
+                .get_historical_fx_quotes(symbol, fallback_currency)
+                .await;
+        }
+
+        // Use "compact" for free tier (returns last 100 data points)
+        // "full" requires premium subscription
+        let params = vec![("symbol", symbol), ("outputsize", "compact")];
         let response_text = self.fetch_data("TIME_SERIES_DAILY", params).await?;
         let response_json: TimeSeriesDaily = serde_json::from_str(&response_text).map_err(|e| {
             MarketDataError::ProviderError(format!("Failed to parse historical quotes: {}", e))
@@ -169,6 +424,7 @@ impl MarketDataProvider for AlphaVantageProvider {
                     close: quote.close.parse::<Decimal>().unwrap_or_default(),
                     adjclose: quote.close.parse::<Decimal>().unwrap_or_default(),
                     currency: fallback_currency.clone(),
+                    notes: None,
                 }
             })
             .collect();
@@ -182,49 +438,39 @@ impl MarketDataProvider for AlphaVantageProvider {
         start: SystemTime,
         end: SystemTime,
     ) -> Result<(Vec<ModelQuote>, Vec<(String, String)>), MarketDataError> {
-        const BATCH_SIZE: usize = 5; // Alpha Vantage has a low rate limit on the free tier
+        // Alpha Vantage free tier: 1 request per second, 25 requests per day
+        // Process sequentially with delays to avoid rate limiting
         let mut all_quotes = Vec::new();
         let mut failed_symbols: Vec<(String, String)> = Vec::new();
         let mut errors_for_logging: Vec<(String, String)> = Vec::new();
 
-        for chunk in symbols_with_currencies.chunks(BATCH_SIZE) {
-            let futures: Vec<_> = chunk
-                .iter()
-                .map(|(symbol, currency)| {
-                    let symbol_clone = symbol.clone();
-                    let currency_clone = currency.clone();
-                    async move {
-                        match self
-                            .get_historical_quotes(
-                                &symbol_clone,
-                                start,
-                                end,
-                                currency_clone.clone(),
-                            )
-                            .await
-                        {
-                            Ok(quotes) => Ok(quotes),
-                            Err(e) => Err((symbol_clone, currency_clone, e.to_string())),
-                        }
-                    }
-                })
-                .collect();
-
-            let results = futures::future::join_all(futures).await;
-
-            for result in results {
-                match result {
-                    Ok(quotes) => all_quotes.extend(quotes),
-                    Err((symbol, currency, error)) => {
-                        failed_symbols.push((symbol.clone(), currency));
-                        errors_for_logging.push((symbol, error));
-                    }
-                }
+        for (i, (symbol, currency)) in symbols_with_currencies.iter().enumerate() {
+            // Add delay before EVERY request to respect 1 req/sec limit
+            // This ensures proper spacing even across different batches/calls
+            // (batches are grouped by start_date, so multiple bulk calls may happen)
+            if i > 0 {
+                tokio::time::sleep(tokio::time::Duration::from_millis(1500)).await;
+            } else {
+                // Small delay even for first request to handle back-to-back batch calls
+                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
             }
 
-            // Add delay between chunks to respect rate limits
-            if chunk.len() == BATCH_SIZE {
-                tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
+            match self
+                .get_historical_quotes(symbol, start, end, currency.clone())
+                .await
+            {
+                Ok(quotes) => {
+                    log::info!(
+                        "AlphaVantage: Successfully fetched {} quotes for {}",
+                        quotes.len(),
+                        symbol
+                    );
+                    all_quotes.extend(quotes);
+                }
+                Err(e) => {
+                    failed_symbols.push((symbol.clone(), currency.clone()));
+                    errors_for_logging.push((symbol.clone(), e.to_string()));
+                }
             }
         }
 

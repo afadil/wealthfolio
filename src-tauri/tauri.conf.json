@@ -24,13 +24,13 @@
   },
   "productName": "Wealthfolio",
   "mainBinaryName": "Wealthfolio",
-  "version": "3.0.0",
+  "version": "3.0.0-beta.1",
   "identifier": "com.teymz.wealthfolio",
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY0RjI4MkRFOUYwRDM3N0QKUldSOU53MmYzb0x5WlBySmErU21wcjVHZFNtMW9zdGcyZTBBRWpVcHRDMkoyKzF1bkQ1VmdKbkYK",
       "endpoints": [
-        "https://wealthfolio.app/releases/{{target}}/{{arch}}/{{current_version}}"
+        "https://xwealthfolio.app/releases/{{target}}/{{arch}}/{{current_version}}"
       ],
       "windows": {
         "installMode": "passive"

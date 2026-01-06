@@ -8,8 +8,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@wealthfolio/ui/components/ui/sheet";
-import { ASSET_SUBCLASS_TYPES, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
-import { Account } from "@/lib/types";
+import { ASSET_SUBCLASS_TYPES, HOLDING_CATEGORY_FILTERS, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { Account, HoldingCategoryFilterId } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { AnimatedToggleGroup, ScrollArea, Separator } from "@wealthfolio/ui";
 
@@ -26,6 +26,8 @@ interface HoldingsMobileFilterSheetProps {
   setSortBy: (value: "symbol" | "marketValue") => void;
   showTotalReturn: boolean;
   setShowTotalReturn: (value: boolean) => void;
+  categoryFilter?: HoldingCategoryFilterId;
+  setCategoryFilter?: (value: HoldingCategoryFilterId) => void;
 }
 
 export const HoldingsMobileFilterSheet = ({
@@ -41,6 +43,8 @@ export const HoldingsMobileFilterSheet = ({
   setSortBy,
   showTotalReturn,
   setShowTotalReturn,
+  categoryFilter = "investments",
+  setCategoryFilter,
 }: HoldingsMobileFilterSheetProps) => {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -56,9 +60,9 @@ export const HoldingsMobileFilterSheet = ({
                 <h4 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
                   Sort By
                 </h4>
-                <AnimatedToggleGroup
+                <AnimatedToggleGroup<"symbol" | "marketValue">
                   value={sortBy}
-                  onValueChange={(value) => setSortBy(value as "symbol" | "marketValue")}
+                  onValueChange={setSortBy}
                   items={[
                     { value: "marketValue", label: "Market Value" },
                     { value: "symbol", label: "Symbol" },
@@ -86,6 +90,39 @@ export const HoldingsMobileFilterSheet = ({
             </div>
 
             <Separator />
+
+            {/* Category Filter Section */}
+            {setCategoryFilter && (
+              <div className="space-y-3">
+                <h4 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+                  Category
+                </h4>
+                <div className="overflow-hidden rounded-lg border">
+                  {HOLDING_CATEGORY_FILTERS.map((filter, index) => (
+                    <div
+                      key={filter.id}
+                      className={cn(
+                        "flex cursor-pointer items-center justify-between p-3 text-sm transition-colors",
+                        index > 0 && "border-t",
+                        categoryFilter === filter.id
+                          ? "bg-accent/50 font-medium"
+                          : "hover:bg-muted/50",
+                      )}
+                      onClick={() => {
+                        setCategoryFilter(filter.id);
+                      }}
+                    >
+                      <span>{filter.label}</span>
+                      {categoryFilter === filter.id && (
+                        <Icons.Check className="text-primary h-4 w-4" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {setCategoryFilter && <Separator />}
 
             {/* Account Filter Section */}
             {showAccountFilter && (

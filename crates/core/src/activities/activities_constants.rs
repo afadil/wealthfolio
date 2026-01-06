@@ -54,11 +54,8 @@ pub const ACTIVITY_TYPE_ADJUSTMENT: &str = "ADJUSTMENT";
 pub const ACTIVITY_TYPE_UNKNOWN: &str = "UNKNOWN";
 
 /// Trading activity types
-pub const TRADING_ACTIVITY_TYPES: [&str; 3] = [
-    ACTIVITY_TYPE_BUY,
-    ACTIVITY_TYPE_SELL,
-    ACTIVITY_TYPE_SPLIT,
-];
+pub const TRADING_ACTIVITY_TYPES: [&str; 3] =
+    [ACTIVITY_TYPE_BUY, ACTIVITY_TYPE_SELL, ACTIVITY_TYPE_SPLIT];
 
 /// Income activity types
 pub const INCOME_ACTIVITY_TYPES: [&str; 2] = [ACTIVITY_TYPE_DIVIDEND, ACTIVITY_TYPE_INTEREST];
@@ -84,3 +81,7 @@ pub const ACTIVITY_SUBTYPE_DIVIDEND_IN_KIND: &str = "DIVIDEND_IN_KIND";
 /// Stock Dividend: Additional shares of the same asset as dividend.
 /// Passes through as SPLIT (adjusts quantity without cash movement).
 pub const ACTIVITY_SUBTYPE_STOCK_DIVIDEND: &str = "STOCK_DIVIDEND";
+
+/// Opening Position: Initial position for manual/alternative assets (property, vehicle, etc.).
+/// Passes through unchanged as TRANSFER_IN - no expansion needed.
+pub const ACTIVITY_SUBTYPE_OPENING_POSITION: &str = "OPENING_POSITION";

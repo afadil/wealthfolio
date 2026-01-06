@@ -106,29 +106,44 @@ diesel::table! {
 }
 
 diesel::table! {
+    // Provider-agnostic asset model per spec:
+    // - No data_source (source belongs on quotes)
+    // - No quote_symbol (use provider_overrides instead)
+    // - kind is NOT NULL
+    // - pricing_mode is NOT NULL
     assets (id) {
         id -> Text,
-        isin -> Nullable<Text>,
+
+        // Core identity
+        kind -> Text,                    // AssetKind enum (NOT NULL)
         name -> Nullable<Text>,
-        asset_type -> Nullable<Text>,
-        symbol -> Text,
+        symbol -> Text,                  // Canonical ticker (no provider suffix)
+
+        // Market identity (for SECURITY)
+        exchange_mic -> Nullable<Text>,  // ISO 10383 MIC code
+
+        // Currency
+        currency -> Text,
+
+        // Pricing configuration
+        pricing_mode -> Text,            // MARKET, MANUAL, DERIVED, NONE (NOT NULL)
+        preferred_provider -> Nullable<Text>,
+        provider_overrides -> Nullable<Text>,  // JSON: provider_id -> provider params
+
+        // Classification
+        isin -> Nullable<Text>,
         asset_class -> Nullable<Text>,
         asset_sub_class -> Nullable<Text>,
+
+        // Metadata
         notes -> Nullable<Text>,
-        countries -> Nullable<Text>,
-        categories -> Nullable<Text>,
-        classes -> Nullable<Text>,
-        attributes -> Nullable<Text>,
+        profile -> Nullable<Text>,       // JSON: sectors, countries, website, etc.
+        metadata -> Nullable<Text>,
+
+        // Status
+        is_active -> Integer,
         created_at -> Timestamp,
         updated_at -> Timestamp,
-        currency -> Text,
-        data_source -> Text,
-        sectors -> Nullable<Text>,
-        url -> Nullable<Text>,
-        kind -> Nullable<Text>,
-        quote_symbol -> Nullable<Text>,
-        is_active -> Integer,
-        metadata -> Nullable<Text>,
     }
 }
 
@@ -280,6 +295,7 @@ diesel::table! {
         currency -> Text,
         data_source -> Text,
         created_at -> Text,
+        notes -> Nullable<Text>,
     }
 }
 

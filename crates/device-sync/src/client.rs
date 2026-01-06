@@ -86,11 +86,12 @@ impl DeviceSyncClient {
         }
 
         serde_json::from_str(&body).map_err(|e| {
-            log::error!("Failed to deserialize response. Body: {}, Error: {}", body, e);
-            DeviceSyncError::api(
-                status.as_u16(),
-                format!("Failed to parse response: {}", e),
-            )
+            log::error!(
+                "Failed to deserialize response. Body: {}, Error: {}",
+                body,
+                e
+            );
+            DeviceSyncError::api(status.as_u16(), format!("Failed to parse response: {}", e))
         })
     }
 

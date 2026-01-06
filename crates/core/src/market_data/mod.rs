@@ -26,5 +26,7 @@ pub use providers::market_data_provider::{AssetProfiler, MarketDataProvider};
 pub use market_data_errors::MarketDataError;
 
 // Re-export quote sync state types
-pub use quote_sync_state_model::{QuoteSyncState, QuoteSyncStateUpdate, SyncCategory, SymbolSyncPlan};
+pub use quote_sync_state_model::{
+    QuoteSyncState, QuoteSyncStateUpdate, SymbolSyncPlan, SyncCategory,
+};
 pub use quote_sync_state_traits::QuoteSyncStateRepositoryTrait;

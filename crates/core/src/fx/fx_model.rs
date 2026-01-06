@@ -45,19 +45,35 @@ impl ExchangeRate {
             data_source: self.source.clone(),
             created_at: self.timestamp,
             currency: self.from_currency.clone(),
+            notes: None,
         }
     }
 
+    /// Parses an FX ID/symbol into (from_currency, to_currency).
+    /// Supports multiple formats:
+    /// - New canonical: "EUR/USD" -> ("EUR", "USD")
+    /// - Legacy concatenated: "EURUSD" -> ("EUR", "USD")
+    /// - Legacy Yahoo: "EURUSD=X" -> ("EUR", "USD")
     pub fn parse_fx_symbol(symbol: &str) -> (String, String) {
-        if let Some(base_symbol) = symbol.strip_suffix("=X") {
-            (base_symbol[..3].to_string(), base_symbol[3..].to_string())
+        // Handle new canonical format with slash
+        if let Some((base, quote)) = symbol.split_once('/') {
+            return (base.to_string(), quote.to_string());
+        }
+
+        // Handle legacy Yahoo format with =X suffix
+        let base_symbol = symbol.strip_suffix("=X").unwrap_or(symbol);
+        if base_symbol.len() >= 6 {
+            (base_symbol[..3].to_string(), base_symbol[3..6].to_string())
         } else {
-            (symbol[..3].to_string(), symbol[3..6].to_string())
+            // Fallback for malformed symbols
+            (base_symbol.to_string(), String::new())
         }
     }
 
+    /// Creates a canonical FX asset ID from currency pair.
+    /// Returns format like "EUR/USD" per spec.
     pub fn make_fx_symbol(from: &str, to: &str) -> String {
-        format!("{}{}=X", from, to)
+        format!("{}/{}", from, to)
     }
 }
 
@@ -97,6 +113,7 @@ impl NewExchangeRate {
             data_source: self.source.clone(),
             created_at: now,
             currency: self.from_currency.clone(),
+            notes: None,
         }
     }
 }

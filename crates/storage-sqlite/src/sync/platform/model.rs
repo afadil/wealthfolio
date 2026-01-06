@@ -15,6 +15,12 @@ pub struct Platform {
     pub url: String,
     /// External UUID from the broker API
     pub external_id: Option<String>,
+    /// Kind of platform (e.g., "BROKERAGE", "BANK")
+    pub kind: String,
+    /// Website URL of the platform
+    pub website_url: Option<String>,
+    /// Logo URL for the platform
+    pub logo_url: Option<String>,
 }
 
 /// Database model for platforms
@@ -37,6 +43,9 @@ pub struct PlatformDB {
     pub name: Option<String>,
     pub url: String,
     pub external_id: Option<String>,
+    pub kind: String,
+    pub website_url: Option<String>,
+    pub logo_url: Option<String>,
 }
 
 impl From<PlatformDB> for Platform {
@@ -46,6 +55,9 @@ impl From<PlatformDB> for Platform {
             name: db.name,
             url: db.url,
             external_id: db.external_id,
+            kind: db.kind,
+            website_url: db.website_url,
+            logo_url: db.logo_url,
         }
     }
 }
@@ -57,6 +69,9 @@ impl From<Platform> for PlatformDB {
             name: p.name,
             url: p.url,
             external_id: p.external_id,
+            kind: p.kind,
+            website_url: p.website_url,
+            logo_url: p.logo_url,
         }
     }
 }

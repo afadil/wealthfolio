@@ -18,6 +18,7 @@ pub struct AccountOwner {
     /// User ID (UUID)
     pub user_id: Option<String>,
     /// Full name of the account owner
+    #[serde(alias = "user_full_name")]
     pub full_name: Option<String>,
     /// Email address
     pub email: Option<String>,
@@ -39,6 +40,7 @@ pub struct BrokerAccountSyncStatus {
 pub struct BrokerSyncStatusDetail {
     pub initial_sync_completed: Option<bool>,
     pub last_successful_sync: Option<String>,
+    pub first_transaction_date: Option<String>,
 }
 
 /// A broker account from the cloud API (new REST API format)
@@ -101,6 +103,18 @@ pub struct BrokerAccount {
     /// Whether this is a paper (simulated) trading account
     #[serde(default)]
     pub is_paper: bool,
+
+    /// Whether sync is enabled for this account
+    #[serde(default = "default_sync_enabled")]
+    pub sync_enabled: bool,
+
+    /// Whether this account is shared with the household
+    #[serde(default)]
+    pub shared_with_household: bool,
+}
+
+fn default_sync_enabled() -> bool {
+    true
 }
 
 /// A brokerage/institution from the cloud API
@@ -128,7 +142,6 @@ pub struct BrokerBrokerage {
 
 /// A brokerage connection/authorization from the cloud API
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct BrokerConnection {
     /// Unique identifier for the authorization (UUID)
     pub id: String,
@@ -140,30 +153,30 @@ pub struct BrokerConnection {
     #[serde(rename = "type")]
     pub connection_type: Option<String>,
 
+    /// Connection status (e.g., "connected", "disconnected")
+    pub status: Option<String>,
+
     /// Whether the connection is disabled
     #[serde(default)]
     pub disabled: bool,
 
     /// When the connection was disabled
-    #[serde(alias = "disabled_date")]
     pub disabled_date: Option<String>,
 
     /// When the connection was last updated
-    #[serde(alias = "updated_date", alias = "updated_at")]
     pub updated_at: Option<String>,
+
+    /// Connection name (user-assigned)
+    pub name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct BrokerConnectionBrokerage {
     pub id: Option<String>,
     pub slug: Option<String>,
     pub name: Option<String>,
-    #[serde(alias = "display_name")]
     pub display_name: Option<String>,
-    #[serde(alias = "aws_s3_logo_url")]
     pub aws_s3_logo_url: Option<String>,
-    #[serde(alias = "aws_s3_square_logo_url")]
     pub aws_s3_square_logo_url: Option<String>,
 }
 
@@ -225,6 +238,13 @@ pub struct AccountUniversalActivityCurrency {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AccountUniversalActivityExchange {
+    pub id: Option<String>,
+    pub code: Option<String>,
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AccountUniversalActivitySymbol {
     pub id: Option<String>,
     pub symbol: Option<String>,
@@ -232,6 +252,12 @@ pub struct AccountUniversalActivitySymbol {
     pub description: Option<String>,
     #[serde(rename = "type")]
     pub symbol_type: Option<AccountUniversalActivitySymbolType>,
+    /// Exchange information for the symbol
+    pub exchange: Option<AccountUniversalActivityExchange>,
+    /// Symbol's native currency
+    pub currency: Option<AccountUniversalActivityCurrency>,
+    /// FIGI identifier
+    pub figi_code: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -244,9 +270,22 @@ pub struct AccountUniversalActivitySymbolType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AccountUniversalActivityUnderlyingSymbol {
+    pub id: Option<String>,
+    pub symbol: Option<String>,
+    pub description: Option<String>,
+    pub currency: Option<AccountUniversalActivityCurrency>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AccountUniversalActivityOptionSymbol {
     pub id: Option<String>,
     pub ticker: Option<String>,
+    pub option_type: Option<String>,
+    pub strike_price: Option<f64>,
+    pub expiration_date: Option<String>,
+    pub is_mini_option: Option<bool>,
+    pub underlying_symbol: Option<AccountUniversalActivityUnderlyingSymbol>,
 }
 
 /// Flow metadata for transfer activities
@@ -363,6 +402,9 @@ pub struct SyncActivitiesResponse {
     pub activities_upserted: usize,
     pub assets_inserted: usize,
     pub accounts_failed: usize,
+    /// IDs of newly created assets (for background enrichment)
+    #[serde(default)]
+    pub new_asset_ids: Vec<String>,
 }
 
 impl BrokerAccount {
@@ -454,10 +496,24 @@ impl BrokerAccount {
             "status": self.status,
             "raw_type": self.raw_type,
             "is_paper": self.is_paper,
+            "sync_enabled": self.sync_enabled,
+            "shared_with_household": self.shared_with_household,
+            "sync_status": self.sync_status.as_ref().map(|s| serde_json::json!({
+                "transactions": s.transactions.as_ref().map(|t| serde_json::json!({
+                    "initial_sync_completed": t.initial_sync_completed,
+                    "last_successful_sync": t.last_successful_sync,
+                    "first_transaction_date": t.first_transaction_date,
+                })),
+                "holdings": s.holdings.as_ref().map(|h| serde_json::json!({
+                    "initial_sync_completed": h.initial_sync_completed,
+                    "last_successful_sync": h.last_successful_sync,
+                })),
+            })),
             "owner": self.owner.as_ref().map(|o| serde_json::json!({
                 "user_id": o.user_id,
                 "full_name": o.full_name,
                 "email": o.email,
+                "avatar_url": o.avatar_url,
                 "is_own_account": o.is_own_account,
             })),
         });
@@ -471,7 +527,6 @@ impl BrokerAccount {
 
 /// Pricing information for a subscription plan
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct PlanPricing {
     pub amount: f64,
     pub currency: String,
@@ -507,25 +562,25 @@ pub struct PlansResponse {
 
 /// User's team information
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct UserTeam {
     pub id: String,
     pub name: String,
     pub logo_url: Option<String>,
-    pub plan: String,
+    pub plan: Option<String>,
     pub subscription_status: Option<String>,
     pub subscription_current_period_end: Option<String>,
     pub subscription_cancel_at_period_end: Option<bool>,
-    pub trial_ends_at: Option<String>,
+    pub canceled_at: Option<String>,
+    pub country_code: Option<String>,
+    pub created_at: Option<String>,
 }
 
 /// User information from the cloud API
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct UserInfo {
     pub id: String,
     pub full_name: Option<String>,
-    pub email: String,
+    pub email: Option<String>,
     pub avatar_url: Option<String>,
     pub locale: Option<String>,
     pub week_starts_on_monday: Option<bool>,

@@ -96,6 +96,9 @@ export const ACTIVITY_SUBTYPES = {
   // Liability subtypes
   LIABILITY_INTEREST_ACCRUAL: 'LIABILITY_INTEREST_ACCRUAL',
   LIABILITY_PRINCIPAL_PAYMENT: 'LIABILITY_PRINCIPAL_PAYMENT',
+
+  // Alternative asset subtypes
+  OPENING_POSITION: 'OPENING_POSITION',
 } as const;
 
 export type ActivitySubtype = (typeof ACTIVITY_SUBTYPES)[keyof typeof ACTIVITY_SUBTYPES];

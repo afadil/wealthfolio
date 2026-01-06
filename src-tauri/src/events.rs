@@ -40,6 +40,28 @@ pub const BROKER_SYNC_START: &str = "broker:sync-start";
 /// Event emitted when the broker sync process completes (success or failure).
 pub const BROKER_SYNC_COMPLETE: &str = "broker:sync-complete";
 
+/// Event emitted to trigger asset profile enrichment for newly synced assets.
+pub const ASSETS_ENRICH_REQUESTED: &str = "assets:enrich-requested";
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct AssetsEnrichPayload {
+    pub asset_ids: Vec<String>,
+}
+
+/// Emits the ASSETS_ENRICH_REQUESTED event to trigger background enrichment.
+pub fn emit_assets_enrich_requested(handle: &tauri::AppHandle, payload: AssetsEnrichPayload) {
+    handle
+        .emit(ASSETS_ENRICH_REQUESTED, &payload)
+        .unwrap_or_else(|e| {
+            log::error!(
+                "Failed to emit {} event for payload {:?}: {}",
+                ASSETS_ENRICH_REQUESTED,
+                payload,
+                e
+            );
+        });
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ResourceEventPayload {
     pub resource_type: String,

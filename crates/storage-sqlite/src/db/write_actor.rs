@@ -1,9 +1,9 @@
 use super::DbPool;
 use crate::errors::StorageError;
 use diesel::SqliteConnection;
-use wealthfolio_core::errors::Result;
 use std::any::Any;
 use tokio::sync::{mpsc, oneshot};
+use wealthfolio_core::errors::Result;
 
 // Type alias for the job to be executed by the writer actor.
 // It takes a mutable reference to a SqliteConnection and returns a Result.

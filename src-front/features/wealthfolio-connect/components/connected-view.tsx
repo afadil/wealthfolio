@@ -7,13 +7,7 @@ import { ActionConfirm } from "@wealthfolio/ui";
 import { Avatar, AvatarFallback, AvatarImage } from "@wealthfolio/ui/components/ui/avatar";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wealthfolio/ui/components/ui/card";
+import { Card, CardContent, CardHeader } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
@@ -21,8 +15,12 @@ import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { useCallback, useState } from "react";
 import { useWealthfolioConnect } from "../providers/wealthfolio-connect-provider";
-import { listBrokerConnections, syncBrokerData } from "../services/broker-service";
-import type { BrokerConnection, SyncResult } from "../types";
+import {
+  listBrokerConnections,
+  listBrokerAccounts,
+  syncBrokerData,
+} from "../services/broker-service";
+import type { BrokerConnection, BrokerAccount, SyncResult } from "../types";
 import { SubscriptionPlans } from "./subscription-plans";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,10 +40,15 @@ function useBrokerConnections(isConnected: boolean) {
 }
 
 /**
- * Opens the Wealthfolio Connect portal in the browser.
+ * Hook to fetch broker accounts from the backend.
  */
-function openConnectPortal() {
-  openUrlInBrowser(WEALTHFOLIO_CONNECT_PORTAL_URL);
+function useBrokerAccountsQuery(isConnected: boolean) {
+  return useQuery({
+    queryKey: [QueryKeys.BROKER_ACCOUNTS],
+    queryFn: listBrokerAccounts,
+    enabled: isConnected,
+    staleTime: 30000,
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -103,57 +106,206 @@ function BrokerConnectionSkeleton() {
   );
 }
 
-interface ConnectionCardProps {
-  connection: BrokerConnection;
-  onManage: () => void;
+interface BrokerAccountCardProps {
+  account: BrokerAccount;
+  connections: BrokerConnection[];
 }
 
-function ConnectionCard({ connection, onManage }: ConnectionCardProps) {
-  const logoUrl = connection.brokerage?.awsS3SquareLogoUrl ?? connection.brokerage?.awsS3LogoUrl;
-  const name = connection.brokerage?.displayName ?? connection.brokerage?.name ?? "Brokerage";
-  const isDisabled = connection.disabled;
+/**
+ * Mask account number to show only last 4 characters
+ */
+function maskAccountNumber(number?: string): string {
+  if (!number) return "";
+  const last4 = number.slice(-4);
+  return `\u2022\u2022${last4}`;
+}
 
-  const lastSyncedText = connection.updatedAt
-    ? `Last synced ${formatDistanceToNow(new Date(connection.updatedAt), { addSuffix: false })} ago`
+/**
+ * Get the latest sync date from transactions or holdings
+ */
+function getLastSyncDate(account: BrokerAccount): string | null {
+  const txDate = account.sync_status?.transactions?.last_successful_sync;
+  const holdingsDate = account.sync_status?.holdings?.last_successful_sync;
+  if (txDate && holdingsDate) {
+    return new Date(txDate) > new Date(holdingsDate) ? txDate : holdingsDate;
+  }
+  return txDate || holdingsDate || null;
+}
+
+function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
+  const isShared = account.owner && !account.owner.is_own_account;
+  const ownerName = account.owner?.full_name;
+  const lastSyncDate = getLastSyncDate(account);
+
+  // Find the connection that matches this account's brokerage_authorization
+  const connection = connections.find((c) => c.id === account.brokerage_authorization);
+  const logoUrl =
+    connection?.brokerage?.aws_s3_square_logo_url ?? connection?.brokerage?.aws_s3_logo_url;
+
+  const lastSyncedText = lastSyncDate
+    ? `Last synced ${formatDistanceToNow(new Date(lastSyncDate), { addSuffix: false })} ago`
     : "Never synced";
 
   return (
-    <div
-      className={`flex items-center justify-between gap-3 rounded-lg border p-3 ${
-        isDisabled ? "border-destructive/30 bg-destructive/5" : "bg-muted/30"
-      }`}
-    >
+    <div className="bg-muted/30 flex items-center justify-between gap-3 rounded-lg border p-3">
       {/* Logo and info */}
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <Avatar className="h-9 w-9 rounded-lg">
-          <AvatarImage src={logoUrl} alt={name} className="bg-white object-contain p-1" />
+          <AvatarImage
+            src={logoUrl}
+            alt={account.institution_name || "Broker"}
+            className="bg-white object-contain p-1"
+          />
           <AvatarFallback className="rounded-lg text-sm font-semibold">
-            {name.charAt(0)}
+            {(account.institution_name || account.name || "B").charAt(0)}
           </AvatarFallback>
         </Avatar>
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-medium">{name}</span>
-            {isDisabled && (
-              <Badge variant="destructive" className="h-5 shrink-0 text-[10px]">
-                Disconnected
+            <span className="truncate text-sm font-medium">{account.name || "Account"}</span>
+            {account.is_paper && (
+              <Badge variant="outline" className="h-5 shrink-0 text-[10px]">
+                Paper
               </Badge>
             )}
+            {isShared && ownerName && (
+              <span className="text-muted-foreground flex items-center gap-1 text-xs">
+                <Icons.Users className="h-3 w-3" />
+                Shared by {ownerName}
+              </span>
+            )}
           </div>
-          <p className="text-muted-foreground text-xs">{lastSyncedText}</p>
+          <div className="text-muted-foreground flex items-center gap-2 text-xs">
+            <span>{account.institution_name}</span>
+            {account.number && <span>{maskAccountNumber(account.number)}</span>}
+          </div>
         </div>
       </div>
 
-      {/* Status indicator or reconnect button */}
-      {isDisabled ? (
-        <Button variant="outline" size="sm" onClick={onManage} className="h-8 shrink-0 text-xs">
-          Reconnect
-        </Button>
-      ) : (
-        <span className="flex h-2 w-2 shrink-0 rounded-full bg-green-500" />
-      )}
+      {/* Status indicators */}
+      <div className="flex items-center gap-2">
+        <span className="text-muted-foreground text-xs">{lastSyncedText}</span>
+        {/* Shared indicator */}
+        {account.shared_with_household && (
+          <Tooltip>
+            <TooltipTrigger>
+              <Icons.Link className="text-muted-foreground h-4 w-4" />
+            </TooltipTrigger>
+            <TooltipContent>Shared with household</TooltipContent>
+          </Tooltip>
+        )}
+        {/* Sync enabled indicator */}
+        <Tooltip>
+          <TooltipTrigger>
+            {account.sync_enabled ? (
+              <Icons.Eye className="h-4 w-4 text-blue-500" />
+            ) : (
+              <Icons.EyeOff className="text-muted-foreground h-4 w-4" />
+            )}
+          </TooltipTrigger>
+          <TooltipContent>{account.sync_enabled ? "Sync enabled" : "Sync disabled"}</TooltipContent>
+        </Tooltip>
+      </div>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Broker Connections Card Component
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface BrokerConnectionsCardProps {
+  connections: BrokerConnection[];
+  isLoading: boolean;
+}
+
+function BrokerConnectionsCard({
+  connections,
+  isLoading,
+}: BrokerConnectionsCardProps) {
+  const openConnectionsPortal = () => {
+    openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/connections`);
+  };
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="bg-muted flex h-8 w-8 items-center justify-center rounded-lg">
+              <Icons.Link className="text-muted-foreground h-4 w-4" />
+            </div>
+            <h3 className="text-base font-semibold">Broker connections</h3>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground"
+            onClick={openConnectionsPortal}
+          >
+            Manage connections
+            <Icons.ArrowRight className="ml-1 h-3.5 w-3.5" />
+          </Button>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          {isLoading ? (
+            <>
+              <BrokerConnectionSkeleton />
+              <BrokerConnectionSkeleton />
+            </>
+          ) : connections.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-6 text-center">
+              <p className="text-muted-foreground text-sm">No broker connections yet</p>
+              <Button className="mt-3" size="sm" onClick={openConnectionsPortal}>
+                <Icons.Plus className="mr-2 h-4 w-4" />
+                Connect Broker
+              </Button>
+            </div>
+          ) : (
+            connections.map((connection) => {
+              const logoUrl =
+                connection.brokerage?.aws_s3_square_logo_url ??
+                connection.brokerage?.aws_s3_logo_url;
+              const brokerageName =
+                connection.brokerage?.display_name ?? connection.brokerage?.name ?? "Unknown Broker";
+              const isConnected = connection.status === "connected" && !connection.disabled;
+
+              return (
+                <div
+                  key={connection.id}
+                  className="bg-muted/30 flex items-center justify-between gap-3 rounded-lg border p-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10 rounded-lg">
+                      <AvatarImage
+                        src={logoUrl}
+                        alt={brokerageName}
+                        className="bg-white object-contain p-1"
+                      />
+                      <AvatarFallback className="rounded-lg text-sm font-semibold">
+                        {brokerageName.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="font-medium">{brokerageName}</span>
+                  </div>
+                  <Badge
+                    className={
+                      isConnected
+                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                        : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                    }
+                  >
+                    {isConnected ? "Connected" : "Disconnected"}
+                  </Badge>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -187,8 +339,9 @@ export function ConnectedView() {
   // Check if user has an active subscription (has a team with a plan)
   const hasSubscription = !!userInfo?.team?.plan;
 
-  // Hooks - only fetch broker connections if user has a subscription
+  // Hooks - only fetch broker connections and accounts if user has a subscription
   const connectionsQuery = useBrokerConnections(hasSubscription);
+  const accountsQuery = useBrokerAccountsQuery(hasSubscription);
 
   // Retry handler for service unavailable state
   const handleRetry = useCallback(async () => {
@@ -237,7 +390,9 @@ export function ConnectedView() {
 
   // Derived state
   const connections = connectionsQuery.data ?? [];
+  const brokerAccounts = accountsQuery.data ?? [];
   const isLoadingConnections = connectionsQuery.isLoading;
+  const isLoadingAccounts = accountsQuery.isLoading;
   const isSyncing = syncToLocalMutation.isPending;
 
   return (
@@ -253,14 +408,14 @@ export function ConnectedView() {
               />
               <AvatarFallback className="bg-success/15">
                 <span className="text-success text-lg font-semibold">
-                  {(userInfo?.fullName?.[0] ?? user?.email?.[0] ?? "U").toUpperCase()}
+                  {(userInfo?.full_name?.[0] ?? user?.email?.[0] ?? "U").toUpperCase()}
                 </span>
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <h3 className="truncate text-base font-semibold">
-                  {userInfo?.fullName ?? user?.email?.split("@")[0] ?? "User"}
+                  {userInfo?.full_name ?? user?.email?.split("@")[0] ?? "User"}
                 </h3>
                 {hasSubscription && (
                   <Badge className="h-5 shrink-0 bg-green-100 px-2 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
@@ -339,113 +494,94 @@ export function ConnectedView() {
 
       {/* Broker Connections Card - Only show if user has an active subscription */}
       {hasSubscription && (
+        <BrokerConnectionsCard connections={connections} isLoading={isLoadingConnections} />
+      )}
+
+      {/* Accounts Card - Only show if user has an active subscription */}
+      {hasSubscription && (
         <Card>
-          <CardHeader className="pb-3">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-medium">Broker Accounts</CardTitle>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => connectionsQuery.refetch()}
-                    disabled={connectionsQuery.isFetching}
-                    className="text-muted-foreground hover:text-foreground h-8 w-8 shrink-0"
-                  >
-                    {connectionsQuery.isFetching ? (
-                      <Icons.Spinner className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Icons.Refresh className="h-4 w-4" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Refresh</p>
-                </TooltipContent>
-              </Tooltip>
+              <div className="flex items-center gap-2">
+                <div className="bg-muted flex h-8 w-8 items-center justify-center rounded-lg">
+                  <Icons.Wallet className="text-muted-foreground h-4 w-4" />
+                </div>
+                <h3 className="text-base font-semibold">Accounts</h3>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={() => openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/accounts`)}
+              >
+                Manage accounts
+                <Icons.ArrowRight className="ml-1 h-3.5 w-3.5" />
+              </Button>
             </div>
-            <CardDescription>
-              Manage your linked broker accounts through Wealthfolio Connect.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {isLoadingConnections ? (
-              <div className="space-y-3">
-                <BrokerConnectionSkeleton />
-                <BrokerConnectionSkeleton />
-              </div>
-            ) : connections.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-6 text-center">
-                <div className="bg-muted/50 mb-4 rounded-full p-3">
-                  <Icons.Link className="h-6 w-6 opacity-60" />
-                </div>
-                <p className="text-foreground font-medium">No broker accounts connected</p>
-                <p className="text-muted-foreground mt-1 max-w-xs text-xs">
-                  Connect your first broker account to start syncing your portfolio automatically.
-                </p>
-                <Button className="mt-4" size="sm" onClick={openConnectPortal}>
-                  <Icons.Plus className="mr-2 h-4 w-4" />
-                  Connect Broker
-                </Button>
-              </div>
-            ) : (
-              <div>
-                {/* Connection list */}
+
+            <div className="mt-4">
+              {isLoadingAccounts || isLoadingConnections ? (
                 <div className="space-y-2">
-                  {connections.map((connection) => (
-                    <ConnectionCard
-                      key={connection.id}
-                      connection={connection}
-                      onManage={openConnectPortal}
-                    />
-                  ))}
+                  <BrokerConnectionSkeleton />
+                  <BrokerConnectionSkeleton />
                 </div>
-
-                {/* Sync Result */}
-                {syncResult && (
-                  <div className="bg-muted/50 mt-3 rounded-lg p-3 text-sm">
-                    <p className="font-medium">{syncResult.message}</p>
-                    {syncResult.accountsSynced && (
-                      <p className="text-muted-foreground mt-1">
-                        {syncResult.accountsSynced.created} accounts created,{" "}
-                        {syncResult.accountsSynced.skipped} skipped
-                      </p>
-                    )}
+              ) : brokerAccounts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-6 text-center">
+                  <p className="text-muted-foreground text-sm">No accounts synced yet</p>
+                  <p className="text-muted-foreground mt-1 max-w-xs text-xs">
+                    Connect a broker to start syncing your accounts.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  {/* Accounts list */}
+                  <div className="space-y-2">
+                    {brokerAccounts.map((account) => (
+                      <BrokerAccountCard
+                        key={account.id}
+                        account={account}
+                        connections={connections}
+                      />
+                    ))}
                   </div>
-                )}
 
-                {/* Actions */}
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => syncToLocalMutation.mutate()}
-                    disabled={isSyncing}
-                    className="flex-1 sm:flex-none"
-                  >
-                    {isSyncing ? (
-                      <>
-                        <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                        Syncing...
-                      </>
-                    ) : (
-                      <>
-                        <Icons.Download className="mr-2 h-4 w-4" />
-                        Sync to Local
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={openConnectPortal}
-                    className="flex-1 sm:flex-none"
-                  >
-                    <Icons.ExternalLink className="mr-2 h-4 w-4" />
-                    Manage Accounts
-                  </Button>
+                  {/* Sync Result */}
+                  {syncResult && (
+                    <div className="bg-muted/50 mt-3 rounded-lg p-3 text-sm">
+                      <p className="font-medium">{syncResult.message}</p>
+                      {syncResult.accountsSynced && (
+                        <p className="text-muted-foreground mt-1">
+                          {syncResult.accountsSynced.created} accounts created,{" "}
+                          {syncResult.accountsSynced.skipped} skipped
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Sync Action */}
+                  <div className="mt-4">
+                    <Button
+                      size="sm"
+                      onClick={() => syncToLocalMutation.mutate()}
+                      disabled={isSyncing}
+                      className="w-full sm:w-auto"
+                    >
+                      {isSyncing ? (
+                        <>
+                          <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                          Syncing...
+                        </>
+                      ) : (
+                        <>
+                          <Icons.Download className="mr-2 h-4 w-4" />
+                          Sync to Local
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </CardContent>
         </Card>
       )}

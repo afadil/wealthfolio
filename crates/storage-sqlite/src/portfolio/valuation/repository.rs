@@ -11,9 +11,9 @@ use std::sync::Arc;
 
 use super::model::DailyAccountValuationDB;
 use crate::db::{get_connection, WriteHandle};
+use crate::errors::StorageError;
 use crate::schema::daily_account_valuation;
 use crate::schema::daily_account_valuation::dsl::*;
-use crate::errors::StorageError;
 use wealthfolio_core::errors::Result;
 use wealthfolio_core::portfolio::valuation::{DailyAccountValuation, ValuationRepositoryTrait};
 
@@ -76,7 +76,8 @@ impl ValuationRepositoryTrait for ValuationRepository {
             query = query.filter(valuation_date.le(end_date_val));
         }
 
-        let history_dbs = query.load::<DailyAccountValuationDB>(&mut conn)
+        let history_dbs = query
+            .load::<DailyAccountValuationDB>(&mut conn)
             .map_err(StorageError::from)?;
 
         // Convert Vec<DailyAccountValuationDB> to Vec<DailyAccountValuation>
@@ -167,8 +168,8 @@ impl ValuationRepositoryTrait for ValuationRepository {
             query_builder = query_builder.bind::<Text, _>(acc_id_str);
         }
 
-        let latest_valuations_db: Vec<DailyAccountValuationDB> =
-            query_builder.load::<DailyAccountValuationDB>(&mut conn)
+        let latest_valuations_db: Vec<DailyAccountValuationDB> = query_builder
+            .load::<DailyAccountValuationDB>(&mut conn)
             .map_err(StorageError::from)?;
 
         // To maintain input order, we first put results into a map

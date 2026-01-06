@@ -14,29 +14,27 @@ use wealthfolio_core::activities::{Activity, ActivityStatus, ActivityUpdate, New
 fn parse_decimal_string_tolerant(value_str: &str, field_name: &str) -> Decimal {
     match Decimal::from_str(value_str) {
         Ok(d) => d,
-        Err(e_decimal) => {
-            match f64::from_str(value_str) {
-                Ok(f_val) => match Decimal::from_f64(f_val) {
-                    Some(dec_val) => dec_val,
-                    None => {
-                        log::error!(
-                            "Failed to convert {} '{}' (parsed as f64: {}) to Decimal.",
-                            field_name,
-                            value_str,
-                            f_val
-                        );
-                        Decimal::ZERO
-                    }
-                },
-                Err(e_f64) => {
+        Err(e_decimal) => match f64::from_str(value_str) {
+            Ok(f_val) => match Decimal::from_f64(f_val) {
+                Some(dec_val) => dec_val,
+                None => {
                     log::error!(
-                        "Failed to parse {} '{}': as Decimal (err: {}), and as f64 (err: {}). Falling back to ZERO.",
-                        field_name, value_str, e_decimal, e_f64
+                        "Failed to convert {} '{}' (parsed as f64: {}) to Decimal.",
+                        field_name,
+                        value_str,
+                        f_val
                     );
                     Decimal::ZERO
                 }
+            },
+            Err(e_f64) => {
+                log::error!(
+                        "Failed to parse {} '{}': as Decimal (err: {}), and as f64 (err: {}). Falling back to ZERO.",
+                        field_name, value_str, e_decimal, e_f64
+                    );
+                Decimal::ZERO
             }
-        }
+        },
     }
 }
 
@@ -158,8 +156,6 @@ pub struct ActivityDetailsDB {
     pub asset_symbol: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub asset_name: Option<String>,
-    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
-    pub asset_data_source: Option<String>,
 }
 
 impl ActivityDetailsDB {
@@ -269,7 +265,7 @@ impl From<ActivityDetailsDB> for wealthfolio_core::activities::ActivityDetails {
             account_currency: db.account_currency,
             asset_symbol: db.asset_symbol.unwrap_or_default(),
             asset_name: db.asset_name,
-            asset_data_source: db.asset_data_source.unwrap_or_else(|| "MANUAL".to_string()),
+            asset_data_source: "MANUAL".to_string(),
             source_system: db.source_system,
             source_record_id: db.source_record_id,
             idempotency_key: db.idempotency_key,

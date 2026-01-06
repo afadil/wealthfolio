@@ -54,9 +54,7 @@ impl From<StorageError> for Error {
             StorageError::QueryFailed(DieselError::DatabaseError(
                 diesel::result::DatabaseErrorKind::UniqueViolation,
                 info,
-            )) => Error::Database(DatabaseError::UniqueViolation(
-                info.message().to_string(),
-            )),
+            )) => Error::Database(DatabaseError::UniqueViolation(info.message().to_string())),
             StorageError::QueryFailed(DieselError::DatabaseError(
                 diesel::result::DatabaseErrorKind::ForeignKeyViolation,
                 info,
@@ -66,12 +64,8 @@ impl From<StorageError> for Error {
             StorageError::QueryFailed(e) => {
                 Error::Database(DatabaseError::QueryFailed(e.to_string()))
             }
-            StorageError::MigrationFailed(e) => {
-                Error::Database(DatabaseError::MigrationFailed(e))
-            }
-            StorageError::SerializationError(e) => {
-                Error::Database(DatabaseError::Internal(e))
-            }
+            StorageError::MigrationFailed(e) => Error::Database(DatabaseError::MigrationFailed(e)),
+            StorageError::SerializationError(e) => Error::Database(DatabaseError::Internal(e)),
             StorageError::CoreError(e) => {
                 // CoreError already contains a stringified core error, wrap it
                 Error::Database(DatabaseError::Internal(e))
@@ -108,7 +102,9 @@ impl DieselErrorExt for diesel::ConnectionError {
 }
 
 /// Helper function to convert a Diesel Result to a core Result.
-pub fn map_diesel_err<T>(result: std::result::Result<T, DieselError>) -> wealthfolio_core::Result<T> {
+pub fn map_diesel_err<T>(
+    result: std::result::Result<T, DieselError>,
+) -> wealthfolio_core::Result<T> {
     result.map_err(|e| e.into_core_error())
 }
 

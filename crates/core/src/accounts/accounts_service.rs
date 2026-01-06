@@ -43,10 +43,7 @@ impl AccountServiceTrait for AccountService {
         // Perform async currency pair registration if needed
         if new_account.currency != base_currency {
             self.fx_service
-                .register_currency_pair(
-                    new_account.currency.as_str(),
-                    base_currency.as_str(),
-                )
+                .register_currency_pair(new_account.currency.as_str(), base_currency.as_str())
                 .await?;
         }
 

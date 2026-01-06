@@ -60,16 +60,22 @@ impl From<ImportRunDB> for ImportRun {
             started_at: DateTime::parse_from_rfc3339(&db.started_at)
                 .map(|dt| dt.with_timezone(&Utc))
                 .unwrap_or_else(|_| Utc::now()),
-            finished_at: db
-                .finished_at
-                .and_then(|s| DateTime::parse_from_rfc3339(&s).ok().map(|dt| dt.with_timezone(&Utc))),
+            finished_at: db.finished_at.and_then(|s| {
+                DateTime::parse_from_rfc3339(&s)
+                    .ok()
+                    .map(|dt| dt.with_timezone(&Utc))
+            }),
             review_mode: serde_json::from_str(&format!("\"{}\"", db.review_mode))
                 .unwrap_or(ReviewMode::Never),
-            applied_at: db
-                .applied_at
-                .and_then(|s| DateTime::parse_from_rfc3339(&s).ok().map(|dt| dt.with_timezone(&Utc))),
+            applied_at: db.applied_at.and_then(|s| {
+                DateTime::parse_from_rfc3339(&s)
+                    .ok()
+                    .map(|dt| dt.with_timezone(&Utc))
+            }),
             checkpoint_in: db.checkpoint_in.and_then(|s| serde_json::from_str(&s).ok()),
-            checkpoint_out: db.checkpoint_out.and_then(|s| serde_json::from_str(&s).ok()),
+            checkpoint_out: db
+                .checkpoint_out
+                .and_then(|s| serde_json::from_str(&s).ok()),
             summary: db.summary.and_then(|s| serde_json::from_str(&s).ok()),
             warnings: db.warnings.and_then(|s| serde_json::from_str(&s).ok()),
             error: db.error,

@@ -121,16 +121,14 @@ impl BrokerSyncStateRepository {
                 match existing {
                     Some(_) => {
                         // Update attempt timestamp and status
-                        diesel::update(
-                            brokers_sync_state::table.find((&account_id, &provider)),
-                        )
-                        .set((
-                            brokers_sync_state::last_attempted_at.eq(&now_str),
-                            brokers_sync_state::sync_status.eq("SYNCING"),
-                            brokers_sync_state::updated_at.eq(&now_str),
-                        ))
-                        .execute(conn)
-                        .map_err(StorageError::from)?;
+                        diesel::update(brokers_sync_state::table.find((&account_id, &provider)))
+                            .set((
+                                brokers_sync_state::last_attempted_at.eq(&now_str),
+                                brokers_sync_state::sync_status.eq("SYNCING"),
+                                brokers_sync_state::updated_at.eq(&now_str),
+                            ))
+                            .execute(conn)
+                            .map_err(StorageError::from)?;
                     }
                     None => {
                         // Create new record
@@ -181,17 +179,15 @@ impl BrokerSyncStateRepository {
                 match existing {
                     Some(_) => {
                         // Update success timestamp and status
-                        diesel::update(
-                            brokers_sync_state::table.find((&account_id, &provider)),
-                        )
-                        .set((
-                            brokers_sync_state::last_successful_at.eq(&now_str),
-                            brokers_sync_state::sync_status.eq("IDLE"),
-                            brokers_sync_state::last_error.eq::<Option<String>>(None),
-                            brokers_sync_state::updated_at.eq(&now_str),
-                        ))
-                        .execute(conn)
-                        .map_err(StorageError::from)?;
+                        diesel::update(brokers_sync_state::table.find((&account_id, &provider)))
+                            .set((
+                                brokers_sync_state::last_successful_at.eq(&now_str),
+                                brokers_sync_state::sync_status.eq("IDLE"),
+                                brokers_sync_state::last_error.eq::<Option<String>>(None),
+                                brokers_sync_state::updated_at.eq(&now_str),
+                            ))
+                            .execute(conn)
+                            .map_err(StorageError::from)?;
                     }
                     None => {
                         // Create new record
@@ -242,16 +238,14 @@ impl BrokerSyncStateRepository {
                 match existing {
                     Some(_) => {
                         // Update failure
-                        diesel::update(
-                            brokers_sync_state::table.find((&account_id, &provider)),
-                        )
-                        .set((
-                            brokers_sync_state::sync_status.eq("FAILED"),
-                            brokers_sync_state::last_error.eq(&error),
-                            brokers_sync_state::updated_at.eq(&now_str),
-                        ))
-                        .execute(conn)
-                        .map_err(StorageError::from)?;
+                        diesel::update(brokers_sync_state::table.find((&account_id, &provider)))
+                            .set((
+                                brokers_sync_state::sync_status.eq("FAILED"),
+                                brokers_sync_state::last_error.eq(&error),
+                                brokers_sync_state::updated_at.eq(&now_str),
+                            ))
+                            .execute(conn)
+                            .map_err(StorageError::from)?;
                     }
                     None => {
                         // Create new record with error

@@ -71,7 +71,10 @@ impl BrokerSyncState {
     }
 
     /// Set checkpoint
-    pub fn set_checkpoint<T: Serialize>(&mut self, checkpoint: &T) -> Result<(), serde_json::Error> {
+    pub fn set_checkpoint<T: Serialize>(
+        &mut self,
+        checkpoint: &T,
+    ) -> Result<(), serde_json::Error> {
         self.checkpoint_json = Some(serde_json::to_value(checkpoint)?);
         self.updated_at = Utc::now();
         Ok(())

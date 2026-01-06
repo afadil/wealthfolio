@@ -16,6 +16,13 @@ export const AccountType = {
   SECURITIES: "SECURITIES",
   CASH: "CASH",
   CRYPTOCURRENCY: "CRYPTOCURRENCY",
+  // New account types for alternative assets
+  PROPERTY: "PROPERTY",
+  VEHICLE: "VEHICLE",
+  COLLECTIBLE: "COLLECTIBLE",
+  PRECIOUS: "PRECIOUS",
+  LIABILITY: "LIABILITY",
+  OTHER: "OTHER",
 } as const;
 
 export type AccountType = (typeof AccountType)[keyof typeof AccountType];
@@ -24,7 +31,89 @@ export const accountTypeSchema = z.enum([
   AccountType.SECURITIES,
   AccountType.CASH,
   AccountType.CRYPTOCURRENCY,
+  AccountType.PROPERTY,
+  AccountType.VEHICLE,
+  AccountType.COLLECTIBLE,
+  AccountType.PRECIOUS,
+  AccountType.LIABILITY,
+  AccountType.OTHER,
 ]);
+
+/**
+ * Returns the default group name for a given account type.
+ * Maps account types to their default group names for UI organization.
+ */
+export function defaultGroupForAccountType(accountType: AccountType): string {
+  switch (accountType) {
+    case AccountType.SECURITIES:
+      return "Investments";
+    case AccountType.CASH:
+      return "Cash";
+    case AccountType.CRYPTOCURRENCY:
+      return "Crypto";
+    case AccountType.PROPERTY:
+      return "Properties";
+    case AccountType.VEHICLE:
+      return "Vehicles";
+    case AccountType.COLLECTIBLE:
+      return "Collectibles";
+    case AccountType.PRECIOUS:
+      return "Precious Metals";
+    case AccountType.LIABILITY:
+      return "Liabilities";
+    case AccountType.OTHER:
+      return "Other Assets";
+    default:
+      return "Other";
+  }
+}
+
+/**
+ * Returns true if the account type is for alternative assets (non-investment).
+ */
+export function isAlternativeAssetType(accountType: AccountType): boolean {
+  return (
+    accountType === AccountType.PROPERTY ||
+    accountType === AccountType.VEHICLE ||
+    accountType === AccountType.COLLECTIBLE ||
+    accountType === AccountType.PRECIOUS ||
+    accountType === AccountType.OTHER
+  );
+}
+
+/**
+ * Returns true if the account type is a liability.
+ */
+export function isLiabilityType(accountType: AccountType): boolean {
+  return accountType === AccountType.LIABILITY;
+}
+
+/**
+ * Alternative asset ID prefixes (per spec: PROP-, VEH-, COLL-, PREC-, LIAB-, ALT-)
+ */
+export const ALTERNATIVE_ASSET_ID_PREFIXES = [
+  "PROP-",
+  "VEH-",
+  "COLL-",
+  "PREC-",
+  "LIAB-",
+  "ALT-",
+] as const;
+
+/**
+ * Returns true if the asset ID (symbol) belongs to an alternative asset.
+ * Alternative assets have prefixed IDs like PROP-xxxxx, VEH-xxxxx, etc.
+ */
+export function isAlternativeAssetId(assetId: string): boolean {
+  return ALTERNATIVE_ASSET_ID_PREFIXES.some((prefix) => assetId.startsWith(prefix));
+}
+
+/**
+ * Returns true if the asset ID belongs to a liability (LIAB- prefix).
+ */
+export function isLiabilityAssetId(assetId: string): boolean {
+  return assetId.startsWith("LIAB-");
+}
 
 export const DataSource = {
   YAHOO: "YAHOO",
@@ -255,6 +344,9 @@ export const ACTIVITY_SUBTYPES = {
   // Liability subtypes
   LIABILITY_INTEREST_ACCRUAL: "LIABILITY_INTEREST_ACCRUAL",
   LIABILITY_PRINCIPAL_PAYMENT: "LIABILITY_PRINCIPAL_PAYMENT",
+
+  // Alternative asset subtypes
+  OPENING_POSITION: "OPENING_POSITION",
 } as const;
 
 export type ActivitySubtype = (typeof ACTIVITY_SUBTYPES)[keyof typeof ACTIVITY_SUBTYPES];
@@ -289,6 +381,7 @@ export const SUBTYPE_DISPLAY_NAMES: Record<string, string> = {
   REVERSE_SPLIT: "Reverse Split",
   LIABILITY_INTEREST_ACCRUAL: "Liability Interest Accrual",
   LIABILITY_PRINCIPAL_PAYMENT: "Liability Principal Payment",
+  OPENING_POSITION: "Opening Position",
 };
 
 // Suggested subtypes per activity type
@@ -322,6 +415,7 @@ export const SUBTYPES_BY_ACTIVITY_TYPE: Record<string, string[]> = {
     ACTIVITY_SUBTYPES.REBATE,
     ACTIVITY_SUBTYPES.REVERSAL,
   ],
+  [ActivityType.TRANSFER_IN]: [ACTIVITY_SUBTYPES.OPENING_POSITION],
 };
 
 // Asset kinds for behavior classification
@@ -335,11 +429,63 @@ export const ASSET_KINDS = [
   "PRIVATE_EQUITY",
   "PROPERTY",
   "VEHICLE",
+  "COLLECTIBLE",
+  "PHYSICAL_PRECIOUS",
   "LIABILITY",
   "OTHER",
 ] as const;
 
 export type AssetKind = (typeof ASSET_KINDS)[number];
+
+// Convenience object for alternative asset kinds
+export const AlternativeAssetKind = {
+  PROPERTY: "PROPERTY",
+  VEHICLE: "VEHICLE",
+  COLLECTIBLE: "COLLECTIBLE",
+  PHYSICAL_PRECIOUS: "PHYSICAL_PRECIOUS",
+  LIABILITY: "LIABILITY",
+  OTHER: "OTHER",
+} as const;
+
+export type AlternativeAssetKind = (typeof AlternativeAssetKind)[keyof typeof AlternativeAssetKind];
+
+// Display names for alternative asset kinds
+export const ALTERNATIVE_ASSET_KIND_DISPLAY_NAMES: Record<AlternativeAssetKind, string> = {
+  [AlternativeAssetKind.PROPERTY]: "Property",
+  [AlternativeAssetKind.VEHICLE]: "Vehicle",
+  [AlternativeAssetKind.COLLECTIBLE]: "Collectible",
+  [AlternativeAssetKind.PHYSICAL_PRECIOUS]: "Precious Metal",
+  [AlternativeAssetKind.LIABILITY]: "Liability",
+  [AlternativeAssetKind.OTHER]: "Other",
+};
+
+// Default account groups for alternative assets
+export const ALTERNATIVE_ASSET_DEFAULT_GROUPS: Record<AlternativeAssetKind, string> = {
+  [AlternativeAssetKind.PROPERTY]: "Properties",
+  [AlternativeAssetKind.VEHICLE]: "Vehicles",
+  [AlternativeAssetKind.COLLECTIBLE]: "Collectibles",
+  [AlternativeAssetKind.PHYSICAL_PRECIOUS]: "Precious Metals",
+  [AlternativeAssetKind.LIABILITY]: "Liabilities",
+  [AlternativeAssetKind.OTHER]: "Other Assets",
+};
+
+// Map API kind values (lowercase) to enum values
+const API_KIND_TO_ENUM: Record<string, AlternativeAssetKind> = {
+  property: AlternativeAssetKind.PROPERTY,
+  vehicle: AlternativeAssetKind.VEHICLE,
+  collectible: AlternativeAssetKind.COLLECTIBLE,
+  precious: AlternativeAssetKind.PHYSICAL_PRECIOUS,
+  liability: AlternativeAssetKind.LIABILITY,
+  other: AlternativeAssetKind.OTHER,
+};
+
+/**
+ * Convert an API kind string (lowercase like "precious") to the AlternativeAssetKind enum value.
+ * Returns OTHER if the kind is not recognized.
+ */
+export function apiKindToAlternativeAssetKind(apiKind: string): AlternativeAssetKind {
+  return API_KIND_TO_ENUM[apiKind.toLowerCase()] ?? AlternativeAssetKind.OTHER;
+}
 
 // Asset subclass types (from Rust AssetSubClass enum)
 export const ASSET_SUBCLASS_TYPES = [
@@ -352,3 +498,48 @@ export const ASSET_SUBCLASS_TYPES = [
   { label: "Alternative", value: "Alternative" },
   { label: "Cash", value: "Cash" },
 ] as const;
+
+/**
+ * Holding category filters for the Holdings page.
+ * Three main categories: Investments (stocks, ETFs, crypto, options, etc.), Assets (alternative assets), Liabilities.
+ * Uses assetKinds to filter holdings directly by their assetKind field.
+ * IDs are stable strings for URL persistence and local storage.
+ */
+export const HOLDING_CATEGORY_FILTERS = [
+  { id: "investments", label: "Investments", assetKinds: ["SECURITY", "CRYPTO", "OPTION", "COMMODITY", "PRIVATE_EQUITY"] },
+  { id: "assets", label: "Assets", assetKinds: ["PROPERTY", "VEHICLE", "COLLECTIBLE", "PHYSICAL_PRECIOUS", "OTHER"] },
+  { id: "liabilities", label: "Liabilities", assetKinds: ["LIABILITY"] },
+] as const;
+
+export type HoldingCategoryFilterId = (typeof HOLDING_CATEGORY_FILTERS)[number]["id"];
+
+/**
+ * Maps account types to their display group names for the Holdings page.
+ * Used for collapsible group headers.
+ */
+export const HOLDING_GROUP_DISPLAY_NAMES: Record<string, string> = {
+  [AccountType.SECURITIES]: "Investments",
+  [AccountType.CRYPTOCURRENCY]: "Investments",
+  [AccountType.CASH]: "Cash",
+  [AccountType.PROPERTY]: "Properties",
+  [AccountType.VEHICLE]: "Vehicles",
+  [AccountType.COLLECTIBLE]: "Collectibles",
+  [AccountType.PRECIOUS]: "Precious Metals",
+  [AccountType.LIABILITY]: "Liabilities",
+  [AccountType.OTHER]: "Other Assets",
+};
+
+/**
+ * Order for displaying holding groups in the Holdings page.
+ * Lower numbers appear first.
+ */
+export const HOLDING_GROUP_ORDER: Record<string, number> = {
+  Investments: 1,
+  Properties: 2,
+  Vehicles: 3,
+  Collectibles: 4,
+  "Precious Metals": 5,
+  "Other Assets": 6,
+  Liabilities: 7,
+  Cash: 8,
+};

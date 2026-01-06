@@ -1,6 +1,6 @@
 {
   "name": "goal-progress-tracker-addon",
-  "version": "3.0.0",
+  "version": "3.0.0-beta.1",
   "description": "An addon for tracking investment progress towards target amounts with progress visualization",
   "type": "module",
   "main": "dist/addon.js",

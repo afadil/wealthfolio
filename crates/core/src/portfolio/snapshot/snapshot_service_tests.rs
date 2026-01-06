@@ -13,7 +13,7 @@ mod tests {
         ImportMapping as ActivityImportMapping, IncomeData as ActivityIncomeData, NewActivity,
         Sort as ActivitySort,
     };
-    use crate::assets::{Asset, AssetRepositoryTrait, NewAsset, UpdateAssetProfile};
+    use crate::assets::{Asset, AssetKind, AssetRepositoryTrait, NewAsset, PricingMode, UpdateAssetProfile};
     use crate::constants::{DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
     use crate::errors::{Error, Result as AppResult};
     use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
@@ -154,23 +154,23 @@ mod tests {
                 "AAPL".to_string(),
                 Asset {
                     id: "AAPL".to_string(),
-                    isin: Some("US0378331005".to_string()),
+                    kind: AssetKind::Security,
                     name: Some("Apple Inc.".to_string()),
-                    asset_type: Some("STOCK".to_string()),
                     symbol: "AAPL".to_string(),
-                    quote_symbol: Some("AAPL".to_string()),
+                    exchange_mic: None,
+                    currency: "USD".to_string(), // USD listing
+                    pricing_mode: PricingMode::Market,
+                    preferred_provider: None,
+                    provider_overrides: None,
+                    isin: Some("US0378331005".to_string()),
                     asset_class: Some("EQUITY".to_string()),
                     asset_sub_class: Some("LARGE_CAP".to_string()),
-                    countries: Some("US".to_string()),
-                    categories: Some("Technology".to_string()),
-                    classes: Some("Equity".to_string()),
-                    currency: "USD".to_string(), // USD listing
-                    data_source: "MANUAL".to_string(),
-                    sectors: Some("Technology".to_string()),
+                    notes: None,
+                    profile: None,
+                    metadata: None,
+                    is_active: true,
                     created_at: chrono::Utc::now().naive_utc(),
                     updated_at: chrono::Utc::now().naive_utc(),
-                    is_active: true,
-                    ..Default::default()
                 },
             );
 
@@ -178,23 +178,23 @@ mod tests {
                 "SHOP".to_string(),
                 Asset {
                     id: "SHOP".to_string(),
-                    isin: Some("CA82509L1076".to_string()),
+                    kind: AssetKind::Security,
                     name: Some("Shopify Inc.".to_string()),
-                    asset_type: Some("STOCK".to_string()),
                     symbol: "SHOP".to_string(),
-                    quote_symbol: Some("SHOP".to_string()),
+                    exchange_mic: None,
+                    currency: "CAD".to_string(), // CAD listing
+                    pricing_mode: PricingMode::Market,
+                    preferred_provider: None,
+                    provider_overrides: None,
+                    isin: Some("CA82509L1076".to_string()),
                     asset_class: Some("EQUITY".to_string()),
                     asset_sub_class: Some("LARGE_CAP".to_string()),
-                    countries: Some("CA".to_string()),
-                    categories: Some("Technology".to_string()),
-                    classes: Some("Equity".to_string()),
-                    currency: "CAD".to_string(), // CAD listing
-                    data_source: "MANUAL".to_string(),
-                    sectors: Some("Technology".to_string()),
+                    notes: None,
+                    profile: None,
+                    metadata: None,
+                    is_active: true,
                     created_at: chrono::Utc::now().naive_utc(),
                     updated_at: chrono::Utc::now().naive_utc(),
-                    is_active: true,
-                    ..Default::default()
                 },
             );
 
@@ -867,6 +867,7 @@ mod tests {
             ),
             created_at: Utc::now(),
             last_updated: Utc::now(),
+            is_alternative: false,
         };
         snap1_cad.positions.insert("TSE.TO".to_string(), pos1_tse);
         snap1_cad.cost_basis = dec!(500);
@@ -890,6 +891,7 @@ mod tests {
             ),
             created_at: Utc::now(),
             last_updated: Utc::now(),
+            is_alternative: false,
         };
         snap2_usd.positions.insert("AAPL".to_string(), pos2_aapl);
         snap2_usd.cost_basis = dec!(750);
@@ -1082,6 +1084,7 @@ mod tests {
                 inception_date: lot1.acquisition_date,
                 created_at: Utc::now(),
                 last_updated: Utc::now(),
+                is_alternative: false,
             },
         );
 
@@ -1100,6 +1103,7 @@ mod tests {
                 inception_date: lot2.acquisition_date,
                 created_at: Utc::now(),
                 last_updated: Utc::now(),
+                is_alternative: false,
             },
         );
 
@@ -1248,7 +1252,9 @@ mod tests {
             "CAD",
         );
 
-        let act_repo = Arc::new(MockActivityRepositoryWithData::new(vec![dep1, dividend, dep2]));
+        let act_repo = Arc::new(MockActivityRepositoryWithData::new(vec![
+            dep1, dividend, dep2,
+        ]));
 
         let fx = Arc::new(MockFxService::new());
         let snaps = Arc::new(MockSnapshotRepository::new());
@@ -1417,8 +1423,9 @@ mod tests {
             "USD",
         );
 
-        let activity_repo =
-            Arc::new(MockActivityRepositoryWithData::new(vec![deposit, buy, sell]));
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![
+            deposit, buy, sell,
+        ]));
         let fx = Arc::new(MockFxService::new());
         let snapshot_repo = Arc::new(MockSnapshotRepository::new());
         let asset_repo = Arc::new(MockAssetRepository::new());
@@ -1494,8 +1501,9 @@ mod tests {
             "USD",
         );
 
-        let activity_repo =
-            Arc::new(MockActivityRepositoryWithData::new(vec![deposit, withdrawal]));
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![
+            deposit, withdrawal,
+        ]));
         let fx = Arc::new(MockFxService::new());
         let snapshot_repo = Arc::new(MockSnapshotRepository::new());
         let asset_repo = Arc::new(MockAssetRepository::new());
@@ -1562,8 +1570,7 @@ mod tests {
             "USD",
         );
 
-        let activity_repo =
-            Arc::new(MockActivityRepositoryWithData::new(vec![deposit, dividend]));
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![deposit, dividend]));
         let fx = Arc::new(MockFxService::new());
         let snapshot_repo = Arc::new(MockSnapshotRepository::new());
         let asset_repo = Arc::new(MockAssetRepository::new());
@@ -1627,8 +1634,7 @@ mod tests {
             "USD",
         );
 
-        let activity_repo =
-            Arc::new(MockActivityRepositoryWithData::new(vec![deposit, interest]));
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![deposit, interest]));
         let fx = Arc::new(MockFxService::new());
         let snapshot_repo = Arc::new(MockSnapshotRepository::new());
         let asset_repo = Arc::new(MockAssetRepository::new());
@@ -1877,8 +1883,10 @@ mod tests {
             "USD",
         );
 
-        let activity_repo =
-            Arc::new(MockActivityRepositoryWithData::new(vec![transfer_in, transfer_out]));
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![
+            transfer_in,
+            transfer_out,
+        ]));
         let fx = Arc::new(MockFxService::new());
         let snapshot_repo = Arc::new(MockSnapshotRepository::new());
         let asset_repo = Arc::new(MockAssetRepository::new());
@@ -1955,8 +1963,9 @@ mod tests {
             "USD",
         );
 
-        let activity_repo =
-            Arc::new(MockActivityRepositoryWithData::new(vec![deposit, buy, split]));
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![
+            deposit, buy, split,
+        ]));
         let fx = Arc::new(MockFxService::new());
         let snapshot_repo = Arc::new(MockSnapshotRepository::new());
         let asset_repo = Arc::new(MockAssetRepository::new());
@@ -2022,7 +2031,7 @@ mod tests {
             "BUY",
             d1,
             Some(dec!(10)),
-            Some(dec!(150)), // USD price
+            Some(dec!(150)),  // USD price
             Some(dec!(1500)), // USD amount
             "USD",
         );
@@ -2119,8 +2128,12 @@ mod tests {
 
         // Use get_snapshots_by_account instead of get_saved_snapshots since
         // the mock clears saved_snapshots on each save operation
-        let acc1_frames = snapshot_repo.get_snapshots_by_account("acc1", None, None).unwrap();
-        let acc2_frames = snapshot_repo.get_snapshots_by_account("acc2", None, None).unwrap();
+        let acc1_frames = snapshot_repo
+            .get_snapshots_by_account("acc1", None, None)
+            .unwrap();
+        let acc2_frames = snapshot_repo
+            .get_snapshots_by_account("acc2", None, None)
+            .unwrap();
 
         // Each account should have its own snapshot
         assert!(!acc1_frames.is_empty(), "acc1 should have snapshots");
@@ -2187,8 +2200,7 @@ mod tests {
             "USD",
         );
 
-        let activity_repo =
-            Arc::new(MockActivityRepositoryWithData::new(vec![dep1, dep2, dep3]));
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![dep1, dep2, dep3]));
         let fx = Arc::new(MockFxService::new());
         let snapshot_repo = Arc::new(MockSnapshotRepository::new());
         let asset_repo = Arc::new(MockAssetRepository::new());
@@ -2643,8 +2655,7 @@ mod tests {
         let mut fx = MockFxService::new();
         fx.add_bidirectional_rate("USD", "CAD", d1, dec!(1.35));
 
-        let activity_repo =
-            Arc::new(MockActivityRepositoryWithData::new(vec![dep_cad, dep_usd]));
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![dep_cad, dep_usd]));
         let snapshot_repo = Arc::new(MockSnapshotRepository::new());
         let asset_repo = Arc::new(MockAssetRepository::new());
 
@@ -2786,8 +2797,9 @@ mod tests {
             "USD",
         );
 
-        let activity_repo =
-            Arc::new(MockActivityRepositoryWithData::new(vec![deposit, buy1, buy2]));
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![
+            deposit, buy1, buy2,
+        ]));
         let fx = Arc::new(MockFxService::new());
         let snapshot_repo = Arc::new(MockSnapshotRepository::new());
         let asset_repo = Arc::new(MockAssetRepository::new());
@@ -2956,7 +2968,9 @@ mod tests {
 
         let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
 
-        let frames = snapshot_repo.get_snapshots_by_account("acc1", None, None).unwrap();
+        let frames = snapshot_repo
+            .get_snapshots_by_account("acc1", None, None)
+            .unwrap();
         let mut sorted = frames.clone();
         sorted.sort_by_key(|s| s.snapshot_date);
 

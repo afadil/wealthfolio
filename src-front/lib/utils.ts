@@ -144,6 +144,15 @@ export function formatDate(input: string | number | Date | null | undefined): st
   return "-";
 }
 
+/**
+ * Formats a Date to ISO date string (YYYY-MM-DD).
+ * @param date The Date object to format
+ * @returns ISO date string in YYYY-MM-DD format
+ */
+export function formatDateISO(date: Date): string {
+  return format(date, "yyyy-MM-dd");
+}
+
 export const formatDateTime = (date: string | Date, timezone?: string) => {
   if (!date) return { date: "-", time: "-" };
 

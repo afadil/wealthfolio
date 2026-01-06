@@ -92,11 +92,9 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
         // Get active symbols OR recently closed symbols (within grace period)
         let results = qss_dsl::quote_sync_state
             .filter(
-                qss_dsl::is_active.eq(1).or(
-                    qss_dsl::is_active
-                        .eq(0)
-                        .and(qss_dsl::position_closed_date.gt(&grace_cutoff_str)),
-                ),
+                qss_dsl::is_active.eq(1).or(qss_dsl::is_active
+                    .eq(0)
+                    .and(qss_dsl::position_closed_date.gt(&grace_cutoff_str))),
             )
             .order(qss_dsl::sync_priority.desc())
             .load::<QuoteSyncStateDB>(&mut conn)
@@ -109,19 +107,21 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
         let db_state = QuoteSyncStateDB::from(state);
 
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<QuoteSyncState> {
-                diesel::replace_into(qss_dsl::quote_sync_state)
-                    .values(&db_state)
-                    .execute(conn)
-                    .map_err(StorageError::from)?;
+            .exec(
+                move |conn: &mut SqliteConnection| -> Result<QuoteSyncState> {
+                    diesel::replace_into(qss_dsl::quote_sync_state)
+                        .values(&db_state)
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
 
-                let result = qss_dsl::quote_sync_state
-                    .filter(qss_dsl::symbol.eq(&db_state.symbol))
-                    .first::<QuoteSyncStateDB>(conn)
-                    .map_err(StorageError::from)?;
+                    let result = qss_dsl::quote_sync_state
+                        .filter(qss_dsl::symbol.eq(&db_state.symbol))
+                        .first::<QuoteSyncStateDB>(conn)
+                        .map_err(StorageError::from)?;
 
-                Ok(QuoteSyncState::from(result))
-            })
+                    Ok(QuoteSyncState::from(result))
+                },
+            )
             .await
     }
 
@@ -220,7 +220,10 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
         let closed_date_str = closed_date.format("%Y-%m-%d").to_string();
         let now = Utc::now().to_rfc3339();
 
-        debug!("Marking symbol {} as inactive (closed: {})", symbol, closed_date);
+        debug!(
+            "Marking symbol {} as inactive (closed: {})",
+            symbol, closed_date
+        );
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {

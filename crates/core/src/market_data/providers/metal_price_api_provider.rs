@@ -303,6 +303,7 @@ impl MarketDataProvider for MetalPriceApiProvider {
             low: Default::default(),
             adjclose: Default::default(),
             volume: Default::default(),
+            notes: None,
         })
     }
 

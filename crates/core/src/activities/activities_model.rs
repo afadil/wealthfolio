@@ -1,6 +1,7 @@
 //! Activity domain models.
 
 use crate::activities::activities_errors::ActivityError;
+use crate::assets::AssetMetadata;
 use crate::Result;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use rust_decimal::prelude::FromPrimitive;
@@ -49,7 +50,7 @@ pub fn parse_decimal_string_tolerant(value_str: &str, field_name: &str) -> Decim
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ActivityStatus {
     #[default]
-    Posted,  // Live, affects calculations
+    Posted, // Live, affects calculations
     Pending, // Awaiting settlement/confirmation
     Draft,   // User-created, not yet confirmed
     Void,    // Cancelled/reversed (soft delete)
@@ -65,10 +66,10 @@ pub struct Activity {
     pub asset_id: Option<String>, // NOW OPTIONAL - NULL for pure cash movements
 
     // Classification
-    pub activity_type: String,                   // Canonical type (closed set of 15)
-    pub activity_type_override: Option<String>,  // User override (never touched by sync)
-    pub source_type: Option<String>,             // Raw provider label (REI, DIV, etc.)
-    pub subtype: Option<String>,                 // Semantic variation (DRIP, STAKING_REWARD, etc.)
+    pub activity_type: String, // Canonical type (closed set of 15)
+    pub activity_type_override: Option<String>, // User override (never touched by sync)
+    pub source_type: Option<String>, // Raw provider label (REI, DIV, etc.)
+    pub subtype: Option<String>, // Semantic variation (DRIP, STAKING_REWARD, etc.)
     pub status: ActivityStatus,
 
     // Timing
@@ -103,17 +104,17 @@ pub struct Activity {
     pub metadata: Option<Value>, // JSON blob
 
     // Source identity
-    pub source_system: Option<String>,     // SNAPTRADE, PLAID, MANUAL, CSV
-    pub source_record_id: Option<String>,  // Provider's record ID
-    pub source_group_id: Option<String>,   // Provider grouping key
-    pub idempotency_key: Option<String>,   // Stable hash for dedupe
-    pub import_run_id: Option<String>,     // Batch/run identifier
+    pub source_system: Option<String>, // SNAPTRADE, PLAID, MANUAL, CSV
+    pub source_record_id: Option<String>, // Provider's record ID
+    pub source_group_id: Option<String>, // Provider grouping key
+    pub idempotency_key: Option<String>, // Stable hash for dedupe
+    pub import_run_id: Option<String>, // Batch/run identifier
 
     // Sync flags
     #[serde(default)]
     pub is_user_modified: bool, // User edited; sync protects economics
     #[serde(default)]
-    pub needs_review: bool,     // Needs user review (low confidence, etc.)
+    pub needs_review: bool, // Needs user review (low confidence, etc.)
 
     // Audit
     #[serde(with = "timestamp_format")]
@@ -183,6 +184,7 @@ pub struct NewActivity {
     pub account_id: String,
     pub asset_id: Option<String>, // NOW OPTIONAL - NULL for pure cash movements
     pub asset_data_source: Option<String>,
+    pub asset_metadata: Option<AssetMetadata>, // Optional asset hints for inline creation
     pub activity_type: String,
     pub subtype: Option<String>, // Semantic variation (DRIP, STAKING_REWARD, etc.)
     pub activity_date: String,
@@ -195,9 +197,9 @@ pub struct NewActivity {
     pub notes: Option<String>,
     pub fx_rate: Option<Decimal>,
     // Sync-related fields
-    pub metadata: Option<String>,       // JSON blob for sync metadata
-    pub needs_review: Option<bool>,     // Flag for activities needing user review
-    pub source_system: Option<String>,  // SNAPTRADE, PLAID, MANUAL, CSV
+    pub metadata: Option<String>,         // JSON blob for sync metadata
+    pub needs_review: Option<bool>,       // Flag for activities needing user review
+    pub source_system: Option<String>,    // SNAPTRADE, PLAID, MANUAL, CSV
     pub source_record_id: Option<String>, // Provider's record ID
     pub source_group_id: Option<String>,  // Provider grouping key
 }

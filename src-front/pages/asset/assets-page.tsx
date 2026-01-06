@@ -52,7 +52,7 @@ export default function AssetsPage() {
     await updateAssetMutation.mutateAsync({
       assetId: values.symbol,
       payload,
-      dataSource: values.dataSource,
+      preferredProvider: values.preferredProvider,
     });
     closeEditor();
   };

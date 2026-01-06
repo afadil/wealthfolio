@@ -43,7 +43,8 @@ impl AccountRepositoryTrait for AccountRepository {
 
                 diesel::insert_into(accounts::table)
                     .values(&account_db)
-                    .execute(conn).map_err(StorageError::from)?;
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
 
                 Ok(account_db.into())
             })
@@ -69,7 +70,8 @@ impl AccountRepositoryTrait for AccountRepository {
 
                 diesel::update(accounts.find(&account_db.id))
                     .set(&account_db)
-                    .execute(conn).map_err(StorageError::from)?;
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
 
                 Ok(account_db.into())
             })
@@ -122,8 +124,9 @@ impl AccountRepositoryTrait for AccountRepository {
         let id_to_delete_owned = account_id_param.to_string();
         self.writer
             .exec(move |conn| {
-                let affected_rows =
-                    diesel::delete(accounts.find(id_to_delete_owned)).execute(conn).map_err(StorageError::from)?;
+                let affected_rows = diesel::delete(accounts.find(id_to_delete_owned))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
                 Ok(affected_rows)
             })
             .await

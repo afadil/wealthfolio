@@ -1,4 +1,6 @@
-use crate::assets::{Asset, AssetServiceTrait, Country as AssetCountry, Sector as AssetSector};
+use crate::assets::{
+    Asset, AssetKind, AssetServiceTrait, Country as AssetCountry, Sector as AssetSector,
+};
 use crate::errors::{CalculatorError, Error as CoreError, Result};
 use crate::fx::currency::{get_normalization_rule, normalize_currency_code};
 use crate::portfolio::holdings::holdings_model::{
@@ -10,7 +12,7 @@ use chrono::Utc;
 use log::{debug, error, warn};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
-use serde_json;
+use serde_json::{self, Value};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -74,9 +76,15 @@ fn normalize_holding_currency(holding: &mut Holding) {
             holding.fx_rate = Some(rate / factor);
         }
 
-        if holding.holding_type == HoldingType::Security {
+        if holding.holding_type == HoldingType::Security
+            || holding.holding_type == HoldingType::AlternativeAsset
+        {
             if let Some(price) = holding.price {
                 holding.price = Some(price * factor);
+            }
+            // Also normalize purchase_price for alternative assets
+            if let Some(purchase_price) = holding.purchase_price {
+                holding.purchase_price = Some(purchase_price * factor);
             }
         } else if holding.holding_type == HoldingType::Cash {
             holding.price = Some(Decimal::ONE);
@@ -145,7 +153,15 @@ impl HoldingsServiceTrait for HoldingsService {
             .into_iter()
             .collect();
 
-        let instruments_map: HashMap<String, Instrument> = if !security_symbols.is_empty() {
+        // AssetInfo combines instrument data with kind and metadata for holding creation
+        struct AssetInfo {
+            instrument: Instrument,
+            kind: AssetKind,
+            metadata: Option<Value>,
+            purchase_price: Option<Decimal>,
+        }
+
+        let assets_info_map: HashMap<String, AssetInfo> = if !security_symbols.is_empty() {
             match self
                 .asset_service
                 .get_assets_by_symbols(&security_symbols)
@@ -154,22 +170,26 @@ impl HoldingsServiceTrait for HoldingsService {
                 Ok(assets) => assets
                     .into_iter()
                     .map(|asset: Asset| {
-                        let countries_vec = asset.countries.as_ref().and_then(|c| {
-                            serde_json::from_str::<Option<Vec<AssetCountry>>>(c)
-                                .map_err(|e| {
-                                    warn!("Failed to parse countries for {}: {}", asset.symbol, e)
+                        // Extract countries and sectors from profile JSON
+                        let (countries_vec, sectors_vec) =
+                            extract_countries_sectors_from_profile(&asset);
+
+                        // Extract metadata (already a Value, no parsing needed)
+                        let metadata: Option<Value> = asset.metadata.clone();
+
+                        // Extract purchase_price from metadata for alternative assets
+                        let purchase_price: Option<Decimal> =
+                            metadata.as_ref().and_then(|m| {
+                                m.get("purchase_price").and_then(|v| {
+                                    if let Some(s) = v.as_str() {
+                                        s.parse::<Decimal>().ok()
+                                    } else if let Some(n) = v.as_f64() {
+                                        Decimal::try_from(n).ok()
+                                    } else {
+                                        None
+                                    }
                                 })
-                                .ok()
-                                .flatten()
-                        });
-                        let sectors_vec = asset.sectors.as_ref().and_then(|s| {
-                            serde_json::from_str::<Option<Vec<AssetSector>>>(s)
-                                .map_err(|e| {
-                                    warn!("Failed to parse sectors for {}: {}", asset.symbol, e)
-                                })
-                                .ok()
-                                .flatten()
-                        });
+                            });
 
                         let instrument = Instrument {
                             id: asset.id.clone(),
@@ -177,7 +197,7 @@ impl HoldingsServiceTrait for HoldingsService {
                             name: asset.name,
                             currency: asset.currency,
                             notes: asset.notes,
-                            data_source: Some(asset.data_source),
+                            preferred_provider: asset.preferred_provider.clone(),
                             asset_class: asset.asset_class,
                             asset_subclass: asset.asset_sub_class,
                             countries: countries_vec.map(|c| {
@@ -197,7 +217,14 @@ impl HoldingsServiceTrait for HoldingsService {
                                     .collect()
                             }),
                         };
-                        (asset.id, instrument)
+
+                        let asset_info = AssetInfo {
+                            instrument,
+                            kind: asset.kind,
+                            metadata,
+                            purchase_price,
+                        };
+                        (asset.id, asset_info)
                     })
                     .collect(),
                 Err(e) => {
@@ -215,23 +242,32 @@ impl HoldingsServiceTrait for HoldingsService {
         let mut holdings: Vec<Holding> = Vec::new();
 
         for snapshot_pos in &snapshot_positions {
-            let instrument_view = instruments_map.get(&snapshot_pos.asset_id).cloned();
+            let asset_info = assets_info_map.get(&snapshot_pos.asset_id);
 
-            if instrument_view.is_none() {
+            if asset_info.is_none() {
                 warn!(
-                    "Instrument details not found for asset_id: {}. Skipping this security holding view.",
+                    "Asset details not found for asset_id: {}. Skipping this holding view.",
                     snapshot_pos.asset_id
                 );
                 continue;
             }
+            let asset_info = asset_info.unwrap();
+
+            // Determine holding type based on asset kind
+            let (holding_type, id_prefix) = if asset_info.kind.is_alternative() {
+                (HoldingType::AlternativeAsset, "ALT")
+            } else {
+                (HoldingType::Security, "SEC")
+            };
 
             let cost_basis_local_val = snapshot_pos.total_cost_basis;
 
             let holding_view = Holding {
-                id: format!("SEC-{}-{}", account_id, snapshot_pos.asset_id),
+                id: format!("{}-{}-{}", id_prefix, account_id, snapshot_pos.asset_id),
                 account_id: account_id.to_string(),
-                holding_type: HoldingType::Security,
-                instrument: instrument_view,
+                holding_type,
+                instrument: Some(asset_info.instrument.clone()),
+                asset_kind: Some(asset_info.kind.clone()),
                 quantity: snapshot_pos.quantity,
                 open_date: Some(snapshot_pos.inception_date),
                 lots: None,
@@ -244,6 +280,7 @@ impl HoldingsServiceTrait for HoldingsService {
                     base: Decimal::ZERO,
                 }),
                 price: None,
+                purchase_price: asset_info.purchase_price,
                 unrealized_gain: None,
                 unrealized_gain_pct: None,
                 realized_gain: None,
@@ -255,6 +292,7 @@ impl HoldingsServiceTrait for HoldingsService {
                 prev_close_value: None,
                 weight: Decimal::ZERO,
                 as_of_date: today,
+                metadata: asset_info.metadata.clone(),
             };
             holdings.push(holding_view);
         }
@@ -269,6 +307,7 @@ impl HoldingsServiceTrait for HoldingsService {
                 account_id: account_id.to_string(),
                 holding_type: HoldingType::Cash,
                 instrument: None,
+                asset_kind: Some(AssetKind::Cash),
                 quantity: amount,
                 open_date: None,
                 lots: None,
@@ -284,6 +323,7 @@ impl HoldingsServiceTrait for HoldingsService {
                     base: Decimal::ZERO,
                 }),
                 price: Some(dec!(1.0)),
+                purchase_price: None,
                 unrealized_gain: Some(MonetaryValue::zero()),
                 unrealized_gain_pct: Some(Decimal::ZERO),
                 realized_gain: Some(MonetaryValue::zero()),
@@ -298,6 +338,7 @@ impl HoldingsServiceTrait for HoldingsService {
                 }),
                 weight: Decimal::ZERO,
                 as_of_date: today,
+                metadata: None,
             };
             holdings.push(holding_view);
         }
@@ -412,27 +453,23 @@ impl HoldingsServiceTrait for HoldingsService {
             )))
         })?;
 
-        let countries_vec = asset_details.countries.as_ref().and_then(|c| {
-            serde_json::from_str::<Option<Vec<AssetCountry>>>(c)
-                .map_err(|e| {
-                    warn!(
-                        "Failed to parse countries for {}: {}",
-                        asset_details.symbol, e
-                    )
-                })
-                .ok()
-                .flatten()
-        });
-        let sectors_vec = asset_details.sectors.as_ref().and_then(|s| {
-            serde_json::from_str::<Option<Vec<AssetSector>>>(s)
-                .map_err(|e| {
-                    warn!(
-                        "Failed to parse sectors for {}: {}",
-                        asset_details.symbol, e
-                    )
-                })
-                .ok()
-                .flatten()
+        // Extract countries and sectors from profile JSON
+        let (countries_vec, sectors_vec) = extract_countries_sectors_from_profile(&asset_details);
+
+        // Extract metadata (already a Value, no parsing needed)
+        let metadata: Option<Value> = asset_details.metadata.clone();
+
+        // Extract purchase_price from metadata for alternative assets
+        let purchase_price: Option<Decimal> = metadata.as_ref().and_then(|m| {
+            m.get("purchase_price").and_then(|v| {
+                if let Some(s) = v.as_str() {
+                    s.parse::<Decimal>().ok()
+                } else if let Some(n) = v.as_f64() {
+                    Decimal::try_from(n).ok()
+                } else {
+                    None
+                }
+            })
         });
 
         let instrument = Instrument {
@@ -441,7 +478,7 @@ impl HoldingsServiceTrait for HoldingsService {
             name: asset_details.name,
             currency: asset_details.currency,
             notes: asset_details.notes,
-            data_source: Some(asset_details.data_source),
+            preferred_provider: asset_details.preferred_provider.clone(),
             asset_class: asset_details.asset_class,
             asset_subclass: asset_details.asset_sub_class,
             countries: countries_vec.map(|c| {
@@ -462,11 +499,19 @@ impl HoldingsServiceTrait for HoldingsService {
             }),
         };
 
+        // Determine holding type based on asset kind
+        let (holding_type, id_prefix) = if asset_details.kind.is_alternative() {
+            (HoldingType::AlternativeAsset, "ALT")
+        } else {
+            (HoldingType::Security, "SEC")
+        };
+
         let holding_view = Holding {
-            id: format!("SEC-{}-{}", account_id, asset_id),
+            id: format!("{}-{}-{}", id_prefix, account_id, asset_id),
             account_id: account_id.to_string(),
-            holding_type: HoldingType::Security,
+            holding_type,
             instrument: Some(instrument),
+            asset_kind: Some(asset_details.kind.clone()),
             quantity: position.quantity,
             open_date: Some(position.inception_date),
             lots: Some(position.lots),
@@ -479,6 +524,7 @@ impl HoldingsServiceTrait for HoldingsService {
                 base: Decimal::ZERO,
             }),
             price: None,
+            purchase_price,
             unrealized_gain: None,
             unrealized_gain_pct: None,
             realized_gain: None,
@@ -490,6 +536,7 @@ impl HoldingsServiceTrait for HoldingsService {
             prev_close_value: None,
             weight: Decimal::ZERO,
             as_of_date: today,
+            metadata,
         };
 
         let mut single_holding_vec = vec![holding_view];
@@ -521,6 +568,47 @@ impl HoldingsServiceTrait for HoldingsService {
     }
 }
 
+/// Helper function to extract countries and sectors from the asset's profile JSON.
+/// Returns (countries, sectors) as Option<Vec<T>> values.
+fn extract_countries_sectors_from_profile(
+    asset: &Asset,
+) -> (Option<Vec<AssetCountry>>, Option<Vec<AssetSector>>) {
+    let profile = match &asset.profile {
+        Some(p) => p,
+        None => return (None, None),
+    };
+
+    // Extract countries from profile.countries (stored as JSON string)
+    let countries_vec = profile.get("countries").and_then(|c| {
+        if let Some(s) = c.as_str() {
+            serde_json::from_str::<Option<Vec<AssetCountry>>>(s)
+                .map_err(|e| {
+                    warn!("Failed to parse countries for {}: {}", asset.symbol, e);
+                })
+                .ok()
+                .flatten()
+        } else {
+            None
+        }
+    });
+
+    // Extract sectors from profile.sectors (stored as JSON string)
+    let sectors_vec = profile.get("sectors").and_then(|s| {
+        if let Some(str_val) = s.as_str() {
+            serde_json::from_str::<Option<Vec<AssetSector>>>(str_val)
+                .map_err(|e| {
+                    warn!("Failed to parse sectors for {}: {}", asset.symbol, e);
+                })
+                .ok()
+                .flatten()
+        } else {
+            None
+        }
+    });
+
+    (countries_vec, sectors_vec)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::snapshot::Lot;
@@ -544,12 +632,13 @@ mod tests {
                 name: Some("Test".to_string()),
                 currency: "GBp".to_string(),
                 notes: None,
-                data_source: None,
+                preferred_provider: None,
                 asset_class: None,
                 asset_subclass: None,
                 countries: None,
                 sectors: None,
             }),
+            asset_kind: None,
             quantity: dec!(1),
             open_date: None,
             lots: Some(VecDeque::from(vec![Lot {
@@ -574,6 +663,7 @@ mod tests {
                 base: dec!(30),
             }),
             price: Some(dec!(3090)),
+            purchase_price: None,
             unrealized_gain: Some(MonetaryValue {
                 local: dec!(90),
                 base: dec!(0.9),
@@ -597,6 +687,7 @@ mod tests {
             }),
             weight: dec!(0.1),
             as_of_date: as_of,
+            metadata: None,
         };
 
         normalize_holding_currency(&mut holding);
@@ -630,6 +721,7 @@ mod tests {
             account_id: "TEST".to_string(),
             holding_type: HoldingType::Cash,
             instrument: None,
+            asset_kind: None,
             quantity: dec!(1000),
             open_date: None,
             lots: None,
@@ -645,6 +737,7 @@ mod tests {
                 base: dec!(10),
             }),
             price: Some(dec!(1)),
+            purchase_price: None,
             unrealized_gain: Some(MonetaryValue::zero()),
             unrealized_gain_pct: Some(Decimal::ZERO),
             realized_gain: Some(MonetaryValue::zero()),
@@ -662,6 +755,7 @@ mod tests {
             }),
             weight: dec!(1),
             as_of_date: Utc::now().date_naive(),
+            metadata: None,
         };
 
         normalize_holding_currency(&mut holding);

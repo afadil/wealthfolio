@@ -18,14 +18,25 @@ export {
   ACTIVITY_SUBTYPES,
   ACTIVITY_TYPE_DISPLAY_NAMES,
   ACTIVITY_TYPES,
+  AlternativeAssetKind,
+  ALTERNATIVE_ASSET_DEFAULT_GROUPS,
+  ALTERNATIVE_ASSET_KIND_DISPLAY_NAMES,
   ASSET_KINDS,
   DataSource,
+  defaultGroupForAccountType,
   ExportDataType,
   ExportedFileFormat,
+  HOLDING_CATEGORY_FILTERS,
+  HOLDING_GROUP_DISPLAY_NAMES,
+  HOLDING_GROUP_ORDER,
   HoldingType,
   ImportFormat,
+  isAlternativeAssetType,
+  isLiabilityType,
   SUBTYPE_DISPLAY_NAMES,
 } from "./constants";
+
+export type { HoldingCategoryFilterId } from "./constants";
 
 export type { ActivitySubtype, AssetKind, ImportRequiredField } from "./constants";
 
@@ -242,28 +253,6 @@ export interface CsvRowError {
   index?: number;
 }
 
-export interface AssetProfile {
-  id: string;
-  isin: string | null;
-  name: string | null;
-  assetType: string | null;
-  symbol: string;
-  symbolMapping: string | null;
-  assetClass: string | null;
-  assetSubClass: string | null;
-  notes: string | null;
-  countries: string | null;
-  categories: string | null;
-  classes: string | null;
-  attributes: string | null;
-  createdAt: Date;
-  currency: string;
-  dataSource: string;
-  updatedAt: Date;
-  sectors: string | null;
-  url: string | null;
-}
-
 export interface QuoteSummary {
   exchange: string;
   shortName: string;
@@ -332,7 +321,7 @@ export interface Instrument {
   name?: string | null;
   currency: string;
   notes?: string | null;
-  dataSource?: string | null;
+  preferredProvider?: string | null;
   assetClass?: string | null;
   assetSubclass?: string | null;
   countries?: Country[] | null;
@@ -379,6 +368,7 @@ export interface Holding {
   holdingType: HoldingType;
   accountId: string;
   instrument?: Instrument | null;
+  assetKind?: AssetKind | null;
   quantity: number;
   openDate?: string | Date | null;
   lots?: Lot[] | null;
@@ -401,36 +391,34 @@ export interface Holding {
   asOfDate: string;
 }
 
+/**
+ * Asset interface matching the new provider-agnostic backend model
+ */
 export interface Asset {
   id: string;
-  symbol: string;
+  symbol: string; // Canonical ticker (no provider suffix)
   name?: string | null;
 
-  // Behavior classification
-  kind?: AssetKind;
+  // Behavior classification (NOT NULL in backend)
+  kind: AssetKind;
 
-  // Provider/market taxonomy
-  assetType?: string | null;
+  // Market identity
+  exchangeMic?: string | null; // ISO 10383 MIC code
+
+  // Classification
   assetClass?: string | null;
   assetSubClass?: string | null;
-
-  // Identifiers
   isin?: string | null;
   currency: string;
 
-  // Pricing
-  dataSource: string;
-  quoteSymbol?: string | null;
+  // Pricing configuration
+  pricingMode: "MARKET" | "MANUAL" | "DERIVED" | "NONE";
+  preferredProvider?: string | null; // Provider hint (YAHOO, ALPHA_VANTAGE)
+  providerOverrides?: Record<string, unknown> | null; // Per-provider params
 
-  // Legacy fields for backward compatibility
-  symbolMapping?: string | null;
+  // Metadata
   notes?: string | null;
-  countries?: string | null;
-  categories?: string | null;
-  classes?: string | null;
-  attributes?: string | null;
-  sectors?: string | null;
-  url?: string | null;
+  profile?: AssetProfileData | null; // Contains: sectors, countries, website
 
   // Status
   isActive?: boolean;
@@ -441,6 +429,15 @@ export interface Asset {
   // Audit
   createdAt: string; // ISO date string
   updatedAt: string; // ISO date string
+}
+
+/**
+ * Profile data for an asset (sectors, countries, website)
+ */
+export interface AssetProfileData {
+  sectors?: string | null;
+  countries?: string | null;
+  website?: string | null;
 }
 
 export interface Quote {
@@ -456,6 +453,7 @@ export interface Quote {
   close: number;
   adjclose: number;
   currency: string;
+  notes?: string | null;
 }
 
 export interface QuoteUpdate {
@@ -648,7 +646,6 @@ export interface PerformanceMetrics {
 
 export interface UpdateAssetProfile {
   symbol: string;
-  symbolMapping?: string | null;
   name?: string;
   sectors: string;
   countries: string;
@@ -701,6 +698,7 @@ export interface Platform {
   name: string | null;
   url: string;
   externalId: string | null;
+  logoUrl?: string | null;
 }
 
 // ============================================================================
@@ -759,4 +757,268 @@ export interface BrokerSyncState {
   syncStatus: SyncStatus;
   createdAt: string;
   updatedAt: string;
+}
+
+// ============================================================================
+// Alternative Assets Types
+// ============================================================================
+
+/**
+ * Alternative asset kind for API requests (lowercase variants)
+ */
+export type AlternativeAssetKindApi =
+  | "property"
+  | "vehicle"
+  | "collectible"
+  | "precious"
+  | "liability"
+  | "other";
+
+/**
+ * Request to create a new alternative asset (property, vehicle, collectible, etc.)
+ * All monetary values are decimal strings to preserve precision.
+ *
+ * NOTE: Alternative assets don't create accounts or activities - just asset + quotes.
+ */
+export interface CreateAlternativeAssetRequest {
+  /** The kind of alternative asset */
+  kind: AlternativeAssetKindApi;
+  /** User-provided name for the asset */
+  name: string;
+  /** Currency code (e.g., "USD", "EUR") */
+  currency: string;
+  /** Current total value as decimal string */
+  currentValue: string;
+  /** Valuation date in ISO format (YYYY-MM-DD) */
+  valueDate: string;
+  /** Optional purchase price as decimal string - for gain calculation */
+  purchasePrice?: string;
+  /** Optional purchase date in ISO format */
+  purchaseDate?: string;
+  /** Kind-specific metadata (e.g., property_type, metal_type, unit) */
+  metadata?: Record<string, string>;
+  /** For liabilities: optional ID of the financed asset (UI-only linking) */
+  linkedAssetId?: string;
+}
+
+/**
+ * Response after creating an alternative asset
+ */
+export interface CreateAlternativeAssetResponse {
+  /** Generated asset ID with prefix (e.g., "PROP-a1b2c3d4") */
+  assetId: string;
+  /** ID of the initial valuation quote */
+  quoteId: string;
+}
+
+/**
+ * Request to update the valuation of an alternative asset
+ */
+export interface UpdateValuationRequest {
+  /** New value as decimal string */
+  value: string;
+  /** Valuation date in ISO format (YYYY-MM-DD) */
+  date: string;
+  /** Optional notes about this valuation */
+  notes?: string;
+}
+
+/**
+ * Response after updating a valuation
+ */
+export interface UpdateValuationResponse {
+  /** ID of the created quote */
+  quoteId: string;
+  /** The valuation date */
+  valuationDate: string;
+  /** The value as decimal string */
+  value: string;
+}
+
+/**
+ * Request to link a liability to an asset (UI-only aggregation)
+ */
+export interface LinkLiabilityRequest {
+  /** ID of the property/vehicle to link to */
+  targetAssetId: string;
+}
+
+/**
+ * Information about a stale asset valuation
+ */
+export interface StaleAssetInfo {
+  /** Asset ID */
+  assetId: string;
+  /** Asset name (if available) */
+  name?: string;
+  /** Date of the last valuation (ISO format) */
+  valuationDate: string;
+  /** Number of days since last valuation */
+  daysStale: number;
+}
+
+/**
+ * Individual item in the assets or liabilities breakdown
+ */
+export interface BreakdownItem {
+  /** Category key (e.g., "cash", "investments", "properties") */
+  category: string;
+  /** Display name */
+  name: string;
+  /** Value in base currency (positive magnitude) as decimal string */
+  value: string;
+  /** Optional: asset ID for individual items */
+  assetId?: string;
+}
+
+/**
+ * Assets section of the balance sheet
+ */
+export interface AssetsSection {
+  /** Total assets value in base currency as decimal string */
+  total: string;
+  /** Breakdown by category */
+  breakdown: BreakdownItem[];
+}
+
+/**
+ * Liabilities section of the balance sheet
+ */
+export interface LiabilitiesSection {
+  /** Total liabilities value in base currency as decimal string */
+  total: string;
+  /** Breakdown by individual liability */
+  breakdown: BreakdownItem[];
+}
+
+/**
+ * Response containing net worth calculation - structured as a balance sheet
+ */
+export interface NetWorthResponse {
+  /** As-of date for the calculation (ISO format) */
+  date: string;
+  /** Assets section with total and breakdown */
+  assets: AssetsSection;
+  /** Liabilities section with total and breakdown */
+  liabilities: LiabilitiesSection;
+  /** Net worth (assets - liabilities) as decimal string */
+  netWorth: string;
+  /** Base currency used for the calculation */
+  currency: string;
+  /** Oldest valuation date used in the calculation */
+  oldestValuationDate?: string;
+  /** Assets with valuations older than 90 days */
+  staleAssets: StaleAssetInfo[];
+}
+
+/**
+ * Single point in net worth history
+ */
+export interface NetWorthHistoryPoint {
+  /** Date of this data point (ISO format) */
+  date: string;
+  /** Total assets value as decimal string */
+  totalAssets: string;
+  /** Total liabilities as decimal string (positive magnitude) */
+  totalLiabilities: string;
+  /** Net worth (assets - liabilities) as decimal string */
+  netWorth: string;
+  /** Currency */
+  currency: string;
+}
+
+/**
+ * Alternative asset holding with valuation details.
+ * Simplified model: no account, no activities, just asset + quotes.
+ */
+export interface AlternativeAssetHolding {
+  /** Asset ID (e.g., "PROP-a1b2c3d4") */
+  id: string;
+  /** Asset kind (property, vehicle, collectible, precious, liability, other) */
+  kind: string;
+  /** Asset name */
+  name: string;
+  /** Asset symbol (same as ID for alternative assets) */
+  symbol: string;
+  /** Currency */
+  currency: string;
+  /** Current market value from latest quote */
+  marketValue: string;
+  /** Purchase price if available (from metadata) */
+  purchasePrice?: string;
+  /** Purchase date if available (from metadata) */
+  purchaseDate?: string;
+  /** Unrealized gain (market_value - purchase_price) */
+  unrealizedGain?: string;
+  /** Unrealized gain percentage */
+  unrealizedGainPct?: string;
+  /** Date of the latest valuation (ISO format) */
+  valuationDate: string;
+  /** Kind-specific metadata */
+  metadata?: Record<string, unknown>;
+  /** For liabilities: linked asset ID if any */
+  linkedAssetId?: string;
+}
+
+/**
+ * Property-specific metadata fields
+ */
+export interface PropertyMetadata {
+  propertyType?: "residence" | "rental" | "land" | "commercial";
+  address?: string;
+  purchasePrice?: string;
+  purchaseDate?: string;
+  purchaseCurrency?: string;
+}
+
+/**
+ * Vehicle-specific metadata fields
+ */
+export interface VehicleMetadata {
+  vehicleType?: "car" | "motorcycle" | "boat" | "rv";
+  purchasePrice?: string;
+  purchaseDate?: string;
+}
+
+/**
+ * Collectible-specific metadata fields
+ */
+export interface CollectibleMetadata {
+  collectibleType?: "art" | "wine" | "watch" | "jewelry" | "memorabilia";
+  purchasePrice?: string;
+  purchaseDate?: string;
+}
+
+/**
+ * Physical precious metals-specific metadata fields
+ */
+export interface PreciousMetalMetadata {
+  metalType?: "gold" | "silver" | "platinum" | "palladium";
+  unit?: "oz" | "g" | "kg";
+  purchasePricePerUnit?: string;
+  purchaseDate?: string;
+}
+
+/**
+ * Liability-specific metadata fields
+ */
+export interface LiabilityMetadata {
+  liabilityType?: "mortgage" | "auto_loan" | "student_loan" | "credit_card" | "personal_loan" | "heloc";
+  linkedAssetId?: string;
+  originalAmount?: string;
+  originationDate?: string;
+  interestRate?: string;
+}
+
+/**
+ * User configuration for net worth view
+ */
+export interface NetWorthConfig {
+  includeInvestments: boolean;
+  includeProperties: boolean;
+  includeVehicles: boolean;
+  includeCollectibles: boolean;
+  includePreciousMetals: boolean;
+  includeOtherAssets: boolean;
+  includeLiabilities: boolean;
 }

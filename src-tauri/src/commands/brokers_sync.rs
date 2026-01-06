@@ -3,15 +3,15 @@
 use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tauri::{AppHandle, State};
+use tauri::State;
 use wealthfolio_core::accounts::Account;
 
 use crate::context::ServiceContext;
 use crate::secret_store::KeyringSecretStore;
 use wealthfolio_connect::{
-    broker::BrokerApiClient, BrokerConnection, ConnectApiClient, Platform,
-    PlansResponse, SyncAccountsResponse, SyncActivitiesResponse, SyncConnectionsResponse,
-    UserInfo, DEFAULT_CLOUD_API_URL,
+    broker::BrokerApiClient, BrokerAccount, BrokerConnection, ConnectApiClient, PlansResponse,
+    Platform, SyncAccountsResponse, SyncActivitiesResponse, SyncConnectionsResponse, UserInfo,
+    DEFAULT_CLOUD_API_URL,
 };
 use wealthfolio_core::secrets::SecretStore;
 
@@ -147,10 +147,7 @@ pub async fn perform_broker_sync(context: &Arc<ServiceContext>) -> Result<SyncRe
 
     // Step 1: Fetch and sync connections (platforms)
     info!("Fetching broker connections...");
-    let connections = client
-        .list_connections()
-        .await
-        .map_err(|e| e.to_string())?;
+    let connections = client.list_connections().await.map_err(|e| e.to_string())?;
     info!("Found {} broker connections", connections.len());
 
     let connections_result = context
@@ -167,7 +164,7 @@ pub async fn perform_broker_sync(context: &Arc<ServiceContext>) -> Result<SyncRe
     // Step 2: Fetch and sync accounts (FX rates are registered via AccountService)
     info!("Fetching broker accounts...");
     let authorization_ids: Vec<String> = connections.iter().map(|c| c.id.clone()).collect();
-    let accounts = client
+    let all_accounts = client
         .list_accounts(if authorization_ids.is_empty() {
             None
         } else {
@@ -175,7 +172,39 @@ pub async fn perform_broker_sync(context: &Arc<ServiceContext>) -> Result<SyncRe
         })
         .await
         .map_err(|e| e.to_string())?;
-    info!("Found {} broker accounts", accounts.len());
+
+    // Log all accounts with their sync_enabled status for debugging
+    info!(
+        "Fetched {} total broker accounts from API",
+        all_accounts.len()
+    );
+    for acc in &all_accounts {
+        debug!(
+            "  Account '{}' (id={:?}): sync_enabled={}, shared_with_household={}",
+            acc.name.as_deref().unwrap_or("unnamed"),
+            acc.id,
+            acc.sync_enabled,
+            acc.shared_with_household
+        );
+    }
+
+    // Filter accounts to only sync those with sync_enabled = true
+    let accounts: Vec<_> = all_accounts
+        .into_iter()
+        .filter(|a| a.sync_enabled)
+        .collect();
+
+    // Create a set of sync-enabled broker account IDs to filter activity sync (before moving accounts)
+    let sync_enabled_broker_ids: std::collections::HashSet<String> = accounts
+        .iter()
+        .filter_map(|a| a.id.clone())
+        .collect();
+
+    let total_accounts = accounts.len();
+    info!(
+        "Filtered to {} broker accounts with sync_enabled=true",
+        total_accounts
+    );
 
     let accounts_result = context
         .sync_service()
@@ -203,6 +232,15 @@ pub async fn perform_broker_sync(context: &Arc<ServiceContext>) -> Result<SyncRe
         let Some(broker_account_id) = account.provider_account_id.clone() else {
             continue;
         };
+
+        // Skip accounts that are not sync-enabled
+        if !sync_enabled_broker_ids.contains(&broker_account_id) {
+            info!(
+                "Skipping activity sync for account '{}' (sync disabled)",
+                account.name
+            );
+            continue;
+        }
 
         let account_id = account.id.clone();
         let account_name = account.name.clone();
@@ -313,13 +351,14 @@ pub async fn perform_broker_sync(context: &Arc<ServiceContext>) -> Result<SyncRe
                     .upsert_account_activities(account_id.clone(), data.clone())
                     .await
                 {
-                    Ok((activities_upserted, assets_inserted)) => {
+                    Ok((activities_upserted, assets_inserted, new_asset_ids)) => {
                         info!(
                             "Upserted {} activities, {} assets for '{}'",
                             activities_upserted, assets_inserted, account_name
                         );
                         activities_summary.activities_upserted += activities_upserted;
                         activities_summary.assets_inserted += assets_inserted;
+                        activities_summary.new_asset_ids.extend(new_asset_ids);
                     }
                     Err(e) => {
                         let e = format!("Failed to upsert activities: {}", e);
@@ -452,13 +491,25 @@ pub async fn list_broker_connections(
     info!("Fetching broker connections from cloud API...");
 
     let client = create_api_client()?;
-    let connections = client
-        .list_connections()
-        .await
-        .map_err(|e| e.to_string())?;
+    let connections = client.list_connections().await.map_err(|e| e.to_string())?;
 
     info!("Found {} broker connections", connections.len());
     Ok(connections)
+}
+
+/// List broker accounts from the cloud API
+/// Returns the live account data including sync_enabled and owner info
+#[tauri::command]
+pub async fn list_broker_accounts(
+    _state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<BrokerAccount>, String> {
+    info!("Fetching broker accounts from cloud API...");
+
+    let client = create_api_client()?;
+    let accounts = client.list_accounts(None).await.map_err(|e| e.to_string())?;
+
+    info!("Found {} broker accounts", accounts.len());
+    Ok(accounts)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -493,7 +544,7 @@ pub async fn get_user_info(_state: State<'_, Arc<ServiceContext>>) -> Result<Use
     let client = create_api_client()?;
     match client.get_user_info().await {
         Ok(user_info) => {
-            info!("User info retrieved for: {}", user_info.email);
+            info!("User info retrieved for: {}", user_info.email.as_deref().unwrap_or("unknown"));
             Ok(user_info)
         }
         Err(e) => {
@@ -556,17 +607,3 @@ pub async fn has_active_subscription() -> Result<bool, String> {
 // ─────────────────────────────────────────────────────────────────────────────
 // Foreground Sync Command
 // ─────────────────────────────────────────────────────────────────────────────
-
-/// Trigger a foreground sync (called when app comes to foreground).
-///
-/// This command:
-/// - Checks if sync should run (throttle check using last_successful_at from DB)
-/// - If throttled, returns `{ synced: false, reason: "throttled", next_sync_available_in: X }`
-/// - If not throttled, runs sync and returns result
-#[tauri::command]
-pub async fn trigger_foreground_sync(
-    state: State<'_, Arc<ServiceContext>>,
-    handle: AppHandle,
-) -> Result<crate::scheduler::ForegroundSyncResult, String> {
-    crate::scheduler::trigger_foreground_sync(&handle, &state).await
-}

@@ -2,7 +2,7 @@
 #[cfg(test)]
 mod tests {
     use crate::activities::{Activity, ActivityStatus, ActivityType};
-    use crate::assets::{Asset, AssetRepositoryTrait, NewAsset, UpdateAssetProfile};
+    use crate::assets::{Asset, AssetKind, AssetRepositoryTrait, NewAsset, PricingMode, UpdateAssetProfile};
     use crate::errors::Result;
     use crate::fx::{ExchangeRate, FxError, FxServiceTrait, NewExchangeRate};
     use crate::portfolio::snapshot::holdings_calculator::HoldingsCalculator;
@@ -47,11 +47,11 @@ mod tests {
                 symbol: symbol.to_string(),
                 currency: currency.to_string(),
                 name: Some(format!("Mock Asset {}", symbol)),
-                asset_type: Some("STOCK".to_string()),
                 asset_class: Some("EQUITY".to_string()),
+                kind: AssetKind::Security,
+                pricing_mode: PricingMode::Market,
                 created_at: Utc::now().naive_utc(),
                 updated_at: Utc::now().naive_utc(),
-                data_source: "MOCK".to_string(),
                 ..Default::default()
             };
             self.assets.insert(symbol.to_string(), asset);
@@ -564,6 +564,7 @@ mod tests {
             }]),
             created_at: Utc::now(),
             last_updated: Utc::now(),
+            is_alternative: false,
         };
         previous_snapshot
             .positions
@@ -673,7 +674,10 @@ mod tests {
         );
         // Verify cash_total_account_currency is computed correctly (converted to CAD)
         let expected_cash_total_cad = expected_cash_usd * rate_usd_cad; // -1262.5 CAD
-        assert_eq!(next_state.cash_total_account_currency, expected_cash_total_cad);
+        assert_eq!(
+            next_state.cash_total_account_currency,
+            expected_cash_total_cad
+        );
 
         // Check overall cost_basis of the snapshot (should be in account currency - CAD)
         // Position cost basis is 1010 USD. Converted to CAD: 1010 USD * 1.25 CAD/USD = 1262.5 CAD
@@ -740,7 +744,10 @@ mod tests {
         );
         // Verify cash_total_account_currency is computed correctly
         let expected_cash_total_cad = dec!(1000) + (net_deposit_usd * rate_usd_cad); // 1000 + 123.75 = 1123.75 CAD
-        assert_eq!(next_state.cash_total_account_currency, expected_cash_total_cad);
+        assert_eq!(
+            next_state.cash_total_account_currency,
+            expected_cash_total_cad
+        );
 
         // Check net contribution (should be in account currency - CAD)
         // Net contribution change is based on the pre-fee deposit amount converted to account currency.
@@ -813,7 +820,10 @@ mod tests {
         );
         // Verify cash_total_account_currency is computed correctly
         let expected_cash_total_cad = dec!(2000) + (-total_withdrawal_usd * rate_usd_cad); // 2000 - 65 = 1935 CAD
-        assert_eq!(next_state.cash_total_account_currency, expected_cash_total_cad);
+        assert_eq!(
+            next_state.cash_total_account_currency,
+            expected_cash_total_cad
+        );
 
         // Check net contribution (should be in account currency - CAD)
         // Net contribution change is based on the pre-fee withdrawal amount converted to account currency.
@@ -900,7 +910,10 @@ mod tests {
         );
         // Verify cash_total_account_currency is computed correctly
         let expected_cash_total_cad = expected_cash_cad + (net_interest_usd * rate_usd_cad); // 1050 + 24.7 = 1074.7 CAD
-        assert_eq!(next_state.cash_total_account_currency, expected_cash_total_cad);
+        assert_eq!(
+            next_state.cash_total_account_currency,
+            expected_cash_total_cad
+        );
 
         // Check net contribution (should remain unchanged for income activities)
         assert_eq!(
@@ -985,7 +998,10 @@ mod tests {
         );
         // Verify cash_total_account_currency is computed correctly
         let expected_cash_total_cad = expected_cash_cad + (-tax_usd * rate_usd_cad); // 975 - 65 = 910 CAD
-        assert_eq!(next_state.cash_total_account_currency, expected_cash_total_cad);
+        assert_eq!(
+            next_state.cash_total_account_currency,
+            expected_cash_total_cad
+        );
 
         // Net contribution should remain unchanged for charges
         assert_eq!(next_state.net_contribution, initial_net_contribution); // 500 CAD
@@ -1070,7 +1086,10 @@ mod tests {
         );
         // Verify cash_total_account_currency
         let expected_cash_total_add = dec!(1000) + (-fee_add_usd * rate_add_date); // 1000 - 6.5 = 993.5 CAD
-        assert_eq!(state_after_add.cash_total_account_currency, expected_cash_total_add);
+        assert_eq!(
+            state_after_add.cash_total_account_currency,
+            expected_cash_total_add
+        );
 
         // Check net contribution after External TransferIn (in CAD)
         // Cost basis added was 10 shares * 200 USD/share + 5 USD fee = 2005 USD.
@@ -1136,8 +1155,12 @@ mod tests {
             Some(&dec!(1000)) // Unchanged 1000 CAD
         );
         // Verify cash_total_account_currency
-        let expected_cash_total_remove = dec!(1000) + (expected_usd_after_remove * rate_remove_date); // 1000 - 9.1 = 990.9 CAD
-        assert_eq!(state_after_remove.cash_total_account_currency, expected_cash_total_remove);
+        let expected_cash_total_remove =
+            dec!(1000) + (expected_usd_after_remove * rate_remove_date); // 1000 - 9.1 = 990.9 CAD
+        assert_eq!(
+            state_after_remove.cash_total_account_currency,
+            expected_cash_total_remove
+        );
 
         // Check net contribution after External TransferOut (in CAD)
         // Cost basis removed was 4 shares * 200.5 USD/share (FIFO cost) = 802 USD.
@@ -1236,8 +1259,12 @@ mod tests {
             Some(&dec!(5000)) // Unchanged 5000 CAD
         );
         // Verify cash_total_account_currency
-        let expected_cash_total_asset_tx_in = dec!(5000) + (-fee_in_asset_tx_in_usd * rate_asset_date); // 5000 - 13 = 4987 CAD
-        assert_eq!(state_after_asset_tx_in.cash_total_account_currency, expected_cash_total_asset_tx_in);
+        let expected_cash_total_asset_tx_in =
+            dec!(5000) + (-fee_in_asset_tx_in_usd * rate_asset_date); // 5000 - 13 = 4987 CAD
+        assert_eq!(
+            state_after_asset_tx_in.cash_total_account_currency,
+            expected_cash_total_asset_tx_in
+        );
 
         // Net Contribution (CAD) - INTERNAL transfer (default), no net_contribution change
         assert_eq!(
@@ -1249,10 +1276,7 @@ mod tests {
         // Position cost basis 6010 USD -> 6010 * 1.30 = 7813 CAD
         let added_basis_usd = position_testusd.total_cost_basis; // 6010 USD
         let position_cost_basis_cad = added_basis_usd * rate_asset_date; // 7813 CAD
-        assert_eq!(
-            state_after_asset_tx_in.cost_basis,
-            position_cost_basis_cad
-        ); // 7813 CAD
+        assert_eq!(state_after_asset_tx_in.cost_basis, position_cost_basis_cad); // 7813 CAD
 
         // --- 2. Asset TransferOut ---
         let transfer_out_asset_activity = create_default_activity(
@@ -1300,8 +1324,12 @@ mod tests {
             Some(&dec!(5000)) // Unchanged 5000 CAD
         );
         // Verify cash_total_account_currency
-        let expected_cash_total_asset_tx_out = dec!(5000) + (expected_usd_after_asset_tx_out * rate_asset_date); // 5000 - 19.5 = 4980.5 CAD
-        assert_eq!(state_after_asset_tx_out.cash_total_account_currency, expected_cash_total_asset_tx_out);
+        let expected_cash_total_asset_tx_out =
+            dec!(5000) + (expected_usd_after_asset_tx_out * rate_asset_date); // 5000 - 19.5 = 4980.5 CAD
+        assert_eq!(
+            state_after_asset_tx_out.cash_total_account_currency,
+            expected_cash_total_asset_tx_out
+        );
 
         // Net Contribution (CAD) - INTERNAL transfer (default), no net_contribution change
         assert_eq!(
@@ -1344,10 +1372,13 @@ mod tests {
         // Cash TransferIn: 1000 - 8 = 992 USD net
         // Expected USD balance: -15 + 992 = 977 USD
         // CAD balance unchanged: 5000 CAD
-        let net_cash_in_usd = transfer_in_cash_activity.price() - transfer_in_cash_activity.fee_amt(); // 1000 - 8 = 992 USD
+        let net_cash_in_usd =
+            transfer_in_cash_activity.price() - transfer_in_cash_activity.fee_amt(); // 1000 - 8 = 992 USD
         let expected_usd_after_cash_tx_in = expected_usd_after_asset_tx_out + net_cash_in_usd; // -15 + 992 = 977 USD
         assert_eq!(
-            state_after_cash_tx_in.cash_balances.get(cash_transfer_currency),
+            state_after_cash_tx_in
+                .cash_balances
+                .get(cash_transfer_currency),
             Some(&expected_usd_after_cash_tx_in) // 977 USD
         );
         assert_eq!(
@@ -1355,8 +1386,12 @@ mod tests {
             Some(&dec!(5000)) // Unchanged 5000 CAD
         );
         // Verify cash_total_account_currency
-        let expected_cash_total_cash_tx_in = dec!(5000) + (expected_usd_after_cash_tx_in * rate_cash_date); // 5000 + 1270.1 = 6270.1 CAD
-        assert_eq!(state_after_cash_tx_in.cash_total_account_currency, expected_cash_total_cash_tx_in);
+        let expected_cash_total_cash_tx_in =
+            dec!(5000) + (expected_usd_after_cash_tx_in * rate_cash_date); // 5000 + 1270.1 = 6270.1 CAD
+        assert_eq!(
+            state_after_cash_tx_in.cash_total_account_currency,
+            expected_cash_total_cash_tx_in
+        );
 
         // Net Contribution (CAD) - INTERNAL transfer (default), no net_contribution change
         assert_eq!(
@@ -1401,7 +1436,9 @@ mod tests {
             transfer_out_cash_activity.price() + transfer_out_cash_activity.fee_amt(); // 200 + 3 = 203 USD
         let expected_usd_after_cash_tx_out = expected_usd_after_cash_tx_in - total_cash_out_usd; // 977 - 203 = 774 USD
         assert_eq!(
-            state_after_cash_tx_out.cash_balances.get(cash_transfer_currency),
+            state_after_cash_tx_out
+                .cash_balances
+                .get(cash_transfer_currency),
             Some(&expected_usd_after_cash_tx_out) // 774 USD
         );
         assert_eq!(
@@ -1409,8 +1446,12 @@ mod tests {
             Some(&dec!(5000)) // Unchanged 5000 CAD
         );
         // Verify cash_total_account_currency
-        let expected_cash_total_cash_tx_out = dec!(5000) + (expected_usd_after_cash_tx_out * rate_cash_date); // 5000 + 1006.2 = 6006.2 CAD
-        assert_eq!(state_after_cash_tx_out.cash_total_account_currency, expected_cash_total_cash_tx_out);
+        let expected_cash_total_cash_tx_out =
+            dec!(5000) + (expected_usd_after_cash_tx_out * rate_cash_date); // 5000 + 1006.2 = 6006.2 CAD
+        assert_eq!(
+            state_after_cash_tx_out.cash_total_account_currency,
+            expected_cash_total_cash_tx_out
+        );
 
         // Net Contribution (CAD) - INTERNAL transfer (default), no net_contribution change
         assert_eq!(
@@ -1510,7 +1551,10 @@ mod tests {
         );
         // Verify cash_total_account_currency (consolidated to CAD)
         let expected_cash_total_cad = dec!(1000000) + (expected_usd_cash * rate_usd_cad); // 1000000 - 5804.5 = 994195.5 CAD
-        assert_eq!(next_state.cash_total_account_currency, expected_cash_total_cad);
+        assert_eq!(
+            next_state.cash_total_account_currency,
+            expected_cash_total_cad
+        );
 
         // --- Check Snapshot Cost Basis (CAD) ---
         // Remaining position cost basis is 4507.5 USD.
@@ -1583,7 +1627,8 @@ mod tests {
         // --- Check Cash Balance (booked in ACTIVITY currency - EUR, per design spec) ---
         // Cash is booked in activity currency (EUR), not converted to account currency (CAD)
         // Cost in EUR: (10 shares * 200 EUR) + 15 EUR fee = 2015 EUR
-        let buy_cost_eur = buy_activity_eur.qty() * buy_activity_eur.price() + buy_activity_eur.fee_amt(); // 2015 EUR
+        let buy_cost_eur =
+            buy_activity_eur.qty() * buy_activity_eur.price() + buy_activity_eur.fee_amt(); // 2015 EUR
         let expected_eur_cash = -buy_cost_eur; // -2015 EUR
 
         assert_eq!(
@@ -1733,7 +1778,8 @@ mod tests {
         // USD: 47 * 1.25 = 58.75
         // EUR: 195 * 1.50 = 292.50
         // Total: 1000 + 58.75 + 292.50 = 1351.25 CAD
-        let expected_cash_total_cad = dec!(1000) + (expected_usd_cash * rate_usd_cad) + (expected_eur_cash * rate_eur_cad);
+        let expected_cash_total_cad =
+            dec!(1000) + (expected_usd_cash * rate_usd_cad) + (expected_eur_cash * rate_eur_cad);
         assert_eq!(
             next_state.cash_total_account_currency, expected_cash_total_cad,
             "Consolidated CAD cash total mismatch"
@@ -2421,8 +2467,7 @@ mod tests {
         // Total: -1005 USD * 1.30 (service rate) = -1306.50 CAD
         let expected_cash_total_cad = -expected_cost_usd * service_rate;
         assert_eq!(
-            next_state.cash_total_account_currency,
-            expected_cash_total_cad,
+            next_state.cash_total_account_currency, expected_cash_total_cad,
             "cash_total_account_currency uses FxService rate"
         );
     }
@@ -2479,8 +2524,7 @@ mod tests {
         // Verify cash_total_account_currency uses FxService rate when fx_rate is None
         let expected_cash_total_cad = -expected_cost_usd * service_rate;
         assert_eq!(
-            next_state.cash_total_account_currency,
-            expected_cash_total_cad,
+            next_state.cash_total_account_currency, expected_cash_total_cad,
             "cash_total_account_currency should use FxService rate when fx_rate is None"
         );
     }
@@ -2538,8 +2582,7 @@ mod tests {
         // Verify cash_total_account_currency uses FxService rate when fx_rate is zero
         let expected_cash_total_cad = -expected_cost_usd * service_rate;
         assert_eq!(
-            next_state.cash_total_account_currency,
-            expected_cash_total_cad,
+            next_state.cash_total_account_currency, expected_cash_total_cad,
             "cash_total_account_currency should use FxService rate when fx_rate is zero"
         );
     }
@@ -2678,6 +2721,7 @@ mod tests {
             }]),
             created_at: Utc::now(),
             last_updated: Utc::now(),
+            is_alternative: false,
         };
         previous_snapshot
             .positions
@@ -2980,7 +3024,8 @@ mod tests {
         // Net contribution for INTERNAL transfer is unchanged (default is internal)
         // This is an internal transfer so net_contribution should NOT change
         assert_eq!(
-            next_state.net_contribution, dec!(0),
+            next_state.net_contribution,
+            dec!(0),
             "Net contribution should not change for internal transfer"
         );
     }

@@ -24,6 +24,7 @@ pub struct Quote {
     pub currency: String,
     pub data_source: DataSource,
     pub created_at: DateTime<Utc>,
+    pub notes: Option<String>,
 }
 
 /// Summary model for quote search results
