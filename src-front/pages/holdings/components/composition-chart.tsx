@@ -90,6 +90,7 @@ interface CustomizedContentProps {
   y?: number;
   width?: number;
   height?: number;
+  id?: string; // Asset ID for navigation
   symbol?: string;
   name?: string;
   gain?: number;
@@ -104,6 +105,7 @@ const CustomizedContent: FC<CustomizedContentProps> = ({
   y = 0,
   width = 0,
   height = 0,
+  id,
   symbol,
   name,
   gain = 0,
@@ -140,7 +142,7 @@ const CustomizedContent: FC<CustomizedContentProps> = ({
       />
       {depth === 1 ? (
         <>
-          <Link to={`/holdings/${encodeURIComponent(symbol || "")}`}>
+          <Link to={`/holdings/${encodeURIComponent(id || symbol || "")}`}>
             <text
               x={x + width / 2}
               y={y + height / 2}
@@ -289,6 +291,7 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
         minGain = Math.min(minGain, gain);
 
         return {
+          id: holding.instrument?.id, // Asset ID for navigation
           symbol: symbol,
           name: holding.instrument?.name, // Use symbol for the treemap node name/link
           marketValueConverted: marketValue,

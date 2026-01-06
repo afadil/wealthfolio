@@ -362,21 +362,45 @@ export default function NetWorthPage() {
     };
   }, [netWorthData]);
 
-  // Calculate gain/loss from history data
+  // Calculate gain/loss from history data using contribution-adjusted calculation
   const { gainLossAmount, gainLossPercent } = useMemo(() => {
     if (!historyData || historyData.length < 2) {
       return { gainLossAmount: 0, gainLossPercent: 0 };
     }
 
-    const firstPoint = historyData[0];
-    const lastPoint = historyData[historyData.length - 1];
-    const startValue = parseFloat(firstPoint.netWorth) || 0;
-    const endValue = parseFloat(lastPoint.netWorth) || 0;
+    const first = historyData[0];
+    const last = historyData[historyData.length - 1];
 
-    const gain = endValue - startValue;
-    const percent = startValue !== 0 ? gain / startValue : 0;
+    // Parse values
+    const firstPortfolioValue = parseFloat(first.portfolioValue) || 0;
+    const lastPortfolioValue = parseFloat(last.portfolioValue) || 0;
+    const firstNetContribution = parseFloat(first.netContribution) || 0;
+    const lastNetContribution = parseFloat(last.netContribution) || 0;
+    const firstAltAssets = parseFloat(first.alternativeAssetsValue) || 0;
+    const lastAltAssets = parseFloat(last.alternativeAssetsValue) || 0;
+    const firstLiabilities = parseFloat(first.totalLiabilities) || 0;
+    const lastLiabilities = parseFloat(last.totalLiabilities) || 0;
+    const firstNetWorth = parseFloat(first.netWorth) || 0;
 
-    return { gainLossAmount: gain, gainLossPercent: percent };
+    // Portfolio gain = (last.portfolioValue - last.netContribution) - (first.portfolioValue - first.netContribution)
+    // This removes the effect of deposits/withdrawals
+    const portfolioGain =
+      (lastPortfolioValue - lastNetContribution) - (firstPortfolioValue - firstNetContribution);
+
+    // Alternative asset gain = simple delta (no contribution tracking)
+    const altAssetGain = lastAltAssets - firstAltAssets;
+
+    // Liability reduction = positive value (debt paid down is gain)
+    const liabilityReduction = firstLiabilities - lastLiabilities;
+
+    // Total gain
+    const totalGain = portfolioGain + altAssetGain + liabilityReduction;
+
+    // Percent based on starting net worth (or starting assets if net worth is zero/negative)
+    const startingBase = firstNetWorth > 0 ? firstNetWorth : Math.abs(firstNetWorth) || 1;
+    const percent = totalGain / startingBase;
+
+    return { gainLossAmount: totalGain, gainLossPercent: percent };
   }, [historyData]);
 
   const currency = netWorthData?.currency || settings?.baseCurrency || "USD";

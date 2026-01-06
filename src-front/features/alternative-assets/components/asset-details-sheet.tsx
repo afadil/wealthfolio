@@ -115,7 +115,7 @@ export function AssetDetailsSheet({
   // NOTE: This must be called before any early returns to maintain hook order
   const linkableAssetOptions: ResponsiveSelectOption[] = useMemo(() => {
     return [
-      { value: "", label: "None (standalone liability)" },
+      { value: "__none__", label: "None (standalone liability)" },
       ...linkableAssets.map((holding) => ({
         value: holding.id,
         label: holding.instrument?.name ?? holding.id,
@@ -443,10 +443,7 @@ function PropertyFields({ form }: { form: ReturnType<typeof useForm<AssetDetails
               <ResponsiveSelect
                 value={field.value ?? ""}
                 onValueChange={(val) => field.onChange(val || null)}
-                options={[
-                  { value: "", label: "Select type..." },
-                  ...PROPERTY_TYPES.map((t) => ({ value: t.value, label: t.label })),
-                ]}
+                options={PROPERTY_TYPES.map((t) => ({ value: t.value, label: t.label }))}
                 placeholder="Select property type"
                 sheetTitle="Property Type"
               />
@@ -472,10 +469,7 @@ function VehicleFields({ form }: { form: ReturnType<typeof useForm<AssetDetailsF
               <ResponsiveSelect
                 value={field.value ?? ""}
                 onValueChange={(val) => field.onChange(val || null)}
-                options={[
-                  { value: "", label: "Select type..." },
-                  ...VEHICLE_TYPES.map((t) => ({ value: t.value, label: t.label })),
-                ]}
+                options={VEHICLE_TYPES.map((t) => ({ value: t.value, label: t.label }))}
                 placeholder="Select vehicle type"
                 sheetTitle="Vehicle Type"
               />
@@ -519,10 +513,7 @@ function CollectibleFields({ form }: { form: ReturnType<typeof useForm<AssetDeta
               <ResponsiveSelect
                 value={field.value ?? ""}
                 onValueChange={(val) => field.onChange(val || null)}
-                options={[
-                  { value: "", label: "Select type..." },
-                  ...COLLECTIBLE_TYPES.map((t) => ({ value: t.value, label: t.label })),
-                ]}
+                options={COLLECTIBLE_TYPES.map((t) => ({ value: t.value, label: t.label }))}
                 placeholder="Select collectible type"
                 sheetTitle="Collectible Type"
               />
@@ -567,10 +558,7 @@ function PreciousMetalFields({ form }: { form: ReturnType<typeof useForm<AssetDe
                 <ResponsiveSelect
                   value={field.value ?? ""}
                   onValueChange={(val) => field.onChange(val || null)}
-                  options={[
-                    { value: "", label: "Select metal..." },
-                    ...METAL_TYPES.map((t) => ({ value: t.value, label: t.label })),
-                  ]}
+                  options={METAL_TYPES.map((t) => ({ value: t.value, label: t.label }))}
                   placeholder="Select metal"
                   sheetTitle="Metal Type"
                 />
@@ -590,10 +578,7 @@ function PreciousMetalFields({ form }: { form: ReturnType<typeof useForm<AssetDe
                 <ResponsiveSelect
                   value={field.value ?? ""}
                   onValueChange={(val) => field.onChange(val || null)}
-                  options={[
-                    { value: "", label: "Select unit..." },
-                    ...WEIGHT_UNITS.map((t) => ({ value: t.value, label: t.label })),
-                  ]}
+                  options={WEIGHT_UNITS.map((t) => ({ value: t.value, label: t.label }))}
                   placeholder="Select unit"
                   sheetTitle="Weight Unit"
                 />
@@ -646,10 +631,7 @@ function LiabilityFields({
               <ResponsiveSelect
                 value={field.value ?? ""}
                 onValueChange={(val) => field.onChange(val || null)}
-                options={[
-                  { value: "", label: "Select type..." },
-                  ...LIABILITY_TYPES.map((t) => ({ value: t.value, label: t.label })),
-                ]}
+                options={LIABILITY_TYPES.map((t) => ({ value: t.value, label: t.label }))}
                 placeholder="Select liability type"
                 sheetTitle="Liability Type"
               />
@@ -728,8 +710,8 @@ function LiabilityFields({
               <FormLabel>Linked Asset</FormLabel>
               <FormControl>
                 <ResponsiveSelect
-                  value={field.value ?? ""}
-                  onValueChange={(val) => field.onChange(val || null)}
+                  value={field.value ?? "__none__"}
+                  onValueChange={(val) => field.onChange(val === "__none__" ? null : val)}
                   options={linkableAssetOptions}
                   placeholder="Select asset to link"
                   sheetTitle="Link to Asset"

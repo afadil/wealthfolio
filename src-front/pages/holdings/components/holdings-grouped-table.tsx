@@ -182,12 +182,14 @@ function HoldingRow({
   const isCash = symbol.startsWith("$CASH");
 
   const handleNavigate = () => {
-    if (!isCash && holding.instrument?.symbol) {
-      navigate(`/holdings/${encodeURIComponent(symbol)}`, { state: { holding } });
+    // Use instrument.id (asset ID) for navigation, not symbol (which may be stripped)
+    const assetId = holding.instrument?.id;
+    if (!isCash && assetId) {
+      navigate(`/holdings/${encodeURIComponent(assetId)}`, { state: { holding } });
     }
   };
 
-  const isClickable = !isCash && holding.instrument?.symbol;
+  const isClickable = !isCash && holding.instrument?.id;
 
   // Calculate display values
   const fxRate = holding.fxRate ?? 1;

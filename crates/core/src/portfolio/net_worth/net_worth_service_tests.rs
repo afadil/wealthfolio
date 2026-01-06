@@ -337,11 +337,19 @@ impl MarketDataRepositoryTrait for MockMarketDataRepository {
 
     fn get_historical_quotes_for_symbols_in_range(
         &self,
-        _symbols: &HashSet<String>,
-        _start_date: NaiveDate,
-        _end_date: NaiveDate,
+        symbols: &HashSet<String>,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
     ) -> Result<Vec<Quote>> {
-        unimplemented!()
+        Ok(self
+            .quotes
+            .iter()
+            .filter(|q| {
+                let date = q.timestamp.date_naive();
+                symbols.contains(&q.symbol) && date >= start_date && date <= end_date
+            })
+            .cloned()
+            .collect())
     }
 
     fn get_all_historical_quotes_for_symbols(&self, _symbols: &HashSet<String>) -> Result<Vec<Quote>> {
@@ -690,6 +698,7 @@ fn create_test_quote(symbol: &str, price: Decimal, date: NaiveDate, currency: &s
         currency: currency.to_string(),
         data_source: DataSource::Manual,
         created_at: Utc::now(),
+        notes: None,
     }
 }
 
@@ -699,12 +708,22 @@ fn create_net_worth_service(
     snapshots: Vec<AccountStateSnapshot>,
     quotes: Vec<Quote>,
 ) -> NetWorthService {
+    create_net_worth_service_with_valuations(accounts, assets, snapshots, quotes, vec![])
+}
+
+fn create_net_worth_service_with_valuations(
+    accounts: Vec<Account>,
+    assets: Vec<Asset>,
+    snapshots: Vec<AccountStateSnapshot>,
+    quotes: Vec<Quote>,
+    valuations: Vec<DailyAccountValuation>,
+) -> NetWorthService {
     let base_currency = Arc::new(RwLock::new("USD".to_string()));
     let account_repo = Arc::new(MockAccountRepository::new(accounts));
     let asset_repo = Arc::new(MockAssetRepository::new(assets));
     let snapshot_repo = Arc::new(MockSnapshotRepository::new(snapshots));
     let market_data_repo = Arc::new(MockMarketDataRepository::new(quotes));
-    let valuation_repo = Arc::new(MockValuationRepository::new(vec![]));
+    let valuation_repo = Arc::new(MockValuationRepository::new(valuations));
     let fx_service = Arc::new(MockFxService::new("USD"));
 
     NetWorthService::new(
@@ -716,6 +735,38 @@ fn create_net_worth_service(
         valuation_repo,
         fx_service,
     )
+}
+
+fn create_total_valuation(
+    date: NaiveDate,
+    total_value: Decimal,
+    net_contribution: Decimal,
+) -> DailyAccountValuation {
+    DailyAccountValuation {
+        id: format!("TOTAL_{}", date),
+        account_id: "TOTAL".to_string(),
+        valuation_date: date,
+        account_currency: "USD".to_string(),
+        base_currency: "USD".to_string(),
+        fx_rate_to_base: dec!(1),
+        cash_balance: Decimal::ZERO,
+        investment_market_value: total_value,
+        total_value,
+        cost_basis: net_contribution,
+        net_contribution,
+        calculated_at: Utc::now(),
+    }
+}
+
+// Helper to get category value from breakdown
+fn get_category_value(response: &NetWorthResponse, category: &str) -> Decimal {
+    response
+        .assets
+        .breakdown
+        .iter()
+        .find(|b| b.category == category)
+        .map(|b| b.value)
+        .unwrap_or(Decimal::ZERO)
 }
 
 // ============================================================================
@@ -730,8 +781,8 @@ async fn test_empty_accounts_returns_zero_net_worth() {
     let result = service.get_net_worth(date).await.unwrap();
 
     assert_eq!(result.net_worth, Decimal::ZERO);
-    assert_eq!(result.total_assets, Decimal::ZERO);
-    assert_eq!(result.total_liabilities, Decimal::ZERO);
+    assert_eq!(result.assets.total, Decimal::ZERO);
+    assert_eq!(result.liabilities.total, Decimal::ZERO);
     assert_eq!(result.currency, "USD");
 }
 
@@ -755,9 +806,9 @@ async fn test_single_investment_account() {
 
     // 100 shares * $185 = $18,500
     assert_eq!(result.net_worth, dec!(18500));
-    assert_eq!(result.total_assets, dec!(18500));
-    assert_eq!(result.total_liabilities, Decimal::ZERO);
-    assert_eq!(result.breakdown.investments, dec!(18500));
+    assert_eq!(result.assets.total, dec!(18500));
+    assert_eq!(result.liabilities.total, Decimal::ZERO);
+    assert_eq!(get_category_value(&result, "investments"), dec!(18500));
 }
 
 #[tokio::test]
@@ -789,11 +840,10 @@ async fn test_net_worth_with_liability() {
     // Assets: 100 * $200 = $20,000
     // Liabilities: $50,000
     // Net Worth: $20,000 - $50,000 = -$30,000
-    assert_eq!(result.total_assets, dec!(20000));
-    assert_eq!(result.total_liabilities, dec!(50000));
+    assert_eq!(result.assets.total, dec!(20000));
+    assert_eq!(result.liabilities.total, dec!(50000));
     assert_eq!(result.net_worth, dec!(-30000));
-    assert_eq!(result.breakdown.investments, dec!(20000));
-    assert_eq!(result.breakdown.liabilities, dec!(50000));
+    assert_eq!(get_category_value(&result, "investments"), dec!(20000));
 }
 
 #[tokio::test]
@@ -815,8 +865,8 @@ async fn test_property_breakdown() {
     let result = service.get_net_worth(date).await.unwrap();
 
     assert_eq!(result.net_worth, dec!(450000));
-    assert_eq!(result.breakdown.properties, dec!(450000));
-    assert_eq!(result.breakdown.investments, Decimal::ZERO);
+    assert_eq!(get_category_value(&result, "properties"), dec!(450000));
+    assert_eq!(get_category_value(&result, "investments"), Decimal::ZERO);
 }
 
 #[tokio::test]
@@ -837,8 +887,8 @@ async fn test_cash_included_in_investments() {
     let result = service.get_net_worth(date).await.unwrap();
 
     assert_eq!(result.net_worth, dec!(10000));
-    // Cash is included in investments breakdown
-    assert_eq!(result.breakdown.investments, dec!(10000));
+    // Cash is in the cash category
+    assert_eq!(get_category_value(&result, "cash"), dec!(10000));
 }
 
 #[tokio::test]
@@ -916,12 +966,11 @@ async fn test_multiple_asset_categories() {
     // Total Assets: $10,000 + $350,000 + $30,000 = $390,000
     // Net Worth: $390,000 - $200,000 = $190,000
 
-    assert_eq!(result.breakdown.investments, dec!(10000));
-    assert_eq!(result.breakdown.properties, dec!(350000));
-    assert_eq!(result.breakdown.vehicles, dec!(30000));
-    assert_eq!(result.breakdown.liabilities, dec!(200000));
-    assert_eq!(result.total_assets, dec!(390000));
-    assert_eq!(result.total_liabilities, dec!(200000));
+    assert_eq!(get_category_value(&result, "investments"), dec!(10000));
+    assert_eq!(get_category_value(&result, "properties"), dec!(350000));
+    assert_eq!(get_category_value(&result, "vehicles"), dec!(30000));
+    assert_eq!(result.assets.total, dec!(390000));
+    assert_eq!(result.liabilities.total, dec!(200000));
     assert_eq!(result.net_worth, dec!(190000));
 }
 
@@ -947,7 +996,7 @@ async fn test_precious_metals_category() {
 
     // 10 oz * $2000 = $20,000
     assert_eq!(result.net_worth, dec!(20000));
-    assert_eq!(result.breakdown.precious_metals, dec!(20000));
+    assert_eq!(get_category_value(&result, "preciousMetals"), dec!(20000));
 }
 
 #[tokio::test]
@@ -969,7 +1018,7 @@ async fn test_collectibles_category() {
     let result = service.get_net_worth(date).await.unwrap();
 
     assert_eq!(result.net_worth, dec!(75000));
-    assert_eq!(result.breakdown.collectibles, dec!(75000));
+    assert_eq!(get_category_value(&result, "collectibles"), dec!(75000));
 }
 
 #[tokio::test]
@@ -993,4 +1042,427 @@ async fn test_no_quote_falls_back_to_cost_basis() {
 
     // Should use cost basis: 100 * ($10,000/100) = $10,000
     assert_eq!(result.net_worth, dec!(10000));
+}
+
+// ============================================================================
+// Net Worth History Tests
+// ============================================================================
+
+#[test]
+fn test_history_basic_portfolio_with_alt_assets() {
+    // Setup: Portfolio + Property + Liability over 5 days
+    let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
+    let d2 = NaiveDate::from_ymd_opt(2024, 1, 2).unwrap();
+    let d3 = NaiveDate::from_ymd_opt(2024, 1, 3).unwrap();
+    let d4 = NaiveDate::from_ymd_opt(2024, 1, 4).unwrap();
+    let d5 = NaiveDate::from_ymd_opt(2024, 1, 5).unwrap();
+
+    // Portfolio valuations (TOTAL account)
+    let valuations = vec![
+        create_total_valuation(d1, dec!(100000), dec!(95000)),  // $5K gain
+        create_total_valuation(d2, dec!(101000), dec!(95000)),  // $6K gain
+        create_total_valuation(d3, dec!(102000), dec!(96000)),  // $6K gain (deposited $1K)
+        create_total_valuation(d4, dec!(103000), dec!(96000)),  // $7K gain
+        create_total_valuation(d5, dec!(104000), dec!(96000)),  // $8K gain
+    ];
+
+    // Property asset
+    let property = create_test_asset("PROP-house", AssetKind::Property, "USD");
+    let property_quotes = vec![
+        create_test_quote("PROP-house", dec!(500000), d1, "USD"),
+        create_test_quote("PROP-house", dec!(505000), d5, "USD"),  // Appreciated
+    ];
+
+    // Liability asset
+    let liability = create_test_asset("LIAB-mortgage", AssetKind::Liability, "USD");
+    let liability_quotes = vec![
+        create_test_quote("LIAB-mortgage", dec!(300000), d1, "USD"),
+        create_test_quote("LIAB-mortgage", dec!(298000), d5, "USD"),  // Paid down
+    ];
+
+    let all_quotes = [property_quotes, liability_quotes].concat();
+
+    let service = create_net_worth_service_with_valuations(
+        vec![],
+        vec![property, liability],
+        vec![],
+        all_quotes,
+        valuations,
+    );
+
+    let history = service.get_net_worth_history(d1, d5).unwrap();
+
+    assert_eq!(history.len(), 5, "Should have 5 data points");
+
+    // Day 1: Portfolio 100K + Property 500K - Liability 300K = 300K
+    assert_eq!(history[0].date, d1);
+    assert_eq!(history[0].portfolio_value, dec!(100000));
+    assert_eq!(history[0].alternative_assets_value, dec!(500000));
+    assert_eq!(history[0].total_liabilities, dec!(300000));
+    assert_eq!(history[0].net_worth, dec!(300000));
+    assert_eq!(history[0].net_contribution, dec!(95000));
+
+    // Day 5: Portfolio 104K + Property 505K - Liability 298K = 311K
+    let last = &history[4];
+    assert_eq!(last.date, d5);
+    assert_eq!(last.portfolio_value, dec!(104000));
+    assert_eq!(last.alternative_assets_value, dec!(505000));
+    assert_eq!(last.total_liabilities, dec!(298000));
+    assert_eq!(last.net_worth, dec!(311000));
+    assert_eq!(last.net_contribution, dec!(96000));
+
+    // Verify gain calculation would work correctly:
+    // Portfolio gain = (104000 - 96000) - (100000 - 95000) = 8000 - 5000 = 3000
+    // Alt asset gain = 505000 - 500000 = 5000
+    // Liability reduction = 300000 - 298000 = 2000
+    // Total gain = 3000 + 5000 + 2000 = 10000
+    let first = &history[0];
+    let portfolio_gain = (last.portfolio_value - last.net_contribution)
+        - (first.portfolio_value - first.net_contribution);
+    let alt_asset_gain = last.alternative_assets_value - first.alternative_assets_value;
+    let liability_reduction = first.total_liabilities - last.total_liabilities;
+    let total_gain = portfolio_gain + alt_asset_gain + liability_reduction;
+    assert_eq!(total_gain, dec!(10000));
+}
+
+#[test]
+fn test_history_portfolio_only_no_alt_assets() {
+    let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
+    let d2 = NaiveDate::from_ymd_opt(2024, 1, 2).unwrap();
+    let d3 = NaiveDate::from_ymd_opt(2024, 1, 3).unwrap();
+
+    let valuations = vec![
+        create_total_valuation(d1, dec!(50000), dec!(48000)),
+        create_total_valuation(d2, dec!(51000), dec!(48000)),
+        create_total_valuation(d3, dec!(52000), dec!(48000)),
+    ];
+
+    let service = create_net_worth_service_with_valuations(
+        vec![],
+        vec![],  // No alternative assets
+        vec![],
+        vec![],  // No quotes
+        valuations,
+    );
+
+    let history = service.get_net_worth_history(d1, d3).unwrap();
+
+    assert_eq!(history.len(), 3);
+    assert_eq!(history[0].portfolio_value, dec!(50000));
+    assert_eq!(history[0].alternative_assets_value, Decimal::ZERO);
+    assert_eq!(history[0].total_liabilities, Decimal::ZERO);
+    assert_eq!(history[0].net_worth, dec!(50000));
+
+    assert_eq!(history[2].net_worth, dec!(52000));
+}
+
+#[test]
+fn test_history_alt_assets_only_no_portfolio() {
+    // Edge case: user only has alternative assets, no portfolio
+    let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
+    let d2 = NaiveDate::from_ymd_opt(2024, 1, 2).unwrap();
+
+    let property = create_test_asset("PROP-house", AssetKind::Property, "USD");
+    let quotes = vec![
+        create_test_quote("PROP-house", dec!(400000), d1, "USD"),
+        create_test_quote("PROP-house", dec!(410000), d2, "USD"),
+    ];
+
+    let service = create_net_worth_service_with_valuations(
+        vec![],
+        vec![property],
+        vec![],
+        quotes,
+        vec![],  // No portfolio valuations
+    );
+
+    let history = service.get_net_worth_history(d1, d2).unwrap();
+
+    assert_eq!(history.len(), 2);
+    assert_eq!(history[0].portfolio_value, Decimal::ZERO);
+    assert_eq!(history[0].alternative_assets_value, dec!(400000));
+    assert_eq!(history[0].net_worth, dec!(400000));
+    assert_eq!(history[0].net_contribution, Decimal::ZERO);
+
+    assert_eq!(history[1].alternative_assets_value, dec!(410000));
+    assert_eq!(history[1].net_worth, dec!(410000));
+}
+
+#[test]
+fn test_history_forward_fill_alt_assets() {
+    // Alt asset has quote on day 1 and day 5 only
+    // Days 2-4 should forward-fill from day 1
+    let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
+    let d2 = NaiveDate::from_ymd_opt(2024, 1, 2).unwrap();
+    let d3 = NaiveDate::from_ymd_opt(2024, 1, 3).unwrap();
+    let d4 = NaiveDate::from_ymd_opt(2024, 1, 4).unwrap();
+    let d5 = NaiveDate::from_ymd_opt(2024, 1, 5).unwrap();
+
+    // Portfolio has data every day
+    let valuations = vec![
+        create_total_valuation(d1, dec!(10000), dec!(10000)),
+        create_total_valuation(d2, dec!(10100), dec!(10000)),
+        create_total_valuation(d3, dec!(10200), dec!(10000)),
+        create_total_valuation(d4, dec!(10300), dec!(10000)),
+        create_total_valuation(d5, dec!(10400), dec!(10000)),
+    ];
+
+    let property = create_test_asset("PROP-house", AssetKind::Property, "USD");
+    // Only quotes on d1 and d5
+    let quotes = vec![
+        create_test_quote("PROP-house", dec!(200000), d1, "USD"),
+        create_test_quote("PROP-house", dec!(210000), d5, "USD"),
+    ];
+
+    let service = create_net_worth_service_with_valuations(
+        vec![],
+        vec![property],
+        vec![],
+        quotes,
+        valuations,
+    );
+
+    let history = service.get_net_worth_history(d1, d5).unwrap();
+
+    assert_eq!(history.len(), 5);
+
+    // Days 2-4 should have forward-filled property value of 200000
+    assert_eq!(history[1].alternative_assets_value, dec!(200000));
+    assert_eq!(history[2].alternative_assets_value, dec!(200000));
+    assert_eq!(history[3].alternative_assets_value, dec!(200000));
+
+    // Day 5 should have updated property value
+    assert_eq!(history[4].alternative_assets_value, dec!(210000));
+}
+
+#[test]
+fn test_history_starts_from_first_portfolio_date() {
+    // Alt assets have data before portfolio starts
+    // History should only start from first portfolio date
+    let d_before = NaiveDate::from_ymd_opt(2023, 12, 1).unwrap();
+    let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
+    let d2 = NaiveDate::from_ymd_opt(2024, 1, 2).unwrap();
+
+    // Portfolio only starts on d1
+    let valuations = vec![
+        create_total_valuation(d1, dec!(50000), dec!(50000)),
+        create_total_valuation(d2, dec!(51000), dec!(50000)),
+    ];
+
+    let property = create_test_asset("PROP-house", AssetKind::Property, "USD");
+    // Property has quote before portfolio started
+    let quotes = vec![
+        create_test_quote("PROP-house", dec!(300000), d_before, "USD"),
+        create_test_quote("PROP-house", dec!(310000), d2, "USD"),
+    ];
+
+    let service = create_net_worth_service_with_valuations(
+        vec![],
+        vec![property],
+        vec![],
+        quotes,
+        valuations,
+    );
+
+    // Query includes d_before, but history should start from d1
+    let history = service.get_net_worth_history(d_before, d2).unwrap();
+
+    // Should only have 2 points (d1 and d2), not 3
+    assert_eq!(history.len(), 2);
+    assert_eq!(history[0].date, d1);
+
+    // d1 should use forward-filled property value from d_before
+    assert_eq!(history[0].portfolio_value, dec!(50000));
+    assert_eq!(history[0].alternative_assets_value, dec!(300000));
+    assert_eq!(history[0].net_worth, dec!(350000));
+}
+
+#[test]
+fn test_history_empty_range() {
+    // Query range before any data exists
+    let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
+    let d2 = NaiveDate::from_ymd_opt(2024, 1, 5).unwrap();
+    let d_after = NaiveDate::from_ymd_opt(2024, 2, 1).unwrap();
+
+    let valuations = vec![
+        create_total_valuation(d_after, dec!(50000), dec!(50000)),
+    ];
+
+    let service = create_net_worth_service_with_valuations(
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        valuations,
+    );
+
+    // Query before any data
+    let history = service.get_net_worth_history(d1, d2).unwrap();
+
+    assert!(history.is_empty(), "Should return empty history");
+}
+
+#[test]
+fn test_history_single_day() {
+    let d1 = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
+
+    let valuations = vec![
+        create_total_valuation(d1, dec!(100000), dec!(90000)),
+    ];
+
+    let property = create_test_asset("PROP-house", AssetKind::Property, "USD");
+    let quotes = vec![
+        create_test_quote("PROP-house", dec!(500000), d1, "USD"),
+    ];
+
+    let service = create_net_worth_service_with_valuations(
+        vec![],
+        vec![property],
+        vec![],
+        quotes,
+        valuations,
+    );
+
+    let history = service.get_net_worth_history(d1, d1).unwrap();
+
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].date, d1);
+    assert_eq!(history[0].portfolio_value, dec!(100000));
+    assert_eq!(history[0].alternative_assets_value, dec!(500000));
+    assert_eq!(history[0].net_worth, dec!(600000));
+    assert_eq!(history[0].net_contribution, dec!(90000));
+}
+
+#[test]
+fn test_history_liability_reduction_is_positive_gain() {
+    // Test that paying down debt shows as positive contribution to net worth
+    let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
+    let d2 = NaiveDate::from_ymd_opt(2024, 1, 31).unwrap();
+
+    let valuations = vec![
+        create_total_valuation(d1, dec!(50000), dec!(50000)),  // No portfolio gain
+        create_total_valuation(d2, dec!(50000), dec!(50000)),
+    ];
+
+    let liability = create_test_asset("LIAB-mortgage", AssetKind::Liability, "USD");
+    let quotes = vec![
+        create_test_quote("LIAB-mortgage", dec!(200000), d1, "USD"),
+        create_test_quote("LIAB-mortgage", dec!(195000), d2, "USD"),  // Paid $5K
+    ];
+
+    let service = create_net_worth_service_with_valuations(
+        vec![],
+        vec![liability],
+        vec![],
+        quotes,
+        valuations,
+    );
+
+    let history = service.get_net_worth_history(d1, d2).unwrap();
+
+    assert_eq!(history.len(), 2);
+
+    // Day 1: Net worth = 50K - 200K = -150K
+    assert_eq!(history[0].net_worth, dec!(-150000));
+
+    // Day 31: Net worth = 50K - 195K = -145K
+    assert_eq!(history[1].net_worth, dec!(-145000));
+
+    // Gain from liability reduction
+    let liability_reduction = history[0].total_liabilities - history[1].total_liabilities;
+    assert_eq!(liability_reduction, dec!(5000));
+}
+
+#[test]
+fn test_history_contribution_adjusted_gain() {
+    // Verify that deposits don't count as gain
+    let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
+    let d2 = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
+
+    // Day 1: 100K portfolio, 95K contributed (5K gain)
+    // Day 15: 150K portfolio, 140K contributed (10K gain)
+    // User deposited 45K, market gained 5K
+    let valuations = vec![
+        create_total_valuation(d1, dec!(100000), dec!(95000)),
+        create_total_valuation(d2, dec!(150000), dec!(140000)),
+    ];
+
+    let service = create_net_worth_service_with_valuations(
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        valuations,
+    );
+
+    let history = service.get_net_worth_history(d1, d2).unwrap();
+
+    assert_eq!(history.len(), 2);
+
+    let first = &history[0];
+    let last = &history[1];
+
+    // Net worth increased by 50K
+    let net_worth_change = last.net_worth - first.net_worth;
+    assert_eq!(net_worth_change, dec!(50000));
+
+    // But contribution-adjusted gain is only 5K
+    let portfolio_gain = (last.portfolio_value - last.net_contribution)
+        - (first.portfolio_value - first.net_contribution);
+    assert_eq!(portfolio_gain, dec!(5000));
+}
+
+#[test]
+fn test_history_multiple_alt_assets() {
+    // Multiple alternative assets, each with different update schedules
+    let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
+    let d2 = NaiveDate::from_ymd_opt(2024, 1, 2).unwrap();
+    let d3 = NaiveDate::from_ymd_opt(2024, 1, 3).unwrap();
+
+    let valuations = vec![
+        create_total_valuation(d1, dec!(10000), dec!(10000)),
+        create_total_valuation(d2, dec!(10000), dec!(10000)),
+        create_total_valuation(d3, dec!(10000), dec!(10000)),
+    ];
+
+    let property = create_test_asset("PROP-house", AssetKind::Property, "USD");
+    let gold = create_test_asset("PREC-gold", AssetKind::PhysicalPrecious, "USD");
+    let mortgage = create_test_asset("LIAB-mortgage", AssetKind::Liability, "USD");
+
+    let quotes = vec![
+        // Property: updates d1 and d3
+        create_test_quote("PROP-house", dec!(500000), d1, "USD"),
+        create_test_quote("PROP-house", dec!(510000), d3, "USD"),
+        // Gold: updates d1 and d2
+        create_test_quote("PREC-gold", dec!(5000), d1, "USD"),
+        create_test_quote("PREC-gold", dec!(5500), d2, "USD"),
+        // Mortgage: only d1
+        create_test_quote("LIAB-mortgage", dec!(200000), d1, "USD"),
+    ];
+
+    let service = create_net_worth_service_with_valuations(
+        vec![],
+        vec![property, gold, mortgage],
+        vec![],
+        quotes,
+        valuations,
+    );
+
+    let history = service.get_net_worth_history(d1, d3).unwrap();
+
+    assert_eq!(history.len(), 3);
+
+    // Day 1: 10K + 500K + 5K - 200K = 315K
+    assert_eq!(history[0].portfolio_value, dec!(10000));
+    assert_eq!(history[0].alternative_assets_value, dec!(505000)); // 500K + 5K
+    assert_eq!(history[0].total_liabilities, dec!(200000));
+    assert_eq!(history[0].net_worth, dec!(315000));
+
+    // Day 2: 10K + 500K + 5.5K - 200K = 315.5K (gold updated, property forward-filled)
+    assert_eq!(history[1].alternative_assets_value, dec!(505500)); // 500K + 5.5K
+    assert_eq!(history[1].net_worth, dec!(315500));
+
+    // Day 3: 10K + 510K + 5.5K - 200K = 325.5K (property updated, gold forward-filled)
+    assert_eq!(history[2].alternative_assets_value, dec!(515500)); // 510K + 5.5K
+    assert_eq!(history[2].net_worth, dec!(325500));
 }

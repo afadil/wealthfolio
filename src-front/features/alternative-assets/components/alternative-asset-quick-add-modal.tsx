@@ -105,6 +105,8 @@ interface FormData {
   currency: string;
   currentValue: string;
   valueDate: Date;
+  purchasePrice?: string;
+  purchaseDate?: Date;
   metalType?: string;
   liabilityType?: string;
   hasMortgage?: boolean;
@@ -218,6 +220,10 @@ export function AlternativeAssetQuickAddModal({
       currency: formData.currency,
       currentValue: formData.currentValue,
       valueDate: formatDateToISO(formData.valueDate),
+      purchasePrice: formData.purchasePrice || undefined,
+      purchaseDate: formData.purchaseDate
+        ? formatDateToISO(formData.purchaseDate)
+        : undefined,
       metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
       linkedAssetId: formData.linkedAssetId || undefined,
     };
@@ -469,6 +475,50 @@ export function AlternativeAssetQuickAddModal({
                     />
                   </div>
                 </div>
+
+                {/* Purchase Price and Date (optional, for gain calculation) - only for assets, not liabilities */}
+                {formData.kind !== AlternativeAssetKind.LIABILITY && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-foreground">
+                        Purchase Price
+                        <span className="text-muted-foreground ml-1 text-xs font-normal">
+                          (optional)
+                        </span>
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          value={formData.purchasePrice || ""}
+                          onChange={(e) =>
+                            updateFormData("purchasePrice", e.target.value)
+                          }
+                          placeholder="0.00"
+                          min="0"
+                          step="any"
+                          className="h-11"
+                        />
+                      </div>
+                      <p className="text-muted-foreground text-xs">
+                        Used to calculate unrealized gain
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-foreground">
+                        Purchase Date
+                        <span className="text-muted-foreground ml-1 text-xs font-normal">
+                          (optional)
+                        </span>
+                      </Label>
+                      <DatePickerInput
+                        value={formData.purchaseDate}
+                        onChange={(date) =>
+                          date && updateFormData("purchaseDate", date)
+                        }
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {/* Mortgage checkbox for property */}
                 {formData.kind === AlternativeAssetKind.PROPERTY && (

@@ -1,5 +1,5 @@
-import * as z from "zod";
 import { AlternativeAssetKind } from "@/lib/types";
+import * as z from "zod";
 
 // Metal types for precious metals
 export const METAL_TYPES = [
@@ -27,7 +27,7 @@ export const LIABILITY_TYPES = [
 ] as const;
 
 // Asset type options for the type selector
-export const ASSET_TYPE_OPTIONS = [
+export const ASSET_KIND_OPTIONS = [
   { value: AlternativeAssetKind.PROPERTY, label: "Property" },
   { value: AlternativeAssetKind.VEHICLE, label: "Vehicle" },
   { value: AlternativeAssetKind.COLLECTIBLE, label: "Collectible" },
@@ -50,10 +50,7 @@ export const alternativeAssetQuickAddSchema = z
     ]),
 
     // Common fields
-    name: z
-      .string()
-      .min(1, "Name is required")
-      .max(100, "Name must be less than 100 characters"),
+    name: z.string().min(1, "Name is required").max(100, "Name must be less than 100 characters"),
     currency: z.string().min(1, "Currency is required"),
     quantity: z.coerce
       .number({
@@ -80,14 +77,7 @@ export const alternativeAssetQuickAddSchema = z
 
     // Liability-specific fields
     liabilityType: z
-      .enum([
-        "mortgage",
-        "auto_loan",
-        "student_loan",
-        "credit_card",
-        "personal_loan",
-        "heloc",
-      ])
+      .enum(["mortgage", "auto_loan", "student_loan", "credit_card", "personal_loan", "heloc"])
       .optional(),
     linkedAssetId: z.string().optional(),
   })
@@ -102,12 +92,10 @@ export const alternativeAssetQuickAddSchema = z
     {
       message: "Metal type and unit are required for precious metals",
       path: ["metalType"],
-    }
+    },
   );
 
-export type AlternativeAssetQuickAddFormValues = z.infer<
-  typeof alternativeAssetQuickAddSchema
->;
+export type AlternativeAssetQuickAddFormValues = z.infer<typeof alternativeAssetQuickAddSchema>;
 
 // Default form values
 export const getDefaultFormValues = (): AlternativeAssetQuickAddFormValues => ({
