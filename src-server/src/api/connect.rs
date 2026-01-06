@@ -287,6 +287,7 @@ async fn sync_broker_activities(
 
     let mut total_activities_upserted = 0;
     let mut total_assets_inserted = 0;
+    let mut total_new_asset_ids: Vec<String> = Vec::new();
     let mut accounts_synced = 0;
     let mut accounts_failed = 0;
 
@@ -321,9 +322,9 @@ async fn sync_broker_activities(
             .get_account_activities(
                 provider_account_id,
                 start_date.as_deref(),
-                None,  // end_date
-                None,  // offset
-                None,  // limit
+                None, // end_date
+                None, // offset
+                None, // limit
             )
             .await
         {
@@ -337,9 +338,10 @@ async fn sync_broker_activities(
                         .upsert_account_activities(account.id.clone(), activities)
                         .await
                     {
-                        Ok((upserted, assets)) => {
+                        Ok((upserted, assets, new_asset_ids)) => {
                             total_activities_upserted += upserted;
                             total_assets_inserted += assets;
+                            total_new_asset_ids.extend(new_asset_ids);
 
                             // Mark success with current date
                             let now = chrono::Utc::now().to_rfc3339();
@@ -395,6 +397,7 @@ async fn sync_broker_activities(
         activities_upserted: total_activities_upserted,
         assets_inserted: total_assets_inserted,
         accounts_failed,
+        new_asset_ids: total_new_asset_ids,
     }))
 }
 

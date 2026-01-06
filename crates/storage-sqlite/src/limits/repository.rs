@@ -40,7 +40,10 @@ impl ContributionLimitRepository {
         let results_db = contribution_limits::table
             .load::<ContributionLimitDB>(&mut conn)
             .map_err(StorageError::from)?;
-        Ok(results_db.into_iter().map(ContributionLimit::from).collect())
+        Ok(results_db
+            .into_iter()
+            .map(ContributionLimit::from)
+            .collect())
     }
 }
 

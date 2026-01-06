@@ -1,5 +1,23 @@
 -- Rollback Activity System Redesign Migration
 -- This migration restores the previous database schema
+--
+-- IMPORTANT: Reverse order from up.sql - activities BEFORE assets
+
+-- ============================================================================
+-- STEP 0: DROP QUOTE INDEXES
+-- ============================================================================
+
+DROP INDEX IF EXISTS idx_quotes_manual_symbol;
+DROP INDEX IF EXISTS idx_quotes_symbol_source_timestamp;
+
+-- ============================================================================
+-- STEP 0.5: DROP QUOTE_SYNC_STATE TABLE
+-- ============================================================================
+
+DROP INDEX IF EXISTS idx_quote_sync_state_dates;
+DROP INDEX IF EXISTS idx_quote_sync_state_priority;
+DROP INDEX IF EXISTS idx_quote_sync_state_active;
+DROP TABLE IF EXISTS quote_sync_state;
 
 -- ============================================================================
 -- STEP 1: RESTORE ACCOUNTS TABLE
@@ -53,55 +71,7 @@ DROP TABLE platforms;
 ALTER TABLE platforms_backup RENAME TO platforms;
 
 -- ============================================================================
--- STEP 3: RESTORE ASSETS TABLE
--- Restores symbol_mapping from quote_symbol
--- ============================================================================
-
--- Drop new indexes
-DROP INDEX IF EXISTS ix_assets_kind;
-DROP INDEX IF EXISTS ix_assets_is_active;
-DROP INDEX IF EXISTS ux_assets_data_source_quote_symbol;
-DROP INDEX IF EXISTS assets_data_source_symbol_key;
-
--- Create backup table with old schema (includes symbol_mapping)
-CREATE TABLE assets_backup (
-    id TEXT NOT NULL PRIMARY KEY,
-    isin TEXT,
-    name TEXT,
-    asset_type TEXT,
-    symbol TEXT NOT NULL,
-    symbol_mapping TEXT,
-    asset_class TEXT,
-    asset_sub_class TEXT,
-    notes TEXT,
-    countries TEXT,
-    categories TEXT,
-    classes TEXT,
-    attributes TEXT,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    currency TEXT NOT NULL,
-    data_source TEXT NOT NULL,
-    sectors TEXT,
-    url TEXT
-);
-
--- Restore data, converting quote_symbol back to symbol_mapping
-INSERT INTO assets_backup (id, isin, name, asset_type, symbol, symbol_mapping, asset_class, asset_sub_class, notes, countries, categories, classes, attributes, created_at, updated_at, currency, data_source, sectors, url)
-SELECT
-    id, isin, name, asset_type, symbol,
-    quote_symbol, -- quote_symbol -> symbol_mapping
-    asset_class, asset_sub_class, notes, countries, categories, classes, attributes, created_at, updated_at, currency, data_source, sectors, url
-FROM assets;
-
-DROP TABLE assets;
-ALTER TABLE assets_backup RENAME TO assets;
-
--- Recreate original asset index
-CREATE UNIQUE INDEX assets_data_source_symbol_key ON assets(data_source, symbol);
-
--- ============================================================================
--- STEP 4: RESTORE ACTIVITIES TABLE
+-- STEP 3: RESTORE ACTIVITIES TABLE (MUST BE DONE BEFORE ASSETS!)
 -- ============================================================================
 
 -- Drop new indexes
@@ -207,6 +177,100 @@ CREATE INDEX idx_activities_account_id ON activities(account_id);
 CREATE INDEX idx_activities_asset_id ON activities(asset_id);
 CREATE INDEX idx_activities_activity_type ON activities(activity_type);
 CREATE INDEX idx_activities_activity_date ON activities(activity_date);
+
+-- ============================================================================
+-- STEP 4: RESTORE ASSETS TABLE
+-- Restores old schema with symbol_mapping and data_source
+-- Drops new columns: exchange_mic, pricing_mode, preferred_provider, provider_overrides, profile
+-- Extracts countries, sectors, url from profile JSON
+-- ============================================================================
+
+-- Drop new indexes
+DROP INDEX IF EXISTS ix_assets_kind;
+DROP INDEX IF EXISTS ix_assets_is_active;
+DROP INDEX IF EXISTS idx_assets_kind_active;
+DROP INDEX IF EXISTS idx_assets_symbol;
+DROP INDEX IF EXISTS idx_assets_exchange_mic;
+DROP INDEX IF EXISTS uq_assets_cash_currency;
+DROP INDEX IF EXISTS uq_assets_crypto_pair;
+DROP INDEX IF EXISTS uq_assets_fx_pair;
+DROP INDEX IF EXISTS uq_assets_security;
+
+-- Create backup table with old schema (includes symbol_mapping and data_source)
+CREATE TABLE assets_backup (
+    id TEXT NOT NULL PRIMARY KEY,
+    isin TEXT,
+    name TEXT,
+    asset_type TEXT,
+    symbol TEXT NOT NULL,
+    symbol_mapping TEXT,
+    asset_class TEXT,
+    asset_sub_class TEXT,
+    notes TEXT,
+    countries TEXT,
+    categories TEXT,
+    classes TEXT,
+    attributes TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    currency TEXT NOT NULL,
+    data_source TEXT NOT NULL,
+    sectors TEXT,
+    url TEXT
+);
+
+-- Restore data:
+-- - Extract symbol_mapping from provider_overrides JSON
+-- - Derive data_source from preferred_provider/pricing_mode
+-- - Extract countries, sectors, url from profile JSON
+-- - Derive asset_type from kind
+INSERT INTO assets_backup (id, isin, name, asset_type, symbol, symbol_mapping, asset_class, asset_sub_class, notes, countries, categories, classes, attributes, created_at, updated_at, currency, data_source, sectors, url)
+SELECT
+    id, isin, name,
+    -- Derive asset_type from kind
+    CASE kind
+        WHEN 'SECURITY' THEN 'Stock'
+        WHEN 'CRYPTO' THEN 'Cryptocurrency'
+        WHEN 'CASH' THEN 'Cash'
+        WHEN 'FX_RATE' THEN 'Forex'
+        WHEN 'OPTION' THEN 'Option'
+        WHEN 'COMMODITY' THEN 'Commodity'
+        WHEN 'PROPERTY' THEN 'Property'
+        WHEN 'VEHICLE' THEN 'Vehicle'
+        WHEN 'LIABILITY' THEN 'Liability'
+        ELSE 'Stock'
+    END,
+    symbol,
+    -- Extract symbol from provider_overrides JSON (first provider's symbol)
+    CASE
+        WHEN provider_overrides IS NOT NULL THEN
+            json_extract(provider_overrides, '$.' || COALESCE(preferred_provider, 'YAHOO') || '.symbol')
+        ELSE NULL
+    END,
+    asset_class, asset_sub_class, notes,
+    -- Extract countries from profile JSON
+    json_extract(profile, '$.countries'),
+    NULL, -- categories (not migrated)
+    NULL, -- classes (not migrated)
+    NULL, -- attributes (not migrated)
+    created_at, updated_at, currency,
+    -- Derive data_source from preferred_provider or pricing_mode
+    CASE
+        WHEN pricing_mode = 'MANUAL' THEN 'MANUAL'
+        WHEN preferred_provider IS NOT NULL THEN preferred_provider
+        ELSE 'YAHOO'
+    END,
+    -- Extract sectors from profile JSON
+    json_extract(profile, '$.sectors'),
+    -- Extract url from profile JSON (website -> url)
+    json_extract(profile, '$.website')
+FROM assets;
+
+DROP TABLE assets;
+ALTER TABLE assets_backup RENAME TO assets;
+
+-- Recreate original asset index
+CREATE UNIQUE INDEX assets_data_source_symbol_key ON assets(data_source, symbol);
 
 -- ============================================================================
 -- STEP 5: DROP BROKERS_SYNC_STATE AND RECREATE OLD VERSION

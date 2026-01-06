@@ -194,14 +194,15 @@ impl SnapshotService {
             return Ok(0);
         }
 
-        let (_final_holdings_states, keyframes_to_save, calculation_warnings) = self.calculate_daily_holdings_snapshots(
-            &accounts_needing_calculation,
-            &activities_by_account_date,
-            &start_keyframes,
-            &effective_start_dates,
-            calculation_min_date,
-            calculation_end_date,
-        )?;
+        let (_final_holdings_states, keyframes_to_save, calculation_warnings) = self
+            .calculate_daily_holdings_snapshots(
+                &accounts_needing_calculation,
+                &activities_by_account_date,
+                &start_keyframes,
+                &effective_start_dates,
+                calculation_min_date,
+                calculation_end_date,
+            )?;
 
         // Log detailed warnings for any activities that couldn't be processed
         if !calculation_warnings.is_empty() {
@@ -699,6 +700,7 @@ impl SnapshotService {
                         inception_date: pos.inception_date,
                         created_at: Utc::now(),
                         last_updated: Utc::now(),
+                        is_alternative: pos.is_alternative, // Inherit from source position
                     });
 
                 agg_pos.quantity += pos.quantity;
@@ -772,12 +774,15 @@ impl SnapshotService {
                 cash_total_base += amount;
             } else {
                 // Convert to base currency
-                match self.holdings_calculator.fx_service.convert_currency_for_date(
-                    amount,
-                    currency,
-                    base_portfolio_currency,
-                    target_date,
-                ) {
+                match self
+                    .holdings_calculator
+                    .fx_service
+                    .convert_currency_for_date(
+                        amount,
+                        currency,
+                        base_portfolio_currency,
+                        target_date,
+                    ) {
                     Ok(converted) => cash_total_base += converted,
                     Err(e) => {
                         warn!(
@@ -934,8 +939,9 @@ impl SnapshotService {
                             if !cumulative_factor.is_zero() {
                                 // Avoid division by zero
                                 // Use correct field name 'unit_price'
-                                adj_activity.unit_price = Some((unit_price / cumulative_factor)
-                                    .round_dp(DECIMAL_PRECISION));
+                                adj_activity.unit_price = Some(
+                                    (unit_price / cumulative_factor).round_dp(DECIMAL_PRECISION),
+                                );
                             } else {
                                 warn!("Cumulative split factor is zero for activity {}. Cannot adjust unit price.", adj_activity.id);
                                 // Use correct field name 'unit_price'

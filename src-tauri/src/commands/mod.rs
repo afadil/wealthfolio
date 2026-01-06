@@ -1,6 +1,7 @@
 pub mod account;
 pub mod activity;
 pub mod addon;
+pub mod alternative_assets;
 pub mod asset;
 pub mod brokers_sync;
 pub mod device_sync;

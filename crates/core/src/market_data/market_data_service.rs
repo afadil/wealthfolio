@@ -15,11 +15,11 @@ use super::market_data_model::{
 };
 use super::market_data_traits::{MarketDataRepositoryTrait, MarketDataServiceTrait};
 use super::providers::models::AssetProfile;
-use super::quote_sync_state_model::{QuoteSyncState, SyncCategory, SymbolSyncPlan};
+use super::quote_sync_state_model::{QuoteSyncState, SymbolSyncPlan, SyncCategory};
 use super::QuoteSyncStateRepositoryTrait;
 use crate::accounts::AccountRepositoryTrait;
 use crate::activities::ActivityRepositoryTrait;
-use crate::assets::{AssetRepositoryTrait, CASH_ASSET_TYPE, FOREX_ASSET_TYPE};
+use crate::assets::{Asset, AssetKind, AssetRepositoryTrait, PricingMode};
 use crate::errors::Result;
 use crate::market_data::providers::ProviderRegistry;
 use crate::portfolio::snapshot::SnapshotRepositoryTrait;
@@ -27,12 +27,60 @@ use crate::secrets::SecretStore;
 use crate::utils::time_utils;
 
 const QUOTE_LOOKBACK_DAYS: i64 = 7;
+/// Minimum lookback days when syncing to avoid single-day fetch failures
+/// (e.g., weekends, holidays, market not yet open)
+const MIN_SYNC_LOOKBACK_DAYS: i64 = 3;
 
 #[derive(Debug)]
 struct SymbolSyncPlanItem {
     symbol: String,
     currency: String,
     start: SystemTime,
+}
+
+/// Extracts the quote symbol from an asset's provider_overrides JSON.
+/// Handles different asset types with appropriate fallbacks:
+/// - CRYPTO: Constructs Yahoo-compatible symbol (e.g., BTC-CAD)
+/// - FX_RATE: Uses provider_overrides (e.g., EURCAD=X for Yahoo)
+/// - Securities: Falls back to asset.symbol (e.g., AAPL)
+fn get_quote_symbol_from_asset(asset: &Asset) -> Option<String> {
+    // 1. Try to extract from provider_overrides JSON first
+    // Format: { "YAHOO": { "type": "equity_symbol", "symbol": "MSFT" } }
+    if let Some(override_symbol) = asset.provider_overrides.as_ref().and_then(|overrides| {
+        let provider_key = asset
+            .preferred_provider
+            .as_deref()
+            .unwrap_or(DATA_SOURCE_YAHOO);
+
+        overrides
+            .get(provider_key)
+            .and_then(|provider_override| provider_override.get("symbol"))
+            .and_then(|symbol| symbol.as_str())
+            .map(|s| s.to_string())
+    }) {
+        return Some(override_symbol);
+    }
+
+    // 2. For CRYPTO assets, construct Yahoo-compatible symbol: {SYMBOL}-{CURRENCY}
+    // Yahoo Finance expects crypto symbols like BTC-CAD, ETH-USD, etc.
+    if asset.kind == AssetKind::Crypto && !asset.currency.is_empty() {
+        return Some(format!("{}-{}", asset.symbol, asset.currency));
+    }
+
+    // 3. For FX_RATE assets without provider_overrides, return None
+    // The caller should handle this by using the asset.id (e.g., "EUR/CAD")
+    // which will then be looked up or the symbol will be constructed elsewhere
+    if asset.kind == AssetKind::FxRate {
+        return None;
+    }
+
+    // 4. For securities (stocks, ETFs, funds), use the ticker symbol directly
+    // Yahoo Finance accepts standard tickers like AAPL, MSFT, etc.
+    if !asset.symbol.is_empty() {
+        return Some(asset.symbol.clone());
+    }
+
+    None
 }
 
 pub struct MarketDataService {
@@ -129,7 +177,7 @@ impl MarketDataServiceTrait for MarketDataService {
             .asset_repository
             .get_by_id(symbol)
             .ok()
-            .and_then(|asset| asset.quote_symbol)
+            .and_then(|asset| get_quote_symbol_from_asset(&asset))
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty())
             .unwrap_or_else(|| symbol.to_string());
@@ -220,13 +268,16 @@ impl MarketDataServiceTrait for MarketDataService {
         let quote_requests: Vec<_> = assets
             .iter()
             .filter(|asset| {
-                asset.asset_type.as_deref() != Some(CASH_ASSET_TYPE)
-                    && asset.data_source != DATA_SOURCE_MANUAL
+                asset.kind != AssetKind::Cash && asset.pricing_mode != PricingMode::Manual
             })
             .map(|asset| QuoteRequest {
-                symbol: asset.symbol.clone(),
-                quote_symbol: asset.quote_symbol.clone(),
-                data_source: asset.data_source.as_str().into(),
+                symbol: asset.id.clone(), // Use asset.id for quote storage (e.g., "EUR/CAD" for FX)
+                quote_symbol: get_quote_symbol_from_asset(asset),
+                data_source: asset
+                    .preferred_provider
+                    .as_deref()
+                    .unwrap_or(DATA_SOURCE_YAHOO)
+                    .into(),
                 currency: asset.currency.clone(),
             })
             .collect();
@@ -502,13 +553,14 @@ impl MarketDataServiceTrait for MarketDataService {
         let today = Utc::now().date_naive();
 
         // Get asset info for symbol mappings and currencies
+        // Key by asset.id since sync states use asset IDs (e.g., "EUR/CAD" for FX)
         let assets = self.asset_repository.list()?;
         let asset_info: HashMap<String, (Option<String>, String)> = assets
             .iter()
             .map(|a| {
                 (
-                    a.symbol.clone(),
-                    (a.quote_symbol.clone(), a.currency.clone()),
+                    a.id.clone(),
+                    (get_quote_symbol_from_asset(a), a.currency.clone()),
                 )
             })
             .collect();
@@ -561,16 +613,25 @@ impl MarketDataServiceTrait for MarketDataService {
                 }
                 SyncCategory::RecentlyClosed => {
                     // Continue syncing from last quote to today (within grace period)
+                    // If no last_quote_date, use minimum lookback to avoid single-day failures
                     let start = state
                         .last_quote_date
                         .map(|d| d.succ_opt().unwrap_or(d))
-                        .unwrap_or(today);
+                        .unwrap_or_else(|| today - Duration::days(MIN_SYNC_LOOKBACK_DAYS));
                     (start, today)
                 }
                 SyncCategory::Closed => continue, // Already filtered above
             };
 
-            // Skip if start is after end
+            // Ensure minimum lookback to avoid single-day fetch failures
+            // (weekends, holidays, market not yet open can cause empty results)
+            let start_date = if start_date >= today {
+                today - Duration::days(MIN_SYNC_LOOKBACK_DAYS)
+            } else {
+                start_date
+            };
+
+            // Skip if start is after end (shouldn't happen after above fix)
             if start_date > end_date {
                 debug!(
                     "Skipping {} - start date {} is after end date {}",
@@ -643,7 +704,7 @@ impl MarketDataServiceTrait for MarketDataService {
             let asset = self.asset_repository.get_by_id(symbol).ok();
             let data_source = asset
                 .as_ref()
-                .map(|a| a.data_source.clone())
+                .and_then(|a| a.preferred_provider.clone())
                 .unwrap_or_else(|| "YAHOO".to_string());
 
             let mut state = QuoteSyncState::new(symbol.to_string(), data_source);
@@ -709,16 +770,21 @@ impl MarketDataServiceTrait for MarketDataService {
             info!("Creating new sync state for symbol {}", symbol);
 
             let asset = self.asset_repository.get_by_id(symbol).ok();
-            let data_source = asset
-                .as_ref()
-                .map(|a| a.data_source.clone())
-                .unwrap_or_else(|| "YAHOO".to_string());
 
-            // Skip manual data source symbols
-            if data_source == DATA_SOURCE_MANUAL {
-                debug!("Skipping manual data source symbol {}", symbol);
+            // Skip manual pricing mode symbols
+            if asset
+                .as_ref()
+                .map(|a| a.pricing_mode == PricingMode::Manual)
+                .unwrap_or(false)
+            {
+                debug!("Skipping manual pricing mode symbol {}", symbol);
                 return Ok(());
             }
+
+            let data_source = asset
+                .as_ref()
+                .and_then(|a| a.preferred_provider.clone())
+                .unwrap_or_else(|| "YAHOO".to_string());
 
             let mut state = QuoteSyncState::new(symbol.to_string(), data_source);
             state.first_activity_date = Some(activity_date);
@@ -861,13 +927,16 @@ impl MarketDataService {
         let quote_requests: Vec<_> = assets
             .iter()
             .filter(|asset| {
-                asset.asset_type.as_deref() != Some(CASH_ASSET_TYPE)
-                    && asset.data_source != DATA_SOURCE_MANUAL
+                asset.kind != AssetKind::Cash && asset.pricing_mode != PricingMode::Manual
             })
             .map(|asset| QuoteRequest {
-                symbol: asset.symbol.clone(),
-                quote_symbol: asset.quote_symbol.clone(),
-                data_source: asset.data_source.as_str().into(),
+                symbol: asset.id.clone(), // Use asset.id for quote storage (e.g., "EUR/CAD" for FX)
+                quote_symbol: get_quote_symbol_from_asset(asset),
+                data_source: asset
+                    .preferred_provider
+                    .as_deref()
+                    .unwrap_or(DATA_SOURCE_YAHOO)
+                    .into(),
                 currency: asset.currency.clone(),
             })
             .collect();
@@ -885,10 +954,18 @@ impl MarketDataService {
             return Ok(((), Vec::new()));
         }
 
-        debug!(
+        info!(
             "Syncing market data with optimized plan: {} symbols",
             sync_plans.len()
         );
+
+        // Log each plan's details for debugging
+        for plan in &sync_plans {
+            info!(
+                "Sync plan: symbol={}, quote_symbol={:?}, currency={}, start={}, end={}, category={:?}",
+                plan.symbol, plan.quote_symbol, plan.currency, plan.start_date, plan.end_date, plan.category
+            );
+        }
 
         // Convert sync plans to quote requests
         let quote_requests: Vec<QuoteRequest> = sync_plans
@@ -1012,6 +1089,14 @@ impl MarketDataService {
                 }
             }
 
+            info!(
+                "Fetching quotes for {} symbols with start_date={}, end_date={}. Fetch symbols: {:?}",
+                fetch_symbols.len(),
+                start_date,
+                today,
+                fetch_symbols.iter().map(|(s, _)| s.as_str()).collect::<Vec<_>>()
+            );
+
             match self
                 .provider_registry
                 .read()
@@ -1020,6 +1105,14 @@ impl MarketDataService {
                 .await
             {
                 Ok((quotes, provider_failures)) => {
+                    info!(
+                        "Provider returned {} quotes, {} failures",
+                        quotes.len(),
+                        provider_failures.len()
+                    );
+                    if !provider_failures.is_empty() {
+                        warn!("Provider failures: {:?}", provider_failures);
+                    }
                     let mut remapped_quotes: Vec<Quote> = Vec::with_capacity(quotes.len());
 
                     for quote in quotes {
@@ -1086,8 +1179,14 @@ impl MarketDataService {
             }
         }
 
+        info!(
+            "Sync complete: {} total quotes fetched, {} failures",
+            all_quotes.len(),
+            failed_syncs.len()
+        );
+
         if !all_quotes.is_empty() {
-            debug!(
+            info!(
                 "Attempting to save {} quotes to the repository.",
                 all_quotes.len()
             );
@@ -1120,7 +1219,7 @@ impl MarketDataService {
                 error!("Failed to save synced quotes to repository: {}", e);
                 failed_syncs.push(("repository_save".to_string(), e.to_string()));
             } else {
-                debug!("Successfully saved {} quotes.", all_quotes.len());
+                info!("Successfully saved {} quotes.", all_quotes.len());
 
                 // Update sync state for each symbol with the new quote date ranges
                 for (symbol, (earliest, latest)) in symbol_quote_ranges {
@@ -1138,6 +1237,8 @@ impl MarketDataService {
                     }
                 }
             }
+        } else {
+            warn!("No quotes to save - all fetches may have failed. Failed syncs: {:?}", failed_syncs);
         }
 
         Ok(((), failed_syncs))
@@ -1505,10 +1606,7 @@ impl MarketDataService {
             return Ok(plan);
         }
 
-        let quotes_map = match self
-            .repository
-            .get_latest_quotes_for_symbols(&symbols_list)
-        {
+        let quotes_map = match self.repository.get_latest_quotes_for_symbols(&symbols_list) {
             Ok(map) => map,
             Err(e) => {
                 error!(
@@ -1627,6 +1725,7 @@ impl MarketDataService {
             currency: import_quote.currency.clone(),
             data_source: DataSource::Manual,
             created_at: Utc::now(),
+            notes: None,
         })
     }
 
@@ -1717,9 +1816,9 @@ impl MarketDataService {
     fn get_quote_date_ranges(
         &self,
     ) -> Result<HashMap<String, (Option<NaiveDate>, Option<NaiveDate>)>> {
-        // Get all symbols from assets
+        // Get all asset IDs - quotes are stored with quotes.symbol = asset.id
         let assets = self.asset_repository.list()?;
-        let symbols: Vec<String> = assets.iter().map(|a| a.symbol.clone()).collect();
+        let symbols: Vec<String> = assets.iter().map(|a| a.id.clone()).collect();
 
         if symbols.is_empty() {
             return Ok(HashMap::new());
@@ -1766,20 +1865,26 @@ impl MarketDataService {
         let quote_ranges = self.get_quote_date_ranges()?;
 
         // 5. Get asset data sources and collect FOREX assets
+        // NOTE: All lookups use asset.id as the key, since that's how positions and activities
+        // reference assets. For securities, id == symbol (e.g., "AAPL"), but for FX assets,
+        // id is the canonical pair (e.g., "EUR/CAD") while symbol is the base currency ("EUR").
         let assets = self.asset_repository.list()?;
-        let asset_data_sources: HashMap<String, String> = assets
+        let asset_data_sources: HashMap<String, (Option<String>, PricingMode)> = assets
             .iter()
-            .map(|a| (a.symbol.clone(), a.data_source.clone()))
+            .map(|a| {
+                (
+                    a.id.clone(), // Use asset.id for consistent lookups
+                    (a.preferred_provider.clone(), a.pricing_mode.clone()),
+                )
+            })
             .collect();
 
-        // Collect FOREX assets that need syncing (non-manual data source)
+        // Collect FOREX assets that need syncing (non-manual pricing mode)
+        // Use asset.id (e.g., "EUR/CAD") not asset.symbol (e.g., "EUR")
         let forex_symbols: HashSet<String> = assets
             .iter()
-            .filter(|a| {
-                a.asset_type.as_deref() == Some(FOREX_ASSET_TYPE)
-                    && a.data_source != DATA_SOURCE_MANUAL
-            })
-            .map(|a| a.symbol.clone())
+            .filter(|a| a.kind == AssetKind::FxRate && a.pricing_mode != PricingMode::Manual)
+            .map(|a| a.id.clone())
             .collect();
         debug!("Found {} FOREX symbols to sync", forex_symbols.len());
 
@@ -1791,12 +1896,12 @@ impl MarketDataService {
         // Include FOREX assets so FX rates are synced even without activities
         all_symbols.extend(forex_symbols.iter().cloned());
 
-        // Filter out manual data source symbols and cash
+        // Filter out manual pricing mode symbols and cash
         all_symbols.retain(|s| {
             !s.starts_with("$CASH")
                 && asset_data_sources
                     .get(s)
-                    .map(|ds| ds != DATA_SOURCE_MANUAL)
+                    .map(|(_, pricing_mode)| *pricing_mode != PricingMode::Manual)
                     .unwrap_or(true)
         });
 
@@ -1807,15 +1912,13 @@ impl MarketDataService {
             // FOREX assets are always considered active since they're needed for currency conversion
             let is_forex = forex_symbols.contains(&symbol);
             let is_active = active_symbols.contains(&symbol) || is_forex;
-            let (first_activity, last_activity) = activity_dates
-                .get(&symbol)
-                .cloned()
-                .unwrap_or((None, None));
+            let (first_activity, last_activity) =
+                activity_dates.get(&symbol).cloned().unwrap_or((None, None));
             let (earliest_quote, latest_quote) =
                 quote_ranges.get(&symbol).cloned().unwrap_or((None, None));
             let data_source = asset_data_sources
                 .get(&symbol)
-                .cloned()
+                .and_then(|(provider, _)| provider.clone())
                 .unwrap_or_else(|| "YAHOO".to_string());
 
             let mut state = if let Some(existing) = existing_map.get(&symbol) {

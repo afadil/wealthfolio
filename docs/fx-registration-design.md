@@ -50,7 +50,13 @@ if new_account.currency != base_currency {
 ```
 
 **Trigger:** When creating an account with currency different from base currency
-**FX Pair:** `{account_currency}{base_currency}=X` (e.g., `USDCAD=X`)
+**FX Asset ID:** `{account_currency}/{base_currency}` (e.g., `USD/CAD`)
+
+> **Note:** FX assets now use canonical format per the Asset Model spec:
+> - `id`: "USD/CAD" format
+> - `symbol`: Base currency only (e.g., "USD")
+> - `currency`: Quote currency (e.g., "CAD")
+> - `provider_overrides`: Contains provider-specific formats (e.g., `{"YAHOO": {"type": "fx_symbol", "symbol": "USDCAD=X"}}`)
 
 ---
 
@@ -74,9 +80,9 @@ if asset.currency != account.currency && asset.currency != activity.currency {
 ```
 
 **Trigger:** Creating or updating an activity
-**FX Pairs:**
-- `{account_currency}{activity_currency}=X`
-- `{account_currency}{asset_currency}=X`
+**FX Asset IDs:**
+- `{account_currency}/{activity_currency}` (e.g., `USD/EUR`)
+- `{account_currency}/{asset_currency}` (e.g., `USD/JPY`)
 
 ---
 
@@ -95,7 +101,7 @@ if activity.currency != account.currency {
 ```
 
 **Trigger:** Importing activities from CSV/file
-**FX Pair:** `{account_currency}{activity_currency}=X`
+**FX Asset ID:** `{account_currency}/{activity_currency}` (e.g., `USD/GBP`)
 
 ---
 
@@ -114,25 +120,25 @@ for currency_code in all_currencies {
 ```
 
 **Trigger:** User changes base currency in settings
-**FX Pairs:** `{each_existing_currency}{new_base_currency}=X`
+**FX Asset IDs:** `{each_existing_currency}/{new_base_currency}` (e.g., `USD/EUR`, `JPY/EUR`)
 
 ---
 
-### 5. Event Listeners (Legacy/Redundant)
+### 5. Event Listeners
 **File:** `src-tauri/src/listeners.rs:237-250, 524-530`
 
 ```rust
-// Account resource change
-let symbol = format!("{}{}=X", currency, base_currency);
+// Account resource change - uses canonical FX ID format
+let symbol = format!("{}/{}", currency, base_currency);
 payload_builder = payload_builder.symbols(Some(vec![symbol]));
 
-// Activity resource change
-symbols.insert(format!("{}{}=X", account.currency, currency));
+// Activity resource change - uses canonical FX ID format
+symbols.insert(format!("{}/{}", account.currency, currency));
 ```
 
 **Trigger:** Resource change events (account created, activity created)
-**Purpose:** Adds FX symbols to market data sync payload
-**Note:** This doesn't call `register_currency_pair` - just adds to sync list
+**Purpose:** Adds FX asset IDs to market data sync payload
+**Note:** Uses canonical FX ID format (e.g., "USD/CAD"). Provider-specific symbols are resolved via `provider_overrides`.
 
 ---
 
@@ -155,16 +161,17 @@ symbols.insert(format!("{}{}=X", account.currency, currency));
 │  │                                                                  │  │
 │  │  - Normalizes currency codes                                     │  │
 │  │  - Checks if rate already exists                                 │  │
-│  │  - Creates FX asset (e.g., USDCAD=X) if not exists              │  │
-│  │  - Sets data_source = "YAHOO" for auto-sync                      │  │
+│  │  - Creates FX asset (e.g., USD/CAD) if not exists                │  │
+│  │  - Sets preferred_provider and provider_overrides for sync       │  │
 │  └──────────────────────────────────────────────────────────────────┘  │
 │                                    │                                    │
 │                                    ▼                                    │
 │  ┌──────────────────────────────────────────────────────────────────┐  │
 │  │                     FxRepository.create_fx_asset()               │  │
 │  │                                                                  │  │
-│  │  - INSERT INTO assets (id, symbol, name, asset_type='Currency') │  │
-│  │  - data_source = 'YAHOO' (for automatic quote fetching)          │  │
+│  │  - INSERT INTO assets (id, symbol, currency, kind='FX_RATE')    │  │
+│  │  - provider_overrides: {"YAHOO": {"type":"fx_symbol","symbol":  │  │
+│  │    "USDCAD=X"}}                                                  │  │
 │  └──────────────────────────────────────────────────────────────────┘  │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -174,8 +181,8 @@ symbols.insert(format!("{}{}=X", account.currency, currency));
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                      Market Data Sync (Periodic)                        │
 ├─────────────────────────────────────────────────────────────────────────┤
-│  - Fetches all assets with data_source != 'MANUAL'                      │
-│  - Downloads quotes from Yahoo Finance                                  │
+│  - Fetches all assets with pricing_mode = 'MARKET'                      │
+│  - Downloads quotes using provider_overrides to resolve symbols         │
 │  - Stores in quotes table                                               │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -188,8 +195,8 @@ symbols.insert(format!("{}{}=X", account.currency, currency));
 The `AccountService` registers `{account_currency}{base_currency}` but NOT `{base_currency}{account_currency}`. The valuation service may need the inverse rate.
 
 **Example:** Account is USD, base is CAD
-- Registered: `USDCAD=X` ✓
-- May need: `CADUSD=X` (for inverse lookups) ✗
+- Registered: `USD/CAD` ✓
+- May need: `CAD/USD` (for inverse lookups) ✗
 
 ### 2. **No Registration for Asset Currency → Base Currency**
 When an asset has a different currency than both the account and base currency, no direct FX pair to base is registered.
@@ -198,8 +205,8 @@ When an asset has a different currency than both the account and base currency, 
 - Base: CAD
 - Account: USD
 - Asset: EUR
-- Registered: `USDEUR=X` (account→asset)
-- Missing: `EURCAD=X` (asset→base for portfolio totals)
+- Registered: `USD/EUR` (account→asset)
+- Missing: `EUR/CAD` (asset→base for portfolio totals)
 
 ### 3. **Duplicate Code**
 The same FX registration logic is repeated in:
@@ -286,7 +293,7 @@ impl FxRequirementService {
         let mut registered = Vec::new();
         for (from, to) in required_pairs {
             self.fx_service.register_currency_pair(&from, &to).await?;
-            registered.push(format!("{}{}=X", from, to));
+            registered.push(format!("{}/{}", from, to));
         }
 
         Ok(registered)
@@ -329,10 +336,10 @@ Given the four currency levels, here are ALL the FX pairs that may be needed:
     └───────────────────────────┘
 
 Required FX Pairs for this example:
-  • USDCAD=X  (Account → Base)
-  • JPYCAD=X  (Asset → Base)
-  • GBPUSD=X  (Activity → Account)
-  • JPYUSD=X  (Asset → Account, for cost basis)
+  • USD/CAD  (Account → Base)
+  • JPY/CAD  (Asset → Base)
+  • GBP/USD  (Activity → Account)
+  • JPY/USD  (Asset → Account, for cost basis)
 ```
 
 **Benefits:**
@@ -381,15 +388,17 @@ impl FxService {
 Use database constraints to automatically maintain FX pairs:
 
 ```sql
--- Trigger on account insert
+-- Trigger on account insert (updated for new canonical format)
 CREATE TRIGGER ensure_account_fx_pair
 AFTER INSERT ON accounts
 BEGIN
-    INSERT OR IGNORE INTO assets (id, symbol, asset_type, data_source)
+    INSERT OR IGNORE INTO assets (id, symbol, currency, kind, pricing_mode, preferred_provider)
     SELECT
-        NEW.currency || (SELECT value FROM settings WHERE key = 'base_currency') || '=X',
-        NEW.currency || (SELECT value FROM settings WHERE key = 'base_currency') || '=X',
-        'Currency',
+        NEW.currency || '/' || (SELECT value FROM settings WHERE key = 'base_currency'),
+        NEW.currency,  -- symbol = base currency only
+        (SELECT value FROM settings WHERE key = 'base_currency'),  -- currency = quote
+        'FX_RATE',
+        'MARKET',
         'YAHOO'
     WHERE NEW.currency != (SELECT value FROM settings WHERE key = 'base_currency');
 END;
@@ -443,17 +452,17 @@ END;
 
 | Location | What it Registers | Issue | Fix |
 |----------|------------------|-------|-----|
-| AccountService | `{account}→{base}` | ✓ Works | Keep |
-| ActivityService (3 places) | `{account}→{activity}`, `{account}→{asset}` | Missing `{asset}→{base}` | Add asset→base |
-| SettingsService | `{all_currencies}→{new_base}` | ✓ Works | Keep |
-| listeners.rs | Adds to sync payload | Redundant with services | Remove |
+| AccountService | `{account}/{base}` | ✓ Works | Keep |
+| ActivityService (3 places) | `{account}/{activity}`, `{account}/{asset}` | Missing `{asset}/{base}` | Add asset→base |
+| SettingsService | `{all_currencies}/{new_base}` | ✓ Works | Keep |
+| listeners.rs | Adds to sync payload | Uses canonical format | Keep |
 | (Missing) | No startup validation | May have gaps | Add FxRequirementService |
 
 ### Root Cause of Alpaca Issue
 
 The Alpaca account issue was caused by:
 1. Account created with USD currency, base is CAD
-2. `AccountService` should have registered `USDCAD=X`
+2. `AccountService` should have registered FX asset `USD/CAD`
 3. But `SyncService` bypassed `AccountService` and called repository directly
 4. No FX rate → valuation skipped → $0.00 displayed
 

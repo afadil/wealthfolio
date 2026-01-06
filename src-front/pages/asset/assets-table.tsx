@@ -153,13 +153,13 @@ export function AssetsTable({
         accessorKey: "assetSubClass",
       },
       {
-        accessorKey: "dataSource",
+        accessorKey: "preferredProvider",
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Source" className="w-[60px]" />
         ),
         cell: ({ row }) => (
           <Badge variant="secondary" className="uppercase">
-            {row.original.dataSource}
+            {row.original.preferredProvider ?? "MANUAL"}
           </Badge>
         ),
       },
@@ -263,9 +263,11 @@ export function AssetsTable({
     ],
   );
 
-  // Build filter options from assets
+  // Build filter options from assets (preferredProvider)
   const dataSourceOptions = useMemo(() => {
-    const sources = new Set(assets.map((asset) => asset.dataSource));
+    const sources = new Set(
+      assets.map((asset) => asset.preferredProvider ?? "MANUAL").filter((s): s is string => !!s),
+    );
     return Array.from(sources).map((source) => ({
       label: source.toUpperCase(),
       value: source,

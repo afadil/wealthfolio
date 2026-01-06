@@ -3,8 +3,8 @@
 use async_trait::async_trait;
 use chrono::NaiveDate;
 
-use crate::errors::Result;
 use super::DailyAccountValuation;
+use crate::errors::Result;
 
 /// Repository trait for managing daily account valuations.
 #[async_trait]
@@ -27,10 +27,7 @@ pub trait ValuationRepositoryTrait: Send + Sync {
     async fn delete_valuations_for_account(&self, account_id: &str) -> Result<()>;
 
     /// Get the latest valuations for multiple accounts.
-    fn get_latest_valuations(
-        &self,
-        account_ids: &[String],
-    ) -> Result<Vec<DailyAccountValuation>>;
+    fn get_latest_valuations(&self, account_ids: &[String]) -> Result<Vec<DailyAccountValuation>>;
 
     /// Get valuations for multiple accounts on a specific date.
     fn get_valuations_on_date(

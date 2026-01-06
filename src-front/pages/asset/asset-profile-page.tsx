@@ -2,6 +2,7 @@ import { getAssetProfile } from "@/commands/market-data";
 import { getHolding } from "@/commands/portfolio";
 import { MobileActionsMenu } from "@/components/mobile-actions-menu";
 import { TickerAvatar } from "@/components/ticker-avatar";
+import { ValueHistoryDataGrid } from "@/features/alternative-assets";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -13,9 +14,9 @@ import { useHapticFeedback } from "@/hooks";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { useQuoteHistory } from "@/hooks/use-quote-history";
 import { useSyncMarketDataMutation } from "@/hooks/use-sync-market-data";
-import { DataSource, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
-import { Asset, Country, Holding, Quote, Sector } from "@/lib/types";
+import { Asset, AssetKind, Country, Holding, Quote, Sector } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatedToggleGroup, Page, PageContent, PageHeader, SwipableView } from "@wealthfolio/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -25,7 +26,22 @@ import AssetHistoryCard from "./asset-history-card";
 import AssetLotsTable from "./asset-lots-table";
 import { useAssetProfileMutations } from "./hooks/use-asset-profile-mutations";
 import { useQuoteMutations } from "./hooks/use-quote-mutations";
-import QuoteHistoryTable from "./quote-history-table";
+import { QuoteHistoryDataGrid } from "./quote-history-data-grid";
+
+// Alternative asset kinds that should use ValueHistoryDataGrid
+const ALTERNATIVE_ASSET_KINDS: AssetKind[] = [
+  "PROPERTY",
+  "VEHICLE",
+  "COLLECTIBLE",
+  "PHYSICAL_PRECIOUS",
+  "LIABILITY",
+  "OTHER",
+];
+
+const isAlternativeAsset = (kind: AssetKind | undefined | null): boolean => {
+  if (!kind) return false;
+  return ALTERNATIVE_ASSET_KINDS.includes(kind);
+};
 
 interface AssetProfileFormData {
   name: string;
@@ -34,7 +50,6 @@ interface AssetProfileFormData {
   assetClass: string;
   assetSubClass: string;
   notes: string;
-  dataSource: DataSource;
 }
 
 interface AssetDetailData {
@@ -80,7 +95,6 @@ export const AssetProfilePage = () => {
     assetClass: "",
     assetSubClass: "",
     notes: "",
-    dataSource: DataSource.MANUAL,
   });
 
   const {
@@ -151,14 +165,20 @@ export const AssetProfilePage = () => {
 
     setFormData({
       name: instrument?.name ?? asset?.name ?? "",
-      sectors: parseSectors(instrument?.sectors ?? asset?.sectors),
-      countries: parseCountries(instrument?.countries ?? asset?.countries),
+      sectors: parseSectors(instrument?.sectors ?? asset?.profile?.sectors),
+      countries: parseCountries(instrument?.countries ?? asset?.profile?.countries),
       assetSubClass: instrument?.assetSubclass ?? asset?.assetSubClass ?? "",
       assetClass: instrument?.assetClass ?? asset?.assetClass ?? "",
       notes: instrument?.notes ?? asset?.notes ?? "",
-      dataSource: (instrument?.dataSource ?? asset?.dataSource ?? DataSource.YAHOO) as DataSource,
     });
   }, [holding, assetProfile]);
+
+  // Determine if manual tracking based on asset's pricingMode
+  const isManualPricingMode = assetProfile?.pricingMode === "MANUAL";
+
+  // Determine if this is an alternative asset (property, vehicle, liability, etc.)
+  const isAltAsset = isAlternativeAsset(assetProfile?.kind);
+  const isLiability = assetProfile?.kind === "LIABILITY";
 
   const profile = useMemo(() => {
     const instrument = holding?.instrument;
@@ -183,18 +203,17 @@ export const AssetProfilePage = () => {
       countries:
         typeof instrument?.countries === "string"
           ? instrument.countries
-          : JSON.stringify(instrument?.countries ?? asset?.countries ?? []),
+          : JSON.stringify(instrument?.countries ?? (asset?.profile?.countries ? JSON.parse(asset.profile.countries) : [])),
       categories: null,
       classes: null,
       attributes: null,
       createdAt: holding?.openDate ? new Date(holding.openDate) : new Date(),
       updatedAt: new Date(),
       currency: instrument?.currency ?? asset?.currency ?? "USD",
-      dataSource: (instrument?.dataSource ?? asset?.dataSource ?? DataSource.YAHOO) as DataSource,
       sectors:
         typeof instrument?.sectors === "string"
           ? instrument.sectors
-          : JSON.stringify(instrument?.sectors ?? asset?.sectors ?? []),
+          : JSON.stringify(instrument?.sectors ?? (asset?.profile?.sectors ? JSON.parse(asset.profile.sectors) : [])),
       url: null,
       marketPrice: quote?.close ?? 0,
       totalGainAmount,
@@ -300,12 +319,11 @@ export const AssetProfilePage = () => {
 
     setFormData({
       name: instrument?.name ?? asset?.name ?? "",
-      sectors: parseSectors(instrument?.sectors ?? asset?.sectors),
-      countries: parseCountries(instrument?.countries ?? asset?.countries),
+      sectors: parseSectors(instrument?.sectors ?? asset?.profile?.sectors),
+      countries: parseCountries(instrument?.countries ?? asset?.profile?.countries),
       assetSubClass: instrument?.assetSubclass ?? asset?.assetSubClass ?? "",
       assetClass: instrument?.assetClass ?? asset?.assetClass ?? "",
       notes: instrument?.notes ?? asset?.notes ?? "",
-      dataSource: (instrument?.dataSource ?? asset?.dataSource ?? DataSource.YAHOO) as DataSource,
     });
   }, [holding, assetProfile]);
 
@@ -321,10 +339,10 @@ export const AssetProfilePage = () => {
       items.push({ value: "lots", label: "Lots" });
     }
 
-    items.push({ value: "history", label: "Quotes" });
+    items.push({ value: "history", label: isAltAsset ? "Values" : "Quotes" });
 
     return items;
-  }, [profile, holding]);
+  }, [profile, holding, isAltAsset]);
 
   // Build swipable tabs for mobile
   const swipableTabs = useMemo(() => {
@@ -516,37 +534,34 @@ export const AssetProfilePage = () => {
       });
     }
 
+    // Use ValueHistoryDataGrid for alternative assets, QuoteHistoryTable for regular assets
     tabs.push({
-      name: "Quotes",
-      content: (
-        <QuoteHistoryTable
+      name: isAltAsset ? "Values" : "Quotes",
+      content: isAltAsset ? (
+        <ValueHistoryDataGrid
           data={quoteHistory ?? []}
-          isManualDataSource={formData.dataSource === DataSource.MANUAL}
+          currency={profile?.currency ?? "USD"}
+          isLiability={isLiability}
           onSaveQuote={(quote: Quote) => {
-            const updatedQuote = { ...quote };
-            if (!updatedQuote.id) {
-              const datePart = new Date(updatedQuote.timestamp)
-                .toISOString()
-                .slice(0, 10)
-                .replace(/-/g, "");
-              updatedQuote.id = `${datePart}_${symbol.toUpperCase()}`;
-            }
-            if (!updatedQuote.currency) {
-              updatedQuote.currency = profile?.currency ?? "USD";
-            }
-            saveQuoteMutation.mutate(updatedQuote);
+            saveQuoteMutation.mutate(quote);
           }}
+          onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
+        />
+      ) : (
+        <QuoteHistoryDataGrid
+          data={quoteHistory ?? []}
+          symbol={symbol}
+          currency={profile?.currency ?? "USD"}
+          assetKind={assetProfile?.kind}
+          isManualDataSource={isManualPricingMode}
+          onSaveQuote={(quote: Quote) => saveQuoteMutation.mutate(quote)}
           onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
           onChangeDataSource={(isManual) => {
             if (profile) {
               updateAssetDataSourceMutation.mutate({
                 symbol,
-                dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
+                dataSource: isManual ? "MANUAL" : "YAHOO",
               });
-              setFormData((prev) => ({
-                ...prev,
-                dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
-              }));
             }
           }}
         />
@@ -567,6 +582,9 @@ export const AssetProfilePage = () => {
     symbol,
     handleCancel,
     handleSave,
+    isAltAsset,
+    isLiability,
+    isManualPricingMode,
   ]);
 
   const isLoading = isHoldingLoading || isQuotesLoading || isAssetProfileLoading;
@@ -590,7 +608,7 @@ export const AssetProfilePage = () => {
     ); // Show loading spinner
 
   // Simplified view for quote-only symbols (like FX rates)
-  if (assetProfile?.assetType === "FOREX") {
+  if (assetProfile?.kind === "FX_RATE") {
     return (
       <Page>
         <PageHeader
@@ -612,36 +630,19 @@ export const AssetProfilePage = () => {
           }
         />
         <PageContent>
-          <QuoteHistoryTable
+          <QuoteHistoryDataGrid
             data={quoteHistory ?? []}
-            // Default to non-manual source, disable changing it as there's no profile context
-            isManualDataSource={assetProfile?.dataSource === DataSource.MANUAL}
-            onSaveQuote={(quote: Quote) => {
-              const updatedQuote = { ...quote };
-              // Generate id if missing
-              if (!updatedQuote.id) {
-                const datePart = new Date(updatedQuote.timestamp)
-                  .toISOString()
-                  .slice(0, 10)
-                  .replace(/-/g, "");
-                updatedQuote.id = `${datePart}_${symbol.toUpperCase()}`;
-              }
-              // Set currency if missing
-              if (!updatedQuote.currency) {
-                updatedQuote.currency = profile?.currency ?? "USD";
-              }
-              saveQuoteMutation.mutate(updatedQuote);
-            }}
+            symbol={symbol}
+            currency={profile?.currency ?? "USD"}
+            assetKind={assetProfile?.kind}
+            isManualDataSource={isManualPricingMode}
+            onSaveQuote={(quote: Quote) => saveQuoteMutation.mutate(quote)}
             onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
             onChangeDataSource={(isManual) => {
               updateAssetDataSourceMutation.mutate({
                 symbol,
-                dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
+                dataSource: isManual ? "MANUAL" : "YAHOO",
               });
-              setFormData((prev) => ({
-                ...prev,
-                dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
-              }));
             }}
           />
         </PageContent>
@@ -1001,40 +1002,35 @@ export const AssetProfilePage = () => {
 
             {/* History/Quotes Content: Requires quoteHistory */}
             <TabsContent value="history" className="space-y-16 pt-6">
-              <QuoteHistoryTable
-                data={quoteHistory ?? []}
-                isManualDataSource={formData.dataSource === DataSource.MANUAL}
-                onSaveQuote={(quote: Quote) => {
-                  const updatedQuote = { ...quote };
-                  // Generate id if missing
-                  if (!updatedQuote.id) {
-                    const datePart = new Date(updatedQuote.timestamp)
-                      .toISOString()
-                      .slice(0, 10)
-                      .replace(/-/g, "");
-                    updatedQuote.id = `${datePart}_${symbol.toUpperCase()}`;
-                  }
-                  // Set currency if missing
-                  if (!updatedQuote.currency) {
-                    updatedQuote.currency = profile?.currency ?? "USD";
-                  }
-                  saveQuoteMutation.mutate(updatedQuote);
-                }}
-                onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
-                onChangeDataSource={(isManual) => {
-                  // Only allow changing data source if there's a profile/holding to update
-                  if (profile) {
-                    updateAssetDataSourceMutation.mutate({
-                      symbol,
-                      dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
-                    });
-                    setFormData((prev) => ({
-                      ...prev,
-                      dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
-                    }));
-                  }
-                }}
-              />
+              {isAltAsset ? (
+                <ValueHistoryDataGrid
+                  data={quoteHistory ?? []}
+                  currency={profile?.currency ?? "USD"}
+                  isLiability={isLiability}
+                  onSaveQuote={(quote: Quote) => {
+                    saveQuoteMutation.mutate(quote);
+                  }}
+                  onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
+                />
+              ) : (
+                <QuoteHistoryDataGrid
+                  data={quoteHistory ?? []}
+                  symbol={symbol}
+                  currency={profile?.currency ?? "USD"}
+                  assetKind={assetProfile?.kind}
+                  isManualDataSource={isManualPricingMode}
+                  onSaveQuote={(quote: Quote) => saveQuoteMutation.mutate(quote)}
+                  onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
+                  onChangeDataSource={(isManual) => {
+                    if (profile) {
+                      updateAssetDataSourceMutation.mutate({
+                        symbol,
+                        dataSource: isManual ? "MANUAL" : "YAHOO",
+                      });
+                    }
+                  }}
+                />
+              )}
             </TabsContent>
           </Tabs>
         )}

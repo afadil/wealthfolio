@@ -67,12 +67,24 @@ export const QueryKeys = {
 
   // Cloud Sync
   BROKER_CONNECTIONS: "brokerConnections",
+  BROKER_ACCOUNTS: "brokerAccounts",
   PLATFORMS: "platforms",
   SYNCED_ACCOUNTS: "syncedAccounts",
   SUBSCRIPTION_PLANS: "subscriptionPlans",
   USER_INFO: "userInfo",
   BROKER_SYNC_STATES: "brokerSyncStates",
   IMPORT_RUNS: "importRuns",
+
+  // Alternative Assets & Net Worth
+  NET_WORTH: "netWorth",
+  netWorth: (date?: string) => [QueryKeys.NET_WORTH, date ?? "current"],
+  ALTERNATIVE_HOLDINGS: "alternativeHoldings",
+  NET_WORTH_HISTORY: "netWorthHistory",
+  netWorthHistory: (startDate: string, endDate: string) => [
+    QueryKeys.NET_WORTH_HISTORY,
+    startDate,
+    endDate,
+  ],
 
   secrets: {
     apiKey: (providerId: string) => ["secrets", "apiKey", providerId],

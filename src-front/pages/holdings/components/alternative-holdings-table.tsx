@@ -1,0 +1,315 @@
+import { DataTable } from "@wealthfolio/ui/components/ui/data-table";
+import { DataTableColumnHeader } from "@wealthfolio/ui/components/ui/data-table/data-table-column-header";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@wealthfolio/ui/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@wealthfolio/ui/components/ui/alert-dialog";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
+import { EmptyPlaceholder, GainPercent, AmountDisplay } from "@wealthfolio/ui";
+import type { ColumnDef } from "@tanstack/react-table";
+import { useMemo, useState } from "react";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import type { AlternativeAssetHolding } from "@/lib/types";
+import { ALTERNATIVE_ASSET_KIND_DISPLAY_NAMES } from "@/lib/types";
+
+interface AlternativeHoldingsTableProps {
+  holdings: AlternativeAssetHolding[];
+  isLoading: boolean;
+  emptyTitle?: string;
+  emptyDescription?: string;
+  onEdit?: (holding: AlternativeAssetHolding) => void;
+  onUpdateValue?: (holding: AlternativeAssetHolding) => void;
+  onViewHistory?: (holding: AlternativeAssetHolding) => void;
+  onDelete?: (holding: AlternativeAssetHolding) => void;
+  isDeleting?: boolean;
+}
+
+export function AlternativeHoldingsTable({
+  holdings,
+  isLoading,
+  emptyTitle = "No assets yet",
+  emptyDescription = "Add your first asset using the button above.",
+  onEdit,
+  onUpdateValue,
+  onViewHistory,
+  onDelete,
+  isDeleting = false,
+}: AlternativeHoldingsTableProps) {
+  const { isBalanceHidden } = useBalancePrivacy();
+  const [assetToDelete, setAssetToDelete] = useState<AlternativeAssetHolding | null>(null);
+
+  const handleConfirmDelete = () => {
+    if (assetToDelete && onDelete) {
+      onDelete(assetToDelete);
+      setAssetToDelete(null);
+    }
+  };
+
+  const columns: ColumnDef<AlternativeAssetHolding>[] = useMemo(
+    () => [
+      {
+        id: "name",
+        accessorKey: "name",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Asset" />,
+        cell: ({ row }) => {
+          const holding = row.original;
+          const kindDisplay =
+            ALTERNATIVE_ASSET_KIND_DISPLAY_NAMES[
+              holding.kind.toUpperCase() as keyof typeof ALTERNATIVE_ASSET_KIND_DISPLAY_NAMES
+            ] ?? holding.kind;
+
+          return (
+            <div className="flex items-center gap-3">
+              <div className="bg-muted flex h-10 w-10 items-center justify-center rounded-full">
+                <AssetKindIcon kind={holding.kind} className="h-5 w-5" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium">{holding.name}</span>
+                <span className="text-muted-foreground text-xs">{kindDisplay}</span>
+              </div>
+            </div>
+          );
+        },
+        enableSorting: true,
+      },
+      {
+        id: "marketValue",
+        accessorKey: "marketValue",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Value" className="justify-end" />
+        ),
+        cell: ({ row }) => {
+          const holding = row.original;
+          const value = parseFloat(holding.marketValue);
+
+          return (
+            <div className="text-right">
+              <AmountDisplay
+                value={value}
+                currency={holding.currency}
+                isHidden={isBalanceHidden}
+                displayCurrency={true}
+              />
+            </div>
+          );
+        },
+        enableSorting: true,
+        sortingFn: (rowA, rowB) => {
+          const valueA = parseFloat(rowA.original.marketValue);
+          const valueB = parseFloat(rowB.original.marketValue);
+          return valueA - valueB;
+        },
+      },
+      {
+        id: "gain",
+        accessorKey: "unrealizedGain",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Gain" className="justify-end" />
+        ),
+        cell: ({ row }) => {
+          const holding = row.original;
+          const gain = holding.unrealizedGain ? parseFloat(holding.unrealizedGain) : null;
+          const gainPct = holding.unrealizedGainPct ? parseFloat(holding.unrealizedGainPct) : null;
+
+          if (gain === null || gainPct === null) {
+            return <div className="text-muted-foreground text-right text-sm">—</div>;
+          }
+
+          return (
+            <div className="flex flex-col items-end">
+              <AmountDisplay
+                value={gain}
+                currency={holding.currency}
+                isHidden={isBalanceHidden}
+                displayCurrency={false}
+                colorFormat={true}
+              />
+              <GainPercent value={gainPct} animated={false} className="text-xs" />
+            </div>
+          );
+        },
+        enableSorting: true,
+        sortingFn: (rowA, rowB) => {
+          const valueA = parseFloat(rowA.original.unrealizedGain ?? "0");
+          const valueB = parseFloat(rowB.original.unrealizedGain ?? "0");
+          return valueA - valueB;
+        },
+      },
+      {
+        id: "valuationDate",
+        accessorKey: "valuationDate",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Last Valued" className="justify-end" />
+        ),
+        cell: ({ row }) => {
+          const holding = row.original;
+          const date = new Date(holding.valuationDate);
+          const formatted = date.toLocaleDateString(undefined, {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          });
+
+          return <div className="text-muted-foreground text-right text-sm">{formatted}</div>;
+        },
+        enableSorting: true,
+      },
+      {
+        id: "actions",
+        header: "",
+        cell: ({ row }) => {
+          const holding = row.original;
+
+          return (
+            <div className="flex justify-end">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="hover:bg-muted text-muted-foreground inline-flex h-9 w-9 items-center justify-center rounded-md border transition"
+                    aria-label="Open actions"
+                  >
+                    <Icons.MoreVertical className="h-4 w-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {onUpdateValue && (
+                    <DropdownMenuItem onClick={() => onUpdateValue(holding)}>
+                      <Icons.DollarSign className="mr-2 h-4 w-4" />
+                      Update Value
+                    </DropdownMenuItem>
+                  )}
+                  {onViewHistory && (
+                    <DropdownMenuItem onClick={() => onViewHistory(holding)}>
+                      <Icons.History className="mr-2 h-4 w-4" />
+                      Value History
+                    </DropdownMenuItem>
+                  )}
+                  {onEdit && (
+                    <DropdownMenuItem onClick={() => onEdit(holding)}>
+                      <Icons.Pencil className="mr-2 h-4 w-4" />
+                      Edit Details
+                    </DropdownMenuItem>
+                  )}
+                  {onDelete && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onSelect={() => setAssetToDelete(holding)}
+                      >
+                        <Icons.Trash className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          );
+        },
+      },
+    ],
+    [isBalanceHidden, onEdit, onUpdateValue, onViewHistory, onDelete],
+  );
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4 pt-6">
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-12 w-full" />
+      </div>
+    );
+  }
+
+  if (!holdings || holdings.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <EmptyPlaceholder
+          icon={<Icons.Wallet className="text-muted-foreground h-10 w-10" />}
+          title={emptyTitle}
+          description={emptyDescription}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <DataTable
+        data={holdings}
+        columns={columns}
+        searchBy="name"
+        defaultSorting={[{ id: "marketValue", desc: true }]}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={assetToDelete !== null} onOpenChange={(open) => !open && setAssetToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Asset</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete{" "}
+              <span className="font-semibold">{assetToDelete?.name}</span>? This will remove all
+              valuation history and cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+/**
+ * Icon component for alternative asset kinds
+ */
+function AssetKindIcon({ kind, className }: { kind: string; className?: string }) {
+  switch (kind.toLowerCase()) {
+    case "property":
+      return <Icons.Building className={className} />;
+    case "vehicle":
+      return <Icons.Car className={className} />;
+    case "collectible":
+      return <Icons.Gem className={className} />;
+    case "precious":
+      return <Icons.Coins className={className} />;
+    case "liability":
+      return <Icons.CreditCard className={className} />;
+    default:
+      return <Icons.Package className={className} />;
+  }
+}
+
+export default AlternativeHoldingsTable;

@@ -31,7 +31,6 @@ impl fmt::Display for FxError {
 
 impl Error for FxError {}
 
-
 impl From<DatabaseError> for FxError {
     fn from(err: DatabaseError) -> Self {
         FxError::DatabaseError(err.to_string())
@@ -75,10 +74,7 @@ impl
         std::sync::PoisonError<
             std::sync::RwLockReadGuard<
                 '_,
-                std::collections::HashMap<
-                    String,
-                    Vec<crate::market_data::Quote>,
-                >,
+                std::collections::HashMap<String, Vec<crate::market_data::Quote>>,
             >,
         >,
     > for FxError
@@ -87,10 +83,7 @@ impl
         err: std::sync::PoisonError<
             std::sync::RwLockReadGuard<
                 '_,
-                std::collections::HashMap<
-                    String,
-                    Vec<crate::market_data::Quote>,
-                >,
+                std::collections::HashMap<String, Vec<crate::market_data::Quote>>,
             >,
         >,
     ) -> Self {
@@ -103,10 +96,7 @@ impl
         std::sync::PoisonError<
             std::sync::RwLockWriteGuard<
                 '_,
-                std::collections::HashMap<
-                    String,
-                    Vec<crate::market_data::Quote>,
-                >,
+                std::collections::HashMap<String, Vec<crate::market_data::Quote>>,
             >,
         >,
     > for FxError
@@ -115,10 +105,7 @@ impl
         err: std::sync::PoisonError<
             std::sync::RwLockWriteGuard<
                 '_,
-                std::collections::HashMap<
-                    String,
-                    Vec<crate::market_data::Quote>,
-                >,
+                std::collections::HashMap<String, Vec<crate::market_data::Quote>>,
             >,
         >,
     ) -> Self {

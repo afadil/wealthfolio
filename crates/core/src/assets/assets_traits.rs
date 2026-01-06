@@ -1,4 +1,4 @@
-use super::assets_model::{Asset, NewAsset, UpdateAssetProfile};
+use super::assets_model::{Asset, AssetMetadata, NewAsset, UpdateAssetProfile};
 use crate::errors::Result;
 
 /// Trait defining the contract for Asset service operations.
@@ -14,13 +14,29 @@ pub trait AssetServiceTrait: Send + Sync {
     ) -> Result<Asset>;
     fn load_cash_assets(&self, base_currency: &str) -> Result<Vec<Asset>>;
     async fn create_cash_asset(&self, currency: &str) -> Result<Asset>;
+    /// Creates a new asset directly without network lookups.
+    /// Used for alternative assets and other manually created assets.
+    async fn create_asset(&self, new_asset: NewAsset) -> Result<Asset>;
     async fn get_or_create_asset(
         &self,
         asset_id: &str,
         context_currency: Option<String>,
     ) -> Result<Asset>;
+    /// Creates a minimal asset without network calls.
+    /// Returns the existing asset if found, or creates a new minimal one.
+    /// Accepts optional metadata hints from the caller (e.g., user-provided asset details).
+    /// Should be followed by an enrichment event for full profile data.
+    async fn get_or_create_minimal_asset(
+        &self,
+        asset_id: &str,
+        context_currency: Option<String>,
+        metadata: Option<AssetMetadata>,
+    ) -> Result<Asset>;
     async fn update_asset_data_source(&self, asset_id: &str, data_source: String) -> Result<Asset>;
     async fn get_assets_by_symbols(&self, symbols: &[String]) -> Result<Vec<Asset>>;
+    /// Enriches an existing asset's profile with data from market data provider.
+    /// Updates the profile JSON (sectors, countries, website) and notes fields.
+    async fn enrich_asset_profile(&self, asset_id: &str) -> Result<Asset>;
 }
 
 /// Trait defining the contract for Asset repository operations.

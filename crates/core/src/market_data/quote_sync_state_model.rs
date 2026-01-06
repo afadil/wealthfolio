@@ -93,24 +93,26 @@ impl QuoteSyncState {
 
         let today = Utc::now().date_naive();
 
+        // FIRST: Check for NEW assets - has activities but no quotes yet
+        // This takes precedence because we need quotes regardless of is_active status
+        // (is_active might be false simply because no snapshot exists yet for new assets)
+        if self.first_activity_date.is_some() && self.earliest_quote_date.is_none() {
+            return SyncCategory::New;
+        }
+
+        // Check if needs backfill (activity date - buffer before earliest quote)
+        // This also applies regardless of is_active status
+        if let (Some(first_activity), Some(earliest_quote)) =
+            (self.first_activity_date, self.earliest_quote_date)
+        {
+            let required_start = first_activity - Duration::days(QUOTE_HISTORY_BUFFER_DAYS);
+            if required_start < earliest_quote {
+                return SyncCategory::NeedsBackfill;
+            }
+        }
+
         // Check if symbol has open position
         if self.is_active {
-            // Check if needs backfill (activity date - buffer before earliest quote)
-            if let (Some(first_activity), Some(earliest_quote)) =
-                (self.first_activity_date, self.earliest_quote_date)
-            {
-                // If (first activity - buffer) is before earliest quote, needs backfill
-                let required_start = first_activity - Duration::days(QUOTE_HISTORY_BUFFER_DAYS);
-                if required_start < earliest_quote {
-                    return SyncCategory::NeedsBackfill;
-                }
-            }
-
-            // Check if it's a new symbol (no quotes yet)
-            if self.earliest_quote_date.is_none() {
-                return SyncCategory::New;
-            }
-
             return SyncCategory::Active;
         }
 
@@ -118,6 +120,15 @@ impl QuoteSyncState {
         if let Some(closed_date) = self.position_closed_date {
             let days_since_close = (today - closed_date).num_days();
             if days_since_close <= grace_period_days {
+                return SyncCategory::RecentlyClosed;
+            }
+        }
+
+        // Fallback: check last_activity_date for recently closed without explicit closed_date
+        // This handles cases where position was closed but closed_date wasn't set
+        if let Some(last_activity) = self.last_activity_date {
+            let days_since_activity = (today - last_activity).num_days();
+            if days_since_activity <= grace_period_days {
                 return SyncCategory::RecentlyClosed;
             }
         }
@@ -221,4 +232,144 @@ pub struct QuoteSyncStateUpdate {
     pub error_count: Option<i32>,
     pub last_error: Option<Option<String>>,
     pub updated_at: Option<DateTime<Utc>>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_test_state() -> QuoteSyncState {
+        QuoteSyncState::new("TEST".to_string(), "YAHOO".to_string())
+    }
+
+    #[test]
+    fn test_new_asset_with_activity_but_no_quotes() {
+        // Scenario: User added a BUY activity for AAPL, but no quotes fetched yet
+        let mut state = create_test_state();
+        state.is_active = false; // No snapshot exists yet
+        state.first_activity_date = Some(Utc::now().date_naive());
+        state.last_activity_date = Some(Utc::now().date_naive());
+        state.earliest_quote_date = None; // No quotes yet
+
+        let category = state.determine_category(30);
+        assert_eq!(
+            category,
+            SyncCategory::New,
+            "Asset with activities but no quotes should be categorized as New"
+        );
+    }
+
+    #[test]
+    fn test_active_position_with_quotes() {
+        let mut state = create_test_state();
+        state.is_active = true;
+        state.first_activity_date = Some(Utc::now().date_naive() - Duration::days(10));
+        state.earliest_quote_date = Some(Utc::now().date_naive() - Duration::days(40));
+        state.last_quote_date = Some(Utc::now().date_naive() - Duration::days(1));
+
+        let category = state.determine_category(30);
+        assert_eq!(category, SyncCategory::Active);
+    }
+
+    #[test]
+    fn test_needs_backfill_activity_before_quotes() {
+        let mut state = create_test_state();
+        state.is_active = true;
+        // Activity date is 60 days ago, but earliest quote is 20 days ago
+        // With 30 day buffer: required_start = activity - 30 = 90 days ago
+        // Since 90 days ago < 20 days ago, needs backfill
+        let today = Utc::now().date_naive();
+        state.first_activity_date = Some(today - Duration::days(60));
+        state.earliest_quote_date = Some(today - Duration::days(20));
+        state.last_quote_date = Some(today - Duration::days(1));
+
+        let category = state.determine_category(30);
+        assert_eq!(
+            category,
+            SyncCategory::NeedsBackfill,
+            "Should need backfill when first_activity - buffer < earliest_quote"
+        );
+    }
+
+    #[test]
+    fn test_recently_closed_within_grace_period() {
+        let mut state = create_test_state();
+        state.is_active = false;
+        let today = Utc::now().date_naive();
+        state.first_activity_date = Some(today - Duration::days(100));
+        state.last_activity_date = Some(today - Duration::days(5)); // 5 days ago
+        state.position_closed_date = Some(today - Duration::days(5));
+        state.earliest_quote_date = Some(today - Duration::days(130));
+
+        let category = state.determine_category(30);
+        assert_eq!(
+            category,
+            SyncCategory::RecentlyClosed,
+            "Position closed 5 days ago should be RecentlyClosed (within 30 day grace)"
+        );
+    }
+
+    #[test]
+    fn test_recently_closed_fallback_to_last_activity() {
+        // Position closed but position_closed_date not set
+        let mut state = create_test_state();
+        state.is_active = false;
+        let today = Utc::now().date_naive();
+        state.first_activity_date = Some(today - Duration::days(100));
+        state.last_activity_date = Some(today - Duration::days(10)); // Last activity 10 days ago
+        state.position_closed_date = None; // Not explicitly set
+        state.earliest_quote_date = Some(today - Duration::days(130));
+
+        let category = state.determine_category(30);
+        assert_eq!(
+            category,
+            SyncCategory::RecentlyClosed,
+            "Should fallback to last_activity_date when position_closed_date is None"
+        );
+    }
+
+    #[test]
+    fn test_closed_beyond_grace_period() {
+        let mut state = create_test_state();
+        state.is_active = false;
+        let today = Utc::now().date_naive();
+        state.first_activity_date = Some(today - Duration::days(100));
+        state.last_activity_date = Some(today - Duration::days(50)); // 50 days ago
+        state.position_closed_date = Some(today - Duration::days(50));
+        state.earliest_quote_date = Some(today - Duration::days(130));
+
+        let category = state.determine_category(30);
+        assert_eq!(
+            category,
+            SyncCategory::Closed,
+            "Position closed 50 days ago should be Closed (beyond 30 day grace)"
+        );
+    }
+
+    #[test]
+    fn test_needs_backfill_even_when_not_active() {
+        // Edge case: position closed but still needs backfill for historical accuracy
+        let mut state = create_test_state();
+        state.is_active = false;
+        let today = Utc::now().date_naive();
+        state.first_activity_date = Some(today - Duration::days(100)); // Activity 100 days ago
+        state.earliest_quote_date = Some(today - Duration::days(50)); // Quotes only from 50 days ago
+        // With 30 day buffer: required_start = 100 - 30 = 70 days ago
+        // Since 70 days ago < 50 days ago, needs backfill
+
+        let category = state.determine_category(30);
+        assert_eq!(
+            category,
+            SyncCategory::NeedsBackfill,
+            "Should detect backfill need regardless of is_active status"
+        );
+    }
+
+    #[test]
+    fn test_category_priorities() {
+        assert!(SyncCategory::Active.default_priority() > SyncCategory::NeedsBackfill.default_priority());
+        assert!(SyncCategory::NeedsBackfill.default_priority() > SyncCategory::New.default_priority());
+        assert!(SyncCategory::New.default_priority() > SyncCategory::RecentlyClosed.default_priority());
+        assert!(SyncCategory::RecentlyClosed.default_priority() > SyncCategory::Closed.default_priority());
+    }
 }

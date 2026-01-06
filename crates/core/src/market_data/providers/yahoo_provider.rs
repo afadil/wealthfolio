@@ -135,13 +135,35 @@ impl YahooProvider {
         let start_offset = start.into();
         let end_offset = end.into();
 
-        let response = self
+        debug!(
+            "YahooProvider: Fetching quotes for symbol='{}', start={:?}, end={:?}",
+            symbol,
+            DateTime::<Utc>::from(start).format("%Y-%m-%d"),
+            DateTime::<Utc>::from(end).format("%Y-%m-%d")
+        );
+
+        let response = match self
             .provider
             .get_quote_history(symbol, start_offset, end_offset)
-            .await?;
+            .await
+        {
+            Ok(resp) => resp,
+            Err(e) => {
+                warn!(
+                    "YahooProvider: Failed to fetch quotes for symbol '{}': {:?}",
+                    symbol, e
+                );
+                return Err(MarketDataError::from(e));
+            }
+        };
 
         match response.quotes() {
             Ok(yahoo_api_quotes) => {
+                debug!(
+                    "YahooProvider: Got {} quotes for symbol '{}'",
+                    yahoo_api_quotes.len(),
+                    symbol
+                );
                 let quotes = yahoo_api_quotes
                     .into_iter()
                     .map(|q| {
@@ -233,6 +255,7 @@ impl YahooProvider {
             adjclose: Decimal::from_f64_retain(regular_market_price.raw.unwrap_or(0.0))
                 .unwrap_or_default(),
             currency: price.currency.clone().unwrap_or(fallback_currency),
+            notes: None,
         })
     }
 
@@ -261,6 +284,7 @@ impl YahooProvider {
             close: Decimal::from_f64_retain(yahoo_quote.close).unwrap_or_default(),
             adjclose: Decimal::from_f64_retain(yahoo_quote.adjclose).unwrap_or_default(),
             currency: fallback_currency,
+            notes: None,
         }
     }
 
@@ -736,58 +760,58 @@ fn get_currency_for_suffix(symbol: &str) -> Option<&'static str> {
 
     match suffix {
         // European exchanges
-        "L" | "IL" => Some("GBP"),       // London Stock Exchange
-        "PA" => Some("EUR"),              // Euronext Paris
-        "AS" => Some("EUR"),              // Euronext Amsterdam
-        "BR" => Some("EUR"),              // Euronext Brussels
+        "L" | "IL" => Some("GBP"), // London Stock Exchange
+        "PA" => Some("EUR"),       // Euronext Paris
+        "AS" => Some("EUR"),       // Euronext Amsterdam
+        "BR" => Some("EUR"),       // Euronext Brussels
         "DE" | "F" | "BE" | "DU" | "HM" | "HA" | "MU" | "SG" => Some("EUR"), // German exchanges
-        "MI" => Some("EUR"),              // Borsa Italiana (Milan)
-        "MC" => Some("EUR"),              // Bolsa de Madrid
-        "LS" => Some("EUR"),              // Euronext Lisbon
-        "VI" => Some("EUR"),              // Vienna Stock Exchange
-        "HE" => Some("EUR"),              // Helsinki Stock Exchange
-        "IR" => Some("EUR"),              // Euronext Dublin
-        "SW" => Some("CHF"),              // SIX Swiss Exchange
-        "OL" => Some("NOK"),              // Oslo Børs
-        "ST" => Some("SEK"),              // Nasdaq Stockholm
-        "CO" => Some("DKK"),              // Nasdaq Copenhagen
-        "IC" => Some("ISK"),              // Nasdaq Iceland
+        "MI" => Some("EUR"),       // Borsa Italiana (Milan)
+        "MC" => Some("EUR"),       // Bolsa de Madrid
+        "LS" => Some("EUR"),       // Euronext Lisbon
+        "VI" => Some("EUR"),       // Vienna Stock Exchange
+        "HE" => Some("EUR"),       // Helsinki Stock Exchange
+        "IR" => Some("EUR"),       // Euronext Dublin
+        "SW" => Some("CHF"),       // SIX Swiss Exchange
+        "OL" => Some("NOK"),       // Oslo Børs
+        "ST" => Some("SEK"),       // Nasdaq Stockholm
+        "CO" => Some("DKK"),       // Nasdaq Copenhagen
+        "IC" => Some("ISK"),       // Nasdaq Iceland
 
         // Americas
         "TO" | "V" | "CN" | "NE" => Some("CAD"), // Toronto, TSX Venture, CSE, NEO
-        "MX" => Some("MXN"),              // Bolsa Mexicana de Valores
-        "SA" => Some("BRL"),              // B3 (São Paulo)
-        "BA" => Some("ARS"),              // Buenos Aires Stock Exchange
-        "SN" => Some("CLP"),              // Santiago Stock Exchange
+        "MX" => Some("MXN"),                     // Bolsa Mexicana de Valores
+        "SA" => Some("BRL"),                     // B3 (São Paulo)
+        "BA" => Some("ARS"),                     // Buenos Aires Stock Exchange
+        "SN" => Some("CLP"),                     // Santiago Stock Exchange
 
         // Asia-Pacific
-        "AX" => Some("AUD"),              // Australian Securities Exchange
-        "NZ" => Some("NZD"),              // New Zealand Exchange
-        "HK" => Some("HKD"),              // Hong Kong Stock Exchange
-        "SS" | "SZ" => Some("CNY"),       // Shanghai, Shenzhen
-        "T" | "TYO" => Some("JPY"),       // Tokyo Stock Exchange
-        "KS" | "KQ" => Some("KRW"),       // Korea Stock Exchange, KOSDAQ
-        "TW" | "TWO" => Some("TWD"),      // Taiwan Stock Exchange
-        "SI" => Some("SGD"),              // Singapore Exchange
-        "BK" => Some("THB"),              // Stock Exchange of Thailand
-        "JK" => Some("IDR"),              // Indonesia Stock Exchange
-        "KL" => Some("MYR"),              // Bursa Malaysia
-        "BO" | "NS" => Some("INR"),       // BSE, NSE India
+        "AX" => Some("AUD"),         // Australian Securities Exchange
+        "NZ" => Some("NZD"),         // New Zealand Exchange
+        "HK" => Some("HKD"),         // Hong Kong Stock Exchange
+        "SS" | "SZ" => Some("CNY"),  // Shanghai, Shenzhen
+        "T" | "TYO" => Some("JPY"),  // Tokyo Stock Exchange
+        "KS" | "KQ" => Some("KRW"),  // Korea Stock Exchange, KOSDAQ
+        "TW" | "TWO" => Some("TWD"), // Taiwan Stock Exchange
+        "SI" => Some("SGD"),         // Singapore Exchange
+        "BK" => Some("THB"),         // Stock Exchange of Thailand
+        "JK" => Some("IDR"),         // Indonesia Stock Exchange
+        "KL" => Some("MYR"),         // Bursa Malaysia
+        "BO" | "NS" => Some("INR"),  // BSE, NSE India
 
         // Middle East & Africa
-        "TA" => Some("ILS"),              // Tel Aviv Stock Exchange
-        "CA" => Some("EGP"),              // Egyptian Exchange (Cairo)
-        "SAU" => Some("SAR"),             // Saudi Stock Exchange (Tadawul)
-        "QA" => Some("QAR"),              // Qatar Stock Exchange
-        "AE" => Some("AED"),              // Abu Dhabi Securities Exchange
-        "JO" => Some("JOD"),              // Amman Stock Exchange
+        "TA" => Some("ILS"),  // Tel Aviv Stock Exchange
+        "CA" => Some("EGP"),  // Egyptian Exchange (Cairo)
+        "SAU" => Some("SAR"), // Saudi Stock Exchange (Tadawul)
+        "QA" => Some("QAR"),  // Qatar Stock Exchange
+        "AE" => Some("AED"),  // Abu Dhabi Securities Exchange
+        "JO" => Some("JOD"),  // Amman Stock Exchange
 
         // Other
-        "IS" => Some("TRY"),              // Borsa Istanbul
-        "PR" => Some("CZK"),              // Prague Stock Exchange
-        "WA" => Some("PLN"),              // Warsaw Stock Exchange
-        "BD" => Some("HUF"),              // Budapest Stock Exchange
-        "AT" => Some("EUR"),              // Athens Stock Exchange
+        "IS" => Some("TRY"), // Borsa Istanbul
+        "PR" => Some("CZK"), // Prague Stock Exchange
+        "WA" => Some("PLN"), // Warsaw Stock Exchange
+        "BD" => Some("HUF"), // Budapest Stock Exchange
+        "AT" => Some("EUR"), // Athens Stock Exchange
 
         _ => None,
     }

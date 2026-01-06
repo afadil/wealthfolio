@@ -1,6 +1,6 @@
 use chrono::NaiveDate;
 use futures::future::join_all;
-use log::{debug, error, info, warn};
+use log::{error, info, warn};
 use serde::Serialize;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -10,10 +10,10 @@ use wealthfolio_core::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
 
 use crate::context::ServiceContext;
 use crate::events::{
-    emit_portfolio_trigger_recalculate, emit_portfolio_trigger_update, PortfolioRequestPayload,
-    ResourceEventPayload, MARKET_SYNC_COMPLETE, MARKET_SYNC_ERROR, MARKET_SYNC_START,
-    PORTFOLIO_TRIGGER_RECALCULATE, PORTFOLIO_TRIGGER_UPDATE, PORTFOLIO_UPDATE_COMPLETE,
-    PORTFOLIO_UPDATE_ERROR, PORTFOLIO_UPDATE_START, RESOURCE_CHANGED,
+    emit_portfolio_trigger_recalculate, emit_portfolio_trigger_update, AssetsEnrichPayload,
+    PortfolioRequestPayload, ResourceEventPayload, ASSETS_ENRICH_REQUESTED, MARKET_SYNC_COMPLETE,
+    MARKET_SYNC_ERROR, MARKET_SYNC_START, PORTFOLIO_TRIGGER_RECALCULATE, PORTFOLIO_TRIGGER_UPDATE,
+    PORTFOLIO_UPDATE_COMPLETE, PORTFOLIO_UPDATE_ERROR, PORTFOLIO_UPDATE_START, RESOURCE_CHANGED,
 };
 
 /// Sets up the global event listeners for the application.
@@ -34,14 +34,16 @@ pub fn setup_event_listeners(handle: AppHandle) {
     handle.listen(RESOURCE_CHANGED, move |event| {
         handle_resource_change(resource_handle.clone(), event.payload());
     });
+
+    // Listener for asset enrichment requests (triggered after broker sync)
+    let enrich_handle = handle.clone();
+    handle.listen(ASSETS_ENRICH_REQUESTED, move |event| {
+        handle_assets_enrichment(enrich_handle.clone(), event.payload());
+    });
 }
 
 /// Handles the common logic for both portfolio update and recalculation requests.
 fn handle_portfolio_request(handle: AppHandle, payload_str: &str, force_recalc: bool) {
-    debug!(
-        "Received portfolio request: {:?}, force_recalc: {}",
-        payload_str, force_recalc
-    );
     let event_name = if force_recalc {
         PORTFOLIO_TRIGGER_RECALCULATE
     } else {
@@ -71,15 +73,10 @@ fn handle_portfolio_request(handle: AppHandle, payload_str: &str, force_recalc: 
 
                     // Use optimized sync - MarketDataService handles the sync state internally
                     let sync_result = if refetch_all {
-                        // Force refetch specific symbols or all
-                        info!("Using full resync (refetch_all=true) for symbols: {:?}", symbols_to_sync);
                         market_data_service
                             .resync_market_data(symbols_to_sync)
                             .await
                     } else {
-                        // Use optimized sync - MarketDataService internally refreshes sync state
-                        // and generates the optimized sync plan
-                        info!("Using optimized sync (refetch_all=false)");
                         market_data_service.sync_market_data().await
                     };
 
@@ -147,8 +144,6 @@ fn handle_portfolio_request(handle: AppHandle, payload_str: &str, force_recalc: 
 }
 
 fn handle_resource_change(handle: AppHandle, payload_str: &str) {
-    debug!("Received resource change event: {:?}", payload_str);
-
     match serde_json::from_str::<ResourceEventPayload>(payload_str) {
         Ok(event) => {
             match event.resource_type.as_str() {
@@ -171,6 +166,44 @@ fn handle_resource_change(handle: AppHandle, payload_str: &str) {
     }
 }
 
+/// Handles asset enrichment requests for newly synced assets.
+/// Fetches additional profile data (sectors, countries, etc.) from market data providers.
+fn handle_assets_enrichment(handle: AppHandle, payload_str: &str) {
+    match serde_json::from_str::<AssetsEnrichPayload>(payload_str) {
+        Ok(payload) => {
+            if payload.asset_ids.is_empty() {
+                return;
+            }
+
+            let context = match handle.try_state::<Arc<ServiceContext>>() {
+                Some(ctx) => ctx.inner().clone(),
+                None => {
+                    warn!("ServiceContext not available for asset enrichment");
+                    return;
+                }
+            };
+
+            // Deduplicate asset IDs
+            let unique_ids: Vec<String> = payload
+                .asset_ids
+                .into_iter()
+                .collect::<std::collections::HashSet<_>>()
+                .into_iter()
+                .collect();
+
+            spawn(async move {
+                let asset_service = context.asset_service();
+
+                for asset_id in unique_ids {
+                    // Enrichment failures are expected for some assets, ignore silently
+                    let _ = asset_service.enrich_asset_profile(&asset_id).await;
+                }
+            });
+        }
+        Err(e) => warn!("Failed to parse asset enrichment payload: {}", e),
+    }
+}
+
 fn handle_asset_resource_change(handle: AppHandle, event: &ResourceEventPayload) {
     let context = match handle.try_state::<Arc<ServiceContext>>() {
         Some(ctx) => ctx,
@@ -190,23 +223,16 @@ fn handle_asset_resource_change(handle: AppHandle, event: &ResourceEventPayload)
                 let market_data_service = context.market_data_service();
 
                 spawn(async move {
-                    if let Err(e) = market_data_service
-                        .delete_sync_state(&asset_id_owned)
-                        .await
-                    {
+                    if let Err(e) = market_data_service.delete_sync_state(&asset_id_owned).await {
                         warn!(
                             "Failed to delete sync state for asset {}: {}",
                             asset_id_owned, e
                         );
-                    } else {
-                        info!("Deleted sync state for asset {}", asset_id_owned);
                     }
                 });
             }
         }
-        _ => {
-            debug!("Unhandled asset action for sync state: {}", event.action);
-        }
+        _ => {}
     }
 }
 
@@ -237,14 +263,11 @@ fn handle_account_resource_change(handle: AppHandle, event: &ResourceEventPayloa
     if let (Some(currency), Some(ctx)) = (&account_currency, context.as_ref()) {
         match ctx.settings_service().get_base_currency() {
             Ok(Some(base_currency)) if !base_currency.is_empty() && base_currency != *currency => {
-                let symbol = format!("{}{}=X", currency, base_currency);
+                // Use canonical FX ID format: EUR/USD
+                let symbol = format!("{}/{}", currency, base_currency);
                 payload_builder = payload_builder.symbols(Some(vec![symbol]));
             }
-            Ok(_) => {
-                debug!(
-                    "Base currency unavailable or matches account currency; skipping symbol sync"
-                );
-            }
+            Ok(_) => {}
             Err(err) => warn!("Failed to fetch base currency for account sync: {}", err),
         }
     }
@@ -333,15 +356,13 @@ fn handle_activity_resource_change(handle: AppHandle, event: &ResourceEventPaylo
                     let service = market_data_service.clone();
 
                     spawn(async move {
-                        if let Err(e) = service.handle_new_activity(&asset_id_owned, activity_date).await {
+                        if let Err(e) = service
+                            .handle_new_activity(&asset_id_owned, activity_date)
+                            .await
+                        {
                             warn!(
                                 "Failed to handle new activity for {}: {}",
                                 asset_id_owned, e
-                            );
-                        } else {
-                            debug!(
-                                "Processed new activity for {} on {}",
-                                asset_id_owned, activity_date
                             );
                         }
                     });
@@ -381,11 +402,6 @@ fn handle_activity_resource_change(handle: AppHandle, event: &ResourceEventPaylo
                                 warn!(
                                     "Failed to handle activity date change for {}: {}",
                                     asset_id_owned, e
-                                );
-                            } else {
-                                info!(
-                                    "Processed activity date change for {} (old: {:?}, new: {})",
-                                    asset_id_owned, old_date, new_date
                                 );
                             }
                         });
@@ -427,8 +443,9 @@ fn handle_activity_resource_change(handle: AppHandle, event: &ResourceEventPaylo
                             if let Ok(activity_date) =
                                 NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
                             {
-                                if let Err(e) =
-                                    service.handle_new_activity(&curr_owned, activity_date).await
+                                if let Err(e) = service
+                                    .handle_new_activity(&curr_owned, activity_date)
+                                    .await
                                 {
                                     warn!(
                                         "Failed to handle activity addition to {}: {}",
@@ -455,8 +472,6 @@ fn handle_activity_resource_change(handle: AppHandle, event: &ResourceEventPaylo
                             "Failed to handle activity deletion for {}: {}",
                             asset_id_owned, e
                         );
-                    } else {
-                        debug!("Processed activity deletion for {}", asset_id_owned);
                     }
                 });
             }
@@ -468,8 +483,6 @@ fn handle_activity_resource_change(handle: AppHandle, event: &ResourceEventPaylo
             spawn(async move {
                 if let Err(e) = service.refresh_sync_state().await {
                     warn!("Failed to refresh sync state after import: {}", e);
-                } else {
-                    info!("Refreshed sync state after activity import");
                 }
             });
         }
@@ -480,14 +493,10 @@ fn handle_activity_resource_change(handle: AppHandle, event: &ResourceEventPaylo
             spawn(async move {
                 if let Err(e) = service.refresh_sync_state().await {
                     warn!("Failed to refresh sync state after bulk mutation: {}", e);
-                } else {
-                    info!("Refreshed sync state after bulk activity mutation");
                 }
             });
         }
-        _ => {
-            debug!("Unhandled activity action for sync state: {}", event.action);
-        }
+        _ => {}
     }
 
     let mut builder = PortfolioRequestPayload::builder();
@@ -526,7 +535,8 @@ fn collect_activity_symbols(
         match context.account_service().get_account(account_id) {
             Ok(account) => {
                 if currency != account.currency {
-                    symbols.insert(format!("{}{}=X", account.currency, currency));
+                    // Use canonical FX ID format: EUR/USD
+                    symbols.insert(format!("{}/{}", account.currency, currency));
                 }
             }
             Err(err) => warn!(

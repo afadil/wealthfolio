@@ -2,6 +2,7 @@
 
 use async_trait::async_trait;
 use log::{debug, error, info, warn};
+use serde_json::json;
 use std::sync::Arc;
 
 use super::mapping;
@@ -97,6 +98,12 @@ impl SyncServiceTrait for SyncService {
                         platform_id.to_lowercase().replace('_', "")
                     ),
                     external_id: brokerage.id.clone(),
+                    kind: "BROKERAGE".to_string(),
+                    website_url: None,
+                    logo_url: brokerage
+                        .aws_s3_square_logo_url
+                        .clone()
+                        .or(brokerage.aws_s3_logo_url.clone()),
                 };
 
                 self.platform_repository.upsert(platform).await?;
@@ -136,13 +143,6 @@ impl SyncServiceTrait for SyncService {
             .collect();
 
         for broker_account in &broker_accounts {
-            // Skip paper/demo accounts
-            if broker_account.is_paper {
-                debug!("Skipping paper account: {:?}", broker_account.id);
-                skipped += 1;
-                continue;
-            }
-
             // Get the provider account ID - skip if missing
             let provider_account_id = match &broker_account.id {
                 Some(id) if !id.is_empty() => id.clone(),
@@ -240,11 +240,11 @@ impl SyncServiceTrait for SyncService {
         &self,
         account_id: String,
         activities_data: Vec<AccountUniversalActivity>,
-    ) -> Result<(usize, usize)> {
+    ) -> Result<(usize, usize, Vec<String>)> {
         use diesel::prelude::*;
 
         if activities_data.is_empty() {
-            return Ok((0, 0));
+            return Ok((0, 0, Vec::new()));
         }
 
         let now_rfc3339 = chrono::Utc::now().to_rfc3339();
@@ -289,12 +289,6 @@ impl SyncServiceTrait for SyncService {
             // Build metadata JSON with flow info, confidence, reasons, and raw_type
             let metadata = mapping::build_activity_metadata(&activity);
 
-            // Log for debugging
-            debug!(
-                "Activity from API: id={:?}, type={}, subtype={:?}, raw_type={:?}, needs_review={}",
-                activity.id, activity_type, subtype, activity.raw_type, needs_review
-            );
-
             let is_cash_like = matches!(
                 activity_type.as_str(),
                 activities::ACTIVITY_TYPE_DEPOSIT
@@ -305,6 +299,7 @@ impl SyncServiceTrait for SyncService {
                     | activities::ACTIVITY_TYPE_TAX
                     | activities::ACTIVITY_TYPE_TRANSFER_IN
                     | activities::ACTIVITY_TYPE_TRANSFER_OUT
+                    | activities::ACTIVITY_TYPE_CREDIT
             );
 
             // Resolve asset_id: option symbol > regular symbol > cash placeholder > unknown placeholder
@@ -324,50 +319,78 @@ impl SyncServiceTrait for SyncService {
                 });
 
             if seen_assets.insert(asset_id.clone()) {
-                let asset_db =
-                    if asset_id.starts_with("$CASH-") || asset_id.starts_with("$UNKNOWN-") {
-                        let new_asset = NewAsset::new_cash_asset(&currency_code);
-                        let mut db: AssetDB = new_asset.into();
-                        // For unknown assets, update the id/symbol to match the placeholder
-                        if asset_id.starts_with("$UNKNOWN-") {
-                            db.id = asset_id.clone();
-                            db.symbol = asset_id.clone();
-                            db.name = Some("Unknown Asset".to_string());
-                        }
-                        db.created_at = now_naive;
-                        db.updated_at = now_naive;
-                        db
-                    } else {
-                        let symbol_type_ref = activity
-                            .symbol
-                            .as_ref()
-                            .and_then(|s| s.symbol_type.as_ref());
+                let asset_db = if asset_id.starts_with("$CASH-") {
+                    // Cash placeholder for cash-like activities without symbols
+                    let new_asset = NewAsset::new_cash_asset(&currency_code);
+                    let mut db: AssetDB = new_asset.into();
+                    db.created_at = now_naive;
+                    db.updated_at = now_naive;
+                    db
+                } else if asset_id.starts_with("$UNKNOWN-") {
+                    // Unknown placeholder - use SECURITY kind with NONE pricing
+                    AssetDB {
+                        id: asset_id.clone(),
+                        symbol: asset_id.clone(),
+                        name: Some("Unknown Asset".to_string()),
+                        currency: currency_code.clone(),
+                        kind: "SECURITY".to_string(),
+                        pricing_mode: "NONE".to_string(),
+                        is_active: 1,
+                        created_at: now_naive,
+                        updated_at: now_naive,
+                        ..Default::default()
+                    }
+                } else {
+                    let symbol_ref = activity.symbol.as_ref();
+                    let symbol_type_ref = symbol_ref.and_then(|s| s.symbol_type.as_ref());
 
-                        let symbol_type_label = symbol_type_ref.and_then(|t| {
-                            broker_symbol_type_label(t.code.as_deref(), t.description.as_deref())
-                        });
+                    let symbol_type_label = symbol_type_ref.and_then(|t| {
+                        broker_symbol_type_label(t.code.as_deref(), t.description.as_deref())
+                    });
 
-                        let symbol_type_code = symbol_type_ref.and_then(|t| t.code.as_deref());
-                        let asset_kind = broker_symbol_type_to_kind(symbol_type_code);
+                    let symbol_type_code = symbol_type_ref.and_then(|t| t.code.as_deref());
+                    let asset_kind = broker_symbol_type_to_kind(symbol_type_code);
 
-                        AssetDB {
-                            id: asset_id.clone(),
-                            symbol: asset_id.clone(),
-                            name: activity
-                                .symbol
-                                .as_ref()
-                                .and_then(|s| s.description.clone())
-                                .filter(|d| !d.trim().is_empty()),
-                            asset_type: symbol_type_label.clone(),
-                            asset_class: symbol_type_label,
-                            currency: currency_code.clone(),
-                            data_source: DataSource::Yahoo.as_str().to_string(),
-                            kind: Some(asset_kind_to_string(&asset_kind)),
-                            created_at: now_naive,
-                            updated_at: now_naive,
-                            ..Default::default()
-                        }
-                    };
+                    // Use symbol's currency if present, otherwise fall back to activity currency
+                    let asset_currency = symbol_ref
+                        .and_then(|s| s.currency.as_ref())
+                        .and_then(|c| c.code.clone())
+                        .filter(|c| !c.trim().is_empty())
+                        .unwrap_or_else(|| currency_code.clone());
+
+                    // Extract exchange MIC from broker data
+                    let exchange_mic = symbol_ref
+                        .and_then(|s| s.exchange.as_ref())
+                        .and_then(|e| e.code.clone())
+                        .filter(|c| !c.trim().is_empty());
+
+                    // Extract FIGI code (store in isin field for now)
+                    let figi_code = symbol_ref
+                        .and_then(|s| s.figi_code.clone())
+                        .filter(|f| !f.trim().is_empty());
+
+                    // Build metadata with additional broker info
+                    let metadata = build_asset_metadata(&activity);
+
+                    AssetDB {
+                        id: asset_id.clone(),
+                        symbol: asset_id.clone(),
+                        name: symbol_ref
+                            .and_then(|s| s.description.clone())
+                            .filter(|d| !d.trim().is_empty()),
+                        exchange_mic,
+                        currency: asset_currency,
+                        asset_class: symbol_type_label,
+                        isin: figi_code,
+                        kind: asset_kind_to_string(&asset_kind),
+                        pricing_mode: "MARKET".to_string(),
+                        preferred_provider: Some(DataSource::Yahoo.as_str().to_string()),
+                        metadata,
+                        created_at: now_naive,
+                        updated_at: now_naive,
+                        ..Default::default()
+                    }
+                };
                 asset_rows.push(asset_db);
             }
 
@@ -407,6 +430,7 @@ impl SyncServiceTrait for SyncService {
                 account_id: account_id.clone(),
                 asset_id: Some(asset_id), // Now Option<String>
                 asset_data_source: None,
+                asset_metadata: None, // Broker sync uses enrichment events instead
                 activity_type,
                 subtype,
                 activity_date,
@@ -440,6 +464,14 @@ impl SyncServiceTrait for SyncService {
         let activities_count = activity_rows.len();
         let assets_count = asset_rows.len();
 
+        // Collect new asset IDs before the closure moves asset_rows
+        // Filter out cash and unknown placeholders - they don't need enrichment
+        let new_asset_ids: Vec<String> = asset_rows
+            .iter()
+            .map(|a| a.id.clone())
+            .filter(|id| !id.starts_with("$CASH-") && !id.starts_with("$UNKNOWN-"))
+            .collect();
+
         debug!(
             "Preparing to upsert {} activities and {} assets for account {}",
             activities_count, assets_count, account_id_for_log
@@ -465,7 +497,6 @@ impl SyncServiceTrait for SyncService {
                 let mut assets_inserted: usize = 0;
                 for asset_db in asset_rows {
                     let asset_id = asset_db.id.clone();
-                    let asset_type = asset_db.asset_type.clone();
                     let asset_class = asset_db.asset_class.clone();
 
                     assets_inserted += diesel::insert_into(schema::assets::table)
@@ -475,16 +506,6 @@ impl SyncServiceTrait for SyncService {
                         .execute(conn)
                         .map_err(StorageError::from)?;
 
-                    if let Some(asset_type) = asset_type {
-                        diesel::update(
-                            schema::assets::table
-                                .filter(schema::assets::id.eq(&asset_id))
-                                .filter(schema::assets::asset_type.is_null()),
-                        )
-                        .set(schema::assets::asset_type.eq(asset_type))
-                        .execute(conn)
-                        .map_err(StorageError::from)?;
-                    }
                     if let Some(asset_class) = asset_class {
                         diesel::update(
                             schema::assets::table
@@ -559,11 +580,11 @@ impl SyncServiceTrait for SyncService {
             .await?;
 
         debug!(
-            "Upserted {} activities for account {} ({} assets inserted)",
-            activities_count, account_id_for_log, assets_inserted
+            "Upserted {} activities for account {} ({} assets inserted, {} new asset IDs)",
+            activities_count, account_id_for_log, assets_inserted, new_asset_ids.len()
         );
 
-        Ok((activities_upserted, assets_inserted))
+        Ok((activities_upserted, assets_inserted, new_asset_ids))
     }
 
     async fn finalize_activity_sync_success(
@@ -724,19 +745,71 @@ fn broker_symbol_type_to_kind(code: Option<&str>) -> AssetKind {
 
 /// Convert AssetKind to database string representation.
 fn asset_kind_to_string(kind: &AssetKind) -> String {
-    match kind {
-        AssetKind::Security => "SECURITY".to_string(),
-        AssetKind::Crypto => "CRYPTO".to_string(),
-        AssetKind::Cash => "CASH".to_string(),
-        AssetKind::FxRate => "FX_RATE".to_string(),
-        AssetKind::Option => "OPTION".to_string(),
-        AssetKind::Commodity => "COMMODITY".to_string(),
-        AssetKind::PrivateEquity => "PRIVATE_EQUITY".to_string(),
-        AssetKind::Property => "PROPERTY".to_string(),
-        AssetKind::Vehicle => "VEHICLE".to_string(),
-        AssetKind::Collectible => "COLLECTIBLE".to_string(),
-        AssetKind::PhysicalPrecious => "PHYSICAL_PRECIOUS".to_string(),
-        AssetKind::Liability => "LIABILITY".to_string(),
-        AssetKind::Other => "OTHER".to_string(),
+    kind.as_db_str().to_string()
+}
+
+/// Build asset metadata JSON from broker activity data.
+/// Stores raw_symbol, exchange details, and option information.
+fn build_asset_metadata(activity: &AccountUniversalActivity) -> Option<String> {
+    let mut metadata = serde_json::Map::new();
+
+    // Store raw_symbol if different from symbol
+    if let Some(ref sym) = activity.symbol {
+        if let Some(ref raw) = sym.raw_symbol {
+            if sym.symbol.as_ref() != Some(raw) && !raw.trim().is_empty() {
+                metadata.insert("raw_symbol".to_string(), json!(raw));
+            }
+        }
+
+        // Store exchange details (name is useful for display)
+        if let Some(ref exchange) = sym.exchange {
+            if exchange.name.is_some() {
+                metadata.insert(
+                    "exchange".to_string(),
+                    json!({
+                        "code": exchange.code,
+                        "name": exchange.name
+                    }),
+                );
+            }
+        }
+    }
+
+    // Store option details if present
+    if let Some(ref opt) = activity.option_symbol {
+        let mut option_data = serde_json::Map::new();
+
+        if let Some(ref t) = opt.option_type {
+            option_data.insert("type".to_string(), json!(t));
+        }
+        if let Some(p) = opt.strike_price {
+            option_data.insert("strike_price".to_string(), json!(p));
+        }
+        if let Some(ref e) = opt.expiration_date {
+            option_data.insert("expiration_date".to_string(), json!(e));
+        }
+        if let Some(m) = opt.is_mini_option {
+            option_data.insert("is_mini_option".to_string(), json!(m));
+        }
+
+        if let Some(ref underlying) = opt.underlying_symbol {
+            option_data.insert(
+                "underlying".to_string(),
+                json!({
+                    "symbol": underlying.symbol,
+                    "description": underlying.description
+                }),
+            );
+        }
+
+        if !option_data.is_empty() {
+            metadata.insert("option".to_string(), json!(option_data));
+        }
+    }
+
+    if metadata.is_empty() {
+        None
+    } else {
+        serde_json::to_string(&serde_json::Value::Object(metadata)).ok()
     }
 }

@@ -47,6 +47,7 @@ struct ApiConnection {
     disabled: Option<bool>,
     updated_at: Option<String>,
     name: Option<String>,
+    status: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -56,6 +57,8 @@ struct ApiBrokerage {
     name: Option<String>,
     display_name: Option<String>,
     slug: Option<String>,
+    aws_s3_logo_url: Option<String>,
+    aws_s3_square_logo_url: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -71,7 +74,6 @@ struct ApiPlansResponse {
 
 #[allow(dead_code)]
 #[derive(Debug, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct ApiPlan {
     id: String,
     name: String,
@@ -96,7 +98,6 @@ struct ApiPlan {
 
 #[allow(dead_code)]
 #[derive(Debug, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct ApiPlanPricing {
     monthly: f64,
     yearly: f64,
@@ -128,7 +129,7 @@ struct ApiTeam {
     id: String,
     name: Option<String>,
     logo_url: Option<String>,
-    plan: String,
+    plan: Option<String>,
     #[serde(default)]
     subscription_status: Option<String>,
     #[serde(default)]
@@ -136,7 +137,11 @@ struct ApiTeam {
     #[serde(default)]
     subscription_cancel_at_period_end: Option<bool>,
     #[serde(default)]
-    trial_ends_at: Option<String>,
+    canceled_at: Option<String>,
+    #[serde(default)]
+    country_code: Option<String>,
+    #[serde(default)]
+    created_at: Option<String>,
 }
 
 #[allow(dead_code)]
@@ -229,10 +234,19 @@ impl ConnectApiClient {
     /// Parse an HTTP response, handling errors appropriately.
     async fn parse_response<T: DeserializeOwned>(&self, response: reqwest::Response) -> Result<T> {
         let status = response.status();
+        let url = response.url().to_string();
         let body = response
             .text()
             .await
             .map_err(|e| Error::Unexpected(format!("Failed to read response: {}", e)))?;
+
+        // Log raw response body for debugging
+        debug!(
+            "[ConnectApi] Response from {} (status={}): {}",
+            url,
+            status,
+            &body
+        );
 
         if !status.is_success() {
             // Try to parse error response for a better message
@@ -324,7 +338,7 @@ impl ConnectApiClient {
 
         Ok(UserInfo {
             id: user.id,
-            email: user.email.unwrap_or_default(),
+            email: user.email,
             full_name: user.full_name,
             avatar_url: user.avatar_url,
             locale: user.locale,
@@ -343,7 +357,9 @@ impl ConnectApiClient {
                 subscription_status: t.subscription_status,
                 subscription_current_period_end: t.subscription_current_period_end,
                 subscription_cancel_at_period_end: t.subscription_cancel_at_period_end,
-                trial_ends_at: t.trial_ends_at,
+                canceled_at: t.canceled_at,
+                country_code: t.country_code,
+                created_at: t.created_at,
             }),
         })
     }
@@ -408,8 +424,38 @@ impl ConnectApiClient {
 impl BrokerApiClient for ConnectApiClient {
     /// Fetch all broker connections for the user.
     async fn list_connections(&self) -> Result<Vec<BrokerConnection>> {
-        let api_response: ApiConnectionsResponse =
-            self.get("/api/v1/sync/brokerage/connections").await?;
+        // First, get the raw response to log it
+        let url = format!("{}/api/v1/sync/brokerage/connections", self.base_url);
+        let response = self
+            .client
+            .get(&url)
+            .headers(self.headers())
+            .send()
+            .await
+            .map_err(|e| Error::Unexpected(format!("Request failed: {}", e)))?;
+
+        let status = response.status();
+        let body = response
+            .text()
+            .await
+            .map_err(|e| Error::Unexpected(format!("Failed to read response: {}", e)))?;
+
+        // Log raw connections payload at INFO level for debugging
+        info!(
+            "[ConnectApi] Raw connections API response (status={}): {}",
+            status, &body
+        );
+
+        if !status.is_success() {
+            return Err(Error::Unexpected(format!(
+                "API error {}: {}",
+                status,
+                body.chars().take(200).collect::<String>()
+            )));
+        }
+
+        let api_response: ApiConnectionsResponse = serde_json::from_str(&body)
+            .map_err(|e| Error::Unexpected(format!("Failed to parse connections: {} - {}", e, body)))?;
 
         let connections: Vec<BrokerConnection> = api_response
             .connections
@@ -421,8 +467,8 @@ impl BrokerApiClient for ConnectApiClient {
                     slug: b.slug,
                     name: b.name.clone(),
                     display_name: b.display_name.or(b.name),
-                    aws_s3_logo_url: None,
-                    aws_s3_square_logo_url: None,
+                    aws_s3_logo_url: b.aws_s3_logo_url,
+                    aws_s3_square_logo_url: b.aws_s3_square_logo_url,
                 });
 
                 let brokerage = brokerage.or_else(|| {
@@ -444,9 +490,11 @@ impl BrokerApiClient for ConnectApiClient {
                     id: c.authorization_id.unwrap_or(c.id),
                     brokerage,
                     connection_type: None,
+                    status: c.status,
                     disabled: c.disabled.unwrap_or(false),
                     disabled_date: None,
                     updated_at: c.updated_at,
+                    name: c.name,
                 }
             })
             .collect();
@@ -461,12 +509,55 @@ impl BrokerApiClient for ConnectApiClient {
         &self,
         _authorization_ids: Option<Vec<String>>,
     ) -> Result<Vec<BrokerAccount>> {
-        let api_response: ApiAccountsResponse = self.get("/api/v1/sync/brokerage/accounts").await?;
+        // First, get the raw response to log it
+        let url = format!("{}/api/v1/sync/brokerage/accounts", self.base_url);
+        let response = self
+            .client
+            .get(&url)
+            .headers(self.headers())
+            .send()
+            .await
+            .map_err(|e| Error::Unexpected(format!("Request failed: {}", e)))?;
+
+        let status = response.status();
+        let body = response
+            .text()
+            .await
+            .map_err(|e| Error::Unexpected(format!("Failed to read response: {}", e)))?;
+
+        // Log raw accounts payload at INFO level for debugging
+        info!(
+            "[ConnectApi] Raw accounts API response (status={}): {}",
+            status, &body
+        );
+
+        if !status.is_success() {
+            return Err(Error::Unexpected(format!(
+                "API error {}: {}",
+                status,
+                body.chars().take(200).collect::<String>()
+            )));
+        }
+
+        let api_response: ApiAccountsResponse = serde_json::from_str(&body)
+            .map_err(|e| Error::Unexpected(format!("Failed to parse accounts: {} - {}", e, body)))?;
 
         info!(
-            "[ConnectApi] Fetched {} broker accounts",
+            "[ConnectApi] Parsed {} broker accounts from API",
             api_response.accounts.len()
         );
+
+        // Log each account's sync_enabled status after parsing
+        for acc in &api_response.accounts {
+            info!(
+                "[ConnectApi] Account '{}' (id={:?}): sync_enabled={}, shared_with_household={}",
+                acc.name.as_deref().unwrap_or("unnamed"),
+                acc.id,
+                acc.sync_enabled,
+                acc.shared_with_household
+            );
+        }
+
         Ok(api_response.accounts)
     }
 

@@ -1,0 +1,996 @@
+//! Unit tests for net worth service.
+
+use super::*;
+use crate::accounts::{Account, AccountRepositoryTrait, AccountUpdate, NewAccount};
+use crate::assets::{Asset, AssetKind, AssetRepositoryTrait, NewAsset, PricingMode, UpdateAssetProfile};
+use crate::errors::Result;
+use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
+use crate::market_data::{
+    DataSource, LatestQuotePair, MarketDataProviderSetting, MarketDataRepositoryTrait, Quote,
+    UpdateMarketDataProviderSetting,
+};
+use crate::portfolio::snapshot::{AccountStateSnapshot, Position, SnapshotRepositoryTrait};
+use crate::portfolio::valuation::{DailyAccountValuation, ValuationRepositoryTrait};
+use async_trait::async_trait;
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::{Arc, RwLock};
+
+// ============================================================================
+// Mock Implementations
+// ============================================================================
+
+struct MockAccountRepository {
+    accounts: Vec<Account>,
+}
+
+impl MockAccountRepository {
+    fn new(accounts: Vec<Account>) -> Self {
+        Self { accounts }
+    }
+}
+
+#[async_trait]
+impl AccountRepositoryTrait for MockAccountRepository {
+    async fn create(&self, _new_account: NewAccount) -> Result<Account> {
+        unimplemented!()
+    }
+
+    async fn update(&self, _account_update: AccountUpdate) -> Result<Account> {
+        unimplemented!()
+    }
+
+    async fn delete(&self, _account_id: &str) -> Result<usize> {
+        unimplemented!()
+    }
+
+    fn get_by_id(&self, account_id: &str) -> Result<Account> {
+        self.accounts
+            .iter()
+            .find(|a| a.id == account_id)
+            .cloned()
+            .ok_or_else(|| crate::errors::Error::Repository(format!("Account {} not found", account_id)))
+    }
+
+    fn list(
+        &self,
+        is_active_filter: Option<bool>,
+        _account_ids: Option<&[String]>,
+    ) -> Result<Vec<Account>> {
+        let accounts = match is_active_filter {
+            Some(true) => self.accounts.iter().filter(|a| a.is_active).cloned().collect(),
+            Some(false) => self.accounts.iter().filter(|a| !a.is_active).cloned().collect(),
+            None => self.accounts.clone(),
+        };
+        Ok(accounts)
+    }
+}
+
+struct MockAssetRepository {
+    assets: Vec<Asset>,
+}
+
+impl MockAssetRepository {
+    fn new(assets: Vec<Asset>) -> Self {
+        Self { assets }
+    }
+}
+
+#[async_trait]
+impl AssetRepositoryTrait for MockAssetRepository {
+    async fn create(&self, _new_asset: NewAsset) -> Result<Asset> {
+        unimplemented!()
+    }
+
+    async fn update_profile(&self, _asset_id: &str, _payload: UpdateAssetProfile) -> Result<Asset> {
+        unimplemented!()
+    }
+
+    async fn update_data_source(&self, _asset_id: &str, _data_source: String) -> Result<Asset> {
+        unimplemented!()
+    }
+
+    fn get_by_id(&self, asset_id: &str) -> Result<Asset> {
+        self.assets
+            .iter()
+            .find(|a| a.id == asset_id)
+            .cloned()
+            .ok_or_else(|| crate::errors::Error::Repository(format!("Asset {} not found", asset_id)))
+    }
+
+    fn list(&self) -> Result<Vec<Asset>> {
+        Ok(self.assets.clone())
+    }
+
+    fn list_cash_assets(&self, _base_currency: &str) -> Result<Vec<Asset>> {
+        Ok(self
+            .assets
+            .iter()
+            .filter(|a| a.kind == AssetKind::Cash)
+            .cloned()
+            .collect())
+    }
+
+    fn list_by_symbols(&self, symbols: &[String]) -> Result<Vec<Asset>> {
+        Ok(self
+            .assets
+            .iter()
+            .filter(|a| symbols.contains(&a.symbol))
+            .cloned()
+            .collect())
+    }
+
+    async fn delete(&self, _asset_id: &str) -> Result<()> {
+        unimplemented!()
+    }
+}
+
+struct MockSnapshotRepository {
+    snapshots: HashMap<String, AccountStateSnapshot>,
+}
+
+impl MockSnapshotRepository {
+    fn new(snapshots: Vec<AccountStateSnapshot>) -> Self {
+        let map = snapshots
+            .into_iter()
+            .map(|s| (s.account_id.clone(), s))
+            .collect();
+        Self { snapshots: map }
+    }
+}
+
+#[async_trait]
+impl SnapshotRepositoryTrait for MockSnapshotRepository {
+    async fn save_snapshots(&self, _snapshots: &[AccountStateSnapshot]) -> Result<()> {
+        unimplemented!()
+    }
+
+    fn get_snapshots_by_account(
+        &self,
+        _account_id: &str,
+        _start_date: Option<NaiveDate>,
+        _end_date: Option<NaiveDate>,
+    ) -> Result<Vec<AccountStateSnapshot>> {
+        unimplemented!()
+    }
+
+    fn get_latest_snapshot_before_date(
+        &self,
+        account_id: &str,
+        _date: NaiveDate,
+    ) -> Result<Option<AccountStateSnapshot>> {
+        Ok(self.snapshots.get(account_id).cloned())
+    }
+
+    fn get_latest_snapshots_before_date(
+        &self,
+        account_ids: &[String],
+        _date: NaiveDate,
+    ) -> Result<HashMap<String, AccountStateSnapshot>> {
+        let result = account_ids
+            .iter()
+            .filter_map(|id| self.snapshots.get(id).map(|s| (id.clone(), s.clone())))
+            .collect();
+        Ok(result)
+    }
+
+    fn get_all_latest_snapshots(
+        &self,
+        account_ids: &[String],
+    ) -> Result<HashMap<String, AccountStateSnapshot>> {
+        let result = account_ids
+            .iter()
+            .filter_map(|id| self.snapshots.get(id).map(|s| (id.clone(), s.clone())))
+            .collect();
+        Ok(result)
+    }
+
+    async fn delete_snapshots_by_account_ids(&self, _account_ids: &[String]) -> Result<usize> {
+        unimplemented!()
+    }
+
+    async fn delete_snapshots_for_account_and_dates(
+        &self,
+        _account_id: &str,
+        _dates_to_delete: &[NaiveDate],
+    ) -> Result<()> {
+        unimplemented!()
+    }
+
+    async fn delete_snapshots_for_account_in_range(
+        &self,
+        _account_id: &str,
+        _start_date: NaiveDate,
+        _end_date: NaiveDate,
+    ) -> Result<()> {
+        unimplemented!()
+    }
+
+    async fn overwrite_snapshots_for_account_in_range(
+        &self,
+        _account_id: &str,
+        _start_date: NaiveDate,
+        _end_date: NaiveDate,
+        _snapshots_to_save: &[AccountStateSnapshot],
+    ) -> Result<()> {
+        unimplemented!()
+    }
+
+    async fn overwrite_multiple_account_snapshot_ranges(
+        &self,
+        _new_snapshots: &[AccountStateSnapshot],
+    ) -> Result<()> {
+        unimplemented!()
+    }
+
+    fn get_total_portfolio_snapshots(
+        &self,
+        _start_date: Option<NaiveDate>,
+        _end_date: Option<NaiveDate>,
+    ) -> Result<Vec<AccountStateSnapshot>> {
+        unimplemented!()
+    }
+
+    fn get_all_active_account_snapshots(
+        &self,
+        _start_date: Option<NaiveDate>,
+        _end_date: Option<NaiveDate>,
+    ) -> Result<Vec<AccountStateSnapshot>> {
+        unimplemented!()
+    }
+
+    fn get_earliest_snapshot_date(&self, _account_id: &str) -> Result<Option<NaiveDate>> {
+        unimplemented!()
+    }
+
+    async fn overwrite_all_snapshots_for_account(
+        &self,
+        _account_id: &str,
+        _snapshots_to_save: &[AccountStateSnapshot],
+    ) -> Result<()> {
+        unimplemented!()
+    }
+}
+
+struct MockMarketDataRepository {
+    quotes: Vec<Quote>,
+}
+
+impl MockMarketDataRepository {
+    fn new(quotes: Vec<Quote>) -> Self {
+        Self { quotes }
+    }
+}
+
+#[async_trait]
+impl MarketDataRepositoryTrait for MockMarketDataRepository {
+    fn get_all_historical_quotes(&self) -> Result<Vec<Quote>> {
+        Ok(self.quotes.clone())
+    }
+
+    fn get_historical_quotes_for_symbol(&self, symbol: &str) -> Result<Vec<Quote>> {
+        Ok(self
+            .quotes
+            .iter()
+            .filter(|q| q.symbol == symbol)
+            .cloned()
+            .collect())
+    }
+
+    async fn save_quotes(&self, _quotes: &[Quote]) -> Result<()> {
+        unimplemented!()
+    }
+
+    async fn save_quote(&self, _quote: &Quote) -> Result<Quote> {
+        unimplemented!()
+    }
+
+    async fn delete_quote(&self, _quote_id: &str) -> Result<()> {
+        unimplemented!()
+    }
+
+    async fn delete_quotes_for_symbols(&self, _symbols: &[String]) -> Result<()> {
+        unimplemented!()
+    }
+
+    fn get_quotes_by_source(&self, symbol: &str, source: &str) -> Result<Vec<Quote>> {
+        Ok(self
+            .quotes
+            .iter()
+            .filter(|q| q.symbol == symbol && q.data_source.as_str() == source)
+            .cloned()
+            .collect())
+    }
+
+    fn get_latest_quote_for_symbol(&self, symbol: &str) -> Result<Quote> {
+        self.quotes
+            .iter()
+            .filter(|q| q.symbol == symbol)
+            .max_by_key(|q| q.timestamp)
+            .cloned()
+            .ok_or_else(|| crate::errors::Error::Repository(format!("Quote not found for {}", symbol)))
+    }
+
+    fn get_latest_quotes_for_symbols(&self, symbols: &[String]) -> Result<HashMap<String, Quote>> {
+        let mut result = HashMap::new();
+        for symbol in symbols {
+            if let Some(quote) = self
+                .quotes
+                .iter()
+                .filter(|q| &q.symbol == symbol)
+                .max_by_key(|q| q.timestamp)
+            {
+                result.insert(symbol.clone(), quote.clone());
+            }
+        }
+        Ok(result)
+    }
+
+    fn get_latest_quotes_pair_for_symbols(
+        &self,
+        _symbols: &[String],
+    ) -> Result<HashMap<String, LatestQuotePair>> {
+        unimplemented!()
+    }
+
+    fn get_historical_quotes_for_symbols_in_range(
+        &self,
+        _symbols: &HashSet<String>,
+        _start_date: NaiveDate,
+        _end_date: NaiveDate,
+    ) -> Result<Vec<Quote>> {
+        unimplemented!()
+    }
+
+    fn get_all_historical_quotes_for_symbols(&self, _symbols: &HashSet<String>) -> Result<Vec<Quote>> {
+        unimplemented!()
+    }
+
+    fn get_all_historical_quotes_for_symbols_by_source(
+        &self,
+        _symbols: &HashSet<String>,
+        _source: &str,
+    ) -> Result<Vec<Quote>> {
+        unimplemented!()
+    }
+
+    fn get_latest_sync_dates_by_source(&self) -> Result<HashMap<String, Option<NaiveDateTime>>> {
+        unimplemented!()
+    }
+
+    fn get_all_providers(&self) -> Result<Vec<MarketDataProviderSetting>> {
+        unimplemented!()
+    }
+
+    fn get_provider_by_id(&self, _provider_id: &str) -> Result<MarketDataProviderSetting> {
+        unimplemented!()
+    }
+
+    async fn update_provider_settings(
+        &self,
+        _provider_id: String,
+        _changes: UpdateMarketDataProviderSetting,
+    ) -> Result<MarketDataProviderSetting> {
+        unimplemented!()
+    }
+
+    async fn bulk_insert_quotes(&self, _quote_records: Vec<Quote>) -> Result<usize> {
+        unimplemented!()
+    }
+
+    async fn bulk_update_quotes(&self, _quote_records: Vec<Quote>) -> Result<usize> {
+        unimplemented!()
+    }
+
+    async fn bulk_upsert_quotes(&self, _quote_records: Vec<Quote>) -> Result<usize> {
+        unimplemented!()
+    }
+
+    fn quote_exists(&self, _symbol_param: &str, _date: &str) -> Result<bool> {
+        unimplemented!()
+    }
+
+    fn get_existing_quotes_for_period(
+        &self,
+        _symbol_param: &str,
+        _start_date: &str,
+        _end_date: &str,
+    ) -> Result<Vec<Quote>> {
+        unimplemented!()
+    }
+}
+
+struct MockFxService {
+    base_currency: String,
+}
+
+impl MockFxService {
+    fn new(base_currency: &str) -> Self {
+        Self {
+            base_currency: base_currency.to_string(),
+        }
+    }
+}
+
+#[async_trait]
+impl FxServiceTrait for MockFxService {
+    fn initialize(&self) -> Result<()> {
+        Ok(())
+    }
+
+    fn get_historical_rates(
+        &self,
+        _from_currency: &str,
+        _to_currency: &str,
+        _days: i64,
+    ) -> Result<Vec<ExchangeRate>> {
+        Ok(vec![])
+    }
+
+    fn get_latest_exchange_rate(&self, _from_currency: &str, _to_currency: &str) -> Result<Decimal> {
+        Ok(dec!(1.0))
+    }
+
+    fn get_exchange_rate_for_date(
+        &self,
+        _from_currency: &str,
+        _to_currency: &str,
+        _date: NaiveDate,
+    ) -> Result<Decimal> {
+        Ok(dec!(1.0))
+    }
+
+    fn convert_currency(
+        &self,
+        amount: Decimal,
+        from_currency: &str,
+        to_currency: &str,
+    ) -> Result<Decimal> {
+        if from_currency == to_currency {
+            return Ok(amount);
+        }
+        // For testing, use 1:1 conversion
+        Ok(amount)
+    }
+
+    fn convert_currency_for_date(
+        &self,
+        amount: Decimal,
+        from_currency: &str,
+        to_currency: &str,
+        _date: NaiveDate,
+    ) -> Result<Decimal> {
+        if from_currency == to_currency {
+            return Ok(amount);
+        }
+        // For testing, use 1:1 conversion
+        Ok(amount)
+    }
+
+    fn get_latest_exchange_rates(&self) -> Result<Vec<ExchangeRate>> {
+        Ok(vec![])
+    }
+
+    async fn add_exchange_rate(&self, _new_rate: NewExchangeRate) -> Result<ExchangeRate> {
+        unimplemented!()
+    }
+
+    async fn update_exchange_rate(
+        &self,
+        _from_currency: &str,
+        _to_currency: &str,
+        _rate: Decimal,
+    ) -> Result<ExchangeRate> {
+        unimplemented!()
+    }
+
+    async fn delete_exchange_rate(&self, _rate_id: &str) -> Result<()> {
+        unimplemented!()
+    }
+
+    async fn register_currency_pair(&self, _from_currency: &str, _to_currency: &str) -> Result<()> {
+        Ok(())
+    }
+
+    async fn register_currency_pair_manual(
+        &self,
+        _from_currency: &str,
+        _to_currency: &str,
+    ) -> Result<()> {
+        Ok(())
+    }
+}
+
+struct MockValuationRepository {
+    valuations: Vec<DailyAccountValuation>,
+}
+
+impl MockValuationRepository {
+    fn new(valuations: Vec<DailyAccountValuation>) -> Self {
+        Self { valuations }
+    }
+}
+
+#[async_trait]
+impl ValuationRepositoryTrait for MockValuationRepository {
+    async fn save_valuations(&self, _valuation_records: &[DailyAccountValuation]) -> Result<()> {
+        Ok(())
+    }
+
+    fn get_historical_valuations(
+        &self,
+        account_id: &str,
+        start_date: Option<NaiveDate>,
+        end_date: Option<NaiveDate>,
+    ) -> Result<Vec<DailyAccountValuation>> {
+        let filtered: Vec<_> = self
+            .valuations
+            .iter()
+            .filter(|v| v.account_id == account_id)
+            .filter(|v| {
+                start_date
+                    .map(|sd| v.valuation_date >= sd)
+                    .unwrap_or(true)
+            })
+            .filter(|v| {
+                end_date.map(|ed| v.valuation_date <= ed).unwrap_or(true)
+            })
+            .cloned()
+            .collect();
+        Ok(filtered)
+    }
+
+    fn load_latest_valuation_date(&self, account_id: &str) -> Result<Option<NaiveDate>> {
+        let latest = self
+            .valuations
+            .iter()
+            .filter(|v| v.account_id == account_id)
+            .max_by_key(|v| v.valuation_date)
+            .map(|v| v.valuation_date);
+        Ok(latest)
+    }
+
+    async fn delete_valuations_for_account(&self, _account_id: &str) -> Result<()> {
+        Ok(())
+    }
+
+    fn get_latest_valuations(&self, account_ids: &[String]) -> Result<Vec<DailyAccountValuation>> {
+        let mut result = vec![];
+        for account_id in account_ids {
+            if let Some(val) = self
+                .valuations
+                .iter()
+                .filter(|v| &v.account_id == account_id)
+                .max_by_key(|v| v.valuation_date)
+            {
+                result.push(val.clone());
+            }
+        }
+        Ok(result)
+    }
+
+    fn get_valuations_on_date(
+        &self,
+        account_ids: &[String],
+        date: NaiveDate,
+    ) -> Result<Vec<DailyAccountValuation>> {
+        let filtered: Vec<_> = self
+            .valuations
+            .iter()
+            .filter(|v| account_ids.contains(&v.account_id) && v.valuation_date == date)
+            .cloned()
+            .collect();
+        Ok(filtered)
+    }
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+fn create_test_account(id: &str, account_type: &str, currency: &str) -> Account {
+    let now = Utc::now().naive_utc();
+    Account {
+        id: id.to_string(),
+        name: format!("Test Account {}", id),
+        account_type: account_type.to_string(),
+        group: None,
+        currency: currency.to_string(),
+        is_default: false,
+        is_active: true,
+        created_at: now,
+        updated_at: now,
+        platform_id: None,
+        account_number: None,
+        meta: None,
+        provider: None,
+        provider_account_id: None,
+    }
+}
+
+fn create_test_asset(id: &str, kind: AssetKind, currency: &str) -> Asset {
+    let now = Utc::now().naive_utc();
+    Asset {
+        id: id.to_string(),
+        isin: None,
+        name: Some(format!("Asset {}", id)),
+        symbol: id.to_string(),
+        asset_class: None,
+        asset_sub_class: None,
+        notes: None,
+        created_at: now,
+        updated_at: now,
+        currency: currency.to_string(),
+        kind,
+        exchange_mic: None,
+        pricing_mode: PricingMode::default(),
+        preferred_provider: None,
+        provider_overrides: None,
+        profile: None,
+        is_active: true,
+        metadata: None,
+    }
+}
+
+fn create_test_position(account_id: &str, asset_id: &str, quantity: Decimal, cost_basis: Decimal, currency: &str) -> Position {
+    Position {
+        id: format!("POS-{}-{}", asset_id, account_id),
+        account_id: account_id.to_string(),
+        asset_id: asset_id.to_string(),
+        quantity,
+        average_cost: if quantity > Decimal::ZERO { cost_basis / quantity } else { Decimal::ZERO },
+        total_cost_basis: cost_basis,
+        currency: currency.to_string(),
+        inception_date: Utc::now(),
+        lots: VecDeque::new(),
+        created_at: Utc::now(),
+        last_updated: Utc::now(),
+        is_alternative: false,
+    }
+}
+
+fn create_test_snapshot(account_id: &str, positions: Vec<Position>, cash: HashMap<String, Decimal>) -> AccountStateSnapshot {
+    let mut positions_map = HashMap::new();
+    for pos in positions {
+        positions_map.insert(pos.asset_id.clone(), pos);
+    }
+
+    AccountStateSnapshot {
+        id: format!("{}_2024-01-15", account_id),
+        account_id: account_id.to_string(),
+        snapshot_date: NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+        currency: "USD".to_string(),
+        positions: positions_map,
+        cash_balances: cash,
+        cost_basis: Decimal::ZERO,
+        net_contribution: Decimal::ZERO,
+        net_contribution_base: Decimal::ZERO,
+        cash_total_account_currency: Decimal::ZERO,
+        cash_total_base_currency: Decimal::ZERO,
+        calculated_at: Utc::now().naive_utc(),
+    }
+}
+
+fn create_test_quote(symbol: &str, price: Decimal, date: NaiveDate, currency: &str) -> Quote {
+    Quote {
+        id: format!("{}-{}", symbol, date),
+        symbol: symbol.to_string(),
+        timestamp: DateTime::from_naive_utc_and_offset(
+            date.and_hms_opt(16, 0, 0).unwrap(),
+            Utc,
+        ),
+        open: price,
+        high: price,
+        low: price,
+        close: price,
+        adjclose: price,
+        volume: dec!(0),
+        currency: currency.to_string(),
+        data_source: DataSource::Manual,
+        created_at: Utc::now(),
+    }
+}
+
+fn create_net_worth_service(
+    accounts: Vec<Account>,
+    assets: Vec<Asset>,
+    snapshots: Vec<AccountStateSnapshot>,
+    quotes: Vec<Quote>,
+) -> NetWorthService {
+    let base_currency = Arc::new(RwLock::new("USD".to_string()));
+    let account_repo = Arc::new(MockAccountRepository::new(accounts));
+    let asset_repo = Arc::new(MockAssetRepository::new(assets));
+    let snapshot_repo = Arc::new(MockSnapshotRepository::new(snapshots));
+    let market_data_repo = Arc::new(MockMarketDataRepository::new(quotes));
+    let valuation_repo = Arc::new(MockValuationRepository::new(vec![]));
+    let fx_service = Arc::new(MockFxService::new("USD"));
+
+    NetWorthService::new(
+        base_currency,
+        account_repo,
+        asset_repo,
+        snapshot_repo,
+        market_data_repo,
+        valuation_repo,
+        fx_service,
+    )
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[tokio::test]
+async fn test_empty_accounts_returns_zero_net_worth() {
+    let service = create_net_worth_service(vec![], vec![], vec![], vec![]);
+
+    let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
+    let result = service.get_net_worth(date).await.unwrap();
+
+    assert_eq!(result.net_worth, Decimal::ZERO);
+    assert_eq!(result.total_assets, Decimal::ZERO);
+    assert_eq!(result.total_liabilities, Decimal::ZERO);
+    assert_eq!(result.currency, "USD");
+}
+
+#[tokio::test]
+async fn test_single_investment_account() {
+    let account = create_test_account("acc1", "SECURITIES", "USD");
+    let asset = create_test_asset("AAPL", AssetKind::Security, "USD");
+    let position = create_test_position("acc1", "AAPL", dec!(100), dec!(15000), "USD");
+    let snapshot = create_test_snapshot("acc1", vec![position], HashMap::new());
+    let quote = create_test_quote("AAPL", dec!(185), NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(), "USD");
+
+    let service = create_net_worth_service(
+        vec![account],
+        vec![asset],
+        vec![snapshot],
+        vec![quote],
+    );
+
+    let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
+    let result = service.get_net_worth(date).await.unwrap();
+
+    // 100 shares * $185 = $18,500
+    assert_eq!(result.net_worth, dec!(18500));
+    assert_eq!(result.total_assets, dec!(18500));
+    assert_eq!(result.total_liabilities, Decimal::ZERO);
+    assert_eq!(result.breakdown.investments, dec!(18500));
+}
+
+#[tokio::test]
+async fn test_net_worth_with_liability() {
+    // Investment account
+    let inv_account = create_test_account("inv1", "SECURITIES", "USD");
+    let asset = create_test_asset("AAPL", AssetKind::Security, "USD");
+    let position = create_test_position("inv1", "AAPL", dec!(100), dec!(15000), "USD");
+    let inv_snapshot = create_test_snapshot("inv1", vec![position], HashMap::new());
+    let quote = create_test_quote("AAPL", dec!(200), NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(), "USD");
+
+    // Liability account
+    let liab_account = create_test_account("liab1", "LIABILITY", "USD");
+    let liab_asset = create_test_asset("LIAB-12345", AssetKind::Liability, "USD");
+    let liab_position = create_test_position("liab1", "LIAB-12345", dec!(1), dec!(50000), "USD");
+    let liab_snapshot = create_test_snapshot("liab1", vec![liab_position], HashMap::new());
+    let liab_quote = create_test_quote("LIAB-12345", dec!(50000), NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(), "USD");
+
+    let service = create_net_worth_service(
+        vec![inv_account, liab_account],
+        vec![asset, liab_asset],
+        vec![inv_snapshot, liab_snapshot],
+        vec![quote, liab_quote],
+    );
+
+    let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
+    let result = service.get_net_worth(date).await.unwrap();
+
+    // Assets: 100 * $200 = $20,000
+    // Liabilities: $50,000
+    // Net Worth: $20,000 - $50,000 = -$30,000
+    assert_eq!(result.total_assets, dec!(20000));
+    assert_eq!(result.total_liabilities, dec!(50000));
+    assert_eq!(result.net_worth, dec!(-30000));
+    assert_eq!(result.breakdown.investments, dec!(20000));
+    assert_eq!(result.breakdown.liabilities, dec!(50000));
+}
+
+#[tokio::test]
+async fn test_property_breakdown() {
+    let account = create_test_account("prop1", "PROPERTY", "USD");
+    let asset = create_test_asset("PROP-abc123", AssetKind::Property, "USD");
+    let position = create_test_position("prop1", "PROP-abc123", dec!(1), dec!(400000), "USD");
+    let snapshot = create_test_snapshot("prop1", vec![position], HashMap::new());
+    let quote = create_test_quote("PROP-abc123", dec!(450000), NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(), "USD");
+
+    let service = create_net_worth_service(
+        vec![account],
+        vec![asset],
+        vec![snapshot],
+        vec![quote],
+    );
+
+    let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
+    let result = service.get_net_worth(date).await.unwrap();
+
+    assert_eq!(result.net_worth, dec!(450000));
+    assert_eq!(result.breakdown.properties, dec!(450000));
+    assert_eq!(result.breakdown.investments, Decimal::ZERO);
+}
+
+#[tokio::test]
+async fn test_cash_included_in_investments() {
+    let account = create_test_account("acc1", "SECURITIES", "USD");
+    let mut cash = HashMap::new();
+    cash.insert("USD".to_string(), dec!(10000));
+    let snapshot = create_test_snapshot("acc1", vec![], cash);
+
+    let service = create_net_worth_service(
+        vec![account],
+        vec![],
+        vec![snapshot],
+        vec![],
+    );
+
+    let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
+    let result = service.get_net_worth(date).await.unwrap();
+
+    assert_eq!(result.net_worth, dec!(10000));
+    // Cash is included in investments breakdown
+    assert_eq!(result.breakdown.investments, dec!(10000));
+}
+
+#[tokio::test]
+async fn test_staleness_detection() {
+    let account = create_test_account("acc1", "SECURITIES", "USD");
+    let asset = create_test_asset("AAPL", AssetKind::Security, "USD");
+    let position = create_test_position("acc1", "AAPL", dec!(100), dec!(15000), "USD");
+    let snapshot = create_test_snapshot("acc1", vec![position], HashMap::new());
+
+    // Quote from 100 days ago
+    let old_date = NaiveDate::from_ymd_opt(2023, 10, 7).unwrap();
+    let quote = create_test_quote("AAPL", dec!(150), old_date, "USD");
+
+    let service = create_net_worth_service(
+        vec![account],
+        vec![asset],
+        vec![snapshot],
+        vec![quote],
+    );
+
+    let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
+    let result = service.get_net_worth(date).await.unwrap();
+
+    // Should detect stale asset (>90 days)
+    assert_eq!(result.stale_assets.len(), 1);
+    assert_eq!(result.stale_assets[0].asset_id, "AAPL");
+    assert!(result.stale_assets[0].days_stale > 90);
+    assert_eq!(result.oldest_valuation_date, Some(old_date));
+}
+
+#[tokio::test]
+async fn test_multiple_asset_categories() {
+    // Securities account
+    let sec_account = create_test_account("sec1", "SECURITIES", "USD");
+    let sec_asset = create_test_asset("AAPL", AssetKind::Security, "USD");
+    let sec_position = create_test_position("sec1", "AAPL", dec!(50), dec!(7500), "USD");
+    let sec_snapshot = create_test_snapshot("sec1", vec![sec_position], HashMap::new());
+    let sec_quote = create_test_quote("AAPL", dec!(200), NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(), "USD");
+
+    // Property account
+    let prop_account = create_test_account("prop1", "PROPERTY", "USD");
+    let prop_asset = create_test_asset("PROP-house", AssetKind::Property, "USD");
+    let prop_position = create_test_position("prop1", "PROP-house", dec!(1), dec!(300000), "USD");
+    let prop_snapshot = create_test_snapshot("prop1", vec![prop_position], HashMap::new());
+    let prop_quote = create_test_quote("PROP-house", dec!(350000), NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(), "USD");
+
+    // Vehicle account
+    let veh_account = create_test_account("veh1", "VEHICLE", "USD");
+    let veh_asset = create_test_asset("VEH-car", AssetKind::Vehicle, "USD");
+    let veh_position = create_test_position("veh1", "VEH-car", dec!(1), dec!(35000), "USD");
+    let veh_snapshot = create_test_snapshot("veh1", vec![veh_position], HashMap::new());
+    let veh_quote = create_test_quote("VEH-car", dec!(30000), NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(), "USD");
+
+    // Liability account
+    let liab_account = create_test_account("liab1", "LIABILITY", "USD");
+    let liab_asset = create_test_asset("LIAB-mortgage", AssetKind::Liability, "USD");
+    let liab_position = create_test_position("liab1", "LIAB-mortgage", dec!(1), dec!(200000), "USD");
+    let liab_snapshot = create_test_snapshot("liab1", vec![liab_position], HashMap::new());
+    let liab_quote = create_test_quote("LIAB-mortgage", dec!(200000), NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(), "USD");
+
+    let service = create_net_worth_service(
+        vec![sec_account, prop_account, veh_account, liab_account],
+        vec![sec_asset, prop_asset, veh_asset, liab_asset],
+        vec![sec_snapshot, prop_snapshot, veh_snapshot, liab_snapshot],
+        vec![sec_quote, prop_quote, veh_quote, liab_quote],
+    );
+
+    let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
+    let result = service.get_net_worth(date).await.unwrap();
+
+    // Investments: 50 * $200 = $10,000
+    // Properties: $350,000
+    // Vehicles: $30,000
+    // Liabilities: $200,000
+    // Total Assets: $10,000 + $350,000 + $30,000 = $390,000
+    // Net Worth: $390,000 - $200,000 = $190,000
+
+    assert_eq!(result.breakdown.investments, dec!(10000));
+    assert_eq!(result.breakdown.properties, dec!(350000));
+    assert_eq!(result.breakdown.vehicles, dec!(30000));
+    assert_eq!(result.breakdown.liabilities, dec!(200000));
+    assert_eq!(result.total_assets, dec!(390000));
+    assert_eq!(result.total_liabilities, dec!(200000));
+    assert_eq!(result.net_worth, dec!(190000));
+}
+
+#[tokio::test]
+async fn test_precious_metals_category() {
+    let account = create_test_account("prec1", "PRECIOUS", "USD");
+    let asset = create_test_asset("PREC-gold", AssetKind::PhysicalPrecious, "USD");
+    // 10 oz of gold
+    let position = create_test_position("prec1", "PREC-gold", dec!(10), dec!(18000), "USD");
+    let snapshot = create_test_snapshot("prec1", vec![position], HashMap::new());
+    // Gold at $2000/oz
+    let quote = create_test_quote("PREC-gold", dec!(2000), NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(), "USD");
+
+    let service = create_net_worth_service(
+        vec![account],
+        vec![asset],
+        vec![snapshot],
+        vec![quote],
+    );
+
+    let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
+    let result = service.get_net_worth(date).await.unwrap();
+
+    // 10 oz * $2000 = $20,000
+    assert_eq!(result.net_worth, dec!(20000));
+    assert_eq!(result.breakdown.precious_metals, dec!(20000));
+}
+
+#[tokio::test]
+async fn test_collectibles_category() {
+    let account = create_test_account("coll1", "COLLECTIBLE", "USD");
+    let asset = create_test_asset("COLL-art", AssetKind::Collectible, "USD");
+    let position = create_test_position("coll1", "COLL-art", dec!(1), dec!(50000), "USD");
+    let snapshot = create_test_snapshot("coll1", vec![position], HashMap::new());
+    let quote = create_test_quote("COLL-art", dec!(75000), NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(), "USD");
+
+    let service = create_net_worth_service(
+        vec![account],
+        vec![asset],
+        vec![snapshot],
+        vec![quote],
+    );
+
+    let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
+    let result = service.get_net_worth(date).await.unwrap();
+
+    assert_eq!(result.net_worth, dec!(75000));
+    assert_eq!(result.breakdown.collectibles, dec!(75000));
+}
+
+#[tokio::test]
+async fn test_no_quote_falls_back_to_cost_basis() {
+    let account = create_test_account("acc1", "SECURITIES", "USD");
+    let asset = create_test_asset("NEWSTOCK", AssetKind::Security, "USD");
+    // Position with $10,000 cost basis, 100 shares -> implied price $100/share
+    let position = create_test_position("acc1", "NEWSTOCK", dec!(100), dec!(10000), "USD");
+    let snapshot = create_test_snapshot("acc1", vec![position], HashMap::new());
+    // No quotes available
+
+    let service = create_net_worth_service(
+        vec![account],
+        vec![asset],
+        vec![snapshot],
+        vec![],  // Empty quotes
+    );
+
+    let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
+    let result = service.get_net_worth(date).await.unwrap();
+
+    // Should use cost basis: 100 * ($10,000/100) = $10,000
+    assert_eq!(result.net_worth, dec!(10000));
+}

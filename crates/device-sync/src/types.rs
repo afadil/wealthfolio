@@ -106,7 +106,6 @@ pub struct TrustedDeviceSummary {
     /// Platform identifier
     pub platform: String,
     /// Last seen timestamp
-    #[serde(rename = "lastSeenAt", alias = "last_seen_at")]
     pub last_seen_at: Option<String>,
 }
 
@@ -121,69 +120,49 @@ pub struct TrustedDeviceSummary {
 pub enum EnrollDeviceResponse {
     /// First device - generate root key locally and initialize E2EE
     Bootstrap {
-        #[serde(rename = "deviceId", alias = "device_id")]
         device_id: String,
-        #[serde(rename = "e2eeKeyVersion", alias = "e2ee_key_version")]
         e2ee_key_version: i32,
     },
     /// Device must pair with an existing trusted device to receive root key
     Pair {
-        #[serde(rename = "deviceId", alias = "device_id")]
         device_id: String,
-        #[serde(rename = "e2eeKeyVersion", alias = "e2ee_key_version")]
         e2ee_key_version: i32,
-        #[serde(rename = "requireSas", alias = "require_sas")]
         require_sas: bool,
-        #[serde(rename = "pairingTtlSeconds", alias = "pairing_ttl_seconds")]
         pairing_ttl_seconds: i32,
-        #[serde(rename = "trustedDevices", alias = "trusted_devices")]
         trusted_devices: Vec<TrustedDeviceSummary>,
     },
     /// Device is already trusted and ready to sync
     Ready {
-        #[serde(rename = "deviceId", alias = "device_id")]
         device_id: String,
-        #[serde(rename = "e2eeKeyVersion", alias = "e2ee_key_version")]
         e2ee_key_version: i32,
-        #[serde(rename = "trustState", alias = "trust_state")]
         trust_state: TrustState,
     },
 }
 
 /// Full device information.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct Device {
     /// Unique device ID
     pub id: String,
     /// User ID that owns this device
-    #[serde(alias = "user_id")]
     pub user_id: String,
     /// Display name of the device
-    #[serde(alias = "display_name")]
     pub display_name: String,
     /// Platform identifier
     pub platform: String,
     /// Device public key (base64 encoded)
-    #[serde(alias = "device_public_key")]
     pub device_public_key: Option<String>,
     /// Trust state
-    #[serde(alias = "trust_state")]
     pub trust_state: TrustState,
     /// Key version if trusted
-    #[serde(alias = "trusted_key_version")]
     pub trusted_key_version: Option<f64>,
     /// OS version
-    #[serde(alias = "os_version")]
     pub os_version: Option<String>,
     /// App version
-    #[serde(alias = "app_version")]
     pub app_version: Option<String>,
     /// Last time this device was seen
-    #[serde(alias = "last_seen_at")]
     pub last_seen_at: Option<String>,
     /// When the device was registered
-    #[serde(alias = "created_at")]
     pub created_at: String,
 }
 
@@ -216,23 +195,17 @@ pub enum InitializeKeysResult {
     Bootstrap {
         challenge: String,
         nonce: String,
-        #[serde(rename = "keyVersion", alias = "key_version")]
         key_version: i32,
     },
     /// E2EE already initialized - device must pair with a trusted device
     PairingRequired {
-        #[serde(rename = "e2eeKeyVersion", alias = "e2ee_key_version")]
         e2ee_key_version: i32,
-        #[serde(rename = "requireSas", alias = "require_sas")]
         require_sas: bool,
-        #[serde(rename = "pairingTtlSeconds", alias = "pairing_ttl_seconds")]
         pairing_ttl_seconds: i32,
-        #[serde(rename = "trustedDevices", alias = "trusted_devices")]
         trusted_devices: Vec<TrustedDeviceSummary>,
     },
     /// Device is already trusted at current key version
     Ready {
-        #[serde(rename = "e2eeKeyVersion", alias = "e2ee_key_version")]
         e2ee_key_version: i32,
     },
 }
@@ -267,23 +240,19 @@ pub enum KeyState {
 
 /// Response from committing team key initialization.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct CommitInitializeKeysResponse {
     pub success: bool,
-    #[serde(alias = "key_state")]
     pub key_state: KeyState,
 }
 
 /// Response from starting key rotation (Phase 1).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct RotateKeysResponse {
     /// Base64 encoded challenge
     pub challenge: String,
     /// Base64 encoded nonce
     pub nonce: String,
     /// New key version
-    #[serde(alias = "new_key_version")]
     pub new_key_version: i32,
 }
 
@@ -314,21 +283,16 @@ pub struct CommitRotateKeysRequest {
 
 /// Response from committing key rotation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct CommitRotateKeysResponse {
     pub success: bool,
-    #[serde(alias = "key_version")]
     pub key_version: i32,
 }
 
 /// Response from resetting team sync.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct ResetTeamSyncResponse {
     pub success: bool,
-    #[serde(alias = "key_version")]
     pub key_version: i32,
-    #[serde(alias = "reset_at")]
     pub reset_at: Option<String>,
 }
 
@@ -348,19 +312,14 @@ pub struct CreatePairingRequest {
 
 /// Response from creating a pairing session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct CreatePairingResponse {
     /// Unique pairing ID
-    #[serde(alias = "pairing_id")]
     pub pairing_id: String,
     /// When the session expires
-    #[serde(alias = "expires_at")]
     pub expires_at: String,
     /// Key version
-    #[serde(alias = "key_version")]
     pub key_version: i32,
     /// Whether SAS verification is required
-    #[serde(alias = "require_sas")]
     pub require_sas: bool,
 }
 
@@ -378,21 +337,16 @@ pub enum PairingStatus {
 
 /// Response from getting a pairing session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct GetPairingResponse {
     /// Pairing ID
-    #[serde(alias = "pairing_id")]
     pub pairing_id: String,
     /// Session status
     pub status: PairingStatus,
     /// Claimer's device ID (if claimed)
-    #[serde(alias = "claimer_device_id")]
     pub claimer_device_id: Option<String>,
     /// Claimer's ephemeral public key (if claimed, base64 encoded)
-    #[serde(alias = "claimer_ephemeral_pub")]
     pub claimer_ephemeral_pub: Option<String>,
     /// When the session expires
-    #[serde(alias = "expires_at")]
     pub expires_at: String,
 }
 
@@ -424,47 +378,36 @@ pub struct ClaimPairingRequest {
 
 /// Response from claiming a pairing session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct ClaimPairingResponse {
     /// Pairing session ID (same as pairing_id)
-    #[serde(alias = "session_id")]
     pub session_id: String,
     /// Issuer's X25519 ephemeral public key for deriving shared secret (base64)
-    #[serde(alias = "issuer_ephemeral_pub")]
     pub issuer_ephemeral_pub: String,
     /// Current E2EE key version (epoch)
-    #[serde(alias = "e2ee_key_version")]
     pub e2ee_key_version: i32,
     /// Whether SAS verification is required
-    #[serde(alias = "require_sas")]
     pub require_sas: bool,
     /// Session expiration timestamp
-    #[serde(alias = "expires_at")]
     pub expires_at: String,
 }
 
 /// Message from issuer to claimer during pairing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct PairingMessage {
     /// Message identifier
     pub id: String,
     /// Type of encrypted payload (e.g., 'rk_transfer_v1' for RK bundle)
-    #[serde(alias = "payload_type")]
     pub payload_type: String,
     /// Encrypted payload (base64 encoded)
     pub payload: String,
     /// Message timestamp
-    #[serde(alias = "created_at")]
     pub created_at: String,
 }
 
 /// Response from polling for messages (claimer side).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct PairingMessagesResponse {
     /// Current session status
-    #[serde(alias = "session_status")]
     pub session_status: PairingStatus,
     /// List of encrypted messages in the pairing session
     pub messages: Vec<PairingMessage>,
@@ -481,12 +424,9 @@ pub struct ConfirmPairingRequest {
 
 /// Response from confirming pairing (claimer becomes trusted).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct ConfirmPairingResponse {
     /// Operation succeeded
     pub success: bool,
     /// E2EE key version the device is now trusted at
-    #[serde(alias = "key_version")]
     pub key_version: i32,
 }
-

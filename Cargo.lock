@@ -7272,7 +7272,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-app"
-version = "3.0.0"
+version = "3.0.0-beta.1"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -7288,6 +7288,7 @@ dependencies = [
  "log",
  "rand 0.8.5",
  "reqwest",
+ "rust_decimal",
  "serde",
  "serde_json",
  "sha2",
@@ -7315,7 +7316,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-connect"
-version = "3.0.0"
+version = "3.0.0-beta.1"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7335,7 +7336,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-core"
-version = "3.0.0"
+version = "3.0.0-beta.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7364,13 +7365,14 @@ dependencies = [
  "tokio",
  "urlencoding",
  "uuid",
- "yahoo_finance_api",
+ "wealthfolio-market-data",
+ "yahoo_finance_api 4.1.0",
  "zip 2.4.2",
 ]
 
 [[package]]
 name = "wealthfolio-device-sync"
-version = "3.0.0"
+version = "3.0.0-beta.1"
 dependencies = [
  "async-trait",
  "log",
@@ -7383,8 +7385,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "wealthfolio-market-data"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "log",
+ "num-traits",
+ "reqwest",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "time",
+ "tokio",
+ "tracing",
+ "yahoo_finance_api 2.4.0",
+]
+
+[[package]]
 name = "wealthfolio-server"
-version = "3.0.0"
+version = "3.0.0-beta.1"
 dependencies = [
  "anyhow",
  "argon2",
@@ -7423,7 +7445,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-storage-sqlite"
-version = "3.0.0"
+version = "3.0.0-beta.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8218,6 +8240,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "388c44dc09d76f1536602ead6d325eb532f5c122f17782bd57fb47baeeb767e2"
 dependencies = [
  "lzma-sys",
+]
+
+[[package]]
+name = "yahoo_finance_api"
+version = "2.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2d318435472bd7e2e95e95d0f546efc075f77a7dfcaeb1469cb747c088566d7"
+dependencies = [
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "time",
 ]
 
 [[package]]

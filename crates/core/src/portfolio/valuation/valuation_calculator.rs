@@ -38,13 +38,16 @@ pub fn calculate_valuation(
     let normalized_base_currency = normalize_currency_code(base_currency);
 
     // --- 1. Calculate Market Values (Account Currency) ---
-    let total_investment_market_value_acct_ccy = calculate_investment_market_value_acct(
-        holdings_snapshot,
-        quotes_today,
-        fx_rates_today,
-        target_date,
-        normalized_account_currency,
-    )?;
+    // Returns (total_investment_value, performance_eligible_value)
+    // performance_eligible_value excludes alternative assets for TWR/IRR calculations
+    let (total_investment_market_value_acct_ccy, _performance_eligible_value) =
+        calculate_investment_market_value_acct(
+            holdings_snapshot,
+            quotes_today,
+            fx_rates_today,
+            target_date,
+            normalized_account_currency,
+        )?;
 
     let total_cash_value_acct_ccy = calculate_cash_value_acct(
         holdings_snapshot,
@@ -105,14 +108,18 @@ pub fn calculate_valuation(
 }
 
 /// Helper to calculate the total market value of investments in the account currency.
+/// Also calculates the investment-only value (excluding alternative assets) for performance calculations.
+/// Returns (total_investment_value, performance_eligible_value).
 fn calculate_investment_market_value_acct(
     holdings_snapshot: &AccountStateSnapshot,
     quotes_today: &HashMap<String, Quote>,
     fx_rates_today: &DailyFxRateMap,
     target_date: NaiveDate,
     account_currency: &str,
-) -> Result<Decimal> {
+) -> Result<(Decimal, Decimal)> {
     let mut total_position_market_value = Decimal::ZERO;
+    let mut performance_eligible_market_value = Decimal::ZERO;
+
     for (asset_id, position) in &holdings_snapshot.positions {
         if let Some(quote) = quotes_today.get(asset_id) {
             let (normalized_price, normalized_quote_currency) =
@@ -131,6 +138,11 @@ fn calculate_investment_market_value_acct(
 
             let market_value = position.quantity * normalized_price * quote_fx_rate;
             total_position_market_value += market_value;
+
+            // Only include non-alternative assets in performance-eligible value
+            if !position.is_alternative {
+                performance_eligible_market_value += market_value;
+            }
         } else {
             debug!(
                 "Missing quote for asset {} on date {}. Position market value treated as ZERO.",
@@ -138,7 +150,7 @@ fn calculate_investment_market_value_acct(
             );
         }
     }
-    Ok(total_position_market_value)
+    Ok((total_position_market_value, performance_eligible_market_value))
 }
 
 /// Helper to calculate the total value of cash balances in the account currency.

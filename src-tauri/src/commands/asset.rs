@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use crate::{
     context::ServiceContext,
-    events::{emit_portfolio_trigger_recalculate, emit_resource_changed, PortfolioRequestPayload, ResourceEventPayload},
+    events::{
+        emit_portfolio_trigger_recalculate, emit_resource_changed, PortfolioRequestPayload,
+        ResourceEventPayload,
+    },
 };
 use serde_json::json;
 use tauri::{AppHandle, State};

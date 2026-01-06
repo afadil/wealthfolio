@@ -7,6 +7,7 @@ use crate::db::{get_connection, DbPool, WriteHandle};
 use crate::errors::StorageError;
 use crate::schema::app_settings::dsl::*;
 use crate::schema::{accounts, assets};
+use wealthfolio_core::assets::AssetKind;
 use wealthfolio_core::errors::Result;
 use wealthfolio_core::settings::{Settings, SettingsRepositoryTrait, SettingsUpdate};
 
@@ -189,7 +190,7 @@ impl SettingsRepositoryTrait for SettingsRepository {
         let mut conn = get_connection(&self.pool)?;
 
         let currency_assets: Vec<String> = assets::table
-            .filter(assets::asset_type.eq("FOREX"))
+            .filter(assets::kind.eq(AssetKind::FxRate.as_db_str()))
             .filter(assets::currency.ne(base_currency))
             .select(assets::currency)
             .distinct()

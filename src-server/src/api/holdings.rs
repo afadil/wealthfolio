@@ -6,9 +6,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use wealthfolio_core::portfolio::{
-    holdings::Holding, valuation::DailyAccountValuation,
-};
+use wealthfolio_core::portfolio::{holdings::Holding, valuation::DailyAccountValuation};
 
 #[derive(serde::Deserialize)]
 struct HoldingsQuery {

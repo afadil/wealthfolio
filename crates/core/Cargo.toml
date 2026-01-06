@@ -31,6 +31,9 @@ futures = { workspace = true }
 log = { workspace = true }
 reqwest = { workspace = true, features = ["cookies"] }
 
+# Sibling crates
+wealthfolio-market-data = { path = "../market-data" }
+
 # Additional dependencies not in workspace
 yahoo_finance_api = "4.1"
 regex = "1.10"

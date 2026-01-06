@@ -1,9 +1,10 @@
 import { getAccounts } from "@/commands/account";
+import { getPlatforms } from "@/features/wealthfolio-connect";
 import { QueryKeys } from "@/lib/query-keys";
-import type { Account } from "@/lib/types";
+import type { Account, Platform } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { Button, EmptyPlaceholder, Icons, Separator, Skeleton } from "@wealthfolio/ui";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { SettingsHeader } from "../settings-header";
 import { AccountEditModal } from "./components/account-edit-modal";
 import { AccountItem } from "./components/account-item";
@@ -14,6 +15,17 @@ const SettingsAccountsPage = () => {
     queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
   });
+
+  const { data: platforms } = useQuery<Platform[], Error>({
+    queryKey: [QueryKeys.PLATFORMS],
+    queryFn: getPlatforms,
+  });
+
+  // Create a map of platform ID to platform for quick lookup
+  const platformMap = useMemo(() => {
+    if (!platforms) return new Map<string, Platform>();
+    return new Map(platforms.map((p) => [p.id, p]));
+  }, [platforms]);
 
   const [visibleModal, setVisibleModal] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
@@ -71,6 +83,7 @@ const SettingsAccountsPage = () => {
                 <AccountItem
                   key={account.id}
                   account={account}
+                  platform={account.platformId ? platformMap.get(account.platformId) : undefined}
                   onEdit={handleEditAccount}
                   onDelete={handleDeleteAccount}
                 />

@@ -8,12 +8,12 @@ use std::str::FromStr;
 use std::sync::Arc;
 use uuid::Uuid;
 
+use wealthfolio_core::activities::ActivityError;
 use wealthfolio_core::activities::{
     Activity, ActivityBulkIdentifierMapping, ActivityBulkMutationResult, ActivityDetails,
     ActivityRepositoryTrait, ActivitySearchResponse, ActivitySearchResponseMeta, ActivityUpdate,
     ImportMapping, IncomeData, NewActivity, Sort, INCOME_ACTIVITY_TYPES, TRADING_ACTIVITY_TYPES,
 };
-use wealthfolio_core::activities::ActivityError;
 use wealthfolio_core::{Error, Result};
 
 use super::model::{ActivityDB, ActivityDetailsDB, ImportMappingDB};
@@ -103,7 +103,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
         activity_type_filter: Option<Vec<String>>, // Optional activity_type filter
         asset_id_keyword: Option<String>,          // Optional asset_id keyword for search
         sort: Option<Sort>,                        // Optional sort
-        needs_review_filter: Option<bool>,           // Optional needs_review filter (maps to DRAFT status)
+        needs_review_filter: Option<bool>, // Optional needs_review filter (maps to DRAFT status)
     ) -> Result<ActivitySearchResponse> {
         let mut conn = get_connection(&self.pool)?;
 
@@ -224,14 +224,14 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 accounts::currency,
                 assets::symbol.nullable(),
                 assets::name.nullable(),
-                assets::data_source.nullable(),
             ))
             .limit(page_size)
             .offset(offset)
             .load::<ActivityDetailsDB>(&mut conn)
             .map_err(StorageError::from)?;
 
-        let results: Vec<ActivityDetails> = results_db.into_iter().map(ActivityDetails::from).collect();
+        let results: Vec<ActivityDetails> =
+            results_db.into_iter().map(ActivityDetails::from).collect();
 
         Ok(ActivitySearchResponse {
             data: results,
@@ -629,7 +629,13 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 activities::currency,
                 activities::amount,
             ))
-            .load::<(String, Option<String>, Option<String>, String, Option<String>)>(&mut conn)
+            .load::<(
+                String,
+                Option<String>,
+                Option<String>,
+                String,
+                Option<String>,
+            )>(&mut conn)
             .map_err(ActivityError::from)?;
 
         // Convert string values to Decimal

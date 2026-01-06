@@ -50,6 +50,8 @@ pub struct QuoteDB {
     pub data_source: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub created_at: String,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub notes: Option<String>,
 }
 
 /// Database model for market data provider settings
@@ -91,14 +93,7 @@ pub struct UpdateMarketDataProviderSettingDB {
 
 /// Database model for quote sync state
 #[derive(
-    Debug,
-    Clone,
-    Queryable,
-    Identifiable,
-    Selectable,
-    Insertable,
-    AsChangeset,
-    QueryableByName,
+    Debug, Clone, Queryable, Identifiable, Selectable, Insertable, AsChangeset, QueryableByName,
 )]
 #[diesel(table_name = crate::schema::quote_sync_state)]
 #[diesel(primary_key(symbol))]
@@ -174,6 +169,7 @@ impl From<QuoteDB> for Quote {
             data_source: DataSource::from(db.data_source.as_ref()),
             created_at: parse_datetime(&db.created_at),
             currency: db.currency,
+            notes: db.notes,
         }
     }
 }
@@ -193,6 +189,7 @@ impl From<&Quote> for QuoteDB {
             currency: quote.currency.clone(),
             data_source: quote.data_source.as_str().to_string(),
             created_at: quote.created_at.to_rfc3339(),
+            notes: quote.notes.clone(),
         }
     }
 }
@@ -239,9 +236,8 @@ impl From<QuoteSyncStateDB> for QuoteSyncState {
                 .unwrap_or_else(|_| Utc::now())
         };
 
-        let parse_date = |s: &str| -> Option<NaiveDate> {
-            NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()
-        };
+        let parse_date =
+            |s: &str| -> Option<NaiveDate> { NaiveDate::parse_from_str(s, "%Y-%m-%d").ok() };
 
         QuoteSyncState {
             symbol: db.symbol,

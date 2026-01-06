@@ -240,7 +240,11 @@ mod tests {
             unimplemented!()
         }
 
-        async fn register_currency_pair(&self, from_currency: &str, to_currency: &str) -> Result<()> {
+        async fn register_currency_pair(
+            &self,
+            from_currency: &str,
+            to_currency: &str,
+        ) -> Result<()> {
             let mut pairs = self.registered_pairs.lock().unwrap();
             pairs.insert((from_currency.to_string(), to_currency.to_string()));
             Ok(())
@@ -438,7 +442,7 @@ mod tests {
             id: id.to_string(),
             symbol: id.to_string(),
             currency: currency.to_string(),
-            data_source: "YAHOO".to_string(),
+            kind: crate::assets::AssetKind::Security,
             ..Default::default()
         }
     }

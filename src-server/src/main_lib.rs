@@ -4,6 +4,7 @@ use std::sync::{Arc, RwLock};
 use crate::{auth::AuthManager, config::Config, events::EventBus, secrets::build_secret_store};
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, EnvFilter};
+use wealthfolio_connect::{PlatformRepository, SyncService, SyncServiceTrait};
 use wealthfolio_core::{
     accounts::AccountService,
     activities::{ActivityService as CoreActivityService, ActivityServiceTrait},
@@ -24,7 +25,6 @@ use wealthfolio_core::{
     secrets::SecretStore,
     settings::{SettingsService, SettingsServiceTrait},
 };
-use wealthfolio_connect::{PlatformRepository, SyncService, SyncServiceTrait};
 use wealthfolio_storage_sqlite::{
     accounts::AccountRepository,
     activities::ActivityRepository,
@@ -130,10 +130,8 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let market_data_repository = Arc::new(MarketDataRepository::new(pool.clone(), writer.clone()));
     let activity_repository = Arc::new(ActivityRepository::new(pool.clone(), writer.clone()));
     let snapshot_repository = Arc::new(SnapshotRepository::new(pool.clone(), writer.clone()));
-    let quote_sync_state_repository = Arc::new(QuoteSyncStateRepository::new(
-        pool.clone(),
-        writer.clone(),
-    ));
+    let quote_sync_state_repository =
+        Arc::new(QuoteSyncStateRepository::new(pool.clone(), writer.clone()));
     let market_data_service = Arc::new(
         MarketDataService::new(
             market_data_repository.clone(),

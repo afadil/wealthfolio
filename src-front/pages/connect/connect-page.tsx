@@ -1,37 +1,35 @@
 import { Page, PageContent, PageHeader } from "@/components/page";
 import { useWealthfolioConnect } from "@/features/wealthfolio-connect/providers/wealthfolio-connect-provider";
-import { useAggregatedSyncStatus, useImportRuns } from "@/features/wealthfolio-connect/hooks";
+import {
+  useAggregatedSyncStatus,
+  useImportRuns,
+  useBrokerAccounts,
+} from "@/features/wealthfolio-connect/hooks";
 import { ConnectEmptyState } from "@/features/wealthfolio-connect/components/connect-empty-state";
 import { SyncSummaryCard } from "@/features/wealthfolio-connect/components/sync-summary-card";
-import { BrokerSyncStateCard } from "@/features/wealthfolio-connect/components/broker-sync-state-card";
+import { BrokerAccountCard } from "@/features/wealthfolio-connect/components/broker-account-card";
 import { ImportRunsList } from "@/features/wealthfolio-connect/components/import-runs-list";
 import { useSyncBrokerData } from "@/features/wealthfolio-connect/hooks/use-sync-broker-data";
-import { useAccounts } from "@/hooks/use-accounts";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useMemo } from "react";
-import type { Account } from "@/lib/types";
+import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 
 export default function ConnectPage() {
   const { isEnabled, isConnected, isInitializing, userInfo } = useWealthfolioConnect();
   const { status, lastSyncTime, issueCount, isLoading, syncStates } =
     useAggregatedSyncStatus();
   const { data: importRuns = [], isLoading: isLoadingRuns } = useImportRuns({ runType: "SYNC" });
-  const { accounts } = useAccounts(false);
+  const { data: brokerAccounts = [], isLoading: isLoadingAccounts } = useBrokerAccounts();
   const { mutate: syncBrokerData, isPending: isSyncing } = useSyncBrokerData();
 
   // Determine if user has an active subscription
   const hasSubscription = useMemo(() => {
     if (!userInfo?.team) return false;
-    const subStatus = userInfo.team.subscriptionStatus;
+    const subStatus = userInfo.team.subscription_status;
     return subStatus === "active" || subStatus === "trialing";
   }, [userInfo]);
-
-  // Map account IDs to account objects for display
-  const accountsMap = useMemo((): Map<string, Account> => {
-    return new Map(accounts.map((a) => [a.id, a]));
-  }, [accounts]);
 
   // Show loading state during initialization
   if (isInitializing) {
@@ -62,10 +60,10 @@ export default function ConnectPage() {
   }
 
   // Check if we have any synced data
-  const hasData = syncStates.length > 0 || importRuns.length > 0;
+  const hasData = brokerAccounts.length > 0 || syncStates.length > 0 || importRuns.length > 0;
 
   // Show empty state with sync action when no data yet
-  if (!isLoading && !isLoadingRuns && !hasData) {
+  if (!isLoading && !isLoadingRuns && !isLoadingAccounts && !hasData) {
     return (
       <Page>
         <PageHeader title="Connect" />
@@ -118,18 +116,32 @@ export default function ConnectPage() {
             isSyncing={isSyncing}
           />
 
-          {/* Broker Sync States */}
-          {syncStates.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-lg font-semibold">Connected Accounts</h2>
-              {syncStates.map((syncState) => (
-                <BrokerSyncStateCard
-                  key={`${syncState.accountId}-${syncState.provider}`}
-                  syncState={syncState}
-                  account={accountsMap.get(syncState.accountId)}
-                />
-              ))}
-            </div>
+          {/* Broker Accounts from API */}
+          {brokerAccounts.length > 0 && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <Icons.Wallet className="h-5 w-5" />
+                  Accounts
+                </CardTitle>
+                <Button variant="ghost" size="sm" className="text-muted-foreground">
+                  Manage accounts
+                  <Icons.ArrowRight className="ml-1 h-4 w-4" />
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-2 pt-0">
+                {isLoadingAccounts ? (
+                  <>
+                    <Skeleton className="h-16 w-full" />
+                    <Skeleton className="h-16 w-full" />
+                  </>
+                ) : (
+                  brokerAccounts.map((account) => (
+                    <BrokerAccountCard key={account.id} account={account} />
+                  ))
+                )}
+              </CardContent>
+            </Card>
           )}
 
           {/* Import Runs History */}

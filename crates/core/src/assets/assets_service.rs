@@ -3,9 +3,59 @@ use std::sync::Arc;
 
 use crate::market_data::MarketDataServiceTrait;
 
-use super::assets_model::{Asset, NewAsset, UpdateAssetProfile};
+use super::assets_model::{Asset, AssetKind, NewAsset, PricingMode, UpdateAssetProfile};
 use super::assets_traits::{AssetRepositoryTrait, AssetServiceTrait};
 use crate::errors::{DatabaseError, Error, Result};
+
+/// Infers asset kind from symbol pattern.
+///
+/// Design principles:
+/// 1. Only match system-defined prefixes (deterministic, no guessing)
+/// 2. Default to Security for unknown patterns
+/// 3. Let async enrichment correct the kind based on provider data
+///
+/// This avoids hardcoded lists that become stale (e.g., crypto symbols).
+fn infer_asset_kind(symbol: &str) -> AssetKind {
+    // System-defined prefixes (deterministic patterns)
+    match symbol {
+        s if s.starts_with("$CASH-") => AssetKind::Cash,
+        s if s.starts_with("$UNKNOWN-") => AssetKind::Security,
+        // Alternative asset prefixes (user-created convention)
+        s if s.starts_with("PROP-") => AssetKind::Property,
+        s if s.starts_with("VEH-") => AssetKind::Vehicle,
+        s if s.starts_with("COLL-") => AssetKind::Collectible,
+        s if s.starts_with("PREC-") => AssetKind::PhysicalPrecious,
+        s if s.starts_with("LIAB-") => AssetKind::Liability,
+        s if s.starts_with("ALT-") => AssetKind::Other,
+        // Default: Security (most common, enrichment will correct if needed)
+        _ => AssetKind::Security,
+    }
+}
+
+/// Converts a provider's asset_type string to our AssetKind enum.
+/// Provider data uses various naming conventions (e.g., "CRYPTOCURRENCY", "ETF", "Equity").
+/// Returns None if the string doesn't map to a known kind (caller decides fallback).
+fn parse_asset_kind_from_provider(asset_type: &str) -> Option<AssetKind> {
+    // Normalize to uppercase for case-insensitive matching
+    match asset_type.to_uppercase().as_str() {
+        // Crypto variants
+        "CRYPTOCURRENCY" | "CRYPTO" => Some(AssetKind::Crypto),
+        // Equity/Security variants (most providers)
+        "EQUITY" | "STOCK" | "ETF" | "MUTUALFUND" | "MUTUAL FUND" | "INDEX" => {
+            Some(AssetKind::Security)
+        }
+        // Currency/FX
+        "CURRENCY" | "FOREX" | "FX" => Some(AssetKind::FxRate),
+        // Cash (rare from providers, usually internal)
+        "CASH" => Some(AssetKind::Cash),
+        // Commodity
+        "COMMODITY" => Some(AssetKind::Commodity),
+        // Option
+        "OPTION" => Some(AssetKind::Option),
+        // Unknown/unmapped - let caller decide
+        _ => None,
+    }
+}
 
 /// Service for managing assets
 pub struct AssetService {
@@ -65,6 +115,11 @@ impl AssetServiceTrait for AssetService {
         self.asset_repository.create(new_asset).await
     }
 
+    /// Creates a new asset directly without network lookups.
+    async fn create_asset(&self, new_asset: NewAsset) -> Result<Asset> {
+        self.asset_repository.create(new_asset).await
+    }
+
     /// Retrieves or creates an asset by its ID
     async fn get_or_create_asset(
         &self,
@@ -103,6 +158,79 @@ impl AssetServiceTrait for AssetService {
         }
     }
 
+    /// Creates a minimal asset without network calls.
+    /// Returns the existing asset if found, or creates a new minimal one.
+    /// Accepts optional metadata hints from the caller (e.g., user-provided asset details).
+    async fn get_or_create_minimal_asset(
+        &self,
+        asset_id: &str,
+        context_currency: Option<String>,
+        metadata: Option<super::assets_model::AssetMetadata>,
+    ) -> Result<Asset> {
+        // Try to get existing asset first
+        match self.asset_repository.get_by_id(asset_id) {
+            Ok(existing_asset) => return Ok(existing_asset),
+            Err(Error::Database(DatabaseError::NotFound(_))) => {
+                // Continue to create minimal asset
+                debug!(
+                    "Asset not found locally, creating minimal asset: {}",
+                    asset_id
+                );
+            }
+            Err(e) => {
+                error!("Error fetching asset by ID '{}': {}", asset_id, e);
+                return Err(e);
+            }
+        }
+
+        // Use metadata kind if provided, otherwise infer from symbol pattern
+        let kind = metadata
+            .as_ref()
+            .and_then(|m| m.kind.clone())
+            .unwrap_or_else(|| infer_asset_kind(asset_id));
+
+        // Determine pricing mode based on kind
+        let pricing_mode = match &kind {
+            AssetKind::Cash => PricingMode::None,
+            AssetKind::Crypto | AssetKind::Security => PricingMode::Market,
+            // Alternative assets use manual pricing
+            _ => PricingMode::Manual,
+        };
+
+        // Use context currency or default to USD
+        let currency = context_currency
+            .filter(|c| !c.is_empty())
+            .unwrap_or_else(|| "USD".to_string());
+
+        // Extract optional fields from metadata
+        let (name, asset_class, asset_sub_class, exchange_mic) = metadata
+            .map(|m| (m.name, m.asset_class, m.asset_sub_class, m.exchange_mic))
+            .unwrap_or_default();
+
+        // Create minimal asset with optional metadata
+        let new_asset = NewAsset {
+            id: Some(asset_id.to_string()),
+            kind,
+            name,
+            symbol: asset_id.to_string(),
+            exchange_mic,
+            currency,
+            pricing_mode,
+            preferred_provider: Some("YAHOO".to_string()),
+            asset_class,
+            asset_sub_class,
+            is_active: true,
+            ..Default::default()
+        };
+
+        debug!(
+            "Creating minimal asset: id={}, kind={:?}, pricing_mode={:?}, name={:?}",
+            asset_id, new_asset.kind, new_asset.pricing_mode, new_asset.name
+        );
+
+        self.asset_repository.create(new_asset).await
+    }
+
     /// Updates the data source for an asset
     async fn update_asset_data_source(&self, asset_id: &str, data_source: String) -> Result<Asset> {
         self.asset_repository
@@ -112,5 +240,82 @@ impl AssetServiceTrait for AssetService {
 
     async fn get_assets_by_symbols(&self, symbols: &[String]) -> Result<Vec<Asset>> {
         self.asset_repository.list_by_symbols(symbols)
+    }
+
+    /// Enriches an existing asset's profile with data from market data provider.
+    /// Updates the profile JSON (sectors, countries, website) and notes fields.
+    async fn enrich_asset_profile(&self, asset_id: &str) -> Result<Asset> {
+        // Get the existing asset
+        let existing_asset = self.asset_repository.get_by_id(asset_id)?;
+
+        // Skip enrichment for assets that don't need market data
+        if existing_asset.pricing_mode != super::assets_model::PricingMode::Market {
+            debug!(
+                "Skipping enrichment for asset {} - pricing mode is {:?}",
+                asset_id, existing_asset.pricing_mode
+            );
+            return Ok(existing_asset);
+        }
+
+        // Fetch profile from provider
+        let provider_profile = match self.market_data_service.get_asset_profile(asset_id).await {
+            Ok(profile) => profile,
+            Err(e) => {
+                debug!(
+                    "Could not fetch profile for asset {}: {}",
+                    asset_id, e
+                );
+                return Ok(existing_asset);
+            }
+        };
+
+        // Derive kind from provider's asset_type if available
+        // Only update kind if current kind is the default (Security) and provider has data
+        let inferred_kind = provider_profile
+            .asset_type
+            .as_ref()
+            .and_then(|t| parse_asset_kind_from_provider(t));
+
+        // Only override kind if we got a meaningful value from provider
+        // and the current kind is the default inferred value
+        let updated_kind = if existing_asset.kind == AssetKind::Security {
+            inferred_kind
+        } else {
+            None // Keep existing non-default kind
+        };
+
+        // Build profile update from provider data
+        let mut update = UpdateAssetProfile {
+            symbol: existing_asset.symbol.clone(),
+            name: provider_profile.name.or(existing_asset.name.clone()),
+            sectors: provider_profile.sectors,
+            countries: provider_profile.countries,
+            notes: existing_asset.notes.clone().unwrap_or_default(),
+            asset_sub_class: provider_profile
+                .asset_sub_class
+                .or(existing_asset.asset_sub_class.clone()),
+            asset_class: provider_profile
+                .asset_class
+                .or(existing_asset.asset_class.clone()),
+            kind: updated_kind,
+            pricing_mode: Some(existing_asset.pricing_mode.clone()),
+            provider_overrides: existing_asset.provider_overrides.clone(),
+        };
+
+        // Update notes with description if notes is empty and provider has notes
+        if update.notes.is_empty() {
+            if let Some(ref notes) = provider_profile.notes {
+                update.notes = notes.clone();
+            }
+        }
+
+        debug!(
+            "Enriching asset {} with provider profile: kind={:?}, sectors={:?}, countries={:?}",
+            asset_id, update.kind, update.sectors, update.countries
+        );
+
+        self.asset_repository
+            .update_profile(asset_id, update)
+            .await
     }
 }

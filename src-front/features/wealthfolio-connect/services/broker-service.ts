@@ -7,6 +7,7 @@ import type { Account, Platform } from "@/lib/types";
 import type {
   SyncResult,
   BrokerConnection,
+  BrokerAccount,
   PlansResponse,
   UserInfo,
   BrokerSyncState,
@@ -71,6 +72,15 @@ export const listBrokerConnections = async (): Promise<BrokerConnection[]> => {
     return await invokeDesktop("list_broker_connections");
   } catch (error) {
     logger.error("Error listing broker connections.");
+    throw error;
+  }
+};
+
+export const listBrokerAccounts = async (): Promise<BrokerAccount[]> => {
+  try {
+    return await invokeDesktop("list_broker_accounts");
+  } catch (error) {
+    logger.error("Error listing broker accounts.");
     throw error;
   }
 };

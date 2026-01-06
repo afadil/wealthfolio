@@ -3,12 +3,12 @@
 mod tests {
     use crate::errors::{Error, Result};
     use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
+    use crate::market_data::providers::models::AssetProfile;
     use crate::market_data::{
         DataSource, LatestQuotePair, MarketDataError, MarketDataProviderInfo,
         MarketDataProviderSetting, MarketDataServiceTrait, Quote, QuoteImport, QuoteSummary,
         QuoteSyncState, SymbolSyncPlan,
     };
-    use crate::market_data::providers::models::AssetProfile;
     use crate::portfolio::holdings::holdings_model::{
         Holding, HoldingType, Instrument, MonetaryValue,
     };
@@ -354,7 +354,7 @@ mod tests {
                 asset_subclass: None,
                 countries: None,
                 sectors: None,
-                data_source: None,
+                preferred_provider: None,
             })
         } else {
             None
@@ -372,12 +372,14 @@ mod tests {
                 base: dec!(0.0),
             }), // Base will be calculated
             instrument,
+            asset_kind: None,
             open_date: None,
             lots: None,
             weight: dec!(0.0),
             as_of_date: NaiveDate::from_ymd_opt(1970, 1, 1).unwrap(), // Placeholder
             market_value: MonetaryValue::zero(),                      // To be calculated
             price: None,                                              // To be calculated
+            purchase_price: None,
             fx_rate: None,                                            // To be calculated
             unrealized_gain: None,                                    // To be calculated
             unrealized_gain_pct: None,                                // To be calculated
@@ -388,6 +390,7 @@ mod tests {
             realized_gain_pct: None,                                  // To be calculated
             total_gain: None,                                         // To be calculated
             total_gain_pct: None,                                     // To be calculated
+            metadata: None,
         }
     }
 

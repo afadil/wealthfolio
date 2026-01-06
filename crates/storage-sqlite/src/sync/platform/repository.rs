@@ -84,7 +84,8 @@ impl PlatformRepository {
                         platforms::url.eq(&platform_db.url),
                         platforms::external_id.eq(&platform_db.external_id),
                     ))
-                    .execute(conn).map_err(StorageError::from)?;
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
 
                 // Return the platform
                 Ok(Platform::from(platform_db))
@@ -97,7 +98,9 @@ impl PlatformRepository {
         let id_to_delete = platform_id.to_string();
         self.writer
             .exec(move |conn| {
-                let affected = diesel::delete(platforms.find(id_to_delete)).execute(conn).map_err(StorageError::from)?;
+                let affected = diesel::delete(platforms.find(id_to_delete))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
                 Ok(affected)
             })
             .await

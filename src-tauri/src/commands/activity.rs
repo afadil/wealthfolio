@@ -1,7 +1,8 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use crate::context::ServiceContext;
-use crate::events::{emit_resource_changed, ResourceEventPayload};
+use crate::events::{emit_assets_enrich_requested, emit_resource_changed, AssetsEnrichPayload, ResourceEventPayload};
 use log::debug;
 use tauri::{AppHandle, State};
 use wealthfolio_core::activities::{
@@ -10,6 +11,19 @@ use wealthfolio_core::activities::{
 };
 
 use serde_json::json;
+
+/// Determines if an asset should be enriched based on its ID pattern.
+/// Excludes cash placeholders, unknown placeholders, and alternative assets.
+fn should_enrich_asset(asset_id: &str) -> bool {
+    !asset_id.starts_with("$CASH-")
+        && !asset_id.starts_with("$UNKNOWN-")
+        && !asset_id.starts_with("PROP-")
+        && !asset_id.starts_with("VEH-")
+        && !asset_id.starts_with("COLL-")
+        && !asset_id.starts_with("PREC-")
+        && !asset_id.starts_with("LIAB-")
+        && !asset_id.starts_with("ALT-")
+}
 
 #[tauri::command]
 pub async fn get_activities(
@@ -27,7 +41,7 @@ pub async fn search_activities(
     activity_type_filter: Option<Vec<String>>, // Optional activity_type filter
     asset_id_keyword: Option<String>,          // Optional asset_id keyword for search
     sort: Option<Sort>,
-    needs_review_filter: Option<bool>,         // Optional needs_review filter for pending review
+    needs_review_filter: Option<bool>, // Optional needs_review filter for pending review
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ActivitySearchResponse, String> {
     debug!("Search activities... {}, {}", page, page_size);
@@ -66,6 +80,18 @@ pub async fn create_activity(
             }),
         ),
     );
+
+    // Trigger asset enrichment for new assets
+    if let Some(ref asset_id) = result.asset_id {
+        if should_enrich_asset(asset_id) {
+            emit_assets_enrich_requested(
+                &handle,
+                AssetsEnrichPayload {
+                    asset_ids: vec![asset_id.clone()],
+                },
+            );
+        }
+    }
 
     Ok(result)
 }
@@ -109,6 +135,20 @@ pub async fn update_activity(
             }),
         ),
     );
+
+    // Trigger asset enrichment if asset changed
+    if result.asset_id != original_activity.asset_id {
+        if let Some(ref asset_id) = result.asset_id {
+            if should_enrich_asset(asset_id) {
+                emit_assets_enrich_requested(
+                    &handle,
+                    AssetsEnrichPayload {
+                        asset_ids: vec![asset_id.clone()],
+                    },
+                );
+            }
+        }
+    }
 
     Ok(result)
 }
@@ -177,6 +217,25 @@ pub async fn save_activities(
         &handle,
         ResourceEventPayload::new("activity", "bulk-mutated", event_payload),
     );
+
+    // Trigger asset enrichment for all unique assets from created activities
+    let new_asset_ids: Vec<String> = result
+        .created
+        .iter()
+        .filter_map(|a| a.asset_id.clone())
+        .filter(|id| should_enrich_asset(id))
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+
+    if !new_asset_ids.is_empty() {
+        emit_assets_enrich_requested(
+            &handle,
+            AssetsEnrichPayload {
+                asset_ids: new_asset_ids,
+            },
+        );
+    }
 
     Ok(result)
 }
@@ -250,6 +309,25 @@ pub async fn import_activities(
             }),
         ),
     );
+
+    // Trigger asset enrichment for all unique assets from imported activities
+    let imported_asset_ids: Vec<String> = result
+        .iter()
+        .filter(|a| a.is_valid)
+        .map(|a| a.symbol.clone())
+        .filter(|id| should_enrich_asset(id))
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+
+    if !imported_asset_ids.is_empty() {
+        emit_assets_enrich_requested(
+            &handle,
+            AssetsEnrichPayload {
+                asset_ids: imported_asset_ids,
+            },
+        );
+    }
 
     Ok(result)
 }

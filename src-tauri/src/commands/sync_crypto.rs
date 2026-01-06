@@ -57,8 +57,8 @@ pub fn derive_dek(root_key_b64: &str, version: u32) -> Result<String, String> {
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EphemeralKeyPair {
-    pub public_key: String,  // Base64-encoded public key
-    pub secret_key: String,  // Base64-encoded secret key (for storage)
+    pub public_key: String, // Base64-encoded public key
+    pub secret_key: String, // Base64-encoded secret key (for storage)
 }
 
 /// Generate an ephemeral X25519 key pair for pairing

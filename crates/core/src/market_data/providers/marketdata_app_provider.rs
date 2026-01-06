@@ -85,6 +85,7 @@ impl MarketDataProvider for MarketDataAppProvider {
                 close: Decimal::from_f64_retain(mid_price).unwrap_or_default(),
                 adjclose: Decimal::from_f64_retain(mid_price).unwrap_or_default(),
                 currency: fallback_currency,
+                notes: None,
             };
             Ok(model_quote)
         } else {
@@ -143,6 +144,7 @@ impl MarketDataProvider for MarketDataAppProvider {
                         adjclose: Decimal::from_f64_retain(close.as_f64().unwrap_or(0.0))
                             .unwrap_or_default(),
                         currency: fallback_currency.clone(),
+                        notes: None,
                     }
                 })
                 .collect();

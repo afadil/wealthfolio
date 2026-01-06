@@ -1,4 +1,4 @@
-use wealthfolio_core::assets::FOREX_ASSET_TYPE;
+use wealthfolio_core::assets::{AssetKind, PricingMode};
 use wealthfolio_core::errors::{DatabaseError, ValidationError};
 use wealthfolio_core::fx::{ExchangeRate, FxRepositoryTrait};
 use wealthfolio_core::market_data::{DataSource, Quote};
@@ -40,7 +40,7 @@ impl FxRepository {
             SELECT q.*
             FROM quotes q
             INNER JOIN assets a ON q.symbol = a.id
-            WHERE a.asset_type = 'FOREX'
+            WHERE a.kind = 'FX_RATE'
             ORDER BY q.symbol, q.timestamp";
 
         let quotes_db: Vec<QuoteDB> = diesel::sql_query(query)
@@ -67,7 +67,7 @@ impl FxRepository {
                 SELECT q.*
                 FROM quotes q
                 INNER JOIN assets a ON q.symbol = a.id
-                WHERE a.asset_type = 'FOREX'
+                WHERE a.kind = 'FX_RATE'
                 AND (q.symbol, q.timestamp) IN (
                     SELECT symbol, MAX(timestamp)
                     FROM quotes
@@ -102,7 +102,7 @@ impl FxRepository {
              WHERE q.symbol IN (
                  SELECT id
                  FROM assets
-                 WHERE asset_type = 'FOREX'
+                 WHERE kind = 'FX_RATE'
              )
              AND (q.symbol, q.timestamp) IN (
                  SELECT symbol, MAX(timestamp) as max_timestamp
@@ -124,7 +124,7 @@ impl FxRepository {
             .collect();
 
         let forex_assets = assets::table
-            .filter(assets::asset_type.eq(FOREX_ASSET_TYPE))
+            .filter(assets::kind.eq(AssetKind::FxRate.as_db_str()))
             .order_by(assets::symbol.asc())
             .load::<AssetDB>(&mut conn)
             .map_err(StorageError::from)?;
@@ -132,17 +132,20 @@ impl FxRepository {
         let mut exchange_rates = Vec::with_capacity(forex_assets.len());
 
         for asset in forex_assets {
-            if let Some(rate) = latest_rates_by_symbol.get(&asset.symbol) {
+            // Look up by asset.id (e.g., "EUR/CAD") since quotes.symbol stores asset IDs
+            if let Some(rate) = latest_rates_by_symbol.get(&asset.id) {
                 exchange_rates.push(rate.clone());
             } else {
-                let (from_currency, to_currency) = ExchangeRate::parse_fx_symbol(&asset.symbol);
+                // No quote found - create placeholder with rate=0
+                // Parse asset.id (e.g., "EUR/CAD") to get from/to currencies
+                let (from_currency, to_currency) = ExchangeRate::parse_fx_symbol(&asset.id);
                 let timestamp = Utc.from_utc_datetime(&asset.updated_at);
                 exchange_rates.push(ExchangeRate {
                     id: asset.id.clone(),
                     from_currency,
                     to_currency,
                     rate: Decimal::ZERO,
-                    source: DataSource::from(asset.data_source.as_str()),
+                    source: DataSource::from(asset.preferred_provider.as_deref().unwrap_or("MANUAL")),
                     timestamp,
                 });
             }
@@ -157,7 +160,7 @@ impl FxRepository {
 
         let all_quotes_db = quotes::table
             .inner_join(assets::table.on(quotes::symbol.eq(assets::id)))
-            .filter(assets::asset_type.eq(FOREX_ASSET_TYPE))
+            .filter(assets::kind.eq(AssetKind::FxRate.as_db_str()))
             .select(quotes::all_columns)
             .order_by((quotes::symbol.asc(), quotes::timestamp.asc()))
             .load::<QuoteDB>(&mut conn)
@@ -262,6 +265,7 @@ impl FxRepository {
                     currency,
                     data_source: source.clone(),
                     created_at: created_at_str,
+                    notes: None,
                 };
 
                 diesel::insert_into(quotes::table)
@@ -363,7 +367,12 @@ impl FxRepository {
             .await
     }
 
-    /// Creates or updates an FX asset in the database
+    /// Creates or updates an FX asset in the database.
+    /// Uses canonical format per spec:
+    /// - `id`: "EUR/USD" format
+    /// - `symbol`: Base currency only (e.g., "EUR")
+    /// - `currency`: Quote currency (e.g., "USD")
+    /// - `provider_overrides`: Contains provider-specific symbol formats
     pub async fn create_fx_asset(&self, from: &str, to: &str, source: &str) -> Result<()> {
         let from_owned = from.to_string();
         let to_owned = to.to_string();
@@ -371,7 +380,8 @@ impl FxRepository {
 
         self.writer
             .exec(move |conn| {
-                let symbol = ExchangeRate::make_fx_symbol(&from_owned, &to_owned);
+                // Canonical ID format: EUR/USD
+                let asset_id = format!("{}/{}", &from_owned, &to_owned);
                 let readable_name = format!("{}/{} Exchange Rate", &from_owned, &to_owned);
                 let notes = format!(
                     "Currency pair for converting from {} to {}",
@@ -379,16 +389,44 @@ impl FxRepository {
                 );
                 let now_naive = chrono::Utc::now().naive_utc();
 
+                // Build provider_overrides with provider-specific symbol format
+                let provider_overrides = if source_owned == "YAHOO" {
+                    Some(
+                        serde_json::json!({
+                            "YAHOO": {
+                                "type": "fx_symbol",
+                                "symbol": format!("{}{}=X", &from_owned, &to_owned)
+                            }
+                        })
+                        .to_string(),
+                    )
+                } else if source_owned == "ALPHA_VANTAGE" {
+                    Some(
+                        serde_json::json!({
+                            "ALPHA_VANTAGE": {
+                                "type": "fx_pair",
+                                "from": &from_owned,
+                                "to": &to_owned
+                            }
+                        })
+                        .to_string(),
+                    )
+                } else {
+                    None
+                };
+
                 let asset_db = AssetDB {
-                    id: symbol.clone(),
-                    symbol: symbol.clone(),
+                    id: asset_id,
+                    symbol: from_owned.clone(), // Base currency only (EUR)
                     name: Some(readable_name),
-                    asset_type: Some(FOREX_ASSET_TYPE.to_string()),
-                    asset_class: Some(FOREX_ASSET_TYPE.to_string()),
-                    asset_sub_class: Some(FOREX_ASSET_TYPE.to_string()),
+                    kind: AssetKind::FxRate.as_db_str().to_string(),
+                    pricing_mode: PricingMode::Market.as_db_str().to_string(),
+                    preferred_provider: Some(source_owned.to_string()),
+                    provider_overrides,
+                    asset_class: Some("Cash".to_string()),
+                    asset_sub_class: Some("Cash".to_string()),
                     notes: Some(notes),
-                    currency: from_owned.to_string(),
-                    data_source: source_owned.to_string(),
+                    currency: to_owned.to_string(), // Quote currency (USD)
                     created_at: now_naive,
                     updated_at: now_naive,
                     ..Default::default()
@@ -400,12 +438,15 @@ impl FxRepository {
                     .do_update()
                     .set((
                         assets::name.eq(&asset_db.name),
-                        assets::asset_type.eq(&asset_db.asset_type),
+                        assets::symbol.eq(&asset_db.symbol),
+                        assets::kind.eq(&asset_db.kind),
+                        assets::pricing_mode.eq(&asset_db.pricing_mode),
+                        assets::preferred_provider.eq(&asset_db.preferred_provider),
+                        assets::provider_overrides.eq(&asset_db.provider_overrides),
                         assets::asset_class.eq(&asset_db.asset_class),
                         assets::asset_sub_class.eq(&asset_db.asset_sub_class),
                         assets::notes.eq(&asset_db.notes),
                         assets::currency.eq(&asset_db.currency),
-                        assets::data_source.eq(&asset_db.data_source),
                         assets::updated_at.eq(now_naive),
                     ))
                     .execute(conn)

@@ -26,11 +26,18 @@ const staticNavigation: NavigationProps = {
       label: "View Dashboard",
     },
     {
+      icon: <Icons.Holdings className="size-6" />,
+      title: "Holdings",
+      href: "/holdings",
+      keywords: ["Holdings", "portfolio", "assets", "positions", "stocks"],
+      label: "View Holdings",
+    },
+    {
       icon: <Icons.Insight className="size-6" />,
       title: "Insights",
       href: "/insights",
-      keywords: ["portfolio", "assets", "positions", "stocks"],
-      label: "View Holdings",
+      keywords: ["insights", "Analytics"],
+      label: "View Insights",
     },
     {
       icon: <Icons.Activity className="size-6" />,
@@ -99,6 +106,15 @@ export function isPathActive(pathname: string, href: string): boolean {
 
   if (normalizedHref === "/") {
     return normalizedPath === "/";
+  }
+
+  // Dashboard and Net Worth are grouped together
+  if (normalizedHref === "/dashboard") {
+    return (
+      normalizedPath === "/" ||
+      normalizedPath === "/dashboard" ||
+      normalizedPath === "/net-worth"
+    );
   }
 
   return normalizedPath === normalizedHref || normalizedPath.startsWith(`${normalizedHref}/`);

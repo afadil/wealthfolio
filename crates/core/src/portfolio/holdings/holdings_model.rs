@@ -1,9 +1,11 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::VecDeque;
 
 // Import Lot from its definition
+use crate::assets::AssetKind;
 use crate::portfolio::snapshot::Lot;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -11,6 +13,9 @@ use crate::portfolio::snapshot::Lot;
 pub enum HoldingType {
     Cash,
     Security,
+    /// Alternative assets: Property, Vehicle, Collectible, PhysicalPrecious, Liability, Other
+    /// These assets use MANUAL data source for valuations and are excluded from TWR/IRR calculations.
+    AlternativeAsset,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -36,7 +41,7 @@ pub struct Instrument {
     pub name: Option<String>,
     pub currency: String,
     pub notes: Option<String>,
-    pub data_source: Option<String>,
+    pub preferred_provider: Option<String>,
 
     // Classification
     pub asset_class: Option<String>,
@@ -75,6 +80,10 @@ pub struct Holding {
     pub holding_type: HoldingType,
     pub instrument: Option<Instrument>,
 
+    /// The asset kind classification (Security, Crypto, Property, Vehicle, etc.)
+    /// Used to determine valuation logic and performance inclusion.
+    pub asset_kind: Option<AssetKind>,
+
     // Position data
     pub quantity: Decimal,
     pub open_date: Option<DateTime<Utc>>,
@@ -89,6 +98,10 @@ pub struct Holding {
     pub market_value: MonetaryValue,
     pub cost_basis: Option<MonetaryValue>,
     pub price: Option<Decimal>,
+
+    /// Purchase price from asset metadata (for alternative assets).
+    /// Used to calculate gain when no lot-based cost basis is available.
+    pub purchase_price: Option<Decimal>,
 
     // Total performance (since inception or purchase)
     pub unrealized_gain: Option<MonetaryValue>,
@@ -108,4 +121,8 @@ pub struct Holding {
 
     // Reference date for performance calculations
     pub as_of_date: NaiveDate,
+
+    /// Asset metadata (JSON) for alternative assets.
+    /// Contains purchase_price, purchase_date, property_type, liability_type, etc.
+    pub metadata: Option<Value>,
 }

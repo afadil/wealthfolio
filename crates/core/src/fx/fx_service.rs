@@ -344,13 +344,18 @@ impl FxServiceTrait for FxService {
 
     /// Register a new currency pair and create necessary FX assets
     async fn register_currency_pair(&self, from: &str, to: &str) -> Result<()> {
-        // Return early if trying to register the same currency
-        if from == to {
+        // Return early if trying to register the same currency or if either currency is empty
+        if from == to || from.is_empty() || to.is_empty() {
             return Ok(());
         }
 
         let normalized_from = normalize_currency_code(from);
         let normalized_to = normalize_currency_code(to);
+
+        // Safety check: ensure normalized codes are also valid
+        if normalized_from.is_empty() || normalized_to.is_empty() {
+            return Ok(());
+        }
 
         // Try to get existing rate first
         let existing_rate = self
@@ -368,12 +373,18 @@ impl FxServiceTrait for FxService {
     }
 
     async fn register_currency_pair_manual(&self, from: &str, to: &str) -> Result<()> {
-        // Return early if trying to register the same currency
-        if from == to {
+        // Return early if trying to register the same currency or if either currency is empty
+        if from == to || from.is_empty() || to.is_empty() {
             return Ok(());
         }
+
         let normalized_from = normalize_currency_code(from);
         let normalized_to = normalize_currency_code(to);
+
+        // Safety check: ensure normalized codes are also valid
+        if normalized_from.is_empty() || normalized_to.is_empty() {
+            return Ok(());
+        }
 
         // Try to get existing rate first
         let existing_rate = self

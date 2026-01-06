@@ -15,7 +15,7 @@ import { useMemo, useState } from "react";
 
 import { AccountSelector } from "@/components/account-selector";
 import { useHoldings } from "@/hooks/use-holdings";
-import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { PORTFOLIO_ACCOUNT_ID, isAlternativeAssetId } from "@/lib/constants";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { Account, Holding, HoldingType, Instrument } from "@/lib/types";
 import { useNavigate } from "react-router-dom";
@@ -131,8 +131,14 @@ export const HoldingsInsightsPage = () => {
   const { cashHoldings, nonCashHoldings } = useMemo(() => {
     const cash =
       holdings?.filter((holding) => holding.holdingType?.toLowerCase() === HoldingType.CASH) ?? [];
+    // Filter out alternative assets (PROP-, VEH-, COLL-, PREC-, LIAB-, ALT-) - insights is investment-focused
     const nonCash =
-      holdings?.filter((holding) => holding.holdingType?.toLowerCase() !== HoldingType.CASH) ?? [];
+      holdings?.filter((holding) => {
+        if (holding.holdingType?.toLowerCase() === HoldingType.CASH) return false;
+        const symbol = holding.instrument?.symbol ?? holding.id;
+        if (isAlternativeAssetId(symbol)) return false;
+        return true;
+      }) ?? [];
 
     return { cashHoldings: cash, nonCashHoldings: nonCash };
   }, [holdings]);

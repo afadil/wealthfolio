@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::assets::{Asset, AssetKind, OptionSpec};
+    use crate::assets::{Asset, AssetKind, OptionSpec, PricingMode};
     use chrono::NaiveDateTime;
     use rust_decimal_macros::dec;
     use serde_json::json;
@@ -50,6 +50,14 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&AssetKind::Vehicle).unwrap(),
             "\"VEHICLE\""
+        );
+        assert_eq!(
+            serde_json::to_string(&AssetKind::Collectible).unwrap(),
+            "\"COLLECTIBLE\""
+        );
+        assert_eq!(
+            serde_json::to_string(&AssetKind::PhysicalPrecious).unwrap(),
+            "\"PHYSICAL_PRECIOUS\""
         );
         assert_eq!(
             serde_json::to_string(&AssetKind::Liability).unwrap(),
@@ -106,6 +114,14 @@ mod tests {
             AssetKind::Vehicle
         );
         assert_eq!(
+            serde_json::from_str::<AssetKind>("\"COLLECTIBLE\"").unwrap(),
+            AssetKind::Collectible
+        );
+        assert_eq!(
+            serde_json::from_str::<AssetKind>("\"PHYSICAL_PRECIOUS\"").unwrap(),
+            AssetKind::PhysicalPrecious
+        );
+        assert_eq!(
             serde_json::from_str::<AssetKind>("\"LIABILITY\"").unwrap(),
             AssetKind::Liability
         );
@@ -124,88 +140,144 @@ mod tests {
     // Test is_holdable method
     #[test]
     fn test_is_holdable_security() {
-        let asset = create_test_asset(Some(AssetKind::Security));
+        let asset = create_test_asset(AssetKind::Security);
         assert!(asset.is_holdable());
     }
 
     #[test]
     fn test_is_holdable_crypto() {
-        let asset = create_test_asset(Some(AssetKind::Crypto));
+        let asset = create_test_asset(AssetKind::Crypto);
         assert!(asset.is_holdable());
     }
 
     #[test]
     fn test_is_holdable_cash() {
-        let asset = create_test_asset(Some(AssetKind::Cash));
+        let asset = create_test_asset(AssetKind::Cash);
         assert!(asset.is_holdable());
     }
 
     #[test]
     fn test_is_holdable_fx_rate() {
-        let asset = create_test_asset(Some(AssetKind::FxRate));
+        let asset = create_test_asset(AssetKind::FxRate);
         assert!(!asset.is_holdable());
     }
 
     #[test]
-    fn test_is_holdable_none_kind() {
-        let asset = create_test_asset(None);
+    fn test_is_holdable_property() {
+        let asset = create_test_asset(AssetKind::Property);
+        assert!(asset.is_holdable());
+    }
+
+    #[test]
+    fn test_is_holdable_vehicle() {
+        let asset = create_test_asset(AssetKind::Vehicle);
+        assert!(asset.is_holdable());
+    }
+
+    #[test]
+    fn test_is_holdable_collectible() {
+        let asset = create_test_asset(AssetKind::Collectible);
+        assert!(asset.is_holdable());
+    }
+
+    #[test]
+    fn test_is_holdable_physical_precious() {
+        let asset = create_test_asset(AssetKind::PhysicalPrecious);
+        assert!(asset.is_holdable());
+    }
+
+    #[test]
+    fn test_is_holdable_liability() {
+        let asset = create_test_asset(AssetKind::Liability);
+        assert!(asset.is_holdable());
+    }
+
+    #[test]
+    fn test_is_holdable_other() {
+        let asset = create_test_asset(AssetKind::Other);
         assert!(asset.is_holdable());
     }
 
     // Test needs_pricing method
     #[test]
     fn test_needs_pricing_cash() {
-        let asset = create_test_asset(Some(AssetKind::Cash));
+        let asset = create_test_asset(AssetKind::Cash);
         assert!(!asset.needs_pricing());
     }
 
     #[test]
     fn test_needs_pricing_security() {
-        let asset = create_test_asset(Some(AssetKind::Security));
+        let asset = create_test_asset(AssetKind::Security);
         assert!(asset.needs_pricing());
     }
 
     #[test]
     fn test_needs_pricing_crypto() {
-        let asset = create_test_asset(Some(AssetKind::Crypto));
+        let asset = create_test_asset(AssetKind::Crypto);
         assert!(asset.needs_pricing());
     }
 
     #[test]
-    fn test_needs_pricing_none_kind() {
-        let asset = create_test_asset(None);
+    fn test_needs_pricing_property() {
+        // Alternative assets need pricing (via Manual quotes)
+        let asset = create_test_asset(AssetKind::Property);
         assert!(asset.needs_pricing());
     }
 
-    // Test effective_kind method
     #[test]
-    fn test_effective_kind_with_some() {
-        let asset = create_test_asset(Some(AssetKind::Crypto));
+    fn test_needs_pricing_vehicle() {
+        let asset = create_test_asset(AssetKind::Vehicle);
+        assert!(asset.needs_pricing());
+    }
+
+    #[test]
+    fn test_needs_pricing_collectible() {
+        let asset = create_test_asset(AssetKind::Collectible);
+        assert!(asset.needs_pricing());
+    }
+
+    #[test]
+    fn test_needs_pricing_physical_precious() {
+        let asset = create_test_asset(AssetKind::PhysicalPrecious);
+        assert!(asset.needs_pricing());
+    }
+
+    #[test]
+    fn test_needs_pricing_liability() {
+        // Liabilities need pricing (balance updates via Manual quotes)
+        let asset = create_test_asset(AssetKind::Liability);
+        assert!(asset.needs_pricing());
+    }
+
+    #[test]
+    fn test_needs_pricing_other() {
+        let asset = create_test_asset(AssetKind::Other);
+        assert!(asset.needs_pricing());
+    }
+
+    // Test effective_kind method (now just returns kind)
+    #[test]
+    fn test_effective_kind() {
+        let asset = create_test_asset(AssetKind::Crypto);
         assert_eq!(asset.effective_kind(), AssetKind::Crypto);
-    }
-
-    #[test]
-    fn test_effective_kind_with_none() {
-        let asset = create_test_asset(None);
-        assert_eq!(asset.effective_kind(), AssetKind::Security);
     }
 
     // Test option_spec method
     #[test]
     fn test_option_spec_non_option_asset() {
-        let asset = create_test_asset(Some(AssetKind::Security));
+        let asset = create_test_asset(AssetKind::Security);
         assert!(asset.option_spec().is_none());
     }
 
     #[test]
     fn test_option_spec_option_without_metadata() {
-        let asset = create_test_asset(Some(AssetKind::Option));
+        let asset = create_test_asset(AssetKind::Option);
         assert!(asset.option_spec().is_none());
     }
 
     #[test]
     fn test_option_spec_option_with_metadata() {
-        let mut asset = create_test_asset(Some(AssetKind::Option));
+        let mut asset = create_test_asset(AssetKind::Option);
         asset.metadata = Some(json!({
             "option": {
                 "underlyingAssetId": "AAPL",
@@ -244,30 +316,32 @@ mod tests {
     }
 
     // Helper function
-    fn create_test_asset(kind: Option<AssetKind>) -> Asset {
+    fn create_test_asset(kind: AssetKind) -> Asset {
+        // Set pricing_mode based on kind (Cash = None, others = Market)
+        let pricing_mode = match kind {
+            AssetKind::Cash => PricingMode::None,
+            _ => PricingMode::Market,
+        };
+
         Asset {
             id: "TEST".to_string(),
-            isin: None,
+            kind,
             name: Some("Test Asset".to_string()),
-            asset_type: Some("Stock".to_string()),
             symbol: "TEST".to_string(),
+            exchange_mic: None,
+            currency: "USD".to_string(),
+            pricing_mode,
+            preferred_provider: None,
+            provider_overrides: None,
+            isin: None,
             asset_class: Some("Equity".to_string()),
             asset_sub_class: None,
             notes: None,
-            countries: None,
-            categories: None,
-            classes: None,
-            attributes: None,
+            profile: None,
+            metadata: None,
+            is_active: true,
             created_at: NaiveDateTime::default(),
             updated_at: NaiveDateTime::default(),
-            currency: "USD".to_string(),
-            data_source: "Manual".to_string(),
-            sectors: None,
-            url: None,
-            kind,
-            quote_symbol: None,
-            is_active: true,
-            metadata: None,
         }
     }
 }

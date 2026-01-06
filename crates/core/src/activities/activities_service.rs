@@ -50,12 +50,21 @@ impl ActivityService {
         if let Some(ref asset_id) = activity.asset_id {
             let asset = self
                 .asset_service
-                .get_or_create_asset(asset_id, Some(asset_context_currency))
+                .get_or_create_minimal_asset(
+                    asset_id,
+                    Some(asset_context_currency),
+                    activity.asset_metadata.clone(),
+                )
                 .await?;
 
             if let Some(requested_source) = activity.asset_data_source.as_ref() {
                 let requested = requested_source.to_uppercase();
-                if !requested.is_empty() && asset.data_source.to_uppercase() != requested {
+                let current_provider = asset
+                    .preferred_provider
+                    .as_ref()
+                    .map(|p| p.to_uppercase())
+                    .unwrap_or_default();
+                if !requested.is_empty() && current_provider != requested {
                     self.asset_service
                         .update_asset_data_source(&asset.id, requested)
                         .await?;
@@ -111,14 +120,20 @@ impl ActivityService {
 
         // Only process asset if asset_id is provided (not a pure cash movement)
         if let Some(ref asset_id) = activity.asset_id {
+            // Updates don't carry asset metadata - pass None
             let asset = self
                 .asset_service
-                .get_or_create_asset(asset_id, Some(asset_context_currency))
+                .get_or_create_minimal_asset(asset_id, Some(asset_context_currency), None)
                 .await?;
 
             if let Some(requested_source) = activity.asset_data_source.as_ref() {
                 let requested = requested_source.to_uppercase();
-                if !requested.is_empty() && asset.data_source.to_uppercase() != requested {
+                let current_provider = asset
+                    .preferred_provider
+                    .as_ref()
+                    .map(|p| p.to_uppercase())
+                    .unwrap_or_default();
+                if !requested.is_empty() && current_provider != requested {
                     self.asset_service
                         .update_asset_data_source(&asset.id, requested)
                         .await?;
@@ -327,9 +342,10 @@ impl ActivityServiceTrait for ActivityService {
                 account.currency.clone()
             };
 
+            // CSV imports don't carry asset metadata - pass None
             let symbol_profile_result = self
                 .asset_service
-                .get_or_create_asset(&activity.symbol, Some(asset_context_currency))
+                .get_or_create_minimal_asset(&activity.symbol, Some(asset_context_currency), None)
                 .await;
 
             let (mut is_valid, mut error_message) = (true, None);
@@ -416,6 +432,7 @@ impl ActivityServiceTrait for ActivityService {
                 account_id: activity.account_id.clone().unwrap_or_default(),
                 asset_id: Some(activity.symbol.clone()),
                 asset_data_source: None,
+                asset_metadata: None, // CSV imports don't carry asset metadata
                 activity_type: activity.activity_type.clone(),
                 subtype: None,
                 activity_date: activity.date.clone(),

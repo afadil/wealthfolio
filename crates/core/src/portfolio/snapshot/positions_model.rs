@@ -36,6 +36,10 @@ pub struct Position {
     pub lots: VecDeque<Lot>,
     pub created_at: DateTime<Utc>,
     pub last_updated: DateTime<Utc>,
+    /// Flag indicating if this position is an alternative asset (Property, Vehicle, Collectible, etc.).
+    /// Alternative assets are excluded from TWR/IRR performance calculations.
+    #[serde(default)]
+    pub is_alternative: bool,
 }
 
 impl Default for Position {
@@ -52,6 +56,7 @@ impl Default for Position {
             lots: VecDeque::new(),
             created_at: Utc::now(),
             last_updated: Utc::now(),
+            is_alternative: false,
         }
     }
 }
@@ -113,6 +118,31 @@ impl Position {
             lots: VecDeque::new(),
             created_at: date,
             last_updated: date,
+            is_alternative: false,
+        }
+    }
+
+    // Constructor with alternative asset flag
+    pub fn new_with_alternative_flag(
+        account_id: String,
+        asset_id: String,
+        asset_currency: String,
+        date: DateTime<Utc>,
+        is_alternative: bool,
+    ) -> Self {
+        Position {
+            id: format!("POS-{}-{}", asset_id, account_id),
+            account_id,
+            asset_id,
+            quantity: Decimal::ZERO,
+            average_cost: Decimal::ZERO,
+            total_cost_basis: Decimal::ZERO,
+            currency: asset_currency,
+            inception_date: date,
+            lots: VecDeque::new(),
+            created_at: date,
+            last_updated: date,
+            is_alternative,
         }
     }
 
@@ -205,9 +235,9 @@ impl Position {
             position_id: self.id.clone(),
             acquisition_date: activity.activity_date,
             quantity,
-            cost_basis,        // Store unrounded in position currency
-            acquisition_price, // Store unrounded in position currency
-            acquisition_fees,  // Store unrounded in position currency
+            cost_basis,                // Store unrounded in position currency
+            acquisition_price,         // Store unrounded in position currency
+            acquisition_fees,          // Store unrounded in position currency
             fx_rate_to_position: None, // No currency conversion in this method
         };
 

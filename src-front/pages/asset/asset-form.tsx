@@ -7,7 +7,6 @@ import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -25,12 +24,11 @@ import { ParsedAsset, formatBreakdownTags, tagsToBreakdown } from "./asset-utils
 
 const assetFormSchema = z.object({
   symbol: z.string().min(1),
-  symbolMapping: z.string().optional(),
   name: z.string().optional(),
   assetClass: z.string().optional(),
   assetSubClass: z.string().optional(),
   currency: z.string().min(1),
-  dataSource: z.enum([DataSource.YAHOO, DataSource.MANUAL]),
+  preferredProvider: z.enum([DataSource.YAHOO, DataSource.MANUAL]),
   notes: z.string().optional(),
   sectors: z.array(z.string()),
   countries: z.array(z.string()),
@@ -38,7 +36,7 @@ const assetFormSchema = z.object({
 
 export type AssetFormValues = z.infer<typeof assetFormSchema>;
 
-const dataSourceOptions: ResponsiveSelectOption[] = [
+const providerOptions: ResponsiveSelectOption[] = [
   { label: "Yahoo Finance", value: DataSource.YAHOO },
   { label: "Manual", value: DataSource.MANUAL },
 ];
@@ -53,12 +51,11 @@ interface AssetFormProps {
 export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProps) {
   const defaultValues: AssetFormValues = {
     symbol: asset.id,
-    symbolMapping: asset.symbolMapping ?? "",
     name: asset.name ?? "",
     assetClass: asset.assetClass ?? "",
     assetSubClass: asset.assetSubClass ?? "",
     currency: asset.currency,
-    dataSource: (asset.dataSource as DataSource) ?? DataSource.YAHOO,
+    preferredProvider: (asset.preferredProvider as DataSource) ?? DataSource.YAHOO,
     notes: asset.notes ?? "",
     sectors: formatBreakdownTags(asset.sectorsList),
     countries: formatBreakdownTags(asset.countriesList),
@@ -122,26 +119,6 @@ export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProp
           />
           <FormField
             control={form.control}
-            name="symbolMapping"
-            render={({ field }) => (
-              <FormItem className="md:col-span-2">
-                <FormLabel>Symbol mapping</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="Override provider symbol (optional)"
-                    {...field}
-                    value={field.value ?? ""}
-                  />
-                </FormControl>
-                <FormDescription>
-                  If set, this symbol is used to fetch quotes from your market data provider.
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
             name="assetClass"
             render={({ field }) => (
               <FormItem>
@@ -168,17 +145,17 @@ export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProp
           />
           <FormField
             control={form.control}
-            name="dataSource"
+            name="preferredProvider"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Data source</FormLabel>
+                <FormLabel>Data provider</FormLabel>
                 <FormControl>
                   <ResponsiveSelect
                     value={field.value}
                     onValueChange={field.onChange}
-                    options={dataSourceOptions}
+                    options={providerOptions}
                     placeholder="Select a provider"
-                    sheetTitle="Pick a data source"
+                    sheetTitle="Pick a data provider"
                     sheetDescription="Choose how prices are loaded for this asset."
                   />
                 </FormControl>
@@ -261,7 +238,6 @@ export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProp
 
 export const buildAssetUpdatePayload = (values: AssetFormValues): UpdateAssetProfile => ({
   symbol: values.symbol,
-  symbolMapping: values.symbolMapping?.trim() ? values.symbolMapping.trim() : null,
   name: values.name || "",
   sectors: values.sectors.length ? JSON.stringify(tagsToBreakdown(values.sectors)) : "",
   countries: values.countries.length ? JSON.stringify(tagsToBreakdown(values.countries)) : "",

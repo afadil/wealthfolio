@@ -108,7 +108,7 @@ const OnboardingPage = () => {
             </div>
             <div className="flex items-center gap-3">
               {currentStep === 3 && (
-                <Button variant="ghost" onClick={handleFinish} size="sm">
+                <Button variant="outline" onClick={handleFinish}>
                   Skip, I'll manage manually
                 </Button>
               )}

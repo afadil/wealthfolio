@@ -3,7 +3,7 @@ import { PrivacyToggle } from "@/components/privacy-toggle";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useHoldings } from "@/hooks/use-holdings";
 import { useValuationHistory } from "@/hooks/use-valuation-history";
-import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { PORTFOLIO_ACCOUNT_ID, HoldingType, isAlternativeAssetId } from "@/lib/constants";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { DateRange, TimePeriod } from "@/lib/types";
 import { calculatePerformanceMetrics } from "@/lib/utils";
@@ -16,6 +16,7 @@ import Balance from "./balance";
 import SavingGoals from "./goals";
 import TopHoldings from "./top-holdings";
 import { SyncButton } from "@/features/wealthfolio-connect/components/sync-button";
+import { PageSwitcher } from "@/components/page-switcher";
 
 // Helper function to get the initial date range for 3M
 const getInitialDateRange = (): DateRange => ({
@@ -31,11 +32,31 @@ export default function DashboardPage() {
     useState<string>("Last 3 months");
   const [isAllTime, setIsAllTime] = useState<boolean>(false);
 
-  const { holdings, isLoading: isHoldingsLoading } = useHoldings(PORTFOLIO_ACCOUNT_ID);
+  const { holdings: allHoldings, isLoading: isHoldingsLoading } = useHoldings(PORTFOLIO_ACCOUNT_ID);
 
+  // Filter holdings for display (exclude alternative assets and cash for TopHoldings)
+  const holdings = useMemo(() => {
+    if (!allHoldings) return [];
+    return allHoldings.filter((h) => {
+      // Exclude cash holdings from display
+      if (h.holdingType === HoldingType.CASH) return false;
+      // Exclude alternative assets from display
+      const symbol = h.instrument?.symbol ?? h.id;
+      if (isAlternativeAssetId(symbol)) return false;
+      return true;
+    });
+  }, [allHoldings]);
+
+  // Total portfolio value (includes cash, excludes alternative assets)
   const totalValue = useMemo(() => {
-    return holdings?.reduce((acc, holding) => acc + (holding.marketValue?.base ?? 0), 0) ?? 0;
-  }, [holdings]);
+    if (!allHoldings) return 0;
+    return allHoldings
+      .filter((h) => {
+        const symbol = h.instrument?.symbol ?? h.id;
+        return !isAlternativeAssetId(symbol);
+      })
+      .reduce((acc, holding) => acc + (holding.marketValue?.base ?? 0), 0);
+  }, [allHoldings]);
 
   const { valuationHistory, isLoading: isValuationHistoryLoading } = useValuationHistory(dateRange);
 
@@ -79,6 +100,9 @@ export default function DashboardPage() {
     <Page className="flex flex-col">
       <div data-ptr-content className="flex min-h-screen flex-col">
         <div className="px-4 pt-22 pb-6 md:px-6 md:pt-10 md:pb-8 lg:px-8 lg:pt-12">
+          <div className="mb-1">
+            <PageSwitcher />
+          </div>
           <PortfolioUpdateTrigger lastCalculatedAt={currentValuation?.calculatedAt}>
             <div className="flex items-start gap-2">
               <div className="min-h-[4.5rem]">

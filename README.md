@@ -672,6 +672,14 @@ Contributions are welcome! Please follow these steps:
 This project is licensed under the AGPL-3.0 license. See the `LICENSE` file for
 details.
 
+Brand assets in `assets/brand/` are trademarks; see
+[TRADEMARKS.md](TRADEMARKS.md).
+
+---
+
+Wealthfolio and the Wealthfolio logo are trademarks of Teymz Inc. The code is
+licensed under AGPL-3.0; trademarks are not granted under that license.
+
 ## 🌟 Star History
 
 ## [![Star History Chart](https://api.star-history.com/svg?repos=afadil/wealthfolio&type=Timeline)](https://star-history.com/#afadil/wealthfolio&Date)

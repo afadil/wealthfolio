@@ -8,22 +8,22 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use super::model::{MarketDataProviderSettingDB, QuoteDB};
-use wealthfolio_core::market_data::{
-    LatestQuotePair, MarketDataError, MarketDataProviderSetting, MarketDataRepositoryTrait, Quote,
-    UpdateMarketDataProviderSetting,
-};
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
-use wealthfolio_core::Result;
 use crate::schema::quotes::dsl::{quotes, symbol, timestamp};
 use diesel::sql_query;
 use diesel::sql_types::Text;
 use diesel::sqlite::Sqlite;
+use wealthfolio_core::market_data::{
+    LatestQuotePair, MarketDataError, MarketDataProviderSetting, MarketDataRepositoryTrait, Quote,
+    UpdateMarketDataProviderSetting,
+};
+use wealthfolio_core::Result;
 
 // Import for daily_account_valuation table
-use wealthfolio_core::market_data::{DATA_SOURCE_MANUAL, DATA_SOURCE_YAHOO};
 use crate::schema::daily_account_valuation::dsl as dav_dsl;
 use crate::schema::market_data_providers::dsl as market_data_providers_dsl;
+use wealthfolio_core::market_data::{DATA_SOURCE_MANUAL, DATA_SOURCE_YAHOO};
 
 pub struct MarketDataRepository {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,

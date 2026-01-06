@@ -74,9 +74,11 @@ export function AssetsTableMobile({
     );
   };
 
-  // Get unique data sources
+  // Get unique data sources (preferredProvider)
   const dataSourceOptions = useMemo(() => {
-    const sources = new Set(assets.map((asset) => asset.dataSource));
+    const sources = new Set(
+      assets.map((asset) => asset.preferredProvider ?? "MANUAL").filter((s): s is string => !!s),
+    );
     return Array.from(sources);
   }, [assets]);
 
@@ -103,7 +105,9 @@ export function AssetsTableMobile({
 
     // Filter by data source
     if (selectedDataSources.length > 0) {
-      filtered = filtered.filter((asset) => selectedDataSources.includes(asset.dataSource));
+      filtered = filtered.filter((asset) =>
+        selectedDataSources.includes(asset.preferredProvider ?? "MANUAL"),
+      );
     }
 
     // Filter by asset sub class
@@ -259,7 +263,7 @@ export function AssetsTableMobile({
               {asset.assetClass ? <Badge variant="outline">{asset.assetClass}</Badge> : null}
               {asset.assetSubClass ? <Badge variant="outline">{asset.assetSubClass}</Badge> : null}
               <Badge variant="secondary" className="uppercase">
-                {asset.dataSource}
+                {asset.preferredProvider ?? "MANUAL"}
               </Badge>
             </div>
 
@@ -323,7 +327,9 @@ export function AssetsTableMobile({
                 <div className="space-y-2">
                   {dataSourceOptions.map((source) => {
                     const isSelected = selectedDataSources.includes(source);
-                    const count = assets.filter((a) => a.dataSource === source).length;
+                    const count = assets.filter(
+                      (a) => (a.preferredProvider ?? "MANUAL") === source,
+                    ).length;
                     return (
                       <button
                         key={source}

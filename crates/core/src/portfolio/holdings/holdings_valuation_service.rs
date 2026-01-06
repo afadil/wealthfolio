@@ -1,3 +1,4 @@
+use crate::assets::AssetKind;
 use crate::errors::Result;
 use crate::fx::currency::{normalize_amount, normalize_currency_code};
 use crate::fx::FxServiceTrait;
@@ -60,10 +61,12 @@ impl HoldingsValuationService {
         let required_symbols: Vec<String> = holdings
             .iter()
             .filter_map(|holding| {
-                if holding.holding_type == HoldingType::Security {
-                    holding.instrument.as_ref().map(|inst| inst.symbol.clone())
-                } else {
-                    None // Skip cash holdings
+                // Include both Security and AlternativeAsset holdings
+                match holding.holding_type {
+                    HoldingType::Security | HoldingType::AlternativeAsset => {
+                        holding.instrument.as_ref().map(|inst| inst.symbol.clone())
+                    }
+                    HoldingType::Cash => None, // Skip cash holdings
                 }
             })
             .collect();
@@ -110,6 +113,23 @@ impl HoldingsValuationServiceTrait for HoldingsValuationService {
                     let base_currency = holding.base_currency.clone();
                     self.calculate_security_valuation(holding, &base_currency, &latest_quote_pairs)
                         .await?;
+                }
+                HoldingType::AlternativeAsset => {
+                    if let Some(sym) = holding.instrument.as_ref().map(|i| i.symbol.clone()) {
+                        holding.as_of_date = latest_quote_pairs
+                            .get(&sym)
+                            .map(|qp| qp.latest.timestamp.date_naive())
+                            .unwrap_or(today);
+                    } else {
+                        holding.as_of_date = today;
+                    }
+                    let base_currency = holding.base_currency.clone();
+                    self.calculate_alternative_asset_valuation(
+                        holding,
+                        &base_currency,
+                        &latest_quote_pairs,
+                    )
+                    .await?;
                 }
                 HoldingType::Cash => {
                     holding.as_of_date = today;
@@ -303,6 +323,198 @@ impl HoldingsValuationService {
         } else {
             warn!(
                 "{}: Quote pair data missing. Market valuation incomplete.",
+                context_msg
+            );
+            holding.market_value = MonetaryValue::zero();
+            holding.price = None;
+            holding.unrealized_gain = None;
+            holding.unrealized_gain_pct = None;
+            holding.day_change = None;
+            holding.day_change_pct = None;
+            holding.prev_close_value = None;
+        }
+
+        holding.realized_gain = None;
+        holding.realized_gain_pct = None;
+        holding.total_gain = holding.unrealized_gain.clone();
+        holding.total_gain_pct = holding.unrealized_gain_pct;
+
+        Ok(())
+    }
+
+    /// Calculate valuation for alternative assets (Property, Vehicle, Collectible, PhysicalPrecious, Liability, Other).
+    ///
+    /// Key differences from security valuation:
+    /// - Uses MANUAL data source quotes
+    /// - Gain calculation uses purchase_price from metadata (if available) instead of lot-based cost basis
+    /// - No day change calculation (manual valuations don't have daily updates)
+    /// - Property: quantity = ownership fraction, quote.close = total property value
+    /// - PhysicalPrecious: quantity = weight, quote.close = price per unit
+    /// - Liability: stored as positive, displayed as negative (sign applied at UI layer)
+    async fn calculate_alternative_asset_valuation(
+        &self,
+        holding: &mut Holding,
+        base_currency: &str,
+        latest_quote_pairs: &HashMap<String, LatestQuotePair>,
+    ) -> Result<()> {
+        let instrument = match &holding.instrument {
+            Some(inst) => inst,
+            None => {
+                warn!(
+                    "Skipping valuation for alternative asset holding {} without instrument.",
+                    holding.id
+                );
+                return Ok(());
+            }
+        };
+        let symbol = &instrument.symbol;
+        let quantity = holding.quantity;
+        let pos_currency = &holding.local_currency;
+        let normalized_position_currency = normalize_currency_code(pos_currency);
+        let asset_kind = holding.asset_kind.clone().unwrap_or(AssetKind::Other);
+        let context_msg = format!(
+            "HoldingValuation [AlternativeAsset {} ({:?})]",
+            symbol, asset_kind
+        );
+
+        // --- Calculate FX Rate ---
+        let fx_rate_local_to_base = self.get_fx_rate_or_fallback(
+            pos_currency,
+            base_currency,
+            &format!("{}: FX Local->Base", context_msg),
+        );
+        holding.fx_rate = Some(fx_rate_local_to_base);
+
+        // --- Calculate Base Cost Basis (If applicable) ---
+        if let Some(cost_basis) = &mut holding.cost_basis {
+            cost_basis.base = cost_basis.local * fx_rate_local_to_base;
+        }
+
+        // --- Handle Zero Quantity ---
+        if quantity == Decimal::ZERO {
+            warn!("{}: Skipping valuation for zero quantity.", context_msg);
+            holding.market_value = MonetaryValue::zero();
+            holding.price = None;
+            holding.unrealized_gain = None;
+            holding.unrealized_gain_pct = None;
+            holding.day_change = None;
+            holding.day_change_pct = None;
+            holding.prev_close_value = None;
+            return Ok(());
+        }
+
+        // --- Fetch and Process Quote Data ---
+        if let Some(quote_pair) = latest_quote_pairs.get(symbol) {
+            let latest_quote = &quote_pair.latest;
+
+            let (normalized_price, normalized_quote_currency) =
+                normalize_amount(latest_quote.close, &latest_quote.currency);
+
+            if normalized_position_currency != normalized_quote_currency {
+                warn!(
+                    "{}: Holding currency ({}) differs from quote currency ({}). Using quote currency FX for market value conversion.",
+                    context_msg, pos_currency, latest_quote.currency
+                );
+            }
+
+            let fx_rate_quote_to_base = self.get_fx_rate_or_fallback(
+                normalized_quote_currency,
+                base_currency,
+                &format!("{}: FX Quote->Base", context_msg),
+            );
+
+            let fx_rate_quote_to_local = self.get_fx_rate_or_fallback(
+                normalized_quote_currency,
+                pos_currency,
+                &format!("{}: FX Quote->Local", context_msg),
+            );
+
+            // --- Calculate Market Value ---
+            // For all alternative assets: market_value = quantity * unit_price
+            // Property: quote.close = total property value, user's share = quantity (fraction) * close
+            // PhysicalPrecious: quote.close = price per unit (oz/g/kg)
+            // Vehicle/Collectible/Liability/Other: quote.close = unit value, quantity usually 1
+            let market_price_quote_curr = latest_quote.close;
+            let market_value_quote_major = normalized_price * quantity;
+            holding.price = Some(market_price_quote_curr);
+
+            let market_value_local = market_value_quote_major * fx_rate_quote_to_local;
+            let market_value_base = market_value_quote_major * fx_rate_quote_to_base;
+
+            holding.market_value = MonetaryValue {
+                local: market_value_local,
+                base: market_value_base,
+            };
+
+            // --- Calculate Gain ---
+            // For alternative assets, use purchase_price from metadata if available
+            // Otherwise, fall back to lot-based cost_basis
+            let gain_calculated = if let Some(purchase_price) = holding.purchase_price {
+                // Gain = market_value - (quantity * purchase_price)
+                let total_cost_local = quantity * purchase_price;
+                let total_cost_base = total_cost_local * fx_rate_local_to_base;
+
+                let unrealized_gain_local = market_value_local - total_cost_local;
+                let unrealized_gain_base = market_value_base - total_cost_base;
+
+                holding.unrealized_gain = Some(MonetaryValue {
+                    local: unrealized_gain_local,
+                    base: unrealized_gain_base,
+                });
+
+                if total_cost_base != dec!(0) {
+                    holding.unrealized_gain_pct =
+                        Some((unrealized_gain_base / total_cost_base).round_dp(4));
+                } else if unrealized_gain_base != dec!(0) {
+                    holding.unrealized_gain_pct = Some(dec!(1.0));
+                } else {
+                    holding.unrealized_gain_pct = Some(Decimal::ZERO);
+                }
+                true
+            } else if let Some(cost_basis) = &holding.cost_basis {
+                // Fall back to lot-based cost basis calculation
+                let cost_basis_base = cost_basis.base;
+
+                let unrealized_gain_local = market_value_local - cost_basis.local;
+                let unrealized_gain_base = market_value_base - cost_basis_base;
+
+                holding.unrealized_gain = Some(MonetaryValue {
+                    local: unrealized_gain_local,
+                    base: unrealized_gain_base,
+                });
+
+                if cost_basis_base != dec!(0) {
+                    holding.unrealized_gain_pct =
+                        Some((unrealized_gain_base / cost_basis_base).round_dp(4));
+                } else if unrealized_gain_base != dec!(0) {
+                    holding.unrealized_gain_pct = Some(dec!(1.0));
+                } else {
+                    holding.unrealized_gain_pct = Some(Decimal::ZERO);
+                }
+                true
+            } else {
+                // No purchase_price and no cost_basis - gain is N/A
+                false
+            };
+
+            if !gain_calculated {
+                holding.unrealized_gain = None;
+                holding.unrealized_gain_pct = None;
+                debug!(
+                    "{}: No purchase_price or cost_basis available. Gain shown as N/A.",
+                    context_msg
+                );
+            }
+
+            // --- Day Change ---
+            // Alternative assets typically don't have daily price changes (manual valuations)
+            // Set to None/zero to indicate N/A
+            holding.day_change = None;
+            holding.day_change_pct = None;
+            holding.prev_close_value = None;
+        } else {
+            warn!(
+                "{}: Quote data missing. Market valuation incomplete.",
                 context_msg
             );
             holding.market_value = MonetaryValue::zero();

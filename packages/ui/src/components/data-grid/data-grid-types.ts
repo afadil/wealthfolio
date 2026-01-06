@@ -50,6 +50,9 @@ export type CellOpts =
       variant: "date";
     }
   | {
+      variant: "date-input";
+    }
+  | {
       variant: "datetime";
     }
   | {

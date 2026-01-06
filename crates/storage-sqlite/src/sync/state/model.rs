@@ -42,13 +42,19 @@ impl From<BrokerSyncStateDB> for BrokerSyncState {
         Self {
             account_id: db.account_id,
             provider: db.provider,
-            checkpoint_json: db.checkpoint_json.and_then(|s| serde_json::from_str(&s).ok()),
-            last_attempted_at: db
-                .last_attempted_at
-                .and_then(|s| DateTime::parse_from_rfc3339(&s).ok().map(|dt| dt.with_timezone(&Utc))),
-            last_successful_at: db
-                .last_successful_at
-                .and_then(|s| DateTime::parse_from_rfc3339(&s).ok().map(|dt| dt.with_timezone(&Utc))),
+            checkpoint_json: db
+                .checkpoint_json
+                .and_then(|s| serde_json::from_str(&s).ok()),
+            last_attempted_at: db.last_attempted_at.and_then(|s| {
+                DateTime::parse_from_rfc3339(&s)
+                    .ok()
+                    .map(|dt| dt.with_timezone(&Utc))
+            }),
+            last_successful_at: db.last_successful_at.and_then(|s| {
+                DateTime::parse_from_rfc3339(&s)
+                    .ok()
+                    .map(|dt| dt.with_timezone(&Utc))
+            }),
             last_error: db.last_error,
             last_run_id: db.last_run_id,
             sync_status: serde_json::from_str(&format!("\"{}\"", db.sync_status))
