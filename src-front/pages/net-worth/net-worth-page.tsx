@@ -17,7 +17,6 @@ import { useSettingsContext } from "@/lib/settings-provider";
 import { formatDateISO } from "@/lib/utils";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { subMonths } from "date-fns";
 import type { DateRange, TimePeriod } from "@/lib/types";
 import { NetWorthChart } from "./net-worth-chart";
 import { PrivacyToggle } from "@/components/privacy-toggle";
@@ -51,13 +50,13 @@ const CATEGORY_CSS_COLORS: Record<string, string> = {
   liabilities: "var(--destructive)",
 };
 
-// Helper to get initial date range (3 months)
+// Helper to get initial date range (all time)
 const getInitialDateRange = (): DateRange => ({
-  from: subMonths(new Date(), 3),
+  from: new Date(2000, 0, 1),
   to: new Date(),
 });
 
-const INITIAL_INTERVAL_CODE: TimePeriod = "3M";
+const INITIAL_INTERVAL_CODE: TimePeriod = "ALL";
 
 /**
  * Formats a date string to a human-readable format
@@ -307,7 +306,7 @@ export default function NetWorthPage() {
   // Chart date range state
   const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
   const [selectedIntervalDescription, setSelectedIntervalDescription] =
-    useState<string>("Last 3 months");
+    useState<string>("All Time");
 
   // Compute ISO date strings for the history query
   const historyDates = useMemo(() => {
@@ -509,11 +508,11 @@ export default function NetWorthPage() {
           )}
         </div>
 
-        {/* Bottom section with gradient background */}
+        {/* Content section with gradient background */}
         <div
           className="grow bg-linear-to-t px-4 pt-12 md:px-6 md:pt-12 lg:px-10 lg:pt-20"
           style={{
-            backgroundImage: `linear-gradient(to top, ${THEME_COLOR.replace(")", " / 0.25)")}, ${THEME_COLOR.replace(")", " / 0.12)")}, ${THEME_COLOR.replace(")", " / 0.06)")})`,
+            backgroundImage: `linear-gradient(to top, ${THEME_COLOR.replace(")", " / 0.30)")}, ${THEME_COLOR.replace(")", " / 0.15)")}, ${THEME_COLOR.replace(")", " / 0.10)")})`,
           }}
         >
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:gap-20">
