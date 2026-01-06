@@ -180,7 +180,8 @@ const getColumns = (
       const avatarSymbol = symbol.startsWith("$CASH") ? "$CASH" : symbol;
 
       const handleNavigate = () => {
-        const navSymbol = holding.instrument?.symbol ?? holding.id;
+        // Use instrument.id (asset ID) for navigation, not symbol (which may be stripped)
+        const navSymbol = holding.instrument?.id ?? holding.id;
         navigate(`/holdings/${encodeURIComponent(navSymbol)}`, { state: { holding } });
       };
 
@@ -412,7 +413,8 @@ const getColumns = (
     cell: ({ row }) => {
       const navigate = useNavigate();
       const handleNavigate = () => {
-        const navSymbol = row.original.instrument?.symbol ?? row.original.id;
+        // Use instrument.id (asset ID) for navigation, not symbol (which may be stripped)
+        const navSymbol = row.original.instrument?.id ?? row.original.id;
         navigate(`/holdings/${encodeURIComponent(navSymbol)}`, {
           state: { holding: row.original },
         });

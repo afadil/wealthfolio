@@ -17,7 +17,7 @@ use crate::assets::{AssetKind, AssetRepositoryTrait};
 use crate::constants::DECIMAL_PRECISION;
 use crate::errors::Result;
 use crate::fx::FxServiceTrait;
-use crate::market_data::{MarketDataRepositoryTrait, Quote};
+use crate::market_data::MarketDataRepositoryTrait;
 use crate::portfolio::snapshot::SnapshotRepositoryTrait;
 use crate::portfolio::valuation::ValuationRepositoryTrait;
 
@@ -491,34 +491,36 @@ impl NetWorthServiceTrait for NetWorthService {
             start_date, end_date, base_currency
         );
 
-        // Get all active accounts
-        let accounts = self.account_repository.list(Some(true), None)?;
-        let account_ids: Vec<String> = accounts.iter().map(|a| a.id.clone()).collect();
-
         // =====================================================================
-        // 1. Aggregate portfolio valuations by date
+        // 1. Load TOTAL account valuations (pre-calculated portfolio summary)
         // =====================================================================
-        // DailyAccountValuation stores total_value per account per day in account currency.
-        // We need to convert to base currency using the stored fx_rate_to_base.
-        let mut portfolio_by_date: BTreeMap<NaiveDate, Decimal> = BTreeMap::new();
+        // The TOTAL account has aggregated values already converted to base currency.
+        // Fields: total_value, net_contribution, fx_rate_to_base (always 1 for TOTAL)
+        let total_valuations = self
+            .valuation_repository
+            .get_historical_valuations("TOTAL", Some(start_date), Some(end_date))?;
 
-        for account_id in &account_ids {
-            let valuations = self.valuation_repository.get_historical_valuations(
-                account_id,
-                Some(start_date),
-                Some(end_date),
-            )?;
+        // Build portfolio lookup by date
+        #[derive(Clone)]
+        struct PortfolioState {
+            value: Decimal,
+            net_contribution: Decimal,
+        }
 
-            for val in valuations {
-                // Convert from account currency to base currency
-                let value_in_base = val.total_value * val.fx_rate_to_base;
-                *portfolio_by_date.entry(val.valuation_date).or_insert(Decimal::ZERO) +=
-                    value_in_base;
-            }
+        let mut portfolio_by_date: BTreeMap<NaiveDate, PortfolioState> = BTreeMap::new();
+        for val in &total_valuations {
+            // TOTAL account is already in base currency (fx_rate_to_base = 1)
+            portfolio_by_date.insert(
+                val.valuation_date,
+                PortfolioState {
+                    value: val.total_value,
+                    net_contribution: val.net_contribution,
+                },
+            );
         }
 
         // =====================================================================
-        // 2. Get alternative assets and their quote history
+        // 2. Load alternative assets and organize by type
         // =====================================================================
         let all_assets = self.asset_repository.list()?;
         let alternative_assets: Vec<_> = all_assets
@@ -539,47 +541,54 @@ impl NetWorthServiceTrait for NetWorthService {
             .map(|a| a.id.clone())
             .collect();
 
-        // Build a map of asset_id -> currency for FX conversion
+        // Build currency lookup for FX conversion
         let asset_currency_map: HashMap<String, String> = alternative_assets
             .iter()
             .map(|a| (a.id.clone(), a.currency.clone()))
             .collect();
 
-        // Get quotes for alternative assets in the date range
+        // =====================================================================
+        // 3. Load quotes for alternative assets
+        // =====================================================================
         let all_alt_symbols: HashSet<String> =
             alternative_assets.iter().map(|a| a.id.clone()).collect();
 
-        // Get all quotes in the range and organize by date
+        // Get quotes in the date range
         let quotes_vec = self
             .market_data_repository
             .get_historical_quotes_for_symbols_in_range(&all_alt_symbols, start_date, end_date)?;
 
-        // Organize quotes by date -> symbol -> quote
-        let mut quotes_by_date: HashMap<NaiveDate, HashMap<String, Quote>> = HashMap::new();
+        // Organize quotes by date -> symbol -> value (converted to base currency)
+        let mut quotes_by_date: BTreeMap<NaiveDate, HashMap<String, Decimal>> = BTreeMap::new();
         for quote in &quotes_vec {
             let date = quote.timestamp.date_naive();
+            let asset_currency = asset_currency_map
+                .get(&quote.symbol)
+                .cloned()
+                .unwrap_or_else(|| base_currency.clone());
+
+            // Convert to base currency
+            let value_base = if asset_currency == base_currency {
+                quote.close
+            } else {
+                self.fx_service
+                    .convert_currency_for_date(quote.close, &asset_currency, &base_currency, date)
+                    .unwrap_or(quote.close)
+            };
+
             quotes_by_date
                 .entry(date)
                 .or_default()
-                .insert(quote.symbol.clone(), quote.clone());
+                .insert(quote.symbol.clone(), value_base);
         }
 
         // =====================================================================
-        // 2b. Get the latest quote BEFORE or ON start_date for each asset
-        // This handles assets with quotes recorded before the date range
-        // and ensures we have initial values for forward-filling
+        // 4. Get initial values for forward-fill (quotes before start_date)
         // =====================================================================
-        // We need initial values for ALL alternative assets, not just those without
-        // quotes in range. An asset might have quotes in range but those quotes might
-        // start after start_date (e.g., asset has quote on Jan 5 2026 but range starts July 2025)
-        // Track per-asset initial values (needed for proper forward-fill when multiple assets)
-        let mut asset_initial_values: HashMap<String, Decimal> = HashMap::new();
+        let mut initial_asset_values: HashMap<String, Decimal> = HashMap::new();
 
         for asset in &alternative_assets {
-            // Get the latest quote before or on start_date
-            // Use start_date to find the most recent known value at the start of our range
-            if let Some((price, _quote_date)) = self.get_latest_quote_as_of(&asset.id, start_date) {
-                // Convert to base currency
+            if let Some((price, _)) = self.get_latest_quote_as_of(&asset.id, start_date) {
                 let value_base = if asset.currency == base_currency {
                     price
                 } else {
@@ -592,83 +601,77 @@ impl NetWorthServiceTrait for NetWorthService {
                         )
                         .unwrap_or(price)
                 };
-
-                asset_initial_values.insert(asset.id.clone(), value_base);
+                initial_asset_values.insert(asset.id.clone(), value_base);
             }
         }
 
         // =====================================================================
-        // 3. Build per-asset value timelines with proper forward-fill
+        // 5. Determine date range (Rule 1: start from first portfolio date)
         // =====================================================================
-        // Track each asset's value separately for proper forward-fill
-        // Initialize with values from before/on start_date
-        let mut current_asset_values: HashMap<String, Decimal> = asset_initial_values.clone();
+        let first_portfolio_date = portfolio_by_date.keys().next().copied();
 
-        // Build date -> (symbol -> value) map for quotes in range
-        let mut quotes_by_date_value: BTreeMap<NaiveDate, HashMap<String, Decimal>> =
-            BTreeMap::new();
+        // Collect all dates with data
+        let mut all_dates: Vec<NaiveDate> = Vec::new();
 
-        for (date, quotes_map) in &quotes_by_date {
-            for (symbol, quote) in quotes_map {
-                // Get asset currency for FX conversion
-                let asset_currency = asset_currency_map
-                    .get(symbol)
-                    .cloned()
-                    .unwrap_or_else(|| base_currency.clone());
+        if let Some(first_pf_date) = first_portfolio_date {
+            // Normal case: include portfolio dates
+            all_dates.extend(portfolio_by_date.keys().cloned());
 
-                // For alternative assets, value = quote.close (quantity is always 1)
-                let value = quote.close;
-
-                // Convert to base currency
-                let value_base = if asset_currency == base_currency {
-                    value
-                } else {
-                    self.fx_service
-                        .convert_currency_for_date(value, &asset_currency, &base_currency, *date)
-                        .unwrap_or(value)
-                };
-
-                quotes_by_date_value
-                    .entry(*date)
-                    .or_default()
-                    .insert(symbol.clone(), value_base);
+            // Add quote dates that are >= first portfolio date
+            for date in quotes_by_date.keys() {
+                if *date >= first_pf_date && !all_dates.contains(date) {
+                    all_dates.push(*date);
+                }
             }
-        }
+        } else {
+            // Edge case: no portfolio data, only alternative assets
+            // Use all quote dates
+            all_dates.extend(quotes_by_date.keys().cloned());
 
-        // =====================================================================
-        // 4. Combine all dates and build history points
-        // =====================================================================
-        // Collect all unique dates
-        let mut all_dates: Vec<NaiveDate> = portfolio_by_date.keys().cloned().collect();
-        for date in quotes_by_date_value.keys() {
-            if !all_dates.contains(date) {
-                all_dates.push(*date);
+            // Also add start_date if we have initial values but no quotes in range
+            if all_dates.is_empty() && !initial_asset_values.is_empty() {
+                all_dates.push(start_date);
             }
-        }
-
-        // Ensure we have at least start_date if we have any initial asset values
-        // This handles the case where alternative assets have quotes from before the range
-        // but nothing happens within the range itself
-        if all_dates.is_empty() && !asset_initial_values.is_empty() {
-            all_dates.push(start_date);
         }
 
         all_dates.sort();
+        all_dates.dedup();
 
-        // Track the last known portfolio value for forward-filling
-        let mut last_portfolio = Decimal::ZERO;
+        // =====================================================================
+        // 6. Build history with forward-fill (Rule 2)
+        // =====================================================================
+        // Current state for forward-fill
+        let mut current_portfolio = PortfolioState {
+            value: Decimal::ZERO,
+            net_contribution: Decimal::ZERO,
+        };
+        let mut portfolio_initialized = false;
+
+        let mut current_asset_values = initial_asset_values.clone();
 
         let mut history: Vec<NetWorthHistoryPoint> = Vec::new();
 
         for date in all_dates {
-            // Update per-asset values if there are new quotes on this date
-            if let Some(quotes_on_date) = quotes_by_date_value.get(&date) {
+            // Update portfolio state if we have data for this date
+            if let Some(pf) = portfolio_by_date.get(&date) {
+                current_portfolio = pf.clone();
+                portfolio_initialized = true;
+            }
+
+            // Update alternative asset values if we have quotes for this date
+            if let Some(quotes_on_date) = quotes_by_date.get(&date) {
                 for (symbol, value) in quotes_on_date {
                     current_asset_values.insert(symbol.clone(), *value);
                 }
             }
 
-            // Calculate totals from current asset values
+            // Skip if portfolio not yet initialized (Rule 1)
+            // Exception: if there's no portfolio data at all, include dates with alt assets
+            if !portfolio_initialized && first_portfolio_date.is_some() {
+                continue;
+            }
+
+            // Calculate totals
             let mut alt_assets_value = Decimal::ZERO;
             let mut liabilities_value = Decimal::ZERO;
 
@@ -680,20 +683,17 @@ impl NetWorthServiceTrait for NetWorthService {
                 }
             }
 
-            // Use current day's portfolio value if available, otherwise carry forward
-            let portfolio_value = portfolio_by_date.get(&date).copied().unwrap_or(last_portfolio);
-            if portfolio_by_date.contains_key(&date) {
-                last_portfolio = portfolio_value;
-            }
-
-            let total_assets = portfolio_value + alt_assets_value;
+            let total_assets = current_portfolio.value + alt_assets_value;
             let net_worth = total_assets - liabilities_value;
 
             history.push(NetWorthHistoryPoint {
                 date,
-                total_assets: total_assets.round_dp(DECIMAL_PRECISION),
+                portfolio_value: current_portfolio.value.round_dp(DECIMAL_PRECISION),
+                alternative_assets_value: alt_assets_value.round_dp(DECIMAL_PRECISION),
                 total_liabilities: liabilities_value.round_dp(DECIMAL_PRECISION),
+                total_assets: total_assets.round_dp(DECIMAL_PRECISION),
                 net_worth: net_worth.round_dp(DECIMAL_PRECISION),
+                net_contribution: current_portfolio.net_contribution.round_dp(DECIMAL_PRECISION),
                 currency: base_currency.clone(),
             });
         }

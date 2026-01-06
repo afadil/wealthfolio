@@ -5,18 +5,38 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 /// A single point in net worth history.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// Provides component-level breakdown for accurate gain calculation:
+/// - Portfolio gain = (last.portfolio_value - last.net_contribution) - (first.portfolio_value - first.net_contribution)
+/// - Alt asset gain = last.alternative_assets_value - first.alternative_assets_value
+/// - Liability reduction = first.total_liabilities - last.total_liabilities
+/// - Total gain = portfolio_gain + alt_asset_gain + liability_reduction
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct NetWorthHistoryPoint {
     /// Date of this data point
     pub date: NaiveDate,
-    /// Total assets value in base currency
-    pub total_assets: Decimal,
-    /// Total liabilities in base currency (positive magnitude)
+
+    // ─── Component Values ───────────────────────────────────────────────
+    /// Portfolio value from TOTAL account (investments + cash) in base currency
+    pub portfolio_value: Decimal,
+    /// Alternative assets value (properties, vehicles, collectibles, precious metals, other)
+    pub alternative_assets_value: Decimal,
+    /// Total liabilities in base currency (positive magnitude, subtracted for net worth)
     pub total_liabilities: Decimal,
-    /// Net worth (assets - liabilities)
+
+    // ─── Totals ─────────────────────────────────────────────────────────
+    /// Total assets = portfolio_value + alternative_assets_value
+    pub total_assets: Decimal,
+    /// Net worth = total_assets - total_liabilities
     pub net_worth: Decimal,
-    /// Currency
+
+    // ─── For Gain Calculation ───────────────────────────────────────────
+    /// Cumulative net contributions (deposits - withdrawals) from portfolio
+    /// Used for contribution-adjusted gain: portfolio_gain = portfolio_value - net_contribution
+    pub net_contribution: Decimal,
+
+    /// Base currency for all values
     pub currency: String,
 }
 

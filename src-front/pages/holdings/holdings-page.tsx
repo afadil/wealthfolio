@@ -118,8 +118,8 @@ export const HoldingsPage = () => {
   // Handler to view value history for an asset
   const handleViewHistory = useCallback(
     (holding: AlternativeAssetHolding) => {
-      // Navigate to asset profile page with history tab
-      navigate(`/holdings/${encodeURIComponent(holding.symbol)}?tab=history`);
+      // Navigate to asset profile page with history tab (use id for asset lookup)
+      navigate(`/holdings/${encodeURIComponent(holding.id)}?tab=history`);
     },
     [navigate],
   );

@@ -110,9 +110,10 @@ export const HoldingsTableMobile = ({
   }, [holdings, selectedTypes, searchQuery, sortBy]);
 
   const handleNavigate = (holding: Holding) => {
-    const symbol = holding.instrument?.symbol;
-    if (symbol && !symbol.startsWith("$CASH")) {
-      navigate(`/holdings/${encodeURIComponent(symbol)}`, { state: { holding } });
+    // Use instrument.id (asset ID) for navigation, not symbol (which may be stripped)
+    const assetId = holding.instrument?.id;
+    if (assetId && !assetId.startsWith("$CASH")) {
+      navigate(`/holdings/${encodeURIComponent(assetId)}`, { state: { holding } });
     }
   };
 

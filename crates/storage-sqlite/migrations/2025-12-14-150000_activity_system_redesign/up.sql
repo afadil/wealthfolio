@@ -268,6 +268,23 @@ SELECT
                 COALESCE(data_source, 'YAHOO'),
                 json_object('type', 'equity_symbol', 'symbol', symbol_mapping)
             )
+        -- Securities with exchange suffix: store original Yahoo symbol in provider_overrides
+        -- This preserves the full symbol (e.g., XEQT.TO) for Yahoo Finance lookups
+        WHEN symbol LIKE '%.TO' OR symbol LIKE '%.V' OR symbol LIKE '%.CN'
+             OR symbol LIKE '%.L' OR symbol LIKE '%.DE' OR symbol LIKE '%.PA'
+             OR symbol LIKE '%.AS' OR symbol LIKE '%.MI' OR symbol LIKE '%.MC'
+             OR symbol LIKE '%.ST' OR symbol LIKE '%.HE' OR symbol LIKE '%.CO'
+             OR symbol LIKE '%.OL' OR symbol LIKE '%.SW' OR symbol LIKE '%.VI'
+             OR symbol LIKE '%.T' OR symbol LIKE '%.HK' OR symbol LIKE '%.SS'
+             OR symbol LIKE '%.SZ' OR symbol LIKE '%.AX' OR symbol LIKE '%.NZ'
+             OR symbol LIKE '%.SA' OR symbol LIKE '%.NS' OR symbol LIKE '%.BO'
+             OR symbol LIKE '%.TW' OR symbol LIKE '%.SI' OR symbol LIKE '%.KS'
+             OR symbol LIKE '%.KQ' OR symbol LIKE '%.BK' OR symbol LIKE '%.JK'
+             OR symbol LIKE '%.KL' OR symbol LIKE '%.TA' THEN
+            json_object(
+                'YAHOO',
+                json_object('type', 'equity_symbol', 'symbol', symbol)
+            )
         ELSE NULL
     END,
     isin,
