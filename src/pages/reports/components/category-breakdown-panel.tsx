@@ -5,7 +5,7 @@ import { formatPercent, PrivacyAmount } from "@wealthfolio/ui";
 import { useMemo, useState, useCallback } from "react";
 import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import type { SpendingSummary, ActivityDetails } from "@/lib/types";
-import { Cell, Pie, PieChart, Sector } from "recharts";
+import { Cell, Pie, PieChart, Sector, type PieProps } from "recharts";
 import { ViewTransactionsButton } from "@/components/view-transactions-button";
 import { useQuery } from "@tanstack/react-query";
 import { getTopSpendingTransactions } from "@/commands/activity";
@@ -214,10 +214,10 @@ export function CategoryBreakdownPanel({
                   innerRadius={70}
                   outerRadius={120}
                   paddingAngle={2}
-                  activeIndex={selectedCategoryIndex}
                   activeShape={renderActiveShape}
                   onClick={handleCategoryClick}
                   style={{ cursor: "pointer" }}
+                  {...({ activeIndex: selectedCategoryIndex } as Partial<PieProps>)}
                 >
                   {categoryChartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.fill} />

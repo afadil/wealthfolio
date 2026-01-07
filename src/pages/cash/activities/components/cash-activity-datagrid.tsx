@@ -857,6 +857,7 @@ export function CashActivityDatagrid({
         categoryId: transaction.categoryId ?? undefined,
         subCategoryId: transaction.subCategoryId ?? undefined,
         eventId: transaction.eventId ?? undefined,
+        recurrence: transaction.recurrence ?? undefined,
       };
 
       if (transaction.isNew) {

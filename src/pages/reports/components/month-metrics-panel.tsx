@@ -114,7 +114,7 @@ export function MonthMetricsPanel({
           </div>
 
           <div className="space-y-1">
-            <p className="text-muted-foreground text-xs"># of Transactions</p>
+            <p className="text-muted-foreground text-xs">Transactions</p>
             <p className="text-lg font-semibold">{isHidden ? "••••" : metrics.transactionCount}</p>
             {renderChangeIndicator(metrics.prevMonth?.countChangePercent)}
           </div>

@@ -266,10 +266,13 @@ impl EventRepositoryTrait for EventRepository {
                 } else {
                     calculated_amount.abs()
                 };
+
                 let amount = if activity_type == "DEPOSIT" {
                     -base_amount
-                } else {
+                } else if activity_type == "WITHDRAWAL" {
                     base_amount
+                } else {
+                    Decimal::ZERO
                 };
 
                 EventSpendingData {

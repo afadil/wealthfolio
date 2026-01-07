@@ -1,30 +1,29 @@
-import { useMemo, useState, useEffect, useRef } from "react";
-import {
-  format,
-  parseISO,
-  startOfMonth,
-  endOfMonth,
-  differenceInMonths,
-  isBefore,
-  isAfter,
-  getDaysInMonth,
-} from "date-fns";
-import type { EventSpendingSummary, EventType } from "@/lib/types";
-import { PrivacyAmount } from "@wealthfolio/ui";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import {
   DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuCheckboxItem,
+  DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { ChevronDown, Filter } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { ScrollArea } from "@wealthfolio/ui";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ViewTransactionsButton } from "@/components/view-transactions-button";
+import type { EventSpendingSummary, EventType } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { PrivacyAmount, ScrollArea } from "@wealthfolio/ui";
+import {
+  differenceInMonths,
+  endOfMonth,
+  format,
+  getDaysInMonth,
+  isAfter,
+  isBefore,
+  parseISO,
+  startOfMonth,
+} from "date-fns";
+import { ChevronDown, Filter } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Area, AreaChart, Cell, Pie, PieChart, XAxis, YAxis } from "recharts";
 
 interface PeriodDateRange {
@@ -604,7 +603,9 @@ export function EventTimeline({
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-foreground text-2xl font-bold">
+                <div
+                  className={`text-foreground text-2xl font-bold ${selectedEvent?.totalSpending < 0 ? "text-green-600" : "text-red-600"}`}
+                >
                   <PrivacyAmount
                     value={selectedEvent.totalSpending}
                     currency={selectedEvent.currency}
@@ -797,7 +798,7 @@ export function EventTimeline({
                   <div className="space-y-4 pr-4">
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground text-sm">Total Spending</span>
-                      <span className="text-foreground text-lg font-bold">
+                      <span className={`text-foreground text-lg font-bold ${selectedEvent?.totalSpending < 0 ? "text-green-600" : "text-red-600"}`}>
                         <PrivacyAmount
                           value={selectedEvent.totalSpending}
                           currency={selectedEvent.currency}
