@@ -13,6 +13,8 @@ mod tests {
         ActivitySearchResponse, ActivityUpdate, ImportMapping as ActivityImportMapping,
         NewActivity, Sort as ActivitySort,
     };
+    use crate::portfolio::income::{CapitalGainsData, CashIncomeData};
+    use crate::spending::SpendingData;
     use crate::assets::{Asset, AssetRepositoryTrait, NewAsset, UpdateAssetProfile};
     use crate::constants::{DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
     use crate::errors::{Error, Result as AppResult};
@@ -362,7 +364,10 @@ mod tests {
             _page_size: i64,
             _account_id_filter: Option<Vec<String>>,
             _activity_type_filter: Option<Vec<String>>,
+            _category_id_filter: Option<Vec<String>>,
+            _event_id_filter: Option<Vec<String>>,
             _asset_id_keyword: Option<String>,
+            _account_type_filter: Option<Vec<String>>,
             _sort: Option<ActivitySort>,
         ) -> AppResult<ActivitySearchResponse> {
             unimplemented!()
@@ -409,6 +414,19 @@ mod tests {
             unimplemented!()
         }
         fn get_first_activity_date_overall(&self) -> AppResult<DateTime<Utc>> {
+            unimplemented!()
+        }
+        fn get_spending_activities_data(
+            &self,
+            _include_event_ids: Option<&[String]>,
+            _include_all_events: bool,
+        ) -> AppResult<Vec<SpendingData>> {
+            unimplemented!()
+        }
+        fn get_cash_income_activities_data(&self) -> AppResult<Vec<CashIncomeData>> {
+            unimplemented!()
+        }
+        fn get_capital_gains_data(&self) -> AppResult<Vec<CapitalGainsData>> {
             unimplemented!()
         }
     }
@@ -473,7 +491,10 @@ mod tests {
             _size: i64,
             _acc: Option<Vec<String>>,
             _typ: Option<Vec<String>>,
+            _cat: Option<Vec<String>>,
+            _evt: Option<Vec<String>>,
             _kw: Option<String>,
+            _account_type: Option<Vec<String>>,
             _sort: Option<ActivitySort>,
         ) -> AppResult<ActivitySearchResponse> {
             unimplemented!()
@@ -517,6 +538,19 @@ mod tests {
             unimplemented!()
         }
         fn get_first_activity_date_overall(&self) -> AppResult<DateTime<Utc>> {
+            unimplemented!()
+        }
+        fn get_spending_activities_data(
+            &self,
+            _include_event_ids: Option<&[String]>,
+            _include_all_events: bool,
+        ) -> AppResult<Vec<SpendingData>> {
+            unimplemented!()
+        }
+        fn get_cash_income_activities_data(&self) -> AppResult<Vec<CashIncomeData>> {
+            unimplemented!()
+        }
+        fn get_capital_gains_data(&self) -> AppResult<Vec<CapitalGainsData>> {
             unimplemented!()
         }
     }
@@ -1130,6 +1164,10 @@ mod tests {
             comment: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            name: None,
+            category_id: None,
+            sub_category_id: None,
+            event_id: None,
         };
         let act2 = Activity {
             id: "act2".into(),
@@ -1190,6 +1228,10 @@ mod tests {
             comment: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            name: None,
+            category_id: None,
+            sub_category_id: None,
+            event_id: None,
         };
         let mut dividend = deposit("div1".into(), d2, dec!(100000));
         dividend.activity_type = "DIVIDEND".into();

@@ -20,7 +20,10 @@ import type {
   DepositsCalculation,
   ExchangeRate,
   Goal,
-  GoalAllocation,
+  GoalWithContributions,
+  GoalContributionWithStatus,
+  NewGoalContribution,
+  AccountFreeCash,
   Holding,
   ImportMappingData,
   IncomeSummary,
@@ -61,10 +64,12 @@ export interface InternalHostAPI {
 
   // Goals
   getGoals(): Promise<Goal[]>;
+  getGoalsWithContributions(): Promise<GoalWithContributions[]>;
   createGoal(goal: unknown): Promise<Goal>;
   updateGoal(goal: Goal): Promise<Goal>;
-  updateGoalsAllocations(allocations: GoalAllocation[]): Promise<void>;
-  getGoalsAllocation(): Promise<GoalAllocation[]>;
+  getAccountFreeCash(accountIds: string[]): Promise<AccountFreeCash[]>;
+  addGoalContribution(contribution: NewGoalContribution): Promise<GoalContributionWithStatus>;
+  removeGoalContribution(contributionId: string): Promise<void>;
 
   // Market data
   searchTicker(query: string): Promise<QuoteSummary[]>;
@@ -241,10 +246,12 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: s
     },
     goals: {
       getAll: internalAPI.getGoals,
+      getWithContributions: internalAPI.getGoalsWithContributions,
       create: internalAPI.createGoal,
       update: internalAPI.updateGoal,
-      updateAllocations: internalAPI.updateGoalsAllocations,
-      getAllocations: internalAPI.getGoalsAllocation,
+      getAccountFreeCash: internalAPI.getAccountFreeCash,
+      addContribution: internalAPI.addGoalContribution,
+      removeContribution: internalAPI.removeGoalContribution,
     },
     settings: {
       get: internalAPI.getSettings,

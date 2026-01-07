@@ -13,6 +13,7 @@ use wealthfolio_core::{
     holdings::Holding,
     income::IncomeSummary,
     performance::{PerformanceMetrics, SimplePerformanceMetrics},
+    spending::SpendingSummary,
     valuation::DailyAccountValuation,
 };
 
@@ -134,11 +135,26 @@ pub async fn get_latest_valuations(
 #[tauri::command]
 pub async fn get_income_summary(
     state: State<'_, Arc<ServiceContext>>,
+    include_event_ids: Option<Vec<String>>,
+    include_all_events: Option<bool>,
 ) -> Result<Vec<IncomeSummary>, String> {
     debug!("Fetching income summary...");
     state
         .income_service()
-        .get_income_summary()
+        .get_income_summary(include_event_ids, include_all_events.unwrap_or(false))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_spending_summary(
+    state: State<'_, Arc<ServiceContext>>,
+    include_event_ids: Option<Vec<String>>,
+    include_all_events: Option<bool>,
+) -> Result<Vec<SpendingSummary>, String> {
+    debug!("Fetching spending summary...");
+    state
+        .spending_service()
+        .get_spending_summary(include_event_ids, include_all_events.unwrap_or(false))
         .map_err(|e| e.to_string())
 }
 

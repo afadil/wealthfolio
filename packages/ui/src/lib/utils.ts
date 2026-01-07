@@ -40,19 +40,21 @@ const getCurrencyFormatter = (currency: string) => {
 };
 
 export function formatAmount(amount: number, currency: string, displayCurrency = true) {
+  // Normalize small negative values and -0 to avoid displaying "-$0.00"
+  const normalizedAmount = Math.abs(amount) < 0.005 ? 0 : amount;
   const rawCurrency = currency ?? "USD";
   const isPenceCurrency = rawCurrency === "GBp" || rawCurrency === "GBX";
 
   if (isPenceCurrency) {
-    const formattedNumber = decimalFormatter.format(amount);
+    const formattedNumber = decimalFormatter.format(normalizedAmount);
     return displayCurrency ? `${formattedNumber}p` : formattedNumber;
   }
 
   if (!displayCurrency) {
-    return decimalFormatter.format(amount);
+    return decimalFormatter.format(normalizedAmount);
   }
 
-  return getCurrencyFormatter(rawCurrency).format(amount);
+  return getCurrencyFormatter(rawCurrency).format(normalizedAmount);
 }
 
 /**
@@ -60,17 +62,20 @@ export function formatAmount(amount: number, currency: string, displayCurrency =
  */
 export function formatPercent(value: number | null | undefined) {
   if (value == null) return "-";
+  // Normalize small negative values and -0 to avoid displaying "-0.00%"
+  // Threshold is 0.00005 because value is decimal (0.5 = 50%) and we display 2 decimal places
+  const normalizedValue = Math.abs(value) < 0.00005 ? 0 : value;
   try {
     // Use Intl.NumberFormat for correct percentage formatting (handles x100 and % sign)
     return new Intl.NumberFormat("en-US", {
       style: "percent",
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    }).format(value);
+    }).format(normalizedValue);
   } catch (error) {
     console.error(`Error formatting percent ${value}: ${error}`);
     // Fallback to simple string conversion if formatting fails
-    return `${value}%`;
+    return `${normalizedValue}%`;
   }
 }
 

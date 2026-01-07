@@ -29,14 +29,17 @@ const COMMANDS: CommandMap = {
   calculate_accounts_simple_performance: { method: "POST", path: "/performance/accounts/simple" },
   calculate_performance_history: { method: "POST", path: "/performance/history" },
   calculate_performance_summary: { method: "POST", path: "/performance/summary" },
-  get_income_summary: { method: "GET", path: "/income/summary" },
+  get_income_summary: { method: "POST", path: "/income/summary" },
+  get_spending_summary: { method: "POST", path: "/spending/summary" },
   // Goals
   get_goals: { method: "GET", path: "/goals" },
+  get_goals_with_contributions: { method: "GET", path: "/goals/with-contributions" },
   create_goal: { method: "POST", path: "/goals" },
   update_goal: { method: "PUT", path: "/goals" },
   delete_goal: { method: "DELETE", path: "/goals" },
-  update_goal_allocations: { method: "POST", path: "/goals/allocations" },
-  load_goals_allocations: { method: "GET", path: "/goals/allocations" },
+  get_account_free_cash: { method: "POST", path: "/goals/free-cash" },
+  add_goal_contribution: { method: "POST", path: "/goals/contributions" },
+  remove_goal_contribution: { method: "DELETE", path: "/goals/contributions" },
   // FX
   get_latest_exchange_rates: { method: "GET", path: "/exchange-rates/latest" },
   update_exchange_rate: { method: "PUT", path: "/exchange-rates" },
@@ -53,6 +56,10 @@ const COMMANDS: CommandMap = {
   import_activities: { method: "POST", path: "/activities/import" },
   get_account_import_mapping: { method: "GET", path: "/activities/import/mapping" },
   save_account_import_mapping: { method: "POST", path: "/activities/import/mapping" },
+  // Activity reports
+  get_top_spending_transactions: { method: "POST", path: "/activities/top-spending" },
+  get_spending_trends: { method: "POST", path: "/activities/spending-trends" },
+  get_month_metrics: { method: "POST", path: "/activities/month-metrics" },
   // Market data providers
   get_market_data_providers: { method: "GET", path: "/providers" },
   get_market_data_providers_settings: { method: "GET", path: "/providers/settings" },
@@ -63,6 +70,39 @@ const COMMANDS: CommandMap = {
   update_contribution_limit: { method: "PUT", path: "/limits" },
   delete_contribution_limit: { method: "DELETE", path: "/limits" },
   calculate_deposits_for_contribution_limit: { method: "GET", path: "/limits" },
+  // Categories
+  get_categories: { method: "GET", path: "/categories" },
+  get_categories_hierarchical: { method: "GET", path: "/categories/hierarchical" },
+  get_expense_categories: { method: "GET", path: "/categories/expense" },
+  get_income_categories: { method: "GET", path: "/categories/income" },
+  get_category_activity_counts: { method: "GET", path: "/categories/activity-counts" },
+  create_category: { method: "POST", path: "/categories" },
+  update_category: { method: "PUT", path: "/categories" },
+  delete_category: { method: "DELETE", path: "/categories" },
+  // Activity Rules
+  get_activity_rules: { method: "GET", path: "/activity-rules" },
+  get_activity_rules_with_names: { method: "GET", path: "/activity-rules/with-names" },
+  create_activity_rule: { method: "POST", path: "/activity-rules" },
+  update_activity_rule: { method: "PUT", path: "/activity-rules" },
+  delete_activity_rule: { method: "DELETE", path: "/activity-rules" },
+  apply_activity_rules: { method: "POST", path: "/activity-rules/apply" },
+  bulk_apply_activity_rules: { method: "POST", path: "/activity-rules/bulk-apply" },
+  test_activity_rule_pattern: { method: "POST", path: "/activity-rules/test-pattern" },
+  // Event Types
+  get_event_types: { method: "GET", path: "/event-types" },
+  get_event_type: { method: "GET", path: "/event-types" },
+  create_event_type: { method: "POST", path: "/event-types" },
+  update_event_type: { method: "PUT", path: "/event-types" },
+  delete_event_type: { method: "DELETE", path: "/event-types" },
+  // Events
+  get_events: { method: "GET", path: "/events" },
+  get_events_with_names: { method: "GET", path: "/events/with-names" },
+  get_event_activity_counts: { method: "GET", path: "/events/activity-counts" },
+  get_event_spending_summaries: { method: "GET", path: "/events/spending-summaries" },
+  get_event: { method: "GET", path: "/events" },
+  create_event: { method: "POST", path: "/events" },
+  update_event: { method: "PUT", path: "/events" },
+  delete_event: { method: "DELETE", path: "/events" },
   // Asset profile
   get_assets: { method: "GET", path: "/assets" },
   delete_asset: { method: "DELETE", path: "/assets" },
@@ -100,6 +140,14 @@ const COMMANDS: CommandMap = {
   download_addon_to_staging: { method: "POST", path: "/addons/store/staging/download" },
   install_addon_from_staging: { method: "POST", path: "/addons/store/install-from-staging" },
   clear_addon_staging: { method: "DELETE", path: "/addons/store/staging" },
+  // Budget
+  get_budget_config: { method: "GET", path: "/budget/config" },
+  upsert_budget_config: { method: "POST", path: "/budget/config" },
+  get_budget_summary: { method: "GET", path: "/budget/summary" },
+  get_budget_allocations: { method: "GET", path: "/budget/allocations" },
+  set_budget_allocation: { method: "POST", path: "/budget/allocations" },
+  delete_budget_allocation: { method: "DELETE", path: "/budget/allocations" },
+  get_budget_vs_actual: { method: "GET", path: "/budget/vs-actual" },
   // Sync (web mode returns not implemented stub)
   get_sync_status: { method: "GET", path: "/sync/status" },
   generate_pairing_payload: { method: "POST", path: "/sync/generate-pairing-payload" },
@@ -189,6 +237,14 @@ export const invokeWeb = async <T>(
       body = JSON.stringify({ accountIds });
       break;
     }
+    case "get_spending_summary": {
+      const { includeEventIds, includeAllEvents } = (payload ?? {}) as {
+        includeEventIds?: string[];
+        includeAllEvents?: boolean;
+      };
+      body = JSON.stringify({ includeEventIds, includeAllEvents });
+      break;
+    }
     case "get_accounts":
       break;
     case "calculate_performance_history": {
@@ -225,8 +281,14 @@ export const invokeWeb = async <T>(
       if (qs) url += `?${qs}`;
       break;
     }
-    case "get_income_summary":
+    case "get_income_summary": {
+      const { includeEventIds, includeAllEvents } = (payload ?? {}) as {
+        includeEventIds?: string[];
+        includeAllEvents?: boolean;
+      };
+      body = JSON.stringify({ includeEventIds, includeAllEvents });
       break;
+    }
     case "delete_goal": {
       const { goalId } = payload as { goalId: string };
       url += `/${encodeURIComponent(goalId)}`;
@@ -242,9 +304,19 @@ export const invokeWeb = async <T>(
       body = JSON.stringify(goal);
       break;
     }
-    case "update_goal_allocations": {
-      const { allocations } = payload as { allocations: Record<string, unknown> };
-      body = JSON.stringify(allocations);
+    case "get_account_free_cash": {
+      const { accountIds } = payload as { accountIds: string[] };
+      body = JSON.stringify({ account_ids: accountIds });
+      break;
+    }
+    case "add_goal_contribution": {
+      const { contribution } = payload as { contribution: Record<string, unknown> };
+      body = JSON.stringify(contribution);
+      break;
+    }
+    case "remove_goal_contribution": {
+      const { contributionId } = payload as { contributionId: string };
+      url += `/${encodeURIComponent(contributionId)}`;
       break;
     }
     case "update_exchange_rate": {
@@ -303,6 +375,18 @@ export const invokeWeb = async <T>(
     case "save_account_import_mapping": {
       const { mapping } = payload as { mapping: Record<string, unknown> };
       body = JSON.stringify({ mapping });
+      break;
+    }
+    case "get_top_spending_transactions": {
+      body = JSON.stringify(payload);
+      break;
+    }
+    case "get_spending_trends": {
+      body = JSON.stringify(payload);
+      break;
+    }
+    case "get_month_metrics": {
+      body = JSON.stringify(payload);
       break;
     }
     case "update_market_data_provider_settings": {
@@ -512,10 +596,146 @@ export const invokeWeb = async <T>(
       body = JSON.stringify({ host, port });
       break;
     }
+    case "create_category": {
+      const { category } = payload as { category: Record<string, unknown> };
+      body = JSON.stringify(category);
+      break;
+    }
+    case "update_category": {
+      const { id, update } = payload as { id: string; update: Record<string, unknown> };
+      url += `/${encodeURIComponent(id)}`;
+      body = JSON.stringify(update);
+      break;
+    }
+    case "delete_category": {
+      const { categoryId } = payload as { categoryId: string };
+      url += `/${encodeURIComponent(categoryId)}`;
+      break;
+    }
+    case "create_activity_rule": {
+      const { rule } = payload as { rule: Record<string, unknown> };
+      body = JSON.stringify(rule);
+      break;
+    }
+    case "update_activity_rule": {
+      const { id, update } = payload as { id: string; update: Record<string, unknown> };
+      url += `/${encodeURIComponent(id)}`;
+      body = JSON.stringify(update);
+      break;
+    }
+    case "delete_activity_rule": {
+      const { ruleId } = payload as { ruleId: string };
+      url += `/${encodeURIComponent(ruleId)}`;
+      break;
+    }
+    case "test_activity_rule_pattern": {
+      body = JSON.stringify(payload);
+      break;
+    }
+    case "get_event_type": {
+      const { id } = payload as { id: string };
+      url += `/${encodeURIComponent(id)}`;
+      break;
+    }
+    case "create_event_type": {
+      const { eventType } = payload as { eventType: Record<string, unknown> };
+      body = JSON.stringify(eventType);
+      break;
+    }
+    case "update_event_type": {
+      const { id, update } = payload as { id: string; update: Record<string, unknown> };
+      url += `/${encodeURIComponent(id)}`;
+      body = JSON.stringify(update);
+      break;
+    }
+    case "delete_event_type": {
+      const { eventTypeId } = payload as { eventTypeId: string };
+      url += `/${encodeURIComponent(eventTypeId)}`;
+      break;
+    }
+    case "get_event": {
+      const { id } = payload as { id: string };
+      url += `/${encodeURIComponent(id)}`;
+      break;
+    }
+    case "create_event": {
+      const { event } = payload as { event: Record<string, unknown> };
+      body = JSON.stringify(event);
+      break;
+    }
+    case "update_event": {
+      const { id, update } = payload as { id: string; update: Record<string, unknown> };
+      url += `/${encodeURIComponent(id)}`;
+      body = JSON.stringify(update);
+      break;
+    }
+    case "delete_event": {
+      const { eventId } = payload as { eventId: string };
+      url += `/${encodeURIComponent(eventId)}`;
+      break;
+    }
+    case "get_categories":
+    case "get_categories_hierarchical":
+    case "get_category_activity_counts":
+    case "get_activity_rules":
+    case "get_activity_rules_with_names":
+      break;
+    case "apply_activity_rules": {
+      body = JSON.stringify(payload);
+      break;
+    }
+    case "bulk_apply_activity_rules": {
+      body = JSON.stringify(payload);
+      break;
+    }
+    case "get_event_types":
+    case "get_events":
+    case "get_events_with_names":
+    case "get_event_activity_counts":
     case "generate_pairing_payload":
     case "get_sync_status":
     case "initialize_sync_for_existing_data":
       break;
+    case "get_event_spending_summaries": {
+      const { startDate, endDate, baseCurrency } = payload as {
+        startDate: string | null;
+        endDate: string | null;
+        baseCurrency: string;
+      };
+      const params = new URLSearchParams();
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
+      params.set("baseCurrency", baseCurrency);
+      url += `?${params.toString()}`;
+      break;
+    }
+    // Budget commands
+    case "get_budget_config":
+    case "get_budget_summary":
+    case "get_budget_allocations":
+      break;
+    case "upsert_budget_config": {
+      const { config } = payload as { config: Record<string, unknown> };
+      body = JSON.stringify(config);
+      break;
+    }
+    case "set_budget_allocation": {
+      const { categoryId, amount } = payload as { categoryId: string; amount: number };
+      body = JSON.stringify({ category_id: categoryId, amount });
+      break;
+    }
+    case "delete_budget_allocation": {
+      const { categoryId } = payload as { categoryId: string };
+      url += `/${encodeURIComponent(categoryId)}`;
+      break;
+    }
+    case "get_budget_vs_actual": {
+      const { month } = payload as { month: string };
+      const params = new URLSearchParams();
+      params.set("month", month);
+      url += `?${params.toString()}`;
+      break;
+    }
   }
 
   const headers: HeadersInit = {};
@@ -531,6 +751,7 @@ export const invokeWeb = async <T>(
     method: config.method,
     headers,
     body,
+    cache: "no-store",
   });
   if (res.status === 401) {
     notifyUnauthorized();

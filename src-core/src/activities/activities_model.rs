@@ -63,6 +63,11 @@ pub struct Activity {
     pub created_at: DateTime<Utc>,
     #[serde(with = "timestamp_format")]
     pub updated_at: DateTime<Utc>,
+    pub name: Option<String>,
+    pub category_id: Option<String>,
+    pub sub_category_id: Option<String>,
+    pub event_id: Option<String>,
+    pub recurrence: Option<String>,
 }
 
 /// Database model for activities
@@ -98,6 +103,11 @@ pub struct ActivityDB {
     pub comment: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    pub name: Option<String>,
+    pub category_id: Option<String>,
+    pub sub_category_id: Option<String>,
+    pub event_id: Option<String>,
+    pub recurrence: Option<String>,
 }
 
 /// Input model for creating a new activity
@@ -117,6 +127,11 @@ pub struct NewActivity {
     pub amount: Option<Decimal>,
     pub is_draft: bool,
     pub comment: Option<String>,
+    pub name: Option<String>,
+    pub category_id: Option<String>,
+    pub sub_category_id: Option<String>,
+    pub event_id: Option<String>,
+    pub recurrence: Option<String>,
 }
 
 impl NewActivity {
@@ -168,6 +183,11 @@ pub struct ActivityUpdate {
     pub amount: Option<Decimal>,
     pub is_draft: bool,
     pub comment: Option<String>,
+    pub name: Option<String>,
+    pub category_id: Option<String>,
+    pub sub_category_id: Option<String>,
+    pub event_id: Option<String>,
+    pub recurrence: Option<String>,
 }
 
 impl ActivityUpdate {
@@ -286,6 +306,24 @@ pub struct ActivityDetails {
     pub asset_name: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub asset_data_source: String,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub name: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub category_id: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub sub_category_id: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub event_id: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub category_name: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub category_color: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub sub_category_name: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub event_name: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub recurrence: Option<String>,
 }
 
 impl ActivityDetails {
@@ -359,6 +397,12 @@ pub struct ActivityImport {
     pub is_draft: bool,
     pub is_valid: bool,
     pub line_number: Option<i32>,
+    // Cash activity specific fields
+    pub name: Option<String>,
+    pub category_id: Option<String>,
+    pub sub_category_id: Option<String>,
+    pub event_id: Option<String>,
+    pub recurrence: Option<String>,
 }
 
 /// Model for sorting activities
@@ -605,6 +649,11 @@ impl From<ActivityDB> for Activity {
                     log::error!("Failed to parse updated_at '{}': {}", db.updated_at, e);
                     Utc::now() // Fallback to now
                 }),
+            name: db.name,
+            category_id: db.category_id,
+            sub_category_id: db.sub_category_id,
+            event_id: db.event_id,
+            recurrence: db.recurrence,
         }
     }
 }
@@ -679,6 +728,11 @@ impl From<NewActivity> for ActivityDB {
             comment: domain.comment,
             created_at: now.to_rfc3339(),
             updated_at: now.to_rfc3339(),
+            name: domain.name,
+            category_id: domain.category_id,
+            sub_category_id: domain.sub_category_id,
+            event_id: domain.event_id,
+            recurrence: domain.recurrence,
         }
     }
 }
@@ -751,6 +805,11 @@ impl From<ActivityUpdate> for ActivityDB {
             comment: domain.comment,
             created_at: now.to_rfc3339(), // This should ideally preserve original created_at. Need to fetch before update.
             updated_at: now.to_rfc3339(),
+            name: domain.name,
+            category_id: domain.category_id,
+            sub_category_id: domain.sub_category_id,
+            event_id: domain.event_id,
+            recurrence: domain.recurrence,
         }
     }
 }
@@ -770,4 +829,123 @@ pub struct IncomeData {
     pub currency: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub amount: Decimal,
+}
+
+/// Request for spending trends data
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpendingTrendsRequest {
+    /// Target month in YYYY-MM format
+    pub month: String,
+    /// Optional category IDs to filter
+    pub category_ids: Option<Vec<String>>,
+    /// Optional subcategory IDs to filter
+    pub subcategory_ids: Option<Vec<String>>,
+    /// Optional event IDs to include (default: all events excluded)
+    pub include_event_ids: Option<Vec<String>>,
+    /// Whether to include all transactions tagged with any event (default: false = exclude all)
+    #[serde(default)]
+    pub include_all_events: bool,
+}
+
+/// Daily spending amount from database
+#[derive(Debug, Clone, Serialize, QueryableByName)]
+#[serde(rename_all = "camelCase")]
+#[diesel(table_name = crate::schema::activities)]
+pub struct DailySpendingRow {
+    /// Day of month (1-31)
+    #[diesel(sql_type = diesel::sql_types::Integer)]
+    pub day: i32,
+    /// Total spending for that day
+    #[diesel(sql_type = diesel::sql_types::Double)]
+    pub amount: f64,
+}
+
+/// Cumulative daily spending for a month
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DailySpending {
+    /// Month identifier (YYYY-MM)
+    pub month: String,
+    /// Cumulative spending by day (index 0 = day 1, etc.)
+    pub cumulative: Vec<f64>,
+}
+
+/// Response for spending trends
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpendingTrendsResponse {
+    /// Current month's cumulative daily spending
+    pub current_month: DailySpending,
+    /// 3-month average cumulative daily spending
+    pub avg_3_month: DailySpending,
+    /// 6-month average cumulative daily spending
+    pub avg_6_month: DailySpending,
+    /// 9-month average cumulative daily spending
+    pub avg_9_month: DailySpending,
+}
+
+/// Request for month metrics data
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MonthMetricsRequest {
+    /// Target month in YYYY-MM format
+    pub month: String,
+    /// Optional list of event IDs to include (if empty/None, excludes all event transactions by default)
+    pub include_event_ids: Option<Vec<String>>,
+    /// If true, include all event transactions (overrides include_event_ids)
+    #[serde(default)]
+    pub include_all_events: bool,
+}
+
+/// Response for month metrics
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MonthMetricsResponse {
+    /// Average transaction size for the month
+    pub avg_transaction_size: f64,
+    /// Number of transactions in the month
+    pub transaction_count: i64,
+    /// Median transaction size
+    pub median_transaction: f64,
+    /// Total spending for the month
+    pub total_spending: f64,
+    /// Previous month's data for comparison
+    pub prev_month: Option<MonthMetricsPrev>,
+    /// Breakdown of spending by recurrence type
+    pub recurrence_breakdown: RecurrenceBreakdown,
+}
+
+/// Breakdown of spending by recurrence type
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecurrenceBreakdown {
+    /// Percentage of spending on fixed recurring transactions
+    pub fixed_percent: f64,
+    /// Amount spent on fixed recurring transactions
+    pub fixed_amount: f64,
+    /// Percentage of spending on variable recurring transactions
+    pub variable_percent: f64,
+    /// Amount spent on variable recurring transactions
+    pub variable_amount: f64,
+    /// Percentage of spending on periodic transactions
+    pub periodic_percent: f64,
+    /// Amount spent on periodic transactions
+    pub periodic_amount: f64,
+    /// Percentage of spending on non-recurring transactions (no recurrence type)
+    pub non_recurring_percent: f64,
+    /// Amount spent on non-recurring transactions
+    pub non_recurring_amount: f64,
+}
+
+/// Previous month metrics for comparison
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MonthMetricsPrev {
+    /// Average transaction size change percentage
+    pub avg_change_percent: Option<f64>,
+    /// Transaction count change percentage
+    pub count_change_percent: Option<f64>,
+    /// Total spending change percentage
+    pub total_change_percent: Option<f64>,
 }

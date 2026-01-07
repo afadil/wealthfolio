@@ -8,6 +8,7 @@ use wealthfolio_core::{
         income::IncomeSummary,
         performance::{PerformanceMetrics, SimplePerformanceMetrics},
     },
+    spending::SpendingSummary,
 };
 
 #[derive(serde::Deserialize)]
@@ -101,10 +102,41 @@ async fn calculate_performance_summary(
     Ok(Json(metrics))
 }
 
+#[derive(serde::Deserialize)]
+struct IncomeSummaryBody {
+    #[serde(rename = "includeEventIds")]
+    include_event_ids: Option<Vec<String>>,
+    #[serde(rename = "includeAllEvents")]
+    include_all_events: Option<bool>,
+}
+
 async fn get_income_summary(
     State(state): State<Arc<AppState>>,
+    Json(body): Json<IncomeSummaryBody>,
 ) -> ApiResult<Json<Vec<IncomeSummary>>> {
-    let items = state.income_service.get_income_summary()?;
+    let items = state.income_service.get_income_summary(
+        body.include_event_ids,
+        body.include_all_events.unwrap_or(false),
+    )?;
+    Ok(Json(items))
+}
+
+#[derive(serde::Deserialize)]
+struct SpendingSummaryBody {
+    #[serde(rename = "includeEventIds")]
+    include_event_ids: Option<Vec<String>>,
+    #[serde(rename = "includeAllEvents")]
+    include_all_events: Option<bool>,
+}
+
+async fn get_spending_summary(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<SpendingSummaryBody>,
+) -> ApiResult<Json<Vec<SpendingSummary>>> {
+    let items = state.spending_service.get_spending_summary(
+        body.include_event_ids,
+        body.include_all_events.unwrap_or(false),
+    )?;
     Ok(Json(items))
 }
 
@@ -116,5 +148,6 @@ pub fn router() -> Router<Arc<AppState>> {
         )
         .route("/performance/history", post(calculate_performance_history))
         .route("/performance/summary", post(calculate_performance_summary))
-        .route("/income/summary", axum::routing::get(get_income_summary))
+        .route("/income/summary", post(get_income_summary))
+        .route("/spending/summary", post(get_spending_summary))
 }

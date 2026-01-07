@@ -4,7 +4,12 @@ use std::sync::{Arc, RwLock};
 use wealthfolio_core::{
     accounts::{AccountRepository, AccountService},
     activities::{ActivityRepository, ActivityService},
+    budget::{BudgetRepository, BudgetService},
+    categories::{CategoryRepository, CategoryService},
+    activity_rules::{ActivityRuleRepository, ActivityRuleService},
     db::{self, write_actor},
+    event_types::{EventTypeRepository, EventTypeService},
+    events::{EventRepository, EventService},
     fx::{FxRepository, FxService, FxServiceTrait},
     goals::{GoalRepository, GoalService},
     limits::{ContributionLimitRepository, ContributionLimitService},
@@ -16,6 +21,7 @@ use wealthfolio_core::{
     },
     settings::{settings_repository::SettingsRepository, SettingsService, SettingsServiceTrait},
     snapshot::{SnapshotRepository, SnapshotService},
+    spending::SpendingService,
     valuation::{ValuationRepository, ValuationService},
     AssetRepository, AssetService,
 };
@@ -46,6 +52,10 @@ pub async fn initialize_context(
     let fx_repository = Arc::new(FxRepository::new(pool.clone(), writer.clone()));
     let snapshot_repository = Arc::new(SnapshotRepository::new(pool.clone(), writer.clone()));
     let valuation_repository = Arc::new(ValuationRepository::new(pool.clone(), writer.clone()));
+    let category_repository = Arc::new(CategoryRepository::new(pool.clone(), writer.clone()));
+    let activity_rule_repository = Arc::new(ActivityRuleRepository::new(pool.clone(), writer.clone()));
+    let event_type_repository = Arc::new(EventTypeRepository::new(pool.clone(), writer.clone()));
+    let event_repository = Arc::new(EventRepository::new(pool.clone(), writer.clone()));
     // Instantiate Transaction Executor using the Arc<DbPool> directly
     let transaction_executor = pool.clone();
 
@@ -88,7 +98,11 @@ pub async fn initialize_context(
         asset_service.clone(),
         fx_service.clone(),
     ));
-    let goal_service = Arc::new(GoalService::new(goal_repo.clone()));
+    let goal_service = Arc::new(GoalService::new(
+        goal_repo.clone(),
+        account_repository.clone(),
+        valuation_repository.clone(),
+    ));
     let limits_service = Arc::new(ContributionLimitService::new(
         fx_service.clone(),
         limit_repository.clone(),
@@ -96,6 +110,12 @@ pub async fn initialize_context(
     ));
 
     let income_service = Arc::new(IncomeService::new(
+        fx_service.clone(),
+        activity_repository.clone(),
+        base_currency.clone(),
+    ));
+
+    let spending_service = Arc::new(SpendingService::new(
         fx_service.clone(),
         activity_repository.clone(),
         base_currency.clone(),
@@ -134,6 +154,23 @@ pub async fn initialize_context(
         holdings_valuation_service.clone(),
     ));
 
+    let category_service = Arc::new(CategoryService::new(category_repository.clone()));
+    let activity_rule_service = Arc::new(ActivityRuleService::new(
+        activity_rule_repository.clone(),
+        category_repository.clone(),
+    ));
+    let event_type_service = Arc::new(EventTypeService::new(event_type_repository.clone()));
+    let event_service = Arc::new(EventService::new(
+        event_repository.clone(),
+        event_type_repository.clone(),
+    ));
+
+    let budget_repository = Arc::new(BudgetRepository::new(pool.clone(), writer.clone()));
+    let budget_service = Arc::new(BudgetService::new(
+        budget_repository.clone(),
+        spending_service.clone(),
+    ));
+
     Ok(ServiceContext {
         base_currency,
         instance_id,
@@ -147,8 +184,14 @@ pub async fn initialize_context(
         fx_service,
         performance_service,
         income_service,
+        spending_service,
         snapshot_service,
         holdings_service,
         valuation_service,
+        category_service,
+        activity_rule_service,
+        event_type_service,
+        event_service,
+        budget_service,
     })
 }

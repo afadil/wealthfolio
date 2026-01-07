@@ -299,6 +299,10 @@ mod tests {
             comment: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            name: None,
+            category_id: None,
+            sub_category_id: None,
+            event_id: None,
         }
     }
 
@@ -330,6 +334,10 @@ mod tests {
             comment: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            name: None,
+            category_id: None,
+            sub_category_id: None,
+            event_id: None,
         }
     }
 

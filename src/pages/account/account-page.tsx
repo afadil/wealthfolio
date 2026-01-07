@@ -415,6 +415,8 @@ const AccountPage = () => {
 
               <div className="flex flex-col space-y-4">
                 <AccountMetrics
+                  accountId={id}
+                  accountType={account?.accountType}
                   valuation={currentValuation}
                   performance={accountPerformance}
                   className="grow"
@@ -424,10 +426,10 @@ const AccountPage = () => {
               </div>
             </div>
 
-            <AccountHoldings accountId={id} />
+            {account?.accountType !== "CASH" && <AccountHoldings accountId={id} />}
           </>
         ) : (
-          <AccountHoldings accountId={id} showEmptyState={true} />
+          account?.accountType !== "CASH" && <AccountHoldings accountId={id} showEmptyState={true} />
         )}
       </PageContent>
     </Page>

@@ -266,7 +266,7 @@ export function SwipablePage({
             {/* Content - relative for absolute positioned actions within */}
             <div
               className={cn(
-                "relative grow overflow-y-auto pt-8",
+                "relative grow overflow-y-auto",
                 withPadding && "px-2 pb-2 lg:px-4 lg:pb-4",
               )}
             >

@@ -1,14 +1,14 @@
-import { getGoals, getGoalsAllocation } from "@/commands/goal";
+import { getGoalsWithContributions } from "@/commands/goal";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icons } from "@/components/ui/icons";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useAccounts } from "@/hooks/use-accounts";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
-import { useLatestValuations } from "@/hooks/use-latest-valuations";
-import { calculateGoalProgress } from "@/lib/portfolio-helper";
-import { Goal, GoalAllocation } from "@/lib/types";
+import { useSettings } from "@/hooks/use-settings";
+import { calculateGoalProgressFromContributions } from "@/lib/portfolio-helper";
+import { QueryKeys } from "@/lib/query-keys";
+import { GoalWithContributions } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { AmountDisplay, formatPercent } from "@wealthfolio/ui";
 import { useMemo } from "react";
@@ -16,45 +16,24 @@ import { Link } from "react-router-dom";
 
 export function SavingGoals() {
   const { isBalanceHidden } = useBalancePrivacy();
-
-  const { accounts, isLoading: isLoadingAccounts, isError: isErrorAccounts } = useAccounts();
-
-  const accountIds = useMemo(() => accounts?.map((acc) => acc.id) ?? [], [accounts]);
+  const { data: settings } = useSettings();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
 
   const {
-    latestValuations,
-    isLoading: isLoadingValuations,
-    error: errorValuations,
-  } = useLatestValuations(accountIds);
-
-  const {
-    data: goals,
-    isLoading: isLoadingGoals,
-    isError: isErrorGoals,
-  } = useQuery<Goal[], Error>({
-    queryKey: ["goals"],
-    queryFn: getGoals,
-  });
-
-  const {
-    data: allocations,
-    isLoading: isLoadingAllocations,
-    isError: isErrorAllocations,
-  } = useQuery<GoalAllocation[], Error>({
-    queryKey: ["goals_allocations"],
-    queryFn: getGoalsAllocation,
+    data: goalsWithContributions,
+    isLoading,
+    isError,
+  } = useQuery<GoalWithContributions[], Error>({
+    queryKey: [QueryKeys.GOALS_WITH_CONTRIBUTIONS],
+    queryFn: getGoalsWithContributions,
   });
 
   const goalsProgress = useMemo(() => {
-    if (!latestValuations || !goals || !allocations) {
+    if (!goalsWithContributions) {
       return undefined;
     }
-    return calculateGoalProgress(latestValuations, goals, allocations);
-  }, [latestValuations, goals, allocations]);
-
-  const isLoading =
-    isLoadingAccounts || isLoadingValuations || isLoadingGoals || isLoadingAllocations;
-  const isError = isErrorAccounts || !!errorValuations || isErrorGoals || isErrorAllocations;
+    return calculateGoalProgressFromContributions(goalsWithContributions, baseCurrency);
+  }, [goalsWithContributions, baseCurrency]);
 
   if (isLoading) {
     return (
@@ -99,7 +78,7 @@ export function SavingGoals() {
     );
   }
 
-  const hasGoals = goals && goals.length > 0;
+  const hasGoals = goalsWithContributions && goalsWithContributions.length > 0;
 
   if (!hasGoals) {
     return (
@@ -128,70 +107,92 @@ export function SavingGoals() {
       <h2 className="text-md font-semibold">Saving Goals</h2>
       <Card className="w-full shadow-xs">
         <CardContent className="bg-transparent px-4 pt-6">
-          {[...goals]
-            .sort((a, b) => a.targetAmount - b.targetAmount)
-            .slice(0, 5)
-            .map((goal) => {
-              const progressData = goalsProgress?.find((p) => p.name === goal.title);
+          {goalsProgress?.slice(0, 5).map((progressData) => {
+            const gwc = goalsWithContributions?.find((g) => g.goal.title === progressData.name);
 
-              const currentProgress = progressData?.progress ?? 0;
-              const currentValue = progressData?.currentValue ?? 0;
-              const currency =
-                progressData?.currency ?? latestValuations?.[0]?.baseCurrency ?? "USD";
+            const currentProgress = progressData.progress;
+            const currentValue = progressData.currentValue;
+            const targetValue = progressData.targetValue;
+            const hasAtRisk = progressData.hasAtRiskContributions;
+            const currency = progressData.currency;
 
-              return (
-                <Tooltip key={goal.id}>
-                  <TooltipTrigger asChild>
-                    <div className="mb-4 cursor-help items-center">
-                      <CardDescription className="text-muted-foreground mb-2 flex items-center text-sm font-light">
-                        {goal.title}
-                        {currentProgress >= 100 ? (
+            return (
+              <Tooltip key={progressData.name}>
+                <TooltipTrigger asChild>
+                  <div className="mb-4 cursor-help items-center">
+                    <div className="mb-2 flex items-center justify-between">
+                      <CardDescription className="text-muted-foreground flex items-center text-sm font-light">
+                        {progressData.name}
+                        {currentProgress >= 1 ? (
                           <Icons.CheckCircle className="text-success ml-1 h-4 w-4" />
                         ) : null}
+                        {hasAtRisk && (
+                          <Icons.AlertTriangle className="text-destructive ml-1 h-4 w-4" />
+                        )}
                       </CardDescription>
-
-                      <Progress
-                        value={currentProgress * 100}
-                        className="[&>div]:bg-success h-2.5 w-full"
-                      />
+                      <span className="text-muted-foreground text-sm">
+                        <AmountDisplay
+                          value={currentValue}
+                          currency={currency}
+                          isHidden={isBalanceHidden}
+                        />
+                        {" / "}
+                        <AmountDisplay
+                          value={targetValue}
+                          currency={currency}
+                          isHidden={isBalanceHidden}
+                        />{" "}
+                        ({formatPercent(currentProgress)})
+                      </span>
                     </div>
-                  </TooltipTrigger>
-                  <TooltipContent className="space-y-2">
-                    <h3 className="text-md text-muted-foreground font-bold">{goal.title}</h3>
-                    <ul className="list-inside list-disc text-xs">
+
+                    <Progress
+                      value={Math.min(currentProgress * 100, 100)}
+                      className="[&>div]:bg-success h-2.5 w-full"
+                    />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="space-y-2">
+                  <h3 className="text-md text-muted-foreground font-bold">{progressData.name}</h3>
+                  <ul className="list-inside list-disc text-xs">
+                    <li>
+                      Progress: <b>{formatPercent(currentProgress)}</b>
+                    </li>
+                    <li>
+                      Contributed:{" "}
+                      <b>
+                        <AmountDisplay
+                          value={currentValue}
+                          currency={currency}
+                          isHidden={isBalanceHidden}
+                        />
+                      </b>
+                    </li>
+                    <li>
+                      Target:{" "}
+                      <b>
+                        <AmountDisplay
+                          value={targetValue}
+                          currency={currency}
+                          isHidden={isBalanceHidden}
+                        />
+                      </b>
+                    </li>
+                    {gwc && (
                       <li>
-                        Progress: <b>{formatPercent(currentProgress)}</b>
+                        Contributions: <b>{gwc.contributions.length}</b>
                       </li>
-                      <li>
-                        Current Value:{" "}
-                        <b>
-                          <AmountDisplay
-                            value={currentValue}
-                            currency={currency}
-                            isHidden={isBalanceHidden}
-                          />
-                        </b>
-                      </li>
-                      <li>
-                        Target Value:{" "}
-                        <b>
-                          <AmountDisplay
-                            value={goal.targetAmount}
-                            currency={currency}
-                            isHidden={isBalanceHidden}
-                          />
-                        </b>
-                      </li>
-                    </ul>
-                    {!progressData && (
-                      <p className="text-muted-foreground text-xs italic">
-                        Progress calculation pending or not applicable.
-                      </p>
                     )}
-                  </TooltipContent>
-                </Tooltip>
-              );
-            })}
+                  </ul>
+                  {hasAtRisk && (
+                    <p className="text-destructive text-xs italic">
+                      Some contributions exceed available account cash
+                    </p>
+                  )}
+                </TooltipContent>
+              </Tooltip>
+            );
+          })}
         </CardContent>
       </Card>
     </div>

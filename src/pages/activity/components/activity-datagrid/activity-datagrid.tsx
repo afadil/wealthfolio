@@ -1,4 +1,22 @@
+import { getExpenseCategories, getIncomeCategories } from "@/commands/category";
+import { getEvents } from "@/commands/event";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import {
   calculateActivityValue,
   isCashActivity,
@@ -6,12 +24,15 @@ import {
   isIncomeActivity,
 } from "@/lib/activity-utils";
 import { ActivityType, ActivityTypeNames, DataSource } from "@/lib/constants";
+import { QueryKeys } from "@/lib/query-keys";
 import {
   Account,
   ActivityBulkMutationRequest,
   ActivityCreate,
   ActivityDetails,
   ActivityUpdate,
+  CategoryWithChildren,
+  Event,
 } from "@/lib/types";
 import {
   cn,
@@ -25,6 +46,7 @@ import {
   toPayloadNumber,
 } from "@/lib/utils";
 import { useAssets } from "@/pages/asset/hooks/use-assets";
+import { useQuery } from "@tanstack/react-query";
 import type { SortingState } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
@@ -97,10 +119,10 @@ const editableFields: EditableField[] = [
   "comment",
 ];
 
-const resolveAssetIdForTransaction = (
+function resolveAssetIdForTransaction(
   transaction: LocalTransaction,
   fallbackCurrency: string,
-): string | undefined => {
+): string | undefined {
   const existingAssetId = transaction.assetId?.trim() || transaction.assetSymbol?.trim();
   if (existingAssetId) {
     return existingAssetId;
@@ -116,14 +138,14 @@ const resolveAssetIdForTransaction = (
   }
 
   return undefined;
-};
+}
 
-const formatAmountDisplay = (
+function formatAmountDisplay(
   value: unknown,
   currency?: string,
   displayCurrency = false,
   fallbackCurrency = "USD",
-): string => {
+): string {
   const numericValue = toFiniteNumberOrUndefined(value);
   if (numericValue === undefined) {
     return "";
@@ -137,12 +159,9 @@ const formatAmountDisplay = (
   } catch {
     return "";
   }
-};
+}
 
-const createDraftTransaction = (
-  accounts: Account[],
-  fallbackCurrency: string,
-): LocalTransaction => {
+function createDraftTransaction(accounts: Account[], fallbackCurrency: string): LocalTransaction {
   const defaultAccount = accounts.find((account) => account.isActive) ?? accounts[0];
   const now = new Date();
 
@@ -169,7 +188,7 @@ const createDraftTransaction = (
     subRows: undefined,
     isNew: true,
   };
-};
+}
 
 interface SortableHeaderProps {
   title: string;
@@ -246,10 +265,32 @@ export function ActivityDatagrid({
   } = useActivityGridState(activities);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [focusedCell, setFocusedCell] = useState<CellCoordinate | null>(null);
+  const [bulkActivityTypeModalOpen, setBulkActivityTypeModalOpen] = useState(false);
+  const [bulkCategoryModalOpen, setBulkCategoryModalOpen] = useState(false);
+  const [bulkEventModalOpen, setBulkEventModalOpen] = useState(false);
   const { saveActivitiesMutation } = useActivityMutations();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { assets } = useAssets();
+
+  const { data: expenseCategories = [] } = useQuery({
+    queryKey: [QueryKeys.EXPENSE_CATEGORIES],
+    queryFn: getExpenseCategories,
+  });
+
+  const { data: incomeCategories = [] } = useQuery({
+    queryKey: [QueryKeys.INCOME_CATEGORIES],
+    queryFn: getIncomeCategories,
+  });
+
+  const categories = useMemo(() => {
+    return [...expenseCategories, ...incomeCategories];
+  }, [expenseCategories, incomeCategories]);
+
+  const { data: events = [] } = useQuery({
+    queryKey: [QueryKeys.EVENTS],
+    queryFn: getEvents,
+  });
 
   const fallbackCurrency = useMemo(() => {
     const defaultAccount = accounts.find((account) => account.isDefault);
@@ -468,6 +509,11 @@ export function ActivityDatagrid({
     virtualRows.length > 0
       ? rowVirtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end
       : 0;
+
+  const { UnsavedChangesDialog } = useUnsavedChanges({
+    hasUnsavedChanges,
+    message: "You have unsaved changes. Are you sure you want to leave? Your changes will be lost.",
+  });
 
   const handleCellNavigation = useCallback(
     (direction: "up" | "down" | "left" | "right") => {
@@ -768,6 +814,126 @@ export function ActivityDatagrid({
     });
   }, []);
 
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  const bulkAssignActivityType = useCallback(
+    (activityType: ActivityType) => {
+      setLocalTransactions((prev) =>
+        prev.map((t) => (selectedIds.has(t.id) ? { ...t, activityType } : t)),
+      );
+      setDirtyTransactionIds((prev) => {
+        const next = new Set(prev);
+        selectedIds.forEach((id) => next.add(id));
+        return next;
+      });
+      setSelectedIds(new Set());
+      setBulkActivityTypeModalOpen(false);
+      toast({
+        title: "Activity type assigned",
+        description: `Activity type assigned to ${selectedIds.size} transaction(s)`,
+        variant: "success",
+      });
+    },
+    [selectedIds, setDirtyTransactionIds, setLocalTransactions],
+  );
+
+  const bulkAssignCategory = useCallback(
+    (categoryId: string | undefined, subCategoryId?: string) => {
+      setLocalTransactions((prev) =>
+        prev.map((t) =>
+          selectedIds.has(t.id)
+            ? {
+                ...t,
+                categoryId: categoryId || undefined,
+                subCategoryId: categoryId ? subCategoryId : undefined,
+              }
+            : t,
+        ),
+      );
+      setDirtyTransactionIds((prev) => {
+        const next = new Set(prev);
+        selectedIds.forEach((id) => next.add(id));
+        return next;
+      });
+      setSelectedIds(new Set());
+      setBulkCategoryModalOpen(false);
+      const message = categoryId
+        ? `Category assigned to ${selectedIds.size} transaction(s)`
+        : `Category cleared from ${selectedIds.size} transaction(s)`;
+      toast({
+        title: categoryId ? "Category assigned" : "Category cleared",
+        description: message,
+        variant: "success",
+      });
+    },
+    [selectedIds, setDirtyTransactionIds, setLocalTransactions],
+  );
+
+  const bulkAssignEvent = useCallback(
+    (eventId: string | undefined) => {
+      setLocalTransactions((prev) =>
+        prev.map((t) => (selectedIds.has(t.id) ? { ...t, eventId: eventId || undefined } : t)),
+      );
+      setDirtyTransactionIds((prev) => {
+        const next = new Set(prev);
+        selectedIds.forEach((id) => next.add(id));
+        return next;
+      });
+      setSelectedIds(new Set());
+      setBulkEventModalOpen(false);
+      toast({
+        title: eventId ? "Event assigned" : "Event cleared",
+        description: `Event ${eventId ? "assigned to" : "cleared from"} ${selectedIds.size} transaction(s)`,
+        variant: "success",
+      });
+    },
+    [selectedIds, setDirtyTransactionIds, setLocalTransactions],
+  );
+
+  const clearAllCategories = useCallback(() => {
+    setLocalTransactions((prev) =>
+      prev.map((t) =>
+        selectedIds.has(t.id)
+          ? {
+              ...t,
+              categoryId: undefined,
+              subCategoryId: undefined,
+            }
+          : t,
+      ),
+    );
+    setDirtyTransactionIds((prev) => {
+      const next = new Set(prev);
+      selectedIds.forEach((id) => next.add(id));
+      return next;
+    });
+    setSelectedIds(new Set());
+    toast({
+      title: "Categories cleared",
+      description: `Cleared categories from ${selectedIds.size} transaction(s)`,
+      variant: "success",
+    });
+  }, [selectedIds, setDirtyTransactionIds, setLocalTransactions]);
+
+  const clearAllEvents = useCallback(() => {
+    setLocalTransactions((prev) =>
+      prev.map((t) => (selectedIds.has(t.id) ? { ...t, eventId: undefined } : t)),
+    );
+    setDirtyTransactionIds((prev) => {
+      const next = new Set(prev);
+      selectedIds.forEach((id) => next.add(id));
+      return next;
+    });
+    setSelectedIds(new Set());
+    toast({
+      title: "Events cleared",
+      description: `Cleared events from ${selectedIds.size} transaction(s)`,
+      variant: "success",
+    });
+  }, [selectedIds, setDirtyTransactionIds, setLocalTransactions]);
+
   const handleEditTransaction = useCallback(
     (activity: ActivityDetails) => {
       onEditActivity(activity);
@@ -942,243 +1108,575 @@ export function ActivityDatagrid({
   }, [localTransactions, dirtyTransactionIds, pendingDeleteIds]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col space-y-3">
-      <div className="bg-muted/20 flex flex-wrap items-center justify-between gap-2 rounded-md border px-2.5 py-1.5">
-        <div className="text-muted-foreground flex items-center gap-2.5 text-xs">
-          {selectedIds.size > 0 && (
-            <span className="font-medium">
-              {selectedIds.size} row{selectedIds.size === 1 ? "" : "s"} selected
-            </span>
-          )}
-          {hasUnsavedChanges && (
-            <div className="flex items-center gap-2">
-              <span className="text-primary font-medium">
-                {dirtyTransactionIds.size + pendingDeleteIds.size} pending change
-                {dirtyTransactionIds.size + pendingDeleteIds.size === 1 ? "" : "s"}
+    <>
+      <UnsavedChangesDialog />
+      <div className="flex min-h-0 flex-1 flex-col space-y-3">
+        <div className="bg-muted/20 flex flex-wrap items-center justify-between gap-2 rounded-md border px-2.5 py-1.5">
+          <div className="text-muted-foreground flex items-center gap-2.5 text-xs">
+            {selectedIds.size > 0 && (
+              <span className="font-medium">
+                {selectedIds.size} row{selectedIds.size === 1 ? "" : "s"} selected
               </span>
-              <div className="bg-border h-3.5 w-px" />
-              <div className="flex items-center gap-4">
-                {changesCounts.newCount > 0 && (
-                  <span className="text-success flex items-center gap-1">
-                    <Icons.PlusCircle className="h-3 w-3" />
-                    <span className="font-medium">{changesCounts.newCount}</span>
-                  </span>
-                )}
-                {changesCounts.updatedCount > 0 && (
-                  <span className="flex items-center gap-1 text-blue-500 dark:text-blue-400">
-                    <Icons.Pencil className="h-3 w-3" />
-                    <span className="font-medium">{changesCounts.updatedCount}</span>
-                  </span>
-                )}
-                {changesCounts.deletedCount > 0 && (
-                  <span className="text-destructive flex items-center gap-1">
-                    <Icons.Trash className="h-3 w-3" />
-                    <span className="font-medium">{changesCounts.deletedCount}</span>
-                  </span>
-                )}
+            )}
+            {hasUnsavedChanges && (
+              <div className="flex items-center gap-2">
+                <span className="text-primary font-medium">
+                  {dirtyTransactionIds.size + pendingDeleteIds.size} pending change
+                  {dirtyTransactionIds.size + pendingDeleteIds.size === 1 ? "" : "s"}
+                </span>
+                <div className="bg-border h-3.5 w-px" />
+                <div className="flex items-center gap-4">
+                  {changesCounts.newCount > 0 && (
+                    <span className="text-success flex items-center gap-1">
+                      <Icons.PlusCircle className="h-3 w-3" />
+                      <span className="font-medium">{changesCounts.newCount}</span>
+                    </span>
+                  )}
+                  {changesCounts.updatedCount > 0 && (
+                    <span className="flex items-center gap-1 text-blue-500 dark:text-blue-400">
+                      <Icons.Pencil className="h-3 w-3" />
+                      <span className="font-medium">{changesCounts.updatedCount}</span>
+                    </span>
+                  )}
+                  {changesCounts.deletedCount > 0 && (
+                    <span className="text-destructive flex items-center gap-1">
+                      <Icons.Trash className="h-3 w-3" />
+                      <span className="font-medium">{changesCounts.deletedCount}</span>
+                    </span>
+                  )}
+                </div>
               </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1">
+            <Button
+              onClick={addNewRow}
+              variant="outline"
+              size="xs"
+              className="shrink-0 rounded-md"
+              title="Add transaction"
+              aria-label="Add transaction"
+            >
+              <Icons.Plus className="h-3.5 w-3.5" />
+              <span>Add</span>
+            </Button>
+
+            {selectedIds.size > 0 && (
+              <>
+                <div className="bg-border mx-1 h-4 w-px" />
+                <Button
+                  onClick={() => setBulkActivityTypeModalOpen(true)}
+                  variant="outline"
+                  size="xs"
+                  className="shrink-0"
+                >
+                  <Icons.ArrowRightLeft className="mr-1 h-3.5 w-3.5" />
+                  Type
+                </Button>
+                <Button
+                  onClick={() => setBulkCategoryModalOpen(true)}
+                  variant="outline"
+                  size="xs"
+                  className="shrink-0"
+                >
+                  <Icons.Tag className="mr-1 h-3.5 w-3.5" />
+                  Category
+                </Button>
+                <Button
+                  onClick={() => setBulkEventModalOpen(true)}
+                  variant="outline"
+                  size="xs"
+                  className="shrink-0"
+                >
+                  <Icons.Calendar className="mr-1 h-3.5 w-3.5" />
+                  Event
+                </Button>
+
+                <div className="bg-border mx-1 h-4 w-px" />
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="xs" className="shrink-0">
+                      <Icons.XCircle className="mr-1 h-3.5 w-3.5" />
+                      Clear
+                      <Icons.ChevronDown className="ml-1 h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem onClick={clearAllCategories}>
+                      <Icons.Tag className="mr-2 h-4 w-4" />
+                      Clear Categories
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={clearAllEvents}>
+                      <Icons.Calendar className="mr-2 h-4 w-4" />
+                      Clear Events
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Button
+                  onClick={deleteSelected}
+                  size="xs"
+                  variant="destructive"
+                  className="shrink-0 rounded-md text-xs"
+                  title="Delete selected"
+                  aria-label="Delete selected"
+                  disabled={saveActivitiesMutation.isPending}
+                >
+                  <Icons.Trash className="h-3.5 w-3.5" />
+                  <span>Delete</span>
+                </Button>
+
+                <Button
+                  onClick={clearSelection}
+                  variant="ghost"
+                  size="xs"
+                  className="ml-auto shrink-0"
+                >
+                  Deselect
+                </Button>
+              </>
+            )}
+
+            {hasUnsavedChanges && (
+              <>
+                <div className="bg-border mx-1 h-4 w-px" />
+                <Button
+                  onClick={handleSaveChanges}
+                  size="xs"
+                  className="shrink-0 rounded-md text-xs"
+                  title="Save changes"
+                  aria-label="Save changes"
+                  disabled={saveActivitiesMutation.isPending}
+                >
+                  {saveActivitiesMutation.isPending ? (
+                    <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Icons.Save className="h-3.5 w-3.5" />
+                  )}
+                  <span>Save</span>
+                </Button>
+
+                <Button
+                  onClick={handleCancelChanges}
+                  size="xs"
+                  variant="outline"
+                  className="shrink-0 rounded-md text-xs"
+                  title="Discard changes"
+                  aria-label="Discard changes"
+                  disabled={saveActivitiesMutation.isPending}
+                >
+                  <Icons.Undo className="h-3.5 w-3.5" />
+                  <span>Cancel</span>
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div
+          ref={scrollContainerRef}
+          className="bg-background min-h-[320px] flex-1 overflow-auto rounded-lg border [&>div]:overflow-visible"
+        >
+          <Table className="min-w-[1080px]">
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="bg-muted/30 h-9 w-12 border-r px-0 py-0">
+                  <div className="flex h-full items-center justify-center">
+                    <Checkbox
+                      checked={
+                        sortedTransactions.length > 0 &&
+                        selectedIds.size === sortedTransactions.length
+                      }
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </div>
+                </TableHead>
+                <SortableHeader
+                  className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold"
+                  title="Type"
+                  columnId="activityType"
+                  sorting={sorting}
+                  onSortingChange={onSortingChange}
+                />
+                <SortableHeader
+                  className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold"
+                  title="Date & Time"
+                  columnId="date"
+                  sorting={sorting}
+                  onSortingChange={onSortingChange}
+                />
+                <SortableHeader
+                  className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold"
+                  title="Symbol"
+                  columnId="assetSymbol"
+                  sorting={sorting}
+                  onSortingChange={onSortingChange}
+                />
+                <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
+                  Quantity
+                </TableHead>
+                <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
+                  Unit Price
+                </TableHead>
+                <TableHead className="bg-muted/30 h-9 w-24 border-r px-2 py-1.5 text-right text-xs font-semibold">
+                  Amount
+                </TableHead>
+                <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
+                  Fee
+                </TableHead>
+                <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
+                  Total
+                </TableHead>
+                <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
+                  Account
+                </TableHead>
+                <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
+                  Currency
+                </TableHead>
+                <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
+                  Comment
+                </TableHead>
+                <TableHead className="bg-muted/30 h-9 px-2 py-1.5" />
+              </TableRow>
+            </TableHeader>
+            {sortedTransactions.length === 0 ? (
+              <TableBody>
+                <TableRow>
+                  <TableCell colSpan={12} className="text-muted-foreground h-32 text-center">
+                    No investment activity yet. Add a trade or import from your brokerage.
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            ) : (
+              <TableBody>
+                {paddingTop > 0 ? (
+                  <TableRow key="virtual-padding-top">
+                    <TableCell colSpan={12} style={{ height: paddingTop }} />
+                  </TableRow>
+                ) : null}
+
+                {virtualRows.map((virtualRow) => {
+                  const transaction = sortedTransactions[virtualRow.index];
+                  if (!transaction) {
+                    return null;
+                  }
+
+                  return (
+                    <Fragment key={virtualRow.key}>
+                      <TransactionRow
+                        transaction={transaction}
+                        activityTypeOptions={activityTypeOptions}
+                        accountOptions={accountOptions}
+                        currencyOptions={currencyOptions}
+                        accountLookup={accountLookup}
+                        isSelected={selectedIds.has(transaction.id)}
+                        isDirty={dirtyTransactionIds.has(transaction.id)}
+                        focusedField={
+                          focusedCell?.rowId === transaction.id ? focusedCell.field : null
+                        }
+                        onToggleSelect={toggleSelect}
+                        onUpdateTransaction={updateTransaction}
+                        onEditTransaction={handleEditTransaction}
+                        onDuplicate={duplicateRow}
+                        onDelete={deleteRow}
+                        onNavigate={handleCellNavigation}
+                        setFocusedCell={setFocusedCell}
+                        resolvedCurrency={
+                          dirtyCurrencyLookup.get(transaction.id) ??
+                          transaction.currency ??
+                          transaction.accountCurrency ??
+                          fallbackCurrency
+                        }
+                        fallbackCurrency={fallbackCurrency}
+                        rowRef={rowVirtualizer.measureElement}
+                      />
+                    </Fragment>
+                  );
+                })}
+
+                {paddingBottom > 0 ? (
+                  <TableRow key="virtual-padding-bottom">
+                    <TableCell colSpan={12} style={{ height: paddingBottom }} />
+                  </TableRow>
+                ) : null}
+              </TableBody>
+            )}
+          </Table>
+        </div>
+      </div>
+
+      <BulkActivityTypeAssignModal
+        open={bulkActivityTypeModalOpen}
+        onClose={() => setBulkActivityTypeModalOpen(false)}
+        onAssign={bulkAssignActivityType}
+        selectedCount={selectedIds.size}
+      />
+
+      <BulkCategoryAssignModal
+        open={bulkCategoryModalOpen}
+        onClose={() => setBulkCategoryModalOpen(false)}
+        categories={categories}
+        onAssign={bulkAssignCategory}
+        selectedCount={selectedIds.size}
+      />
+
+      <BulkEventAssignModal
+        open={bulkEventModalOpen}
+        onClose={() => setBulkEventModalOpen(false)}
+        events={events}
+        onAssign={bulkAssignEvent}
+        selectedCount={selectedIds.size}
+      />
+    </>
+  );
+}
+
+// Bulk action modals
+
+interface BulkActivityTypeAssignModalProps {
+  open: boolean;
+  onClose: () => void;
+  onAssign: (activityType: ActivityType) => void;
+  selectedCount: number;
+}
+
+const BULK_ACTIVITY_TYPE_OPTIONS = Object.values(ActivityType).map((type) => ({
+  value: type,
+  label: ActivityTypeNames[type],
+}));
+
+function BulkActivityTypeAssignModal({
+  open,
+  onClose,
+  onAssign,
+  selectedCount,
+}: BulkActivityTypeAssignModalProps) {
+  const [selectedType, setSelectedType] = useState<string>("");
+
+  const handleAssign = () => {
+    if (selectedType) {
+      onAssign(selectedType as ActivityType);
+      setSelectedType("");
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            Assign Type to {selectedCount} Transaction{selectedCount !== 1 ? "s" : ""}
+          </DialogTitle>
+          <DialogDescription>Select an activity type to assign.</DialogDescription>
+        </DialogHeader>
+        <div className="py-4">
+          <label className="mb-1 block text-sm font-medium">Activity Type</label>
+          <Select value={selectedType} onValueChange={setSelectedType}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select activity type" />
+            </SelectTrigger>
+            <SelectContent>
+              {BULK_ACTIVITY_TYPE_OPTIONS.map((type) => (
+                <SelectItem key={type.value} value={type.value}>
+                  {type.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleAssign} disabled={!selectedType}>
+            Assign
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface BulkCategoryAssignModalProps {
+  open: boolean;
+  onClose: () => void;
+  categories: CategoryWithChildren[];
+  onAssign: (categoryId: string | undefined, subCategoryId?: string) => void;
+  selectedCount: number;
+}
+
+const NONE_CATEGORY_VALUE = "__none__";
+
+function BulkCategoryAssignModal({
+  open,
+  onClose,
+  categories,
+  onAssign,
+  selectedCount,
+}: BulkCategoryAssignModalProps) {
+  const [selectedCat, setSelectedCat] = useState("");
+  const [selectedSub, setSelectedSub] = useState("");
+
+  const isNoneSelected = selectedCat === NONE_CATEGORY_VALUE;
+  const selectedCategory = !isNoneSelected
+    ? categories.find((c) => c.id === selectedCat)
+    : undefined;
+  const subCategories = selectedCategory?.children || [];
+
+  const handleAssign = () => {
+    if (selectedCat === NONE_CATEGORY_VALUE) {
+      onAssign(undefined, undefined);
+    } else if (selectedCat) {
+      onAssign(selectedCat, selectedSub || undefined);
+    }
+    setSelectedCat("");
+    setSelectedSub("");
+  };
+
+  if (!open) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            Assign Category to {selectedCount} Transaction{selectedCount !== 1 ? "s" : ""}
+          </DialogTitle>
+          <DialogDescription>
+            Select a category and optionally a subcategory to assign, or clear existing categories.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium">Category</label>
+            <Select
+              value={selectedCat}
+              onValueChange={(v) => {
+                setSelectedCat(v);
+                setSelectedSub("");
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE_CATEGORY_VALUE}>None (Clear category)</SelectItem>
+                {categories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id}>
+                    <span className="flex items-center gap-2">
+                      {cat.color && (
+                        <span
+                          className="h-3 w-3 rounded-full"
+                          style={{ backgroundColor: cat.color }}
+                        />
+                      )}
+                      {cat.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {subCategories.length > 0 && !isNoneSelected && (
+            <div>
+              <label className="mb-1 block text-sm font-medium">Subcategory (optional)</label>
+              <Select value={selectedSub} onValueChange={setSelectedSub}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select subcategory" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subCategories.map((sub) => (
+                    <SelectItem key={sub.id} value={sub.id}>
+                      {sub.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
         </div>
-
-        <div className="flex items-center gap-1">
-          <Button
-            onClick={addNewRow}
-            variant="outline"
-            size="xs"
-            className="shrink-0 rounded-md"
-            title="Add transaction"
-            aria-label="Add transaction"
-          >
-            <Icons.Plus className="h-3.5 w-3.5" />
-            <span>Add</span>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
           </Button>
+          <Button onClick={handleAssign} disabled={!selectedCat}>
+            Assign
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
-          {selectedIds.size > 0 && (
-            <>
-              <div className="bg-border mx-1 h-4 w-px" />
-              <Button
-                onClick={deleteSelected}
-                size="xs"
-                variant="destructive"
-                className="shrink-0 rounded-md text-xs"
-                title="Delete selected"
-                aria-label="Delete selected"
-                disabled={saveActivitiesMutation.isPending}
-              >
-                <Icons.Trash className="h-3.5 w-3.5" />
-                <span>Delete</span>
-              </Button>
-            </>
-          )}
+interface BulkEventAssignModalProps {
+  open: boolean;
+  onClose: () => void;
+  events: Event[];
+  onAssign: (eventId: string | undefined) => void;
+  selectedCount: number;
+}
 
-          {hasUnsavedChanges && (
-            <>
-              <div className="bg-border mx-1 h-4 w-px" />
-              <Button
-                onClick={handleSaveChanges}
-                size="xs"
-                className="shrink-0 rounded-md text-xs"
-                title="Save changes"
-                aria-label="Save changes"
-                disabled={saveActivitiesMutation.isPending}
-              >
-                {saveActivitiesMutation.isPending ? (
-                  <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Icons.Save className="h-3.5 w-3.5" />
-                )}
-                <span>Save</span>
-              </Button>
+const NONE_EVENT_VALUE = "__none__";
 
-              <Button
-                onClick={handleCancelChanges}
-                size="xs"
-                variant="outline"
-                className="shrink-0 rounded-md text-xs"
-                title="Discard changes"
-                aria-label="Discard changes"
-                disabled={saveActivitiesMutation.isPending}
-              >
-                <Icons.Undo className="h-3.5 w-3.5" />
-                <span>Cancel</span>
-              </Button>
-            </>
-          )}
+function BulkEventAssignModal({
+  open,
+  onClose,
+  events,
+  onAssign,
+  selectedCount,
+}: BulkEventAssignModalProps) {
+  const [selectedEvent, setSelectedEvent] = useState("");
+
+  const handleAssign = () => {
+    if (selectedEvent === NONE_EVENT_VALUE) {
+      onAssign(undefined);
+    } else if (selectedEvent) {
+      onAssign(selectedEvent);
+    }
+    setSelectedEvent("");
+  };
+
+  if (!open) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            Assign Event to {selectedCount} Transaction{selectedCount !== 1 ? "s" : ""}
+          </DialogTitle>
+          <DialogDescription>Select an event to assign or clear existing events.</DialogDescription>
+        </DialogHeader>
+        <div className="py-4">
+          <label className="mb-1 block text-sm font-medium">Event</label>
+          <Select value={selectedEvent} onValueChange={setSelectedEvent}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select event" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE_EVENT_VALUE}>None (Clear event)</SelectItem>
+              {events.map((event) => (
+                <SelectItem key={event.id} value={event.id}>
+                  {event.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-      </div>
-
-      <div
-        ref={scrollContainerRef}
-        className="bg-background min-h-[320px] flex-1 overflow-auto rounded-lg border [&>div]:overflow-visible"
-      >
-        <Table className="min-w-[1080px]">
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="bg-muted/30 h-9 w-12 border-r px-0 py-0">
-                <div className="flex h-full items-center justify-center">
-                  <Checkbox
-                    checked={
-                      sortedTransactions.length > 0 &&
-                      selectedIds.size === sortedTransactions.length
-                    }
-                    onCheckedChange={toggleSelectAll}
-                  />
-                </div>
-              </TableHead>
-              <SortableHeader
-                className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold"
-                title="Type"
-                columnId="activityType"
-                sorting={sorting}
-                onSortingChange={onSortingChange}
-              />
-              <SortableHeader
-                className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold"
-                title="Date & Time"
-                columnId="date"
-                sorting={sorting}
-                onSortingChange={onSortingChange}
-              />
-              <SortableHeader
-                className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold"
-                title="Symbol"
-                columnId="assetSymbol"
-                sorting={sorting}
-                onSortingChange={onSortingChange}
-              />
-              <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
-                Quantity
-              </TableHead>
-              <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
-                Unit Price
-              </TableHead>
-              <TableHead className="bg-muted/30 h-9 w-24 border-r px-2 py-1.5 text-right text-xs font-semibold">
-                Amount
-              </TableHead>
-              <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
-                Fee
-              </TableHead>
-              <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
-                Total
-              </TableHead>
-              <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
-                Account
-              </TableHead>
-              <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
-                Currency
-              </TableHead>
-              <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
-                Comment
-              </TableHead>
-              <TableHead className="bg-muted/30 h-9 px-2 py-1.5" />
-            </TableRow>
-          </TableHeader>
-          {sortedTransactions.length === 0 ? (
-            <TableBody>
-              <TableRow>
-                <TableCell colSpan={12} className="text-muted-foreground h-32 text-center">
-                  No transactions yet. Click &quot;Add Transaction&quot; to get started.
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          ) : (
-            <TableBody>
-              {paddingTop > 0 ? (
-                <TableRow key="virtual-padding-top">
-                  <TableCell colSpan={12} style={{ height: paddingTop }} />
-                </TableRow>
-              ) : null}
-
-              {virtualRows.map((virtualRow) => {
-                const transaction = sortedTransactions[virtualRow.index];
-                if (!transaction) {
-                  return null;
-                }
-
-                return (
-                  <Fragment key={virtualRow.key}>
-                    <TransactionRow
-                      transaction={transaction}
-                      activityTypeOptions={activityTypeOptions}
-                      accountOptions={accountOptions}
-                      currencyOptions={currencyOptions}
-                      accountLookup={accountLookup}
-                      isSelected={selectedIds.has(transaction.id)}
-                      isDirty={dirtyTransactionIds.has(transaction.id)}
-                      focusedField={
-                        focusedCell?.rowId === transaction.id ? focusedCell.field : null
-                      }
-                      onToggleSelect={toggleSelect}
-                      onUpdateTransaction={updateTransaction}
-                      onEditTransaction={handleEditTransaction}
-                      onDuplicate={duplicateRow}
-                      onDelete={deleteRow}
-                      onNavigate={handleCellNavigation}
-                      setFocusedCell={setFocusedCell}
-                      resolvedCurrency={
-                        dirtyCurrencyLookup.get(transaction.id) ??
-                        transaction.currency ??
-                        transaction.accountCurrency ??
-                        fallbackCurrency
-                      }
-                      fallbackCurrency={fallbackCurrency}
-                      rowRef={rowVirtualizer.measureElement}
-                    />
-                  </Fragment>
-                );
-              })}
-
-              {paddingBottom > 0 ? (
-                <TableRow key="virtual-padding-bottom">
-                  <TableCell colSpan={12} style={{ height: paddingBottom }} />
-                </TableRow>
-              ) : null}
-            </TableBody>
-          )}
-        </Table>
-      </div>
-    </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleAssign} disabled={!selectedEvent}>
+            Assign
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

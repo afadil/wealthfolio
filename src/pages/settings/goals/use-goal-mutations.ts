@@ -1,6 +1,13 @@
 import { logger } from "@/adapters";
-import { createGoal, deleteGoal, updateGoal, updateGoalsAllocations } from "@/commands/goal";
+import {
+  createGoal,
+  deleteGoal,
+  updateGoal,
+  addGoalContribution,
+  removeGoalContribution,
+} from "@/commands/goal";
 import { QueryKeys } from "@/lib/query-keys";
+import { NewGoalContribution } from "@/lib/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -21,8 +28,9 @@ export const useGoalMutations = () => {
   const addGoalMutation = useMutation({
     mutationFn: createGoal,
     onSuccess: () =>
-      handleSuccess("Goal added successfully. Start adding or importing this goal activities.", [
+      handleSuccess("Goal added successfully.", [
         QueryKeys.GOALS,
+        QueryKeys.GOALS_WITH_CONTRIBUTIONS,
       ]),
     onError: (e) => {
       logger.error(`Error adding goal: ${e}`);
@@ -32,7 +40,11 @@ export const useGoalMutations = () => {
 
   const updateGoalMutation = useMutation({
     mutationFn: updateGoal,
-    onSuccess: () => handleSuccess("Goal updated successfully.", [QueryKeys.GOALS]),
+    onSuccess: () =>
+      handleSuccess("Goal updated successfully.", [
+        QueryKeys.GOALS,
+        QueryKeys.GOALS_WITH_CONTRIBUTIONS,
+      ]),
     onError: (e) => {
       logger.error(`Error updating goal: ${e}`);
       handleError("updating this goal");
@@ -42,31 +54,47 @@ export const useGoalMutations = () => {
   const deleteGoalMutation = useMutation({
     mutationFn: deleteGoal,
     onSuccess: () =>
-      handleSuccess("Goal deleted successfully.", [QueryKeys.GOALS, QueryKeys.GOALS_ALLOCATIONS]),
+      handleSuccess("Goal deleted successfully.", [
+        QueryKeys.GOALS,
+        QueryKeys.GOALS_WITH_CONTRIBUTIONS,
+      ]),
     onError: (e) => {
       logger.error(`Error deleting goal: ${e}`);
       handleError("deleting this goal");
     },
   });
 
-  const saveAllocationsMutation = useMutation({
-    mutationFn: updateGoalsAllocations,
+  const addContributionMutation = useMutation({
+    mutationFn: (contribution: NewGoalContribution) => addGoalContribution(contribution),
     onSuccess: () =>
-      handleSuccess("Allocation saved successfully.", [
-        QueryKeys.GOALS,
-        QueryKeys.GOALS_ALLOCATIONS,
+      handleSuccess("Contribution added successfully.", [
+        QueryKeys.GOALS_WITH_CONTRIBUTIONS,
+        QueryKeys.ACCOUNT_FREE_CASH,
       ]),
     onError: (e) => {
-      logger.error(`Error saving allocations: ${e}`);
-      console.error("Error saving allocations:", e);
-      handleError("saving the allocations");
+      logger.error(`Error adding contribution: ${e}`);
+      handleError("adding the contribution");
+    },
+  });
+
+  const removeContributionMutation = useMutation({
+    mutationFn: (contributionId: string) => removeGoalContribution(contributionId),
+    onSuccess: () =>
+      handleSuccess("Contribution removed successfully.", [
+        QueryKeys.GOALS_WITH_CONTRIBUTIONS,
+        QueryKeys.ACCOUNT_FREE_CASH,
+      ]),
+    onError: (e) => {
+      logger.error(`Error removing contribution: ${e}`);
+      handleError("removing the contribution");
     },
   });
 
   return {
-    deleteGoalMutation,
-    saveAllocationsMutation,
     addGoalMutation,
     updateGoalMutation,
+    deleteGoalMutation,
+    addContributionMutation,
+    removeContributionMutation,
   };
 };

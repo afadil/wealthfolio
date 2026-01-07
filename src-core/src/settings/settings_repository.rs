@@ -62,6 +62,9 @@ impl SettingsRepositoryTrait for SettingsRepository {
                 "sync_enabled" => {
                     settings.sync_enabled = value.parse().unwrap_or(true);
                 }
+                "budget_variance_tolerance" => {
+                    settings.budget_variance_tolerance = value.parse().unwrap_or(10);
+                }
                 _ => {} // Ignore unknown settings
             }
         }
@@ -136,6 +139,15 @@ impl SettingsRepositoryTrait for SettingsRepository {
                         .execute(conn)?;
                 }
 
+                if let Some(budget_variance_tolerance) = settings.budget_variance_tolerance {
+                    diesel::replace_into(app_settings)
+                        .values(&AppSetting {
+                            setting_key: "budget_variance_tolerance".to_string(),
+                            setting_value: budget_variance_tolerance.to_string(),
+                        })
+                        .execute(conn)?;
+                }
+
                 Ok(())
             })
             .await
@@ -159,6 +171,7 @@ impl SettingsRepositoryTrait for SettingsRepository {
                     "auto_update_check_enabled" => "true",
                     "menu_bar_visible" => "true",
                     "sync_enabled" => "true",
+                    "budget_variance_tolerance" => "10",
                     _ => return Err(Error::from(diesel::result::Error::NotFound)),
                 };
                 Ok(default_value.to_string())
