@@ -1,0 +1,1355 @@
+{
+  "name": "Regions",
+  "color": "#d58791",
+  "categories": [
+    {
+      "name": "Europe",
+      "key": "R10",
+      "color": "#b8dcbc",
+      "children": [
+        {
+          "name": "North Europe",
+          "key": "R1010",
+          "color": "#d6fa92",
+          "children": [
+            {
+              "name": "Denmark",
+              "key": "country_DK",
+              "color": "#999cc3"
+            },
+            {
+              "name": "Estonia",
+              "key": "country_EE",
+              "color": "#e8d6b4"
+            },
+            {
+              "name": "Finland",
+              "key": "country_FI",
+              "color": "#b2c3e0"
+            },
+            {
+              "name": "Great Britain",
+              "key": "country_GB",
+              "color": "#e0dab2"
+            },
+            {
+              "name": "Iceland",
+              "key": "country_IS",
+              "color": "#b19dbb"
+            },
+            {
+              "name": "Ireland",
+              "key": "country_IE",
+              "color": "#bfa3c0"
+            },
+            {
+              "name": "Latvia",
+              "key": "country_LV",
+              "color": "#8cd9b9"
+            },
+            {
+              "name": "Lithuania",
+              "key": "country_LT",
+              "color": "#83d6e9"
+            },
+            {
+              "name": "Norway",
+              "key": "country_NO",
+              "color": "#f580e6"
+            },
+            {
+              "name": "Sweden",
+              "key": "country_SE",
+              "color": "#cdacfd"
+            }
+          ]
+        },
+        {
+          "name": "West Europe",
+          "key": "R1020",
+          "color": "#b27f98",
+          "children": [
+            {
+              "name": "Austria",
+              "key": "country_AT",
+              "color": "#dbf5e7"
+            },
+            {
+              "name": "Belgium",
+              "key": "country_BE",
+              "color": "#a7dbd2"
+            },
+            {
+              "name": "France",
+              "key": "country_FR",
+              "color": "#d5e291"
+            },
+            {
+              "name": "Germany",
+              "key": "country_DE",
+              "color": "#a7c2a8"
+            },
+            {
+              "name": "Liechtenstein",
+              "key": "country_LI",
+              "color": "#c8bdfc"
+            },
+            {
+              "name": "Luxembourg",
+              "key": "country_LU",
+              "color": "#e2f0de"
+            },
+            {
+              "name": "Monaco",
+              "key": "country_MC",
+              "color": "#87d0ba"
+            },
+            {
+              "name": "Netherlands",
+              "key": "country_NL",
+              "color": "#eaa1f1"
+            },
+            {
+              "name": "Switzerland",
+              "key": "country_CH",
+              "color": "#859cdf"
+            }
+          ]
+        },
+        {
+          "name": "East Europe",
+          "key": "R1030",
+          "color": "#9bf191",
+          "children": [
+            {
+              "name": "Belarus",
+              "key": "country_BY",
+              "color": "#ca9484"
+            },
+            {
+              "name": "Bulgaria",
+              "key": "country_BG",
+              "color": "#ef8aac"
+            },
+            {
+              "name": "Czech Republic",
+              "key": "country_CZ",
+              "color": "#f5ba93"
+            },
+            {
+              "name": "Hungary",
+              "key": "country_HU",
+              "color": "#c39594"
+            },
+            {
+              "name": "Poland",
+              "key": "country_PL",
+              "color": "#ddb4cc"
+            },
+            {
+              "name": "Romania",
+              "key": "country_RO",
+              "color": "#9f7fd8"
+            },
+            {
+              "name": "Russia",
+              "key": "country_RU",
+              "color": "#f1e4c3"
+            },
+            {
+              "name": "Slovakia",
+              "key": "country_SK",
+              "color": "#f6deb6"
+            },
+            {
+              "name": "Ukraine",
+              "key": "country_UA",
+              "color": "#f4c18b"
+            }
+          ]
+        },
+        {
+          "name": "South Europe",
+          "key": "R1040",
+          "color": "#cac783",
+          "children": [
+            {
+              "name": "Albania",
+              "key": "country_AL",
+              "color": "#a8e592"
+            },
+            {
+              "name": "Andorra",
+              "key": "country_AD",
+              "color": "#c09dc3"
+            },
+            {
+              "name": "Bosnia and Herzegovina",
+              "key": "country_BA",
+              "color": "#c287e2"
+            },
+            {
+              "name": "Croatia",
+              "key": "country_HR",
+              "color": "#e3e8ab"
+            },
+            {
+              "name": "Gibraltar",
+              "key": "country_GI",
+              "color": "#e08cbd"
+            },
+            {
+              "name": "Greece",
+              "key": "country_GR",
+              "color": "#c7dc9b"
+            },
+            {
+              "name": "Italy",
+              "key": "country_IT",
+              "color": "#cac88d"
+            },
+            {
+              "name": "Malta",
+              "key": "country_MT",
+              "color": "#e6ed94"
+            },
+            {
+              "name": "Montenegro",
+              "key": "country_ME",
+              "color": "#e39a8d"
+            },
+            {
+              "name": "Portugal",
+              "key": "country_PT",
+              "color": "#88fab0"
+            },
+            {
+              "name": "San Marino",
+              "key": "country_SM",
+              "color": "#b6cbe4"
+            },
+            {
+              "name": "Serbia",
+              "key": "country_RS",
+              "color": "#b68994"
+            },
+            {
+              "name": "Spain",
+              "key": "country_ES",
+              "color": "#f3cdbc"
+            },
+            {
+              "name": "Vatican city",
+              "key": "country_VA",
+              "color": "#dcf7e9"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "America",
+      "key": "R20",
+      "color": "#cfa9f7",
+      "children": [
+        {
+          "name": "North America",
+          "key": "R2010",
+          "color": "#a6c5ee",
+          "children": [
+            {
+              "name": "Bermuda",
+              "key": "country_BM",
+              "color": "#cadee9"
+            },
+            {
+              "name": "Canada",
+              "key": "country_CA",
+              "color": "#9fa0d7"
+            },
+            {
+              "name": "Greenland",
+              "key": "country_GL",
+              "color": "#8cbfb9"
+            },
+            {
+              "name": "Mexico",
+              "key": "country_MX",
+              "color": "#a6f1c8"
+            },
+            {
+              "name": "Saint-Pierre and Miquelon",
+              "key": "country_PM",
+              "color": "#d7a0a2"
+            },
+            {
+              "name": "United States",
+              "key": "country_US",
+              "color": "#8fa5e6"
+            }
+          ]
+        },
+        {
+          "name": "Central America",
+          "key": "R2020",
+          "color": "#8af1c5",
+          "children": [
+            {
+              "name": "Belize",
+              "key": "country_BZ",
+              "color": "#eabfc3"
+            },
+            {
+              "name": "Costa Rica",
+              "key": "country_CR",
+              "color": "#98aedb"
+            },
+            {
+              "name": "El Salvador",
+              "key": "country_SV",
+              "color": "#a3dee0"
+            },
+            {
+              "name": "Guatemala",
+              "key": "country_GT",
+              "color": "#d5d79d"
+            },
+            {
+              "name": "Honduras",
+              "key": "country_HN",
+              "color": "#87d6dd"
+            },
+            {
+              "name": "Nicaragua",
+              "key": "country_NI",
+              "color": "#b696e9"
+            },
+            {
+              "name": "Panama",
+              "key": "country_PA",
+              "color": "#99a9e5"
+            }
+          ]
+        },
+        {
+          "name": "Caribbean",
+          "key": "R2030",
+          "color": "#deade6",
+          "children": [
+            {
+              "name": "American Virgin Islands",
+              "key": "country_VI",
+              "color": "#9d8b9c"
+            },
+            {
+              "name": "Anguilla",
+              "key": "country_AI",
+              "color": "#bcc0f7"
+            },
+            {
+              "name": "Antigua and Barbuda",
+              "key": "country_AG",
+              "color": "#9e83d7"
+            },
+            {
+              "name": "Aruba",
+              "key": "country_AW",
+              "color": "#e7c9fc"
+            },
+            {
+              "name": "Bahamas",
+              "key": "country_BS",
+              "color": "#f9dde6"
+            },
+            {
+              "name": "Barbados",
+              "key": "country_BB",
+              "color": "#b7ebd5"
+            },
+            {
+              "name": "British Virgin Islands",
+              "key": "country_VG",
+              "color": "#bed79f"
+            },
+            {
+              "name": "Cayman Islands",
+              "key": "country_KY",
+              "color": "#c18bb2"
+            },
+            {
+              "name": "Cuba",
+              "key": "country_CU",
+              "color": "#f6e1b5"
+            },
+            {
+              "name": "Dominica",
+              "key": "country_DM",
+              "color": "#eb95e4"
+            },
+            {
+              "name": "Dominican Republic",
+              "key": "country_DO",
+              "color": "#88d7c1"
+            },
+            {
+              "name": "Grenada",
+              "key": "country_GD",
+              "color": "#cbf4ee"
+            },
+            {
+              "name": "Guadeloupe",
+              "key": "country_GP",
+              "color": "#82c1d0"
+            },
+            {
+              "name": "Haiti",
+              "key": "country_HT",
+              "color": "#aa859d"
+            },
+            {
+              "name": "Jamaica",
+              "key": "country_JM",
+              "color": "#cfcfc7"
+            },
+            {
+              "name": "Martinique",
+              "key": "country_MQ",
+              "color": "#8eb0f6"
+            },
+            {
+              "name": "Montserrat",
+              "key": "country_MS",
+              "color": "#ebecf0"
+            },
+            {
+              "name": "Puerto Rico",
+              "key": "country_PR",
+              "color": "#bcead6"
+            },
+            {
+              "name": "Saint Martin",
+              "key": "country_MF",
+              "color": "#a9bbb5"
+            },
+            {
+              "name": "Sint Maarten",
+              "key": "country_SX",
+              "color": "#dfe3c5"
+            },
+            {
+              "name": "St. Barthélemy",
+              "key": "country_BL",
+              "color": "#caf3fb"
+            },
+            {
+              "name": "St. Kitts and Nevis",
+              "key": "country_KN",
+              "color": "#bbec92"
+            },
+            {
+              "name": "St. Lucia",
+              "key": "country_LC",
+              "color": "#bea7fe"
+            },
+            {
+              "name": "St. Vincent and the Grenadines",
+              "key": "country_VC",
+              "color": "#ddbcd0"
+            },
+            {
+              "name": "Trinidad and Tobago",
+              "key": "country_TT",
+              "color": "#a0b1e9"
+            },
+            {
+              "name": "Turks and Caicos Islands",
+              "key": "country_TC",
+              "color": "#85d4b0"
+            }
+          ]
+        },
+        {
+          "name": "South America",
+          "key": "R2040",
+          "color": "#a18daa",
+          "children": [
+            {
+              "name": "Argentina",
+              "key": "country_AR",
+              "color": "#ea98f7"
+            },
+            {
+              "name": "Bolivia",
+              "key": "country_BO",
+              "color": "#bda6d5"
+            },
+            {
+              "name": "Brazil",
+              "key": "country_BR",
+              "color": "#d781da"
+            },
+            {
+              "name": "Chile",
+              "key": "country_CL",
+              "color": "#ded3a2"
+            },
+            {
+              "name": "Colombia",
+              "key": "country_CO",
+              "color": "#a5f8d3"
+            },
+            {
+              "name": "Ecuador",
+              "key": "country_EC",
+              "color": "#eabcca"
+            },
+            {
+              "name": "Falkland Islands",
+              "key": "country_FK",
+              "color": "#80b8af"
+            },
+            {
+              "name": "French Guiana",
+              "key": "country_GF",
+              "color": "#a9cde5"
+            },
+            {
+              "name": "Guyana",
+              "key": "country_GY",
+              "color": "#dbab9c"
+            },
+            {
+              "name": "Paraguay",
+              "key": "country_PY",
+              "color": "#9c8cdc"
+            },
+            {
+              "name": "Peru",
+              "key": "country_PE",
+              "color": "#a891b6"
+            },
+            {
+              "name": "Suriname",
+              "key": "country_SR",
+              "color": "#d6ea9e"
+            },
+            {
+              "name": "Uruguay",
+              "key": "country_UY",
+              "color": "#d8c7fc"
+            },
+            {
+              "name": "Venezuela",
+              "key": "country_VE",
+              "color": "#d6d5bb"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Asia",
+      "key": "R30",
+      "color": "#f8dbef",
+      "children": [
+        {
+          "name": "West Asia (Near Asia)",
+          "key": "R3010",
+          "color": "#a2f3f0",
+          "children": [
+            {
+              "name": "Armenia",
+              "key": "country_AM",
+              "color": "#b5b3e4"
+            },
+            {
+              "name": "Azerbaijan",
+              "key": "country_AZ",
+              "color": "#9fa0bf"
+            },
+            {
+              "name": "Bahrain",
+              "key": "country_BH",
+              "color": "#da7fbf"
+            },
+            {
+              "name": "Cyprus",
+              "key": "country_CY",
+              "color": "#c6a380"
+            },
+            {
+              "name": "Georgia",
+              "key": "country_GE",
+              "color": "#b98ec7"
+            },
+            {
+              "name": "Iraq",
+              "key": "country_IQ",
+              "color": "#e1f7c1"
+            },
+            {
+              "name": "Israel",
+              "key": "country_IL",
+              "color": "#f2edf2"
+            },
+            {
+              "name": "Jordan",
+              "key": "country_JO",
+              "color": "#93fbd3"
+            },
+            {
+              "name": "Kuwait",
+              "key": "country_KW",
+              "color": "#f4b9d7"
+            },
+            {
+              "name": "Lebanon",
+              "key": "country_LB",
+              "color": "#afa9cc"
+            },
+            {
+              "name": "Oman",
+              "key": "country_OM",
+              "color": "#c5f4c8"
+            },
+            {
+              "name": "Qatar",
+              "key": "country_QA",
+              "color": "#cf8e9e"
+            },
+            {
+              "name": "Saudi Arabia",
+              "key": "country_SA",
+              "color": "#accc99"
+            },
+            {
+              "name": "Syria",
+              "key": "country_SY",
+              "color": "#c98fc0"
+            },
+            {
+              "name": "Turkey",
+              "key": "country_TR",
+              "color": "#d293c5"
+            },
+            {
+              "name": "United Arab Emirates",
+              "key": "country_AE",
+              "color": "#f3c3b3"
+            },
+            {
+              "name": "Yemen",
+              "key": "country_YE",
+              "color": "#fca1fe"
+            }
+          ]
+        },
+        {
+          "name": "Central Asia",
+          "key": "R3020",
+          "color": "#8db5ec",
+          "children": [
+            {
+              "name": "Kazakhstan",
+              "key": "country_KZ",
+              "color": "#c9c4f4"
+            },
+            {
+              "name": "Kyrgyzstan",
+              "key": "country_KG",
+              "color": "#f8d3af"
+            },
+            {
+              "name": "Tajikistan",
+              "key": "country_TJ",
+              "color": "#dbbcbf"
+            },
+            {
+              "name": "Turkmenistan",
+              "key": "country_TM",
+              "color": "#c2fb86"
+            },
+            {
+              "name": "Uzbekistan",
+              "key": "country_UZ",
+              "color": "#8e8a96"
+            }
+          ]
+        },
+        {
+          "name": "East Asia",
+          "key": "R3030",
+          "color": "#c39691",
+          "children": [
+            {
+              "name": "China",
+              "key": "country_CN",
+              "color": "#f0b091"
+            },
+            {
+              "name": "Hong Kong",
+              "key": "country_HK",
+              "color": "#eef0d0"
+            },
+            {
+              "name": "Japan",
+              "key": "country_JP",
+              "color": "#c2c6df"
+            },
+            {
+              "name": "Macau",
+              "key": "country_MO",
+              "color": "#99c9a1"
+            },
+            {
+              "name": "Mongolia",
+              "key": "country_MN",
+              "color": "#d1a1c9"
+            },
+            {
+              "name": "North Korea",
+              "key": "country_KP",
+              "color": "#988ccc"
+            },
+            {
+              "name": "South Korea",
+              "key": "country_KR",
+              "color": "#eed2d1"
+            },
+            {
+              "name": "Taiwan",
+              "key": "country_TW",
+              "color": "#afa6f4"
+            }
+          ]
+        },
+        {
+          "name": "South Asia",
+          "key": "R3040",
+          "color": "#e9c6bf",
+          "children": [
+            {
+              "name": "Afghanistan",
+              "key": "country_AF",
+              "color": "#82de8b"
+            },
+            {
+              "name": "Bangladesh",
+              "key": "country_BD",
+              "color": "#9dceb4"
+            },
+            {
+              "name": "Bhutan",
+              "key": "country_BT",
+              "color": "#95ae86"
+            },
+            {
+              "name": "India",
+              "key": "country_IN",
+              "color": "#f5f190"
+            },
+            {
+              "name": "Iran",
+              "key": "country_IR",
+              "color": "#f1ab97"
+            },
+            {
+              "name": "Maldives",
+              "key": "country_MV",
+              "color": "#c7bf85"
+            },
+            {
+              "name": "Nepal",
+              "key": "country_NP",
+              "color": "#abdcc5"
+            },
+            {
+              "name": "Pakistan",
+              "key": "country_PK",
+              "color": "#b2a58f"
+            },
+            {
+              "name": "Sri Lanka",
+              "key": "country_LK",
+              "color": "#7fa9a4"
+            }
+          ]
+        },
+        {
+          "name": "Southeast Asia",
+          "key": "R3050",
+          "color": "#f28f7f",
+          "children": [
+            {
+              "name": "Brunei Darussalam",
+              "key": "country_BN",
+              "color": "#83b391"
+            },
+            {
+              "name": "Cambodia",
+              "key": "country_KH",
+              "color": "#f28dd1"
+            },
+            {
+              "name": "Indonesia",
+              "key": "country_ID",
+              "color": "#cc8ec3"
+            },
+            {
+              "name": "Laos",
+              "key": "country_LA",
+              "color": "#dd85a5"
+            },
+            {
+              "name": "Malaysia",
+              "key": "country_MY",
+              "color": "#b0aae1"
+            },
+            {
+              "name": "Myanmar",
+              "key": "country_MM",
+              "color": "#b592d1"
+            },
+            {
+              "name": "Philippines",
+              "key": "country_PH",
+              "color": "#92bed0"
+            },
+            {
+              "name": "Singapore",
+              "key": "country_SG",
+              "color": "#dd989e"
+            },
+            {
+              "name": "Thailand",
+              "key": "country_TH",
+              "color": "#c7c9d4"
+            },
+            {
+              "name": "Timor Leste",
+              "key": "country_TL",
+              "color": "#addbef"
+            },
+            {
+              "name": "Vietnam",
+              "key": "country_VN",
+              "color": "#fbe1a5"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Africa",
+      "key": "R40",
+      "color": "#8be8ca",
+      "children": [
+        {
+          "name": "North Africa",
+          "key": "R4010",
+          "color": "#84cbc7",
+          "children": [
+            {
+              "name": "Algeria",
+              "key": "country_DZ",
+              "color": "#a5dee1"
+            },
+            {
+              "name": "Egypt",
+              "key": "country_EG",
+              "color": "#ac83d9"
+            },
+            {
+              "name": "Libya",
+              "key": "country_LY",
+              "color": "#9e9f9a"
+            },
+            {
+              "name": "Morocco",
+              "key": "country_MA",
+              "color": "#c5ce9e"
+            },
+            {
+              "name": "Sudan",
+              "key": "country_SS",
+              "color": "#a1abfe"
+            },
+            {
+              "name": "Tunisia",
+              "key": "country_TN",
+              "color": "#9e81e4"
+            },
+            {
+              "name": "Western Sahara",
+              "key": "country_EH",
+              "color": "#a9de88"
+            }
+          ]
+        },
+        {
+          "name": "West Africa",
+          "key": "R4020",
+          "color": "#b1f3a3",
+          "children": [
+            {
+              "name": "Benin",
+              "key": "country_BJ",
+              "color": "#8e9f91"
+            },
+            {
+              "name": "Burkina Faso",
+              "key": "country_BF",
+              "color": "#88d8d7"
+            },
+            {
+              "name": "Cape Verde",
+              "key": "country_CV",
+              "color": "#c5f9d6"
+            },
+            {
+              "name": "Gambia",
+              "key": "country_GM",
+              "color": "#f5b9ec"
+            },
+            {
+              "name": "Ghana",
+              "key": "country_GH",
+              "color": "#d59bc2"
+            },
+            {
+              "name": "Guinea",
+              "key": "country_GQ",
+              "color": "#e0b2af"
+            },
+            {
+              "name": "Guinea-Bissau",
+              "key": "country_GW",
+              "color": "#9ff3e0"
+            },
+            {
+              "name": "Liberia",
+              "key": "country_LR",
+              "color": "#b49585"
+            },
+            {
+              "name": "Mali",
+              "key": "country_ML",
+              "color": "#c897ae"
+            },
+            {
+              "name": "Mauritania",
+              "key": "country_MR",
+              "color": "#eff380"
+            },
+            {
+              "name": "Niger",
+              "key": "country_NE",
+              "color": "#a7d9f7"
+            },
+            {
+              "name": "Nigeria",
+              "key": "country_NG",
+              "color": "#bb899f"
+            },
+            {
+              "name": "Senegal",
+              "key": "country_SN",
+              "color": "#e08fdf"
+            },
+            {
+              "name": "Sierra Leone",
+              "key": "country_SL",
+              "color": "#e2e4ed"
+            },
+            {
+              "name": "St. Helena",
+              "key": "country_SH",
+              "color": "#9ddf87"
+            },
+            {
+              "name": "Togo",
+              "key": "country_TG",
+              "color": "#95b0c0"
+            }
+          ]
+        },
+        {
+          "name": "East Africa",
+          "key": "R4030",
+          "color": "#da94fc",
+          "children": [
+            {
+              "name": "British Indian Ocean Territory",
+              "key": "country_IO",
+              "color": "#9e87e8"
+            },
+            {
+              "name": "Burundi",
+              "key": "country_BI",
+              "color": "#e7d0c4"
+            },
+            {
+              "name": "Comoros",
+              "key": "country_KM",
+              "color": "#b8d685"
+            },
+            {
+              "name": "Djibouti",
+              "key": "country_DJ",
+              "color": "#8ac4d0"
+            },
+            {
+              "name": "Eritrea",
+              "key": "country_ER",
+              "color": "#9ccca0"
+            },
+            {
+              "name": "Ethiopia",
+              "key": "country_ET",
+              "color": "#b8bad2"
+            },
+            {
+              "name": "French Southern and Antarctic Lands",
+              "key": "country_TF",
+              "color": "#a0b199"
+            },
+            {
+              "name": "Kenya",
+              "key": "country_KE",
+              "color": "#8995f8"
+            },
+            {
+              "name": "Madagascar",
+              "key": "country_MG",
+              "color": "#87b0dd"
+            },
+            {
+              "name": "Malawi",
+              "key": "country_MW",
+              "color": "#a5baa3"
+            },
+            {
+              "name": "Mauritius",
+              "key": "country_MU",
+              "color": "#818ee1"
+            },
+            {
+              "name": "Mayotte",
+              "key": "country_YT",
+              "color": "#cacfb4"
+            },
+            {
+              "name": "Mozambique",
+              "key": "country_MZ",
+              "color": "#93e6a3"
+            },
+            {
+              "name": "Reunion",
+              "key": "country_RE",
+              "color": "#f2b396"
+            },
+            {
+              "name": "Rwanda",
+              "key": "country_RW",
+              "color": "#bb8deb"
+            },
+            {
+              "name": "Seychelles",
+              "key": "country_SC",
+              "color": "#81a3c8"
+            },
+            {
+              "name": "Somalia",
+              "key": "country_SO",
+              "color": "#fb939c"
+            },
+            {
+              "name": "South Sudan",
+              "key": "country_SD",
+              "color": "#9880bc"
+            },
+            {
+              "name": "Tanzania",
+              "key": "country_TZ",
+              "color": "#eae1bc"
+            },
+            {
+              "name": "Uganda",
+              "key": "country_UG",
+              "color": "#c49cb6"
+            },
+            {
+              "name": "Zambia",
+              "key": "country_ZM",
+              "color": "#f4d68b"
+            },
+            {
+              "name": "Zimbabwe",
+              "key": "country_ZW",
+              "color": "#bdee8e"
+            }
+          ]
+        },
+        {
+          "name": "Central Africa",
+          "key": "R4040",
+          "color": "#c29cd0",
+          "children": [
+            {
+              "name": "Angola",
+              "key": "country_AO",
+              "color": "#babaf7"
+            },
+            {
+              "name": "Cameroon",
+              "key": "country_CM",
+              "color": "#93dd82"
+            },
+            {
+              "name": "Central African Republic",
+              "key": "country_CF",
+              "color": "#df90b4"
+            },
+            {
+              "name": "Chad",
+              "key": "country_TD",
+              "color": "#e4b69d"
+            },
+            {
+              "name": "Democratic Republic of Congo",
+              "key": "country_CD",
+              "color": "#d9b7b4"
+            },
+            {
+              "name": "Gabon",
+              "key": "country_GA",
+              "color": "#ce88c7"
+            },
+            {
+              "name": "Republic of the Congo",
+              "key": "country_CG",
+              "color": "#b6d3ef"
+            },
+            {
+              "name": "Sao Tome and Principe",
+              "key": "country_ST",
+              "color": "#ccb494"
+            }
+          ]
+        },
+        {
+          "name": "South Africa",
+          "key": "R4050",
+          "color": "#fca396",
+          "children": [
+            {
+              "name": "Lesotho",
+              "key": "country_LS",
+              "color": "#e38ec8"
+            },
+            {
+              "name": "Namibia",
+              "key": "country_NA",
+              "color": "#eb82ce"
+            },
+            {
+              "name": "South Africa",
+              "key": "country_ZA",
+              "color": "#e1b2a6"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Oceania",
+      "key": "R50",
+      "color": "#92a8eb",
+      "children": [
+        {
+          "name": "Australia and New Zealand",
+          "key": "R5010",
+          "color": "#7feec7",
+          "children": [
+            {
+              "name": "Australia",
+              "key": "country_AU",
+              "color": "#eda4ea"
+            },
+            {
+              "name": "New Zealand",
+              "key": "country_NZ",
+              "color": "#97a491"
+            },
+            {
+              "name": "Norfolk Island",
+              "key": "country_NF",
+              "color": "#a4dfed"
+            }
+          ]
+        },
+        {
+          "name": "Melanesia",
+          "key": "R5020",
+          "color": "#e78caf",
+          "children": [
+            {
+              "name": "Fiji",
+              "key": "country_FJ",
+              "color": "#7faf82"
+            },
+            {
+              "name": "New Caledonia",
+              "key": "country_NC",
+              "color": "#db84b2"
+            },
+            {
+              "name": "Papua New Guinea",
+              "key": "country_PG",
+              "color": "#96aaa0"
+            },
+            {
+              "name": "Vanuatu",
+              "key": "country_VU",
+              "color": "#bfaaa5"
+            }
+          ]
+        },
+        {
+          "name": "Micronesia",
+          "key": "R5030",
+          "color": "#f59696",
+          "children": [
+            {
+              "name": "Guam",
+              "key": "country_GU",
+              "color": "#dbdf92"
+            },
+            {
+              "name": "Kiribati",
+              "key": "country_KI",
+              "color": "#a7e1e0"
+            },
+            {
+              "name": "Marshall Islands",
+              "key": "country_MH",
+              "color": "#9ffbb4"
+            },
+            {
+              "name": "Micronesia",
+              "key": "country_FM",
+              "color": "#b4ae83"
+            },
+            {
+              "name": "Nauru",
+              "key": "country_NR",
+              "color": "#87ea93"
+            },
+            {
+              "name": "Northern Mariana Islands",
+              "key": "country_MP",
+              "color": "#caa499"
+            },
+            {
+              "name": "Palau",
+              "key": "country_PW",
+              "color": "#ddf794"
+            }
+          ]
+        },
+        {
+          "name": "Polynesia",
+          "key": "R5040",
+          "color": "#f5e0f6",
+          "children": [
+            {
+              "name": "American Samoa",
+              "key": "country_AS",
+              "color": "#fda48a"
+            },
+            {
+              "name": "Cook Islands",
+              "key": "country_CK",
+              "color": "#d6d4df"
+            },
+            {
+              "name": "French Polynesia",
+              "key": "country_PF",
+              "color": "#a58580"
+            },
+            {
+              "name": "Niue",
+              "key": "country_NU",
+              "color": "#99fcd9"
+            },
+            {
+              "name": "Pitcairn Islands",
+              "key": "country_PN",
+              "color": "#94c6b4"
+            },
+            {
+              "name": "Samoa",
+              "key": "country_WS",
+              "color": "#93c5c5"
+            },
+            {
+              "name": "Tokelau",
+              "key": "country_TK",
+              "color": "#b9aa9b"
+            },
+            {
+              "name": "Tonga",
+              "key": "country_TO",
+              "color": "#f188a1"
+            },
+            {
+              "name": "Tuvalu",
+              "key": "country_TV",
+              "color": "#d481ba"
+            },
+            {
+              "name": "Wallis and Futuna",
+              "key": "country_WF",
+              "color": "#dd80d4"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "instruments": [
+    {
+      "identifiers": {
+        "name": "Dogecoin",
+        "ticker": "DOGE"
+      },
+      "categories": [
+        {
+          "key": "R1010",
+          "path": [
+            "Europe",
+            "North Europe"
+          ],
+          "weight": 100.0
+        }
+      ]
+    },
+    {
+      "identifiers": {
+        "name": "Microsoft Corporation",
+        "ticker": "MSFT"
+      },
+      "categories": [
+        {
+          "key": "country_US",
+          "path": [
+            "America",
+            "North America",
+            "United States"
+          ],
+          "weight": 100.0
+        }
+      ]
+    }
+  ]
+}

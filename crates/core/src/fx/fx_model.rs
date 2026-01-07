@@ -1,4 +1,4 @@
-use crate::market_data::{DataSource, Quote};
+use crate::quotes::{DataSource, Quote};
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};

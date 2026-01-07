@@ -11,28 +11,13 @@ use axum::{
     routing::{delete, get, post, put},
     Json, Router,
 };
-use wealthfolio_core::market_data::{
-    MarketDataProviderInfo, MarketDataProviderSetting, Quote, QuoteImport,
-};
+use wealthfolio_core::quotes::{ProviderInfo, Quote, QuoteImport, QuoteSummary};
 
 async fn get_market_data_providers(
     State(state): State<Arc<AppState>>,
-) -> ApiResult<Json<Vec<MarketDataProviderInfo>>> {
-    let infos = state
-        .market_data_service
-        .get_market_data_providers_info()
-        .await?;
+) -> ApiResult<Json<Vec<ProviderInfo>>> {
+    let infos = state.quote_service.get_providers_info().await?;
     Ok(Json(infos))
-}
-
-async fn get_market_data_providers_settings(
-    State(state): State<Arc<AppState>>,
-) -> ApiResult<Json<Vec<MarketDataProviderSetting>>> {
-    let settings = state
-        .market_data_service
-        .get_market_data_providers_settings()
-        .await?;
-    Ok(Json(settings))
 }
 
 #[derive(serde::Deserialize)]
@@ -46,12 +31,12 @@ struct ProviderUpdateBody {
 async fn update_market_data_provider_settings(
     State(state): State<Arc<AppState>>,
     Json(body): Json<ProviderUpdateBody>,
-) -> ApiResult<Json<MarketDataProviderSetting>> {
-    let updated = state
-        .market_data_service
-        .update_market_data_provider_settings(body.provider_id, body.priority, body.enabled)
+) -> ApiResult<StatusCode> {
+    state
+        .quote_service
+        .update_provider_settings(&body.provider_id, body.priority, body.enabled)
         .await?;
-    Ok(Json(updated))
+    Ok(StatusCode::NO_CONTENT)
 }
 
 #[derive(serde::Deserialize)]
@@ -62,8 +47,8 @@ struct SearchQuery {
 async fn search_symbol(
     State(state): State<Arc<AppState>>,
     Query(q): Query<SearchQuery>,
-) -> ApiResult<Json<Vec<wealthfolio_core::market_data::QuoteSummary>>> {
-    let res = state.market_data_service.search_symbol(&q.query).await?;
+) -> ApiResult<Json<Vec<QuoteSummary>>> {
+    let res = state.quote_service.search_symbol(&q.query).await?;
     Ok(Json(res))
 }
 
@@ -76,9 +61,7 @@ async fn get_quote_history(
     State(state): State<Arc<AppState>>,
     Query(q): Query<QuoteHistoryQuery>,
 ) -> ApiResult<Json<Vec<Quote>>> {
-    let res = state
-        .market_data_service
-        .get_historical_quotes_for_symbol(&q.symbol)?;
+    let res = state.quote_service.get_historical_quotes(&q.symbol)?;
     Ok(Json(res))
 }
 
@@ -90,7 +73,7 @@ async fn update_quote(
     // Ensure symbol matches body
     quote.symbol = symbol;
     let target_symbol = quote.symbol.clone();
-    state.market_data_service.update_quote(quote).await?;
+    state.quote_service.update_quote(quote).await?;
     enqueue_portfolio_job(
         state.clone(),
         PortfolioJobConfig {
@@ -107,7 +90,7 @@ async fn delete_quote(
     Path(id): Path<String>,
     State(state): State<Arc<AppState>>,
 ) -> ApiResult<StatusCode> {
-    state.market_data_service.delete_quote(&id).await?;
+    state.quote_service.delete_quote(&id).await?;
     enqueue_portfolio_job(
         state,
         PortfolioJobConfig {
@@ -121,9 +104,9 @@ async fn delete_quote(
 }
 
 async fn sync_history_quotes(State(state): State<Arc<AppState>>) -> ApiResult<StatusCode> {
-    let (_ok, failures) = state.market_data_service.resync_market_data(None).await?;
-    if !failures.is_empty() {
-        tracing::warn!("resync_market_data reported {} failures", failures.len());
+    let result = state.quote_service.resync(None).await?;
+    if result.failed > 0 {
+        tracing::warn!("resync reported {} failures", result.failed);
     }
     Ok(StatusCode::NO_CONTENT)
 }
@@ -140,8 +123,8 @@ async fn import_quotes_csv(
     Json(body): Json<ImportQuotesBody>,
 ) -> ApiResult<Json<Vec<QuoteImport>>> {
     let result = state
-        .market_data_service
-        .import_quotes_from_csv(body.quotes, body.overwrite_existing)
+        .quote_service
+        .import_quotes(body.quotes, body.overwrite_existing)
         .await?;
 
     enqueue_portfolio_job(
@@ -189,9 +172,7 @@ async fn get_latest_quotes(
     State(state): State<Arc<AppState>>,
     Json(body): Json<LatestQuotesBody>,
 ) -> ApiResult<Json<std::collections::HashMap<String, Quote>>> {
-    let quotes = state
-        .market_data_service
-        .get_latest_quotes_for_symbols(&body.symbols)?;
+    let quotes = state.quote_service.get_latest_quotes(&body.symbols)?;
     Ok(Json(quotes))
 }
 
@@ -200,7 +181,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/providers", get(get_market_data_providers))
         .route(
             "/providers/settings",
-            get(get_market_data_providers_settings).put(update_market_data_provider_settings),
+            put(update_market_data_provider_settings),
         )
         .route("/market-data/search", get(search_symbol))
         .route("/market-data/quotes/history", get(get_quote_history))

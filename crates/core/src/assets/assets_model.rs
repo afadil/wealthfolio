@@ -281,6 +281,30 @@ pub struct Country {
     pub weight: f64,
 }
 
+/// Profile data returned by market data providers.
+/// Used to create/enrich assets from external sources.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderProfile {
+    pub id: Option<String>,
+    pub isin: Option<String>,
+    pub name: Option<String>,
+    pub asset_type: Option<String>,
+    pub symbol: String,
+    pub quote_symbol: Option<String>, // Symbol for quote fetching (replaces symbol_mapping)
+    pub asset_class: Option<String>,
+    pub asset_sub_class: Option<String>,
+    pub notes: Option<String>,
+    pub countries: Option<String>,
+    pub categories: Option<String>,
+    pub classes: Option<String>,
+    pub attributes: Option<String>,
+    pub currency: String,
+    pub data_source: String,
+    pub sectors: Option<String>,
+    pub url: Option<String>,
+}
+
 /// Input model for creating a new asset
 /// Provider-agnostic: no data_source or quote_symbol (use provider_overrides instead)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -403,8 +427,8 @@ impl NewAsset {
     }
 }
 
-impl From<crate::market_data::providers::models::AssetProfile> for NewAsset {
-    fn from(profile: crate::market_data::providers::models::AssetProfile) -> Self {
+impl From<ProviderProfile> for NewAsset {
+    fn from(profile: ProviderProfile) -> Self {
         // Build provider_overrides from quote_symbol if different from symbol
         let provider_overrides = profile.quote_symbol.as_ref().and_then(|qs| {
             if qs != &profile.symbol {

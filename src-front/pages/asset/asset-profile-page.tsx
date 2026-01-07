@@ -127,7 +127,9 @@ export const AssetProfilePage = () => {
   });
 
   const quote = useMemo(() => {
-    return quoteHistory?.at(-1) ?? null;
+    // Backend returns quotes in descending order (newest first)
+    // So .at(0) gives the latest quote
+    return quoteHistory?.at(0) ?? null;
   }, [quoteHistory]);
 
   const { updateAssetProfileMutation, updateAssetDataSourceMutation } = useAssetProfileMutations();

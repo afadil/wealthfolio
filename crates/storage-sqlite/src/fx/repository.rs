@@ -1,7 +1,7 @@
 use wealthfolio_core::assets::{AssetKind, PricingMode};
 use wealthfolio_core::errors::{DatabaseError, ValidationError};
 use wealthfolio_core::fx::{ExchangeRate, FxRepositoryTrait};
-use wealthfolio_core::market_data::{DataSource, Quote};
+use wealthfolio_core::quotes::{DataSource, Quote};
 use wealthfolio_core::{Error, Result};
 
 use crate::assets::AssetDB;
@@ -39,9 +39,9 @@ impl FxRepository {
         let query = "
             SELECT q.*
             FROM quotes q
-            INNER JOIN assets a ON q.symbol = a.id
+            INNER JOIN assets a ON q.asset_id = a.id
             WHERE a.kind = 'FX_RATE'
-            ORDER BY q.symbol, q.timestamp";
+            ORDER BY q.asset_id, q.timestamp";
 
         let quotes_db: Vec<QuoteDB> = diesel::sql_query(query)
             .load(&mut conn)
@@ -66,12 +66,12 @@ impl FxRepository {
             WITH LatestQuotes AS (
                 SELECT q.*
                 FROM quotes q
-                INNER JOIN assets a ON q.symbol = a.id
+                INNER JOIN assets a ON q.asset_id = a.id
                 WHERE a.kind = 'FX_RATE'
-                AND (q.symbol, q.timestamp) IN (
-                    SELECT symbol, MAX(timestamp)
+                AND (q.asset_id, q.timestamp) IN (
+                    SELECT asset_id, MAX(timestamp)
                     FROM quotes
-                    GROUP BY symbol
+                    GROUP BY asset_id
                 )
             )
             SELECT * FROM LatestQuotes";
@@ -84,7 +84,7 @@ impl FxRepository {
             .into_iter()
             .map(|q| {
                 (
-                    q.symbol,
+                    q.asset_id,
                     Decimal::from_str(&q.close).unwrap_or_else(|_| Decimal::from(0)),
                 )
             })
@@ -96,20 +96,20 @@ impl FxRepository {
 
         let latest_quotes = sql_query(
             r#"SELECT
-                q.id, q.symbol, q.timestamp, q.open, q.high, q.low, q.close, q.adjclose, q.volume,
-                q.currency, q.data_source, q.created_at
+                q.id, q.asset_id, q.day, q.source, q.open, q.high, q.low, q.close, q.adjclose, q.volume,
+                q.currency, q.notes, q.created_at, q.timestamp
              FROM quotes q
-             WHERE q.symbol IN (
+             WHERE q.asset_id IN (
                  SELECT id
                  FROM assets
                  WHERE kind = 'FX_RATE'
              )
-             AND (q.symbol, q.timestamp) IN (
-                 SELECT symbol, MAX(timestamp) as max_timestamp
+             AND (q.asset_id, q.timestamp) IN (
+                 SELECT asset_id, MAX(timestamp) as max_timestamp
                  FROM quotes
-                 GROUP BY symbol
+                 GROUP BY asset_id
              )
-             ORDER BY q.symbol"#,
+             ORDER BY q.asset_id"#,
         )
         .load::<QuoteDB>(&mut conn)
         .map_err(StorageError::from)?;
@@ -159,10 +159,10 @@ impl FxRepository {
         let mut conn = get_connection(&self.pool)?;
 
         let all_quotes_db = quotes::table
-            .inner_join(assets::table.on(quotes::symbol.eq(assets::id)))
+            .inner_join(assets::table.on(quotes::asset_id.eq(assets::id)))
             .filter(assets::kind.eq(AssetKind::FxRate.as_db_str()))
             .select(quotes::all_columns)
-            .order_by((quotes::symbol.asc(), quotes::timestamp.asc()))
+            .order_by((quotes::asset_id.asc(), quotes::timestamp.asc()))
             .load::<QuoteDB>(&mut conn)
             .map_err(StorageError::from)?;
 
@@ -180,7 +180,7 @@ impl FxRepository {
 
         let symbol = ExchangeRate::make_fx_symbol(from, to);
         let quote_db = quotes::table
-            .filter(quotes::symbol.eq(symbol))
+            .filter(quotes::asset_id.eq(symbol))
             .order_by(quotes::timestamp.desc())
             .first::<QuoteDB>(&mut conn)
             .optional()
@@ -193,7 +193,7 @@ impl FxRepository {
         let mut conn = get_connection(&self.pool)?;
 
         let quote_db = quotes::table
-            .filter(quotes::symbol.eq(id))
+            .filter(quotes::asset_id.eq(id))
             .order_by(quotes::timestamp.desc())
             .first::<QuoteDB>(&mut conn)
             .optional()
@@ -214,7 +214,7 @@ impl FxRepository {
         let end_dt_str = Utc.from_utc_datetime(&end_date).to_rfc3339();
 
         let quotes_db = quotes::table
-            .filter(quotes::symbol.eq(symbol))
+            .filter(quotes::asset_id.eq(symbol))
             .filter(quotes::timestamp.ge(start_dt_str))
             .filter(quotes::timestamp.le(end_dt_str))
             .order_by(quotes::timestamp.asc())
@@ -229,7 +229,7 @@ impl FxRepository {
         symbol: String,
         date_str: String,
         rate: Decimal,
-        source: String,
+        source_str: String,
     ) -> Result<Quote> {
         self.writer
             .exec(move |conn| {
@@ -250,39 +250,41 @@ impl FxRepository {
                 let created_at_str = Utc::now().to_rfc3339();
 
                 let currency = symbol.split_at(3).0.to_string();
-                let quote_id = format!("{}_{}", date_str.replace("-", ""), symbol);
+                // Generate deterministic ID: {asset_id}_{day}_{source}
+                let quote_id = format!("{}_{}_{}", symbol, date_str, source_str);
 
                 let quote_db = QuoteDB {
                     id: quote_id,
-                    symbol: symbol.clone(),
-                    timestamp: timestamp_str.clone(),
-                    open: rate.to_string(),
-                    high: rate.to_string(),
-                    low: rate.to_string(),
+                    asset_id: symbol.clone(),
+                    day: date_str.clone(),
+                    source: source_str.clone(),
+                    open: Some(rate.to_string()),
+                    high: Some(rate.to_string()),
+                    low: Some(rate.to_string()),
                     close: rate.to_string(),
-                    adjclose: rate.to_string(),
-                    volume: "0".to_string(),
+                    adjclose: Some(rate.to_string()),
+                    volume: None,
                     currency,
-                    data_source: source.clone(),
                     created_at: created_at_str,
+                    timestamp: timestamp_str.clone(),
                     notes: None,
                 };
 
                 diesel::insert_into(quotes::table)
                     .values(&quote_db)
-                    .on_conflict((quotes::symbol, quotes::timestamp, quotes::data_source))
+                    .on_conflict(quotes::id)
                     .do_update()
                     .set((
                         quotes::close.eq(quote_db.close.clone()),
-                        quotes::data_source.eq(&quote_db.data_source),
+                        quotes::source.eq(&quote_db.source),
                     ))
                     .execute(conn)
                     .map_err(StorageError::from)?;
 
                 quotes::table
-                    .filter(quotes::symbol.eq(&symbol))
-                    .filter(quotes::timestamp.eq(&timestamp_str))
-                    .filter(quotes::data_source.eq(&source))
+                    .filter(quotes::asset_id.eq(&symbol))
+                    .filter(quotes::day.eq(&date_str))
+                    .filter(quotes::source.eq(&source_str))
                     .first::<QuoteDB>(conn)
                     .map(Quote::from)
                     .map_err(|e| StorageError::from(e).into())
@@ -307,7 +309,7 @@ impl FxRepository {
                         quotes::close.eq(quote_db.close.clone()),
                         quotes::adjclose.eq(quote_db.adjclose.clone()),
                         quotes::volume.eq(quote_db.volume.clone()),
-                        quotes::data_source.eq(&quote_db.data_source),
+                        quotes::source.eq(&quote_db.source),
                     ))
                     .execute(conn)
                     .map_err(StorageError::from)?;
@@ -335,11 +337,11 @@ impl FxRepository {
                 let quote_db = QuoteDB::from(&quote);
 
                 diesel::update(quotes::table)
-                    .filter(quotes::symbol.eq(&quote_db.symbol))
-                    .filter(quotes::timestamp.eq(&quote_db.timestamp))
+                    .filter(quotes::asset_id.eq(&quote_db.asset_id))
+                    .filter(quotes::day.eq(&quote_db.day))
                     .set((
                         quotes::close.eq(quote_db.close.clone()),
-                        quotes::data_source.eq(&quote_db.data_source),
+                        quotes::source.eq(&quote_db.source),
                     ))
                     .get_result::<QuoteDB>(conn)
                     .map(|q| ExchangeRate::from_quote(&Quote::from(q)))
@@ -353,7 +355,7 @@ impl FxRepository {
         self.writer
             .exec(move |conn| {
                 // Delete all quotes for this exchange rate
-                diesel::delete(quotes::table.filter(quotes::symbol.eq(&rate_id_owned)))
+                diesel::delete(quotes::table.filter(quotes::asset_id.eq(&rate_id_owned)))
                     .execute(conn)
                     .map_err(StorageError::from)?;
 

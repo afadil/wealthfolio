@@ -47,6 +47,19 @@ impl ProviderOverrides {
         Self::default()
     }
 
+    /// Parse ProviderOverrides from a JSON value.
+    ///
+    /// Expected format:
+    /// ```json
+    /// {
+    ///   "YAHOO": { "type": "equity_symbol", "symbol": "SHOP.TO" },
+    ///   "ALPHA_VANTAGE": { "type": "equity_symbol", "symbol": "SHOP" }
+    /// }
+    /// ```
+    pub fn from_json(json: &serde_json::Value) -> Result<Self, serde_json::Error> {
+        serde_json::from_value(json.clone())
+    }
+
     /// Get the override for a specific provider
     pub fn get(&self, provider_id: &str) -> Option<&ProviderInstrument> {
         self.overrides.get(provider_id)

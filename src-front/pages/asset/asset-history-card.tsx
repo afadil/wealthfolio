@@ -52,15 +52,20 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
   const filteredData = useMemo(() => {
     if (!quoteHistory) return [];
 
+    // Sort quotes chronologically (oldest first) for proper chart display
+    const sortedQuotes = [...quoteHistory].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+
     if (!dateRange?.from || !dateRange?.to || selectedIntervalCode === "ALL") {
-      return quoteHistory.map((quote) => ({
+      return sortedQuotes.map((quote) => ({
         timestamp: quote.timestamp,
         totalValue: quote.close,
         currency: currency,
       }));
     }
 
-    return quoteHistory
+    return sortedQuotes
       .filter((quote) => {
         const quoteDate = new Date(quote.timestamp);
         return (

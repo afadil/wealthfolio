@@ -1,6 +1,6 @@
 use crate::constants::{DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
 use crate::errors::{self, Result, ValidationError};
-use crate::market_data::MarketDataServiceTrait;
+use crate::quotes::QuoteServiceTrait;
 use crate::performance::ReturnData;
 use crate::valuation::ValuationServiceTrait;
 
@@ -46,7 +46,7 @@ pub trait PerformanceServiceTrait: Send + Sync {
 
 pub struct PerformanceService {
     valuation_service: Arc<dyn ValuationServiceTrait + Send + Sync>,
-    market_data_service: Arc<dyn MarketDataServiceTrait + Send + Sync>,
+    quote_service: Arc<dyn QuoteServiceTrait + Send + Sync>,
 }
 
 const TRADING_DAYS_PER_YEAR: u32 = 252;
@@ -56,11 +56,11 @@ const SQRT_TRADING_DAYS_APPROX: Decimal = dec!(15.874507866); // sqrt(252)
 impl PerformanceService {
     pub fn new(
         valuation_service: Arc<dyn ValuationServiceTrait + Send + Sync>,
-        market_data_service: Arc<dyn MarketDataServiceTrait + Send + Sync>,
+        quote_service: Arc<dyn QuoteServiceTrait + Send + Sync>,
     ) -> Self {
         Self {
             valuation_service,
-            market_data_service,
+            quote_service,
         }
     }
 
@@ -346,8 +346,8 @@ impl PerformanceService {
         }
 
         let quote_history = self
-            .market_data_service
-            .get_historical_quotes_from_provider(symbol, effective_start_date, effective_end_date)
+            .quote_service
+            .fetch_quotes_from_provider(symbol, effective_start_date, effective_end_date)
             .await?;
 
         if quote_history.is_empty() {

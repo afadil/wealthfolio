@@ -267,6 +267,7 @@ mod tests {
             account_id: "account-1".to_string(),
             asset_id: Some("AAPL".to_string()),
             asset_data_source: None,
+            asset_metadata: None,
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),

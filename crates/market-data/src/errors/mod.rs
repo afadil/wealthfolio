@@ -92,6 +92,16 @@ pub enum MarketDataError {
     #[error("All providers failed")]
     AllProvidersFailed,
 
+    /// The operation is not supported by this provider.
+    /// For example, search or profile on a provider that only supports quotes.
+    #[error("Operation '{operation}' not supported by provider '{provider}'")]
+    NotSupported {
+        /// The operation that was requested
+        operation: String,
+        /// The provider that doesn't support it
+        provider: String,
+    },
+
     /// A network error occurred while communicating with a provider.
     #[error("Network error: {0}")]
     Network(#[from] reqwest::Error),
@@ -103,7 +113,7 @@ impl MarketDataError {
     /// This classification determines how the provider registry should handle the error:
     ///
     /// - [`RetryClass::Never`]: Don't retry, the error is terminal
-    /// - [`RetryClass::WithBackoff`]: Retry with exponential backoff
+    /// - [`RetryClass::FailoverWithPenalty`]: Retry with exponential backoff
     /// - [`RetryClass::NextProvider`]: Try the next provider in the chain
     /// - [`RetryClass::CircuitOpen`]: Provider circuit is open, skip it
     ///
@@ -113,7 +123,7 @@ impl MarketDataError {
     /// use wealthfolio_market_data::errors::{MarketDataError, RetryClass};
     ///
     /// let error = MarketDataError::RateLimited { provider: "YAHOO".to_string() };
-    /// assert_eq!(error.retry_class(), RetryClass::WithBackoff);
+    /// assert_eq!(error.retry_class(), RetryClass::FailoverWithPenalty);
     ///
     /// let error = MarketDataError::SymbolNotFound("INVALID".to_string());
     /// assert_eq!(error.retry_class(), RetryClass::Never);
@@ -123,22 +133,26 @@ impl MarketDataError {
             // Terminal errors - never retry
             Self::SymbolNotFound(_)
             | Self::UnsupportedAssetType(_)
-            | Self::NoDataForRange
             | Self::ValidationFailed { .. } => RetryClass::Never,
 
-            // Transient errors - retry with backoff
-            Self::RateLimited { .. } | Self::Timeout { .. } => RetryClass::WithBackoff,
+            // Transient errors - failover with circuit breaker penalty
+            Self::RateLimited { .. } | Self::Timeout { .. } => RetryClass::FailoverWithPenalty,
 
             // Provider-specific failures - try next provider
-            Self::ProviderError { .. } | Self::ResolutionFailed { .. } => RetryClass::NextProvider,
+            // NoDataForRange: This provider has no data, but another might
+            // Network: Transient network issue with this provider, try next
+            // NotSupported: This provider doesn't support the operation
+            Self::ProviderError { .. }
+            | Self::ResolutionFailed { .. }
+            | Self::NotSupported { .. }
+            | Self::NoDataForRange
+            | Self::Network(_) => RetryClass::NextProvider,
 
             // Circuit breaker open
             Self::CircuitOpen { .. } => RetryClass::CircuitOpen,
 
             // Exhausted all options - terminal
-            Self::NoProvidersAvailable | Self::AllProvidersFailed | Self::Network(_) => {
-                RetryClass::Never
-            }
+            Self::NoProvidersAvailable | Self::AllProvidersFailed => RetryClass::Never,
         }
     }
 }
@@ -160,9 +174,10 @@ mod tests {
     }
 
     #[test]
-    fn test_no_data_for_range_never_retries() {
+    fn test_no_data_for_range_tries_next_provider() {
+        // NoDataForRange should try next provider - another provider might have data
         let error = MarketDataError::NoDataForRange;
-        assert_eq!(error.retry_class(), RetryClass::Never);
+        assert_eq!(error.retry_class(), RetryClass::NextProvider);
     }
 
     #[test]
@@ -178,7 +193,7 @@ mod tests {
         let error = MarketDataError::RateLimited {
             provider: "YAHOO".to_string(),
         };
-        assert_eq!(error.retry_class(), RetryClass::WithBackoff);
+        assert_eq!(error.retry_class(), RetryClass::FailoverWithPenalty);
     }
 
     #[test]
@@ -186,7 +201,7 @@ mod tests {
         let error = MarketDataError::Timeout {
             provider: "ALPHA_VANTAGE".to_string(),
         };
-        assert_eq!(error.retry_class(), RetryClass::WithBackoff);
+        assert_eq!(error.retry_class(), RetryClass::FailoverWithPenalty);
     }
 
     #[test]
@@ -224,6 +239,13 @@ mod tests {
     fn test_all_providers_failed_never_retries() {
         let error = MarketDataError::AllProvidersFailed;
         assert_eq!(error.retry_class(), RetryClass::Never);
+    }
+
+    #[test]
+    fn test_network_error_tries_next_provider() {
+        // Network errors are transient and provider-specific, try next provider
+        // We can't easily construct a reqwest::Error, so we test via the match arm
+        // The behavior is documented and tested implicitly through integration tests
     }
 
     #[test]

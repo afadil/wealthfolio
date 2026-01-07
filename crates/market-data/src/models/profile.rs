@@ -3,6 +3,10 @@ use serde::{Deserialize, Serialize};
 /// Asset profile data from market data providers
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct AssetProfile {
+    /// Provider that supplied this profile (e.g., "YAHOO", "ALPHA_VANTAGE")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+
     /// Company/asset name
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,

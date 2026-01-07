@@ -26,18 +26,18 @@ use super::alternative_assets_traits::{
 };
 use super::{generate_asset_id, AssetKind, AssetRepositoryTrait, NewAsset, PricingMode};
 use crate::errors::{Error, Result, ValidationError};
-use crate::market_data::{DataSource, MarketDataServiceTrait, Quote};
+use crate::quotes::{DataSource, Quote, QuoteServiceTrait};
 
 /// Service for managing alternative assets.
 ///
-/// This service coordinates between the asset repository and market data service
+/// This service coordinates between the asset repository and quote service
 /// to manage the lifecycle of alternative assets.
 ///
 /// NOTE: Alternative assets don't create accounts or activities - just asset + quotes.
 pub struct AlternativeAssetService {
     alternative_asset_repository: Arc<dyn AlternativeAssetRepositoryTrait>,
     asset_repository: Arc<dyn AssetRepositoryTrait>,
-    market_data_service: Arc<dyn MarketDataServiceTrait>,
+    quote_service: Arc<dyn QuoteServiceTrait>,
 }
 
 impl AlternativeAssetService {
@@ -45,12 +45,12 @@ impl AlternativeAssetService {
     pub fn new(
         alternative_asset_repository: Arc<dyn AlternativeAssetRepositoryTrait>,
         asset_repository: Arc<dyn AssetRepositoryTrait>,
-        market_data_service: Arc<dyn MarketDataServiceTrait>,
+        quote_service: Arc<dyn QuoteServiceTrait>,
     ) -> Self {
         Self {
             alternative_asset_repository,
             asset_repository,
-            market_data_service,
+            quote_service,
         }
     }
 
@@ -212,7 +212,7 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
             notes: None,
         };
 
-        let saved_quote = self.market_data_service.add_quote(&quote).await?;
+        let saved_quote = self.quote_service.add_quote(&quote).await?;
         debug!("Created initial valuation quote: {}", saved_quote.id);
 
         Ok(CreateAlternativeAssetResponse {
@@ -241,8 +241,8 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
         // Get the existing quote to find the currency
         // If no existing quote, we need to fetch the asset to get currency
         let currency = match self
-            .market_data_service
-            .get_latest_quote_for_symbol(&request.asset_id)
+            .quote_service
+            .get_latest_quote(&request.asset_id)
         {
             Ok(existing_quote) => existing_quote.currency,
             Err(_) => {
@@ -274,7 +274,7 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
             notes: request.notes.clone(),
         };
 
-        let saved_quote = self.market_data_service.add_quote(&quote).await?;
+        let saved_quote = self.quote_service.add_quote(&quote).await?;
         debug!("Created valuation quote: {}", saved_quote.id);
 
         Ok(UpdateValuationResponse {
@@ -395,7 +395,7 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
         let symbols: Vec<String> = alternative_assets.iter().map(|a| a.symbol.clone()).collect();
 
         // Fetch latest quotes for all alternative assets
-        let quotes = self.market_data_service.get_latest_quotes_for_symbols(&symbols)?;
+        let quotes = self.quote_service.get_latest_quotes(&symbols)?;
 
         // Build AlternativeHolding for each asset
         let holdings: Vec<AlternativeHolding> = alternative_assets

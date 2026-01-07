@@ -1,6 +1,6 @@
 use super::fx_model::{ExchangeRate, NewExchangeRate};
 use crate::errors::Result;
-use crate::market_data::Quote;
+use crate::quotes::Quote;
 use async_trait::async_trait;
 use chrono::{NaiveDate, NaiveDateTime};
 use rust_decimal::Decimal;

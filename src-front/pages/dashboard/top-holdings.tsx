@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { AmountDisplay, Button, GainAmount, GainPercent, Icons } from "@wealthfolio/ui";
 import { useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 
 const MAX_DISPLAYED_HOLDINGS = 5;
 const MAX_STACKED_AVATARS = 5;
@@ -20,10 +21,11 @@ interface TopHoldingsProps {
 interface HoldingRowProps {
   holding: Holding;
   baseCurrency: string;
+  isHidden?: boolean;
   onClick?: () => void;
 }
 
-function HoldingRow({ holding, baseCurrency, onClick }: HoldingRowProps) {
+function HoldingRow({ holding, baseCurrency, isHidden, onClick }: HoldingRowProps) {
   const symbol = holding.instrument?.symbol ?? holding.id;
   const displayName = symbol.split(".")[0];
   const marketValue = holding.marketValue?.base ?? 0;
@@ -52,6 +54,7 @@ function HoldingRow({ holding, baseCurrency, onClick }: HoldingRowProps) {
         <AmountDisplay
           value={marketValue}
           currency={baseCurrency}
+          isHidden={isHidden}
           className="text-sm font-semibold"
         />
         <div className="flex items-center gap-2">
@@ -176,6 +179,7 @@ function TopHoldingsEmptyState() {
 
 export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsProps) {
   const navigate = useNavigate();
+  const { isBalanceHidden } = useBalancePrivacy();
 
   // Filter out cash holdings and alternative assets, then sort by market value
   // Dashboard shows only investment holdings (securities, crypto, etc.)
@@ -228,6 +232,7 @@ export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsPr
                   key={holding.id}
                   holding={holding}
                   baseCurrency={baseCurrency}
+                  isHidden={isBalanceHidden}
                   onClick={() => navigate(`/holdings/${symbol}`)}
                 />
               );

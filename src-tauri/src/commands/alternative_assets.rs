@@ -28,7 +28,7 @@ use crate::{
 
 use wealthfolio_core::{
     assets::{generate_asset_id, AlternativeAssetRepositoryTrait, AssetKind, NewAsset, PricingMode},
-    market_data::{DataSource, Quote},
+    quotes::{DataSource, Quote},
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -304,7 +304,7 @@ pub async fn create_alternative_asset(
     };
 
     state
-        .market_data_service()
+        .quote_service()
         .update_quote(quote)
         .await
         .map_err(|e| {
@@ -387,7 +387,7 @@ pub async fn update_alternative_asset_valuation(
     };
 
     state
-        .market_data_service()
+        .quote_service()
         .update_quote(quote)
         .await
         .map_err(|e| {
@@ -734,8 +734,8 @@ pub async fn get_alternative_holdings(
 
     // Fetch latest quotes for all alternative assets
     let quotes = state
-        .market_data_service()
-        .get_latest_quotes_for_symbols(&symbols)
+        .quote_service()
+        .get_latest_quotes(&symbols)
         .map_err(|e| format!("Failed to get quotes: {}", e))?;
 
     // Build response for each asset

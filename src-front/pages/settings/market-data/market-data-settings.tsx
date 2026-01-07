@@ -197,6 +197,30 @@ function ProviderSettings({
                 )}
               </CardDescription>
             )}
+
+            {/* Capabilities - compact display */}
+            {provider.capabilities && (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                {provider.capabilities.instruments && (
+                  <span className="flex items-center gap-1">
+                    <Icons.TrendingUp className="h-3 w-3" />
+                    {provider.capabilities.instruments}
+                  </span>
+                )}
+                {provider.capabilities.coverage && (
+                  <span className="flex items-center gap-1">
+                    <Icons.Globe className="h-3 w-3" />
+                    {provider.capabilities.coverage}
+                  </span>
+                )}
+                {provider.capabilities.features.length > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Icons.Sparkles className="h-3 w-3" />
+                    {provider.capabilities.features.join(" • ")}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Controls section */}

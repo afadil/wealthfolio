@@ -9,7 +9,7 @@ use thiserror::Error;
 
 use crate::activities::ActivityError;
 use crate::fx::FxError;
-use crate::market_data::MarketDataError;
+use crate::quotes::MarketDataError;
 
 /// Type alias for Result using our Error type.
 pub type Result<T> = std::result::Result<T, Error>;

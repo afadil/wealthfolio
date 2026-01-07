@@ -6,9 +6,16 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-use wealthfolio_core::market_data::{DataSource, MarketDataProviderSetting, Quote, QuoteSyncState};
+use wealthfolio_core::quotes::{
+    DataSource, MarketDataProviderSetting, ProviderCapabilities, Quote, QuoteSyncState,
+};
 
 /// Database model for quotes
+///
+/// Updated to use the new schema with:
+/// - `asset_id` instead of `symbol`
+/// - `day` for YYYY-MM-DD date
+/// - `source` instead of `data_source`
 #[derive(
     Queryable,
     Identifiable,
@@ -29,29 +36,31 @@ pub struct QuoteDB {
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub id: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
-    pub symbol: String,
+    pub asset_id: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
-    pub timestamp: String,
+    pub day: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
-    pub open: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub high: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub low: String,
+    pub source: String,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub open: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub high: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub low: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub close: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub adjclose: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub volume: String,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub adjclose: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub volume: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub currency: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub data_source: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub created_at: String,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub notes: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub created_at: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub timestamp: String,
 }
 
 /// Database model for market data provider settings
@@ -96,11 +105,11 @@ pub struct UpdateMarketDataProviderSettingDB {
     Debug, Clone, Queryable, Identifiable, Selectable, Insertable, AsChangeset, QueryableByName,
 )]
 #[diesel(table_name = crate::schema::quote_sync_state)]
-#[diesel(primary_key(symbol))]
+#[diesel(primary_key(asset_id))]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct QuoteSyncStateDB {
     #[diesel(sql_type = diesel::sql_types::Text)]
-    pub symbol: String,
+    pub asset_id: String,
     #[diesel(sql_type = diesel::sql_types::Integer)]
     pub is_active: i32,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
@@ -156,17 +165,24 @@ impl From<QuoteDB> for Quote {
                 .unwrap_or_else(|_| Utc::now())
         };
 
+        let parse_optional_decimal = |s: &Option<String>| -> Decimal {
+            s.as_ref()
+                .and_then(|v| Decimal::from_str(v).ok())
+                .unwrap_or_default()
+        };
+
         Quote {
             id: db.id,
-            symbol: db.symbol,
+            // Use asset_id for the symbol field (backward compatibility)
+            symbol: db.asset_id,
             timestamp: parse_datetime(&db.timestamp),
-            open: Decimal::from_str(&db.open).unwrap_or_default(),
-            high: Decimal::from_str(&db.high).unwrap_or_default(),
-            low: Decimal::from_str(&db.low).unwrap_or_default(),
+            open: parse_optional_decimal(&db.open),
+            high: parse_optional_decimal(&db.high),
+            low: parse_optional_decimal(&db.low),
             close: Decimal::from_str(&db.close).unwrap_or_default(),
-            adjclose: Decimal::from_str(&db.adjclose).unwrap_or_default(),
-            volume: Decimal::from_str(&db.volume).unwrap_or_default(),
-            data_source: DataSource::from(db.data_source.as_ref()),
+            adjclose: parse_optional_decimal(&db.adjclose),
+            volume: parse_optional_decimal(&db.volume),
+            data_source: DataSource::from(db.source.as_ref()),
             created_at: parse_datetime(&db.created_at),
             currency: db.currency,
             notes: db.notes,
@@ -176,26 +192,40 @@ impl From<QuoteDB> for Quote {
 
 impl From<&Quote> for QuoteDB {
     fn from(quote: &Quote) -> Self {
+        // Extract day from timestamp (YYYY-MM-DD)
+        let day = quote.timestamp.format("%Y-%m-%d").to_string();
+
+        // Convert Decimal to Option<String>, treating zero as None for OHLV
+        let decimal_to_optional = |d: &Decimal| -> Option<String> {
+            if d.is_zero() {
+                None
+            } else {
+                Some(d.to_string())
+            }
+        };
+
         QuoteDB {
             id: quote.id.clone(),
-            symbol: quote.symbol.clone(),
-            timestamp: quote.timestamp.to_rfc3339(),
-            open: quote.open.to_string(),
-            high: quote.high.to_string(),
-            low: quote.low.to_string(),
+            asset_id: quote.symbol.clone(),
+            day,
+            source: quote.data_source.as_str().to_string(),
+            open: decimal_to_optional(&quote.open),
+            high: decimal_to_optional(&quote.high),
+            low: decimal_to_optional(&quote.low),
             close: quote.close.to_string(),
-            adjclose: quote.adjclose.to_string(),
-            volume: quote.volume.to_string(),
+            adjclose: decimal_to_optional(&quote.adjclose),
+            volume: decimal_to_optional(&quote.volume),
             currency: quote.currency.clone(),
-            data_source: quote.data_source.as_str().to_string(),
-            created_at: quote.created_at.to_rfc3339(),
             notes: quote.notes.clone(),
+            created_at: quote.created_at.to_rfc3339(),
+            timestamp: quote.timestamp.to_rfc3339(),
         }
     }
 }
 
 impl From<MarketDataProviderSettingDB> for MarketDataProviderSetting {
     fn from(db: MarketDataProviderSettingDB) -> Self {
+        let capabilities = ProviderCapabilities::for_provider(&db.id);
         Self {
             id: db.id,
             name: db.name,
@@ -207,6 +237,7 @@ impl From<MarketDataProviderSettingDB> for MarketDataProviderSetting {
             last_synced_at: db.last_synced_at,
             last_sync_status: db.last_sync_status,
             last_sync_error: db.last_sync_error,
+            capabilities,
         }
     }
 }
@@ -240,7 +271,8 @@ impl From<QuoteSyncStateDB> for QuoteSyncState {
             |s: &str| -> Option<NaiveDate> { NaiveDate::parse_from_str(s, "%Y-%m-%d").ok() };
 
         QuoteSyncState {
-            symbol: db.symbol,
+            // Use asset_id for the symbol field (backward compatibility)
+            symbol: db.asset_id,
             is_active: db.is_active != 0,
             first_activity_date: db.first_activity_date.as_deref().and_then(parse_date),
             last_activity_date: db.last_activity_date.as_deref().and_then(parse_date),
@@ -261,7 +293,8 @@ impl From<QuoteSyncStateDB> for QuoteSyncState {
 impl From<&QuoteSyncState> for QuoteSyncStateDB {
     fn from(state: &QuoteSyncState) -> Self {
         QuoteSyncStateDB {
-            symbol: state.symbol.clone(),
+            // Map symbol to asset_id
+            asset_id: state.symbol.clone(),
             is_active: if state.is_active { 1 } else { 0 },
             first_activity_date: state
                 .first_activity_date

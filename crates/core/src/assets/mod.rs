@@ -29,7 +29,7 @@ pub use alternative_assets_traits::{
 pub use assets_constants::*;
 pub use assets_model::{
     Asset, AssetKind, AssetMetadata, Country, InstrumentId, NewAsset, OptionSpec, PricingMode,
-    Sector, UpdateAssetProfile,
+    ProviderProfile, Sector, UpdateAssetProfile,
 };
 pub use assets_service::AssetService;
 pub use assets_traits::{AssetRepositoryTrait, AssetServiceTrait};

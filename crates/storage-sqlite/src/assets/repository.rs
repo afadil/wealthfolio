@@ -222,15 +222,8 @@ impl AssetRepositoryTrait for AssetRepository {
                     ));
                 }
 
-                // Get the asset symbol for deleting quotes
-                let asset_symbol: String = assets::table
-                    .filter(assets::id.eq(&asset_id_owned))
-                    .select(assets::symbol)
-                    .first(conn)
-                    .map_err(StorageError::from)?;
-
-                // Delete all quotes for this asset (by symbol)
-                diesel::delete(quotes::table.filter(quotes::symbol.eq(&asset_symbol)))
+                // Delete all quotes for this asset (by asset_id)
+                diesel::delete(quotes::table.filter(quotes::asset_id.eq(&asset_id_owned)))
                     .execute(conn)
                     .map_err(StorageError::from)?;
 

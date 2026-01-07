@@ -11,7 +11,7 @@ use super::model::{QuoteSyncStateDB, QuoteSyncStateUpdateDB};
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
 use crate::schema::quote_sync_state::dsl as qss_dsl;
-use wealthfolio_core::market_data::{QuoteSyncState, QuoteSyncStateRepositoryTrait};
+use wealthfolio_core::quotes::{QuoteSyncState, SyncStateStore};
 use wealthfolio_core::Result;
 
 pub struct QuoteSyncStateRepository {
@@ -26,7 +26,7 @@ impl QuoteSyncStateRepository {
 }
 
 #[async_trait]
-impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
+impl SyncStateStore for QuoteSyncStateRepository {
     fn get_all(&self) -> Result<Vec<QuoteSyncState>> {
         let mut conn = get_connection(&self.pool)?;
 
@@ -42,7 +42,7 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
         let mut conn = get_connection(&self.pool)?;
 
         let result = qss_dsl::quote_sync_state
-            .filter(qss_dsl::symbol.eq(symbol))
+            .filter(qss_dsl::asset_id.eq(symbol))
             .first::<QuoteSyncStateDB>(&mut conn)
             .optional()
             .map_err(StorageError::from)?;
@@ -58,7 +58,7 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
         let mut conn = get_connection(&self.pool)?;
 
         let results = qss_dsl::quote_sync_state
-            .filter(qss_dsl::symbol.eq_any(symbols))
+            .filter(qss_dsl::asset_id.eq_any(symbols))
             .load::<QuoteSyncStateDB>(&mut conn)
             .map_err(StorageError::from)?;
 
@@ -115,7 +115,7 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
                         .map_err(StorageError::from)?;
 
                     let result = qss_dsl::quote_sync_state
-                        .filter(qss_dsl::symbol.eq(&db_state.symbol))
+                        .filter(qss_dsl::asset_id.eq(&db_state.asset_id))
                         .first::<QuoteSyncStateDB>(conn)
                         .map_err(StorageError::from)?;
 
@@ -159,6 +159,13 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                // Get current state to compare earliest_quote_date
+                let current: Option<QuoteSyncStateDB> = qss_dsl::quote_sync_state
+                    .filter(qss_dsl::asset_id.eq(&symbol_owned))
+                    .first(conn)
+                    .optional()
+                    .map_err(StorageError::from)?;
+
                 let mut update = QuoteSyncStateUpdateDB {
                     last_synced_at: Some(Some(now.clone())),
                     last_quote_date: Some(Some(last_quote_str)),
@@ -168,11 +175,22 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
                     ..Default::default()
                 };
 
-                if earliest_quote_str.is_some() {
-                    update.earliest_quote_date = Some(earliest_quote_str);
+                // Only update earliest_quote_date if:
+                // 1. We have a new earliest date AND
+                // 2. Either no existing date OR new date is earlier than existing
+                if let Some(ref new_earliest) = earliest_quote_str {
+                    let should_update = current
+                        .as_ref()
+                        .and_then(|c| c.earliest_quote_date.as_ref())
+                        .map(|existing| new_earliest < existing)
+                        .unwrap_or(true); // No existing date, so update
+
+                    if should_update {
+                        update.earliest_quote_date = Some(Some(new_earliest.clone()));
+                    }
                 }
 
-                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::symbol.eq(&symbol_owned)))
+                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&symbol_owned)))
                     .set(&update)
                     .execute(conn)
                     .map_err(StorageError::from)?;
@@ -191,7 +209,7 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
                 // First get current error count
                 let current: Option<QuoteSyncStateDB> = qss_dsl::quote_sync_state
-                    .filter(qss_dsl::symbol.eq(&symbol_owned))
+                    .filter(qss_dsl::asset_id.eq(&symbol_owned))
                     .first(conn)
                     .optional()
                     .map_err(StorageError::from)?;
@@ -205,7 +223,7 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
                     ..Default::default()
                 };
 
-                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::symbol.eq(&symbol_owned)))
+                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&symbol_owned)))
                     .set(&update)
                     .execute(conn)
                     .map_err(StorageError::from)?;
@@ -235,7 +253,7 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
                     ..Default::default()
                 };
 
-                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::symbol.eq(&symbol_owned)))
+                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&symbol_owned)))
                     .set(&update)
                     .execute(conn)
                     .map_err(StorageError::from)?;
@@ -261,7 +279,7 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
                     ..Default::default()
                 };
 
-                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::symbol.eq(&symbol_owned)))
+                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&symbol_owned)))
                     .set(&update)
                     .execute(conn)
                     .map_err(StorageError::from)?;
@@ -284,7 +302,7 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
                 // Get current state
                 let current: Option<QuoteSyncStateDB> = qss_dsl::quote_sync_state
-                    .filter(qss_dsl::symbol.eq(&symbol_owned))
+                    .filter(qss_dsl::asset_id.eq(&symbol_owned))
                     .first(conn)
                     .optional()
                     .map_err(StorageError::from)?;
@@ -322,7 +340,7 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
                     }
                 }
 
-                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::symbol.eq(&symbol_owned)))
+                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&symbol_owned)))
                     .set(&update)
                     .execute(conn)
                     .map_err(StorageError::from)?;
@@ -337,7 +355,7 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
-                diesel::delete(qss_dsl::quote_sync_state.filter(qss_dsl::symbol.eq(&symbol_owned)))
+                diesel::delete(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&symbol_owned)))
                     .execute(conn)
                     .map_err(StorageError::from)?;
                 Ok(())
@@ -355,4 +373,84 @@ impl QuoteSyncStateRepositoryTrait for QuoteSyncStateRepository {
             })
             .await
     }
+
+    async fn refresh_activity_dates_from_activities(&self) -> Result<usize> {
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
+                // Update first_activity_date and last_activity_date from activities table
+                // This uses a subquery to get min/max activity dates per asset_id
+                let updated = diesel::sql_query(
+                    r#"
+                    UPDATE quote_sync_state
+                    SET
+                        first_activity_date = (
+                            SELECT MIN(date(a.activity_date))
+                            FROM activities a
+                            INNER JOIN accounts acc ON a.account_id = acc.id
+                            WHERE a.asset_id = quote_sync_state.asset_id
+                            AND acc.is_active = 1
+                        ),
+                        last_activity_date = (
+                            SELECT MAX(date(a.activity_date))
+                            FROM activities a
+                            INNER JOIN accounts acc ON a.account_id = acc.id
+                            WHERE a.asset_id = quote_sync_state.asset_id
+                            AND acc.is_active = 1
+                        ),
+                        updated_at = datetime('now')
+                    WHERE EXISTS (
+                        SELECT 1 FROM activities a
+                        INNER JOIN accounts acc ON a.account_id = acc.id
+                        WHERE a.asset_id = quote_sync_state.asset_id
+                        AND acc.is_active = 1
+                    )
+                    "#,
+                )
+                .execute(conn)
+                .map_err(StorageError::from)?;
+
+                debug!(
+                    "Refreshed activity dates for {} sync states from activities",
+                    updated
+                );
+                Ok(updated)
+            })
+            .await
+    }
+
+    async fn refresh_earliest_quote_dates(&self) -> Result<usize> {
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
+                // Update earliest_quote_date from quotes table
+                // This ensures it reflects the actual minimum quote date
+                let updated = diesel::sql_query(
+                    r#"
+                    UPDATE quote_sync_state
+                    SET
+                        earliest_quote_date = (
+                            SELECT MIN(q.day)
+                            FROM quotes q
+                            WHERE q.asset_id = quote_sync_state.asset_id
+                        ),
+                        updated_at = datetime('now')
+                    WHERE EXISTS (
+                        SELECT 1 FROM quotes q
+                        WHERE q.asset_id = quote_sync_state.asset_id
+                    )
+                    "#,
+                )
+                .execute(conn)
+                .map_err(StorageError::from)?;
+
+                debug!(
+                    "Refreshed earliest_quote_date for {} sync states from quotes",
+                    updated
+                );
+                Ok(updated)
+            })
+            .await
+    }
 }
+
+// Note: SyncStateStore is implemented above directly.
+// The implementation provides all methods required by the SyncStateStore trait.

@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 
 use crate::errors::MarketDataError;
-use crate::models::{ProviderInstrument, Quote, QuoteContext};
+use crate::models::{AssetProfile, ProviderInstrument, Quote, QuoteContext, SearchResult};
 
 use super::capabilities::{ProviderCapabilities, RateLimit};
 
@@ -113,4 +113,40 @@ pub trait MarketDataProvider: Send + Sync {
         start: DateTime<Utc>,
         end: DateTime<Utc>,
     ) -> Result<Vec<Quote>, MarketDataError>;
+
+    /// Search for symbols matching the query.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - The search query (e.g., "AAPL", "Apple")
+    ///
+    /// # Returns
+    ///
+    /// A vector of search results, or an error if search is not supported.
+    /// Default implementation returns `NotSupported`.
+    async fn search(&self, query: &str) -> Result<Vec<SearchResult>, MarketDataError> {
+        let _ = query;
+        Err(MarketDataError::NotSupported {
+            operation: "search".to_string(),
+            provider: self.id().to_string(),
+        })
+    }
+
+    /// Fetch asset profile information.
+    ///
+    /// # Arguments
+    ///
+    /// * `symbol` - The symbol to fetch profile for
+    ///
+    /// # Returns
+    ///
+    /// The asset profile, or an error if profile is not supported.
+    /// Default implementation returns `NotSupported`.
+    async fn get_profile(&self, symbol: &str) -> Result<AssetProfile, MarketDataError> {
+        let _ = symbol;
+        Err(MarketDataError::NotSupported {
+            operation: "profile".to_string(),
+            provider: self.id().to_string(),
+        })
+    }
 }

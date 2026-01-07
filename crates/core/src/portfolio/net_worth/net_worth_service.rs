@@ -17,7 +17,7 @@ use crate::assets::{AssetKind, AssetRepositoryTrait};
 use crate::constants::DECIMAL_PRECISION;
 use crate::errors::Result;
 use crate::fx::FxServiceTrait;
-use crate::market_data::MarketDataRepositoryTrait;
+use crate::quotes::QuoteServiceTrait;
 use crate::portfolio::snapshot::SnapshotRepositoryTrait;
 use crate::portfolio::valuation::ValuationRepositoryTrait;
 
@@ -30,7 +30,7 @@ pub struct NetWorthService {
     account_repository: Arc<dyn AccountRepositoryTrait>,
     asset_repository: Arc<dyn AssetRepositoryTrait>,
     snapshot_repository: Arc<dyn SnapshotRepositoryTrait>,
-    market_data_repository: Arc<dyn MarketDataRepositoryTrait>,
+    quote_service: Arc<dyn QuoteServiceTrait>,
     valuation_repository: Arc<dyn ValuationRepositoryTrait>,
     fx_service: Arc<dyn FxServiceTrait>,
 }
@@ -43,7 +43,7 @@ impl NetWorthService {
         account_repository: Arc<dyn AccountRepositoryTrait>,
         asset_repository: Arc<dyn AssetRepositoryTrait>,
         snapshot_repository: Arc<dyn SnapshotRepositoryTrait>,
-        market_data_repository: Arc<dyn MarketDataRepositoryTrait>,
+        quote_service: Arc<dyn QuoteServiceTrait>,
         valuation_repository: Arc<dyn ValuationRepositoryTrait>,
         fx_service: Arc<dyn FxServiceTrait>,
     ) -> Self {
@@ -52,7 +52,7 @@ impl NetWorthService {
             account_repository,
             asset_repository,
             snapshot_repository,
-            market_data_repository,
+            quote_service,
             valuation_repository,
             fx_service,
         }
@@ -100,8 +100,8 @@ impl NetWorthService {
     ) -> Option<(Decimal, NaiveDate)> {
         // Get all quotes for this symbol and find the latest one <= date
         let quotes = self
-            .market_data_repository
-            .get_historical_quotes_for_symbol(asset_id)
+            .quote_service
+            .get_historical_quotes(asset_id)
             .ok()?;
 
         quotes
@@ -555,8 +555,8 @@ impl NetWorthServiceTrait for NetWorthService {
 
         // Get quotes in the date range
         let quotes_vec = self
-            .market_data_repository
-            .get_historical_quotes_for_symbols_in_range(&all_alt_symbols, start_date, end_date)?;
+            .quote_service
+            .get_quotes_in_range_filled(&all_alt_symbols, start_date, end_date)?;
 
         // Organize quotes by date -> symbol -> value (converted to base currency)
         let mut quotes_by_date: BTreeMap<NaiveDate, HashMap<String, Decimal>> = BTreeMap::new();
