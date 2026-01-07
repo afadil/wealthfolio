@@ -82,11 +82,11 @@ impl AlternativeAssetRepositoryTrait for AlternativeAssetRepository {
                     }
                 }
 
-                // Step 2: Delete all quotes for this asset with data_source = 'MANUAL'
+                // Step 2: Delete all quotes for this asset with source = 'MANUAL'
                 diesel::delete(
                     quotes::table
-                        .filter(quotes::symbol.eq(&asset_id_owned))
-                        .filter(quotes::data_source.eq("MANUAL")),
+                        .filter(quotes::asset_id.eq(&asset_id_owned))
+                        .filter(quotes::source.eq("MANUAL")),
                 )
                 .execute(conn)
                 .map_err(StorageError::from)?;

@@ -12,7 +12,6 @@ use wealthfolio_core::{
     fx::{FxService, FxServiceTrait},
     goals::{GoalService, GoalServiceTrait},
     limits::{ContributionLimitService, ContributionLimitServiceTrait},
-    market_data::{MarketDataService, MarketDataServiceTrait},
     portfolio::income::{IncomeService, IncomeServiceTrait},
     portfolio::{
         holdings::{
@@ -22,6 +21,7 @@ use wealthfolio_core::{
         snapshot::{SnapshotService, SnapshotServiceTrait},
         valuation::{ValuationService, ValuationServiceTrait},
     },
+    quotes::{QuoteService, QuoteServiceTrait},
     secrets::SecretStore,
     settings::{SettingsService, SettingsServiceTrait},
 };
@@ -43,7 +43,7 @@ pub struct AppState {
     pub settings_service: Arc<SettingsService>,
     pub holdings_service: Arc<dyn HoldingsServiceTrait + Send + Sync>,
     pub valuation_service: Arc<dyn ValuationServiceTrait + Send + Sync>,
-    pub market_data_service: Arc<dyn MarketDataServiceTrait + Send + Sync>,
+    pub quote_service: Arc<dyn QuoteServiceTrait + Send + Sync>,
     pub base_currency: Arc<RwLock<String>>,
     pub snapshot_service: Arc<dyn SnapshotServiceTrait + Send + Sync>,
     pub performance_service:
@@ -132,22 +132,20 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let snapshot_repository = Arc::new(SnapshotRepository::new(pool.clone(), writer.clone()));
     let quote_sync_state_repository =
         Arc::new(QuoteSyncStateRepository::new(pool.clone(), writer.clone()));
-    let market_data_service = Arc::new(
-        MarketDataService::new(
-            market_data_repository.clone(),
-            asset_repository.clone(),
+    let quote_service: Arc<dyn QuoteServiceTrait + Send + Sync> = Arc::new(
+        QuoteService::new(
+            market_data_repository.clone(),      // QuoteStore
+            quote_sync_state_repository.clone(), // SyncStateStore
+            market_data_repository.clone(),      // ProviderSettingsStore
+            asset_repository.clone(),            // AssetRepositoryTrait
             secret_store.clone(),
-            quote_sync_state_repository.clone(),
-            snapshot_repository.clone(),
-            activity_repository.clone(),
-            account_repo.clone(),
         )
         .await?,
     );
 
     let asset_service = Arc::new(AssetService::new(
         asset_repository.clone(),
-        market_data_service.clone(),
+        quote_service.clone(),
     )?);
     let snapshot_service = Arc::new(SnapshotService::new(
         base_currency.clone(),
@@ -163,13 +161,13 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         base_currency.clone(),
         valuation_repository.clone(),
         snapshot_service.clone(),
-        market_data_service.clone(),
+        quote_service.clone(),
         fx_service.clone(),
     ));
 
     let holdings_valuation_service = Arc::new(HoldingsValuationService::new(
         fx_service.clone(),
-        market_data_service.clone(),
+        quote_service.clone(),
     ));
     let holdings_service = Arc::new(HoldingsService::new(
         asset_service.clone(),
@@ -180,7 +178,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let performance_service = Arc::new(
         wealthfolio_core::portfolio::performance::PerformanceService::new(
             valuation_service.clone(),
-            market_data_service.clone(),
+            quote_service.clone(),
         ),
     );
 
@@ -238,7 +236,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         settings_service,
         holdings_service,
         valuation_service,
-        market_data_service: market_data_service.clone(),
+        quote_service,
         base_currency,
         snapshot_service,
         performance_service,

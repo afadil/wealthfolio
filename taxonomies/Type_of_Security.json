@@ -1,0 +1,58 @@
+{
+  "name": "Type of Security",
+  "color": "#fe96bb",
+  "categories": [
+    {
+      "name": "Stock",
+      "key": "Stock",
+      "color": "#0000ff"
+    },
+    {
+      "name": "Equity Fund",
+      "key": "Fund",
+      "color": "#ffff00"
+    },
+    {
+      "name": "Exchange Traded Fund (ETF)",
+      "key": "ETF",
+      "color": "#ff0000"
+    },
+    {
+      "name": "Bond",
+      "key": "Bond",
+      "color": "#80ff80"
+    },
+    {
+      "name": "Stock Option",
+      "key": "Option",
+      "color": "#cfd18f"
+    },
+    {
+      "name": "Index",
+      "key": "Index",
+      "color": "#9082dd"
+    },
+    {
+      "name": "Currency",
+      "key": "Currency",
+      "color": "#ff8000"
+    }
+  ],
+  "instruments": [
+    {
+      "identifiers": {
+        "name": "Microsoft Corporation",
+        "ticker": "MSFT"
+      },
+      "categories": [
+        {
+          "key": "Stock",
+          "path": [
+            "Stock"
+          ],
+          "weight": 100.0
+        }
+      ]
+    }
+  ]
+}

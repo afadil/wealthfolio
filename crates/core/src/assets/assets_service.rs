@@ -1,7 +1,7 @@
 use log::{debug, error};
 use std::sync::Arc;
 
-use crate::market_data::MarketDataServiceTrait;
+use crate::quotes::QuoteServiceTrait;
 
 use super::assets_model::{Asset, AssetKind, NewAsset, PricingMode, UpdateAssetProfile};
 use super::assets_traits::{AssetRepositoryTrait, AssetServiceTrait};
@@ -59,7 +59,7 @@ fn parse_asset_kind_from_provider(asset_type: &str) -> Option<AssetKind> {
 
 /// Service for managing assets
 pub struct AssetService {
-    market_data_service: Arc<dyn MarketDataServiceTrait>,
+    quote_service: Arc<dyn QuoteServiceTrait>,
     asset_repository: Arc<dyn AssetRepositoryTrait>,
 }
 
@@ -67,10 +67,10 @@ impl AssetService {
     /// Creates a new AssetService instance
     pub fn new(
         asset_repository: Arc<dyn AssetRepositoryTrait>,
-        market_data_service: Arc<dyn MarketDataServiceTrait>,
+        quote_service: Arc<dyn QuoteServiceTrait>,
     ) -> Result<Self> {
         Ok(Self {
-            market_data_service,
+            quote_service,
             asset_repository,
         })
     }
@@ -134,7 +134,7 @@ impl AssetServiceTrait for AssetService {
                     asset_id
                 );
                 let asset_profile_from_provider =
-                    self.market_data_service.get_asset_profile(asset_id).await?;
+                    self.quote_service.get_asset_profile(asset_id).await?;
 
                 let mut new_asset: NewAsset = asset_profile_from_provider.into();
 
@@ -258,7 +258,7 @@ impl AssetServiceTrait for AssetService {
         }
 
         // Fetch profile from provider
-        let provider_profile = match self.market_data_service.get_asset_profile(asset_id).await {
+        let provider_profile = match self.quote_service.get_asset_profile(asset_id).await {
             Ok(profile) => profile,
             Err(e) => {
                 debug!(

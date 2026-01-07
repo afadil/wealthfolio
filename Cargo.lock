@@ -7366,7 +7366,7 @@ dependencies = [
  "urlencoding",
  "uuid",
  "wealthfolio-market-data",
- "yahoo_finance_api 4.1.0",
+ "yahoo_finance_api",
  "zip 2.4.2",
 ]
 
@@ -7390,6 +7390,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
+ "lazy_static",
  "log",
  "num-traits",
  "reqwest",
@@ -7401,7 +7402,8 @@ dependencies = [
  "time",
  "tokio",
  "tracing",
- "yahoo_finance_api 2.4.0",
+ "urlencoding",
+ "yahoo_finance_api",
 ]
 
 [[package]]
@@ -8240,19 +8242,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "388c44dc09d76f1536602ead6d325eb532f5c122f17782bd57fb47baeeb767e2"
 dependencies = [
  "lzma-sys",
-]
-
-[[package]]
-name = "yahoo_finance_api"
-version = "2.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2d318435472bd7e2e95e95d0f546efc075f77a7dfcaeb1469cb747c088566d7"
-dependencies = [
- "reqwest",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "time",
 ]
 
 [[package]]

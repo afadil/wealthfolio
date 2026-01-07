@@ -1,19 +1,19 @@
 // Test cases for HoldingsValuationService will go here.
 #[cfg(test)]
 mod tests {
+    use crate::assets::ProviderProfile;
     use crate::errors::{Error, Result};
     use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
-    use crate::market_data::providers::models::AssetProfile;
-    use crate::market_data::{
-        DataSource, LatestQuotePair, MarketDataError, MarketDataProviderInfo,
-        MarketDataProviderSetting, MarketDataServiceTrait, Quote, QuoteImport, QuoteSummary,
-        QuoteSyncState, SymbolSyncPlan,
-    };
+    use crate::quotes::{DataSource, MarketDataError};
     use crate::portfolio::holdings::holdings_model::{
         Holding, HoldingType, Instrument, MonetaryValue,
     };
     use crate::portfolio::holdings::holdings_valuation_service::{
         HoldingsValuationService, HoldingsValuationServiceTrait,
+    };
+    use crate::quotes::{
+        LatestQuotePair, ProviderInfo, Quote, QuoteImport, QuoteSummary, QuoteServiceTrait,
+        QuoteSyncState, SymbolSyncPlan, SyncResult,
     };
     use async_trait::async_trait;
     use chrono::{NaiveDate, Utc};
@@ -143,7 +143,7 @@ mod tests {
         }
     }
 
-    // --- Mock MarketDataService ---
+    // --- Mock MarketDataService (implements QuoteServiceTrait) ---
     #[derive(Clone, Default)]
     struct MockMarketDataService {
         quotes: Arc<Mutex<HashMap<String, LatestQuotePair>>>,
@@ -158,98 +158,122 @@ mod tests {
     }
 
     #[async_trait]
-    impl MarketDataServiceTrait for MockMarketDataService {
-        async fn search_symbol(&self, _query: &str) -> Result<Vec<QuoteSummary>> {
+    impl QuoteServiceTrait for MockMarketDataService {
+        // =========================================================================
+        // Quote CRUD Operations
+        // =========================================================================
+
+        fn get_latest_quote(&self, _symbol: &str) -> Result<Quote> {
             unimplemented!()
         }
-        fn get_latest_quote_for_symbol(&self, _symbol: &str) -> Result<Quote> {
+
+        fn get_latest_quotes(&self, _symbols: &[String]) -> Result<HashMap<String, Quote>> {
             unimplemented!()
         }
-        fn get_latest_quotes_for_symbols(
+
+        fn get_latest_quotes_pair(
             &self,
-            _symbols: &[String],
-        ) -> Result<HashMap<String, Quote>> {
+            symbols: &[String],
+        ) -> Result<HashMap<String, LatestQuotePair>> {
+            if *self.should_fail.lock().unwrap() {
+                return Err(Error::MarketData(MarketDataError::ProviderError(
+                    "Intentional market data failure".to_string(),
+                )));
+            }
+            let quotes_db = self.quotes.lock().unwrap();
+            let mut result = HashMap::new();
+            for symbol in symbols {
+                if let Some(pair) = quotes_db.get(symbol) {
+                    result.insert(symbol.clone(), pair.clone());
+                }
+            }
+            Ok(result)
+        }
+
+        fn get_historical_quotes(&self, _symbol: &str) -> Result<Vec<Quote>> {
             unimplemented!()
         }
+
         fn get_all_historical_quotes(&self) -> Result<HashMap<String, Vec<(NaiveDate, Quote)>>> {
             unimplemented!()
         }
-        async fn get_asset_profile(&self, _symbol: &str) -> Result<AssetProfile> {
-            unimplemented!()
-        }
-        fn get_historical_quotes_for_symbol(&self, _symbol: &str) -> Result<Vec<Quote>> {
-            unimplemented!()
-        }
-        async fn add_quote(&self, _quote: &Quote) -> Result<Quote> {
-            unimplemented!()
-        }
-        async fn update_quote(&self, _quote: Quote) -> Result<Quote> {
-            unimplemented!()
-        }
-        async fn delete_quote(&self, _quote_id: &str) -> Result<()> {
-            unimplemented!()
-        }
-        async fn get_historical_quotes_from_provider(
-            &self,
-            _symbol: &str,
-            _start_date: NaiveDate,
-            _end_date: NaiveDate,
-        ) -> Result<Vec<Quote>> {
-            unimplemented!()
-        }
-        async fn sync_market_data(&self) -> Result<((), Vec<(String, String)>)> {
-            unimplemented!()
-        }
-        async fn resync_market_data(
-            &self,
-            _symbols: Option<Vec<String>>,
-        ) -> Result<((), Vec<(String, String)>)> {
-            unimplemented!()
-        }
-        fn get_historical_quotes_for_symbols_in_range(
+
+        fn get_quotes_in_range(
             &self,
             _symbols: &HashSet<String>,
-            _start_date: NaiveDate,
-            _end_date: NaiveDate,
+            _start: NaiveDate,
+            _end: NaiveDate,
         ) -> Result<Vec<Quote>> {
             unimplemented!()
         }
+
+        fn get_quotes_in_range_filled(
+            &self,
+            _symbols: &HashSet<String>,
+            _start: NaiveDate,
+            _end: NaiveDate,
+        ) -> Result<Vec<Quote>> {
+            unimplemented!()
+        }
+
         async fn get_daily_quotes(
             &self,
             _asset_ids: &HashSet<String>,
-            _start_date: NaiveDate,
-            _end_date: NaiveDate,
+            _start: NaiveDate,
+            _end: NaiveDate,
         ) -> Result<HashMap<NaiveDate, HashMap<String, Quote>>> {
             unimplemented!()
         }
-        async fn get_market_data_providers_info(&self) -> Result<Vec<MarketDataProviderInfo>> {
+
+        async fn add_quote(&self, _quote: &Quote) -> Result<Quote> {
             unimplemented!()
         }
-        async fn get_market_data_providers_settings(
-            &self,
-        ) -> Result<Vec<MarketDataProviderSetting>> {
+
+        async fn update_quote(&self, _quote: Quote) -> Result<Quote> {
             unimplemented!()
         }
-        async fn update_market_data_provider_settings(
-            &self,
-            _provider_id: String,
-            _priority: i32,
-            _enabled: bool,
-        ) -> Result<MarketDataProviderSetting> {
+
+        async fn delete_quote(&self, _quote_id: &str) -> Result<()> {
             unimplemented!()
         }
-        async fn import_quotes_from_csv(
-            &self,
-            _quotes: Vec<QuoteImport>,
-            _overwrite: bool,
-        ) -> Result<Vec<QuoteImport>> {
-            unimplemented!()
-        }
+
         async fn bulk_upsert_quotes(&self, _quotes: Vec<Quote>) -> Result<usize> {
             unimplemented!()
         }
 
-        // --- Quote Sync State Methods ---
+        // =========================================================================
+        // Provider Operations
+        // =========================================================================
+
+        async fn search_symbol(&self, _query: &str) -> Result<Vec<QuoteSummary>> {
+            unimplemented!()
+        }
+
+        async fn get_asset_profile(&self, _symbol: &str) -> Result<ProviderProfile> {
+            unimplemented!()
+        }
+
+        async fn fetch_quotes_from_provider(
+            &self,
+            _symbol: &str,
+            _start: NaiveDate,
+            _end: NaiveDate,
+        ) -> Result<Vec<Quote>> {
+            unimplemented!()
+        }
+
+        // =========================================================================
+        // Sync Operations
+        // =========================================================================
+
+        async fn sync(&self) -> Result<SyncResult> {
+            unimplemented!()
+        }
+
+        async fn resync(&self, _symbols: Option<Vec<String>>) -> Result<SyncResult> {
+            unimplemented!()
+        }
+
         async fn refresh_sync_state(&self) -> Result<()> {
             Ok(())
         }
@@ -258,16 +282,7 @@ mod tests {
             Ok(Vec::new())
         }
 
-        async fn handle_activity_date_change(
-            &self,
-            _symbol: &str,
-            _old_date: Option<NaiveDate>,
-            _new_date: NaiveDate,
-        ) -> Result<()> {
-            Ok(())
-        }
-
-        async fn handle_new_activity(
+        async fn handle_activity_created(
             &self,
             _symbol: &str,
             _activity_date: NaiveDate,
@@ -287,23 +302,33 @@ mod tests {
             Ok(Vec::new())
         }
 
-        fn get_latest_quotes_pair_for_symbols(
+        // =========================================================================
+        // Provider Settings
+        // =========================================================================
+
+        async fn get_providers_info(&self) -> Result<Vec<ProviderInfo>> {
+            unimplemented!()
+        }
+
+        async fn update_provider_settings(
             &self,
-            symbols: &[String],
-        ) -> Result<HashMap<String, LatestQuotePair>> {
-            if *self.should_fail.lock().unwrap() {
-                return Err(Error::MarketData(MarketDataError::ProviderError(
-                    "Intentional market data failure".to_string(),
-                )));
-            }
-            let quotes_db = self.quotes.lock().unwrap();
-            let mut result = HashMap::new();
-            for symbol in symbols {
-                if let Some(pair) = quotes_db.get(symbol) {
-                    result.insert(symbol.clone(), pair.clone());
-                }
-            }
-            Ok(result)
+            _provider_id: &str,
+            _priority: i32,
+            _enabled: bool,
+        ) -> Result<()> {
+            unimplemented!()
+        }
+
+        // =========================================================================
+        // Quote Import
+        // =========================================================================
+
+        async fn import_quotes(
+            &self,
+            _quotes: Vec<QuoteImport>,
+            _overwrite: bool,
+        ) -> Result<Vec<QuoteImport>> {
+            unimplemented!()
         }
     }
 
@@ -329,6 +354,7 @@ mod tests {
             currency: currency.to_string(),
             data_source: DataSource::Yahoo,
             created_at: Utc::now(),
+            notes: None,
         }
     }
 

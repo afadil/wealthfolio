@@ -9,7 +9,6 @@ use wealthfolio_core::{
     fx::{FxService, FxServiceTrait},
     goals::GoalService,
     limits::ContributionLimitService,
-    market_data::{MarketDataService, MarketDataServiceTrait},
     portfolio::{
         holdings::{HoldingsService, HoldingsValuationService},
         income::IncomeService,
@@ -18,6 +17,7 @@ use wealthfolio_core::{
         snapshot::SnapshotService,
         valuation::ValuationService,
     },
+    quotes::{QuoteService, QuoteServiceTrait},
     settings::{SettingsService, SettingsServiceTrait},
 };
 use wealthfolio_storage_sqlite::{
@@ -79,23 +79,21 @@ pub async fn initialize_context(
     let quote_sync_state_repository =
         Arc::new(QuoteSyncStateRepository::new(pool.clone(), writer.clone()));
 
-    // MarketDataService now includes sync state functionality
-    let market_data_service: Arc<dyn MarketDataServiceTrait> = Arc::new(
-        MarketDataService::new(
-            market_data_repo.clone(),
-            asset_repository.clone(),
+    // QuoteService provides all quote operations via QuoteServiceTrait
+    let quote_service: Arc<dyn QuoteServiceTrait> = Arc::new(
+        QuoteService::new(
+            market_data_repo.clone(),           // QuoteStore
+            quote_sync_state_repository.clone(), // SyncStateStore
+            market_data_repo.clone(),           // ProviderSettingsStore
+            asset_repository.clone(),           // AssetRepositoryTrait
             secret_store.clone(),
-            quote_sync_state_repository.clone(),
-            snapshot_repository.clone(),
-            activity_repository.clone(),
-            account_repository.clone(),
         )
         .await?,
     );
 
     let asset_service = Arc::new(AssetService::new(
         asset_repository.clone(),
-        market_data_service.clone(),
+        quote_service.clone(),
     )?);
 
     let account_service = Arc::new(AccountService::new(
@@ -133,20 +131,20 @@ pub async fn initialize_context(
 
     let holdings_valuation_service = Arc::new(HoldingsValuationService::new(
         fx_service.clone(),
-        market_data_service.clone(),
+        quote_service.clone(),
     ));
 
     let valuation_service = Arc::new(ValuationService::new(
         base_currency.clone(),
         valuation_repository.clone(),
         snapshot_service.clone(),
-        market_data_service.clone(),
+        quote_service.clone(),
         fx_service.clone(),
     ));
 
     let performance_service = Arc::new(PerformanceService::new(
         valuation_service.clone(),
-        market_data_service.clone(),
+        quote_service.clone(),
     ));
 
     let holdings_service = Arc::new(HoldingsService::new(
@@ -160,7 +158,7 @@ pub async fn initialize_context(
         account_repository.clone(),
         asset_repository.clone(),
         snapshot_repository.clone(),
-        market_data_repo.clone(),
+        quote_service.clone(),
         valuation_repository.clone(),
         fx_service.clone(),
     ));
@@ -183,7 +181,7 @@ pub async fn initialize_context(
         activity_service,
         asset_service,
         goal_service,
-        market_data_service,
+        quote_service,
         limits_service,
         fx_service,
         performance_service,

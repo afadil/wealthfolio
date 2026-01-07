@@ -4,6 +4,16 @@ use serde::{Deserialize, Serialize};
 
 use super::types::{Currency, Mic};
 
+/// Market data instrument classification.
+/// Used for provider capability filtering (separate from portfolio's AssetKind).
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum InstrumentKind {
+    Equity, // Exchange-traded securities
+    Crypto, // Cryptocurrencies
+    Fx,     // Foreign exchange pairs
+    Metal,  // Precious metals
+}
+
 /// Asset classification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -47,6 +57,16 @@ impl InstrumentId {
             Self::Crypto { .. } => AssetKind::Crypto,
             Self::Fx { .. } => AssetKind::FxRate,
             Self::Metal { .. } => AssetKind::Commodity,
+        }
+    }
+
+    /// Returns the instrument kind (for market-data capability filtering).
+    pub fn instrument_kind(&self) -> InstrumentKind {
+        match self {
+            Self::Equity { .. } => InstrumentKind::Equity,
+            Self::Crypto { .. } => InstrumentKind::Crypto,
+            Self::Fx { .. } => InstrumentKind::Fx,
+            Self::Metal { .. } => InstrumentKind::Metal,
         }
     }
 }

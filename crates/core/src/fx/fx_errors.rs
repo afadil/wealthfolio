@@ -74,7 +74,7 @@ impl
         std::sync::PoisonError<
             std::sync::RwLockReadGuard<
                 '_,
-                std::collections::HashMap<String, Vec<crate::market_data::Quote>>,
+                std::collections::HashMap<String, Vec<crate::quotes::Quote>>,
             >,
         >,
     > for FxError
@@ -83,7 +83,7 @@ impl
         err: std::sync::PoisonError<
             std::sync::RwLockReadGuard<
                 '_,
-                std::collections::HashMap<String, Vec<crate::market_data::Quote>>,
+                std::collections::HashMap<String, Vec<crate::quotes::Quote>>,
             >,
         >,
     ) -> Self {
@@ -96,7 +96,7 @@ impl
         std::sync::PoisonError<
             std::sync::RwLockWriteGuard<
                 '_,
-                std::collections::HashMap<String, Vec<crate::market_data::Quote>>,
+                std::collections::HashMap<String, Vec<crate::quotes::Quote>>,
             >,
         >,
     > for FxError
@@ -105,7 +105,7 @@ impl
         err: std::sync::PoisonError<
             std::sync::RwLockWriteGuard<
                 '_,
-                std::collections::HashMap<String, Vec<crate::market_data::Quote>>,
+                std::collections::HashMap<String, Vec<crate::quotes::Quote>>,
             >,
         >,
     ) -> Self {

@@ -1,7 +1,7 @@
 use crate::errors::{CalculatorError, Error as CoreError, Result as CoreResult};
 use crate::fx::currency::normalize_currency_code;
 use crate::fx::FxServiceTrait;
-use crate::market_data::MarketDataServiceTrait;
+use crate::quotes::QuoteServiceTrait;
 use crate::portfolio::snapshot::SnapshotServiceTrait;
 use crate::portfolio::valuation::valuation_calculator::calculate_valuation;
 use crate::portfolio::valuation::valuation_model::DailyAccountValuation;
@@ -77,7 +77,7 @@ pub struct ValuationService {
     base_currency: Arc<RwLock<String>>,
     valuation_repository: Arc<dyn ValuationRepositoryTrait>,
     snapshot_service: Arc<dyn SnapshotServiceTrait>,
-    market_data_service: Arc<dyn MarketDataServiceTrait>,
+    quote_service: Arc<dyn QuoteServiceTrait>,
     fx_service: Arc<dyn FxServiceTrait>,
 }
 
@@ -86,13 +86,13 @@ impl ValuationService {
         base_currency: Arc<RwLock<String>>,
         valuation_repository: Arc<dyn ValuationRepositoryTrait>,
         snapshot_service: Arc<dyn SnapshotServiceTrait>,
-        market_data_service: Arc<dyn MarketDataServiceTrait>,
+        quote_service: Arc<dyn QuoteServiceTrait>,
         fx_service: Arc<dyn FxServiceTrait>,
     ) -> Self {
         Self {
             base_currency,
             snapshot_service,
-            market_data_service,
+            quote_service,
             fx_service,
             valuation_repository,
         }
@@ -222,8 +222,8 @@ impl ValuationServiceTrait for ValuationService {
         let account_curr = normalized_account_currency.unwrap_or_else(|| base_curr.clone());
 
         let quotes_vec = self
-            .market_data_service
-            .get_historical_quotes_for_symbols_in_range(
+            .quote_service
+            .get_quotes_in_range_filled(
                 &required_asset_ids,
                 actual_calculation_start_date,
                 calculation_end_date,

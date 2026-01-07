@@ -8,6 +8,13 @@ import {
 } from "@/lib/types";
 import { invoke, logger } from "@/adapters";
 
+// Provider capabilities from backend
+export interface ProviderCapabilities {
+  instruments: string;
+  coverage: string;
+  features: string[];
+}
+
 // Interface matching the backend struct
 export interface MarketDataProviderSetting {
   id: string;
@@ -20,6 +27,7 @@ export interface MarketDataProviderSetting {
   lastSyncedAt: string | null;
   lastSyncStatus: string | null;
   lastSyncError: string | null;
+  capabilities: ProviderCapabilities | null;
 }
 
 export const searchTicker = async (query: string): Promise<QuoteSummary[]> => {

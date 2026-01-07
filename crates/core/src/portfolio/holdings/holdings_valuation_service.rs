@@ -2,7 +2,7 @@ use crate::assets::AssetKind;
 use crate::errors::Result;
 use crate::fx::currency::{normalize_amount, normalize_currency_code};
 use crate::fx::FxServiceTrait;
-use crate::market_data::{LatestQuotePair, MarketDataServiceTrait};
+use crate::quotes::{LatestQuotePair, QuoteServiceTrait};
 use crate::portfolio::holdings::{Holding, HoldingType, MonetaryValue};
 use async_trait::async_trait;
 use chrono::Utc;
@@ -20,17 +20,17 @@ pub trait HoldingsValuationServiceTrait: Send + Sync {
 #[derive(Clone)]
 pub struct HoldingsValuationService {
     fx_service: Arc<dyn FxServiceTrait>,
-    market_data_service: Arc<dyn MarketDataServiceTrait>,
+    quote_service: Arc<dyn QuoteServiceTrait>,
 }
 
 impl HoldingsValuationService {
     pub fn new(
         fx_service: Arc<dyn FxServiceTrait>,
-        market_data_service: Arc<dyn MarketDataServiceTrait>,
+        quote_service: Arc<dyn QuoteServiceTrait>,
     ) -> Self {
         Self {
             fx_service,
-            market_data_service,
+            quote_service,
         }
     }
 
@@ -72,8 +72,8 @@ impl HoldingsValuationService {
             .collect();
 
         let latest_quote_pairs = if !required_symbols.is_empty() {
-            self.market_data_service
-                .get_latest_quotes_pair_for_symbols(&required_symbols)?
+            self.quote_service
+                .get_latest_quotes_pair(&required_symbols)?
         } else {
             HashMap::new()
         };

@@ -194,7 +194,7 @@ impl CurrencyConverter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::market_data::DataSource;
+    use crate::quotes::DataSource;
     use chrono::{NaiveDate, TimeZone, Utc};
 
     fn make_rate(from: &str, to: &str, rate: f64, y: i32, m: u32, d: u32) -> ExchangeRate {

@@ -148,6 +148,23 @@ mod tests {
         async fn get_assets_by_symbols(&self, _symbols: &[String]) -> Result<Vec<Asset>> {
             unimplemented!()
         }
+
+        async fn create_asset(&self, _new_asset: crate::assets::NewAsset) -> Result<Asset> {
+            unimplemented!()
+        }
+
+        async fn get_or_create_minimal_asset(
+            &self,
+            asset_id: &str,
+            _context_currency: Option<String>,
+            _metadata: Option<crate::assets::AssetMetadata>,
+        ) -> Result<Asset> {
+            self.get_asset_by_id(asset_id)
+        }
+
+        async fn enrich_asset_profile(&self, _asset_id: &str) -> Result<Asset> {
+            unimplemented!()
+        }
     }
 
     // --- Mock FxService ---
@@ -486,6 +503,7 @@ mod tests {
             account_id: "acc-1".to_string(),
             asset_id: Some("NESN".to_string()),
             asset_data_source: None,
+            asset_metadata: None,
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -552,6 +570,7 @@ mod tests {
             account_id: "acc-1".to_string(),
             asset_id: Some("NESN".to_string()),
             asset_data_source: None,
+            asset_metadata: None,
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -618,6 +637,7 @@ mod tests {
             account_id: "acc-1".to_string(),
             asset_id: Some("AAPL".to_string()),
             asset_data_source: None,
+            asset_metadata: None,
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -684,6 +704,7 @@ mod tests {
                 account_id: "acc-1".to_string(),
                 asset_id: Some("NESN".to_string()),
                 asset_data_source: None,
+                asset_metadata: None,
                 activity_type: "BUY".to_string(),
                 subtype: None,
                 activity_date: "2024-01-15".to_string(),

@@ -263,8 +263,8 @@ diesel::table! {
 }
 
 diesel::table! {
-    quote_sync_state (symbol) {
-        symbol -> Text,
+    quote_sync_state (asset_id) {
+        asset_id -> Text,
         is_active -> Integer,
         first_activity_date -> Nullable<Text>,
         last_activity_date -> Nullable<Text>,
@@ -284,18 +284,19 @@ diesel::table! {
 diesel::table! {
     quotes (id) {
         id -> Text,
-        symbol -> Text,
-        timestamp -> Text,
-        open -> Text,
-        high -> Text,
-        low -> Text,
+        asset_id -> Text,
+        day -> Text,
+        source -> Text,
+        open -> Nullable<Text>,
+        high -> Nullable<Text>,
+        low -> Nullable<Text>,
         close -> Text,
-        adjclose -> Text,
-        volume -> Text,
+        adjclose -> Nullable<Text>,
+        volume -> Nullable<Text>,
         currency -> Text,
-        data_source -> Text,
-        created_at -> Text,
         notes -> Nullable<Text>,
+        created_at -> Text,
+        timestamp -> Text,
     }
 }
 
@@ -303,7 +304,7 @@ diesel::table! {
 diesel::joinable!(accounts -> platforms (platform_id));
 diesel::joinable!(goals_allocation -> accounts (account_id));
 diesel::joinable!(goals_allocation -> goals (goal_id));
-diesel::joinable!(quotes -> assets (symbol));
+diesel::joinable!(quotes -> assets (asset_id));
 diesel::joinable!(import_runs -> accounts (account_id));
 
 diesel::allow_tables_to_appear_in_same_query!(

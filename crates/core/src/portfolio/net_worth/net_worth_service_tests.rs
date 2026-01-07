@@ -2,15 +2,16 @@
 
 use super::*;
 use crate::accounts::{Account, AccountRepositoryTrait, AccountUpdate, NewAccount};
-use crate::assets::{Asset, AssetKind, AssetRepositoryTrait, NewAsset, PricingMode, UpdateAssetProfile};
+use crate::assets::{Asset, AssetKind, AssetRepositoryTrait, NewAsset, PricingMode, ProviderProfile, UpdateAssetProfile};
 use crate::errors::Result;
 use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
-use crate::market_data::{
-    DataSource, LatestQuotePair, MarketDataProviderSetting, MarketDataRepositoryTrait, Quote,
-    UpdateMarketDataProviderSetting,
-};
+use crate::quotes::DataSource;
 use crate::portfolio::snapshot::{AccountStateSnapshot, Position, SnapshotRepositoryTrait};
 use crate::portfolio::valuation::{DailyAccountValuation, ValuationRepositoryTrait};
+use crate::quotes::{
+    LatestQuotePair, ProviderInfo, Quote, QuoteImport, QuoteServiceTrait, QuoteSummary,
+    QuoteSyncState, SymbolSyncPlan, SyncResult,
+};
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use rust_decimal::Decimal;
@@ -265,46 +266,12 @@ impl MockMarketDataRepository {
 }
 
 #[async_trait]
-impl MarketDataRepositoryTrait for MockMarketDataRepository {
-    fn get_all_historical_quotes(&self) -> Result<Vec<Quote>> {
-        Ok(self.quotes.clone())
-    }
+impl QuoteServiceTrait for MockMarketDataRepository {
+    // =========================================================================
+    // Quote CRUD Operations
+    // =========================================================================
 
-    fn get_historical_quotes_for_symbol(&self, symbol: &str) -> Result<Vec<Quote>> {
-        Ok(self
-            .quotes
-            .iter()
-            .filter(|q| q.symbol == symbol)
-            .cloned()
-            .collect())
-    }
-
-    async fn save_quotes(&self, _quotes: &[Quote]) -> Result<()> {
-        unimplemented!()
-    }
-
-    async fn save_quote(&self, _quote: &Quote) -> Result<Quote> {
-        unimplemented!()
-    }
-
-    async fn delete_quote(&self, _quote_id: &str) -> Result<()> {
-        unimplemented!()
-    }
-
-    async fn delete_quotes_for_symbols(&self, _symbols: &[String]) -> Result<()> {
-        unimplemented!()
-    }
-
-    fn get_quotes_by_source(&self, symbol: &str, source: &str) -> Result<Vec<Quote>> {
-        Ok(self
-            .quotes
-            .iter()
-            .filter(|q| q.symbol == symbol && q.data_source.as_str() == source)
-            .cloned()
-            .collect())
-    }
-
-    fn get_latest_quote_for_symbol(&self, symbol: &str) -> Result<Quote> {
+    fn get_latest_quote(&self, symbol: &str) -> Result<Quote> {
         self.quotes
             .iter()
             .filter(|q| q.symbol == symbol)
@@ -313,7 +280,7 @@ impl MarketDataRepositoryTrait for MockMarketDataRepository {
             .ok_or_else(|| crate::errors::Error::Repository(format!("Quote not found for {}", symbol)))
     }
 
-    fn get_latest_quotes_for_symbols(&self, symbols: &[String]) -> Result<HashMap<String, Quote>> {
+    fn get_latest_quotes(&self, symbols: &[String]) -> Result<HashMap<String, Quote>> {
         let mut result = HashMap::new();
         for symbol in symbols {
             if let Some(quote) = self
@@ -328,84 +295,174 @@ impl MarketDataRepositoryTrait for MockMarketDataRepository {
         Ok(result)
     }
 
-    fn get_latest_quotes_pair_for_symbols(
+    fn get_latest_quotes_pair(
         &self,
         _symbols: &[String],
     ) -> Result<HashMap<String, LatestQuotePair>> {
         unimplemented!()
     }
 
-    fn get_historical_quotes_for_symbols_in_range(
+    fn get_historical_quotes(&self, symbol: &str) -> Result<Vec<Quote>> {
+        Ok(self
+            .quotes
+            .iter()
+            .filter(|q| q.symbol == symbol)
+            .cloned()
+            .collect())
+    }
+
+    fn get_all_historical_quotes(&self) -> Result<HashMap<String, Vec<(NaiveDate, Quote)>>> {
+        let mut result: HashMap<String, Vec<(NaiveDate, Quote)>> = HashMap::new();
+        for quote in &self.quotes {
+            let date = quote.timestamp.date_naive();
+            result
+                .entry(quote.symbol.clone())
+                .or_default()
+                .push((date, quote.clone()));
+        }
+        Ok(result)
+    }
+
+    fn get_quotes_in_range(
         &self,
         symbols: &HashSet<String>,
-        start_date: NaiveDate,
-        end_date: NaiveDate,
+        start: NaiveDate,
+        end: NaiveDate,
     ) -> Result<Vec<Quote>> {
         Ok(self
             .quotes
             .iter()
             .filter(|q| {
                 let date = q.timestamp.date_naive();
-                symbols.contains(&q.symbol) && date >= start_date && date <= end_date
+                symbols.contains(&q.symbol) && date >= start && date <= end
             })
             .cloned()
             .collect())
     }
 
-    fn get_all_historical_quotes_for_symbols(&self, _symbols: &HashSet<String>) -> Result<Vec<Quote>> {
+    fn get_quotes_in_range_filled(
+        &self,
+        symbols: &HashSet<String>,
+        start: NaiveDate,
+        end: NaiveDate,
+    ) -> Result<Vec<Quote>> {
+        // For testing, just return the raw quotes in range
+        // The actual implementation would fill gaps
+        self.get_quotes_in_range(symbols, start, end)
+    }
+
+    async fn get_daily_quotes(
+        &self,
+        _asset_ids: &HashSet<String>,
+        _start: NaiveDate,
+        _end: NaiveDate,
+    ) -> Result<HashMap<NaiveDate, HashMap<String, Quote>>> {
         unimplemented!()
     }
 
-    fn get_all_historical_quotes_for_symbols_by_source(
+    async fn add_quote(&self, _quote: &Quote) -> Result<Quote> {
+        unimplemented!()
+    }
+
+    async fn update_quote(&self, _quote: Quote) -> Result<Quote> {
+        unimplemented!()
+    }
+
+    async fn delete_quote(&self, _quote_id: &str) -> Result<()> {
+        unimplemented!()
+    }
+
+    async fn bulk_upsert_quotes(&self, _quotes: Vec<Quote>) -> Result<usize> {
+        unimplemented!()
+    }
+
+    // =========================================================================
+    // Provider Operations
+    // =========================================================================
+
+    async fn search_symbol(&self, _query: &str) -> Result<Vec<QuoteSummary>> {
+        unimplemented!()
+    }
+
+    async fn get_asset_profile(&self, _symbol: &str) -> Result<ProviderProfile> {
+        unimplemented!()
+    }
+
+    async fn fetch_quotes_from_provider(
         &self,
-        _symbols: &HashSet<String>,
-        _source: &str,
+        _symbol: &str,
+        _start: NaiveDate,
+        _end: NaiveDate,
     ) -> Result<Vec<Quote>> {
         unimplemented!()
     }
 
-    fn get_latest_sync_dates_by_source(&self) -> Result<HashMap<String, Option<NaiveDateTime>>> {
+    // =========================================================================
+    // Sync Operations
+    // =========================================================================
+
+    async fn sync(&self) -> Result<SyncResult> {
         unimplemented!()
     }
 
-    fn get_all_providers(&self) -> Result<Vec<MarketDataProviderSetting>> {
+    async fn resync(&self, _symbols: Option<Vec<String>>) -> Result<SyncResult> {
         unimplemented!()
     }
 
-    fn get_provider_by_id(&self, _provider_id: &str) -> Result<MarketDataProviderSetting> {
+    async fn refresh_sync_state(&self) -> Result<()> {
+        Ok(())
+    }
+
+    fn get_sync_plan(&self) -> Result<Vec<SymbolSyncPlan>> {
+        Ok(Vec::new())
+    }
+
+    async fn handle_activity_created(
+        &self,
+        _symbol: &str,
+        _activity_date: NaiveDate,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    async fn handle_activity_deleted(&self, _symbol: &str) -> Result<()> {
+        Ok(())
+    }
+
+    async fn delete_sync_state(&self, _symbol: &str) -> Result<()> {
+        Ok(())
+    }
+
+    fn get_symbols_needing_sync(&self) -> Result<Vec<QuoteSyncState>> {
+        Ok(Vec::new())
+    }
+
+    // =========================================================================
+    // Provider Settings
+    // =========================================================================
+
+    async fn get_providers_info(&self) -> Result<Vec<ProviderInfo>> {
         unimplemented!()
     }
 
     async fn update_provider_settings(
         &self,
-        _provider_id: String,
-        _changes: UpdateMarketDataProviderSetting,
-    ) -> Result<MarketDataProviderSetting> {
+        _provider_id: &str,
+        _priority: i32,
+        _enabled: bool,
+    ) -> Result<()> {
         unimplemented!()
     }
 
-    async fn bulk_insert_quotes(&self, _quote_records: Vec<Quote>) -> Result<usize> {
-        unimplemented!()
-    }
+    // =========================================================================
+    // Quote Import
+    // =========================================================================
 
-    async fn bulk_update_quotes(&self, _quote_records: Vec<Quote>) -> Result<usize> {
-        unimplemented!()
-    }
-
-    async fn bulk_upsert_quotes(&self, _quote_records: Vec<Quote>) -> Result<usize> {
-        unimplemented!()
-    }
-
-    fn quote_exists(&self, _symbol_param: &str, _date: &str) -> Result<bool> {
-        unimplemented!()
-    }
-
-    fn get_existing_quotes_for_period(
+    async fn import_quotes(
         &self,
-        _symbol_param: &str,
-        _start_date: &str,
-        _end_date: &str,
-    ) -> Result<Vec<Quote>> {
+        _quotes: Vec<QuoteImport>,
+        _overwrite: bool,
+    ) -> Result<Vec<QuoteImport>> {
         unimplemented!()
     }
 }

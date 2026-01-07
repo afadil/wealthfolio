@@ -22,7 +22,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use crate::errors::MarketDataError;
-use crate::models::{AssetKind, ProviderInstrument, Quote, QuoteContext};
+use crate::models::{Coverage, InstrumentKind, ProviderInstrument, Quote, QuoteContext};
 use crate::provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
 
 /// Supported metal symbols
@@ -92,9 +92,12 @@ impl MarketDataProvider for MetalPriceApiProvider {
 
     fn capabilities(&self) -> ProviderCapabilities {
         ProviderCapabilities {
-            asset_kinds: &[AssetKind::Commodity], // Only metals
-            supports_historical: false,           // Free tier doesn't support historical
+            instrument_kinds: &[InstrumentKind::Metal],
+            coverage: Coverage::metals_usd_only(),
+            supports_latest: true,
+            supports_historical: false, // CRITICAL: Metal Price API only supports latest quotes
             supports_search: false,
+            supports_profile: false,
         }
     }
 
@@ -201,8 +204,11 @@ impl MarketDataProvider for MetalPriceApiProvider {
         _start: DateTime<Utc>,
         _end: DateTime<Utc>,
     ) -> Result<Vec<Quote>, MarketDataError> {
-        // Free tier doesn't support historical data
-        Err(MarketDataError::NoDataForRange)
+        // Metal Price API free tier doesn't support historical data
+        Err(MarketDataError::NotSupported {
+            operation: "historical_quotes".to_string(),
+            provider: PROVIDER_ID.to_string(),
+        })
     }
 }
 
@@ -240,9 +246,11 @@ mod tests {
     fn test_provider_capabilities() {
         let provider = MetalPriceApiProvider::new("test_key".to_string());
         let caps = provider.capabilities();
-        assert_eq!(caps.asset_kinds, &[AssetKind::Commodity]);
+        assert_eq!(caps.instrument_kinds, &[InstrumentKind::Metal]);
+        assert!(caps.supports_latest);
         assert!(!caps.supports_historical);
         assert!(!caps.supports_search);
+        assert!(!caps.supports_profile);
     }
 
     #[test]

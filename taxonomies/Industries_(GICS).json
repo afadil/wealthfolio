@@ -1,0 +1,1717 @@
+{
+  "name": "Industries (GICS)",
+  "color": "#cbd9f3",
+  "categories": [
+    {
+      "name": "Energy",
+      "key": "10",
+      "color": "#8a892c",
+      "children": [
+        {
+          "name": "Energy",
+          "key": "1010",
+          "color": "#a3a345",
+          "children": [
+            {
+              "name": "Energy Equipment \u0026 Services",
+              "key": "101010",
+              "color": "#bdbc62",
+              "children": [
+                {
+                  "name": "Oil \u0026 Gas Drilling",
+                  "key": "10101010",
+                  "description": "Drilling contractors or owners of drilling rigs that contract their services for drilling wells.",
+                  "color": "#d6d685"
+                },
+                {
+                  "name": "Oil \u0026 Gas Equipment \u0026 Services",
+                  "key": "10101020",
+                  "description": "Manufacturers of equipment, including drilling rigs and equipment, and providers of supplies and services to companies involved in the drilling, evaluation and completion of oil and gas wells.",
+                  "color": "#d6d685"
+                }
+              ]
+            },
+            {
+              "name": "Oil, Gas \u0026 Consumable Fuels",
+              "key": "101020",
+              "color": "#bdbc62",
+              "children": [
+                {
+                  "name": "Integrated Oil \u0026 Gas",
+                  "key": "10102010",
+                  "description": "Integrated oil companies engaged in the exploration \u0026 production of oil and gas, as well as at least one other significant activity in either refining, marketing and transportation, or chemicals.",
+                  "color": "#d6d685"
+                },
+                {
+                  "name": "Oil \u0026 Gas Exploration \u0026 Production",
+                  "key": "10102020",
+                  "description": "Companies engaged in the exploration and production of oil and gas not classified elsewhere.",
+                  "color": "#d6d685"
+                },
+                {
+                  "name": "Oil \u0026 Gas Refining \u0026 Marketing",
+                  "key": "10102030",
+                  "description": "Companies engaged in the refining and marketing of oil, gas and/or refined products not classified in the Integrated Oil \u0026 Gas or Independent Power Producers \u0026 Energy Traders Sub-Industries.",
+                  "color": "#d6d685"
+                },
+                {
+                  "name": "Oil \u0026 Gas Storage \u0026 Transportation",
+                  "key": "10102040",
+                  "description": "Companies engaged in the storage and/or transportation of oil, gas and/or refined products. Includes diversified midstream natural gas companies, oil and refined product pipelines, coal slurry pipelines and oil \u0026 gas shipping companies.",
+                  "color": "#d6d685"
+                },
+                {
+                  "name": "Coal \u0026 Consumable Fuels",
+                  "key": "10102050",
+                  "description": "Companies primarily involved in the production and mining of coal, related products and other consumable fuels related to the generation of energy. Excludes companies primarily producing gases classified in the Industrial Gases Sub-Industry and companies primarily mining for metallurgical (coking) coal used for steel production.",
+                  "color": "#d6d685"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Materials",
+      "key": "15",
+      "color": "#578a2c",
+      "children": [
+        {
+          "name": "Materials",
+          "key": "1510",
+          "color": "#70a345",
+          "children": [
+            {
+              "name": "Chemicals",
+              "key": "151010",
+              "color": "#8cbd62",
+              "children": [
+                {
+                  "name": "Commodity Chemicals",
+                  "key": "15101010",
+                  "description": "Companies that primarily produce industrial chemicals and basic chemicals. Including but not limited to plastics, synthetic fibers, films, commodity-based paints \u0026 pigments, explosives and petrochemicals. Excludes chemical companies classified in the Diversified Chemicals, Fertilizers \u0026 Agricultural Chemicals, Industrial Gases, or Specialty Chemicals Sub-Industries.",
+                  "color": "#aad685"
+                },
+                {
+                  "name": "Diversified Chemicals",
+                  "key": "15101020",
+                  "description": "Manufacturers of a diversified range of chemical products not classified in the Industrial Gases, Commodity Chemicals, Specialty Chemicals or Fertilizers \u0026 Agricultural Chemicals Sub-Industries.",
+                  "color": "#aad685"
+                },
+                {
+                  "name": "Fertilizers \u0026 Agricultural Chemicals",
+                  "key": "15101030",
+                  "description": "Producers of fertilizers, pesticides, potash or other agriculture-related chemicals not classified elsewhere.",
+                  "color": "#aad685"
+                },
+                {
+                  "name": "Industrial Gases",
+                  "key": "15101040",
+                  "description": "Manufacturers of industrial gases.",
+                  "color": "#aad685"
+                },
+                {
+                  "name": "Specialty Chemicals",
+                  "key": "15101050",
+                  "description": "Companies that primarily produce high value-added chemicals used in the manufacture of a wide variety of products, including but not limited to fine chemicals, additives, advanced polymers, adhesives, sealants and specialty paints, pigments and coatings.",
+                  "color": "#aad685"
+                }
+              ]
+            },
+            {
+              "name": "Construction Materials",
+              "key": "151020",
+              "color": "#8cbd62",
+              "children": [
+                {
+                  "name": "Construction Materials",
+                  "key": "15102010",
+                  "description": "Manufacturers of construction materials including sand, clay, gypsum, lime, aggregates, cement, concrete and bricks. Other finished or semi-finished building materials are classified in the Building Products Sub-Industry.",
+                  "color": "#aad685"
+                }
+              ]
+            },
+            {
+              "name": "Containers \u0026 Packaging",
+              "key": "151030",
+              "color": "#8cbd62",
+              "children": [
+                {
+                  "name": "Metal \u0026 Glass Containers",
+                  "key": "15103010",
+                  "description": "Manufacturers of metal, glass or plastic containers. Includes corks and caps.",
+                  "color": "#aad685"
+                },
+                {
+                  "name": "Paper Packaging",
+                  "key": "15103020",
+                  "description": "Manufacturers of paper and cardboard containers and packaging.",
+                  "color": "#aad685"
+                }
+              ]
+            },
+            {
+              "name": "Metals \u0026 Mining",
+              "key": "151040",
+              "color": "#8cbd62",
+              "children": [
+                {
+                  "name": "Aluminum",
+                  "key": "15104010",
+                  "description": "Producers of aluminum and related products, including companies that mine or process bauxite and companies that recycle aluminum to produce finished or semi-finished products. Excludes companies that primarily produce aluminum building materials classified in the Building Products Sub-Industry.",
+                  "color": "#aad685"
+                },
+                {
+                  "name": "Diversified Metals \u0026 Mining",
+                  "key": "15104020",
+                  "description": "Companies engaged in the diversified production or extraction of metals and minerals not classified elsewhere. Including, but not limited to, nonferrous metal mining (except bauxite), salt and borate mining, phosphate rock mining, and diversified mining operations. Excludes iron ore mining, classified in the Steel Sub-Industry, bauxite mining, classified in the Aluminum Sub-Industry, and coal mining, classified in either the Steel or Coal \u0026 Consumable Fuels Sub-Industries.",
+                  "color": "#aad685"
+                },
+                {
+                  "name": "Copper",
+                  "key": "15104025",
+                  "description": "Companies involved primarily in copper ore mining.",
+                  "color": "#aad685"
+                },
+                {
+                  "name": "Gold",
+                  "key": "15104030",
+                  "description": "Producers of gold and related products, including companies that mine or process gold and the South African finance houses which primarily invest in, but do not operate, gold mines.",
+                  "color": "#aad685"
+                },
+                {
+                  "name": "Precious Metals \u0026 Minerals",
+                  "key": "15104040",
+                  "description": "Companies mining precious metals and minerals not classified in the Gold Sub-Industry. Includes companies primarily mining platinum.",
+                  "color": "#aad685"
+                },
+                {
+                  "name": "Silver",
+                  "key": "15104045",
+                  "description": "Companies primarily mining silver. Excludes companies classified in the Gold or Precious Metals \u0026 Minerals Sub-Industries.",
+                  "color": "#aad685"
+                },
+                {
+                  "name": "Steel",
+                  "key": "15104050",
+                  "description": "Producers of iron and steel and related products, including metallurgical (coking) coal mining used for steel production.",
+                  "color": "#aad685"
+                }
+              ]
+            },
+            {
+              "name": "Paper \u0026 Forest Products",
+              "key": "151050",
+              "color": "#8cbd62",
+              "children": [
+                {
+                  "name": "Forest Products",
+                  "key": "15105010",
+                  "description": "Manufacturers of timber and related wood products. Includes lumber for the building industry.",
+                  "color": "#aad685"
+                },
+                {
+                  "name": "Paper Products",
+                  "key": "15105020",
+                  "description": "Manufacturers of all grades of paper. Excludes companies specializing in paper packaging classified in the Paper Packaging Sub-Industry.",
+                  "color": "#aad685"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Industrials",
+      "key": "20",
+      "color": "#2c8a34",
+      "children": [
+        {
+          "name": "Capital Goods",
+          "key": "2010",
+          "color": "#45a34d",
+          "children": [
+            {
+              "name": "Aerospace \u0026 Defense",
+              "key": "201010",
+              "color": "#62bd6a",
+              "children": [
+                {
+                  "name": "Aerospace \u0026 Defense",
+                  "key": "20101010",
+                  "description": "Manufacturers of civil or military aerospace and defense equipment, parts or products. Includes defense electronics and space equipment.",
+                  "color": "#85d68c"
+                }
+              ]
+            },
+            {
+              "name": "Building Products",
+              "key": "201020",
+              "color": "#62bd6a",
+              "children": [
+                {
+                  "name": "Building Products",
+                  "key": "20102010",
+                  "description": "Manufacturers of building components and home improvement products and equipment. Excludes lumber and plywood classified under Forest Products and cement and other materials classified in the Construction Materials Sub-Industry.",
+                  "color": "#85d68c"
+                }
+              ]
+            },
+            {
+              "name": "Construction \u0026 Engineering",
+              "key": "201030",
+              "color": "#62bd6a",
+              "children": [
+                {
+                  "name": "Construction \u0026 Engineering",
+                  "key": "20103010",
+                  "description": "Companies engaged in primarily non-residential construction. Includes civil engineering companies and large-scale contractors. Excludes companies classified in the Homebuilding Sub-Industry.",
+                  "color": "#85d68c"
+                }
+              ]
+            },
+            {
+              "name": "Electrical Equipment",
+              "key": "201040",
+              "color": "#62bd6a",
+              "children": [
+                {
+                  "name": "Electrical Components \u0026 Equipment",
+                  "key": "20104010",
+                  "description": "Companies that produce electric cables and wires, electrical components or equipment not classified in the Heavy Electrical Equipment Sub-Industry.",
+                  "color": "#85d68c"
+                },
+                {
+                  "name": "Heavy Electrical Equipment",
+                  "key": "20104020",
+                  "description": "Manufacturers of power-generating equipment and other heavy electrical equipment, including power turbines, heavy electrical machinery intended for fixed-use and large electrical systems. Excludes cables and wires, classified in the Electrical Components \u0026 Equipment Sub-Industry.",
+                  "color": "#85d68c"
+                }
+              ]
+            },
+            {
+              "name": "Industrial Conglomerates",
+              "key": "201050",
+              "color": "#62bd6a",
+              "children": [
+                {
+                  "name": "Industrial Conglomerates",
+                  "key": "20105010",
+                  "description": "Diversified industrial companies with business activities in three or more Sectors, none of which contributes a majority of revenues. Stakes held are predominantly of a controlling nature and stake holders maintain an operational interest in the running of the subsidiaries.",
+                  "color": "#85d68c"
+                }
+              ]
+            },
+            {
+              "name": "Machinery",
+              "key": "201060",
+              "color": "#62bd6a",
+              "children": [
+                {
+                  "name": "Construction Machinery \u0026 Heavy Trucks",
+                  "key": "20106010",
+                  "description": "Manufacturers of heavy duty trucks, rolling machinery, earth-moving and construction equipment, and manufacturers of related parts. Includes non-military shipbuilding.",
+                  "color": "#85d68c"
+                },
+                {
+                  "name": "Agricultural \u0026 Farm Machinery",
+                  "key": "20106015",
+                  "description": "Companies manufacturing agricultural machinery, farm machinery, and their related parts. Includes machinery used for the production of crops and agricultural livestock, agricultural tractors, planting and fertilizing machinery, fertilizer and chemical application equipment, and grain dryers and blowers.",
+                  "color": "#85d68c"
+                },
+                {
+                  "name": "Industrial Machinery",
+                  "key": "20106020",
+                  "description": "Manufacturers of industrial machinery and industrial components. Includes companies that manufacture presses, machine tools, compressors, pollution control equipment, elevators, escalators, insulators, pumps, roller bearings and other metal fabrications.",
+                  "color": "#85d68c"
+                }
+              ]
+            },
+            {
+              "name": "Trading Companies \u0026 Distributors",
+              "key": "201070",
+              "color": "#62bd6a",
+              "children": [
+                {
+                  "name": "Trading Companies \u0026 Distributors",
+                  "key": "20107010",
+                  "description": "Trading companies and other distributors of industrial equipment and products.",
+                  "color": "#85d68c"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Commercial \u0026 Professional Services",
+          "key": "2020",
+          "color": "#45a34d",
+          "children": [
+            {
+              "name": "Commercial Services \u0026 Supplies",
+              "key": "202010",
+              "color": "#62bd6a",
+              "children": [
+                {
+                  "name": "Commercial Printing",
+                  "key": "20201010",
+                  "description": "Companies providing commercial printing services. Includes printers primarily serving the media industry.",
+                  "color": "#85d68c"
+                },
+                {
+                  "name": "Environmental \u0026 Facilities Services",
+                  "key": "20201050",
+                  "description": "Companies providing environmental and facilities maintenance services. Includes waste management, facilities management and pollution control services. Excludes large-scale water treatment systems classified in the Water Utilities Sub-Industry.",
+                  "color": "#85d68c"
+                },
+                {
+                  "name": "Office Services \u0026 Supplies",
+                  "key": "20201060",
+                  "description": "Providers of office services and manufacturers of office supplies and equipment not classified elsewhere.",
+                  "color": "#85d68c"
+                },
+                {
+                  "name": "Diversified Support Services",
+                  "key": "20201070",
+                  "description": "Companies primarily providing labor oriented support services to businesses and governments. Includes commercial cleaning services, dining \u0026 catering services, equipment repair services, industrial maintenance services, industrial auctioneers, storage \u0026 warehousing, transaction services, uniform rental services, and other business support services.",
+                  "color": "#85d68c"
+                },
+                {
+                  "name": "Security \u0026 Alarm Services",
+                  "key": "20201080",
+                  "description": "Companies providing security and protection services to business and governments. Includes companies providing services such as correctional facilities, security \u0026 alarm services, armored transportation \u0026 guarding. Excludes companies providing security software classified under the Systems Software Sub-Industry and home security services classified under the Specialized Consumer Services Sub-Industry. Also excludes companies manufacturing security system equipment classified under the Electronic Equipment \u0026 Instruments Sub-Industry.",
+                  "color": "#85d68c"
+                }
+              ]
+            },
+            {
+              "name": "Professional Services",
+              "key": "202020",
+              "color": "#62bd6a",
+              "children": [
+                {
+                  "name": "Human Resource \u0026 Employment Services",
+                  "key": "20202010",
+                  "description": "Companies providing business support services relating to human capital management. Includes employment agencies, employee training, payroll \u0026 benefit support services, retirement support services and temporary agencies.",
+                  "color": "#85d68c"
+                },
+                {
+                  "name": "Research \u0026 Consulting Services",
+                  "key": "20202020",
+                  "description": "Companies primarily providing research and consulting services to businesses and governments not classified elsewhere. Includes companies involved in management consulting services, architectural design, business information or scientific research, marketing, and testing \u0026 certification services. Excludes companies providing information technology consulting services classified in the IT Consulting \u0026 Other Services Sub-Industry.",
+                  "color": "#85d68c"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Transportation",
+          "key": "2030",
+          "color": "#45a34d",
+          "children": [
+            {
+              "name": "Air Freight \u0026 Logistics",
+              "key": "203010",
+              "color": "#62bd6a",
+              "children": [
+                {
+                  "name": "Air Freight \u0026 Logistics",
+                  "key": "20301010",
+                  "description": "Companies providing air freight transportation, courier and logistics services, including package and mail delivery and customs agents. Excludes those companies classified in the Airlines, Marine or Trucking Sub-Industries.",
+                  "color": "#85d68c"
+                }
+              ]
+            },
+            {
+              "name": "Airlines",
+              "key": "203020",
+              "color": "#62bd6a",
+              "children": [
+                {
+                  "name": "Airlines",
+                  "key": "20302010",
+                  "description": "Companies providing primarily passenger air transportation.",
+                  "color": "#85d68c"
+                }
+              ]
+            },
+            {
+              "name": "Marine",
+              "key": "203030",
+              "color": "#62bd6a",
+              "children": [
+                {
+                  "name": "Marine",
+                  "key": "20303010",
+                  "description": "Companies providing goods or passenger maritime transportation. Excludes cruise-ships classified in the Hotels, Resorts \u0026 Cruise Lines Sub-Industry.",
+                  "color": "#85d68c"
+                }
+              ]
+            },
+            {
+              "name": "Road \u0026 Rail",
+              "key": "203040",
+              "color": "#62bd6a",
+              "children": [
+                {
+                  "name": "Railroads",
+                  "key": "20304010",
+                  "description": "Companies providing primarily goods and passenger rail transportation.",
+                  "color": "#85d68c"
+                },
+                {
+                  "name": "Trucking",
+                  "key": "20304020",
+                  "description": "Companies providing primarily goods and passenger land transportation. Includes vehicle rental and taxi companies.",
+                  "color": "#85d68c"
+                }
+              ]
+            },
+            {
+              "name": "Transportation Infrastructure",
+              "key": "203050",
+              "color": "#62bd6a",
+              "children": [
+                {
+                  "name": "Airport Services",
+                  "key": "20305010",
+                  "description": "Operators of airports and companies providing related services.",
+                  "color": "#85d68c"
+                },
+                {
+                  "name": "Highways \u0026 Railtracks",
+                  "key": "20305020",
+                  "description": "Owners and operators of roads, tunnels and railtracks.",
+                  "color": "#85d68c"
+                },
+                {
+                  "name": "Marine Ports \u0026 Services",
+                  "key": "20305030",
+                  "description": "Owners and operators of marine ports and related services.",
+                  "color": "#85d68c"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Consumer Discretionary",
+      "key": "25",
+      "color": "#2c8a67",
+      "children": [
+        {
+          "name": "Automobiles \u0026 Components",
+          "key": "2510",
+          "color": "#45a380",
+          "children": [
+            {
+              "name": "Auto Components",
+              "key": "251010",
+              "color": "#62bd9b",
+              "children": [
+                {
+                  "name": "Auto Parts \u0026 Equipment",
+                  "key": "25101010",
+                  "description": "Manufacturers of parts and accessories for automobiles and motorcycles. Excludes companies classified in the Tires \u0026 Rubber Sub-Industry.",
+                  "color": "#85d6b8"
+                },
+                {
+                  "name": "Tires \u0026 Rubber",
+                  "key": "25101020",
+                  "description": "Manufacturers of tires and rubber.",
+                  "color": "#85d6b8"
+                }
+              ]
+            },
+            {
+              "name": "Automobiles",
+              "key": "251020",
+              "color": "#62bd9b",
+              "children": [
+                {
+                  "name": "Automobile Manufacturers",
+                  "key": "25102010",
+                  "description": "Companies that produce mainly passenger automobiles and light trucks. Excludes companies producing mainly motorcycles and three-wheelers classified in the Motorcycle Manufacturers Sub-Industry and heavy duty trucks classified in the Construction Machinery \u0026 Heavy Trucks Sub-Industry.",
+                  "color": "#85d6b8"
+                },
+                {
+                  "name": "Motorcycle Manufacturers",
+                  "key": "25102020",
+                  "description": "Companies that produce motorcycles, scooters or three-wheelers. Excludes bicycles classified in the Leisure Products Sub-Industry.",
+                  "color": "#85d6b8"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Consumer Durables \u0026 Apparel",
+          "key": "2520",
+          "color": "#45a380",
+          "children": [
+            {
+              "name": "Household Durables",
+              "key": "252010",
+              "color": "#62bd9b",
+              "children": [
+                {
+                  "name": "Consumer Electronics",
+                  "key": "25201010",
+                  "description": "Manufacturers of consumer electronics products including TVs, home audio equipment, game consoles, digital cameras, and related products. Excludes personal home computer manufacturers classified in the Technology Hardware, Storage \u0026 Peripherals Sub-Industry, and electric household appliances classified in the Household Appliances Sub-Industry.",
+                  "color": "#85d6b8"
+                },
+                {
+                  "name": "Home Furnishings",
+                  "key": "25201020",
+                  "description": "Manufacturers of soft home furnishings or furniture, including upholstery, carpets and wall-coverings.",
+                  "color": "#85d6b8"
+                },
+                {
+                  "name": "Homebuilding",
+                  "key": "25201030",
+                  "description": "Residential construction companies. Includes manufacturers of prefabricated houses and semi-fixed manufactured homes.",
+                  "color": "#85d6b8"
+                },
+                {
+                  "name": "Household Appliances",
+                  "key": "25201040",
+                  "description": "Manufacturers of electric household appliances and related products. Includes manufacturers of power and hand tools, including garden improvement tools. Excludes TVs and other audio and video products classified in the Consumer Electronics Sub-Industry and personal computers classified in the Technology Hardware, Storage \u0026 Peripherals Sub-Industry.",
+                  "color": "#85d6b8"
+                },
+                {
+                  "name": "Housewares \u0026 Specialties",
+                  "key": "25201050",
+                  "description": "Manufacturers of durable household products, including cutlery, cookware, glassware, crystal, silverware, utensils, kitchenware and consumer specialties not classified elsewhere.",
+                  "color": "#85d6b8"
+                }
+              ]
+            },
+            {
+              "name": "Leisure Products",
+              "key": "252020",
+              "color": "#62bd9b",
+              "children": [
+                {
+                  "name": "Leisure Products",
+                  "key": "25202010",
+                  "description": "Manufacturers of leisure products and equipment including sports equipment, bicycles and toys.",
+                  "color": "#85d6b8"
+                }
+              ]
+            },
+            {
+              "name": "Textiles, Apparel \u0026 Luxury Goods",
+              "key": "252030",
+              "color": "#62bd9b",
+              "children": [
+                {
+                  "name": "Apparel, Accessories \u0026 Luxury Goods",
+                  "key": "25203010",
+                  "description": "Manufacturers of apparel, accessories \u0026 luxury goods. Includes companies primarily producing designer handbags, wallets, luggage, jewelry and watches. Excludes shoes classified in the Footwear Sub-Industry.",
+                  "color": "#85d6b8"
+                },
+                {
+                  "name": "Footwear",
+                  "key": "25203020",
+                  "description": "Manufacturers of footwear. Includes sport and leather shoes.",
+                  "color": "#85d6b8"
+                },
+                {
+                  "name": "Textiles",
+                  "key": "25203030",
+                  "description": "Manufacturers of textile and related products not classified in the Apparel, Accessories \u0026 Luxury Goods, Footwear or Home Furnishings Sub-Industries.",
+                  "color": "#85d6b8"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Consumer Services",
+          "key": "2530",
+          "color": "#45a380",
+          "children": [
+            {
+              "name": "Hotels, Restaurants \u0026 Leisure",
+              "key": "253010",
+              "color": "#62bd9b",
+              "children": [
+                {
+                  "name": "Casinos \u0026 Gaming",
+                  "key": "25301010",
+                  "description": "Owners and operators of casinos and gaming facilities. Includes companies providing lottery and betting services.",
+                  "color": "#85d6b8"
+                },
+                {
+                  "name": "Hotels, Resorts \u0026 Cruise Lines",
+                  "key": "25301020",
+                  "description": "Owners and operators of hotels, resorts and cruise-ships. Includes travel agencies, tour operators and related services not classified elsewhere. Excludes casino-hotels classified in the Casinos \u0026 Gaming Sub-Industry.",
+                  "color": "#85d6b8"
+                },
+                {
+                  "name": "Leisure Facilities",
+                  "key": "25301030",
+                  "description": "Owners and operators of leisure facilities, including sport and fitness centers, stadiums, golf courses and amusement parks not classified in the Movies \u0026 Entertainment Sub-Industry.",
+                  "color": "#85d6b8"
+                },
+                {
+                  "name": "Restaurants",
+                  "key": "25301040",
+                  "description": "Owners and operators of restaurants, bars, pubs, fast-food or take-out facilities. Includes companies that provide food catering services.",
+                  "color": "#85d6b8"
+                }
+              ]
+            },
+            {
+              "name": "Diversified Consumer Services",
+              "key": "253020",
+              "color": "#62bd9b",
+              "children": [
+                {
+                  "name": "Education Services",
+                  "key": "25302010",
+                  "description": "Companies providing educational services, either on-line or through conventional teaching methods. Includes, private universities, correspondence teaching, providers of educational seminars, educational materials and technical education. Excludes companies providing employee education programs classified in the Human Resources \u0026 Employment Services Sub-Industry.",
+                  "color": "#85d6b8"
+                },
+                {
+                  "name": "Specialized Consumer Services",
+                  "key": "25302020",
+                  "description": "Companies providing consumer services not classified elsewhere. Includes residential services, home security, legal services, personal services, renovation \u0026 interior design services, consumer auctions and wedding \u0026 funeral services.",
+                  "color": "#85d6b8"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Retailing",
+          "key": "2550",
+          "color": "#45a380",
+          "children": [
+            {
+              "name": "Distributors",
+              "key": "255010",
+              "color": "#62bd9b",
+              "children": [
+                {
+                  "name": "Distributors",
+                  "key": "25501010",
+                  "description": "Distributors and wholesalers of general merchandise not classified elsewhere. Includes vehicle distributors.",
+                  "color": "#85d6b8"
+                }
+              ]
+            },
+            {
+              "name": "Internet \u0026 Direct Marketing Retail",
+              "key": "255020",
+              "color": "#62bd9b",
+              "children": [
+                {
+                  "name": "Internet \u0026 Direct Marketing Retail",
+                  "key": "25502020",
+                  "description": "Companies providing retail services primarily on the Internet, through mail order, and TV home shopping retailers. Also includes companies providing online marketplaces for consumer products and services.",
+                  "color": "#85d6b8"
+                }
+              ]
+            },
+            {
+              "name": "Multiline Retail",
+              "key": "255030",
+              "color": "#62bd9b",
+              "children": [
+                {
+                  "name": "Department Stores",
+                  "key": "25503010",
+                  "description": "Owners and operators of department stores.",
+                  "color": "#85d6b8"
+                },
+                {
+                  "name": "General Merchandise Stores",
+                  "key": "25503020",
+                  "description": "Owners and operators of stores offering diversified general merchandise. Excludes hypermarkets and large-scale super centers classified in the Hypermarkets \u0026 Super Centers Sub-Industry.",
+                  "color": "#85d6b8"
+                }
+              ]
+            },
+            {
+              "name": "Specialty Retail",
+              "key": "255040",
+              "color": "#62bd9b",
+              "children": [
+                {
+                  "name": "Apparel Retail",
+                  "key": "25504010",
+                  "description": "Retailers specialized mainly in apparel and accessories.",
+                  "color": "#85d6b8"
+                },
+                {
+                  "name": "Computer \u0026 Electronics Retail",
+                  "key": "25504020",
+                  "description": "Owners and operators of consumer electronics, computers, video and related products retail stores.",
+                  "color": "#85d6b8"
+                },
+                {
+                  "name": "Home Improvement Retail",
+                  "key": "25504030",
+                  "description": "Owners and operators of home and garden improvement retail stores. Includes stores offering building materials and supplies.",
+                  "color": "#85d6b8"
+                },
+                {
+                  "name": "Specialty Stores",
+                  "key": "25504040",
+                  "description": "Owners and operators of specialty retail stores not classified elsewhere. Includes jewelry stores, toy stores, office supply stores, health \u0026 vision care stores, and book \u0026 entertainment stores.",
+                  "color": "#85d6b8"
+                },
+                {
+                  "name": "Automotive Retail",
+                  "key": "25504050",
+                  "description": "Owners and operators of stores specializing in automotive retail. Includes auto dealers, gas stations, and retailers of auto accessories, motorcycles \u0026 parts, automotive glass, and automotive equipment \u0026 parts.",
+                  "color": "#85d6b8"
+                },
+                {
+                  "name": "Homefurnishing Retail",
+                  "key": "25504060",
+                  "description": "Owners and operators of furniture and home furnishings retail stores. Includes residential furniture, homefurnishings, housewares, and interior design. Excludes home and garden improvement stores, classified in the Home Improvement Retail Sub-Industry.",
+                  "color": "#85d6b8"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Consumer Staples",
+      "key": "30",
+      "color": "#2c798a",
+      "children": [
+        {
+          "name": "Food \u0026 Staples Retailing",
+          "key": "3010",
+          "color": "#4592a3",
+          "children": [
+            {
+              "name": "Food \u0026 Staples Retailing",
+              "key": "301010",
+              "color": "#62adbd",
+              "children": [
+                {
+                  "name": "Drug Retail",
+                  "key": "30101010",
+                  "description": "Owners and operators of primarily drug retail stores and pharmacies.",
+                  "color": "#85c8d6"
+                },
+                {
+                  "name": "Food Distributors",
+                  "key": "30101020",
+                  "description": "Distributors of food products to other companies and not directly to the consumer.",
+                  "color": "#85c8d6"
+                },
+                {
+                  "name": "Food Retail",
+                  "key": "30101030",
+                  "description": "Owners and operators of primarily food retail stores.",
+                  "color": "#85c8d6"
+                },
+                {
+                  "name": "Hypermarkets \u0026 Super Centers",
+                  "key": "30101040",
+                  "description": "Owners and operators of hypermarkets and super centers selling food and a wide-range of consumer staple products. Excludes Food and Drug Retailers classified in the Food Retail and Drug Retail Sub-Industries, respectively.",
+                  "color": "#85c8d6"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Food, Beverage \u0026 Tobacco",
+          "key": "3020",
+          "color": "#4592a3",
+          "children": [
+            {
+              "name": "Beverages",
+              "key": "302010",
+              "color": "#62adbd",
+              "children": [
+                {
+                  "name": "Brewers",
+                  "key": "30201010",
+                  "description": "Producers of beer and malt liquors. Includes breweries not classified in the Restaurants Sub-Industry.",
+                  "color": "#85c8d6"
+                },
+                {
+                  "name": "Distillers \u0026 Vintners",
+                  "key": "30201020",
+                  "description": "Distillers, vintners and producers of alcoholic beverages not classified in the Brewers Sub-Industry.",
+                  "color": "#85c8d6"
+                },
+                {
+                  "name": "Soft Drinks",
+                  "key": "30201030",
+                  "description": "Producers of non-alcoholic beverages including mineral waters. Excludes producers of milk classified in the Packaged Foods Sub-Industry.",
+                  "color": "#85c8d6"
+                }
+              ]
+            },
+            {
+              "name": "Food Products",
+              "key": "302020",
+              "color": "#62adbd",
+              "children": [
+                {
+                  "name": "Agricultural Products",
+                  "key": "30202010",
+                  "description": "Producers of agricultural products. Includes crop growers, owners of plantations and companies that produce and process foods but do not package and market them. Excludes companies classified in the Forest Products Sub-Industry and those that package and market the food products classified in the Packaged Foods Sub-Industry.",
+                  "color": "#85c8d6"
+                },
+                {
+                  "name": "Packaged Foods \u0026 Meats",
+                  "key": "30202030",
+                  "description": "Producers of packaged foods including dairy products, fruit juices, meats, poultry, fish and pet foods.",
+                  "color": "#85c8d6"
+                }
+              ]
+            },
+            {
+              "name": "Tobacco",
+              "key": "302030",
+              "color": "#62adbd",
+              "children": [
+                {
+                  "name": "Tobacco",
+                  "key": "30203010",
+                  "description": "Manufacturers of cigarettes and other tobacco products.",
+                  "color": "#85c8d6"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Household \u0026 Personal Products",
+          "key": "3030",
+          "color": "#4592a3",
+          "children": [
+            {
+              "name": "Household Products",
+              "key": "303010",
+              "color": "#62adbd",
+              "children": [
+                {
+                  "name": "Household Products",
+                  "key": "30301010",
+                  "description": "Producers of non-durable household products, including detergents, soaps, diapers and other tissue and household paper products not classified in the Paper Products Sub-Industry.",
+                  "color": "#85c8d6"
+                }
+              ]
+            },
+            {
+              "name": "Personal Products",
+              "key": "303020",
+              "color": "#62adbd",
+              "children": [
+                {
+                  "name": "Personal Products",
+                  "key": "30302010",
+                  "description": "Manufacturers of personal and beauty care products, including cosmetics and perfumes.",
+                  "color": "#85c8d6"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Health Care",
+      "key": "35",
+      "color": "#2c468a",
+      "children": [
+        {
+          "name": "Health Care Equipment \u0026 Services",
+          "key": "3510",
+          "color": "#455fa3",
+          "children": [
+            {
+              "name": "Health Care Equipment \u0026 Supplies",
+              "key": "351010",
+              "color": "#627bbd",
+              "children": [
+                {
+                  "name": "Health Care Equipment",
+                  "key": "35101010",
+                  "description": "Manufacturers of health care equipment and devices. Includes medical instruments, drug delivery systems, cardiovascular \u0026 orthopedic devices, and diagnostic equipment.",
+                  "color": "#859cd6"
+                },
+                {
+                  "name": "Health Care Supplies",
+                  "key": "35101020",
+                  "description": "Manufacturers of health care supplies and medical products not classified elsewhere. Includes eye care products, hospital supplies, and safety needle \u0026 syringe devices.",
+                  "color": "#859cd6"
+                }
+              ]
+            },
+            {
+              "name": "Health Care Providers \u0026 Services",
+              "key": "351020",
+              "color": "#627bbd",
+              "children": [
+                {
+                  "name": "Health Care Distributors",
+                  "key": "35102010",
+                  "description": "Distributors and wholesalers of health care products not classified elsewhere.",
+                  "color": "#859cd6"
+                },
+                {
+                  "name": "Health Care Services",
+                  "key": "35102015",
+                  "description": "Providers of patient health care services not classified elsewhere. Includes dialysis centers, lab testing services, and pharmacy management services. Also includes companies providing business support services to health care providers, such as clerical support services, collection agency services, staffing services and outsourced sales \u0026 marketing services.",
+                  "color": "#859cd6"
+                },
+                {
+                  "name": "Health Care Facilities",
+                  "key": "35102020",
+                  "description": "Owners and operators of health care facilities, including hospitals, nursing homes, rehabilitation centers and animal hospitals.",
+                  "color": "#859cd6"
+                },
+                {
+                  "name": "Managed Health Care",
+                  "key": "35102030",
+                  "description": "Owners and operators of Health Maintenance Organizations (HMOs) and other managed plans.",
+                  "color": "#859cd6"
+                }
+              ]
+            },
+            {
+              "name": "Health Care Technology",
+              "key": "351030",
+              "color": "#627bbd",
+              "children": [
+                {
+                  "name": "Health Care Technology",
+                  "key": "35103010",
+                  "description": "Companies providing information technology services primarily to health care providers. Includes companies providing application, systems and/or data processing software, internet-based tools, and IT consulting services to doctors, hospitals or businesses operating primarily in the Health Care Sector.",
+                  "color": "#859cd6"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Pharmaceuticals, Biotechnology \u0026 Life Sciences",
+          "key": "3520",
+          "color": "#455fa3",
+          "children": [
+            {
+              "name": "Biotechnology",
+              "key": "352010",
+              "color": "#627bbd",
+              "children": [
+                {
+                  "name": "Biotechnology",
+                  "key": "35201010",
+                  "description": "Companies primarily engaged in the research, development, manufacturing and/or marketing of products based on genetic analysis and genetic engineering. Includes companies specializing in protein-based therapeutics to treat human diseases. Excludes companies manufacturing products using biotechnology but without a health care application.",
+                  "color": "#859cd6"
+                }
+              ]
+            },
+            {
+              "name": "Pharmaceuticals",
+              "key": "352020",
+              "color": "#627bbd",
+              "children": [
+                {
+                  "name": "Pharmaceuticals",
+                  "key": "35202010",
+                  "description": "Companies engaged in the research, development or production of pharmaceuticals. Includes veterinary drugs.",
+                  "color": "#859cd6"
+                }
+              ]
+            },
+            {
+              "name": "Life Sciences Tools \u0026 Services",
+              "key": "352030",
+              "color": "#627bbd",
+              "children": [
+                {
+                  "name": "Life Sciences Tools \u0026 Services",
+                  "key": "35203010",
+                  "description": "Companies enabling the drug discovery, development and production continuum by providing analytical tools, instruments, consumables \u0026 supplies, clinical trial services and contract research services. Includes firms primarily servicing the pharmaceutical and biotechnology industries.",
+                  "color": "#859cd6"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Financials",
+      "key": "40",
+      "color": "#452c8a",
+      "children": [
+        {
+          "name": "Banks",
+          "key": "4010",
+          "color": "#5e45a3",
+          "children": [
+            {
+              "name": "Banks",
+              "key": "401010",
+              "color": "#7b62bd",
+              "children": [
+                {
+                  "name": "Diversified Banks",
+                  "key": "40101010",
+                  "description": "Large, geographically diverse banks with a national footprint whose revenues are derived primarily from conventional banking operations, have significant business activity in retail banking and small and medium corporate lending, and provide a diverse range of financial services. Excludes banks classified in the Regional Banks and Thrifts \u0026 Mortgage Finance Sub-Industries. Also excludes investment banks classified in the Investment Banking \u0026 Brokerage Sub-Industry.",
+                  "color": "#9b85d6"
+                },
+                {
+                  "name": "Regional Banks",
+                  "key": "40101015",
+                  "description": "Commercial banks whose businesses are derived primarily from conventional banking operations and have significant business activity in retail banking and small and medium corporate lending. Regional banks tend to operate in limited geographic regions. Excludes companies classified in the Diversified Banks and Thrifts \u0026 Mortgage Banks sub-industries. Also excludes investment banks classified in the Investment Banking \u0026 Brokerage Sub-Industry.",
+                  "color": "#9b85d6"
+                }
+              ]
+            },
+            {
+              "name": "Thrifts \u0026 Mortgage Finance",
+              "key": "401020",
+              "color": "#7b62bd",
+              "children": [
+                {
+                  "name": "Thrifts \u0026 Mortgage Finance",
+                  "key": "40102010",
+                  "description": "Financial institutions providing mortgage and mortgage related services. These include financial institutions whose assets are primarily mortgage related, savings \u0026 loans, mortgage lending institutions, building societies and companies providing insurance to mortgage banks.",
+                  "color": "#9b85d6"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Diversified Financials",
+          "key": "4020",
+          "color": "#5e45a3",
+          "children": [
+            {
+              "name": "Diversified Financial Services",
+              "key": "402010",
+              "color": "#7b62bd",
+              "children": [
+                {
+                  "name": "Other Diversified Financial Services",
+                  "key": "40201020",
+                  "description": "Providers of a diverse range of financial services and/or with some interest in a wide range of financial services including banking, insurance and capital markets, but with no dominant business line. Excludes companies classified in the Regional Banks and Diversified Banks Sub-Industries.",
+                  "color": "#9b85d6"
+                },
+                {
+                  "name": "Multi-Sector Holdings",
+                  "key": "40201030",
+                  "description": "A company with significantly diversified holdings across three or more Sectors, none of which contributes a majority of profit and/or sales. Stakes held are predominantly of a non-controlling nature. Includes diversified financial companies where stakes held are of a controlling nature. Excludes other diversified companies classified in the Industrials Conglomerates Sub-Industry.",
+                  "color": "#9b85d6"
+                },
+                {
+                  "name": "Specialized Finance",
+                  "key": "40201040",
+                  "description": "Providers of specialized financial services not classified elsewhere. Companies in this Sub-Industry derive a majority of revenue from one specialized line of business. Includes, but not limited to, commercial financing companies, central banks, leasing institutions, factoring services, and specialty boutiques. Excludes companies classified in the Financial Exchanges \u0026 Data Sub-Industry.",
+                  "color": "#9b85d6"
+                }
+              ]
+            },
+            {
+              "name": "Consumer Finance",
+              "key": "402020",
+              "color": "#7b62bd",
+              "children": [
+                {
+                  "name": "Consumer Finance",
+                  "key": "40202010",
+                  "description": "Providers of consumer finance services, including personal credit, credit cards, lease financing, travel-related money services and pawn shops. Excludes mortgage lenders classified in the Thrifts \u0026 Mortgage Finance Sub-Industry.",
+                  "color": "#9b85d6"
+                }
+              ]
+            },
+            {
+              "name": "Capital Markets",
+              "key": "402030",
+              "color": "#7b62bd",
+              "children": [
+                {
+                  "name": "Asset Management \u0026 Custody Banks",
+                  "key": "40203010",
+                  "description": "Financial institutions primarily engaged in investment management and/or related custody and securities fee-based services. Includes companies operating mutual funds, closed-end funds and unit investment trusts. Excludes banks and other financial institutions primarily involved in commercial lending, investment banking, brokerage and other specialized financial activities.",
+                  "color": "#9b85d6"
+                },
+                {
+                  "name": "Investment Banking \u0026 Brokerage",
+                  "key": "40203020",
+                  "description": "Financial institutions primarily engaged in investment banking \u0026 brokerage services, including equity and debt underwriting, mergers and acquisitions, securities lending and advisory services. Excludes banks and other financial institutions primarily involved in commercial lending, asset management and specialized financial activities.",
+                  "color": "#9b85d6"
+                },
+                {
+                  "name": "Diversified Capital Markets",
+                  "key": "40203030",
+                  "description": "Financial institutions primarily engaged in diversified capital markets activities, including a significant presence in at least two of the following area: large/major corporate lending, investment banking, brokerage and asset management. Excludes less diversified companies classified in the Asset Management \u0026 Custody Banks or Investment Banking \u0026 Brokerage Sub-Industries. Also excludes companies classified in the Banks or Insurance Industry Groups or the Consumer Finance Sub-Industry.",
+                  "color": "#9b85d6"
+                },
+                {
+                  "name": "Financial Exchanges \u0026 Data",
+                  "key": "40203040",
+                  "description": "Financial exchanges for securities, commodities, derivatives and other financial instruments, and providers of financial decision support tools and products including ratings agencies.",
+                  "color": "#9b85d6"
+                }
+              ]
+            },
+            {
+              "name": "Mortgage Real Estate Investment Trusts (REITs)",
+              "key": "402040",
+              "color": "#7b62bd",
+              "children": [
+                {
+                  "name": "Mortgage REITs",
+                  "key": "40204010",
+                  "description": "Companies or Trusts that service, originate, purchase and/or securitize residential and/or commercial mortgage loans. Includes trusts that invest in mortgage-backed securities and other mortgage related assets.",
+                  "color": "#9b85d6"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Insurance",
+          "key": "4030",
+          "color": "#5e45a3",
+          "children": [
+            {
+              "name": "Insurance",
+              "key": "403010",
+              "color": "#7b62bd",
+              "children": [
+                {
+                  "name": "Insurance Brokers",
+                  "key": "40301010",
+                  "description": "Insurance and reinsurance brokerage firms.",
+                  "color": "#9b85d6"
+                },
+                {
+                  "name": "Life \u0026 Health Insurance",
+                  "key": "40301020",
+                  "description": "Companies providing primarily life, disability, indemnity or supplemental health insurance. Excludes managed care companies classified in the Managed Health Care Sub-Industry.",
+                  "color": "#9b85d6"
+                },
+                {
+                  "name": "Multi-line Insurance",
+                  "key": "40301030",
+                  "description": "Insurance companies with diversified interests in life, health and property and casualty insurance.",
+                  "color": "#9b85d6"
+                },
+                {
+                  "name": "Property \u0026 Casualty Insurance",
+                  "key": "40301040",
+                  "description": "Companies providing primarily property and casualty insurance.",
+                  "color": "#9b85d6"
+                },
+                {
+                  "name": "Reinsurance",
+                  "key": "40301050",
+                  "description": "Companies providing primarily reinsurance.",
+                  "color": "#9b85d6"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Information Technology",
+      "key": "45",
+      "color": "#782c8a",
+      "children": [
+        {
+          "name": "Software \u0026 Services",
+          "key": "4510",
+          "color": "#9145a3",
+          "children": [
+            {
+              "name": "IT Services",
+              "key": "451020",
+              "color": "#ac62bd",
+              "children": [
+                {
+                  "name": "IT Consulting \u0026 Other Services",
+                  "key": "45102010",
+                  "description": "Providers of information technology and systems integration services not classified in the Data Processing \u0026 Outsourced Services Sub-Industry. Includes information technology consulting and information management services.",
+                  "color": "#c785d6"
+                },
+                {
+                  "name": "Data Processing \u0026 Outsourced Services",
+                  "key": "45102020",
+                  "description": "Providers of commercial electronic data processing and/or business process outsourcing services. Includes companies that provide services for back-office automation.",
+                  "color": "#c785d6"
+                },
+                {
+                  "name": "Internet Services \u0026 Infrastructure",
+                  "key": "45102030",
+                  "description": "Companies providing services and infrastructure for the internet industry including data centers and cloud networking and storage infrastructure. Also includes companies providing web hosting services. Excludes companies classified in the Software Industry.",
+                  "color": "#c785d6"
+                }
+              ]
+            },
+            {
+              "name": "Software",
+              "key": "451030",
+              "color": "#ac62bd",
+              "children": [
+                {
+                  "name": "Application Software",
+                  "key": "45103010",
+                  "description": "Companies engaged in developing and producing software designed for specialized applications for the business or consumer market. Includes enterprise and technical software as well as cloud-based software. Excludes companies classified in the Interactive Home Entertainment Sub-Industry. Excludes companies classified in the Home Entertainment Software Sub-Industry. Also excludes companies producing systems or database management software classified in the Systems Software Sub-Industry.",
+                  "color": "#c785d6"
+                },
+                {
+                  "name": "Systems Software",
+                  "key": "45103020",
+                  "description": "Companies engaged in developing and producing systems and database management software.",
+                  "color": "#c785d6"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Technology Hardware \u0026 Equipment",
+          "key": "4520",
+          "color": "#9145a3",
+          "children": [
+            {
+              "name": "Communications Equipment",
+              "key": "452010",
+              "color": "#ac62bd",
+              "children": [
+                {
+                  "name": "Communications Equipment",
+                  "key": "45201020",
+                  "description": "Manufacturers of communication equipment and products, including LANs, WANs, routers, telephones, switchboards and exchanges. Excludes cellular phone manufacturers classified in the Technology Hardware, Storage \u0026 Peripherals Sub-Industry.",
+                  "color": "#c785d6"
+                }
+              ]
+            },
+            {
+              "name": "Technology Hardware, Storage \u0026 Peripherals",
+              "key": "452020",
+              "color": "#ac62bd",
+              "children": [
+                {
+                  "name": "Technology Hardware, Storage \u0026 Peripherals",
+                  "key": "45202030",
+                  "description": "Manufacturers of cellular phones, personal computers, servers, electronic computer components and peripherals. Includes data storage components, motherboards, audio and video cards, monitors, keyboards, printers, and other peripherals. Excludes semiconductors classified in the Semiconductors Sub-Industry.",
+                  "color": "#c785d6"
+                }
+              ]
+            },
+            {
+              "name": "Electronic Equipment, Instruments \u0026 Components",
+              "key": "452030",
+              "color": "#ac62bd",
+              "children": [
+                {
+                  "name": "Electronic Equipment \u0026 Instruments",
+                  "key": "45203010",
+                  "description": "Manufacturers of electronic equipment and instruments including analytical, electronic test and measurement instruments, scanner/barcode products, lasers, display screens, point-of-sales machines, and security system equipment.",
+                  "color": "#c785d6"
+                },
+                {
+                  "name": "Electronic Components",
+                  "key": "45203015",
+                  "description": "Manufacturers of electronic components. Includes electronic components, connection devices, electron tubes, electronic capacitors and resistors, electronic coil, printed circuit board, transformer and other inductors, signal processing technology/components.",
+                  "color": "#c785d6"
+                },
+                {
+                  "name": "Electronic Manufacturing Services",
+                  "key": "45203020",
+                  "description": "Producers of electronic equipment mainly for the OEM (Original Equipment Manufacturers) markets.",
+                  "color": "#c785d6"
+                },
+                {
+                  "name": "Technology Distributors",
+                  "key": "45203030",
+                  "description": "Distributors of technology hardware and equipment. Includes distributors of communications equipment, computers \u0026 peripherals, semiconductors, and electronic equipment and components.",
+                  "color": "#c785d6"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Semiconductors \u0026 Semiconductor Equipment",
+          "key": "4530",
+          "color": "#9145a3",
+          "children": [
+            {
+              "name": "Semiconductors \u0026 Semiconductor Equipment",
+              "key": "453010",
+              "color": "#ac62bd",
+              "children": [
+                {
+                  "name": "Semiconductor Equipment",
+                  "key": "45301010",
+                  "description": "Manufacturers of semiconductor equipment, including manufacturers of the raw material and equipment used in the solar power industry.",
+                  "color": "#c785d6"
+                },
+                {
+                  "name": "Semiconductors",
+                  "key": "45301020",
+                  "description": "Manufacturers of semiconductors and related products, including manufacturers of solar modules and cells.",
+                  "color": "#c785d6"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Communication Services",
+      "key": "50",
+      "color": "#8a2c68",
+      "children": [
+        {
+          "name": "Telecommunication Services",
+          "key": "5010",
+          "color": "#a34581",
+          "children": [
+            {
+              "name": "Diversified Telecommunication Services",
+              "key": "501010",
+              "color": "#bd629c",
+              "children": [
+                {
+                  "name": "Alternative Carriers",
+                  "key": "50101010",
+                  "description": "Providers of communications and high-density data transmission services primarily through a high bandwidth/fiber-optic cable network.",
+                  "color": "#d685b9"
+                },
+                {
+                  "name": "Integrated Telecommunication Services",
+                  "key": "50101020",
+                  "description": "Operators of primarily fixed-line telecommunications networks and companies providing both wireless and fixed-line telecommunications services not classified elsewhere. Also includes internet service providers offering internet access to end users.",
+                  "color": "#d685b9"
+                }
+              ]
+            },
+            {
+              "name": "Wireless Telecommunication Services",
+              "key": "501020",
+              "color": "#bd629c",
+              "children": [
+                {
+                  "name": "Wireless Telecommunication Services",
+                  "key": "50102010",
+                  "description": "Providers of primarily cellular or wireless telecommunication services.",
+                  "color": "#d685b9"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Media \u0026 Entertainment",
+          "key": "5020",
+          "color": "#a34581",
+          "children": [
+            {
+              "name": "Media",
+              "key": "502010",
+              "color": "#bd629c",
+              "children": [
+                {
+                  "name": "Advertising",
+                  "key": "50201010",
+                  "description": "Companies providing advertising, marketing or public relations services.",
+                  "color": "#d685b9"
+                },
+                {
+                  "name": "Broadcasting",
+                  "key": "50201020",
+                  "description": "Owners and operators of television or radio broadcasting systems, including programming. Includes radio and television broadcasting, radio networks, and radio stations.",
+                  "color": "#d685b9"
+                },
+                {
+                  "name": "Cable \u0026 Satellite",
+                  "key": "50201030",
+                  "description": "Providers of cable or satellite television services. Includes cable networks and program distribution.",
+                  "color": "#d685b9"
+                },
+                {
+                  "name": "Publishing",
+                  "key": "50201040",
+                  "description": "Publishers of newspapers, magazines and books in print or electronic formats.",
+                  "color": "#d685b9"
+                }
+              ]
+            },
+            {
+              "name": "Entertainment",
+              "key": "502020",
+              "color": "#bd629c",
+              "children": [
+                {
+                  "name": "Movies \u0026 Entertainment",
+                  "key": "50202010",
+                  "description": "Companies that engage in producing and selling entertainment products and services, including companies engaged in the production, distribution and screening of movies and television shows, producers and distributors of music, entertainment theaters and sports teams. Also includes companies offering and/or producing entertainment content streamed online.",
+                  "color": "#d685b9"
+                },
+                {
+                  "name": "Interactive Home Entertainment",
+                  "key": "50202020",
+                  "description": "Producers of interactive gaming products, including mobile gaming applications. Also includes educational software used primarily in the home. Excludes online gambling companies classified in the Casinos \u0026 Gaming Sub-Industry.",
+                  "color": "#d685b9"
+                }
+              ]
+            },
+            {
+              "name": "Interactive Media \u0026 Services",
+              "key": "502030",
+              "color": "#bd629c",
+              "children": [
+                {
+                  "name": "Interactive Media \u0026 Services",
+                  "key": "50203010",
+                  "description": "Companies engaging in content and information creation or distribution through proprietary platforms, where revenues are derived primarily through pay-per-click advertisements. Includes search engines, social media and networking platforms, online classifieds, and online review companies. Excludes companies operating online marketplaces classified in Internet \u0026 Direct Marketing Retail.",
+                  "color": "#d685b9"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Utilities",
+      "key": "55",
+      "color": "#8a2c35",
+      "children": [
+        {
+          "name": "Utilities",
+          "key": "5510",
+          "color": "#a3454e",
+          "children": [
+            {
+              "name": "Electric Utilities",
+              "key": "551010",
+              "color": "#bd626b",
+              "children": [
+                {
+                  "name": "Electric Utilities",
+                  "key": "55101010",
+                  "description": "Companies that produce or distribute electricity. Includes both nuclear and non-nuclear facilities.",
+                  "color": "#d6858d"
+                }
+              ]
+            },
+            {
+              "name": "Gas Utilities",
+              "key": "551020",
+              "color": "#bd626b",
+              "children": [
+                {
+                  "name": "Gas Utilities",
+                  "key": "55102010",
+                  "description": "Companies whose main charter is to distribute and transmit natural and manufactured gas. Excludes companies primarily involved in gas exploration or production classified in the Oil \u0026 Gas Exploration \u0026 Production Sub-Industry. Also excludes companies engaged in the storage and/or transportation of oil, gas, and/or refined products classified in the Oil \u0026 Gas Storage \u0026 Transportation Sub-Industry.",
+                  "color": "#d6858d"
+                }
+              ]
+            },
+            {
+              "name": "Multi-Utilities",
+              "key": "551030",
+              "color": "#bd626b",
+              "children": [
+                {
+                  "name": "Multi-Utilities",
+                  "key": "55103010",
+                  "description": "Utility companies with significantly diversified activities in addition to core Electric Utility, Gas Utility and/or Water Utility operations.",
+                  "color": "#d6858d"
+                }
+              ]
+            },
+            {
+              "name": "Water Utilities",
+              "key": "551040",
+              "color": "#bd626b",
+              "children": [
+                {
+                  "name": "Water Utilities",
+                  "key": "55104010",
+                  "description": "Companies that purchase and redistribute water to the end-consumer. Includes large-scale water treatment systems.",
+                  "color": "#d6858d"
+                }
+              ]
+            },
+            {
+              "name": "Independent Power and Renewable Electricity Producers",
+              "key": "551050",
+              "color": "#bd626b",
+              "children": [
+                {
+                  "name": "Independent Power Producers \u0026 Energy Traders",
+                  "key": "55105010",
+                  "description": "Companies that operate as Independent Power Producers (IPPs), Gas \u0026 Power Marketing \u0026 Trading Specialists and/or Integrated Energy Merchants. Excludes producers of electricity using renewable sources, such as solar power, hydropower, and wind power. Also excludes electric transmission companies and utility distribution companies classified in the Electric Utilities Sub-Industry.",
+                  "color": "#d6858d"
+                },
+                {
+                  "name": "Renewable Electricity",
+                  "key": "55105020",
+                  "description": "Companies that engage in the generation and distribution of electricity using renewable sources, including, but not limited to, companies that produce electricity using biomass, geothermal energy, solar energy, hydropower, and wind power. Excludes companies manufacturing capital equipment used to generate electricity using renewable sources, such as manufacturers of solar power systems, installers of photovoltaic cells, and companies involved in the provision of technology, components, and services mainly to this market.",
+                  "color": "#d6858d"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Real Estate",
+      "key": "60",
+      "color": "#8a562c",
+      "children": [
+        {
+          "name": "Real Estate",
+          "key": "6010",
+          "color": "#a36f45",
+          "children": [
+            {
+              "name": "Equity Real Estate Investment Trusts (REITs)",
+              "key": "601010",
+              "color": "#bd8b62",
+              "children": [
+                {
+                  "name": "Diversified REITs",
+                  "key": "60101010",
+                  "description": "A company or Trust with significantly diversified operations across two or more property types.",
+                  "color": "#d6aa85"
+                },
+                {
+                  "name": "Industrial REITs",
+                  "key": "60101020",
+                  "description": "Companies or Trusts engaged in the acquisition, development, ownership, leasing, management and operation of industrial properties. Includes companies operating industrial warehouses and distribution properties.",
+                  "color": "#d6aa85"
+                },
+                {
+                  "name": "Hotel \u0026 Resort REITs",
+                  "key": "60101030",
+                  "description": "Companies or Trusts engaged in the acquisition, development, ownership, leasing, management and operation of hotel and resort properties.",
+                  "color": "#d6aa85"
+                },
+                {
+                  "name": "Office REITs",
+                  "key": "60101040",
+                  "description": "Companies or Trusts engaged in the acquisition, development, ownership, leasing, management and operation of office properties.",
+                  "color": "#d6aa85"
+                },
+                {
+                  "name": "Health Care REITs",
+                  "key": "60101050",
+                  "description": "Companies or Trusts engaged in the acquisition, development, ownership, leasing, management and operation of properties serving the health care industry, including hospitals, nursing homes, and assisted living properties.",
+                  "color": "#d6aa85"
+                },
+                {
+                  "name": "Residential REITs",
+                  "key": "60101060",
+                  "description": "Companies or Trusts engaged in the acquisition, development, ownership, leasing, management and operation of residential properties including multifamily homes, apartments, manufactured homes and student housing properties.",
+                  "color": "#d6aa85"
+                },
+                {
+                  "name": "Retail REITs",
+                  "key": "60101070",
+                  "description": "Companies or Trusts engaged in the acquisition, development, ownership, leasing, management and operation of shopping malls, outlet malls, neighborhood and community shopping centers.",
+                  "color": "#d6aa85"
+                },
+                {
+                  "name": "Specialized REITs",
+                  "key": "60101080",
+                  "description": "Companies or Trusts engaged in the acquisition, development, ownership, leasing, management and operation of properties not classified elsewhere. Includes trusts that operate and invest in storage properties. It also includes REITs that do not generate a majority of their revenues and income from real estate rental and leasing operations.",
+                  "color": "#d6aa85"
+                }
+              ]
+            },
+            {
+              "name": "Real Estate Management \u0026 Development",
+              "key": "601020",
+              "color": "#bd8b62",
+              "children": [
+                {
+                  "name": "Diversified Real Estate Activities",
+                  "key": "60102010",
+                  "description": "Companies engaged in a diverse spectrum of real estate activities including real estate development \u0026 sales, real estate management, or real estate services, but with no dominant business line.",
+                  "color": "#d6aa85"
+                },
+                {
+                  "name": "Real Estate Operating Companies",
+                  "key": "60102020",
+                  "description": "Companies engaged in operating real estate properties for the purpose of leasing \u0026 management.",
+                  "color": "#d6aa85"
+                },
+                {
+                  "name": "Real Estate Development",
+                  "key": "60102030",
+                  "description": "Companies that develop real estate and sell the properties after development. Excludes companies classified in the Homebuilding Sub-Industry.",
+                  "color": "#d6aa85"
+                },
+                {
+                  "name": "Real Estate Services",
+                  "key": "60102040",
+                  "description": "Real estate service providers such as real estate agents, brokers \u0026 real estate appraisers.",
+                  "color": "#d6aa85"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "instruments": [
+    {
+      "identifiers": {
+        "name": "Microsoft Corporation",
+        "ticker": "MSFT"
+      },
+      "categories": [
+        {
+          "key": "4510",
+          "path": [
+            "Information Technology",
+            "Software \u0026 Services"
+          ],
+          "weight": 100.0
+        }
+      ]
+    },
+    {
+      "identifiers": {
+        "name": "Dogecoin",
+        "ticker": "DOGE"
+      },
+      "categories": [
+        {
+          "key": "502030",
+          "path": [
+            "Communication Services",
+            "Media \u0026 Entertainment",
+            "Interactive Media \u0026 Services"
+          ],
+          "weight": 100.0
+        }
+      ]
+    }
+  ]
+}

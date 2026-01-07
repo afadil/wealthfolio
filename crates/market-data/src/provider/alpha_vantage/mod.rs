@@ -9,16 +9,16 @@
 
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, TimeZone, Utc};
+use log::{debug, warn};
 use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::time::Duration;
-use tracing::{debug, warn};
 
 use crate::errors::MarketDataError;
-use crate::models::{AssetKind, ProviderInstrument, Quote, QuoteContext};
+use crate::models::{AssetProfile, Coverage, InstrumentKind, ProviderInstrument, Quote, QuoteContext};
 use crate::provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
 
 const BASE_URL: &str = "https://www.alphavantage.co/query";
@@ -173,20 +173,121 @@ impl CryptoDailyQuote {
     }
 }
 
+/// OVERVIEW response for company fundamentals
+/// Only includes fields that map to AssetProfile; API returns many more fields.
+#[derive(Debug, Deserialize)]
+struct CompanyOverviewResponse {
+    // Company identification
+    #[serde(rename = "Symbol")]
+    symbol: Option<String>,
+    #[serde(rename = "AssetType")]
+    asset_type: Option<String>,
+    #[serde(rename = "Name")]
+    name: Option<String>,
+    #[serde(rename = "Description")]
+    description: Option<String>,
+    #[serde(rename = "Country")]
+    country: Option<String>,
+    #[serde(rename = "Sector")]
+    sector: Option<String>,
+    #[serde(rename = "Industry")]
+    industry: Option<String>,
+
+    // Market data
+    #[serde(rename = "MarketCapitalization")]
+    market_capitalization: Option<String>,
+
+    // Valuation ratios
+    #[serde(rename = "PERatio")]
+    pe_ratio: Option<String>,
+    #[serde(rename = "TrailingPE")]
+    trailing_pe: Option<String>,
+
+    // Dividend data
+    #[serde(rename = "DividendYield")]
+    dividend_yield: Option<String>,
+
+    // Technical indicators
+    #[serde(rename = "52WeekHigh")]
+    week_52_high: Option<String>,
+    #[serde(rename = "52WeekLow")]
+    week_52_low: Option<String>,
+
+    // Error handling
+    #[serde(rename = "Error Message")]
+    error_message: Option<String>,
+    #[serde(rename = "Note")]
+    note: Option<String>,
+    #[serde(rename = "Information")]
+    information: Option<String>,
+    // Note: API provides many more fields (CIK, Exchange, Currency, EPS, Beta, etc.)
+    // that are not currently mapped to AssetProfile
+}
+
+impl CompanyOverviewResponse {
+    /// Parse a string field as f64, handling "None" and "-" values
+    fn parse_f64(s: &Option<String>) -> Option<f64> {
+        s.as_ref()
+            .filter(|v| !v.is_empty() && *v != "None" && *v != "-" && *v != "0")
+            .and_then(|v| v.parse::<f64>().ok())
+    }
+
+    /// Check if the response indicates an error
+    fn has_error(&self) -> bool {
+        self.error_message.is_some()
+            || self.information.as_ref().map_or(false, |i| i.contains("demo"))
+    }
+
+    /// Convert to AssetProfile
+    fn to_asset_profile(&self) -> AssetProfile {
+        // Parse asset class/sub-class from AssetType
+        let (asset_class, asset_sub_class) = match self.asset_type.as_deref() {
+            Some("Common Stock") => (Some("Equity".to_string()), Some("Stock".to_string())),
+            Some("ETF") => (Some("Equity".to_string()), Some("ETF".to_string())),
+            Some("Mutual Fund") => (Some("Equity".to_string()), Some("Mutual Fund".to_string())),
+            Some(other) => (Some(other.to_string()), None),
+            None => (None, None),
+        };
+
+        AssetProfile {
+            source: Some(PROVIDER_ID.to_string()),
+            name: self.name.clone(),
+            sector: self.sector.clone(),
+            industry: self.industry.clone(),
+            website: None, // Alpha Vantage doesn't provide website
+            description: self.description.clone(),
+            country: self.country.clone(),
+            employees: None, // Alpha Vantage doesn't provide employee count
+            logo_url: None,
+            asset_class,
+            asset_sub_class,
+            market_cap: Self::parse_f64(&self.market_capitalization),
+            pe_ratio: Self::parse_f64(&self.pe_ratio)
+                .or_else(|| Self::parse_f64(&self.trailing_pe)),
+            dividend_yield: Self::parse_f64(&self.dividend_yield),
+            week_52_high: Self::parse_f64(&self.week_52_high),
+            week_52_low: Self::parse_f64(&self.week_52_low),
+        }
+    }
+}
+
 // ============================================================================
 // AlphaVantageProvider implementation
 // ============================================================================
 
 impl AlphaVantageProvider {
     /// Create a new Alpha Vantage provider with the given API key.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP client cannot be created.
     pub fn new(api_key: String) -> Self {
-        Self {
-            client: Client::builder()
-                .timeout(Duration::from_secs(30))
-                .build()
-                .expect("Failed to create HTTP client"),
-            api_key,
-        }
+        let client = Client::builder()
+            .timeout(Duration::from_secs(30))
+            .build()
+            .unwrap_or_else(|_| Client::new());
+
+        Self { client, api_key }
     }
 
     /// Make a request to the Alpha Vantage API.
@@ -492,6 +593,45 @@ impl AlphaVantageProvider {
             .filter(|q| q.timestamp >= start && q.timestamp <= end)
             .collect()
     }
+
+    /// Fetch company overview using OVERVIEW endpoint.
+    async fn fetch_company_overview(
+        &self,
+        symbol: &str,
+    ) -> Result<AssetProfile, MarketDataError> {
+        let params = [("function", "OVERVIEW"), ("symbol", symbol)];
+
+        let text = self.fetch(&params).await?;
+
+        // First try to parse as a valid response
+        let response: CompanyOverviewResponse =
+            serde_json::from_str(&text).map_err(|e| MarketDataError::ProviderError {
+                provider: PROVIDER_ID.to_string(),
+                message: format!("Failed to parse company overview response: {}", e),
+            })?;
+
+        // Check for API-level errors
+        Self::check_api_error(
+            &response.error_message,
+            &response.note,
+            &response.information,
+        )?;
+
+        // Check if we got actual data (symbol should be present)
+        if response.symbol.is_none() || response.has_error() {
+            return Err(MarketDataError::SymbolNotFound(format!(
+                "No company overview data for symbol: {}",
+                symbol
+            )));
+        }
+
+        debug!(
+            "Alpha Vantage: fetched company overview for {}",
+            symbol
+        );
+
+        Ok(response.to_asset_profile())
+    }
 }
 
 // ============================================================================
@@ -511,9 +651,12 @@ impl MarketDataProvider for AlphaVantageProvider {
 
     fn capabilities(&self) -> ProviderCapabilities {
         ProviderCapabilities {
-            asset_kinds: &[AssetKind::Security, AssetKind::Crypto, AssetKind::FxRate],
+            instrument_kinds: &[InstrumentKind::Equity, InstrumentKind::Crypto, InstrumentKind::Fx],
+            coverage: Coverage::global_strict(),
+            supports_latest: true,
             supports_historical: true,
-            supports_search: true, // SYMBOL_SEARCH endpoint exists
+            supports_search: false,
+            supports_profile: true, // Via OVERVIEW endpoint for equities
         }
     }
 
@@ -644,6 +787,11 @@ impl MarketDataProvider for AlphaVantageProvider {
 
         Ok(filtered)
     }
+
+    async fn get_profile(&self, symbol: &str) -> Result<AssetProfile, MarketDataError> {
+        debug!("Fetching profile for {} from Alpha Vantage", symbol);
+        self.fetch_company_overview(symbol).await
+    }
 }
 
 #[cfg(test)]
@@ -692,11 +840,13 @@ mod tests {
     fn test_provider_capabilities() {
         let provider = AlphaVantageProvider::new("test_key".to_string());
         let caps = provider.capabilities();
-        assert!(caps.asset_kinds.contains(&AssetKind::Security));
-        assert!(caps.asset_kinds.contains(&AssetKind::Crypto));
-        assert!(caps.asset_kinds.contains(&AssetKind::FxRate));
+        assert!(caps.instrument_kinds.contains(&InstrumentKind::Equity));
+        assert!(caps.instrument_kinds.contains(&InstrumentKind::Crypto));
+        assert!(caps.instrument_kinds.contains(&InstrumentKind::Fx));
+        assert!(caps.supports_latest);
         assert!(caps.supports_historical);
-        assert!(caps.supports_search);
+        assert!(!caps.supports_search);
+        assert!(caps.supports_profile); // Now supports profile via OVERVIEW endpoint
     }
 
     #[test]
@@ -772,5 +922,80 @@ mod tests {
         assert_eq!(quote.get_low().unwrap().to_string(), "44000.00");
         assert_eq!(quote.get_close().unwrap().to_string(), "45500.00");
         assert_eq!(quote.get_volume().unwrap().to_string(), "1000000");
+    }
+
+    #[test]
+    fn test_company_overview_parsing() {
+        // Note: API returns more fields (CIK, Exchange, Currency) but we only parse what's needed
+        let json = r#"{
+            "Symbol": "IBM",
+            "AssetType": "Common Stock",
+            "Name": "International Business Machines Corporation",
+            "Description": "International Business Machines Corporation provides integrated solutions.",
+            "Country": "USA",
+            "Sector": "TECHNOLOGY",
+            "Industry": "COMPUTER & OFFICE EQUIPMENT",
+            "MarketCapitalization": "191234567890",
+            "PERatio": "22.5",
+            "DividendYield": "0.0455",
+            "52WeekHigh": "199.18",
+            "52WeekLow": "128.06"
+        }"#;
+
+        let response: CompanyOverviewResponse = serde_json::from_str(json).unwrap();
+        let profile = response.to_asset_profile();
+
+        assert_eq!(profile.source, Some("ALPHA_VANTAGE".to_string()));
+        assert_eq!(
+            profile.name,
+            Some("International Business Machines Corporation".to_string())
+        );
+        assert_eq!(profile.sector, Some("TECHNOLOGY".to_string()));
+        assert_eq!(
+            profile.industry,
+            Some("COMPUTER & OFFICE EQUIPMENT".to_string())
+        );
+        assert_eq!(profile.country, Some("USA".to_string()));
+        assert_eq!(profile.asset_class, Some("Equity".to_string()));
+        assert_eq!(profile.asset_sub_class, Some("Stock".to_string()));
+        assert_eq!(profile.market_cap, Some(191234567890.0));
+        assert_eq!(profile.pe_ratio, Some(22.5));
+        assert_eq!(profile.dividend_yield, Some(0.0455));
+        assert_eq!(profile.week_52_high, Some(199.18));
+        assert_eq!(profile.week_52_low, Some(128.06));
+    }
+
+    #[test]
+    fn test_company_overview_with_none_values() {
+        let json = r#"{
+            "Symbol": "TEST",
+            "AssetType": "ETF",
+            "Name": "Test ETF",
+            "Sector": "None",
+            "Industry": "-",
+            "PERatio": "None",
+            "DividendYield": "0"
+        }"#;
+
+        let response: CompanyOverviewResponse = serde_json::from_str(json).unwrap();
+        let profile = response.to_asset_profile();
+
+        assert_eq!(profile.name, Some("Test ETF".to_string()));
+        assert_eq!(profile.asset_class, Some("Equity".to_string()));
+        assert_eq!(profile.asset_sub_class, Some("ETF".to_string()));
+        // "None" and "-" and "0" values should be parsed as None
+        assert_eq!(profile.sector, Some("None".to_string())); // Raw string preserved
+        assert_eq!(profile.pe_ratio, None); // Parsed as None
+        assert_eq!(profile.dividend_yield, None); // "0" treated as None
+    }
+
+    #[test]
+    fn test_company_overview_parse_f64() {
+        assert_eq!(CompanyOverviewResponse::parse_f64(&Some("123.45".to_string())), Some(123.45));
+        assert_eq!(CompanyOverviewResponse::parse_f64(&Some("None".to_string())), None);
+        assert_eq!(CompanyOverviewResponse::parse_f64(&Some("-".to_string())), None);
+        assert_eq!(CompanyOverviewResponse::parse_f64(&Some("0".to_string())), None);
+        assert_eq!(CompanyOverviewResponse::parse_f64(&Some("".to_string())), None);
+        assert_eq!(CompanyOverviewResponse::parse_f64(&None), None);
     }
 }

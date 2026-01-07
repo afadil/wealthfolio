@@ -8,7 +8,7 @@ use crate::{
 
 use log::{debug, error};
 use tauri::{AppHandle, State};
-use wealthfolio_core::market_data::{MarketDataProviderInfo, Quote, QuoteImport, QuoteSummary};
+use wealthfolio_core::quotes::{service::ProviderInfo, Quote, QuoteImport, QuoteSummary};
 
 #[tauri::command]
 pub async fn search_symbol(
@@ -16,7 +16,7 @@ pub async fn search_symbol(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<Vec<QuoteSummary>, String> {
     state
-        .market_data_service()
+        .quote_service()
         .search_symbol(&query)
         .await
         .map_err(|e| format!("Failed to search ticker: {}", e))
@@ -45,7 +45,7 @@ pub async fn update_quote(
 ) -> Result<(), String> {
     debug!("Updating quote: {:?}", quote);
     state
-        .market_data_service()
+        .quote_service()
         .update_quote(quote.clone())
         .await
         .map(|_| ())
@@ -71,7 +71,7 @@ pub async fn delete_quote(
 ) -> Result<(), String> {
     debug!("Deleting quote: {}", id);
     state
-        .market_data_service()
+        .quote_service()
         .delete_quote(&id)
         .await
         .map_err(|e| e.to_string())?;
@@ -95,8 +95,8 @@ pub async fn get_quote_history(
 ) -> Result<Vec<Quote>, String> {
     debug!("Fetching quote history for symbol: {}", symbol);
     state
-        .market_data_service()
-        .get_historical_quotes_for_symbol(&symbol)
+        .quote_service()
+        .get_historical_quotes(&symbol)
         .map_err(|e| e.to_string())
 }
 
@@ -106,19 +106,19 @@ pub async fn get_latest_quotes(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<HashMap<String, Quote>, String> {
     state
-        .market_data_service()
-        .get_latest_quotes_for_symbols(&symbols)
+        .quote_service()
+        .get_latest_quotes(&symbols)
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn get_market_data_providers(
     state: State<'_, Arc<ServiceContext>>,
-) -> Result<Vec<MarketDataProviderInfo>, String> {
+) -> Result<Vec<ProviderInfo>, String> {
     debug!("Received request to get market data providers");
     state
-        .market_data_service()
-        .get_market_data_providers_info()
+        .quote_service()
+        .get_providers_info()
         .await
         .map_err(|e| {
             error!("Failed to get market data providers: {}", e);
@@ -139,18 +139,18 @@ pub async fn import_quotes_csv(
         overwrite_existing
     );
     let result = state
-        .market_data_service()
-        .import_quotes_from_csv(quotes, overwrite_existing)
+        .quote_service()
+        .import_quotes(quotes, overwrite_existing)
         .await
         .map_err(|e| {
-            error!("❌ TAURI COMMAND: import_quotes_csv failed: {}", e);
+            error!("TAURI COMMAND: import_quotes_csv failed: {}", e);
             format!("Failed to import CSV quotes: {}", e)
         })?;
 
     // Trigger portfolio update after import
     let handle = handle.clone();
     tauri::async_runtime::spawn(async move {
-        debug!("🔄 Triggering portfolio update after quote import");
+        debug!("Triggering portfolio update after quote import");
         let payload = PortfolioRequestPayload::builder()
             .account_ids(None)
             .refetch_all_market_data(false)

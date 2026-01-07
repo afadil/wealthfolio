@@ -9,9 +9,11 @@
 mod circuit_breaker;
 mod rate_limiter;
 mod registry;
+mod skip_reason;
 mod validator;
 
 pub use circuit_breaker::{CircuitBreaker, CircuitState};
-pub use rate_limiter::RateLimiter;
+pub use rate_limiter::{RateLimitConfig, RateLimiter};
 pub use registry::ProviderRegistry;
-pub use validator::QuoteValidator;
+pub use skip_reason::{FetchDiagnostics, ProviderAttempt, SkipReason};
+pub use validator::{QuoteValidator, ValidationResult, ValidationSeverity};

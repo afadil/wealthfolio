@@ -62,7 +62,7 @@ fn handle_portfolio_request(handle: AppHandle, payload_str: &str, force_recalc: 
                 let context_result = handle_clone.try_state::<Arc<ServiceContext>>();
 
                 if let Some(context) = context_result {
-                    let market_data_service = context.market_data_service();
+                    let market_data_service = context.quote_service();
 
                     // Emit sync start event
                     if let Err(e) = handle_clone.emit(MARKET_SYNC_START, &()) {
@@ -71,20 +71,20 @@ fn handle_portfolio_request(handle: AppHandle, payload_str: &str, force_recalc: 
 
                     let sync_start = Instant::now();
 
-                    // Use optimized sync - MarketDataService handles the sync state internally
+                    // Use optimized sync - QuoteService handles the sync state internally
                     let sync_result = if refetch_all {
-                        market_data_service
-                            .resync_market_data(symbols_to_sync)
-                            .await
+                        market_data_service.resync(symbols_to_sync).await
                     } else {
-                        market_data_service.sync_market_data().await
+                        market_data_service.sync().await
                     };
 
                     let sync_duration = sync_start.elapsed();
                     info!("Market data sync completed in: {:?}", sync_duration);
 
                     match sync_result {
-                        Ok((_, failed_syncs)) => {
+                        Ok(result) => {
+                            // Convert SyncResult to legacy format for backwards compatibility
+                            let failed_syncs = result.failures;
                             let result_payload = MarketSyncResult { failed_syncs };
                             if let Err(e) = handle_clone.emit(MARKET_SYNC_COMPLETE, &result_payload)
                             {
@@ -220,7 +220,7 @@ fn handle_asset_resource_change(handle: AppHandle, event: &ResourceEventPayload)
 
             if let Some(asset_id) = asset_id {
                 let asset_id_owned = asset_id.to_string();
-                let market_data_service = context.market_data_service();
+                let market_data_service = context.quote_service();
 
                 spawn(async move {
                     if let Err(e) = market_data_service.delete_sync_state(&asset_id_owned).await {
@@ -342,7 +342,7 @@ fn handle_activity_resource_change(handle: AppHandle, event: &ResourceEventPaylo
     }
 
     // Handle quote sync state updates based on activity action
-    let market_data_service = context.market_data_service();
+    let market_data_service = context.quote_service();
 
     match event.action.as_str() {
         "created" => {
@@ -357,7 +357,7 @@ fn handle_activity_resource_change(handle: AppHandle, event: &ResourceEventPaylo
 
                     spawn(async move {
                         if let Err(e) = service
-                            .handle_new_activity(&asset_id_owned, activity_date)
+                            .handle_activity_created(&asset_id_owned, activity_date)
                             .await
                         {
                             warn!(
@@ -380,23 +380,18 @@ fn handle_activity_resource_change(handle: AppHandle, event: &ResourceEventPaylo
             if date_changed {
                 let asset_id = event.payload.get("asset_id").and_then(|v| v.as_str());
                 let new_date_str = event.payload.get("activity_date").and_then(|v| v.as_str());
-                let old_date_str = event
-                    .payload
-                    .get("previous_activity_date")
-                    .and_then(|v| v.as_str());
 
                 if let (Some(asset_id), Some(new_date_str)) = (asset_id, new_date_str) {
                     let new_date = NaiveDate::parse_from_str(new_date_str, "%Y-%m-%d").ok();
-                    let old_date =
-                        old_date_str.and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
 
                     if let Some(new_date) = new_date {
                         let asset_id_owned = asset_id.to_string();
                         let service = market_data_service.clone();
 
+                        // Use handle_activity_created to update sync state with new date
                         spawn(async move {
                             if let Err(e) = service
-                                .handle_activity_date_change(&asset_id_owned, old_date, new_date)
+                                .handle_activity_created(&asset_id_owned, new_date)
                                 .await
                             {
                                 warn!(
@@ -444,7 +439,7 @@ fn handle_activity_resource_change(handle: AppHandle, event: &ResourceEventPaylo
                                 NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
                             {
                                 if let Err(e) = service
-                                    .handle_new_activity(&curr_owned, activity_date)
+                                    .handle_activity_created(&curr_owned, activity_date)
                                     .await
                                 {
                                     warn!(

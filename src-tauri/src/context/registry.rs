@@ -1,7 +1,7 @@
 use std::sync::{Arc, RwLock};
 use wealthfolio_connect::SyncServiceTrait;
 use wealthfolio_core::{
-    self, accounts, activities, assets, fx, goals, limits, market_data, portfolio, settings,
+    self, accounts, activities, assets, fx, goals, limits, portfolio, quotes, settings,
 };
 use wealthfolio_storage_sqlite::assets::AlternativeAssetRepository;
 
@@ -15,7 +15,7 @@ pub struct ServiceContext {
     pub account_service: Arc<dyn accounts::AccountServiceTrait>,
     pub goal_service: Arc<dyn goals::GoalServiceTrait>,
     pub asset_service: Arc<dyn assets::AssetServiceTrait>,
-    pub market_data_service: Arc<dyn market_data::MarketDataServiceTrait>,
+    pub quote_service: Arc<dyn quotes::QuoteServiceTrait>,
     pub limits_service: Arc<dyn limits::ContributionLimitServiceTrait>,
     pub fx_service: Arc<dyn fx::FxServiceTrait>,
     pub performance_service: Arc<dyn portfolio::performance::PerformanceServiceTrait>,
@@ -57,8 +57,8 @@ impl ServiceContext {
         Arc::clone(&self.goal_service)
     }
 
-    pub fn market_data_service(&self) -> Arc<dyn market_data::MarketDataServiceTrait> {
-        Arc::clone(&self.market_data_service)
+    pub fn quote_service(&self) -> Arc<dyn quotes::QuoteServiceTrait> {
+        Arc::clone(&self.quote_service)
     }
 
     pub fn limits_service(&self) -> Arc<dyn limits::ContributionLimitServiceTrait> {

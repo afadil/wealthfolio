@@ -159,19 +159,16 @@ pub async fn process_portfolio_job(
 
     let sync_start = std::time::Instant::now();
     let sync_result = if config.refetch_all_market_data {
-        state
-            .market_data_service
-            .resync_market_data(config.symbols.clone())
-            .await
+        state.quote_service.resync(config.symbols.clone()).await
     } else {
-        state.market_data_service.sync_market_data().await
+        state.quote_service.sync().await
     };
 
     match sync_result {
-        Ok((_, failed_syncs)) => {
+        Ok(result) => {
             event_bus.publish(ServerEvent::with_payload(
                 MARKET_SYNC_COMPLETE,
-                json!({ "failed_syncs": failed_syncs }),
+                json!({ "failed_syncs": result.failed }),
             ));
             tracing::info!("Market data sync completed in {:?}", sync_start.elapsed());
             if let Err(err) = state.fx_service.initialize() {

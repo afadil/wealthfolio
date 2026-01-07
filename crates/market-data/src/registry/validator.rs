@@ -10,15 +10,49 @@ use log::warn;
 use rust_decimal::Decimal;
 
 use crate::errors::MarketDataError;
-use crate::models::Quote;
+use crate::models::{InstrumentId, Quote};
 
 /// Validation severity levels.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ValidationSeverity {
-    /// Validation error - quote should be rejected.
-    Error,
-    /// Validation warning - quote is suspicious but usable.
-    Warning,
+    /// Hard failure - reject quote, try next provider.
+    Hard,
+    /// Soft warning - accept quote but log warning.
+    Soft,
+}
+
+/// Result of quote validation.
+#[derive(Clone, Debug)]
+pub struct ValidationResult {
+    pub valid: bool,
+    pub severity: Option<ValidationSeverity>,
+    pub message: Option<String>,
+}
+
+impl ValidationResult {
+    pub fn ok() -> Self {
+        Self {
+            valid: true,
+            severity: None,
+            message: None,
+        }
+    }
+
+    pub fn hard_fail(message: impl Into<String>) -> Self {
+        Self {
+            valid: false,
+            severity: Some(ValidationSeverity::Hard),
+            message: Some(message.into()),
+        }
+    }
+
+    pub fn soft_warn(message: impl Into<String>) -> Self {
+        Self {
+            valid: true, // Still accepted
+            severity: Some(ValidationSeverity::Soft),
+            message: Some(message.into()),
+        }
+    }
 }
 
 /// Validation result details.
@@ -100,7 +134,7 @@ impl QuoteValidator {
         // Check for any errors
         let errors: Vec<_> = issues
             .iter()
-            .filter(|i| i.severity == ValidationSeverity::Error)
+            .filter(|i| i.severity == ValidationSeverity::Hard)
             .collect();
 
         if !errors.is_empty() {
@@ -111,7 +145,7 @@ impl QuoteValidator {
         }
 
         // Log warnings
-        for issue in issues.iter().filter(|i| i.severity == ValidationSeverity::Warning) {
+        for issue in issues.iter().filter(|i| i.severity == ValidationSeverity::Soft) {
             warn!("Quote validation warning for {:?}: {}", quote.timestamp, issue.message);
         }
 
@@ -139,7 +173,7 @@ impl QuoteValidator {
     fn validate_close_price(&self, quote: &Quote, issues: &mut Vec<ValidationIssue>) {
         if self.config.reject_negative_prices && quote.close < Decimal::ZERO {
             issues.push(ValidationIssue {
-                severity: ValidationSeverity::Error,
+                severity: ValidationSeverity::Hard,
                 message: format!("Negative close price: {}", quote.close),
             });
         }
@@ -159,7 +193,7 @@ impl QuoteValidator {
                 // No OHLC data - just close, which is valid
                 if self.config.warn_on_missing_ohlc {
                     issues.push(ValidationIssue {
-                        severity: ValidationSeverity::Warning,
+                        severity: ValidationSeverity::Soft,
                         message: "Missing OHLC data (only close provided)".to_string(),
                     });
                 }
@@ -169,7 +203,7 @@ impl QuoteValidator {
                 // Partial OHLC data - warn but validate what we have
                 if self.config.warn_on_missing_ohlc {
                     issues.push(ValidationIssue {
-                        severity: ValidationSeverity::Warning,
+                        severity: ValidationSeverity::Soft,
                         message: "Partial OHLC data provided".to_string(),
                     });
                 }
@@ -184,7 +218,7 @@ impl QuoteValidator {
         // High >= Low
         if self.config.reject_invalid_ohlc && high < low {
             issues.push(ValidationIssue {
-                severity: ValidationSeverity::Error,
+                severity: ValidationSeverity::Hard,
                 message: format!("High ({}) is less than Low ({})", high, low),
             });
         }
@@ -192,7 +226,7 @@ impl QuoteValidator {
         // Open between Low and High
         if self.config.reject_invalid_ohlc && (open < low || open > high) {
             issues.push(ValidationIssue {
-                severity: ValidationSeverity::Warning,
+                severity: ValidationSeverity::Soft,
                 message: format!(
                     "Open ({}) is outside High/Low range ({}-{})",
                     open, low, high
@@ -203,7 +237,7 @@ impl QuoteValidator {
         // Close between Low and High
         if self.config.reject_invalid_ohlc && (quote.close < low || quote.close > high) {
             issues.push(ValidationIssue {
-                severity: ValidationSeverity::Warning,
+                severity: ValidationSeverity::Soft,
                 message: format!(
                     "Close ({}) is outside High/Low range ({}-{})",
                     quote.close, low, high
@@ -215,19 +249,19 @@ impl QuoteValidator {
         if self.config.reject_negative_prices {
             if high < Decimal::ZERO {
                 issues.push(ValidationIssue {
-                    severity: ValidationSeverity::Error,
+                    severity: ValidationSeverity::Hard,
                     message: format!("Negative high price: {}", high),
                 });
             }
             if low < Decimal::ZERO {
                 issues.push(ValidationIssue {
-                    severity: ValidationSeverity::Error,
+                    severity: ValidationSeverity::Hard,
                     message: format!("Negative low price: {}", low),
                 });
             }
             if open < Decimal::ZERO {
                 issues.push(ValidationIssue {
-                    severity: ValidationSeverity::Error,
+                    severity: ValidationSeverity::Hard,
                     message: format!("Negative open price: {}", open),
                 });
             }
@@ -239,7 +273,7 @@ impl QuoteValidator {
         if let Some(max_price) = self.config.max_price {
             if quote.close > max_price {
                 issues.push(ValidationIssue {
-                    severity: ValidationSeverity::Warning,
+                    severity: ValidationSeverity::Soft,
                     message: format!(
                         "Close price ({}) exceeds max threshold ({})",
                         quote.close, max_price
@@ -250,7 +284,7 @@ impl QuoteValidator {
             if let Some(high) = quote.high {
                 if high > max_price {
                     issues.push(ValidationIssue {
-                        severity: ValidationSeverity::Warning,
+                        severity: ValidationSeverity::Soft,
                         message: format!(
                             "High price ({}) exceeds max threshold ({})",
                             high, max_price
@@ -266,18 +300,56 @@ impl QuoteValidator {
         if let Some(volume) = quote.volume {
             if volume < Decimal::ZERO {
                 issues.push(ValidationIssue {
-                    severity: ValidationSeverity::Error,
+                    severity: ValidationSeverity::Hard,
                     message: format!("Negative volume: {}", volume),
                 });
             }
 
             if self.config.warn_on_zero_volume && volume == Decimal::ZERO {
                 issues.push(ValidationIssue {
-                    severity: ValidationSeverity::Warning,
+                    severity: ValidationSeverity::Soft,
                     message: "Zero volume".to_string(),
                 });
             }
         }
+    }
+
+    /// Validate a quote with severity levels.
+    pub fn validate_with_severity(
+        &self,
+        quote: &Quote,
+        _context: &InstrumentId,
+    ) -> ValidationResult {
+        // Hard validations (reject quote)
+        if self.config.reject_negative_prices && quote.close < Decimal::ZERO {
+            return ValidationResult::hard_fail("Negative close price");
+        }
+
+        if let Some(max) = self.config.max_price {
+            if quote.close > max {
+                return ValidationResult::hard_fail(format!(
+                    "Price {} exceeds sanity limit {}",
+                    quote.close, max
+                ));
+            }
+        }
+
+        if self.config.reject_invalid_ohlc {
+            if let (Some(high), Some(low)) = (quote.high, quote.low) {
+                if high < low {
+                    return ValidationResult::hard_fail("High < Low in OHLC");
+                }
+            }
+        }
+
+        // Soft validations (warn but accept)
+        if self.config.warn_on_zero_volume {
+            if quote.volume == Some(Decimal::ZERO) {
+                return ValidationResult::soft_warn("Zero volume (market may be closed)");
+            }
+        }
+
+        ValidationResult::ok()
     }
 }
 

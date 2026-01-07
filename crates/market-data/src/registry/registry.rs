@@ -1,22 +1,26 @@
 //! Provider registry for orchestrating market data providers.
 //!
 //! The registry manages multiple providers, handling:
-//! - Provider selection based on asset kind and preference
+//! - Provider selection based on instrument kind, coverage, and capabilities
 //! - Fallback to alternative providers on failure
 //! - Rate limiting and circuit breaking
 //! - Quote validation
+//! - Diagnostic tracking for debugging provider selection
 
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use log::{debug, info, warn};
 
-use super::{CircuitBreaker, QuoteValidator, RateLimiter};
+use super::{
+    CircuitBreaker, FetchDiagnostics, QuoteValidator, RateLimitConfig, RateLimiter, SkipReason,
+};
 use crate::errors::{MarketDataError, RetryClass};
-use crate::models::{AssetKind, InstrumentId, ProviderId, ProviderInstrument, Quote, QuoteContext};
-use crate::provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
-use crate::resolver::{ResolvedInstrument, ResolutionSource, SymbolResolver};
+use crate::models::{AssetProfile, InstrumentId, ProviderId, Quote, QuoteContext, SearchResult};
+use crate::provider::MarketDataProvider;
+use crate::resolver::SymbolResolver;
 
 /// Provider registry for orchestrating market data fetching.
 pub struct ProviderRegistry {
@@ -25,20 +29,63 @@ pub struct ProviderRegistry {
     rate_limiter: RateLimiter,
     circuit_breaker: CircuitBreaker,
     validator: QuoteValidator,
+    /// User-configured priorities (provider_id -> priority).
+    /// Lower values = higher priority. If not set, falls back to provider's default priority.
+    custom_priorities: HashMap<String, i32>,
 }
 
 impl ProviderRegistry {
     /// Create a new provider registry.
+    ///
+    /// Automatically configures rate limits for each provider based on their
+    /// declared `rate_limit()` capabilities.
+    ///
+    /// # Arguments
+    ///
+    /// * `providers` - List of market data providers
+    /// * `resolver` - Symbol resolver for provider-specific symbol mapping
     pub fn new(
         providers: Vec<Arc<dyn MarketDataProvider>>,
         resolver: Arc<dyn SymbolResolver>,
     ) -> Self {
+        Self::with_priorities(providers, resolver, HashMap::new())
+    }
+
+    /// Create a new provider registry with custom priorities.
+    ///
+    /// # Arguments
+    ///
+    /// * `providers` - List of market data providers
+    /// * `resolver` - Symbol resolver for provider-specific symbol mapping
+    /// * `custom_priorities` - User-configured priorities (provider_id -> priority).
+    ///   Lower values = higher priority.
+    pub fn with_priorities(
+        providers: Vec<Arc<dyn MarketDataProvider>>,
+        resolver: Arc<dyn SymbolResolver>,
+        custom_priorities: HashMap<String, i32>,
+    ) -> Self {
+        let rate_limiter = RateLimiter::new();
+
+        // Configure rate limits for each provider
+        for provider in &providers {
+            let limit = provider.rate_limit();
+            let provider_id: ProviderId = Cow::Borrowed(provider.id());
+            rate_limiter.configure(
+                &provider_id,
+                RateLimitConfig {
+                    requests_per_minute: limit.requests_per_minute,
+                    burst_capacity: limit.max_concurrency as f64,
+                },
+            );
+        }
+
         Self {
             providers,
             resolver,
-            rate_limiter: RateLimiter::new(),
+            rate_limiter,
             circuit_breaker: CircuitBreaker::new(),
             validator: QuoteValidator::new(),
+            custom_priorities,
         }
     }
 
@@ -56,6 +103,7 @@ impl ProviderRegistry {
             rate_limiter,
             circuit_breaker,
             validator,
+            custom_priorities: HashMap::new(),
         }
     }
 
@@ -76,7 +124,7 @@ impl ProviderRegistry {
         start: DateTime<Utc>,
         end: DateTime<Utc>,
     ) -> Result<Vec<Quote>, MarketDataError> {
-        let providers = self.ordered_providers(context);
+        let providers = self.ordered_providers(context, true); // true = historical
 
         if providers.is_empty() {
             warn!(
@@ -174,7 +222,7 @@ impl ProviderRegistry {
                             );
                             return Err(e);
                         }
-                        RetryClass::WithBackoff | RetryClass::CircuitOpen => {
+                        RetryClass::FailoverWithPenalty | RetryClass::CircuitOpen => {
                             // Record failure for circuit breaker
                             self.circuit_breaker.record_failure(&provider_id);
                             warn!(
@@ -203,7 +251,7 @@ impl ProviderRegistry {
         &self,
         context: &QuoteContext,
     ) -> Result<Quote, MarketDataError> {
-        let providers = self.ordered_providers(context);
+        let providers = self.ordered_providers(context, false); // false = latest
 
         if providers.is_empty() {
             return Err(MarketDataError::NoProvidersAvailable);
@@ -247,7 +295,7 @@ impl ProviderRegistry {
                         return Err(e);
                     }
 
-                    if matches!(retry_class, RetryClass::WithBackoff | RetryClass::CircuitOpen) {
+                    if matches!(retry_class, RetryClass::FailoverWithPenalty | RetryClass::CircuitOpen) {
                         self.circuit_breaker.record_failure(&provider_id);
                     }
 
@@ -262,35 +310,130 @@ impl ProviderRegistry {
     /// Get providers ordered by preference for the given context.
     ///
     /// Orders providers by:
-    /// 1. Filter to providers that support the asset kind
-    /// 2. Preferred provider first (if set and available)
-    /// 3. Then by priority (lower is higher priority)
-    fn ordered_providers(&self, context: &QuoteContext) -> Vec<&Arc<dyn MarketDataProvider>> {
-        let asset_kind = context.instrument.kind();
-
+    /// 1. Filter to providers that support the instrument (kind + coverage)
+    /// 2. Filter by operation capability (historical or latest)
+    /// 3. Preferred provider first (if set and available)
+    /// 4. Then by priority (lower is higher priority)
+    ///
+    /// # Arguments
+    /// * `context` - The quote context with instrument info
+    /// * `for_historical` - If true, filter by `supports_historical`; if false, by `supports_latest`
+    fn ordered_providers(
+        &self,
+        context: &QuoteContext,
+        for_historical: bool,
+    ) -> Vec<&Arc<dyn MarketDataProvider>> {
         let mut providers: Vec<_> = self
             .providers
             .iter()
-            .filter(|p| p.capabilities().asset_kinds.contains(&asset_kind))
+            .filter(|p| {
+                let caps = p.capabilities();
+                // Check instrument support
+                if !caps.supports_instrument(&context.instrument) {
+                    return false;
+                }
+                // Check operation capability
+                if for_historical {
+                    caps.supports_historical
+                } else {
+                    caps.supports_latest
+                }
+            })
             .collect();
 
-        // Sort by preferred provider, then by priority
-        if let Some(preferred) = &context.preferred_provider {
-            providers.sort_by_key(|p| {
-                if p.id() == preferred.as_ref() {
-                    // Preferred provider gets priority 0
-                    0i32
-                } else {
-                    // Others sorted by their declared priority
-                    p.priority() as i32 + 1
+        self.sort_by_preference(&mut providers, context);
+        providers
+    }
+
+    /// Filter providers for a fetch operation, recording skip reasons.
+    fn filter_providers(
+        &self,
+        context: &QuoteContext,
+        for_historical: bool,
+        diagnostics: &mut FetchDiagnostics,
+    ) -> Vec<&Arc<dyn MarketDataProvider>> {
+        let mut eligible = Vec::new();
+
+        for provider in &self.providers {
+            let provider_id: ProviderId = Cow::Borrowed(provider.id());
+            let caps = provider.capabilities();
+
+            // Check capability for fetch type
+            if for_historical {
+                if !caps.supports_historical {
+                    diagnostics.record_skip(provider_id.clone(), SkipReason::HistoricalNotSupported);
+                    continue;
                 }
-            });
-        } else {
-            // No preference, just sort by priority
-            providers.sort_by_key(|p| p.priority());
+            } else if !caps.supports_latest {
+                diagnostics.record_skip(provider_id.clone(), SkipReason::LatestNotSupported);
+                continue;
+            }
+
+            // Check instrument kind
+            if !caps.instrument_kinds.contains(&context.instrument.instrument_kind()) {
+                diagnostics.record_skip(provider_id.clone(), SkipReason::InstrumentKindMismatch);
+                continue;
+            }
+
+            // Check coverage
+            if !caps.coverage.supports(&context.instrument) {
+                let skip_reason = match &context.instrument {
+                    InstrumentId::Equity { mic, .. } => {
+                        if mic.is_none() && !caps.coverage.allow_unknown_mic {
+                            SkipReason::UnknownMicRejected
+                        } else {
+                            SkipReason::MicNotCovered {
+                                mic: mic.as_ref().map(|m| m.to_string()),
+                            }
+                        }
+                    }
+                    InstrumentId::Metal { quote, .. } => SkipReason::QuoteCurrencyMismatch {
+                        expected: quote.to_string(),
+                    },
+                    _ => SkipReason::InstrumentKindMismatch,
+                };
+                diagnostics.record_skip(provider_id.clone(), skip_reason);
+                continue;
+            }
+
+            // Check circuit breaker
+            if !self.circuit_breaker.is_allowed(&provider_id) {
+                diagnostics.record_skip(provider_id, SkipReason::CircuitBreakerOpen);
+                continue;
+            }
+
+            eligible.push(provider);
         }
 
-        providers
+        self.sort_by_preference(&mut eligible, context);
+        eligible
+    }
+
+    /// Sort providers by preference.
+    ///
+    /// Priority order:
+    /// 1. Preferred provider (from context) always first
+    /// 2. Custom user priorities (from settings) if configured
+    /// 3. Provider's default priority as fallback
+    fn sort_by_preference(
+        &self,
+        providers: &mut Vec<&Arc<dyn MarketDataProvider>>,
+        context: &QuoteContext,
+    ) {
+        providers.sort_by_key(|p| {
+            // Preferred provider always comes first
+            if let Some(preferred) = &context.preferred_provider {
+                if p.id() == preferred.as_ref() {
+                    return i32::MIN;
+                }
+            }
+
+            // Use custom priority if configured, otherwise use provider's default
+            self.custom_priorities
+                .get(p.id())
+                .copied()
+                .unwrap_or_else(|| p.priority() as i32)
+        });
     }
 
     /// Get the list of registered providers.
@@ -307,12 +450,309 @@ impl ProviderRegistry {
     pub fn reset_circuit(&self, provider_id: &ProviderId) {
         self.circuit_breaker.reset(provider_id);
     }
+
+    /// Search for symbols matching the query.
+    ///
+    /// Tries providers that support search until one succeeds.
+    pub async fn search(&self, query: &str) -> Result<Vec<SearchResult>, MarketDataError> {
+        let providers: Vec<_> = self
+            .providers
+            .iter()
+            .filter(|p| p.capabilities().supports_search)
+            .collect();
+
+        if providers.is_empty() {
+            return Err(MarketDataError::NotSupported {
+                operation: "search".to_string(),
+                provider: "all".to_string(),
+            });
+        }
+
+        let mut last_error: Option<MarketDataError> = None;
+
+        for provider in providers {
+            let provider_id: ProviderId = Cow::Borrowed(provider.id());
+
+            if !self.circuit_breaker.is_allowed(&provider_id) {
+                continue;
+            }
+
+            self.rate_limiter.acquire(&provider_id).await;
+
+            match provider.search(query).await {
+                Ok(results) if !results.is_empty() => {
+                    self.circuit_breaker.record_success(&provider_id);
+                    return Ok(results);
+                }
+                Ok(_) => {
+                    // Empty results, try next provider
+                    debug!("Provider '{}' returned no search results for '{}'", provider_id, query);
+                }
+                Err(MarketDataError::NotSupported { .. }) => {
+                    // This provider doesn't support search, skip
+                    continue;
+                }
+                Err(e) => {
+                    let retry_class = e.retry_class();
+                    if matches!(retry_class, RetryClass::FailoverWithPenalty | RetryClass::CircuitOpen) {
+                        self.circuit_breaker.record_failure(&provider_id);
+                    }
+                    last_error = Some(e);
+                }
+            }
+        }
+
+        Err(last_error.unwrap_or(MarketDataError::AllProvidersFailed))
+    }
+
+    /// Get asset profile for a symbol.
+    ///
+    /// Tries providers that support profiles until one succeeds.
+    pub async fn get_profile(&self, symbol: &str) -> Result<AssetProfile, MarketDataError> {
+        let providers: Vec<_> = self
+            .providers
+            .iter()
+            .filter(|p| p.capabilities().supports_profile)
+            .collect();
+
+        if providers.is_empty() {
+            return Err(MarketDataError::NotSupported {
+                operation: "profile".to_string(),
+                provider: "all".to_string(),
+            });
+        }
+
+        let mut last_error: Option<MarketDataError> = None;
+
+        for provider in providers {
+            let provider_id: ProviderId = Cow::Borrowed(provider.id());
+
+            if !self.circuit_breaker.is_allowed(&provider_id) {
+                continue;
+            }
+
+            self.rate_limiter.acquire(&provider_id).await;
+
+            match provider.get_profile(symbol).await {
+                Ok(profile) => {
+                    self.circuit_breaker.record_success(&provider_id);
+                    return Ok(profile);
+                }
+                Err(MarketDataError::NotSupported { .. }) => {
+                    continue;
+                }
+                Err(MarketDataError::SymbolNotFound(_)) => {
+                    // Terminal for this provider, try next
+                    continue;
+                }
+                Err(e) => {
+                    let retry_class = e.retry_class();
+                    if matches!(retry_class, RetryClass::FailoverWithPenalty | RetryClass::CircuitOpen) {
+                        self.circuit_breaker.record_failure(&provider_id);
+                    }
+                    last_error = Some(e);
+                }
+            }
+        }
+
+        Err(last_error.unwrap_or_else(|| MarketDataError::SymbolNotFound(symbol.to_string())))
+    }
+
+    /// Fetch quotes for an instrument with diagnostics.
+    ///
+    /// Returns both the result and detailed diagnostics about which providers
+    /// were tried, skipped, or failed. Useful for debugging provider selection.
+    pub async fn fetch_quotes_with_diagnostics(
+        &self,
+        context: &QuoteContext,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+    ) -> (Result<Vec<Quote>, MarketDataError>, FetchDiagnostics) {
+        let mut diagnostics = FetchDiagnostics::new();
+        let providers = self.filter_providers(context, true, &mut diagnostics);
+
+        if providers.is_empty() {
+            warn!(
+                "No providers available for instrument: {:?}. Diagnostics: {}",
+                context.instrument,
+                diagnostics.summary()
+            );
+            return (Err(MarketDataError::NoProvidersAvailable), diagnostics);
+        }
+
+        let mut last_error: Option<MarketDataError> = None;
+
+        for provider in providers {
+            let provider_id: ProviderId = Cow::Borrowed(provider.id());
+
+            // Resolve symbol for this provider
+            let resolved = match self.resolver.resolve(&provider_id, context) {
+                Ok(r) => r,
+                Err(e) => {
+                    diagnostics.record_skip(
+                        provider_id.clone(),
+                        SkipReason::ResolutionFailed {
+                            message: format!("{:?}", e),
+                        },
+                    );
+                    continue;
+                }
+            };
+
+            info!(
+                "Fetching quotes from provider '{}' with {:?} (source: {:?})",
+                provider_id, resolved.instrument, resolved.source
+            );
+
+            self.rate_limiter.acquire(&provider_id).await;
+
+            match provider
+                .get_historical_quotes(context, resolved.instrument, start, end)
+                .await
+            {
+                Ok(mut quotes) => {
+                    self.circuit_breaker.record_success(&provider_id);
+
+                    let original_count = quotes.len();
+                    let mut valid_quotes = Vec::with_capacity(original_count);
+                    for quote in quotes.drain(..) {
+                        match self.validator.validate(&quote) {
+                            Ok(()) => valid_quotes.push(quote),
+                            Err(e) => {
+                                warn!(
+                                    "Quote validation failed for {:?}: {:?}",
+                                    quote.timestamp, e
+                                );
+                            }
+                        }
+                    }
+
+                    if valid_quotes.is_empty() && original_count > 0 {
+                        diagnostics.record_error(
+                            provider_id.clone(),
+                            "All quotes failed validation".to_string(),
+                        );
+                        last_error = Some(MarketDataError::ValidationFailed {
+                            message: "All quotes failed validation".to_string(),
+                        });
+                        continue;
+                    }
+
+                    diagnostics.record_success(provider_id);
+                    info!(
+                        "Successfully fetched {} valid quotes. Diagnostics: {}",
+                        valid_quotes.len(),
+                        diagnostics.summary()
+                    );
+                    return (Ok(valid_quotes), diagnostics);
+                }
+                Err(e) => {
+                    let retry_class = e.retry_class();
+                    diagnostics.record_error(provider_id.clone(), format!("{:?}", e));
+
+                    match retry_class {
+                        RetryClass::Never => {
+                            return (Err(e), diagnostics);
+                        }
+                        RetryClass::FailoverWithPenalty | RetryClass::CircuitOpen => {
+                            self.circuit_breaker.record_failure(&provider_id);
+                        }
+                        RetryClass::NextProvider => {}
+                    }
+
+                    last_error = Some(e);
+                }
+            }
+        }
+
+        warn!(
+            "All providers failed. Diagnostics: {}",
+            diagnostics.summary()
+        );
+        (
+            Err(last_error.unwrap_or(MarketDataError::AllProvidersFailed)),
+            diagnostics,
+        )
+    }
+
+    /// Fetch latest quote for an instrument with diagnostics.
+    pub async fn fetch_latest_quote_with_diagnostics(
+        &self,
+        context: &QuoteContext,
+    ) -> (Result<Quote, MarketDataError>, FetchDiagnostics) {
+        let mut diagnostics = FetchDiagnostics::new();
+        let providers = self.filter_providers(context, false, &mut diagnostics);
+
+        if providers.is_empty() {
+            return (Err(MarketDataError::NoProvidersAvailable), diagnostics);
+        }
+
+        let mut last_error: Option<MarketDataError> = None;
+
+        for provider in providers {
+            let provider_id: ProviderId = Cow::Borrowed(provider.id());
+
+            let resolved = match self.resolver.resolve(&provider_id, context) {
+                Ok(r) => r,
+                Err(e) => {
+                    diagnostics.record_skip(
+                        provider_id.clone(),
+                        SkipReason::ResolutionFailed {
+                            message: format!("{:?}", e),
+                        },
+                    );
+                    continue;
+                }
+            };
+
+            self.rate_limiter.acquire(&provider_id).await;
+
+            match provider
+                .get_latest_quote(context, resolved.instrument)
+                .await
+            {
+                Ok(quote) => {
+                    self.circuit_breaker.record_success(&provider_id);
+
+                    if let Err(e) = self.validator.validate(&quote) {
+                        diagnostics.record_error(provider_id.clone(), format!("{:?}", e));
+                        last_error = Some(e);
+                        continue;
+                    }
+
+                    diagnostics.record_success(provider_id);
+                    return (Ok(quote), diagnostics);
+                }
+                Err(e) => {
+                    let retry_class = e.retry_class();
+                    diagnostics.record_error(provider_id.clone(), format!("{:?}", e));
+
+                    if retry_class == RetryClass::Never {
+                        return (Err(e), diagnostics);
+                    }
+
+                    if matches!(retry_class, RetryClass::FailoverWithPenalty | RetryClass::CircuitOpen) {
+                        self.circuit_breaker.record_failure(&provider_id);
+                    }
+
+                    last_error = Some(e);
+                }
+            }
+        }
+
+        (
+            Err(last_error.unwrap_or(MarketDataError::AllProvidersFailed)),
+            diagnostics,
+        )
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::Currency;
+    use crate::models::{Coverage, Currency, InstrumentKind, ProviderInstrument};
+    use crate::provider::{ProviderCapabilities, RateLimit};
+    use crate::resolver::{ResolutionSource, ResolvedInstrument};
     use rust_decimal_macros::dec;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Duration;
@@ -347,9 +787,12 @@ mod tests {
 
         fn capabilities(&self) -> ProviderCapabilities {
             ProviderCapabilities {
-                asset_kinds: &[AssetKind::Security, AssetKind::FxRate],
+                instrument_kinds: &[InstrumentKind::Equity, InstrumentKind::Fx],
+                coverage: Coverage::global_best_effort(),
+                supports_latest: true,
                 supports_historical: true,
                 supports_search: false,
+                supports_profile: false,
             }
         }
 
@@ -448,17 +891,18 @@ mod tests {
         let resolver = Arc::new(MockResolver);
         let registry = ProviderRegistry::new(providers, resolver);
 
+        // Use a known MIC so coverage check passes
         let context = QuoteContext {
             instrument: InstrumentId::Equity {
                 ticker: Arc::from("TEST"),
-                mic: None,
+                mic: Some(Cow::Borrowed("XNAS")),
             },
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
         };
 
-        let ordered = registry.ordered_providers(&context);
+        let ordered = registry.ordered_providers(&context, true);
 
         assert_eq!(ordered[0].id(), "HIGH_PRIORITY");
         assert_eq!(ordered[1].id(), "MED_PRIORITY");
@@ -479,14 +923,14 @@ mod tests {
         let context = QuoteContext {
             instrument: InstrumentId::Equity {
                 ticker: Arc::from("TEST"),
-                mic: None,
+                mic: Some(Cow::Borrowed("XNAS")),
             },
             overrides: None,
             currency_hint: None,
             preferred_provider: Some(Cow::Borrowed("PROVIDER_C")),
         };
 
-        let ordered = registry.ordered_providers(&context);
+        let ordered = registry.ordered_providers(&context, true);
 
         // PROVIDER_C should be first despite having lowest priority
         assert_eq!(ordered[0].id(), "PROVIDER_C");
@@ -495,7 +939,7 @@ mod tests {
     }
 
     #[test]
-    fn test_filter_by_asset_kind() {
+    fn test_filter_by_instrument_kind() {
         struct CryptoOnlyProvider;
 
         #[async_trait::async_trait]
@@ -505,9 +949,12 @@ mod tests {
             }
             fn capabilities(&self) -> ProviderCapabilities {
                 ProviderCapabilities {
-                    asset_kinds: &[AssetKind::Crypto],
+                    instrument_kinds: &[InstrumentKind::Crypto],
+                    coverage: Coverage::global_best_effort(),
+                    supports_latest: true,
                     supports_historical: true,
                     supports_search: false,
+                    supports_profile: false,
                 }
             }
             fn rate_limit(&self) -> RateLimit {
@@ -547,14 +994,14 @@ mod tests {
         let equity_context = QuoteContext {
             instrument: InstrumentId::Equity {
                 ticker: Arc::from("TEST"),
-                mic: None,
+                mic: Some(Cow::Borrowed("XNAS")),
             },
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
         };
 
-        let equity_providers = registry.ordered_providers(&equity_context);
+        let equity_providers = registry.ordered_providers(&equity_context, true);
         assert_eq!(equity_providers.len(), 1);
         assert_eq!(equity_providers[0].id(), "EQUITY_PROVIDER");
 
@@ -569,8 +1016,161 @@ mod tests {
             preferred_provider: None,
         };
 
-        let crypto_providers = registry.ordered_providers(&crypto_context);
+        let crypto_providers = registry.ordered_providers(&crypto_context, true);
         assert_eq!(crypto_providers.len(), 1);
         assert_eq!(crypto_providers[0].id(), "CRYPTO_ONLY");
+    }
+
+    #[test]
+    fn test_filter_by_coverage() {
+        struct UsOnlyProvider;
+
+        #[async_trait::async_trait]
+        impl MarketDataProvider for UsOnlyProvider {
+            fn id(&self) -> &'static str {
+                "US_ONLY"
+            }
+            fn capabilities(&self) -> ProviderCapabilities {
+                ProviderCapabilities {
+                    instrument_kinds: &[InstrumentKind::Equity],
+                    coverage: Coverage::us_only_strict(),
+                    supports_latest: true,
+                    supports_historical: true,
+                    supports_search: false,
+                    supports_profile: false,
+                }
+            }
+            fn rate_limit(&self) -> RateLimit {
+                RateLimit::default()
+            }
+            async fn get_latest_quote(
+                &self,
+                _: &QuoteContext,
+                _: ProviderInstrument,
+            ) -> Result<Quote, MarketDataError> {
+                unimplemented!()
+            }
+            async fn get_historical_quotes(
+                &self,
+                _: &QuoteContext,
+                _: ProviderInstrument,
+                _: DateTime<Utc>,
+                _: DateTime<Utc>,
+            ) -> Result<Vec<Quote>, MarketDataError> {
+                unimplemented!()
+            }
+        }
+
+        let providers: Vec<Arc<dyn MarketDataProvider>> = vec![Arc::new(UsOnlyProvider)];
+
+        let resolver = Arc::new(MockResolver);
+        let registry = ProviderRegistry::new(providers, resolver);
+
+        // US equity should be supported
+        let us_context = QuoteContext {
+            instrument: InstrumentId::Equity {
+                ticker: Arc::from("AAPL"),
+                mic: Some(Cow::Borrowed("XNAS")),
+            },
+            overrides: None,
+            currency_hint: None,
+            preferred_provider: None,
+        };
+        assert_eq!(registry.ordered_providers(&us_context, true).len(), 1);
+
+        // Canadian equity should be filtered out
+        let ca_context = QuoteContext {
+            instrument: InstrumentId::Equity {
+                ticker: Arc::from("SHOP"),
+                mic: Some(Cow::Borrowed("XTSE")),
+            },
+            overrides: None,
+            currency_hint: None,
+            preferred_provider: None,
+        };
+        assert_eq!(registry.ordered_providers(&ca_context, true).len(), 0);
+
+        // Unknown MIC should be filtered out (strict mode)
+        let unknown_context = QuoteContext {
+            instrument: InstrumentId::Equity {
+                ticker: Arc::from("AAPL"),
+                mic: None,
+            },
+            overrides: None,
+            currency_hint: None,
+            preferred_provider: None,
+        };
+        assert_eq!(registry.ordered_providers(&unknown_context, true).len(), 0);
+    }
+
+    #[test]
+    fn test_custom_priorities_override_defaults() {
+        // Providers with hardcoded priorities: 5, 10, 20
+        let providers: Vec<Arc<dyn MarketDataProvider>> = vec![
+            Arc::new(MockProvider::new("PROVIDER_A", 5, false)),  // Default priority 5
+            Arc::new(MockProvider::new("PROVIDER_B", 10, false)), // Default priority 10
+            Arc::new(MockProvider::new("PROVIDER_C", 20, false)), // Default priority 20
+        ];
+
+        // Custom priorities: C=1 (highest), A=50 (lowest), B not set (uses default 10)
+        let mut custom_priorities = HashMap::new();
+        custom_priorities.insert("PROVIDER_C".to_string(), 1);  // Override to highest priority
+        custom_priorities.insert("PROVIDER_A".to_string(), 50); // Override to lowest priority
+
+        let resolver = Arc::new(MockResolver);
+        let registry = ProviderRegistry::with_priorities(providers, resolver, custom_priorities);
+
+        let context = QuoteContext {
+            instrument: InstrumentId::Equity {
+                ticker: Arc::from("TEST"),
+                mic: Some(Cow::Borrowed("XNAS")),
+            },
+            overrides: None,
+            currency_hint: None,
+            preferred_provider: None,
+        };
+
+        let ordered = registry.ordered_providers(&context, true);
+
+        // Order should be: C (priority 1), B (priority 10 default), A (priority 50)
+        assert_eq!(ordered[0].id(), "PROVIDER_C");
+        assert_eq!(ordered[1].id(), "PROVIDER_B");
+        assert_eq!(ordered[2].id(), "PROVIDER_A");
+    }
+
+    #[test]
+    fn test_preferred_provider_overrides_custom_priorities() {
+        let providers: Vec<Arc<dyn MarketDataProvider>> = vec![
+            Arc::new(MockProvider::new("PROVIDER_A", 5, false)),
+            Arc::new(MockProvider::new("PROVIDER_B", 10, false)),
+            Arc::new(MockProvider::new("PROVIDER_C", 20, false)),
+        ];
+
+        // Custom priorities: A=1 (highest)
+        let mut custom_priorities = HashMap::new();
+        custom_priorities.insert("PROVIDER_A".to_string(), 1);
+        custom_priorities.insert("PROVIDER_B".to_string(), 2);
+        custom_priorities.insert("PROVIDER_C".to_string(), 3);
+
+        let resolver = Arc::new(MockResolver);
+        let registry = ProviderRegistry::with_priorities(providers, resolver, custom_priorities);
+
+        // Request with preferred_provider = PROVIDER_C (lowest custom priority)
+        let context = QuoteContext {
+            instrument: InstrumentId::Equity {
+                ticker: Arc::from("TEST"),
+                mic: Some(Cow::Borrowed("XNAS")),
+            },
+            overrides: None,
+            currency_hint: None,
+            preferred_provider: Some(Cow::Borrowed("PROVIDER_C")),
+        };
+
+        let ordered = registry.ordered_providers(&context, true);
+
+        // Preferred provider should still come first
+        assert_eq!(ordered[0].id(), "PROVIDER_C");
+        assert_eq!(ordered[1].id(), "PROVIDER_A");
+        assert_eq!(ordered[2].id(), "PROVIDER_B");
     }
 }

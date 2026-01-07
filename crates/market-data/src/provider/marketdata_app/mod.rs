@@ -21,7 +21,7 @@ use serde::Deserialize;
 use std::time::Duration;
 
 use crate::errors::MarketDataError;
-use crate::models::{AssetKind, ProviderInstrument, Quote, QuoteContext};
+use crate::models::{Coverage, InstrumentKind, ProviderInstrument, Quote, QuoteContext};
 use crate::provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
 
 const BASE_URL: &str = "https://api.marketdata.app/v1";
@@ -162,9 +162,12 @@ impl MarketDataProvider for MarketDataAppProvider {
 
     fn capabilities(&self) -> ProviderCapabilities {
         ProviderCapabilities {
-            asset_kinds: &[AssetKind::Security],
+            instrument_kinds: &[InstrumentKind::Equity],
+            coverage: Coverage::us_only_strict(),
+            supports_latest: true,
             supports_historical: true,
             supports_search: false,
+            supports_profile: false,
         }
     }
 
@@ -208,18 +211,23 @@ impl MarketDataProvider for MarketDataAppProvider {
                 message: "No price data in response".to_string(),
             })?;
 
-        // Extract the timestamp
+        // Extract and validate the timestamp
         let timestamp_unix = price_resp
             .updated
             .as_ref()
             .and_then(|arr| arr.first())
             .copied()
-            .unwrap_or(0);
+            .ok_or_else(|| MarketDataError::ProviderError {
+                provider: PROVIDER_ID.to_string(),
+                message: "No timestamp in response".to_string(),
+            })?;
 
         let timestamp = Utc
             .timestamp_opt(timestamp_unix, 0)
             .single()
-            .unwrap_or_else(Utc::now);
+            .ok_or_else(|| MarketDataError::ValidationFailed {
+                message: format!("Invalid timestamp: {}", timestamp_unix),
+            })?;
 
         let close = Decimal::from_f64_retain(*mid_price).ok_or_else(|| {
             MarketDataError::ValidationFailed {
@@ -302,11 +310,28 @@ impl MarketDataProvider for MarketDataAppProvider {
                 }
             };
 
-            let timestamp_unix = timestamps.get(i).copied().unwrap_or(0);
-            let timestamp = Utc
-                .timestamp_opt(timestamp_unix, 0)
-                .single()
-                .unwrap_or_else(Utc::now);
+            // Skip quotes with missing timestamps to avoid data corruption
+            let timestamp_unix = match timestamps.get(i) {
+                Some(&ts) if ts > 0 => ts,
+                _ => {
+                    warn!(
+                        "Skipping quote at index {}: missing or invalid timestamp",
+                        i
+                    );
+                    continue;
+                }
+            };
+            let timestamp = match Utc.timestamp_opt(timestamp_unix, 0).single() {
+                Some(ts) => ts,
+                None => {
+                    warn!(
+                        "Skipping quote at index {}: failed to parse timestamp {}",
+                        i,
+                        timestamp_unix
+                    );
+                    continue;
+                }
+            };
 
             // Optional fields - use None if conversion fails
             let open = opens.get(i).and_then(|v| Decimal::from_f64_retain(*v));
@@ -356,9 +381,11 @@ mod tests {
         let provider = MarketDataAppProvider::new("test-key".to_string());
         let caps = provider.capabilities();
 
-        assert_eq!(caps.asset_kinds, &[AssetKind::Security]);
+        assert_eq!(caps.instrument_kinds, &[InstrumentKind::Equity]);
+        assert!(caps.supports_latest);
         assert!(caps.supports_historical);
         assert!(!caps.supports_search);
+        assert!(!caps.supports_profile);
     }
 
     #[test]

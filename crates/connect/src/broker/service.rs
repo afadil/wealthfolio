@@ -21,7 +21,7 @@ use wealthfolio_core::accounts::{Account, AccountServiceTrait, NewAccount};
 use wealthfolio_core::activities::{self, NewActivity};
 use wealthfolio_core::assets::{AssetKind, NewAsset};
 use wealthfolio_core::errors::Result;
-use wealthfolio_core::market_data::DataSource;
+use wealthfolio_core::quotes::DataSource;
 use wealthfolio_core::sync::ImportRun;
 use wealthfolio_storage_sqlite::activities::ActivityDB;
 use wealthfolio_storage_sqlite::assets::AssetDB;
