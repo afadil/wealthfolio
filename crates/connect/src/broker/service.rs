@@ -10,7 +10,7 @@ use super::models::{
     AccountUniversalActivity, BrokerAccount, BrokerConnection, SyncAccountsResponse,
     SyncConnectionsResponse,
 };
-use super::traits::SyncServiceTrait;
+use super::traits::BrokerSyncServiceTrait;
 use crate::platform::{Platform, PlatformRepository};
 use crate::state::BrokerSyncState;
 use crate::state::BrokerSyncStateRepository;
@@ -33,7 +33,7 @@ use wealthfolio_storage_sqlite::sync::ImportRunRepository;
 const DEFAULT_BROKERAGE_PROVIDER: &str = "snaptrade";
 
 /// Service for syncing broker data to the local database
-pub struct SyncService {
+pub struct BrokerSyncService {
     account_service: Arc<dyn AccountServiceTrait>,
     platform_repository: Arc<PlatformRepository>,
     brokers_sync_state_repository: Arc<BrokerSyncStateRepository>,
@@ -41,7 +41,7 @@ pub struct SyncService {
     writer: WriteHandle,
 }
 
-impl SyncService {
+impl BrokerSyncService {
     pub fn new(
         account_service: Arc<dyn AccountServiceTrait>,
         platform_repository: Arc<PlatformRepository>,
@@ -62,7 +62,7 @@ impl SyncService {
 }
 
 #[async_trait]
-impl SyncServiceTrait for SyncService {
+impl BrokerSyncServiceTrait for BrokerSyncService {
     /// Sync connections from the broker API to local platforms table
     async fn sync_connections(
         &self,
@@ -623,7 +623,7 @@ impl SyncServiceTrait for SyncService {
     }
 }
 
-impl SyncService {
+impl BrokerSyncService {
     /// Find the platform ID for a broker account based on its institution name
     fn find_platform_for_account(&self, broker_account: &BrokerAccount) -> Result<Option<String>> {
         // First, try to find platform by matching institution name

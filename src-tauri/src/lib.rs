@@ -7,6 +7,7 @@ mod events;
 mod listeners;
 mod scheduler;
 mod secret_store;
+mod services;
 
 #[cfg(desktop)]
 mod menu;
@@ -284,6 +285,21 @@ pub fn run() {
             commands::market_data::get_latest_quotes,
             commands::market_data::get_market_data_providers,
             commands::market_data::import_quotes_csv,
+            // Taxonomy commands
+            commands::taxonomy::get_taxonomies,
+            commands::taxonomy::get_taxonomy,
+            commands::taxonomy::create_taxonomy,
+            commands::taxonomy::update_taxonomy,
+            commands::taxonomy::delete_taxonomy,
+            commands::taxonomy::create_category,
+            commands::taxonomy::update_category,
+            commands::taxonomy::delete_category,
+            commands::taxonomy::move_category,
+            commands::taxonomy::import_taxonomy_json,
+            commands::taxonomy::export_taxonomy_json,
+            commands::taxonomy::get_asset_taxonomy_assignments,
+            commands::taxonomy::assign_asset_to_category,
+            commands::taxonomy::remove_asset_taxonomy_assignment,
             // Platform commands
             commands::platform::get_platform,
             commands::platform::is_mobile,

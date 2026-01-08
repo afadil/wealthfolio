@@ -7,7 +7,7 @@ use std::sync::Arc;
 use log::{debug, info, warn};
 use tauri::AppHandle;
 
-use crate::commands::brokers_sync::{has_active_subscription, perform_broker_sync};
+use crate::commands::brokers_sync::perform_broker_sync;
 use crate::context::ServiceContext;
 use crate::events::{
     emit_assets_enrich_requested, emit_broker_sync_complete, emit_broker_sync_start,
@@ -23,8 +23,8 @@ use crate::events::{
 pub async fn run_startup_sync(handle: &AppHandle, context: &Arc<ServiceContext>) {
     info!("Running startup broker sync...");
 
-    // Check subscription status first
-    match has_active_subscription().await {
+    // Check subscription status first using ConnectService
+    match context.connect_service().has_active_subscription().await {
         Ok(true) => {
             // User has active subscription, proceed
         }

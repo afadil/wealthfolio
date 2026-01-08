@@ -405,7 +405,7 @@ impl AlphaVantageProvider {
         let params = [
             ("function", "TIME_SERIES_DAILY"),
             ("symbol", symbol),
-            ("outputsize", "full"),
+            ("outputsize", "compact"), // TIME_SERIES_DAILY: 'full' is premium-only
         ];
 
         let text = self.fetch(&params).await?;
@@ -466,7 +466,7 @@ impl AlphaVantageProvider {
             ("function", "FX_DAILY"),
             ("from_symbol", from),
             ("to_symbol", to),
-            ("outputsize", "full"),
+            ("outputsize", "full"), // FX_DAILY supports full on free tier
         ];
 
         let text = self.fetch(&params).await?;
@@ -652,7 +652,8 @@ impl MarketDataProvider for AlphaVantageProvider {
     fn capabilities(&self) -> ProviderCapabilities {
         ProviderCapabilities {
             instrument_kinds: &[InstrumentKind::Equity, InstrumentKind::Crypto, InstrumentKind::Fx],
-            coverage: Coverage::global_strict(),
+            // Use best_effort to accept instruments without MIC codes
+            coverage: Coverage::global_best_effort(),
             supports_latest: true,
             supports_historical: true,
             supports_search: false,

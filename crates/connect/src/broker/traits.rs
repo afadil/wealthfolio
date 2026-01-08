@@ -40,7 +40,7 @@ pub trait PlatformRepositoryTrait: Send + Sync {
 
 /// Trait for the sync service operations
 #[async_trait]
-pub trait SyncServiceTrait: Send + Sync {
+pub trait BrokerSyncServiceTrait: Send + Sync {
     /// Sync connections from the broker API to local platforms table
     async fn sync_connections(
         &self,

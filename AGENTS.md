@@ -20,7 +20,7 @@ References:
 - `README.md`:1 — Project intro, features, dev, and Docker.
 - `src/App.tsx`:1 — App providers and QueryClient wiring.
 - `src/routes.tsx`:1 — Route map and dynamic addon routes.
-- `src/styles.css`:1 — Tailwind v4 CSS-first setup and theme tokens.
+- `src/globals.css`:1 — Tailwind v4 CSS-first setup and theme tokens.
 - `src/adapters/index.ts`:1 — Runtime env (desktop/web) and invoke bridges.
 - `src/commands/portfolio.ts`:1 — Example web/Tauri command wrappers.
 - `src-server/src/main.rs`:1 — Axum server entrypoint.
@@ -47,7 +47,8 @@ References:
 
 ### Quality Checks
 
-- Type check: `pnpm type-check` (all packages) | `pnpm type-check:root` (root only)
+- Type check: `pnpm type-check` (all packages) | `pnpm type-check:root` (root
+  only)
 - Lint: `pnpm lint` | `pnpm lint:fix`
 - Format: `pnpm format` | `pnpm format:check`
 - All checks: `pnpm check`

@@ -1,9 +1,11 @@
 use std::sync::{Arc, RwLock};
-use wealthfolio_connect::SyncServiceTrait;
+use wealthfolio_connect::BrokerSyncServiceTrait;
 use wealthfolio_core::{
-    self, accounts, activities, assets, fx, goals, limits, portfolio, quotes, settings,
+    self, accounts, activities, assets, fx, goals, limits, portfolio, quotes, settings, taxonomies,
 };
 use wealthfolio_storage_sqlite::assets::AlternativeAssetRepository;
+
+use crate::services::ConnectService;
 
 pub struct ServiceContext {
     pub base_currency: Arc<RwLock<String>>,
@@ -24,8 +26,10 @@ pub struct ServiceContext {
     pub holdings_service: Arc<dyn portfolio::holdings::HoldingsServiceTrait>,
     pub valuation_service: Arc<dyn portfolio::valuation::ValuationServiceTrait>,
     pub net_worth_service: Arc<dyn portfolio::net_worth::NetWorthServiceTrait>,
-    pub sync_service: Arc<dyn SyncServiceTrait>,
+    pub sync_service: Arc<dyn BrokerSyncServiceTrait>,
     pub alternative_asset_repository: Arc<AlternativeAssetRepository>,
+    pub taxonomy_service: Arc<dyn taxonomies::TaxonomyServiceTrait>,
+    pub connect_service: Arc<ConnectService>,
 }
 
 impl ServiceContext {
@@ -89,7 +93,7 @@ impl ServiceContext {
         Arc::clone(&self.valuation_service)
     }
 
-    pub fn sync_service(&self) -> Arc<dyn SyncServiceTrait> {
+    pub fn sync_service(&self) -> Arc<dyn BrokerSyncServiceTrait> {
         Arc::clone(&self.sync_service)
     }
 
@@ -99,5 +103,13 @@ impl ServiceContext {
 
     pub fn alternative_asset_repository(&self) -> Arc<AlternativeAssetRepository> {
         Arc::clone(&self.alternative_asset_repository)
+    }
+
+    pub fn taxonomy_service(&self) -> Arc<dyn taxonomies::TaxonomyServiceTrait> {
+        Arc::clone(&self.taxonomy_service)
+    }
+
+    pub fn connect_service(&self) -> Arc<ConnectService> {
+        Arc::clone(&self.connect_service)
     }
 }

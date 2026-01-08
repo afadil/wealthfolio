@@ -377,9 +377,15 @@ where
                             // Update sync state
                             if let Some(last_quote) = quotes.last() {
                                 let earliest = quotes.first().map(|q| q.timestamp.date_naive());
+                                let data_source = last_quote.data_source.as_str();
                                 if let Err(e) = self
                                     .sync_state_store
-                                    .update_after_sync(&asset.id, last_quote.timestamp.date_naive(), earliest)
+                                    .update_after_sync(
+                                        &asset.id,
+                                        last_quote.timestamp.date_naive(),
+                                        earliest,
+                                        Some(data_source),
+                                    )
                                     .await
                                 {
                                     warn!("Failed to update sync state for {}: {:?}", asset.id, e);

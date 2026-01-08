@@ -45,12 +45,8 @@ export function useUpdateMarketDataProviderSettings() {
       // Return a context object with the snapshotted value
       return { previousProviders };
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.MARKET_DATA_PROVIDER_SETTINGS] });
-      toast({
-        title: `${data.name} settings updated successfully.`,
-        variant: "success",
-      });
     },
     onError: (error, variables, context) => {
       // If the mutation fails, use the context returned from onMutate to roll back
@@ -80,10 +76,6 @@ export function useSetApiKey() {
       setSecret(variables.providerId, variables.apiKey),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.MARKET_DATA_PROVIDER_SETTINGS] });
-      toast({
-        title: "API Key saved successfully.",
-        variant: "success",
-      });
     },
     onError: (error) => {
       toast({
@@ -101,10 +93,6 @@ export function useDeleteApiKey() {
     mutationFn: async (variables: { providerId: string }) => deleteSecret(variables.providerId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.MARKET_DATA_PROVIDER_SETTINGS] });
-      toast({
-        title: "API Key deleted successfully.",
-        variant: "success",
-      });
     },
     onError: (error) => {
       toast({

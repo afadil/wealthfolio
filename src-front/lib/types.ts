@@ -1036,3 +1036,130 @@ export interface NetWorthConfig {
   includeOtherAssets: boolean;
   includeLiabilities: boolean;
 }
+
+// ============================================================================
+// Taxonomy Types
+// ============================================================================
+
+/**
+ * Taxonomy - a classification system (e.g., "Asset Classes", "Regions", "Industries")
+ */
+export interface Taxonomy {
+  id: string;
+  name: string;
+  color: string;
+  description?: string | null;
+  isSystem: boolean;
+  isSingleSelect: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Category within a taxonomy (hierarchical)
+ */
+export interface TaxonomyCategory {
+  id: string;
+  taxonomyId: string;
+  parentId?: string | null;
+  name: string;
+  key: string;
+  color: string;
+  description?: string | null;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Taxonomy with its categories
+ */
+export interface TaxonomyWithCategories {
+  taxonomy: Taxonomy;
+  categories: TaxonomyCategory[];
+}
+
+/**
+ * Assignment of an asset to a taxonomy category
+ */
+export interface AssetTaxonomyAssignment {
+  id: string;
+  assetId: string;
+  taxonomyId: string;
+  categoryId: string;
+  weight: number; // basis points: 10000 = 100%
+  source: string; // "manual", "provider", "inferred"
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Create a new taxonomy
+ */
+export interface NewTaxonomy {
+  id?: string | null;
+  name: string;
+  color: string;
+  description?: string | null;
+  isSystem: boolean;
+  isSingleSelect: boolean;
+  sortOrder: number;
+}
+
+/**
+ * Create a new category
+ */
+export interface NewTaxonomyCategory {
+  id?: string | null;
+  taxonomyId: string;
+  parentId?: string | null;
+  name: string;
+  key: string;
+  color: string;
+  description?: string | null;
+  sortOrder: number;
+}
+
+/**
+ * Create a new asset taxonomy assignment
+ */
+export interface NewAssetTaxonomyAssignment {
+  id?: string | null;
+  assetId: string;
+  taxonomyId: string;
+  categoryId: string;
+  weight: number; // basis points: 10000 = 100%
+  source: string;
+}
+
+/**
+ * JSON format for taxonomy import/export (Portfolio Performance compatible)
+ */
+export interface TaxonomyJson {
+  name: string;
+  color: string;
+  categories: TaxonomyCategoryJson[];
+  instruments?: TaxonomyInstrumentMappingJson[];
+}
+
+/**
+ * Category in JSON format (recursive children structure)
+ */
+export interface TaxonomyCategoryJson {
+  name: string;
+  key: string;
+  color: string;
+  description?: string | null;
+  children: TaxonomyCategoryJson[];
+}
+
+/**
+ * Instrument mapping in taxonomy JSON
+ */
+export interface TaxonomyInstrumentMappingJson {
+  isin?: string | null;
+  symbol?: string | null;
+  categoryKey: string;
+  weight: number;
+}

@@ -89,4 +89,11 @@ export const QueryKeys = {
   secrets: {
     apiKey: (providerId: string) => ["secrets", "apiKey", providerId],
   },
+
+  // Taxonomies
+  TAXONOMIES: "taxonomies",
+  TAXONOMY: "taxonomy",
+  taxonomy: (id: string) => [QueryKeys.TAXONOMY, id],
+  ASSET_TAXONOMY_ASSIGNMENTS: "assetTaxonomyAssignments",
+  assetTaxonomyAssignments: (assetId: string) => [QueryKeys.ASSET_TAXONOMY_ASSIGNMENTS, assetId],
 } as const;
