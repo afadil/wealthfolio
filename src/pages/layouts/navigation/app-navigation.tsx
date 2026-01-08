@@ -51,7 +51,7 @@ const staticNavigation: NavigationProps = {
 };
 
 export function useNavigation() {
-  const [dynamicItems, setDynamicItems] = useState<NavigationProps["primary"]>([]);
+  const [dynamicItems, setDynamicItems] = useState<NavigationProps["addons"]>([]);
 
   // Subscribe to navigation updates from addons
   useEffect(() => {
