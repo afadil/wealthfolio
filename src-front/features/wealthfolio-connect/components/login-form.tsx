@@ -1,7 +1,5 @@
-import { isDesktop } from "@/adapters";
-import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
+import { isDesktop, openUrlInBrowser } from "@/adapters";
 import { getPreferredProvider, savePreferredProvider } from "@/lib/cookie-utils";
-import { isAppleDevice } from "@/lib/device-utils";
 import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
@@ -29,7 +27,148 @@ import { ProviderButton } from "./provider-button";
 // Web (self-hosted) uses email OTP only since we can't register all possible redirect URLs
 const isNativeApp = isDesktop;
 
-type Provider = "google" | "apple" | "email";
+type Provider = "google" | "email";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Features Section
+// ─────────────────────────────────────────────────────────────────────────────
+
+const features = [
+  {
+    icon: Icons.CloudSync2,
+    title: "Broker Sync",
+    description: "Auto-sync transactions daily",
+    color: "orange",
+  },
+  {
+    icon: Icons.Devices,
+    title: "Device Sync",
+    description: "End-to-end encrypted sync",
+    color: "green",
+  },
+  {
+    icon: Icons.Users,
+    title: "Household",
+    description: "Shared family portfolio view",
+    color: "blue",
+  },
+];
+
+const featureColors = {
+  orange: {
+    bg: "bg-orange-100 dark:bg-orange-900/30",
+    icon: "text-orange-600 dark:text-orange-400",
+  },
+  green: {
+    bg: "bg-green-100 dark:bg-green-900/30",
+    icon: "text-green-600 dark:text-green-400",
+  },
+  blue: {
+    bg: "bg-blue-100 dark:bg-blue-900/30",
+    icon: "text-blue-600 dark:text-blue-400",
+  },
+};
+
+function FeaturesSection() {
+  return (
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
+      {features.map((feature) => {
+        const colors = featureColors[feature.color as keyof typeof featureColors];
+        return (
+          <div
+            key={feature.title}
+            className="flex items-center gap-3 rounded-lg border bg-muted/30 p-3 sm:flex-col sm:gap-2 sm:text-center"
+          >
+            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${colors.bg}`}>
+              <feature.icon className={`h-4 w-4 ${colors.icon}`} />
+            </div>
+            <div>
+              <p className="text-xs font-medium">{feature.title}</p>
+              <p className="text-[10px] text-muted-foreground">{feature.description}</p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Plans Preview Section
+// ─────────────────────────────────────────────────────────────────────────────
+
+const plans = [
+  { name: "Essentials", price: "$7.99", accounts: "5 connections", users: "1 user" },
+  { name: "Duo", price: "$12.99", accounts: "12 connections", users: "2 users", popular: true },
+  { name: "Plus", price: "$24.99", accounts: "Unlimited", users: "2 users" },
+];
+
+function PlansPreviewSection() {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="mb-4 text-center">
+          <h3 className="text-sm font-semibold">Simple, transparent pricing</h3>
+          <p className="text-xs text-muted-foreground">
+            Choose a plan that fits your needs. Cancel anytime.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {plans.map((plan) => (
+            <div
+              key={plan.name}
+              className={`relative rounded-lg border p-3 ${
+                plan.popular ? "border-primary bg-primary/5" : "bg-muted/30"
+              }`}
+            >
+              {plan.popular && (
+                <span className="absolute -top-2 left-3 rounded-full bg-primary px-2 py-0.5 text-[9px] font-medium text-primary-foreground sm:left-1/2 sm:-translate-x-1/2">
+                  Popular
+                </span>
+              )}
+              {/* Mobile: horizontal layout */}
+              <div className="flex items-center justify-between sm:hidden">
+                <div>
+                  <p className="text-sm font-semibold">{plan.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {plan.accounts} · {plan.users}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-lg font-bold">{plan.price}</span>
+                  <span className="text-xs text-muted-foreground">/mo</span>
+                </div>
+              </div>
+              {/* Desktop: vertical layout */}
+              <div className="hidden text-center sm:block">
+                <p className="text-xs font-semibold">{plan.name}</p>
+                <p className="mt-1 text-lg font-bold">{plan.price}</p>
+                <p className="text-[10px] text-muted-foreground">/month</p>
+                <div className="mt-2 space-y-0.5">
+                  <p className="text-[10px] text-muted-foreground">{plan.accounts}</p>
+                  <p className="text-[10px] text-muted-foreground">{plan.users}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 flex items-center justify-center">
+          <Button
+            variant="link"
+            size="sm"
+            className="h-auto p-0 text-xs text-muted-foreground"
+            onClick={() => openUrlInBrowser("https://wealthfolio.app/connect/")}
+          >
+            Compare all features
+            <Icons.ArrowRight className="ml-1 h-3 w-3" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export function LoginForm() {
   const { signInWithOAuth, signInWithMagicLink, verifyOtp, error, clearError, isLoading } =
@@ -66,11 +205,6 @@ export function LoginForm() {
       return [preferredProvider];
     }
 
-    // If on Apple device, show both Google and Apple
-    if (isAppleDevice()) {
-      return ["google", "apple"];
-    }
-
     // Default: show Google only
     return ["google"];
   };
@@ -83,14 +217,14 @@ export function LoginForm() {
     }
 
     const topProviders = getTopProviders();
-    const allProviders: Provider[] = ["google", "apple", "email"];
+    const allProviders: Provider[] = ["google", "email"];
     return allProviders.filter((p) => !topProviders.includes(p));
   };
 
   const topProviders = getTopProviders();
   const moreOptionsProviders = getMoreOptionsProviders();
 
-  const handleOAuthSignIn = async (provider: "google" | "apple") => {
+  const handleOAuthSignIn = async (provider: "google") => {
     setLocalError(null);
     setSuccessMessage(null);
     clearError();
@@ -204,21 +338,24 @@ export function LoginForm() {
 
   return (
     <div className="space-y-6">
+      {/* Hero Section */}
+      <div className="text-center">
+        <h2 className="text-xl font-semibold">Wealthfolio Connect</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Sync your brokers automatically. Your data stays on your device.
+        </p>
+      </div>
+
+      {/* Features Grid */}
+      <FeaturesSection />
+
+      {/* Sign In Card */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="bg-primary/10 flex h-12 w-12 items-center justify-center rounded-xl">
-              <Icons.Globe className="text-primary h-6 w-6" />
-            </div>
-            <div>
-              <CardTitle className="text-lg font-semibold">
-                Sign in to Wealthfolio Connect
-              </CardTitle>
-              <CardDescription>
-                Connect your broker accounts and access your portfolio from anywhere.
-              </CardDescription>
-            </div>
-          </div>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-center text-base font-medium">Get started</CardTitle>
+          <CardDescription className="text-center">
+            Sign in to connect your broker accounts
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Error Alert */}
@@ -316,14 +453,6 @@ export function LoginForm() {
                     isLastUsed={preferredProvider === "google"}
                   />
                 )}
-                {topProviders.includes("apple") && (
-                  <ProviderButton
-                    provider="apple"
-                    onClick={() => handleOAuthSignIn("apple")}
-                    isLoading={loadingProvider === "apple"}
-                    isLastUsed={preferredProvider === "apple"}
-                  />
-                )}
                 {topProviders.includes("email") && (
                   <form onSubmit={handleMagicLinkSignIn} className="w-full max-w-sm space-y-3">
                     <div className="space-y-2">
@@ -371,7 +500,7 @@ export function LoginForm() {
                   <Button
                     type="button"
                     variant="ghost"
-                    className="w-full max-w-sm justify-between"
+                    className="gap-2"
                     disabled={isLoading}
                   >
                     <span className="text-muted-foreground text-sm">More sign-in options</span>
@@ -391,16 +520,9 @@ export function LoginForm() {
                     isLoading={loadingProvider === "google"}
                   />
                 )}
-                {moreOptionsProviders.includes("apple") && (
-                  <ProviderButton
-                    provider="apple"
-                    onClick={() => handleOAuthSignIn("apple")}
-                    isLoading={loadingProvider === "apple"}
-                  />
-                )}
                 {moreOptionsProviders.includes("email") && (
-                  <form onSubmit={handleMagicLinkSignIn} className="w-full max-w-sm space-y-3">
-                    <div className="space-y-2">
+                  <form onSubmit={handleMagicLinkSignIn} className="flex w-full max-w-sm flex-col items-center space-y-3">
+                    <div className="w-full space-y-2">
                       <Label htmlFor="more-email">Email</Label>
                       <Input
                         id="more-email"
@@ -430,7 +552,7 @@ export function LoginForm() {
               <p className="text-muted-foreground text-center text-xs">
                 By continuing, you agree to our{" "}
                 <a
-                  href="https://wealthfolio.app/legal/terms-of-use"
+                  href="https://wealthfolio.app/connect/legal/terms-of-use"
                   target="_blank"
                   rel="noreferrer noopener"
                   className="hover:text-foreground underline underline-offset-4"
@@ -439,7 +561,7 @@ export function LoginForm() {
                 </a>{" "}
                 and{" "}
                 <a
-                  href="https://wealthfolio.app/legal/privacy-policy"
+                  href="https://wealthfolio.app/connect/legal/privacy-policy"
                   target="_blank"
                   rel="noreferrer noopener"
                   className="hover:text-foreground underline underline-offset-4"
@@ -453,30 +575,14 @@ export function LoginForm() {
         </CardContent>
       </Card>
 
-      {/* Manage Account Card */}
-      <Card className="border-dashed">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <Icons.Settings className="text-muted-foreground mt-0.5 h-5 w-5" />
-              <div>
-                <p className="text-sm font-medium">Manage My Wealthfolio Connect Account</p>
-                <p className="text-muted-foreground text-sm">
-                  Update your profile, manage subscriptions, and configure sync settings.
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.open(WEALTHFOLIO_CONNECT_PORTAL_URL, "_blank")}
-            >
-              <Icons.ExternalLink className="mr-2 h-4 w-4" />
-              Open
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Plans Preview */}
+      <PlansPreviewSection />
+
+      {/* Privacy Footnote */}
+      <p className="text-center text-xs text-muted-foreground">
+        Your portfolio data never leaves your device. Connect uses secure aggregators
+        to sync transactions directly to your local database.
+      </p>
     </div>
   );
 }

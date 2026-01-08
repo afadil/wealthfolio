@@ -85,13 +85,6 @@ VALUES
     1, 1, 10
   ),
   (
-    'risk_category',
-    'Risk Category',
-    '#d14d41',
-    'Risk level classification for assets. Single-select: each asset can only have one risk category assigned.',
-    1, 1, 15
-  ),
-  (
     'asset_classes',
     'Asset Classes',
     '#879a39',
@@ -111,6 +104,13 @@ VALUES
     '#8b7ec8',
     'Geographic exposure grouping for reporting (e.g., North America, Europe, Emerging Markets). Define what "region" means (domicile vs revenue exposure) and apply consistently.',
     1, 0, 40
+  ),
+   (
+    'risk_category',
+    'Risk Category',
+    '#d14d41',
+    'Risk level classification for assets. Single-select: each asset can only have one risk category assigned.',
+    1, 1, 50
   ),
   (
     'custom_groups',

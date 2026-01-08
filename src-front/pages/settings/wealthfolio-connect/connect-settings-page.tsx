@@ -1,14 +1,10 @@
+import { ConnectedView, LoginForm, useWealthfolioConnect } from "@/features/wealthfolio-connect";
+import { Card, CardDescription, CardHeader, CardTitle } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Separator } from "@wealthfolio/ui/components/ui/separator";
-import {
-  useWealthfolioConnect,
-  ConnectedView,
-  LoginForm,
-} from "@/features/wealthfolio-connect";
-import { Card, CardDescription, CardHeader, CardTitle } from "@wealthfolio/ui";
 import { SettingsHeader } from "../settings-header";
 
-export default function WealthfolioConnectPage() {
+export default function ConnectSettingsPage() {
   const { isEnabled, isConnected, isInitializing } = useWealthfolioConnect();
 
   // Show "not configured" state when Connect feature is disabled

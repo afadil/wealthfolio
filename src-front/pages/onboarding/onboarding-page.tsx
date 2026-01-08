@@ -71,7 +71,7 @@ const OnboardingPage = () => {
       </header>
 
       {/* Main content - centered vertically in remaining space */}
-      <main className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 sm:px-6">
+      <main className="flex flex-1 flex-col items-center justify-start overflow-y-auto px-4 pt-8 sm:px-6 sm:pt-12">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={currentStep}
@@ -96,24 +96,20 @@ const OnboardingPage = () => {
 
       {/* Fixed Footer */}
       <footer className="flex-none pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto max-w-4xl px-4 pt-6 pb-8 sm:px-6 sm:pb-12">
-          <div className="flex items-center justify-between">
-            <div>
-              {currentStep > 1 && (
+        <div className="mx-auto max-w-4xl px-4 pt-6 pb-8 sm:px-6 sm:pb-18">
+          {currentStep === 3 ? (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="order-2 sm:order-1">
                 <Button variant="ghost" onClick={handleBack} size="sm">
                   <Icons.ArrowLeft className="mr-1.5 h-4 w-4" />
                   Back
                 </Button>
-              )}
-            </div>
-            <div className="flex items-center gap-3">
-              {currentStep === 3 && (
-                <Button variant="outline" onClick={handleFinish}>
-                  Skip, I'll manage manually
-                </Button>
-              )}
-              {currentStep === 3 ? (
-                <Button asChild className="from-primary to-primary/90 bg-linear-to-r">
+              </div>
+              <div className="order-1 flex flex-col gap-2 sm:order-2 sm:flex-row sm:gap-3">
+                <Button
+                  asChild
+                  className="from-primary to-primary/90 bg-linear-to-r order-1 sm:order-2"
+                >
                   <a
                     href={WEALTHFOLIO_CONNECT_PORTAL_URL}
                     target="_blank"
@@ -123,18 +119,35 @@ const OnboardingPage = () => {
                     <Icons.ExternalLink className="ml-1.5 h-4 w-4" />
                   </a>
                 </Button>
-              ) : (
                 <Button
-                  onClick={handleContinue}
-                  disabled={!isStepValid}
-                  className="from-primary to-primary/90 bg-linear-to-r"
+                  variant="outline"
+                  onClick={handleFinish}
+                  className="order-2 sm:order-1"
                 >
-                  Continue
-                  <Icons.ArrowRight className="ml-1.5 h-4 w-4" />
+                  Skip, I'll manage manually
                 </Button>
-              )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div>
+                {currentStep > 1 && (
+                  <Button variant="ghost" onClick={handleBack} size="sm">
+                    <Icons.ArrowLeft className="mr-1.5 h-4 w-4" />
+                    Back
+                  </Button>
+                )}
+              </div>
+              <Button
+                onClick={handleContinue}
+                disabled={!isStepValid}
+                className="from-primary to-primary/90 bg-linear-to-r"
+              >
+                Continue
+                <Icons.ArrowRight className="ml-1.5 h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
       </footer>
     </div>

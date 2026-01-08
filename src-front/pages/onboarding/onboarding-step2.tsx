@@ -1,3 +1,6 @@
+import { useSettingsContext } from "@/lib/settings-provider";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Icons } from "@wealthfolio/ui";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import {
   Form,
@@ -8,9 +11,6 @@ import {
   FormMessage,
 } from "@wealthfolio/ui/components/ui/form";
 import { Input } from "@wealthfolio/ui/components/ui/input";
-import { useSettingsContext } from "@/lib/settings-provider";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Icons } from "@wealthfolio/ui";
 import { worldCurrencies } from "@wealthfolio/ui/lib/currencies";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -126,11 +126,9 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
 
     return (
       <>
-        <div className="w-full max-w-2xl space-y-4">
+        <div className="w-full max-w-xl space-y-4">
           <div className="text-center">
-            <p className="text-muted-foreground text-sm">
-              Just a couple preferences to get you started
-            </p>
+            <p className="text-muted-foreground">Just a couple preferences to get you started</p>
           </div>
           <Card className="border-none bg-transparent">
             <CardContent className="p-0 sm:p-6">
