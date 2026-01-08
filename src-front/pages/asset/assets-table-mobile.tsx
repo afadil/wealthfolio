@@ -37,6 +37,7 @@ interface AssetsTableMobileProps {
   onDelete: (asset: ParsedAsset) => void;
   onUpdateQuotes: (asset: ParsedAsset) => void;
   onRefetchQuotes: (asset: ParsedAsset) => void;
+  onClassify?: (asset: ParsedAsset) => void;
   isUpdatingQuotes?: boolean;
   isRefetchingQuotes?: boolean;
 }
@@ -49,6 +50,7 @@ export function AssetsTableMobile({
   onDelete,
   onUpdateQuotes,
   onRefetchQuotes,
+  onClassify,
   isUpdatingQuotes,
   isRefetchingQuotes,
 }: AssetsTableMobileProps) {
@@ -245,6 +247,10 @@ export function AssetsTableMobile({
                     Refetch quotes
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => onClassify?.(asset)}>
+                    <Icons.Tag className="mr-2 h-4 w-4" />
+                    Classify
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => onEdit(asset)}>Edit</DropdownMenuItem>
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"

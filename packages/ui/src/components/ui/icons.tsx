@@ -109,7 +109,6 @@ import {
   Store,
   StretchHorizontal,
   Sun,
-  Tag,
   Trash,
   Trash2,
   TrendingDown,
@@ -131,6 +130,7 @@ import type { ComponentType, CSSProperties } from "react";
 
 // Phosphor icons - deep imports for optimal tree shaking with Vite
 import { DevicesIcon } from "@phosphor-icons/react/dist/csr/Devices";
+import { TagIcon } from "@phosphor-icons/react/dist/csr/Tag";
 import { UserSwitchIcon } from "@phosphor-icons/react/dist/csr/UserSwitch";
 
 // Unified icon props that work with both Lucide and Phosphor
@@ -223,7 +223,6 @@ const IconsInternal = {
   Goal: Goal,
   Trash: Trash,
   Trash2: Trash2,
-  Tag: Tag,
   Hash: Hash,
   Type: Type,
   AlignLeft: AlignLeft,
@@ -702,6 +701,9 @@ const IconsInternal = {
   ),
   UserSwitch: ({ size, className, style, color }: IconProps) => (
     <UserSwitchIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
+  Tag: ({ size, className, style, color }: IconProps) => (
+    <TagIcon size={size} weight="duotone" className={className} style={style} color={color} />
   ),
 };
 

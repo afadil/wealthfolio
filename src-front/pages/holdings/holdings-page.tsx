@@ -31,6 +31,7 @@ import {
   type AssetDetailsSheetAsset,
 } from "@/features/alternative-assets";
 import { updateAlternativeAssetMetadata } from "@/commands/alternative-assets";
+import { ClassificationSheet } from "@/components/classification/classification-sheet";
 
 export const HoldingsPage = () => {
   const navigate = useNavigate();
@@ -77,6 +78,9 @@ export const HoldingsPage = () => {
 
   // Delete mutation
   const { mutate: deleteAsset, isPending: isDeleting } = useDeleteAlternativeAsset();
+
+  // Classification sheet state
+  const [classifyAsset, setClassifyAsset] = useState<{id: string, symbol: string, name?: string} | null>(null);
 
   const handleAccountSelect = (account: Account) => {
     setSelectedAccount(account);
@@ -291,6 +295,11 @@ export const HoldingsPage = () => {
                 isLoading={isDataLoading}
                 showTotalReturn={showTotalReturn}
                 setShowTotalReturn={setShowTotalReturn}
+                onClassify={(holding) => setClassifyAsset({
+                  id: holding.instrument?.id ?? holding.id,
+                  symbol: holding.instrument?.symbol ?? holding.id,
+                  name: holding.instrument?.name ?? undefined,
+                })}
               />
             </div>
 
@@ -412,6 +421,15 @@ export const HoldingsPage = () => {
         currentValue={updateValueAsset?.marketValue ?? "0"}
         lastUpdatedDate={updateValueAsset?.valuationDate?.split("T")[0] ?? ""}
         currency={updateValueAsset?.currency ?? "USD"}
+      />
+
+      {/* Classification Sheet */}
+      <ClassificationSheet
+        open={!!classifyAsset}
+        onOpenChange={(open) => !open && setClassifyAsset(null)}
+        assetId={classifyAsset?.id ?? ""}
+        assetSymbol={classifyAsset?.symbol}
+        assetName={classifyAsset?.name}
       />
     </Page>
   );

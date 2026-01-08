@@ -19,7 +19,7 @@ export default function ConnectSettingsPage() {
         <Card>
           <CardHeader className="items-center text-center">
             <div className="bg-muted mb-2 flex h-12 w-12 items-center justify-center rounded-full">
-              <Icons.Cloud className="text-muted-foreground h-6 w-6" />
+              <Icons.CloudOff className="text-muted-foreground h-6 w-6" />
             </div>
             <CardTitle>Not Configured</CardTitle>
             <CardDescription>Wealthfolio Connect is not configured for this build.</CardDescription>

@@ -10,11 +10,15 @@ export default function TaxonomiesPage() {
   const { data: taxonomies = [], isLoading: isLoadingTaxonomies } = useTaxonomies();
   const [selectedTaxonomyId, setSelectedTaxonomyId] = useState<string | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const exportMutation = useExportTaxonomy();
 
   // Auto-select first taxonomy if none selected
   const activeTaxonomyId = selectedTaxonomyId ?? taxonomies[0]?.id ?? null;
   const activeTaxonomy = taxonomies.find((t) => t.id === activeTaxonomyId);
+
+  // Custom Groups is editable even though it's a system taxonomy
+  const isEditableTaxonomy = !activeTaxonomy?.isSystem || activeTaxonomyId === "custom_groups";
 
   const { data: taxonomyWithCategories, isLoading: isLoadingCategories } =
     useTaxonomy(activeTaxonomyId);
@@ -35,6 +39,16 @@ export default function TaxonomiesPage() {
 
   const handleSelectCategory = (node: TreeNode) => {
     setSelectedCategoryId(node.id);
+    setIsCreatingCategory(false);
+  };
+
+  const handleAddCategory = () => {
+    setSelectedCategoryId(null);
+    setIsCreatingCategory(true);
+  };
+
+  const handleCategoryCreated = () => {
+    setIsCreatingCategory(false);
   };
 
   const handleExport = async () => {
@@ -111,10 +125,18 @@ export default function TaxonomiesPage() {
                 </p>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={handleExport}>
-              <Icons.Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
+            <div className="flex items-center gap-2">
+              {isEditableTaxonomy && (
+                <Button variant="default" size="sm" onClick={handleAddCategory}>
+                  <Icons.Plus className="h-4 w-4 mr-2" />
+                  Add Category
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={handleExport}>
+                <Icons.Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+            </div>
           </div>
 
           {/* Categories and details */}
@@ -143,11 +165,20 @@ export default function TaxonomiesPage() {
 
             {/* Category details */}
             <div className="flex-1 p-4">
-              {selectedCategory ? (
+              {isCreatingCategory ? (
+                <CategoryForm
+                  taxonomyId={activeTaxonomyId}
+                  taxonomyColor={activeTaxonomy?.color}
+                  onClose={() => setIsCreatingCategory(false)}
+                  onCreate={handleCategoryCreated}
+                />
+              ) : selectedCategory ? (
                 <CategoryForm
                   category={selectedCategory}
                   taxonomyId={activeTaxonomyId}
+                  isSystem={!isEditableTaxonomy}
                   onClose={() => setSelectedCategoryId(null)}
+                  onDelete={() => setSelectedCategoryId(null)}
                 />
               ) : (
                 <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
