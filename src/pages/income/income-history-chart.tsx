@@ -193,7 +193,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                 dot={false}
               />
               <Line
-                yAxisId={isMobile ? "left" : "right"}
+                yAxisId="left"
                 type="monotone"
                 dataKey="previousIncome"
                 stroke="var(--color-previousIncome)"
