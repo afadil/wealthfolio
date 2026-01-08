@@ -1,11 +1,11 @@
 //! Finnhub market data provider implementation.
 //!
 //! This module provides market data from Finnhub API:
-//! - Equities via /quote and /stock/candle endpoints
+//! - Equities via /quote endpoint (real-time only, historical candles are premium)
 //! - Symbol search via /search endpoint
 //! - Company profiles via /stock/profile2 endpoint
 //!
-//! Finnhub free tier is limited to 60 API calls per minute.
+//! Finnhub free tier: 60 API calls/minute, US stocks only, no historical candles.
 //! API documentation: https://finnhub.io/docs/api
 
 use std::time::Duration;
@@ -184,9 +184,12 @@ impl FinnhubProvider {
         })?;
 
         let status = response.status();
+        debug!("Finnhub response status: {} for {}", status, endpoint);
 
-        // Handle rate limiting
+        // Handle rate limiting (HTTP 429)
         if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+            let body = response.text().await.unwrap_or_default();
+            warn!("Finnhub rate limited (HTTP 429): {}", body);
             return Err(MarketDataError::RateLimited {
                 provider: PROVIDER_ID.to_string(),
             });
@@ -200,10 +203,13 @@ impl FinnhubProvider {
             });
         }
 
-        // Handle forbidden (API key quota exceeded)
+        // Handle forbidden - typically means invalid API key or access denied
         if status == reqwest::StatusCode::FORBIDDEN {
-            return Err(MarketDataError::RateLimited {
+            let body = response.text().await.unwrap_or_default();
+            warn!("Finnhub 403 Forbidden response: {}", body);
+            return Err(MarketDataError::ProviderError {
                 provider: PROVIDER_ID.to_string(),
+                message: format!("Access forbidden - check API key: {}", body),
             });
         }
 
@@ -541,10 +547,11 @@ impl MarketDataProvider for FinnhubProvider {
         ProviderCapabilities {
             // Finnhub primarily supports equities, but also has crypto/forex
             instrument_kinds: &[InstrumentKind::Equity],
-            // Global coverage for major exchanges
+            // Global coverage for major exchanges (free tier = US only)
             coverage: Coverage::global_best_effort(),
             supports_latest: true,
-            supports_historical: true,
+            // Historical candles require premium subscription
+            supports_historical: false,
             supports_search: true,
             supports_profile: true,
         }

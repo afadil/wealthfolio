@@ -4,7 +4,7 @@ use std::sync::{Arc, RwLock};
 use crate::{auth::AuthManager, config::Config, events::EventBus, secrets::build_secret_store};
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, EnvFilter};
-use wealthfolio_connect::{PlatformRepository, SyncService, SyncServiceTrait};
+use wealthfolio_connect::{BrokerSyncService, BrokerSyncServiceTrait, PlatformRepository};
 use wealthfolio_core::{
     accounts::AccountService,
     activities::{ActivityService as CoreActivityService, ActivityServiceTrait},
@@ -54,7 +54,7 @@ pub struct AppState {
     pub fx_service: Arc<dyn FxServiceTrait + Send + Sync>,
     pub activity_service: Arc<dyn ActivityServiceTrait + Send + Sync>,
     pub asset_service: Arc<dyn AssetServiceTrait + Send + Sync>,
-    pub connect_sync_service: Arc<dyn SyncServiceTrait + Send + Sync>,
+    pub connect_sync_service: Arc<dyn BrokerSyncServiceTrait + Send + Sync>,
     pub addons_root: String,
     pub data_root: String,
     pub db_path: String,
@@ -212,12 +212,13 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
 
     // Connect sync service for broker data synchronization
     let platform_repository = Arc::new(PlatformRepository::new(pool.clone(), writer.clone()));
-    let connect_sync_service: Arc<dyn SyncServiceTrait + Send + Sync> = Arc::new(SyncService::new(
-        account_service.clone(),
-        platform_repository,
-        pool.clone(),
-        writer.clone(),
-    ));
+    let connect_sync_service: Arc<dyn BrokerSyncServiceTrait + Send + Sync> =
+        Arc::new(BrokerSyncService::new(
+            account_service.clone(),
+            platform_repository,
+            pool.clone(),
+            writer.clone(),
+        ));
 
     // Determine data root directory (parent of DB path)
     let data_root = data_root_path.to_string_lossy().to_string();

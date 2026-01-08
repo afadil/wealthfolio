@@ -19,15 +19,19 @@ export interface ProviderCapabilities {
 export interface MarketDataProviderSetting {
   id: string;
   name: string;
-  description: string;
+  description: string | null;
   url: string | null;
   priority: number;
   enabled: boolean;
   logoFilename: string | null;
-  lastSyncedAt: string | null;
-  lastSyncStatus: string | null;
-  lastSyncError: string | null;
   capabilities: ProviderCapabilities | null;
+  requiresApiKey: boolean;
+  hasApiKey: boolean;
+  assetCount: number;
+  errorCount: number;
+  lastSyncedAt: string | null;
+  lastSyncError: string | null;
+  uniqueErrors: string[];
 }
 
 export const searchTicker = async (query: string): Promise<QuoteSummary[]> => {

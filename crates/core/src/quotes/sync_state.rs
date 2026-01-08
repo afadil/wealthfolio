@@ -249,9 +249,30 @@ pub struct QuoteSyncStateUpdate {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
+/// Aggregated sync statistics for a data provider.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderSyncStats {
+    /// Provider ID (data_source)
+    pub provider_id: String,
+    /// Number of assets synced by this provider
+    pub asset_count: i64,
+    /// Number of assets with errors
+    pub error_count: i64,
+    /// Most recent sync timestamp
+    pub last_synced_at: Option<DateTime<Utc>>,
+    /// Most recent error message (if any)
+    pub last_error: Option<String>,
+    /// All unique error messages for this provider
+    pub unique_errors: Vec<String>,
+}
+
 /// Trait for quote sync state storage operations.
 #[async_trait]
 pub trait SyncStateStore: Send + Sync {
+    /// Get sync statistics aggregated by provider (data_source).
+    fn get_provider_sync_stats(&self) -> Result<Vec<ProviderSyncStats>>;
+
     /// Get all sync states.
     fn get_all(&self) -> Result<Vec<QuoteSyncState>>;
 
@@ -279,6 +300,7 @@ pub trait SyncStateStore: Send + Sync {
         symbol: &str,
         last_quote_date: NaiveDate,
         earliest_quote_date: Option<NaiveDate>,
+        data_source: Option<&str>,
     ) -> Result<()>;
 
     /// Update sync state after sync failure.

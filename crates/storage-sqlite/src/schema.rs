@@ -300,15 +300,61 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    taxonomies (id) {
+        id -> Text,
+        name -> Text,
+        color -> Text,
+        description -> Nullable<Text>,
+        is_system -> Bool,
+        is_single_select -> Bool,
+        sort_order -> Integer,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    taxonomy_categories (taxonomy_id, id) {
+        id -> Text,
+        taxonomy_id -> Text,
+        parent_id -> Nullable<Text>,
+        name -> Text,
+        key -> Text,
+        color -> Text,
+        description -> Nullable<Text>,
+        sort_order -> Integer,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    asset_taxonomy_assignments (id) {
+        id -> Text,
+        asset_id -> Text,
+        taxonomy_id -> Text,
+        category_id -> Text,
+        weight -> Integer,  // basis points: 10000 = 100%
+        source -> Text,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
 // Joinable relationships
 diesel::joinable!(accounts -> platforms (platform_id));
 diesel::joinable!(goals_allocation -> accounts (account_id));
 diesel::joinable!(goals_allocation -> goals (goal_id));
 diesel::joinable!(quotes -> assets (asset_id));
 diesel::joinable!(import_runs -> accounts (account_id));
+diesel::joinable!(taxonomy_categories -> taxonomies (taxonomy_id));
+diesel::joinable!(asset_taxonomy_assignments -> assets (asset_id));
+diesel::joinable!(asset_taxonomy_assignments -> taxonomies (taxonomy_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
+    asset_taxonomy_assignments,
     brokers_sync_state,
     activities,
     activity_import_profiles,
@@ -324,4 +370,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     platforms,
     quote_sync_state,
     quotes,
+    taxonomies,
+    taxonomy_categories,
 );

@@ -34,10 +34,23 @@ pub struct ProviderInfo {
     pub id: String,
     pub name: String,
     pub description: Option<String>,
+    pub url: Option<String>,
     pub enabled: bool,
     pub priority: i32,
+    pub logo_filename: Option<String>,
+    pub capabilities: Option<super::provider_settings::ProviderCapabilities>,
     pub requires_api_key: bool,
     pub has_api_key: bool,
+    /// Number of assets synced by this provider
+    pub asset_count: i64,
+    /// Number of assets with sync errors
+    pub error_count: i64,
+    /// Most recent sync timestamp
+    pub last_synced_at: Option<String>,
+    /// Most recent error message (if any)
+    pub last_sync_error: Option<String>,
+    /// All unique error messages for this provider
+    pub unique_errors: Vec<String>,
 }
 
 /// Unified trait for all quote operations.
@@ -524,17 +537,22 @@ where
         use super::constants::*;
 
         let settings = self.provider_settings_store.get_all_providers()?;
-        let client = self.client.read().await;
-        let available_providers = client.providers();
+
+        // Get aggregated sync stats from quote_sync_state table
+        let sync_stats = self.sync_state_store.get_provider_sync_stats()?;
+        let stats_map: HashMap<String, super::sync_state::ProviderSyncStats> = sync_stats
+            .into_iter()
+            .map(|s| (s.provider_id.clone(), s))
+            .collect();
 
         let mut infos = Vec::new();
         for setting in settings {
             // Check if provider requires an API key
             let requires_key = matches!(
                 setting.id.as_str(),
-                DATA_SOURCE_ALPHA_VANTAGE | DATA_SOURCE_MARKET_DATA_APP | DATA_SOURCE_METAL_PRICE_API
+                DATA_SOURCE_ALPHA_VANTAGE | DATA_SOURCE_MARKET_DATA_APP | DATA_SOURCE_METAL_PRICE_API | DATA_SOURCE_FINNHUB
             );
-            // Check if API key is set - use provider ID as secret key (consistent with client.rs)
+            // Check if API key is set (this may trigger keychain prompt on macOS)
             let has_key = if requires_key {
                 self.secret_store
                     .get_secret(&setting.id)
@@ -546,14 +564,34 @@ where
                 true
             };
 
+            // Get sync stats for this provider
+            let stats = stats_map.get(&setting.id);
+            let asset_count = stats.map(|s| s.asset_count).unwrap_or(0);
+            let error_count = stats.map(|s| s.error_count).unwrap_or(0);
+            let last_synced_at = stats
+                .and_then(|s| s.last_synced_at)
+                .map(|dt| dt.to_rfc3339());
+            let last_sync_error = stats.and_then(|s| s.last_error.clone());
+            let unique_errors = stats
+                .map(|s| s.unique_errors.clone())
+                .unwrap_or_default();
+
             infos.push(ProviderInfo {
                 id: setting.id.clone(),
                 name: setting.name.clone(),
                 description: Some(setting.description.clone()),
-                enabled: setting.enabled && available_providers.contains(&setting.id.as_str()),
+                url: setting.url.clone(),
+                enabled: setting.enabled,
                 priority: setting.priority,
+                logo_filename: setting.logo_filename.clone(),
+                capabilities: setting.capabilities.clone(),
                 requires_api_key: requires_key,
                 has_api_key: has_key,
+                asset_count,
+                error_count,
+                last_synced_at,
+                last_sync_error,
+                unique_errors,
             });
         }
 

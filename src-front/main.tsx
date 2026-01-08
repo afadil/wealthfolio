@@ -5,7 +5,7 @@ import ReactDOM from "react-dom/client";
 import { debugAddonState, isAddonDevModeEnabled, loadAllAddons } from "./addons/addons-loader";
 import "./addons/addons-runtime-context";
 import App from "./App";
-import "./styles.css";
+import "./globals.css";
 
 if (isAddonDevModeEnabled) {
   void import("./addons/addons-dev-mode");

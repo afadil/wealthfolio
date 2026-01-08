@@ -9,23 +9,14 @@ use wealthfolio_core::accounts::Account;
 use crate::context::ServiceContext;
 use crate::secret_store::KeyringSecretStore;
 use wealthfolio_connect::{
-    broker::BrokerApiClient, BrokerAccount, BrokerConnection, ConnectApiClient, PlansResponse,
-    Platform, SyncAccountsResponse, SyncActivitiesResponse, SyncConnectionsResponse, UserInfo,
-    DEFAULT_CLOUD_API_URL,
+    broker::BrokerApiClient, BrokerAccount, BrokerConnection, PlansResponse, Platform,
+    SyncAccountsResponse, SyncActivitiesResponse, SyncConnectionsResponse, UserInfo,
 };
 use wealthfolio_core::secrets::SecretStore;
 
 /// Secret key for storing the cloud API access token (same as frontend)
 /// Note: SecretStore adds "wealthfolio_" prefix automatically
 const CLOUD_ACCESS_TOKEN_KEY: &str = "sync_access_token";
-
-fn cloud_api_base_url() -> String {
-    std::env::var("CONNECT_API_URL")
-        .ok()
-        .map(|v| v.trim().trim_end_matches('/').to_string())
-        .filter(|v| !v.is_empty())
-        .unwrap_or_else(|| DEFAULT_CLOUD_API_URL.to_string())
-}
 
 /// Sync configuration status
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,30 +35,6 @@ pub struct SyncResult {
     pub connections_synced: Option<SyncConnectionsResponse>,
     pub accounts_synced: Option<SyncAccountsResponse>,
     pub activities_synced: Option<SyncActivitiesResponse>,
-}
-
-/// Create a shared API client using the stored access token
-fn create_api_client() -> Result<ConnectApiClient, String> {
-    info!("create_api_client: attempting to get access token from keyring...");
-    let access_token = match KeyringSecretStore.get_secret(CLOUD_ACCESS_TOKEN_KEY) {
-        Ok(Some(token)) => {
-            info!(
-                "create_api_client: found access token (length={})",
-                token.len()
-            );
-            token
-        }
-        Ok(None) => {
-            error!("create_api_client: no access token found in keyring");
-            return Err("No access token configured. Please sign in first.".to_string());
-        }
-        Err(e) => {
-            error!("create_api_client: error reading from keyring: {}", e);
-            return Err(format!("Failed to get access token: {}", e));
-        }
-    };
-
-    ConnectApiClient::new(&cloud_api_base_url(), &access_token).map_err(|e| e.to_string())
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -143,7 +110,7 @@ pub async fn sync_broker_data(state: State<'_, Arc<ServiceContext>>) -> Result<S
 pub async fn perform_broker_sync(context: &Arc<ServiceContext>) -> Result<SyncResult, String> {
     info!("Starting broker data sync...");
 
-    let client = create_api_client()?;
+    let client = context.connect_service().get_api_client()?;
 
     // Step 1: Fetch and sync connections (platforms)
     info!("Fetching broker connections...");
@@ -486,11 +453,11 @@ pub async fn get_platforms(state: State<'_, Arc<ServiceContext>>) -> Result<Vec<
 /// List broker connections from the cloud API
 #[tauri::command]
 pub async fn list_broker_connections(
-    _state: State<'_, Arc<ServiceContext>>,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<Vec<BrokerConnection>, String> {
     info!("Fetching broker connections from cloud API...");
 
-    let client = create_api_client()?;
+    let client = state.connect_service().get_api_client()?;
     let connections = client.list_connections().await.map_err(|e| e.to_string())?;
 
     info!("Found {} broker connections", connections.len());
@@ -501,11 +468,11 @@ pub async fn list_broker_connections(
 /// Returns the live account data including sync_enabled and owner info
 #[tauri::command]
 pub async fn list_broker_accounts(
-    _state: State<'_, Arc<ServiceContext>>,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<Vec<BrokerAccount>, String> {
     info!("Fetching broker accounts from cloud API...");
 
-    let client = create_api_client()?;
+    let client = state.connect_service().get_api_client()?;
     let accounts = client.list_accounts(None).await.map_err(|e| e.to_string())?;
 
     info!("Found {} broker accounts", accounts.len());
@@ -519,11 +486,11 @@ pub async fn list_broker_accounts(
 /// Get subscription plans from the cloud API
 #[tauri::command]
 pub async fn get_subscription_plans(
-    _state: State<'_, Arc<ServiceContext>>,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<PlansResponse, String> {
     info!("Fetching subscription plans from cloud API...");
 
-    let client = create_api_client()?;
+    let client = state.connect_service().get_api_client()?;
     match client.get_subscription_plans().await {
         Ok(response) => {
             info!("Found {} subscription plans", response.plans.len());
@@ -538,10 +505,10 @@ pub async fn get_subscription_plans(
 
 /// Get current user info from the cloud API
 #[tauri::command]
-pub async fn get_user_info(_state: State<'_, Arc<ServiceContext>>) -> Result<UserInfo, String> {
+pub async fn get_user_info(state: State<'_, Arc<ServiceContext>>) -> Result<UserInfo, String> {
     info!("Fetching user info from cloud API...");
 
-    let client = create_api_client()?;
+    let client = state.connect_service().get_api_client()?;
     match client.get_user_info().await {
         Ok(user_info) => {
             info!("User info retrieved for: {}", user_info.email.as_deref().unwrap_or("unknown"));
@@ -586,22 +553,6 @@ pub async fn get_import_runs(
         .sync_service()
         .get_import_runs(run_type.as_deref(), limit)
         .map_err(|e| format!("Failed to get import runs: {}", e))
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Subscription Check Helper
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Checks if the current user has an active subscription.
-/// Returns Ok(true) if subscription_status is "active".
-/// Returns Ok(false) if no subscription or inactive.
-/// Returns Err if there's an API/auth error.
-pub async fn has_active_subscription() -> Result<bool, String> {
-    let client = create_api_client()?;
-    client
-        .has_active_subscription()
-        .await
-        .map_err(|e| e.to_string())
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

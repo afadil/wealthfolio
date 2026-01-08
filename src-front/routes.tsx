@@ -26,6 +26,7 @@ import GeneralSettingsPage from "./pages/settings/general/general-page";
 import SettingsGoalsPage from "./pages/settings/goals/goals-page";
 import MarketDataImportPage from "./pages/settings/market-data/market-data-import-page";
 import MarketDataSettingsPage from "./pages/settings/market-data/market-data-settings";
+import TaxonomiesPage from "./pages/settings/taxonomies/taxonomies-page";
 import WealthfolioConnectPage from "./pages/settings/wealthfolio-connect/wealthfolio-connect-page";
 // import QRScannerPage from './pages/qr-scanner/qr-scanner-page'; // File not found
 import { getDynamicRoutes, subscribeToNavigationUpdates } from "@/addons/addons-runtime-context";
@@ -114,6 +115,7 @@ export function AppRoutes() {
             <Route path="market-data" element={<MarketDataSettingsPage />} />
             <Route path="market-data/import" element={<MarketDataImportPage />} />
             <Route path="securities" element={<AssetsPage />} />
+            <Route path="taxonomies" element={<TaxonomiesPage />} />
             <Route path="wealthfolio-connect" element={<WealthfolioConnectPage />} />
             <Route path="addons" element={<AddonSettingsPage />} />
           </Route>

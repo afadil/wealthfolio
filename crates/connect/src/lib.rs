@@ -13,9 +13,9 @@ pub mod state;
 #[cfg(feature = "broker")]
 pub use broker::{
     AccountUniversalActivity, BrokerAccount, BrokerApiClient, BrokerBrokerage, BrokerConnection,
-    PaginatedUniversalActivity, PlanPricing, PlanPricingPeriods, PlansResponse,
-    PlatformRepositoryTrait, SubscriptionPlan, SyncAccountsResponse, SyncActivitiesResponse,
-    SyncConnectionsResponse, SyncService, SyncServiceTrait, UserInfo, UserTeam,
+    BrokerSyncService, BrokerSyncServiceTrait, PaginatedUniversalActivity, PlanPricing,
+    PlanPricingPeriods, PlansResponse, PlatformRepositoryTrait, SubscriptionPlan,
+    SyncAccountsResponse, SyncActivitiesResponse, SyncConnectionsResponse, UserInfo, UserTeam,
 };
 
 // Re-export the HTTP client

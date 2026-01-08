@@ -149,6 +149,7 @@ pub struct QuoteSyncStateUpdateDB {
     pub last_synced_at: Option<Option<String>>,
     pub last_quote_date: Option<Option<String>>,
     pub earliest_quote_date: Option<Option<String>>,
+    pub data_source: Option<String>,
     pub sync_priority: Option<i32>,
     pub error_count: Option<i32>,
     pub last_error: Option<Option<String>>,

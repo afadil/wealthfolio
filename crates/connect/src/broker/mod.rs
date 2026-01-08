@@ -4,5 +4,5 @@ mod service;
 mod traits;
 
 pub use models::*;
-pub use service::SyncService;
+pub use service::BrokerSyncService;
 pub use traits::*;

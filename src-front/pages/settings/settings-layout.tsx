@@ -42,6 +42,12 @@ const sidebarNavItems = [
     icon: <Icons.BadgeDollarSign className="size-5" />,
   },
   {
+    title: "Classifications",
+    href: "taxonomies",
+    subtitle: "Asset classification hierarchies",
+    icon: <Icons.Blocks className="size-5" />,
+  },
+  {
     title: "Market Data",
     href: "market-data",
     subtitle: "Providers and data update",

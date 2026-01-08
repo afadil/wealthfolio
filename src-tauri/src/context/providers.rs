@@ -1,7 +1,8 @@
 use super::registry::ServiceContext;
 use crate::secret_store::shared_secret_store;
+use crate::services::ConnectService;
 use std::sync::{Arc, RwLock};
-use wealthfolio_connect::{PlatformRepository, SyncService};
+use wealthfolio_connect::{BrokerSyncService, PlatformRepository};
 use wealthfolio_core::{
     accounts::AccountService,
     activities::ActivityService,
@@ -19,6 +20,7 @@ use wealthfolio_core::{
     },
     quotes::{QuoteService, QuoteServiceTrait},
     settings::{SettingsService, SettingsServiceTrait},
+    taxonomies::TaxonomyService,
 };
 use wealthfolio_storage_sqlite::{
     accounts::AccountRepository,
@@ -31,6 +33,7 @@ use wealthfolio_storage_sqlite::{
     market_data::{MarketDataRepository, QuoteSyncStateRepository},
     portfolio::{snapshot::SnapshotRepository, valuation::ValuationRepository},
     settings::SettingsRepository,
+    taxonomies::TaxonomyRepository,
 };
 
 // Other imports
@@ -166,12 +169,17 @@ pub async fn initialize_context(
     let alternative_asset_repository =
         Arc::new(AlternativeAssetRepository::new(pool.clone(), writer.clone()));
 
-    let sync_service = Arc::new(SyncService::new(
+    let taxonomy_repository = Arc::new(TaxonomyRepository::new(pool.clone(), writer.clone()));
+    let taxonomy_service = Arc::new(TaxonomyService::new(taxonomy_repository));
+
+    let sync_service = Arc::new(BrokerSyncService::new(
         account_service.clone(),
         platform_repository.clone(),
         pool.clone(),
         writer.clone(),
     ));
+
+    let connect_service = Arc::new(ConnectService::new());
 
     Ok(ServiceContext {
         base_currency,
@@ -192,5 +200,7 @@ pub async fn initialize_context(
         net_worth_service,
         sync_service,
         alternative_asset_repository,
+        taxonomy_service,
+        connect_service,
     })
 }

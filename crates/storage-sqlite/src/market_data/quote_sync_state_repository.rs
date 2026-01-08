@@ -11,7 +11,7 @@ use super::model::{QuoteSyncStateDB, QuoteSyncStateUpdateDB};
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
 use crate::schema::quote_sync_state::dsl as qss_dsl;
-use wealthfolio_core::quotes::{QuoteSyncState, SyncStateStore};
+use wealthfolio_core::quotes::{ProviderSyncStats, QuoteSyncState, SyncStateStore};
 use wealthfolio_core::Result;
 
 pub struct QuoteSyncStateRepository {
@@ -27,6 +27,82 @@ impl QuoteSyncStateRepository {
 
 #[async_trait]
 impl SyncStateStore for QuoteSyncStateRepository {
+    fn get_provider_sync_stats(&self) -> Result<Vec<ProviderSyncStats>> {
+        use diesel::sql_types::{BigInt, Nullable, Text};
+
+        #[derive(QueryableByName)]
+        struct ProviderSyncStatsRow {
+            #[diesel(sql_type = Text)]
+            provider_id: String,
+            #[diesel(sql_type = BigInt)]
+            asset_count: i64,
+            #[diesel(sql_type = BigInt)]
+            error_count: i64,
+            #[diesel(sql_type = Nullable<Text>)]
+            last_synced_at: Option<String>,
+            #[diesel(sql_type = Nullable<Text>)]
+            last_error: Option<String>,
+            #[diesel(sql_type = Nullable<Text>)]
+            unique_errors: Option<String>,
+        }
+
+        let mut conn = get_connection(&self.pool)?;
+
+        let results: Vec<ProviderSyncStatsRow> = diesel::sql_query(
+            r#"
+            SELECT
+                data_source as provider_id,
+                COUNT(*) as asset_count,
+                SUM(CASE WHEN last_error IS NOT NULL THEN 1 ELSE 0 END) as error_count,
+                MAX(last_synced_at) as last_synced_at,
+                (
+                    SELECT qss2.last_error
+                    FROM quote_sync_state qss2
+                    WHERE qss2.data_source = quote_sync_state.data_source
+                      AND qss2.last_error IS NOT NULL
+                    ORDER BY qss2.updated_at DESC
+                    LIMIT 1
+                ) as last_error,
+                (
+                    SELECT GROUP_CONCAT(DISTINCT qss3.last_error)
+                    FROM quote_sync_state qss3
+                    WHERE qss3.data_source = quote_sync_state.data_source
+                      AND qss3.last_error IS NOT NULL
+                ) as unique_errors
+            FROM quote_sync_state
+            GROUP BY data_source
+            ORDER BY data_source
+            "#,
+        )
+        .load(&mut conn)
+        .map_err(StorageError::from)?;
+
+        Ok(results
+            .into_iter()
+            .map(|row| {
+                let last_synced_at = row
+                    .last_synced_at
+                    .and_then(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
+                    .map(|dt| dt.with_timezone(&Utc));
+
+                // GROUP_CONCAT uses comma as default separator
+                let unique_errors: Vec<String> = row
+                    .unique_errors
+                    .map(|s| s.split(',').map(|e| e.trim().to_string()).collect())
+                    .unwrap_or_default();
+
+                ProviderSyncStats {
+                    provider_id: row.provider_id,
+                    asset_count: row.asset_count,
+                    error_count: row.error_count,
+                    last_synced_at,
+                    last_error: row.last_error,
+                    unique_errors,
+                }
+            })
+            .collect())
+    }
+
     fn get_all(&self) -> Result<Vec<QuoteSyncState>> {
         let mut conn = get_connection(&self.pool)?;
 
@@ -151,10 +227,12 @@ impl SyncStateStore for QuoteSyncStateRepository {
         symbol: &str,
         last_quote_date: NaiveDate,
         earliest_quote_date: Option<NaiveDate>,
+        data_source: Option<&str>,
     ) -> Result<()> {
         let symbol_owned = symbol.to_string();
         let last_quote_str = last_quote_date.format("%Y-%m-%d").to_string();
         let earliest_quote_str = earliest_quote_date.map(|d| d.format("%Y-%m-%d").to_string());
+        let data_source_owned = data_source.map(|s| s.to_string());
         let now = Utc::now().to_rfc3339();
 
         self.writer
@@ -169,6 +247,7 @@ impl SyncStateStore for QuoteSyncStateRepository {
                 let mut update = QuoteSyncStateUpdateDB {
                     last_synced_at: Some(Some(now.clone())),
                     last_quote_date: Some(Some(last_quote_str)),
+                    data_source: data_source_owned,
                     error_count: Some(0),
                     last_error: Some(None),
                     updated_at: Some(now),

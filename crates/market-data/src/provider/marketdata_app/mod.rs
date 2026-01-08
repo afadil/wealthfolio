@@ -163,7 +163,8 @@ impl MarketDataProvider for MarketDataAppProvider {
     fn capabilities(&self) -> ProviderCapabilities {
         ProviderCapabilities {
             instrument_kinds: &[InstrumentKind::Equity],
-            coverage: Coverage::us_only_strict(),
+            // Use best_effort to accept instruments without MIC codes
+            coverage: Coverage::us_only_best_effort(),
             supports_latest: true,
             supports_historical: true,
             supports_search: false,
