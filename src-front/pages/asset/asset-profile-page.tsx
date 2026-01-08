@@ -1,5 +1,6 @@
 import { getAssetProfile } from "@/commands/market-data";
 import { getHolding } from "@/commands/portfolio";
+import { ClassificationSheet } from "@/components/classification/classification-sheet";
 import { MobileActionsMenu } from "@/components/mobile-actions-menu";
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { ValueHistoryDataGrid } from "@/features/alternative-assets";
@@ -86,6 +87,7 @@ export const AssetProfilePage = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
+  const [classificationSheetOpen, setClassificationSheetOpen] = useState(false);
   const triggerHaptic = useHapticFeedback();
   const isMobile = useIsMobileViewport();
   const [formData, setFormData] = useState<AssetProfileFormData>({
@@ -701,6 +703,14 @@ export const AssetProfilePage = () => {
                   className={`h-4 w-4 ${syncMarketDataMutation.isPending ? "animate-spin" : ""}`}
                 />
               </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setClassificationSheetOpen(true)}
+                title="Classify Asset"
+              >
+                <Icons.Tag className="h-4 w-4" />
+              </Button>
               <AnimatedToggleGroup
                 items={toggleItems}
                 value={activeTab}
@@ -736,6 +746,12 @@ export const AssetProfilePage = () => {
                     label: "Refresh Quote",
                     description: "Update market data",
                     onClick: handleRefreshQuotes,
+                  },
+                  {
+                    icon: "Tag",
+                    label: "Classify",
+                    description: "Assign categories to this asset",
+                    onClick: () => setClassificationSheetOpen(true),
                   },
                 ]}
               />
@@ -1037,6 +1053,15 @@ export const AssetProfilePage = () => {
           </Tabs>
         )}
       </PageContent>
+
+      {/* Classification Sheet */}
+      <ClassificationSheet
+        open={classificationSheetOpen}
+        onOpenChange={setClassificationSheetOpen}
+        assetId={assetProfile?.id ?? ""}
+        assetSymbol={symbol}
+        assetName={formData.name || (assetProfile?.name ?? undefined)}
+      />
     </Page>
   );
 };

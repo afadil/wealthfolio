@@ -9,14 +9,22 @@ import {
   FormLabel,
   FormControl,
   FormMessage,
-  FormDescription,
   Input,
   Button,
   Icons,
   Textarea,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@wealthfolio/ui";
 import type { TaxonomyCategory } from "@/lib/types";
-import { useUpdateCategory } from "@/hooks/use-taxonomies";
+import { useCreateCategory, useUpdateCategory, useDeleteCategory } from "@/hooks/use-taxonomies";
 import { toast } from "sonner";
 
 const categoryFormSchema = z.object({
@@ -29,49 +37,109 @@ const categoryFormSchema = z.object({
 type CategoryFormValues = z.infer<typeof categoryFormSchema>;
 
 interface CategoryFormProps {
-  category: TaxonomyCategory;
+  category?: TaxonomyCategory;
   taxonomyId: string;
+  taxonomyColor?: string;
+  isSystem?: boolean;
   onClose: () => void;
+  onCreate?: () => void;
+  onDelete?: () => void;
 }
 
-export function CategoryForm({ category, taxonomyId: _taxonomyId, onClose }: CategoryFormProps) {
-  void _taxonomyId; // Keep for potential future use
+function generateKey(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
+}
+
+export function CategoryForm({
+  category,
+  taxonomyId,
+  taxonomyColor,
+  isSystem,
+  onClose,
+  onCreate,
+  onDelete,
+}: CategoryFormProps) {
+  const isCreateMode = !category;
+  const createMutation = useCreateCategory();
   const updateMutation = useUpdateCategory();
+  const deleteMutation = useDeleteCategory();
 
   const form = useForm<CategoryFormValues>({
     resolver: zodResolver(categoryFormSchema),
     defaultValues: {
-      name: category.name,
-      key: category.key,
-      color: category.color,
-      description: category.description ?? "",
+      name: category?.name ?? "",
+      key: category?.key ?? "",
+      color: category?.color ?? taxonomyColor ?? "#808080",
+      description: category?.description ?? "",
     },
   });
 
   // Reset form when category changes
   useEffect(() => {
     form.reset({
-      name: category.name,
-      key: category.key,
-      color: category.color,
-      description: category.description ?? "",
+      name: category?.name ?? "",
+      key: category?.key ?? "",
+      color: category?.color ?? taxonomyColor ?? "#808080",
+      description: category?.description ?? "",
     });
-  }, [category, form]);
+  }, [category, taxonomyColor, form]);
+
+  // Auto-generate key from name in create mode
+  const watchName = form.watch("name");
+  useEffect(() => {
+    if (isCreateMode && watchName) {
+      form.setValue("key", generateKey(watchName), { shouldDirty: true });
+    }
+  }, [isCreateMode, watchName, form]);
 
   const onSubmit = async (values: CategoryFormValues) => {
     try {
-      await updateMutation.mutateAsync({
-        ...category,
-        name: values.name,
-        key: values.key,
-        color: values.color,
-        description: values.description ?? null,
-      });
-      toast.success("Category updated successfully");
-    } catch (error) {
-      toast.error("Failed to update category");
+      if (isCreateMode) {
+        await createMutation.mutateAsync({
+          taxonomyId,
+          parentId: null, // One level only
+          name: values.name,
+          key: values.key,
+          color: values.color,
+          description: values.description ?? null,
+          sortOrder: 0,
+        });
+        toast.success("Category created successfully");
+        onCreate?.();
+      } else if (category) {
+        await updateMutation.mutateAsync({
+          ...category,
+          name: values.name,
+          key: values.key,
+          color: values.color,
+          description: values.description ?? null,
+        });
+        toast.success("Category updated successfully");
+      }
+    } catch {
+      toast.error(isCreateMode ? "Failed to create category" : "Failed to update category");
     }
   };
+
+  const handleDelete = async () => {
+    if (!category) return;
+    try {
+      await deleteMutation.mutateAsync({
+        taxonomyId,
+        categoryId: category.id,
+      });
+      toast.success("Category deleted successfully");
+      onDelete?.();
+    } catch {
+      toast.error("Failed to delete category");
+    }
+  };
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+  const currentColor = form.watch("color");
 
   return (
     <div className="space-y-6">
@@ -79,9 +147,11 @@ export function CategoryForm({ category, taxonomyId: _taxonomyId, onClose }: Cat
         <div className="flex items-center gap-3">
           <span
             className="w-4 h-4 rounded-full shrink-0"
-            style={{ backgroundColor: category.color }}
+            style={{ backgroundColor: currentColor }}
           />
-          <h3 className="font-semibold text-lg">{category.name}</h3>
+          <h3 className="font-semibold text-lg">
+            {isCreateMode ? "New Category" : category?.name}
+          </h3>
         </div>
         <Button variant="ghost" size="icon" onClick={onClose}>
           <Icons.Close className="h-4 w-4" />
@@ -97,7 +167,7 @@ export function CategoryForm({ category, taxonomyId: _taxonomyId, onClose }: Cat
               <FormItem>
                 <FormLabel>Name</FormLabel>
                 <FormControl>
-                  <Input {...field} />
+                  <Input {...field} placeholder="Category name" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -145,28 +215,73 @@ export function CategoryForm({ category, taxonomyId: _taxonomyId, onClose }: Cat
             )}
           />
 
-          <div className="flex items-center gap-2 pt-4">
-            <Button
-              type="submit"
-              disabled={updateMutation.isPending || !form.formState.isDirty}
-            >
-              {updateMutation.isPending ? (
-                <>
-                  <Icons.Loader className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save Changes"
+          <div className="flex items-center justify-between pt-4">
+            <div className="flex items-center gap-2">
+              <Button
+                type="submit"
+                disabled={isPending || (!isCreateMode && !form.formState.isDirty)}
+              >
+                {isPending ? (
+                  <>
+                    <Icons.Loader className="h-4 w-4 mr-2 animate-spin" />
+                    {isCreateMode ? "Creating..." : "Saving..."}
+                  </>
+                ) : isCreateMode ? (
+                  "Create Category"
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
+              {!isCreateMode && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => form.reset()}
+                  disabled={!form.formState.isDirty}
+                >
+                  Reset
+                </Button>
               )}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => form.reset()}
-              disabled={!form.formState.isDirty}
-            >
-              Reset
-            </Button>
+            </div>
+
+            {/* Delete button for non-system taxonomies */}
+            {!isCreateMode && !isSystem && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    disabled={deleteMutation.isPending}
+                  >
+                    {deleteMutation.isPending ? (
+                      <Icons.Loader className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Icons.Trash2 className="h-4 w-4" />
+                    )}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Category</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete "{category?.name}"? This will remove all asset
+                      assignments to this category. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDelete}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </div>
         </form>
       </Form>

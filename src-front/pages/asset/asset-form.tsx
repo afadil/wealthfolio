@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 
@@ -19,6 +19,9 @@ import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
 import { DataSource } from "@/lib/constants";
 import { UpdateAssetProfile } from "@/lib/types";
 import { ResponsiveSelect, type ResponsiveSelectOption } from "@wealthfolio/ui";
+import { SingleSelectTaxonomy } from "@/components/classification/single-select-taxonomy";
+import { MultiSelectTaxonomy } from "@/components/classification/multi-select-taxonomy";
+import { useTaxonomies } from "@/hooks/use-taxonomies";
 
 import { ParsedAsset, formatBreakdownTags, tagsToBreakdown } from "./asset-utils";
 
@@ -49,6 +52,17 @@ interface AssetFormProps {
 }
 
 export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProps) {
+  const { data: taxonomies = [] } = useTaxonomies();
+
+  // Split taxonomies by selection type and sort by sortOrder
+  const { singleSelectTaxonomies, multiSelectTaxonomies } = useMemo(() => {
+    const sorted = [...taxonomies].sort((a, b) => a.sortOrder - b.sortOrder);
+    return {
+      singleSelectTaxonomies: sorted.filter((t) => t.isSingleSelect),
+      multiSelectTaxonomies: sorted.filter((t) => !t.isSingleSelect),
+    };
+  }, [taxonomies]);
+
   const defaultValues: AssetFormValues = {
     symbol: asset.id,
     name: asset.name ?? "",
@@ -214,6 +228,33 @@ export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProp
             )}
           />
         </div>
+
+        {/* Classifications Section */}
+        {asset.id && (singleSelectTaxonomies.length > 0 || multiSelectTaxonomies.length > 0) && (
+          <div className="space-y-4 pt-4 border-t">
+            <h4 className="text-sm font-medium">Classifications</h4>
+
+            {/* Single-select taxonomies */}
+            {singleSelectTaxonomies.map((tax) => (
+              <SingleSelectTaxonomy
+                key={tax.id}
+                taxonomyId={tax.id}
+                assetId={asset.id}
+                label={tax.name}
+              />
+            ))}
+
+            {/* Multi-select taxonomies */}
+            {multiSelectTaxonomies.map((tax) => (
+              <MultiSelectTaxonomy
+                key={tax.id}
+                taxonomyId={tax.id}
+                assetId={asset.id}
+                label={tax.name}
+              />
+            ))}
+          </div>
+        )}
 
         <div className="flex justify-end gap-3">
           {onCancel ? (

@@ -77,14 +77,16 @@ function FeaturesSection() {
         return (
           <div
             key={feature.title}
-            className="flex items-center gap-3 rounded-lg border bg-muted/30 p-3 sm:flex-col sm:gap-2 sm:text-center"
+            className="bg-muted/30 flex items-center gap-3 rounded-lg border p-3 sm:flex-col sm:gap-2 sm:text-center"
           >
-            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${colors.bg}`}>
+            <div
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${colors.bg}`}
+            >
               <feature.icon className={`h-4 w-4 ${colors.icon}`} />
             </div>
             <div>
               <p className="text-xs font-medium">{feature.title}</p>
-              <p className="text-[10px] text-muted-foreground">{feature.description}</p>
+              <p className="text-muted-foreground text-[10px]">{feature.description}</p>
             </div>
           </div>
         );
@@ -109,7 +111,7 @@ function PlansPreviewSection() {
       <CardContent className="p-4">
         <div className="mb-4 text-center">
           <h3 className="text-sm font-semibold">Simple, transparent pricing</h3>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-muted-foreground text-xs">
             Choose a plan that fits your needs. Cancel anytime.
           </p>
         </div>
@@ -123,7 +125,7 @@ function PlansPreviewSection() {
               }`}
             >
               {plan.popular && (
-                <span className="absolute -top-2 left-3 rounded-full bg-primary px-2 py-0.5 text-[9px] font-medium text-primary-foreground sm:left-1/2 sm:-translate-x-1/2">
+                <span className="bg-primary text-primary-foreground absolute -top-2 left-3 rounded-full px-2 py-0.5 text-[9px] font-medium sm:left-1/2 sm:-translate-x-1/2">
                   Popular
                 </span>
               )}
@@ -131,23 +133,23 @@ function PlansPreviewSection() {
               <div className="flex items-center justify-between sm:hidden">
                 <div>
                   <p className="text-sm font-semibold">{plan.name}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-foreground text-xs">
                     {plan.accounts} · {plan.users}
                   </p>
                 </div>
                 <div className="text-right">
                   <span className="text-lg font-bold">{plan.price}</span>
-                  <span className="text-xs text-muted-foreground">/mo</span>
+                  <span className="text-muted-foreground text-xs">/mo</span>
                 </div>
               </div>
               {/* Desktop: vertical layout */}
               <div className="hidden text-center sm:block">
                 <p className="text-xs font-semibold">{plan.name}</p>
                 <p className="mt-1 text-lg font-bold">{plan.price}</p>
-                <p className="text-[10px] text-muted-foreground">/month</p>
+                <p className="text-muted-foreground text-[10px]">/month</p>
                 <div className="mt-2 space-y-0.5">
-                  <p className="text-[10px] text-muted-foreground">{plan.accounts}</p>
-                  <p className="text-[10px] text-muted-foreground">{plan.users}</p>
+                  <p className="text-muted-foreground text-[10px]">{plan.accounts}</p>
+                  <p className="text-muted-foreground text-[10px]">{plan.users}</p>
                 </div>
               </div>
             </div>
@@ -158,7 +160,7 @@ function PlansPreviewSection() {
           <Button
             variant="link"
             size="sm"
-            className="h-auto p-0 text-xs text-muted-foreground"
+            className="text-muted-foreground h-auto p-0 text-xs"
             onClick={() => openUrlInBrowser("https://wealthfolio.app/connect/")}
           >
             Compare all features
@@ -338,14 +340,6 @@ export function LoginForm() {
 
   return (
     <div className="space-y-6">
-      {/* Hero Section */}
-      <div className="text-center">
-        <h2 className="text-xl font-semibold">Wealthfolio Connect</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Sync your brokers automatically. Your data stays on your device.
-        </p>
-      </div>
-
       {/* Features Grid */}
       <FeaturesSection />
 
@@ -497,12 +491,7 @@ export function LoginForm() {
             <Collapsible open={isMoreOptionsOpen} onOpenChange={setIsMoreOptionsOpen}>
               <div className="flex justify-center">
                 <CollapsibleTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="gap-2"
-                    disabled={isLoading}
-                  >
+                  <Button type="button" variant="ghost" className="gap-2" disabled={isLoading}>
                     <span className="text-muted-foreground text-sm">More sign-in options</span>
                     <Icons.ChevronDown
                       className={`h-4 w-4 transition-transform ${
@@ -521,7 +510,10 @@ export function LoginForm() {
                   />
                 )}
                 {moreOptionsProviders.includes("email") && (
-                  <form onSubmit={handleMagicLinkSignIn} className="flex w-full max-w-sm flex-col items-center space-y-3">
+                  <form
+                    onSubmit={handleMagicLinkSignIn}
+                    className="flex w-full max-w-sm flex-col items-center space-y-3"
+                  >
                     <div className="w-full space-y-2">
                       <Label htmlFor="more-email">Email</Label>
                       <Input
@@ -579,9 +571,9 @@ export function LoginForm() {
       <PlansPreviewSection />
 
       {/* Privacy Footnote */}
-      <p className="text-center text-xs text-muted-foreground">
-        Your portfolio data never leaves your device. Connect uses secure aggregators
-        to sync transactions directly to your local database.
+      <p className="text-muted-foreground text-center text-xs">
+        Your portfolio data never leaves your device. Connect uses secure aggregators to sync
+        transactions directly to your local database.
       </p>
     </div>
   );

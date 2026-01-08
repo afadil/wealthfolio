@@ -1,6 +1,12 @@
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { DataTable } from "@wealthfolio/ui/components/ui/data-table";
 import { DataTableColumnHeader } from "@wealthfolio/ui/components/ui/data-table/data-table-column-header";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@wealthfolio/ui/components/ui/dropdown-menu";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { safeDivide } from "@/lib/utils";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -47,11 +53,13 @@ export const HoldingsTable = ({
   isLoading,
   showTotalReturn = true,
   setShowTotalReturn,
+  onClassify,
 }: {
   holdings: Holding[];
   isLoading: boolean;
   showTotalReturn?: boolean;
   setShowTotalReturn?: (value: boolean) => void;
+  onClassify?: (holding: Holding) => void;
 }) => {
   const { isBalanceHidden } = useBalancePrivacy();
   const { settings } = useSettingsContext();
@@ -102,7 +110,7 @@ export const HoldingsTable = ({
     <div className="flex h-full flex-col">
       <DataTable
         data={holdings}
-        columns={getColumns(isBalanceHidden, showConvertedValues, showTotalReturn)}
+        columns={getColumns(isBalanceHidden, showConvertedValues, showTotalReturn, onClassify)}
         searchBy="symbol"
         filters={filters}
         showColumnToggle={true}
@@ -163,6 +171,7 @@ const getColumns = (
   isHidden: boolean,
   showConvertedValues: boolean,
   showTotalReturn: boolean,
+  onClassify?: (holding: Holding) => void,
 ): ColumnDef<Holding>[] => [
   {
     id: "symbol",
@@ -412,19 +421,38 @@ const getColumns = (
     header: () => null,
     cell: ({ row }) => {
       const navigate = useNavigate();
+      const holding = row.original;
+      const hasInstrument = !!holding.instrument;
+
       const handleNavigate = () => {
         // Use instrument.id (asset ID) for navigation, not symbol (which may be stripped)
-        const navSymbol = row.original.instrument?.id ?? row.original.id;
+        const navSymbol = holding.instrument?.id ?? holding.id;
         navigate(`/holdings/${encodeURIComponent(navSymbol)}`, {
-          state: { holding: row.original },
+          state: { holding },
         });
       };
 
       return (
-        <div>
-          <Button variant="ghost" size="sm" onClick={handleNavigate}>
-            <Icons.ChevronRight className="h-4 w-4" />
-          </Button>
+        <div className="flex items-center justify-end">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <Icons.MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {hasInstrument && onClassify && (
+                <DropdownMenuItem onClick={() => onClassify(holding)}>
+                  <Icons.Tag className="mr-2 h-4 w-4" />
+                  Classify
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={handleNavigate}>
+                <Icons.ChevronRight className="mr-2 h-4 w-4" />
+                View Details
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       );
     },

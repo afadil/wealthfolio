@@ -1,9 +1,10 @@
 "use client";
 
-import * as React from "react";
-import * as CollapsiblePrimitive from "@radix-ui/react-collapsible";
-import { ChevronRight, Folder, FolderOpen, File } from "lucide-react";
 import { cn } from "@/lib/utils";
+import * as CollapsiblePrimitive from "@radix-ui/react-collapsible";
+import { ChevronRight, File, Folder, FolderOpen } from "lucide-react";
+import * as React from "react";
+import { Icons } from "./icons";
 
 // Types
 export interface TreeNode {
@@ -11,6 +12,7 @@ export interface TreeNode {
   name: string;
   children?: TreeNode[];
   icon?: React.ReactNode;
+  color?: string;
   data?: unknown;
 }
 
@@ -34,27 +36,17 @@ interface TreeItemProps {
 }
 
 // TreeItem component (recursive)
-function TreeItem({
-  node,
-  level,
-  selectedId,
-  onSelect,
-  expandedIds,
-  onToggle,
-}: TreeItemProps) {
+function TreeItem({ node, level, selectedId, onSelect, expandedIds, onToggle }: TreeItemProps) {
   const hasChildren = node.children && node.children.length > 0;
   const isExpanded = expandedIds.has(node.id);
   const isSelected = selectedId === node.id;
 
   return (
     <div className="select-none">
-      <CollapsiblePrimitive.Root
-        open={isExpanded}
-        onOpenChange={() => hasChildren && onToggle(node.id)}
-      >
+      <CollapsiblePrimitive.Root open={isExpanded} onOpenChange={() => hasChildren && onToggle(node.id)}>
         <div
           className={cn(
-            "flex items-center gap-1 rounded-md px-2 py-1.5 text-sm cursor-pointer transition-colors",
+            "flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-sm transition-colors",
             "hover:bg-muted/50",
             isSelected && "bg-accent text-accent-foreground",
           )}
@@ -64,35 +56,32 @@ function TreeItem({
           {hasChildren ? (
             <CollapsiblePrimitive.Trigger asChild>
               <button
-                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm hover:bg-muted"
+                className="hover:bg-muted flex h-5 w-5 shrink-0 items-center justify-center rounded-sm"
                 onClick={(e) => {
                   e.stopPropagation();
                   onToggle(node.id);
                 }}
               >
-                <ChevronRight
-                  className={cn(
-                    "h-4 w-4 transition-transform duration-200",
-                    isExpanded && "rotate-90",
-                  )}
-                />
+                <ChevronRight className={cn("h-4 w-4 transition-transform duration-200", isExpanded && "rotate-90")} />
               </button>
             </CollapsiblePrimitive.Trigger>
           ) : (
             <span className="w-5" />
           )}
 
-          <span className="shrink-0 text-muted-foreground">
+          <span className="shrink-0">
             {node.icon ? (
               node.icon
+            ) : node.color ? (
+              <Icons.Tag className="h-4 w-4" style={{ color: node.color }} />
             ) : hasChildren ? (
               isExpanded ? (
-                <FolderOpen className="h-4 w-4" />
+                <FolderOpen className="text-muted-foreground h-4 w-4" />
               ) : (
-                <Folder className="h-4 w-4" />
+                <Folder className="text-muted-foreground h-4 w-4" />
               )
             ) : (
-              <File className="h-4 w-4" />
+              <File className="text-muted-foreground h-4 w-4" />
             )}
           </span>
 
@@ -129,9 +118,7 @@ export function TreeView({
   onExpandedChange,
   defaultExpandedIds = [],
 }: TreeViewProps) {
-  const [internalExpandedIds, setInternalExpandedIds] = React.useState<Set<string>>(
-    () => new Set(defaultExpandedIds),
-  );
+  const [internalExpandedIds, setInternalExpandedIds] = React.useState<Set<string>>(() => new Set(defaultExpandedIds));
 
   const expandedIds = controlledExpandedIds ?? internalExpandedIds;
   const setExpandedIds = onExpandedChange ?? setInternalExpandedIds;
@@ -167,7 +154,7 @@ export function TreeView({
 }
 
 // Helper to convert flat categories to tree structure
-export function buildCategoryTree<T extends { id: string; parentId?: string | null; name: string }>(
+export function buildCategoryTree<T extends { id: string; parentId?: string | null; name: string; color?: string }>(
   categories: T[],
 ): TreeNode[] {
   const map = new Map<string, TreeNode & { originalData: T }>();
@@ -179,6 +166,7 @@ export function buildCategoryTree<T extends { id: string; parentId?: string | nu
       id: cat.id,
       name: cat.name,
       children: [],
+      color: cat.color,
       data: cat,
       originalData: cat,
     });

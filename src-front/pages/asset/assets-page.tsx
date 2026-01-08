@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 
+import { ClassificationSheet } from "@/components/classification/classification-sheet";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,6 +46,7 @@ export default function AssetsPage() {
 
   const [editingAsset, setEditingAsset] = useState<ParsedAsset | null>(null);
   const [assetPendingDelete, setAssetPendingDelete] = useState<ParsedAsset | null>(null);
+  const [classifyAsset, setClassifyAsset] = useState<{id: string, symbol: string, name?: string} | null>(null);
 
   const closeEditor = () => setEditingAsset(null);
 
@@ -80,6 +83,7 @@ export default function AssetsPage() {
             onDelete={(asset) => setAssetPendingDelete(asset)}
             onUpdateQuotes={(asset) => updateQuotesMutation.mutate([asset.symbol])}
             onRefetchQuotes={(asset) => refetchQuotesMutation.mutate([asset.symbol])}
+            onClassify={(asset) => setClassifyAsset({ id: asset.id, symbol: asset.symbol, name: asset.name ?? undefined })}
             isUpdatingQuotes={updateQuotesMutation.isPending}
             isRefetchingQuotes={refetchQuotesMutation.isPending}
           />
@@ -92,6 +96,7 @@ export default function AssetsPage() {
             onDelete={(asset) => setAssetPendingDelete(asset)}
             onUpdateQuotes={(asset) => updateQuotesMutation.mutate([asset.symbol])}
             onRefetchQuotes={(asset) => refetchQuotesMutation.mutate([asset.symbol])}
+            onClassify={(asset) => setClassifyAsset({ id: asset.id, symbol: asset.symbol, name: asset.name ?? undefined })}
             isUpdatingQuotes={updateQuotesMutation.isPending}
             isRefetchingQuotes={refetchQuotesMutation.isPending}
           />
@@ -183,6 +188,18 @@ export default function AssetsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ClassificationSheet
+        assetId={classifyAsset?.id ?? ""}
+        assetSymbol={classifyAsset?.symbol}
+        assetName={classifyAsset?.name}
+        open={classifyAsset !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setClassifyAsset(null);
+          }
+        }}
+      />
     </div>
   );
 }
