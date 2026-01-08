@@ -23,10 +23,10 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
   ChevronsLeft,
   ChevronsRight,
   ChevronsUpDown,
+  ChevronUp,
   Circle,
   CircleGauge,
   Clock,
@@ -68,7 +68,6 @@ import {
   ListFilter,
   Loader,
   Loader2,
-  LucideProps,
   Mail,
   Menu,
   MinusCircle,
@@ -127,12 +126,27 @@ import {
   Wifi,
   X,
   XCircle,
-  type LucideIcon,
 } from "lucide-react";
+import type { ComponentType, CSSProperties } from "react";
 
-export type Icon = LucideIcon;
+// Phosphor icons - deep imports for optimal tree shaking with Vite
+import { DevicesIcon } from "@phosphor-icons/react/dist/csr/Devices";
+import { UserSwitchIcon } from "@phosphor-icons/react/dist/csr/UserSwitch";
 
-export const Icons = {
+// Unified icon props that work with both Lucide and Phosphor
+export interface IconProps {
+  size?: number | string;
+  color?: string;
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number | string;
+  className?: string;
+  style?: CSSProperties;
+}
+
+export type Icon = ComponentType<IconProps>;
+
+const IconsInternal = {
   AlertCircle: AlertCircle,
   AlertTriangle: AlertTriangle,
   DatabaseBackup: DatabaseBackup,
@@ -261,7 +275,7 @@ export const Icons = {
   Mail: Mail,
   OctagonX: OctagonX,
   Settings2: Settings2,
-  Dashboard: ({ size, ...props }: LucideProps) => (
+  Dashboard: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 32}
@@ -278,7 +292,7 @@ export const Icons = {
     </svg>
   ),
 
-  Performance: ({ size, ...props }: LucideProps) => (
+  Performance: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 32}
@@ -292,7 +306,7 @@ export const Icons = {
     </svg>
   ),
 
-  Goals: ({ size, ...props }: LucideProps) => (
+  Goals: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 32}
@@ -306,7 +320,7 @@ export const Icons = {
     </svg>
   ),
 
-  Database: ({ size, ...props }: LucideProps) => (
+  Database: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 32}
@@ -320,7 +334,7 @@ export const Icons = {
     </svg>
   ),
 
-  FileCsv: ({ size, ...props }: LucideProps) => (
+  FileCsv: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 24}
@@ -343,7 +357,7 @@ export const Icons = {
     </svg>
   ),
 
-  FileJson: ({ size, ...props }: LucideProps) => (
+  FileJson: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 24}
@@ -364,7 +378,7 @@ export const Icons = {
     </svg>
   ),
 
-  Files: ({ size, ...props }: LucideProps) => (
+  Files: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 32}
@@ -378,7 +392,7 @@ export const Icons = {
     </svg>
   ),
 
-  Holdings: ({ size, ...props }: LucideProps) => (
+  Holdings: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 32}
@@ -395,7 +409,7 @@ export const Icons = {
     </svg>
   ),
 
-  Activity: ({ size, ...props }: LucideProps) => (
+  Activity: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 32}
@@ -409,7 +423,7 @@ export const Icons = {
     </svg>
   ),
 
-  Settings: ({ size, ...props }: LucideProps) => (
+  Settings: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 32}
@@ -426,7 +440,7 @@ export const Icons = {
     </svg>
   ),
 
-  Invoice: ({ size, ...props }: LucideProps) => (
+  Invoice: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 32}
@@ -440,7 +454,7 @@ export const Icons = {
     </svg>
   ),
 
-  Income: ({ size, ...props }: LucideProps) => (
+  Income: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 32}
@@ -457,7 +471,7 @@ export const Icons = {
     </svg>
   ),
 
-  Logo: ({ size, ...props }: LucideProps) => (
+  Logo: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 65}
@@ -481,7 +495,7 @@ export const Icons = {
     </svg>
   ),
 
-  ChartBar: ({ size, ...props }: LucideProps) => (
+  ChartBar: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 32}
@@ -495,7 +509,7 @@ export const Icons = {
     </svg>
   ),
 
-  InfoCircle: ({ size, ...props }: LucideProps) => (
+  InfoCircle: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 80}
@@ -508,7 +522,7 @@ export const Icons = {
       <path d="M33.2284 61.377H48.7558C50.5136 61.377 51.9296 60.1074 51.9296 58.3008C51.9296 56.5918 50.5136 55.2734 48.7558 55.2734H44.4589V37.0117C44.4589 34.6191 43.287 33.1055 41.0898 33.1055H33.9609C32.203 33.1055 30.8359 34.4238 30.8359 36.084C30.8359 37.8906 32.203 39.1602 33.9609 39.1602H37.5253V55.2734H33.2284C31.4706 55.2734 30.0546 56.5918 30.0546 58.3008C30.0546 60.1074 31.4706 61.377 33.2284 61.377ZM39.4296 27.0996C42.5058 27.0996 44.8984 24.6582 44.8984 21.582C44.8984 18.5059 42.5058 16.1133 39.4296 16.1133C36.4023 16.1133 33.9609 18.5059 33.9609 21.582C33.9609 24.6582 36.4023 27.0996 39.4296 27.0996Z" />
     </svg>
   ),
-  CirclesFour: ({ size, ...props }: LucideProps) => (
+  CirclesFour: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 32}
@@ -524,7 +538,7 @@ export const Icons = {
       <path d="M80,40a40,40,0,1,0,40,40A40,40,0,0,0,80,40Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,80,104Zm96,16a40,40,0,1,0-40-40A40,40,0,0,0,176,120Zm0-64a24,24,0,1,1-24,24A24,24,0,0,1,176,56ZM80,136a40,40,0,1,0,40,40A40,40,0,0,0,80,136Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,80,200Zm96-64a40,40,0,1,0,40,40A40,40,0,0,0,176,136Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,176,200Z"></path>
     </svg>
   ),
-  Money: ({ size, ...props }: LucideProps) => (
+  Money: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       {...props}
@@ -541,7 +555,7 @@ export const Icons = {
     </svg>
   ),
 
-  Addons: ({ size, ...props }: LucideProps) => (
+  Addons: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       {...props}
@@ -558,7 +572,7 @@ export const Icons = {
     </svg>
   ),
 
-  LogOut: ({ size, ...props }: LucideProps) => (
+  LogOut: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       {...props}
@@ -575,7 +589,7 @@ export const Icons = {
     </svg>
   ),
 
-  Launcher: ({ size, ...props }: LucideProps) => (
+  Launcher: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       {...props}
@@ -592,7 +606,7 @@ export const Icons = {
     </svg>
   ),
 
-  Search2: ({ size, ...props }: LucideProps) => (
+  Search2: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       {...props}
@@ -606,7 +620,7 @@ export const Icons = {
     </svg>
   ),
 
-  Insight: ({ size, ...props }: LucideProps) => (
+  Insight: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       {...props}
@@ -620,7 +634,7 @@ export const Icons = {
     </svg>
   ),
 
-  Google: ({ size, ...props }: LucideProps) => (
+  Google: ({ size, ...props }: IconProps) => (
     <svg xmlns="http://www.w3.org/2000/svg" width={size ?? 24} height={size ?? 24} viewBox="0 0 24 24" {...props}>
       <path
         d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -641,7 +655,7 @@ export const Icons = {
     </svg>
   ),
 
-  Apple: ({ size, ...props }: LucideProps) => (
+  Apple: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 24}
@@ -654,7 +668,7 @@ export const Icons = {
     </svg>
   ),
 
-  CloudSync2: ({ size, ...props }: LucideProps) => (
+  CloudSync2: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       {...props}
@@ -668,7 +682,7 @@ export const Icons = {
     </svg>
   ),
 
-  CloudOff: ({ size, ...props }: LucideProps) => (
+  CloudOff: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       {...props}
@@ -681,4 +695,178 @@ export const Icons = {
       <path d="M53.92,34.62A8,8,0,1,0,42.08,45.38L81.32,88.55l-.06.12A65,65,0,0,0,72,88a64,64,0,0,0,0,128h88a87.34,87.34,0,0,0,31.8-5.93l10.28,11.31a8,8,0,1,0,11.84-10.76ZM160,200H72a48,48,0,0,1,0-96c1.1,0,2.2,0,3.3.12A88.4,88.4,0,0,0,72,128a8,8,0,0,0,16,0,72.25,72.25,0,0,1,5.06-26.54l87,95.7A71.66,71.66,0,0,1,160,200Zm88-72a87.89,87.89,0,0,1-22.35,58.61A8,8,0,0,1,213.71,176,72,72,0,0,0,117.37,70a8,8,0,0,1-9.48-12.89A88,88,0,0,1,248,128Z"></path>
     </svg>
   ),
+
+  // Phosphor icons
+  Devices: ({ size, className, style, color }: IconProps) => (
+    <DevicesIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
+  UserSwitch: ({ size, className, style, color }: IconProps) => (
+    <UserSwitchIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
 };
+
+/**
+ * All available icon names
+ */
+export type IconName =
+  | "AlertCircle"
+  | "AlertTriangle"
+  | "DatabaseBackup"
+  | "DatabaseZap"
+  | "Blocks"
+  | "BadgeDollarSign"
+  | "Grid3x3"
+  | "Rows3"
+  | "Calendar"
+  | "Check"
+  | "CheckCircle"
+  | "Clock"
+  | "Cloud"
+  | "CloudSync"
+  | "ListChecks"
+  | "LayoutDashboard"
+  | "HandCoins"
+  | "Home"
+  | "Copy"
+  | "HelpCircle"
+  | "History"
+  | "ArrowRight"
+  | "ArrowLeft"
+  | "ArrowDown"
+  | "ArrowUp"
+  | "Billing"
+  | "CreditCard"
+  | "Bitcoin"
+  | "Briefcase"
+  | "Search"
+  | "Save"
+  | "Group"
+  | "Ungroup"
+  | "Globe"
+  | "Close"
+  | "Eye"
+  | "Info"
+  | "EyeOff"
+  | "Refresh"
+  | "RefreshCw"
+  | "RotateCcw"
+  | "PanelLeftOpen"
+  | "Download"
+  | "Activity2"
+  | "DollarSign"
+  | "Users"
+  | "User"
+  | "ChevronUp"
+  | "ChevronDown"
+  | "ChevronsUpDown"
+  | "ChevronLeft"
+  | "ChevronRight"
+  | "ChevronsLeft"
+  | "ChevronsRight"
+  | "Circle"
+  | "Plus"
+  | "Pencil"
+  | "PlusCircle"
+  | "PanelLeft"
+  | "MinusCircle"
+  | "PauseCircle"
+  | "Monitor"
+  | "Laptop"
+  | "Keyboard"
+  | "QrCode"
+  | "Camera"
+  | "Wifi"
+  | "Smartphone"
+  | "PieChart"
+  | "BarChart"
+  | "Spinner"
+  | "Loader"
+  | "MoreVertical"
+  | "Goal"
+  | "Trash"
+  | "Trash2"
+  | "Tag"
+  | "Hash"
+  | "Type"
+  | "AlignLeft"
+  | "Wallet"
+  | "WalletCards"
+  | "StretchHorizontal"
+  | "Menu"
+  | "Import"
+  | "FileText"
+  | "FileX"
+  | "XCircle"
+  | "ScrollText"
+  | "GaugeCircle"
+  | "ListCollapse"
+  | "CircleGauge"
+  | "ArrowRightLeft"
+  | "ArrowLeftRight"
+  | "Receipt"
+  | "ReceiptText"
+  | "Percent"
+  | "Split"
+  | "FileUp"
+  | "Store"
+  | "Package"
+  | "Star"
+  | "Shield"
+  | "ShieldAlert"
+  | "ShieldCheck"
+  | "ShieldOff"
+  | "ShieldX"
+  | "ExternalLink"
+  | "TrendingUp"
+  | "TrendingDown"
+  | "Link"
+  | "Building"
+  | "Car"
+  | "Gem"
+  | "Coins"
+  | "Eraser"
+  | "Sparkles"
+  | "Palette"
+  | "Moon"
+  | "Sun"
+  | "ListFilter"
+  | "Undo"
+  | "Unplug"
+  | "Fullscreen"
+  | "RectangleEllipsis"
+  | "Mail"
+  | "OctagonX"
+  | "Settings2"
+  | "Dashboard"
+  | "Performance"
+  | "Goals"
+  | "Database"
+  | "FileCsv"
+  | "FileJson"
+  | "Files"
+  | "Holdings"
+  | "Activity"
+  | "Settings"
+  | "Invoice"
+  | "Income"
+  | "Logo"
+  | "ChartBar"
+  | "InfoCircle"
+  | "CirclesFour"
+  | "Money"
+  | "Addons"
+  | "LogOut"
+  | "Launcher"
+  | "Search2"
+  | "Insight"
+  | "Google"
+  | "Apple"
+  | "CloudSync2"
+  | "CloudOff"
+  | "Devices"
+  | "UserSwitch";
+
+/**
+ * Icons object with unified typing - all icons have the same Icon type
+ */
+export const Icons: { [K in IconName]: Icon } = IconsInternal as { [K in IconName]: Icon };

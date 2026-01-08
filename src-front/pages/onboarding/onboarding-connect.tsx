@@ -4,22 +4,22 @@ import React from "react";
 
 const features = [
   {
-    icon: Icons.RefreshCw,
+    icon: Icons.CloudSync2,
     title: "Brokerage Sync",
-    description: "Auto-sync your accounts and transactions into your local database daily.",
+    description: "Auto-sync your accounts and transactions into your local database.",
     color: "orange",
   },
   {
-    icon: Icons.Users,
-    title: "Household View",
-    description: "Share selected accounts with family and see an aggregated view together.",
-    color: "blue",
-  },
-  {
-    icon: Icons.Laptop,
+    icon: Icons.Devices,
     title: "Device Sync",
     description: "Keep your database in sync across all devices with end-to-end encryption.",
     color: "green",
+  },
+  {
+    icon: Icons.UserSwitch,
+    title: "Household View",
+    description: "Share selected accounts with family and see an aggregated view together.",
+    color: "blue",
   },
 ];
 
@@ -54,31 +54,27 @@ export const OnboardingConnect: React.FC = () => {
       </div>
 
       {/* Features */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
         {features.map((feature) => {
           const colors = colorClasses[feature.color as keyof typeof colorClasses];
           return (
-            <Card key={feature.title} className="border p-5">
-              <div className="flex flex-col items-center text-center">
-                <div className={`mb-4 rounded-xl p-3 ${colors.bg}`}>
-                  <feature.icon className={`h-6 w-6 ${colors.icon}`} />
+            <Card key={feature.title} className="border p-3 sm:p-5">
+              <div className="flex min-h-16 items-center gap-3 sm:min-h-0 sm:flex-col sm:text-center">
+                <div
+                  className={`shrink-0 rounded-lg p-2 sm:mb-4 sm:rounded-xl sm:p-3 ${colors.bg}`}
+                >
+                  <feature.icon className={`h-5 w-5 sm:h-6 sm:w-6 ${colors.icon}`} />
                 </div>
-                <h3 className="mb-2 font-semibold">{feature.title}</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  {feature.description}
-                </p>
+                <div>
+                  <h3 className="text-sm font-semibold sm:mb-2 sm:text-base">{feature.title}</h3>
+                  <p className="text-muted-foreground text-xs leading-relaxed sm:text-sm">
+                    {feature.description}
+                  </p>
+                </div>
               </div>
             </Card>
           );
         })}
-      </div>
-
-      {/* Trust badge */}
-      <div className="flex justify-center">
-        <div className="text-muted-foreground inline-flex items-center gap-2 text-xs">
-          <Icons.ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
-          <span>SOC 2 Type II certified · Your credentials are never stored</span>
-        </div>
       </div>
 
       {/* Learn more link */}

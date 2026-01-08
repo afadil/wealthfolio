@@ -6,22 +6,22 @@ import { ConnectFlowDiagram } from "./connect-flow-diagram";
 
 const features = [
   {
-    icon: Icons.RefreshCw,
+    icon: Icons.CloudSync2,
     title: "Brokerage Sync",
     description: "Auto-sync accounts and transactions daily.",
     color: "orange",
   },
   {
-    icon: Icons.Users,
-    title: "Household View",
-    description: "Share accounts with family members.",
-    color: "blue",
-  },
-  {
-    icon: Icons.Laptop,
+    icon: Icons.Devices,
     title: "Device Sync",
     description: "Sync across devices with E2E encryption.",
     color: "green",
+  },
+  {
+    icon: Icons.UserSwitch,
+    title: "Household View",
+    description: "Share accounts with family members.",
+    color: "blue",
   },
 ];
 
@@ -46,11 +46,7 @@ export function ConnectEmptyState() {
       <div className="w-full max-w-3xl space-y-8 sm:space-y-12">
         {/* Header with Logo */}
         <header className="text-center">
-          <img
-            alt="Wealthfolio"
-            className="mx-auto mb-4 h-16 w-16"
-            src="/logo-vantage.png"
-          />
+          <img alt="Wealthfolio" className="mx-auto mb-4 h-16 w-16" src="/logo-vantage.png" />
           <div className="bg-secondary text-secondary-foreground mb-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium">
             <Icons.Sparkles className="h-3 w-3" />
             Optional

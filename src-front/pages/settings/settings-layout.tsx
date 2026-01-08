@@ -1,6 +1,6 @@
+import { ApplicationShell } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Separator } from "@wealthfolio/ui/components/ui/separator";
-import { ApplicationShell } from "@wealthfolio/ui";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { SidebarNav } from "./sidebar-nav";
 
@@ -67,7 +67,7 @@ const sidebarNavItems = [
   },
   {
     title: "Connect",
-    href: "wealthfolio-connect",
+    href: "connect",
     subtitle: "Login to your Wealthfolio Connect account",
     icon: <Icons.CloudSync2 className="size-6 text-blue-400" />,
   },

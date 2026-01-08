@@ -42,9 +42,9 @@ export function deleteCookie(name: string): void {
 /**
  * Get preferred sign-in provider from cookie
  */
-export function getPreferredProvider(): 'google' | 'apple' | 'email' | null {
+export function getPreferredProvider(): 'google' | 'email' | null {
   const value = getCookieValue(COOKIE_NAMES.PREFERRED_SIGNIN_PROVIDER);
-  if (value === 'google' || value === 'apple' || value === 'email') {
+  if (value === 'google' || value === 'email') {
     return value;
   }
   return null;
@@ -53,6 +53,6 @@ export function getPreferredProvider(): 'google' | 'apple' | 'email' | null {
 /**
  * Save preferred sign-in provider to cookie
  */
-export function savePreferredProvider(provider: 'google' | 'apple' | 'email'): void {
+export function savePreferredProvider(provider: 'google' | 'email'): void {
   setCookie(COOKIE_NAMES.PREFERRED_SIGNIN_PROVIDER, provider);
 }
