@@ -1,6 +1,6 @@
 import { CalendarDate, CalendarDateTime, getLocalTimeZone, parseDate, parseDateTime } from "@internationalized/date";
-import { CalendarIcon } from "lucide-react";
 import * as React from "react";
+import { Icons } from "./icons";
 import {
   Button,
   DateValue,
@@ -132,7 +132,7 @@ export function DatePickerInput({
           )}
           aria-label="Pick a date"
         >
-          <CalendarIcon size={16} />
+          <Icons.CalendarIcon size={16} />
         </Button>
       </Group>
       <Popover

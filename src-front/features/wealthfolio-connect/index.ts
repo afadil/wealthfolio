@@ -20,6 +20,7 @@ export {
   getPlatforms,
   listBrokerConnections,
   getSubscriptionPlans,
+  getSubscriptionPlansPublic,
   getUserInfo,
 } from "./services/broker-service";
 
@@ -39,6 +40,7 @@ export type {
   PlanId,
   BillingPeriod,
   PlanPricing,
+  PlanLimits,
   SubscriptionPlan,
   PlansResponse,
   UserTeam,

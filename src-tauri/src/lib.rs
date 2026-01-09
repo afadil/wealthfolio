@@ -300,6 +300,9 @@ pub fn run() {
             commands::taxonomy::get_asset_taxonomy_assignments,
             commands::taxonomy::assign_asset_to_category,
             commands::taxonomy::remove_asset_taxonomy_assignment,
+            // Taxonomy migration commands
+            commands::taxonomy::get_migration_status,
+            commands::taxonomy::migrate_legacy_classifications,
             // Platform commands
             commands::platform::get_platform,
             commands::platform::is_mobile,
@@ -339,6 +342,7 @@ pub fn run() {
             commands::brokers_sync::list_broker_connections,
             commands::brokers_sync::list_broker_accounts,
             commands::brokers_sync::get_subscription_plans,
+            commands::brokers_sync::get_subscription_plans_public,
             commands::brokers_sync::get_user_info,
             commands::brokers_sync::get_broker_sync_states,
             commands::brokers_sync::get_import_runs,

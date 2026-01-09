@@ -8,6 +8,10 @@ export interface WeightedBreakdown {
 export interface ParsedAsset extends Asset {
   sectorsList: Sector[];
   countriesList: Country[];
+  // Legacy classification fields extracted from metadata.legacy for UI display
+  // These should eventually be replaced by taxonomy-based classifications
+  assetClass?: string | null;
+  assetSubClass?: string | null;
 }
 
 const normalizeWeight = (weight: unknown): number => {
@@ -63,8 +67,23 @@ export const tagsToBreakdown = (values: string[]): WeightedBreakdown[] =>
     })
     .filter(Boolean) as WeightedBreakdown[];
 
-export const toParsedAsset = (asset: Asset): ParsedAsset => ({
-  ...asset,
-  sectorsList: parseJsonBreakdown(asset.profile?.sectors ?? null),
-  countriesList: parseJsonBreakdown(asset.profile?.countries ?? null),
-});
+export const toParsedAsset = (asset: Asset): ParsedAsset => {
+  // Legacy data is in metadata.legacy (for migration purposes)
+  // New data should come from taxonomies
+  const legacy = asset.metadata?.legacy as
+    | {
+        sectors?: string | null;
+        countries?: string | null;
+        asset_class?: string | null;
+        asset_sub_class?: string | null;
+      }
+    | undefined;
+
+  return {
+    ...asset,
+    sectorsList: parseJsonBreakdown(legacy?.sectors ?? null),
+    countriesList: parseJsonBreakdown(legacy?.countries ?? null),
+    assetClass: legacy?.asset_class ?? null,
+    assetSubClass: legacy?.asset_sub_class ?? null,
+  };
+};

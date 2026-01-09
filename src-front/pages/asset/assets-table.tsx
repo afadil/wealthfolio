@@ -38,7 +38,6 @@ interface AssetsTableProps {
   onDelete: (asset: ParsedAsset) => void;
   onUpdateQuotes: (asset: ParsedAsset) => void;
   onRefetchQuotes: (asset: ParsedAsset) => void;
-  onClassify?: (asset: ParsedAsset) => void;
   isUpdatingQuotes?: boolean;
   isRefetchingQuotes?: boolean;
 }
@@ -48,9 +47,10 @@ const PRICE_STALE_OPTIONS = [
   { label: "Stale", value: "true" },
 ];
 
-const isStaleQuote = (quote?: Quote) => {
-  if (!quote) {
-    return false;
+const isStaleQuote = (quote?: Quote, isActive?: boolean) => {
+  // Inactive assets or missing quotes are considered stale
+  if (!quote || isActive === false) {
+    return true;
   }
 
   const quoteDate = new Date(quote.timestamp);
@@ -71,7 +71,6 @@ export function AssetsTable({
   onDelete,
   onUpdateQuotes,
   onRefetchQuotes,
-  onClassify,
   isUpdatingQuotes,
   isRefetchingQuotes,
 }: AssetsTableProps) {
@@ -82,7 +81,7 @@ export function AssetsTable({
       {
         id: "symbol",
         accessorKey: "symbol",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Asset" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Security" />,
         cell: ({ row }) => {
           const asset = row.original;
           const displaySymbol = asset.symbol.startsWith("$CASH")
@@ -92,81 +91,73 @@ export function AssetsTable({
             <button
               type="button"
               onClick={() => navigate(`/holdings/${encodeURIComponent(asset.symbol)}`)}
-              className="hover:bg-muted/60 focus-visible:ring-ring group flex w-full items-center gap-3 rounded-md px-1 py-1 text-left transition"
+              className="hover:bg-muted/60 focus-visible:ring-ring group flex w-full items-center gap-2.5 rounded-md py-1 text-left transition"
             >
-              <TickerAvatar symbol={asset.symbol} className="h-10 w-10" />
-              <div className="space-y-1">
-                <div className="group-hover:text-primary leading-none font-semibold transition-colors">
+              <TickerAvatar symbol={asset.symbol} className="h-8 w-8 shrink-0" />
+              <div className="min-w-0">
+                <div className="group-hover:text-primary font-semibold leading-tight transition-colors">
                   {displaySymbol}
                 </div>
-                <div className="text-muted-foreground text-xs">{asset.name ?? "-"}</div>
+                <div className="text-muted-foreground truncate text-xs leading-tight">
+                  {asset.name ?? "—"}
+                </div>
               </div>
             </button>
           );
         },
       },
       {
-        accessorKey: "currency",
-        header: ({ column }) => (
-          <DataTableColumnHeader
-            column={column}
-            title="Currency"
-            className="w-[50px] text-center"
-          />
-        ),
-        cell: ({ row }) => (
-          <div className="flex justify-center">
-            <Badge
-              variant="secondary"
-              className="min-w-[64px] justify-center px-2 py-1 text-[11px] uppercase"
-            >
-              {row.original.currency || "USD"}
-            </Badge>
-          </div>
-        ),
-      },
-      {
-        accessorKey: "assetClass",
-        header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="Class" className="w-[120px]" />
-        ),
+        id: "market",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Market" />,
         cell: ({ row }) => {
-          const { assetClass, assetSubClass } = row.original;
-
-          if (!assetClass && !assetSubClass) {
-            return <span className="text-muted-foreground text-xs">-</span>;
-          }
-
+          const asset = row.original;
+          const isManual = asset.pricingMode === "MANUAL";
           return (
-            <div className="space-y-1">
-              {assetClass ? (
-                <div className="text-xs leading-tight font-semibold uppercase">{assetClass}</div>
-              ) : null}
-              {assetSubClass ? (
-                <div className="text-muted-foreground text-[11px] leading-tight uppercase">
-                  {assetSubClass}
-                </div>
-              ) : null}
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-1.5 text-sm">
+                <span className="font-medium">{asset.currency}</span>
+                {asset.exchangeMic ? (
+                  <>
+                    <span className="text-muted-foreground/50">·</span>
+                    <span className="text-muted-foreground">{asset.exchangeMic}</span>
+                  </>
+                ) : null}
+              </div>
+              <div>
+                <Badge
+                  variant={isManual ? "outline" : "secondary"}
+                  className="px-1.5 py-0 text-[10px]"
+                >
+                  {isManual ? "Manual" : "Auto"}
+                </Badge>
+              </div>
             </div>
           );
         },
       },
       {
-        accessorKey: "assetSubClass",
+        accessorKey: "currency",
+        header: () => null,
+        cell: () => null,
+        enableHiding: false,
       },
       {
-        accessorKey: "preferredProvider",
-        header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="Source" className="w-[60px]" />
-        ),
-        cell: ({ row }) => (
-          <Badge variant="secondary" className="uppercase">
-            {row.original.preferredProvider ?? "MANUAL"}
-          </Badge>
-        ),
+        accessorKey: "assetSubClass",
+        header: () => null,
+        cell: () => null,
+        enableHiding: false,
+      },
+      {
+        accessorKey: "pricingMode",
+        header: () => null,
+        cell: () => null,
+        enableHiding: false,
       },
       {
         accessorKey: "isStale",
+        header: () => null,
+        cell: () => null,
+        enableHiding: false,
         filterFn: (row, id, value) => {
           const filterValue = value as string[];
           const cellValue = row.getValue(id);
@@ -175,35 +166,48 @@ export function AssetsTable({
       },
       {
         id: "latestQuote",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Last Close" />,
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Quote" className="text-right" />
+        ),
         cell: ({ row }) => {
           const asset = row.original;
           const quote = latestQuotes[asset.symbol];
-          const stale = isStaleQuote(quote);
+          const stale = isStaleQuote(quote, asset.isActive);
 
           if (!quote) {
-            return <div className="text-muted-foreground text-sm">No quotes</div>;
+            return (
+              <div className="text-right">
+                <div className="flex items-center justify-end gap-1.5">
+                  <Icons.AlertTriangle className="text-amber-500 h-3.5 w-3.5" />
+                  <span className="text-muted-foreground text-sm">No quotes</span>
+                </div>
+              </div>
+            );
           }
 
           return (
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <div className="leading-none font-semibold">
-                  {formatAmount(quote.close, quote.currency ?? asset.currency ?? "USD")}
-                </div>
+            <div className="text-right">
+              <div className="flex items-center justify-end gap-1.5">
                 {stale ? (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Icons.AlertTriangle
-                        className="text-destructive h-4 w-4"
+                        className="text-amber-500 h-3.5 w-3.5"
                         aria-label="Quote not updated today"
                       />
                     </TooltipTrigger>
-                    <TooltipContent>Latest close is not from today</TooltipContent>
+                    <TooltipContent>Latest quote is not from today</TooltipContent>
                   </Tooltip>
                 ) : null}
+                <span className="font-semibold tabular-nums">
+                  {formatAmount(quote.close, quote.currency ?? asset.currency ?? "USD")}
+                </span>
               </div>
-              <div className="text-muted-foreground text-xs">{formatDate(quote.timestamp)}</div>
+              <div className="text-muted-foreground text-[11px]">
+                {formatDate(quote.timestamp)}
+                <span className="text-muted-foreground/50"> · </span>
+                <span className="uppercase">{quote.dataSource || "—"}</span>
+              </div>
             </div>
           );
         },
@@ -226,6 +230,10 @@ export function AssetsTable({
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => onEdit(asset)}>
+                    Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => onUpdateQuotes(asset)}
                     disabled={isUpdatingQuotes}
@@ -239,11 +247,6 @@ export function AssetsTable({
                     Refetch quotes
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onClassify?.(asset)}>
-                    <Icons.Tag className="mr-2 h-4 w-4" />
-                    Classify
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onEdit(asset)}>Edit</DropdownMenuItem>
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
                     onSelect={() => onDelete(asset)}
@@ -259,7 +262,6 @@ export function AssetsTable({
     ],
     [
       latestQuotes,
-      onClassify,
       onDelete,
       onEdit,
       onRefetchQuotes,
@@ -270,40 +272,23 @@ export function AssetsTable({
     ],
   );
 
-  // Build filter options from assets (preferredProvider)
-  const dataSourceOptions = useMemo(() => {
-    const sources = new Set(
-      assets.map((asset) => asset.preferredProvider ?? "MANUAL").filter((s): s is string => !!s),
+  // Build filter options from assets (pricingMode)
+  const pricingModeOptions = useMemo(() => {
+    const modes = new Set(
+      assets.map((asset) => asset.pricingMode).filter(Boolean),
     );
-    return Array.from(sources).map((source) => ({
-      label: source.toUpperCase(),
-      value: source,
+    return Array.from(modes).map((mode) => ({
+      label: mode === "MARKET" ? "Auto" : mode,
+      value: mode,
     }));
-  }, [assets]);
-
-  const assetSubClassOptions = useMemo(() => {
-    const subClasses = new Set(
-      assets.map((asset) => asset.assetSubClass).filter((c): c is string => !!c),
-    );
-    return Array.from(subClasses)
-      .sort()
-      .map((assetSubClass) => ({
-        label: assetSubClass.toUpperCase(),
-        value: assetSubClass,
-      }));
   }, [assets]);
 
   const filters: DataTableFacetedFilterProps<ParsedAsset, unknown>[] = useMemo(
     () => [
       {
-        id: "assetSubClass",
-        title: "Class",
-        options: assetSubClassOptions,
-      },
-      {
-        id: "dataSource",
-        title: "Data Source",
-        options: dataSourceOptions,
+        id: "pricingMode",
+        title: "Mode",
+        options: pricingModeOptions,
       },
       {
         id: "isStale",
@@ -311,7 +296,7 @@ export function AssetsTable({
         options: PRICE_STALE_OPTIONS,
       },
     ],
-    [assetSubClassOptions, dataSourceOptions],
+    [pricingModeOptions],
   );
 
   // Add computed field for stale status to enable filtering
@@ -319,7 +304,7 @@ export function AssetsTable({
     () =>
       assets.map((asset) => ({
         ...asset,
-        isStale: isStaleQuote(latestQuotes[asset.symbol]) ? "true" : "false",
+        isStale: isStaleQuote(latestQuotes[asset.symbol], asset.isActive) ? "true" : "false",
       })),
     [assets, latestQuotes],
   );
@@ -334,49 +319,39 @@ export function AssetsTable({
           <Table>
             <TableHeader className="bg-muted/50 sticky top-0 z-10">
               <TableRow>
-                <TableHead>Asset</TableHead>
-                <TableHead className="text-center">Currency</TableHead>
-                <TableHead>Class</TableHead>
-                <TableHead>Source</TableHead>
-                <TableHead>Last Close</TableHead>
-                <TableHead></TableHead>
+                <TableHead>Security</TableHead>
+                <TableHead>Market</TableHead>
+                <TableHead className="text-right">Quote</TableHead>
+                <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {Array.from({ length: 5 }).map((_, index) => (
+              {Array.from({ length: 6 }).map((_, index) => (
                 <TableRow key={index}>
                   <TableCell>
-                    <div className="flex items-center gap-3 px-1 py-1">
-                      <Skeleton className="h-10 w-10 rounded-full" />
-                      <div className="space-y-2">
-                        <Skeleton className="h-4 w-24" />
-                        <Skeleton className="h-3 w-32" />
+                    <div className="flex items-center gap-2.5 py-1">
+                      <Skeleton className="h-8 w-8 rounded-full" />
+                      <div className="space-y-1">
+                        <Skeleton className="h-4 w-14" />
+                        <Skeleton className="h-3 w-28" />
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex justify-center">
-                      <Skeleton className="h-6 w-16" />
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       <Skeleton className="h-4 w-20" />
-                      <Skeleton className="h-3 w-16" />
+                      <Skeleton className="h-4 w-10" />
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Skeleton className="h-6 w-12" />
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-2">
-                      <Skeleton className="h-4 w-24" />
-                      <Skeleton className="h-3 w-20" />
+                    <div className="flex flex-col items-end gap-1">
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="h-3 w-24" />
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-end">
-                      <Skeleton className="h-9 w-9" />
+                      <Skeleton className="h-8 w-8" />
                     </div>
                   </TableCell>
                 </TableRow>
@@ -394,9 +369,9 @@ export function AssetsTable({
       columns={columns}
       searchBy="symbol"
       filters={filters}
-      defaultColumnVisibility={{ isStale: false, assetSubClass: false }}
+      defaultColumnVisibility={{ currency: false, isStale: false, assetSubClass: false, pricingMode: false }}
       defaultSorting={[{ id: "symbol", desc: false }]}
-      storageKey="assets-table"
+      storageKey="securities-table-v2"
       scrollable
     />
   );

@@ -51,11 +51,17 @@ impl ExchangeRate {
 
     /// Parses an FX ID/symbol into (from_currency, to_currency).
     /// Supports multiple formats:
-    /// - New canonical: "EUR/USD" -> ("EUR", "USD")
+    /// - New canonical: "EUR:USD" -> ("EUR", "USD")
+    /// - Legacy slash: "EUR/USD" -> ("EUR", "USD")
     /// - Legacy concatenated: "EURUSD" -> ("EUR", "USD")
     /// - Legacy Yahoo: "EURUSD=X" -> ("EUR", "USD")
     pub fn parse_fx_symbol(symbol: &str) -> (String, String) {
-        // Handle new canonical format with slash
+        // Handle new canonical format with colon (primary format)
+        if let Some((base, quote)) = symbol.split_once(':') {
+            return (base.to_string(), quote.to_string());
+        }
+
+        // Handle legacy format with slash
         if let Some((base, quote)) = symbol.split_once('/') {
             return (base.to_string(), quote.to_string());
         }
@@ -71,9 +77,9 @@ impl ExchangeRate {
     }
 
     /// Creates a canonical FX asset ID from currency pair.
-    /// Returns format like "EUR/USD" per spec.
+    /// Returns format like "EUR:USD" per spec.
     pub fn make_fx_symbol(from: &str, to: &str) -> String {
-        format!("{}/{}", from, to)
+        format!("{}:{}", from, to)
     }
 }
 

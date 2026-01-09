@@ -212,6 +212,7 @@ mod tests {
             _symbols: &HashSet<String>,
             _start: NaiveDate,
             _end: NaiveDate,
+            _first_appearance: &HashMap<String, NaiveDate>,
         ) -> Result<Vec<Quote>> {
             unimplemented!()
         }
@@ -381,6 +382,7 @@ mod tests {
                 countries: None,
                 sectors: None,
                 preferred_provider: None,
+                classifications: None,
             })
         } else {
             None

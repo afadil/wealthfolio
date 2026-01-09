@@ -1,16 +1,6 @@
 import type { Column, Table } from "@tanstack/react-table";
-import {
-  BaselineIcon,
-  CalendarIcon,
-  CheckSquareIcon,
-  FileIcon,
-  HashIcon,
-  LinkIcon,
-  ListChecksIcon,
-  ListIcon,
-  TextInitialIcon,
-} from "lucide-react";
 import type * as React from "react";
+import { Icons } from "../ui/icons";
 import type {
   CellOpts,
   CellPosition,
@@ -231,23 +221,23 @@ export function getColumnVariant(variant?: CellOpts["variant"]): {
 } | null {
   switch (variant) {
     case "short-text":
-      return { label: "Short text", icon: BaselineIcon };
+      return { label: "Short text", icon: Icons.Baseline };
     case "long-text":
-      return { label: "Long text", icon: TextInitialIcon };
+      return { label: "Long text", icon: Icons.CaseSensitive };
     case "number":
-      return { label: "Number", icon: HashIcon };
+      return { label: "Number", icon: Icons.Hash };
     case "url":
-      return { label: "URL", icon: LinkIcon };
+      return { label: "URL", icon: Icons.Link };
     case "checkbox":
-      return { label: "Checkbox", icon: CheckSquareIcon };
+      return { label: "Checkbox", icon: Icons.CheckSquare };
     case "select":
-      return { label: "Select", icon: ListIcon };
+      return { label: "Select", icon: Icons.List };
     case "multi-select":
-      return { label: "Multi-select", icon: ListChecksIcon };
+      return { label: "Multi-select", icon: Icons.ListChecks };
     case "date":
-      return { label: "Date", icon: CalendarIcon };
+      return { label: "Date", icon: Icons.CalendarIcon };
     case "file":
-      return { label: "File", icon: FileIcon };
+      return { label: "File", icon: Icons.File };
     default:
       return null;
   }

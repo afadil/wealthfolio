@@ -23,7 +23,7 @@ use super::store::{ProviderSettingsStore, QuoteStore};
 use super::sync::{QuoteSyncService, QuoteSyncServiceTrait, SyncResult};
 use super::sync_state::{QuoteSyncState, SyncStateStore, SymbolSyncPlan};
 use super::types::{AssetId, Day};
-use crate::assets::{AssetRepositoryTrait, ProviderProfile};
+use crate::assets::{AssetRepositoryTrait, ProviderProfile, CASH_PREFIX};
 use crate::errors::Result;
 use crate::secrets::SecretStore;
 
@@ -93,11 +93,20 @@ pub trait QuoteServiceTrait: Send + Sync {
     /// 1. Fetches all quotes in range (with lookback for initial values)
     /// 2. For each day in the range, outputs the last known quote for each symbol
     /// 3. Symbols with no quotes before the start date will have no output until their first quote
+    ///
+    /// # Arguments
+    /// * `symbols` - Set of symbols to fetch quotes for
+    /// * `start` - Start date of the range
+    /// * `end` - End date of the range
+    /// * `first_appearance` - Optional map of symbol -> first date it appeared in portfolio.
+    ///   Debug messages for missing quotes are only logged for dates on or after the symbol's
+    ///   first appearance, reducing noise from assets added later.
     fn get_quotes_in_range_filled(
         &self,
         symbols: &HashSet<String>,
         start: NaiveDate,
         end: NaiveDate,
+        first_appearance: &HashMap<String, NaiveDate>,
     ) -> Result<Vec<Quote>>;
 
     /// Get daily quotes grouped by date, then by symbol.
@@ -392,6 +401,7 @@ where
         symbols: &HashSet<String>,
         start: NaiveDate,
         end: NaiveDate,
+        first_appearance: &HashMap<String, NaiveDate>,
     ) -> Result<Vec<Quote>> {
         if symbols.is_empty() {
             return Ok(Vec::new());
@@ -409,7 +419,13 @@ where
         }
 
         // Fill missing quotes
-        Ok(fill_missing_quotes(&all_quotes, symbols, start, end))
+        Ok(fill_missing_quotes(
+            &all_quotes,
+            symbols,
+            start,
+            end,
+            first_appearance,
+        ))
     }
 
     async fn get_daily_quotes(
@@ -703,6 +719,9 @@ where
 /// * `required_symbols` - Symbols to fill
 /// * `start_date` - Start of the output range
 /// * `end_date` - End of the output range
+/// * `first_appearance` - Optional map of symbol -> first date it appeared in portfolio.
+///   Debug messages for missing quotes are only logged for dates on or after the symbol's
+///   first appearance, reducing noise from assets added later.
 ///
 /// # Returns
 /// A Vec of quotes with one entry per symbol per day (filled from last known value)
@@ -711,7 +730,19 @@ fn fill_missing_quotes(
     required_symbols: &HashSet<String>,
     start_date: NaiveDate,
     end_date: NaiveDate,
+    first_appearance: &HashMap<String, NaiveDate>,
 ) -> Vec<Quote> {
+    if required_symbols.is_empty() {
+        return Vec::new();
+    }
+
+    // Filter out cash symbols - they don't need quotes (valued at 1:1)
+    let required_symbols: HashSet<String> = required_symbols
+        .iter()
+        .filter(|s| !s.starts_with(CASH_PREFIX))
+        .cloned()
+        .collect();
+
     if required_symbols.is_empty() {
         return Vec::new();
     }
@@ -760,7 +791,7 @@ fn fill_missing_quotes(
         }
 
         // Output a quote for each required symbol using last known value
-        for symbol in required_symbols {
+        for symbol in &required_symbols {
             if let Some(last_quote) = last_known_quotes.get(symbol) {
                 let mut quote_for_today = last_quote.clone();
                 // Update timestamp to current date at noon UTC
@@ -768,10 +799,19 @@ fn fill_missing_quotes(
                     Utc.from_utc_datetime(&current_date.and_hms_opt(12, 0, 0).unwrap());
                 all_filled_quotes.push(quote_for_today);
             } else {
-                debug!(
-                    "No quote available for symbol '{}' on or before date {}",
-                    symbol, current_date
-                );
+                // Only log debug message if we're past the symbol's first appearance date
+                // This avoids noisy logs for assets added to portfolio later
+                let should_log = first_appearance
+                    .get(symbol)
+                    .map(|first_date| current_date >= *first_date)
+                    .unwrap_or(true); // Log if no first_appearance info provided
+
+                if should_log {
+                    debug!(
+                        "No quote available for symbol '{}' on or before date {}",
+                        symbol, current_date
+                    );
+                }
             }
         }
     }

@@ -203,22 +203,32 @@ impl AssetServiceTrait for AssetService {
             .unwrap_or_else(|| "USD".to_string());
 
         // Extract optional fields from metadata
-        let (name, asset_class, asset_sub_class, exchange_mic) = metadata
-            .map(|m| (m.name, m.asset_class, m.asset_sub_class, m.exchange_mic))
+        let (name, exchange_mic) = metadata
+            .map(|m| (m.name, m.exchange_mic))
             .unwrap_or_default();
+
+        // For crypto assets, extract base symbol from "BTC-CAD" format
+        // The asset_id remains "BTC-CAD" but symbol should be just "BTC"
+        let symbol = if kind == AssetKind::Crypto && asset_id.contains('-') {
+            asset_id
+                .split('-')
+                .next()
+                .unwrap_or(asset_id)
+                .to_string()
+        } else {
+            asset_id.to_string()
+        };
 
         // Create minimal asset with optional metadata
         let new_asset = NewAsset {
             id: Some(asset_id.to_string()),
             kind,
             name,
-            symbol: asset_id.to_string(),
+            symbol,
             exchange_mic,
             currency,
             pricing_mode,
             preferred_provider: Some("YAHOO".to_string()),
-            asset_class,
-            asset_sub_class,
             is_active: true,
             ..Default::default()
         };
@@ -285,19 +295,13 @@ impl AssetServiceTrait for AssetService {
         };
 
         // Build profile update from provider data
+        // Note: sectors/countries/classifications now come from taxonomies, not stored on asset
         let mut update = UpdateAssetProfile {
             symbol: existing_asset.symbol.clone(),
             name: provider_profile.name.or(existing_asset.name.clone()),
-            sectors: provider_profile.sectors,
-            countries: provider_profile.countries,
             notes: existing_asset.notes.clone().unwrap_or_default(),
-            asset_sub_class: provider_profile
-                .asset_sub_class
-                .or(existing_asset.asset_sub_class.clone()),
-            asset_class: provider_profile
-                .asset_class
-                .or(existing_asset.asset_class.clone()),
             kind: updated_kind,
+            exchange_mic: None, // Keep existing exchange_mic
             pricing_mode: Some(existing_asset.pricing_mode.clone()),
             provider_overrides: existing_asset.provider_overrides.clone(),
         };
@@ -310,8 +314,8 @@ impl AssetServiceTrait for AssetService {
         }
 
         debug!(
-            "Enriching asset {} with provider profile: kind={:?}, sectors={:?}, countries={:?}",
-            asset_id, update.kind, update.sectors, update.countries
+            "Enriching asset {} with provider profile: kind={:?}, name={:?}",
+            asset_id, update.kind, update.name
         );
 
         self.asset_repository

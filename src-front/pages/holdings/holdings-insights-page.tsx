@@ -85,19 +85,34 @@ export const HoldingsInsightsPage = () => {
       case "class":
         filteredHoldings = holdings.filter((h) => {
           const isCash = h.holdingType === HoldingType.CASH;
-          const assetSubClass = isCash ? "Cash" : (h.instrument?.assetSubclass ?? "Other");
-          return assetSubClass === sheetFilterName;
+          // Check taxonomy assetType first, fall back to legacy assetSubclass
+          const assetType = isCash
+            ? "Cash"
+            : h.instrument?.classifications?.assetType?.name ??
+              h.instrument?.assetSubclass ??
+              "Other";
+          return assetType === sheetFilterName;
         });
         break;
       case "sector":
-        filteredHoldings = holdings.filter((h) =>
-          h.instrument?.sectors?.some((s) => s.name === sheetFilterName),
-        );
+        filteredHoldings = holdings.filter((h) => {
+          // Check taxonomy sectors first, fall back to legacy sectors
+          const taxonomySectors = h.instrument?.classifications?.sectors;
+          if (taxonomySectors && taxonomySectors.length > 0) {
+            return taxonomySectors.some((s) => s.category.name === sheetFilterName);
+          }
+          return h.instrument?.sectors?.some((s) => s.name === sheetFilterName);
+        });
         break;
       case "country":
-        filteredHoldings = holdings.filter((h) =>
-          h.instrument?.countries?.some((c) => c.name === sheetFilterName),
-        );
+        filteredHoldings = holdings.filter((h) => {
+          // Check taxonomy regions first, fall back to legacy countries
+          const taxonomyRegions = h.instrument?.classifications?.regions;
+          if (taxonomyRegions && taxonomyRegions.length > 0) {
+            return taxonomyRegions.some((r) => r.category.name === sheetFilterName);
+          }
+          return h.instrument?.countries?.some((c) => c.name === sheetFilterName);
+        });
         break;
       case "currency":
         filteredHoldings = holdings.filter((h) => h.localCurrency === sheetFilterName);

@@ -93,24 +93,20 @@ interface PlanCardProps {
 }
 
 function PlanCard({ plan, billingPeriod, isDefault, isComingSoon }: PlanCardProps) {
-  const pricing = plan.pricing[billingPeriod];
+  const priceAmount = billingPeriod === "monthly" ? plan.pricing.monthly : plan.pricing.yearly;
   const yearlyPricing = plan.pricing.yearly;
   const monthlyPricing = plan.pricing.monthly;
 
-  // Calculate savings for yearly billing
+  // Use yearlyDiscountPercent from API if available, otherwise calculate
   const yearlySavings =
     billingPeriod === "yearly"
-      ? Math.round(
-          ((monthlyPricing.amount * 12 - yearlyPricing.amount) /
-            (monthlyPricing.amount * 12)) *
-            100
-        )
+      ? plan.yearlyDiscountPercent ?? Math.round(((monthlyPricing * 12 - yearlyPricing) / (monthlyPricing * 12)) * 100)
       : 0;
 
-  const formatPrice = (amount: number, currency: string) => {
+  const formatPrice = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency,
+      currency: "USD",
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
     }).format(amount);
@@ -120,13 +116,16 @@ function PlanCard({ plan, billingPeriod, isDefault, isComingSoon }: PlanCardProp
     openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/onboarding?plan=${plan.id}`);
   };
 
+  // Use isComingSoon from API if available
+  const showComingSoon = isComingSoon || plan.isComingSoon;
+
   return (
     <div
       className={`relative flex flex-col rounded-lg border bg-muted/30 p-4 ${
         isDefault ? "border-primary" : "border-border"
-      } ${isComingSoon ? "opacity-60" : ""}`}
+      } ${showComingSoon ? "opacity-60" : ""}`}
     >
-      {isComingSoon && (
+      {showComingSoon && (
         <Badge
           className="absolute -top-2.5 left-1/2 -translate-x-1/2"
           variant="secondary"
@@ -137,13 +136,13 @@ function PlanCard({ plan, billingPeriod, isDefault, isComingSoon }: PlanCardProp
 
       <div className="mb-3">
         <h3 className="text-base font-semibold">{plan.name}</h3>
-        <p className="text-muted-foreground mt-0.5 text-xs">{plan.description}</p>
+        <p className="text-muted-foreground mt-0.5 text-xs">{plan.tagline ?? plan.description}</p>
       </div>
 
       <div className="mb-4">
         <div className="flex items-baseline gap-1">
           <span className="text-2xl font-bold">
-            {formatPrice(pricing.amount, pricing.currency)}
+            {formatPrice(priceAmount)}
           </span>
           <span className="text-muted-foreground text-xs">
             /{billingPeriod === "monthly" ? "mo" : "yr"}
@@ -170,9 +169,9 @@ function PlanCard({ plan, billingPeriod, isDefault, isComingSoon }: PlanCardProp
         size="sm"
         variant={isDefault ? "default" : "outline"}
         onClick={handleGetStarted}
-        disabled={isComingSoon}
+        disabled={showComingSoon || !plan.isAvailable}
       >
-        {isComingSoon ? "Coming Soon" : "Get Started"}
+        {showComingSoon ? "Coming Soon" : "Get Started"}
       </Button>
     </div>
   );
@@ -360,8 +359,7 @@ export function SubscriptionPlans({ enabled = true, onRefresh, isRefreshing }: S
                 key={plan.id}
                 plan={plan}
                 billingPeriod={billingPeriod}
-                isDefault={plan.id === "essentials"}
-                isComingSoon={plan.id === "plus"}
+                isDefault={plan.id === "essentials" || plan.badge === "Popular"}
               />
             ))}
           </div>

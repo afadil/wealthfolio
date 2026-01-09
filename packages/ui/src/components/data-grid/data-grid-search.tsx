@@ -2,7 +2,7 @@
 
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { Icons } from "../ui/icons";
 import * as React from "react";
 import { useDebouncedCallback } from "../../hooks/use-debounced-callback";
 import type { SearchState } from "./data-grid-types";
@@ -174,7 +174,7 @@ function DataGridSearchImpl({
             onPointerDown={onPrevMatchPointerDown}
             disabled={searchMatches.length === 0}
           >
-            <ChevronUp />
+            <Icons.ChevronUp />
           </Button>
           <Button
             aria-label="Next match"
@@ -185,7 +185,7 @@ function DataGridSearchImpl({
             onPointerDown={onNextMatchPointerDown}
             disabled={searchMatches.length === 0}
           >
-            <ChevronDown />
+            <Icons.ChevronDown />
           </Button>
           <Button
             aria-label="Close search"
@@ -194,7 +194,7 @@ function DataGridSearchImpl({
             className="size-7"
             onClick={onClose}
           >
-            <X />
+            <Icons.X />
           </Button>
         </div>
       </div>

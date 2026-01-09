@@ -2,7 +2,18 @@
 
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
+use log::error;
 use serde::{Deserialize, Serialize};
+
+/// Helper to parse RFC3339 string to NaiveDateTime
+fn text_to_datetime(s: &str) -> NaiveDateTime {
+    chrono::DateTime::parse_from_rfc3339(s)
+        .map(|dt| dt.naive_utc())
+        .unwrap_or_else(|e| {
+            error!("Failed to parse datetime '{}': {}", s, e);
+            chrono::Utc::now().naive_utc()
+        })
+}
 
 /// Database model for taxonomies
 #[derive(
@@ -16,11 +27,11 @@ pub struct TaxonomyDB {
     pub name: String,
     pub color: String,
     pub description: Option<String>,
-    pub is_system: bool,
-    pub is_single_select: bool,
+    pub is_system: i32,        // Schema uses Integer
+    pub is_single_select: i32, // Schema uses Integer
     pub sort_order: i32,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
+    pub created_at: String,    // Schema uses Text
+    pub updated_at: String,    // Schema uses Text
 }
 
 /// Database model for creating a new taxonomy
@@ -32,9 +43,11 @@ pub struct NewTaxonomyDB {
     pub name: String,
     pub color: String,
     pub description: Option<String>,
-    pub is_system: bool,
-    pub is_single_select: bool,
+    pub is_system: i32,        // Schema uses Integer
+    pub is_single_select: i32, // Schema uses Integer
     pub sort_order: i32,
+    pub created_at: String,    // Schema uses Text
+    pub updated_at: String,    // Schema uses Text
 }
 
 /// Database model for taxonomy categories
@@ -54,8 +67,8 @@ pub struct CategoryDB {
     pub color: String,
     pub description: Option<String>,
     pub sort_order: i32,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
+    pub created_at: String, // Schema uses Text
+    pub updated_at: String, // Schema uses Text
 }
 
 /// Database model for creating a new category
@@ -71,6 +84,8 @@ pub struct NewCategoryDB {
     pub color: String,
     pub description: Option<String>,
     pub sort_order: i32,
+    pub created_at: String, // Schema uses Text
+    pub updated_at: String, // Schema uses Text
 }
 
 /// Database model for asset taxonomy assignments
@@ -87,8 +102,8 @@ pub struct AssetTaxonomyAssignmentDB {
     pub category_id: String,
     pub weight: i32,  // basis points: 10000 = 100%
     pub source: String,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
+    pub created_at: String, // Schema uses Text
+    pub updated_at: String, // Schema uses Text
 }
 
 /// Database model for creating a new assignment
@@ -102,6 +117,8 @@ pub struct NewAssetTaxonomyAssignmentDB {
     pub category_id: String,
     pub weight: i32,  // basis points: 10000 = 100%
     pub source: String,
+    pub created_at: String, // Schema uses Text
+    pub updated_at: String, // Schema uses Text
 }
 
 // Conversion to domain models
@@ -112,11 +129,11 @@ impl From<TaxonomyDB> for wealthfolio_core::taxonomies::Taxonomy {
             name: db.name,
             color: db.color,
             description: db.description,
-            is_system: db.is_system,
-            is_single_select: db.is_single_select,
+            is_system: db.is_system != 0,
+            is_single_select: db.is_single_select != 0,
             sort_order: db.sort_order,
-            created_at: db.created_at,
-            updated_at: db.updated_at,
+            created_at: text_to_datetime(&db.created_at),
+            updated_at: text_to_datetime(&db.updated_at),
         }
     }
 }
@@ -132,8 +149,8 @@ impl From<CategoryDB> for wealthfolio_core::taxonomies::Category {
             color: db.color,
             description: db.description,
             sort_order: db.sort_order,
-            created_at: db.created_at,
-            updated_at: db.updated_at,
+            created_at: text_to_datetime(&db.created_at),
+            updated_at: text_to_datetime(&db.updated_at),
         }
     }
 }
@@ -147,8 +164,8 @@ impl From<AssetTaxonomyAssignmentDB> for wealthfolio_core::taxonomies::AssetTaxo
             category_id: db.category_id,
             weight: db.weight,
             source: db.source,
-            created_at: db.created_at,
-            updated_at: db.updated_at,
+            created_at: text_to_datetime(&db.created_at),
+            updated_at: text_to_datetime(&db.updated_at),
         }
     }
 }
@@ -156,20 +173,24 @@ impl From<AssetTaxonomyAssignmentDB> for wealthfolio_core::taxonomies::AssetTaxo
 // Conversion from domain models
 impl From<wealthfolio_core::taxonomies::NewTaxonomy> for NewTaxonomyDB {
     fn from(domain: wealthfolio_core::taxonomies::NewTaxonomy) -> Self {
+        let now = chrono::Utc::now().to_rfc3339();
         Self {
             id: domain.id,
             name: domain.name,
             color: domain.color,
             description: domain.description,
-            is_system: domain.is_system,
-            is_single_select: domain.is_single_select,
+            is_system: if domain.is_system { 1 } else { 0 },
+            is_single_select: if domain.is_single_select { 1 } else { 0 },
             sort_order: domain.sort_order,
+            created_at: now.clone(),
+            updated_at: now,
         }
     }
 }
 
 impl From<wealthfolio_core::taxonomies::NewCategory> for NewCategoryDB {
     fn from(domain: wealthfolio_core::taxonomies::NewCategory) -> Self {
+        let now = chrono::Utc::now().to_rfc3339();
         Self {
             id: domain.id,
             taxonomy_id: domain.taxonomy_id,
@@ -179,12 +200,15 @@ impl From<wealthfolio_core::taxonomies::NewCategory> for NewCategoryDB {
             color: domain.color,
             description: domain.description,
             sort_order: domain.sort_order,
+            created_at: now.clone(),
+            updated_at: now,
         }
     }
 }
 
 impl From<wealthfolio_core::taxonomies::NewAssetTaxonomyAssignment> for NewAssetTaxonomyAssignmentDB {
     fn from(domain: wealthfolio_core::taxonomies::NewAssetTaxonomyAssignment) -> Self {
+        let now = chrono::Utc::now().to_rfc3339();
         Self {
             id: domain.id,
             asset_id: domain.asset_id,
@@ -192,6 +216,8 @@ impl From<wealthfolio_core::taxonomies::NewAssetTaxonomyAssignment> for NewAsset
             category_id: domain.category_id,
             weight: domain.weight,
             source: domain.source,
+            created_at: now.clone(),
+            updated_at: now,
         }
     }
 }

@@ -5,7 +5,7 @@ use serde_json::Value;
 use std::collections::VecDeque;
 
 // Import Lot from its definition
-use crate::assets::AssetKind;
+use crate::assets::{AssetClassifications, AssetKind};
 use crate::portfolio::snapshot::Lot;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -50,6 +50,9 @@ pub struct Instrument {
     // Display categorization
     pub countries: Option<Vec<Country>>,
     pub sectors: Option<Vec<Sector>>,
+
+    // Taxonomy-based classifications
+    pub classifications: Option<AssetClassifications>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

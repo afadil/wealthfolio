@@ -11,8 +11,7 @@ use serde_json::Value;
 use crate::errors::Result;
 use crate::errors::ValidationError;
 use crate::Error;
-
-use super::assets_constants::*;
+use super::{cash_id, fx_id};
 
 // Re-export InstrumentId from market-data crate for convenience
 pub use wealthfolio_market_data::InstrumentId;
@@ -75,6 +74,7 @@ pub struct OptionSpec {
 
 /// Domain model representing an asset in the system
 /// Provider-agnostic: no data_source or quote_symbol (use provider_overrides instead)
+/// Classification is handled via taxonomy system, not legacy fields
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Asset {
@@ -96,15 +96,9 @@ pub struct Asset {
     pub preferred_provider: Option<String>, // Provider hint (YAHOO, ALPHA_VANTAGE)
     pub provider_overrides: Option<Value>,  // JSON for per-provider overrides
 
-    // Classification
-    pub isin: Option<String>,
-    pub asset_class: Option<String>,
-    pub asset_sub_class: Option<String>,
-
     // Metadata
     pub notes: Option<String>,
-    pub profile: Option<Value>,  // JSON: sectors, countries, website, description
-    pub metadata: Option<Value>, // JSON for extensions (OptionSpec, etc.)
+    pub metadata: Option<Value>, // JSON for extensions (OptionSpec, legacy migration data, etc.)
 
     // Status
     #[serde(default = "default_is_active")]
@@ -307,6 +301,7 @@ pub struct ProviderProfile {
 
 /// Input model for creating a new asset
 /// Provider-agnostic: no data_source or quote_symbol (use provider_overrides instead)
+/// Classification is handled via taxonomy system, not legacy fields
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct NewAsset {
@@ -328,15 +323,9 @@ pub struct NewAsset {
     pub preferred_provider: Option<String>, // Provider hint (YAHOO, ALPHA_VANTAGE)
     pub provider_overrides: Option<Value>,  // JSON for per-provider overrides
 
-    // Classification
-    pub isin: Option<String>,
-    pub asset_class: Option<String>,
-    pub asset_sub_class: Option<String>,
-
     // Metadata
     pub notes: Option<String>,
-    pub profile: Option<Value>,  // JSON: sectors, countries, website, description
-    pub metadata: Option<Value>, // JSON for extensions
+    pub metadata: Option<Value>, // JSON for extensions (OptionSpec, legacy migration data, etc.)
 
     // Status
     #[serde(default = "default_is_active")]
@@ -359,34 +348,38 @@ impl NewAsset {
         Ok(())
     }
 
-    /// Creates a new cash asset
+    /// Creates a new cash asset.
+    ///
+    /// Uses canonical ID format: `CASH:{currency}` (e.g., "CASH:USD")
     pub fn new_cash_asset(currency: &str) -> Self {
-        let asset_id = format!("$CASH-{}", currency);
+        let currency_upper = currency.to_uppercase();
+        let asset_id = cash_id(&currency_upper);
         Self {
-            id: Some(asset_id.clone()),
+            id: Some(asset_id),
             kind: AssetKind::Cash,
-            symbol: asset_id,
-            currency: currency.to_string(),
+            symbol: currency_upper.clone(), // Symbol is just the currency code
+            currency: currency_upper,
             pricing_mode: PricingMode::None,
-            asset_class: Some(CASH_ASSET_CLASS.to_string()),
-            asset_sub_class: Some(CASH_ASSET_CLASS.to_string()),
             is_active: true,
             ..Default::default()
         }
     }
 
     /// Creates a new FX asset following the canonical format:
-    /// - `id`: "EUR/USD" format
+    /// - `id`: "EUR:USD" format (base:quote)
     /// - `symbol`: Base currency only (e.g., "EUR")
     /// - `currency`: Quote currency (e.g., "USD")
     /// - `provider_overrides`: Contains provider-specific symbol formats (e.g., "EURUSD=X" for Yahoo)
     pub fn new_fx_asset(base_currency: &str, quote_currency: &str, provider: &str) -> Self {
-        // Canonical ID format: EUR/USD
-        let asset_id = format!("{}/{}", base_currency, quote_currency);
-        let readable_name = format!("{}/{} Exchange Rate", base_currency, quote_currency);
+        let base_upper = base_currency.to_uppercase();
+        let quote_upper = quote_currency.to_uppercase();
+
+        // Canonical ID format: EUR:USD
+        let asset_id = fx_id(&base_upper, &quote_upper);
+        let readable_name = format!("{}/{} Exchange Rate", base_upper, quote_upper);
         let notes = format!(
             "Currency pair for converting from {} to {}",
-            base_currency, quote_currency
+            base_upper, quote_upper
         );
 
         // Build provider_overrides with provider-specific symbol format
@@ -394,15 +387,15 @@ impl NewAsset {
             Some(serde_json::json!({
                 "YAHOO": {
                     "type": "fx_symbol",
-                    "symbol": format!("{}{}=X", base_currency, quote_currency)
+                    "symbol": format!("{}{}=X", base_upper, quote_upper)
                 }
             }))
         } else if provider == "ALPHA_VANTAGE" {
             Some(serde_json::json!({
                 "ALPHA_VANTAGE": {
                     "type": "fx_pair",
-                    "from": base_currency,
-                    "to": quote_currency
+                    "from": base_upper,
+                    "to": quote_upper
                 }
             }))
         } else {
@@ -413,13 +406,11 @@ impl NewAsset {
             id: Some(asset_id),
             kind: AssetKind::FxRate,
             name: Some(readable_name),
-            symbol: base_currency.to_string(), // Base currency only (EUR in EUR/USD)
-            currency: quote_currency.to_string(), // Quote currency (USD in EUR/USD)
+            symbol: base_upper,        // Base currency only (EUR in EUR:USD)
+            currency: quote_upper,     // Quote currency (USD in EUR:USD)
             pricing_mode: PricingMode::Market,
             preferred_provider: Some(provider.to_string()),
             provider_overrides,
-            asset_class: Some(CASH_ASSET_CLASS.to_string()),
-            asset_sub_class: Some(CASH_ASSET_CLASS.to_string()),
             notes: Some(notes),
             is_active: true,
             ..Default::default()
@@ -444,25 +435,31 @@ impl From<ProviderProfile> for NewAsset {
             }
         });
 
-        // Build profile JSON from legacy fields (sectors, countries, url)
-        let profile_json = {
-            let mut obj = serde_json::Map::new();
+        // Build metadata.legacy from provider profile fields for migration purposes
+        let metadata = {
+            let mut legacy = serde_json::Map::new();
+            if let Some(ref isin) = profile.isin {
+                legacy.insert("isin".to_string(), serde_json::Value::String(isin.clone()));
+            }
+            if let Some(ref ac) = profile.asset_class {
+                legacy.insert("asset_class".to_string(), serde_json::Value::String(ac.clone()));
+            }
+            if let Some(ref asc) = profile.asset_sub_class {
+                legacy.insert("asset_sub_class".to_string(), serde_json::Value::String(asc.clone()));
+            }
             if let Some(ref s) = profile.sectors {
-                obj.insert("sectors".to_string(), serde_json::Value::String(s.clone()));
+                legacy.insert("sectors".to_string(), serde_json::Value::String(s.clone()));
             }
             if let Some(ref c) = profile.countries {
-                obj.insert(
-                    "countries".to_string(),
-                    serde_json::Value::String(c.clone()),
-                );
+                legacy.insert("countries".to_string(), serde_json::Value::String(c.clone()));
             }
             if let Some(ref u) = profile.url {
-                obj.insert("website".to_string(), serde_json::Value::String(u.clone()));
+                legacy.insert("website".to_string(), serde_json::Value::String(u.clone()));
             }
-            if obj.is_empty() {
+            if legacy.is_empty() {
                 None
             } else {
-                Some(serde_json::Value::Object(obj))
+                Some(serde_json::json!({ "legacy": legacy }))
             }
         };
 
@@ -474,44 +471,37 @@ impl From<ProviderProfile> for NewAsset {
             exchange_mic: None,
             currency: profile.currency,
             pricing_mode: PricingMode::Market,
-            preferred_provider: Some(profile.data_source),
+            preferred_provider: Some(profile.data_source.clone()),
             provider_overrides,
-            isin: profile.isin,
-            asset_class: profile.asset_class,
-            asset_sub_class: profile.asset_sub_class,
             notes: profile.notes,
-            profile: profile_json,
-            metadata: None,
+            metadata,
             is_active: true,
         }
     }
 }
 
 /// Input model for updating an asset profile
+/// Classification (asset_class, sectors, countries) is now handled via taxonomy system
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateAssetProfile {
     pub symbol: String,
     pub name: Option<String>,
-    pub sectors: Option<String>,
-    pub countries: Option<String>,
     pub notes: String,
-    pub asset_sub_class: Option<String>,
-    pub asset_class: Option<String>,
-    pub kind: Option<AssetKind>,           // Asset behavior classification
+    pub kind: Option<AssetKind>,            // Asset behavior classification
+    pub exchange_mic: Option<String>,       // ISO 10383 MIC code
     pub pricing_mode: Option<PricingMode>,
-    pub provider_overrides: Option<Value>, // JSON for per-provider overrides
+    pub provider_overrides: Option<Value>,  // JSON for per-provider overrides
 }
 
 /// Optional asset metadata that can be passed during activity creation.
 /// Allows users to provide/override asset details inline.
+/// Classification is handled via taxonomy system, not here.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AssetMetadata {
     pub name: Option<String>,
     pub kind: Option<AssetKind>,
-    pub asset_class: Option<String>,
-    pub asset_sub_class: Option<String>,
     pub exchange_mic: Option<String>,
 }
 

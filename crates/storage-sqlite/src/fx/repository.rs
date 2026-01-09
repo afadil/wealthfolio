@@ -94,15 +94,22 @@ impl FxRepository {
     pub fn get_exchange_rates(&self) -> Result<Vec<ExchangeRate>> {
         let mut conn = get_connection(&self.pool)?;
 
+        // Get all FX assets with their latest quote (if any)
+        // Use asset.symbol as from_currency and asset.currency as to_currency
+        let forex_assets = assets::table
+            .filter(assets::kind.eq(AssetKind::FxRate.as_db_str()))
+            .order_by(assets::symbol.asc())
+            .load::<AssetDB>(&mut conn)
+            .map_err(StorageError::from)?;
+
+        // Get latest quotes for each FX asset
         let latest_quotes = sql_query(
             r#"SELECT
                 q.id, q.asset_id, q.day, q.source, q.open, q.high, q.low, q.close, q.adjclose, q.volume,
                 q.currency, q.notes, q.created_at, q.timestamp
              FROM quotes q
              WHERE q.asset_id IN (
-                 SELECT id
-                 FROM assets
-                 WHERE kind = 'FX_RATE'
+                 SELECT id FROM assets WHERE kind = 'FX_RATE'
              )
              AND (q.asset_id, q.timestamp) IN (
                  SELECT asset_id, MAX(timestamp) as max_timestamp
@@ -114,32 +121,40 @@ impl FxRepository {
         .load::<QuoteDB>(&mut conn)
         .map_err(StorageError::from)?;
 
-        let latest_rates_by_symbol: HashMap<String, ExchangeRate> = latest_quotes
+        // Build a map of asset_id -> latest quote
+        let latest_quotes_by_id: HashMap<String, QuoteDB> = latest_quotes
             .into_iter()
-            .map(|quote_db| {
-                let quote = Quote::from(quote_db);
-                let symbol = quote.symbol.clone();
-                (symbol, ExchangeRate::from_quote(&quote))
-            })
+            .map(|q| (q.asset_id.clone(), q))
             .collect();
-
-        let forex_assets = assets::table
-            .filter(assets::kind.eq(AssetKind::FxRate.as_db_str()))
-            .order_by(assets::symbol.asc())
-            .load::<AssetDB>(&mut conn)
-            .map_err(StorageError::from)?;
 
         let mut exchange_rates = Vec::with_capacity(forex_assets.len());
 
         for asset in forex_assets {
-            // Look up by asset.id (e.g., "EUR/CAD") since quotes.symbol stores asset IDs
-            if let Some(rate) = latest_rates_by_symbol.get(&asset.id) {
-                exchange_rates.push(rate.clone());
+            // Use asset.symbol as from_currency, asset.currency as to_currency
+            // This avoids parsing the ID
+            let from_currency = asset.symbol.clone();
+            let to_currency = asset.currency.clone();
+
+            if let Some(quote_db) = latest_quotes_by_id.get(&asset.id) {
+                let timestamp = chrono::DateTime::parse_from_rfc3339(&quote_db.timestamp)
+                    .map(|dt| dt.with_timezone(&Utc))
+                    .unwrap_or_else(|_| Utc::now());
+                let rate = Decimal::from_str(&quote_db.close).unwrap_or(Decimal::ZERO);
+
+                exchange_rates.push(ExchangeRate {
+                    id: asset.id.clone(),
+                    from_currency,
+                    to_currency,
+                    rate,
+                    source: DataSource::from(quote_db.source.as_str()),
+                    timestamp,
+                });
             } else {
                 // No quote found - create placeholder with rate=0
-                // Parse asset.id (e.g., "EUR/CAD") to get from/to currencies
-                let (from_currency, to_currency) = ExchangeRate::parse_fx_symbol(&asset.id);
-                let timestamp = Utc.from_utc_datetime(&asset.updated_at);
+                let timestamp = chrono::DateTime::parse_from_rfc3339(&asset.updated_at)
+                    .map(|dt| dt.with_timezone(&Utc))
+                    .unwrap_or_else(|_| Utc::now());
+
                 exchange_rates.push(ExchangeRate {
                     id: asset.id.clone(),
                     from_currency,
@@ -158,19 +173,31 @@ impl FxRepository {
     pub fn get_all_historical_exchange_rates(&self) -> Result<Vec<ExchangeRate>> {
         let mut conn = get_connection(&self.pool)?;
 
-        let all_quotes_db = quotes::table
+        // Join quotes with assets to get symbol (from) and currency (to) directly
+        let results: Vec<(QuoteDB, AssetDB)> = quotes::table
             .inner_join(assets::table.on(quotes::asset_id.eq(assets::id)))
             .filter(assets::kind.eq(AssetKind::FxRate.as_db_str()))
-            .select(quotes::all_columns)
+            .select((quotes::all_columns, assets::all_columns))
             .order_by((quotes::asset_id.asc(), quotes::timestamp.asc()))
-            .load::<QuoteDB>(&mut conn)
+            .load(&mut conn)
             .map_err(StorageError::from)?;
 
-        Ok(all_quotes_db
+        Ok(results
             .into_iter()
-            .map(|q_db| {
-                let quote = Quote::from(q_db);
-                ExchangeRate::from_quote(&quote)
+            .map(|(quote_db, asset_db)| {
+                let timestamp = chrono::DateTime::parse_from_rfc3339(&quote_db.timestamp)
+                    .map(|dt| dt.with_timezone(&Utc))
+                    .unwrap_or_else(|_| Utc::now());
+                let rate = Decimal::from_str(&quote_db.close).unwrap_or(Decimal::ZERO);
+
+                ExchangeRate {
+                    id: asset_db.id,
+                    from_currency: asset_db.symbol,  // Use asset.symbol as from
+                    to_currency: asset_db.currency,  // Use asset.currency as to
+                    rate,
+                    source: DataSource::from(quote_db.source.as_str()),
+                    timestamp,
+                }
             })
             .collect())
     }
@@ -178,28 +205,64 @@ impl FxRepository {
     pub fn get_exchange_rate(&self, from: &str, to: &str) -> Result<Option<ExchangeRate>> {
         let mut conn = get_connection(&self.pool)?;
 
-        let symbol = ExchangeRate::make_fx_symbol(from, to);
-        let quote_db = quotes::table
-            .filter(quotes::asset_id.eq(symbol))
+        // Build asset ID using new format: from:to
+        let asset_id = ExchangeRate::make_fx_symbol(from, to);
+
+        // Join with assets to get from/to currencies directly
+        let result: Option<(QuoteDB, AssetDB)> = quotes::table
+            .inner_join(assets::table.on(quotes::asset_id.eq(assets::id)))
+            .filter(quotes::asset_id.eq(&asset_id))
             .order_by(quotes::timestamp.desc())
-            .first::<QuoteDB>(&mut conn)
+            .select((quotes::all_columns, assets::all_columns))
+            .first(&mut conn)
             .optional()
             .map_err(StorageError::from)?;
 
-        Ok(quote_db.map(|q| ExchangeRate::from_quote(&Quote::from(q))))
+        Ok(result.map(|(quote_db, asset_db)| {
+            let timestamp = chrono::DateTime::parse_from_rfc3339(&quote_db.timestamp)
+                .map(|dt| dt.with_timezone(&Utc))
+                .unwrap_or_else(|_| Utc::now());
+            let rate = Decimal::from_str(&quote_db.close).unwrap_or(Decimal::ZERO);
+
+            ExchangeRate {
+                id: asset_db.id,
+                from_currency: asset_db.symbol,
+                to_currency: asset_db.currency,
+                rate,
+                source: DataSource::from(quote_db.source.as_str()),
+                timestamp,
+            }
+        }))
     }
 
     pub fn get_exchange_rate_by_id(&self, id: &str) -> Result<Option<ExchangeRate>> {
         let mut conn = get_connection(&self.pool)?;
 
-        let quote_db = quotes::table
+        // Join with assets to get from/to currencies directly
+        let result: Option<(QuoteDB, AssetDB)> = quotes::table
+            .inner_join(assets::table.on(quotes::asset_id.eq(assets::id)))
             .filter(quotes::asset_id.eq(id))
             .order_by(quotes::timestamp.desc())
-            .first::<QuoteDB>(&mut conn)
+            .select((quotes::all_columns, assets::all_columns))
+            .first(&mut conn)
             .optional()
             .map_err(StorageError::from)?;
 
-        Ok(quote_db.map(|q| ExchangeRate::from_quote(&Quote::from(q))))
+        Ok(result.map(|(quote_db, asset_db)| {
+            let timestamp = chrono::DateTime::parse_from_rfc3339(&quote_db.timestamp)
+                .map(|dt| dt.with_timezone(&Utc))
+                .unwrap_or_else(|_| Utc::now());
+            let rate = Decimal::from_str(&quote_db.close).unwrap_or(Decimal::ZERO);
+
+            ExchangeRate {
+                id: asset_db.id,
+                from_currency: asset_db.symbol,
+                to_currency: asset_db.currency,
+                rate,
+                source: DataSource::from(quote_db.source.as_str()),
+                timestamp,
+            }
+        }))
     }
 
     pub fn get_historical_quotes(
@@ -371,7 +434,7 @@ impl FxRepository {
 
     /// Creates or updates an FX asset in the database.
     /// Uses canonical format per spec:
-    /// - `id`: "EUR/USD" format
+    /// - `id`: "EUR:USD" format (base:quote)
     /// - `symbol`: Base currency only (e.g., "EUR")
     /// - `currency`: Quote currency (e.g., "USD")
     /// - `provider_overrides`: Contains provider-specific symbol formats
@@ -382,14 +445,14 @@ impl FxRepository {
 
         self.writer
             .exec(move |conn| {
-                // Canonical ID format: EUR/USD
-                let asset_id = format!("{}/{}", &from_owned, &to_owned);
+                // Canonical ID format: EUR:USD (base:quote)
+                let asset_id = format!("{}:{}", &from_owned, &to_owned);
                 let readable_name = format!("{}/{} Exchange Rate", &from_owned, &to_owned);
                 let notes = format!(
                     "Currency pair for converting from {} to {}",
                     &from_owned, &to_owned
                 );
-                let now_naive = chrono::Utc::now().naive_utc();
+                let now_rfc3339 = chrono::Utc::now().to_rfc3339();
 
                 // Build provider_overrides with provider-specific symbol format
                 let provider_overrides = if source_owned == "YAHOO" {
@@ -417,6 +480,14 @@ impl FxRepository {
                     None
                 };
 
+                // Build metadata with legacy classification
+                let metadata = serde_json::json!({
+                    "legacy": {
+                        "asset_class": "Cash",
+                        "asset_sub_class": "Cash"
+                    }
+                }).to_string();
+
                 let asset_db = AssetDB {
                     id: asset_id,
                     symbol: from_owned.clone(), // Base currency only (EUR)
@@ -425,12 +496,11 @@ impl FxRepository {
                     pricing_mode: PricingMode::Market.as_db_str().to_string(),
                     preferred_provider: Some(source_owned.to_string()),
                     provider_overrides,
-                    asset_class: Some("Cash".to_string()),
-                    asset_sub_class: Some("Cash".to_string()),
                     notes: Some(notes),
+                    metadata: Some(metadata.clone()),
                     currency: to_owned.to_string(), // Quote currency (USD)
-                    created_at: now_naive,
-                    updated_at: now_naive,
+                    created_at: now_rfc3339.clone(),
+                    updated_at: now_rfc3339.clone(),
                     ..Default::default()
                 };
 
@@ -445,11 +515,10 @@ impl FxRepository {
                         assets::pricing_mode.eq(&asset_db.pricing_mode),
                         assets::preferred_provider.eq(&asset_db.preferred_provider),
                         assets::provider_overrides.eq(&asset_db.provider_overrides),
-                        assets::asset_class.eq(&asset_db.asset_class),
-                        assets::asset_sub_class.eq(&asset_db.asset_sub_class),
+                        assets::metadata.eq(&asset_db.metadata),
                         assets::notes.eq(&asset_db.notes),
                         assets::currency.eq(&asset_db.currency),
-                        assets::updated_at.eq(now_naive),
+                        assets::updated_at.eq(&now_rfc3339),
                     ))
                     .execute(conn)
                     .map_err(StorageError::from)?;

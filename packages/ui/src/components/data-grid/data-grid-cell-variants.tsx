@@ -17,20 +17,7 @@ import { Popover, PopoverAnchor, PopoverContent } from "../ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Skeleton } from "../ui/skeleton";
 import { Textarea } from "../ui/textarea";
-import {
-  Check,
-  File,
-  FileArchive,
-  FileAudio,
-  FileImage,
-  FileSpreadsheet,
-  FileText,
-  FileVideo,
-  PlusCircle,
-  Presentation,
-  Upload,
-  X,
-} from "lucide-react";
+import { Icons } from "../ui/icons";
 import * as React from "react";
 import { toast } from "sonner";
 import { useBadgeOverflow } from "../../hooks/use-badge-overflow";
@@ -1139,7 +1126,7 @@ export function MultiSelectCell<TData>({
                           event.stopPropagation();
                         }}
                       >
-                        <X className="size-3" />
+                        <Icons.X className="size-3" />
                       </button>
                     </Badge>
                   );
@@ -1167,7 +1154,7 @@ export function MultiSelectCell<TData>({
                             isSelected ? "bg-primary text-primary-foreground" : "opacity-50 [&_svg]:invisible",
                           )}
                         >
-                          <Check className="size-3" />
+                          <Icons.Check className="size-3" />
                         </div>
                         <span>{option.label}</span>
                       </CommandItem>
@@ -1708,16 +1695,16 @@ function formatFileSize(bytes: number): string {
   return `${Number.parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`;
 }
 
-function getFileIcon(type: string): React.ComponentType<React.SVGProps<SVGSVGElement>> {
-  if (type.startsWith("image/")) return FileImage;
-  if (type.startsWith("video/")) return FileVideo;
-  if (type.startsWith("audio/")) return FileAudio;
-  if (type.includes("pdf")) return FileText;
-  if (type.includes("zip") || type.includes("rar")) return FileArchive;
-  if (type.includes("word") || type.includes("document") || type.includes("doc")) return FileText;
-  if (type.includes("sheet") || type.includes("excel") || type.includes("xls")) return FileSpreadsheet;
-  if (type.includes("presentation") || type.includes("powerpoint") || type.includes("ppt")) return Presentation;
-  return File;
+function getFileIcon(type: string) {
+  if (type.startsWith("image/")) return Icons.FileImage;
+  if (type.startsWith("video/")) return Icons.FileVideo;
+  if (type.startsWith("audio/")) return Icons.FileAudio;
+  if (type.includes("pdf")) return Icons.FileText;
+  if (type.includes("zip") || type.includes("rar")) return Icons.FileArchive;
+  if (type.includes("word") || type.includes("document") || type.includes("doc")) return Icons.FileText;
+  if (type.includes("sheet") || type.includes("excel") || type.includes("xls")) return Icons.FileSpreadsheet;
+  if (type.includes("presentation") || type.includes("powerpoint") || type.includes("ppt")) return Icons.Presentation;
+  return Icons.File;
 }
 
 export function FileCell<TData>({
@@ -2241,7 +2228,7 @@ export function FileCell<TData>({
                 onDrop={onDropzoneDrop}
                 onKeyDown={onDropzoneKeyDown}
               >
-                <Upload className="text-muted-foreground size-8" />
+                <Icons.Upload className="text-muted-foreground size-8" />
                 <div className="text-center text-sm">
                   <p className="font-medium">{isDragging ? "Drop files here" : "Drag files here"}</p>
                   <p className="text-muted-foreground text-xs">or click to browse</p>
@@ -2313,7 +2300,7 @@ export function FileCell<TData>({
                             onClick={() => removeFile(file.id)}
                             disabled={isPending}
                           >
-                            <X className="size-3" />
+                            <Icons.X className="size-3" />
                           </Button>
                         </div>
                       );
@@ -2327,7 +2314,7 @@ export function FileCell<TData>({
       ) : null}
       {isDraggingOver ? (
         <div className="text-primary flex items-center justify-center gap-2 text-sm">
-          <Upload className="size-4" />
+          <Icons.Upload className="size-4" />
           <span>Drop files here</span>
         </div>
       ) : files.length > 0 ? (
@@ -2565,7 +2552,7 @@ export function SymbolCell<TData>({
                       className="flex items-center justify-between"
                     >
                       <div className="flex items-center gap-3">
-                        <PlusCircle className="text-muted-foreground size-4" />
+                        <Icons.PlusCircle className="text-muted-foreground size-4" />
                         <div className="flex flex-col">
                           <span className="font-mono text-xs font-semibold uppercase">
                             {trimmedQuery.toUpperCase()}
@@ -2591,7 +2578,7 @@ export function SymbolCell<TData>({
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-muted-foreground text-xs">{option.exchange}</span>
-                          {value === option.symbol && <Check className="size-4" />}
+                          {value === option.symbol && <Icons.Check className="size-4" />}
                         </div>
                       </CommandItem>
                     ))}
@@ -2758,7 +2745,7 @@ export function CurrencyCell<TData>({
                         <span className="font-mono text-xs font-semibold">{currency.value}</span>
                         <span className="text-muted-foreground text-xs">{currency.label}</span>
                       </div>
-                      {value === currency.value && <Check className="size-4" />}
+                      {value === currency.value && <Icons.Check className="size-4" />}
                     </CommandItem>
                   ))}
                 </CommandGroup>

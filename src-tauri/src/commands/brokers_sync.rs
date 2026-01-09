@@ -9,8 +9,9 @@ use wealthfolio_core::accounts::Account;
 use crate::context::ServiceContext;
 use crate::secret_store::KeyringSecretStore;
 use wealthfolio_connect::{
-    broker::BrokerApiClient, BrokerAccount, BrokerConnection, PlansResponse, Platform,
-    SyncAccountsResponse, SyncActivitiesResponse, SyncConnectionsResponse, UserInfo,
+    broker::BrokerApiClient, fetch_subscription_plans_public, BrokerAccount, BrokerConnection,
+    PlansResponse, Platform, SyncAccountsResponse, SyncActivitiesResponse, SyncConnectionsResponse,
+    UserInfo, DEFAULT_CLOUD_API_URL,
 };
 use wealthfolio_core::secrets::SecretStore;
 
@@ -483,7 +484,7 @@ pub async fn list_broker_accounts(
 // User & Subscription Commands
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Get subscription plans from the cloud API
+/// Get subscription plans from the cloud API (requires authentication)
 #[tauri::command]
 pub async fn get_subscription_plans(
     state: State<'_, Arc<ServiceContext>>,
@@ -498,6 +499,26 @@ pub async fn get_subscription_plans(
         }
         Err(e) => {
             error!("Failed to get subscription plans: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
+/// Get subscription plans from the cloud API (public, no authentication required)
+#[tauri::command]
+pub async fn get_subscription_plans_public() -> Result<PlansResponse, String> {
+    info!("Fetching subscription plans from cloud API (public)...");
+
+    let base_url =
+        std::env::var("CONNECT_API_URL").unwrap_or_else(|_| DEFAULT_CLOUD_API_URL.to_string());
+
+    match fetch_subscription_plans_public(&base_url).await {
+        Ok(response) => {
+            info!("Found {} subscription plans (public)", response.plans.len());
+            Ok(response)
+        }
+        Err(e) => {
+            error!("Failed to get subscription plans (public): {}", e);
             Err(e.to_string())
         }
     }

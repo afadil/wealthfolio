@@ -58,22 +58,24 @@ impl HoldingsValuationService {
         &self,
         holdings: &[Holding],
     ) -> Result<HashMap<String, LatestQuotePair>> {
-        let required_symbols: Vec<String> = holdings
+        // Use asset ID (not symbol) for quote lookups
+        // Asset ID is the unique identifier matching quotes table (e.g., "SHOP:XTSE", "BTC:USD")
+        let required_asset_ids: Vec<String> = holdings
             .iter()
             .filter_map(|holding| {
                 // Include both Security and AlternativeAsset holdings
                 match holding.holding_type {
                     HoldingType::Security | HoldingType::AlternativeAsset => {
-                        holding.instrument.as_ref().map(|inst| inst.symbol.clone())
+                        holding.instrument.as_ref().map(|inst| inst.id.clone())
                     }
                     HoldingType::Cash => None, // Skip cash holdings
                 }
             })
             .collect();
 
-        let latest_quote_pairs = if !required_symbols.is_empty() {
+        let latest_quote_pairs = if !required_asset_ids.is_empty() {
             self.quote_service
-                .get_latest_quotes_pair(&required_symbols)?
+                .get_latest_quotes_pair(&required_asset_ids)?
         } else {
             HashMap::new()
         };
@@ -102,9 +104,10 @@ impl HoldingsValuationServiceTrait for HoldingsValuationService {
         for holding in holdings.iter_mut() {
             match holding.holding_type {
                 HoldingType::Security => {
-                    if let Some(sym) = holding.instrument.as_ref().map(|i| i.symbol.clone()) {
+                    // Use asset ID for quote lookups (e.g., "SHOP:XTSE", not "SHOP")
+                    if let Some(asset_id) = holding.instrument.as_ref().map(|i| i.id.clone()) {
                         holding.as_of_date = latest_quote_pairs
-                            .get(&sym)
+                            .get(&asset_id)
                             .map(|qp| qp.latest.timestamp.date_naive())
                             .unwrap_or(today);
                     } else {
@@ -115,9 +118,10 @@ impl HoldingsValuationServiceTrait for HoldingsValuationService {
                         .await?;
                 }
                 HoldingType::AlternativeAsset => {
-                    if let Some(sym) = holding.instrument.as_ref().map(|i| i.symbol.clone()) {
+                    // Use asset ID for quote lookups
+                    if let Some(asset_id) = holding.instrument.as_ref().map(|i| i.id.clone()) {
                         holding.as_of_date = latest_quote_pairs
-                            .get(&sym)
+                            .get(&asset_id)
                             .map(|qp| qp.latest.timestamp.date_naive())
                             .unwrap_or(today);
                     } else {
@@ -163,11 +167,12 @@ impl HoldingsValuationService {
                 return Ok(());
             }
         };
-        let symbol = &instrument.symbol;
+        let asset_id = &instrument.id;   // Use ID for quote lookups
+        let symbol = &instrument.symbol; // Use symbol for logging
         let quantity = holding.quantity;
         let pos_currency = &holding.local_currency;
         let normalized_position_currency = normalize_currency_code(pos_currency);
-        let context_msg = format!("HoldingValuation [Security {}]", symbol);
+        let context_msg = format!("HoldingValuation [Security {} ({})]", symbol, asset_id);
 
         // --- Calculate FX Rate (Needed even for zero quantity) ---
         let fx_rate_local_to_base = self.get_fx_rate_or_fallback(
@@ -199,7 +204,7 @@ impl HoldingsValuationService {
         }
 
         // --- Fetch and Process Quote Data (For Non-Zero Quantity) ---
-        if let Some(quote_pair) = latest_quote_pairs.get(symbol) {
+        if let Some(quote_pair) = latest_quote_pairs.get(asset_id) {
             let latest_quote = &quote_pair.latest;
             let prev_quote_opt = quote_pair.previous.as_ref();
 
@@ -367,14 +372,15 @@ impl HoldingsValuationService {
                 return Ok(());
             }
         };
-        let symbol = &instrument.symbol;
+        let asset_id = &instrument.id;   // Use ID for quote lookups
+        let symbol = &instrument.symbol; // Use symbol for logging
         let quantity = holding.quantity;
         let pos_currency = &holding.local_currency;
         let normalized_position_currency = normalize_currency_code(pos_currency);
         let asset_kind = holding.asset_kind.clone().unwrap_or(AssetKind::Other);
         let context_msg = format!(
-            "HoldingValuation [AlternativeAsset {} ({:?})]",
-            symbol, asset_kind
+            "HoldingValuation [AlternativeAsset {} ({}) ({:?})]",
+            symbol, asset_id, asset_kind
         );
 
         // --- Calculate FX Rate ---
@@ -404,7 +410,7 @@ impl HoldingsValuationService {
         }
 
         // --- Fetch and Process Quote Data ---
-        if let Some(quote_pair) = latest_quote_pairs.get(symbol) {
+        if let Some(quote_pair) = latest_quote_pairs.get(asset_id) {
             let latest_quote = &quote_pair.latest;
 
             let (normalized_price, normalized_quote_currency) =

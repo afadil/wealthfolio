@@ -108,8 +108,8 @@ pub struct UpdateMarketDataProviderSettingDB {
 #[diesel(primary_key(asset_id))]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct QuoteSyncStateDB {
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub asset_id: String,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub asset_id: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Integer)]
     pub is_active: i32,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
@@ -272,8 +272,8 @@ impl From<QuoteSyncStateDB> for QuoteSyncState {
             |s: &str| -> Option<NaiveDate> { NaiveDate::parse_from_str(s, "%Y-%m-%d").ok() };
 
         QuoteSyncState {
-            // Use asset_id for the symbol field (backward compatibility)
-            symbol: db.asset_id,
+            // Use asset_id for the symbol field (schema has Nullable but shouldn't be null in practice)
+            symbol: db.asset_id.unwrap_or_default(),
             is_active: db.is_active != 0,
             first_activity_date: db.first_activity_date.as_deref().and_then(parse_date),
             last_activity_date: db.last_activity_date.as_deref().and_then(parse_date),
@@ -294,8 +294,8 @@ impl From<QuoteSyncStateDB> for QuoteSyncState {
 impl From<&QuoteSyncState> for QuoteSyncStateDB {
     fn from(state: &QuoteSyncState) -> Self {
         QuoteSyncStateDB {
-            // Map symbol to asset_id
-            asset_id: state.symbol.clone(),
+            // Map symbol to asset_id (schema has Nullable but we always have a value)
+            asset_id: Some(state.symbol.clone()),
             is_active: if state.is_active { 1 } else { 0 },
             first_activity_date: state
                 .first_activity_date

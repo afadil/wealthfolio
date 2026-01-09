@@ -1,9 +1,10 @@
+use crate::assets::CASH_PREFIX;
 use crate::errors::{Error, Result};
 use crate::fx::currency::{normalize_amount, normalize_currency_code};
 use crate::fx::FxError;
-use crate::quotes::Quote;
 use crate::portfolio::snapshot::AccountStateSnapshot;
 use crate::portfolio::valuation::DailyAccountValuation;
+use crate::quotes::Quote;
 
 use chrono::{NaiveDate, Utc};
 use log::{debug, error, warn};
@@ -121,6 +122,12 @@ fn calculate_investment_market_value_acct(
     let mut performance_eligible_market_value = Decimal::ZERO;
 
     for (asset_id, position) in &holdings_snapshot.positions {
+        // Skip cash assets - they don't need quotes (valued at 1:1)
+        // Cash is handled separately via cash_balances in calculate_cash_value_acct
+        if asset_id.starts_with(CASH_PREFIX) {
+            continue;
+        }
+
         if let Some(quote) = quotes_today.get(asset_id) {
             let (normalized_price, normalized_quote_currency) =
                 normalize_amount(quote.close, &quote.currency);

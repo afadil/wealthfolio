@@ -89,30 +89,118 @@ export function isLiabilityType(accountType: AccountType): boolean {
 }
 
 /**
- * Alternative asset ID prefixes (per spec: PROP-, VEH-, COLL-, PREC-, LIAB-, ALT-)
+ * Asset ID delimiter used in all asset IDs (colon).
+ * Format: {primary}:{qualifier}
+ * Examples: AAPL:XNAS, BTC:USD, CASH:USD, PROP:abc12345
+ */
+export const ASSET_ID_DELIMITER = ":";
+
+/**
+ * Alternative asset ID prefixes (per spec: PROP:, VEH:, COLL:, PREC:, LIAB:, ALT:)
  */
 export const ALTERNATIVE_ASSET_ID_PREFIXES = [
-  "PROP-",
-  "VEH-",
-  "COLL-",
-  "PREC-",
-  "LIAB-",
-  "ALT-",
+  "PROP:",
+  "VEH:",
+  "COLL:",
+  "PREC:",
+  "LIAB:",
+  "ALT:",
 ] as const;
 
 /**
+ * Cash asset ID prefix
+ */
+export const CASH_ASSET_ID_PREFIX = "CASH:";
+
+/**
+ * Parsed asset ID structure
+ */
+export interface ParsedAssetId {
+  primary: string;
+  qualifier: string;
+  kind?: "security" | "crypto" | "fx" | "cash" | "alternative";
+}
+
+/**
+ * Parses an asset ID into its components.
+ * Returns null if the ID doesn't contain the delimiter.
+ *
+ * @example
+ * parseAssetId("AAPL:XNAS") // { primary: "AAPL", qualifier: "XNAS", kind: "security" }
+ * parseAssetId("BTC:USD") // { primary: "BTC", qualifier: "USD", kind: "crypto" }
+ * parseAssetId("CASH:USD") // { primary: "CASH", qualifier: "USD", kind: "cash" }
+ * parseAssetId("PROP:abc12345") // { primary: "PROP", qualifier: "abc12345", kind: "alternative" }
+ */
+export function parseAssetId(assetId: string): ParsedAssetId | null {
+  const parts = assetId.split(ASSET_ID_DELIMITER);
+  if (parts.length !== 2) {
+    return null;
+  }
+
+  const [primary, qualifier] = parts;
+
+  // Determine kind based on the ID format
+  let kind: ParsedAssetId["kind"];
+
+  if (primary === "CASH") {
+    kind = "cash";
+  } else if (["PROP", "VEH", "COLL", "PREC", "LIAB", "ALT"].includes(primary)) {
+    kind = "alternative";
+  } else if (qualifier.length === 4 && /^[A-Z]{4}$/.test(qualifier)) {
+    // 4-letter qualifier is MIC code (security)
+    kind = "security";
+  } else if (qualifier.length === 3 && /^[A-Z]{3}$/.test(qualifier)) {
+    // 3-letter qualifier could be FX or crypto
+    kind = primary.length === 3 ? "fx" : "crypto";
+  }
+
+  return { primary, qualifier, kind };
+}
+
+/**
+ * Formats an asset ID for display.
+ * For securities: shows symbol only (AAPL:XNAS -> AAPL)
+ * For cash: shows currency (CASH:USD -> USD)
+ * For alternatives: shows full ID (PROP:abc12345)
+ */
+export function formatAssetIdForDisplay(assetId: string): string {
+  const parsed = parseAssetId(assetId);
+  if (!parsed) return assetId;
+
+  switch (parsed.kind) {
+    case "security":
+    case "crypto":
+    case "fx":
+      return parsed.primary;
+    case "cash":
+      return parsed.qualifier; // Show currency code
+    case "alternative":
+      return assetId; // Show full ID for alternatives
+    default:
+      return parsed.primary;
+  }
+}
+
+/**
  * Returns true if the asset ID (symbol) belongs to an alternative asset.
- * Alternative assets have prefixed IDs like PROP-xxxxx, VEH-xxxxx, etc.
+ * Alternative assets have prefixed IDs like PROP:xxxxx, VEH:xxxxx, etc.
  */
 export function isAlternativeAssetId(assetId: string): boolean {
   return ALTERNATIVE_ASSET_ID_PREFIXES.some((prefix) => assetId.startsWith(prefix));
 }
 
 /**
- * Returns true if the asset ID belongs to a liability (LIAB- prefix).
+ * Returns true if the asset ID belongs to a liability (LIAB: prefix).
  */
 export function isLiabilityAssetId(assetId: string): boolean {
-  return assetId.startsWith("LIAB-");
+  return assetId.startsWith("LIAB:");
+}
+
+/**
+ * Returns true if the asset ID belongs to a cash position (CASH: prefix).
+ */
+export function isCashAssetId(assetId: string): boolean {
+  return assetId.startsWith(CASH_ASSET_ID_PREFIX);
 }
 
 export const DataSource = {
@@ -436,6 +524,38 @@ export const ASSET_KINDS = [
 ] as const;
 
 export type AssetKind = (typeof ASSET_KINDS)[number];
+
+// Display names for all asset kinds
+export const ASSET_KIND_DISPLAY_NAMES: Record<AssetKind, string> = {
+  SECURITY: "Security",
+  CRYPTO: "Cryptocurrency",
+  CASH: "Cash",
+  FX_RATE: "FX Rate",
+  OPTION: "Option",
+  COMMODITY: "Commodity",
+  PRIVATE_EQUITY: "Private Equity",
+  PROPERTY: "Property",
+  VEHICLE: "Vehicle",
+  COLLECTIBLE: "Collectible",
+  PHYSICAL_PRECIOUS: "Precious Metal",
+  LIABILITY: "Liability",
+  OTHER: "Other",
+};
+
+// User-editable asset kinds (excludes system-managed types like CASH and FX_RATE)
+export const EDITABLE_ASSET_KINDS: AssetKind[] = [
+  "SECURITY",
+  "CRYPTO",
+  "OPTION",
+  "COMMODITY",
+  "PRIVATE_EQUITY",
+  "PROPERTY",
+  "VEHICLE",
+  "COLLECTIBLE",
+  "PHYSICAL_PRECIOUS",
+  "LIABILITY",
+  "OTHER",
+];
 
 // Convenience object for alternative asset kinds
 export const AlternativeAssetKind = {

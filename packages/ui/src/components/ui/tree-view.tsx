@@ -2,7 +2,6 @@
 
 import { cn } from "@/lib/utils";
 import * as CollapsiblePrimitive from "@radix-ui/react-collapsible";
-import { ChevronRight, File, Folder, FolderOpen } from "lucide-react";
 import * as React from "react";
 import { Icons } from "./icons";
 
@@ -62,7 +61,7 @@ function TreeItem({ node, level, selectedId, onSelect, expandedIds, onToggle }: 
                   onToggle(node.id);
                 }}
               >
-                <ChevronRight className={cn("h-4 w-4 transition-transform duration-200", isExpanded && "rotate-90")} />
+                <Icons.ChevronRight className={cn("h-4 w-4 transition-transform duration-200", isExpanded && "rotate-90")} />
               </button>
             </CollapsiblePrimitive.Trigger>
           ) : (
@@ -76,12 +75,12 @@ function TreeItem({ node, level, selectedId, onSelect, expandedIds, onToggle }: 
               <Icons.Tag className="h-4 w-4" style={{ color: node.color }} />
             ) : hasChildren ? (
               isExpanded ? (
-                <FolderOpen className="text-muted-foreground h-4 w-4" />
+                <Icons.FolderOpen className="text-muted-foreground h-4 w-4" />
               ) : (
-                <Folder className="text-muted-foreground h-4 w-4" />
+                <Icons.Folder className="text-muted-foreground h-4 w-4" />
               )
             ) : (
-              <File className="text-muted-foreground h-4 w-4" />
+              <Icons.File className="text-muted-foreground h-4 w-4" />
             )}
           </span>
 

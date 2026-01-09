@@ -1,6 +1,9 @@
 import { invoke, logger } from "@/adapters";
 import type {
+  AssetClassifications,
   AssetTaxonomyAssignment,
+  MigrationResult,
+  MigrationStatus,
   NewAssetTaxonomyAssignment,
   NewTaxonomy,
   NewTaxonomyCategory,
@@ -156,6 +159,37 @@ export const removeAssetTaxonomyAssignment = async (id: string): Promise<number>
     return await invoke("remove_asset_taxonomy_assignment", { id });
   } catch (error) {
     logger.error(`Error removing taxonomy assignment ${id}.`);
+    throw error;
+  }
+};
+
+// ============================================================================
+// Classification Commands
+// ============================================================================
+
+export const getAssetClassifications = async (assetId: string): Promise<AssetClassifications> => {
+  try {
+    return await invoke("get_asset_classifications", { assetId });
+  } catch (error) {
+    logger.error(`Error fetching classifications for asset ${assetId}.`);
+    throw error;
+  }
+};
+
+export const getMigrationStatus = async (): Promise<MigrationStatus> => {
+  try {
+    return await invoke("get_migration_status");
+  } catch (error) {
+    logger.error("Error fetching migration status.");
+    throw error;
+  }
+};
+
+export const migrateLegacyClassifications = async (): Promise<MigrationResult> => {
+  try {
+    return await invoke("migrate_legacy_classifications");
+  } catch (error) {
+    logger.error("Error migrating legacy classifications.");
     throw error;
   }
 };

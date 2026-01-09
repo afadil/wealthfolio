@@ -12,8 +12,7 @@ use std::time::Duration;
 
 use crate::broker::{
     BrokerAccount, BrokerBrokerage, BrokerConnection, BrokerConnectionBrokerage,
-    PaginatedUniversalActivity, PlanPricing, PlanPricingPeriods, PlansResponse, SubscriptionPlan,
-    UserInfo, UserTeam,
+    PaginatedUniversalActivity, PlansResponse, UserInfo, UserTeam,
 };
 use wealthfolio_core::errors::{Error, Result};
 
@@ -67,43 +66,6 @@ struct ApiAccountsResponse {
     accounts: Vec<BrokerAccount>,
 }
 
-#[derive(Debug, serde::Deserialize)]
-struct ApiPlansResponse {
-    plans: Vec<ApiPlan>,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, serde::Deserialize)]
-struct ApiPlan {
-    id: String,
-    name: String,
-    #[serde(default)]
-    tagline: Option<String>,
-    description: String,
-    features: Vec<String>,
-    #[serde(default)]
-    features_extended: Option<Vec<String>>,
-    pricing: ApiPlanPricing,
-    #[serde(default)]
-    limits: Option<serde_json::Value>,
-    #[serde(default)]
-    is_available: Option<bool>,
-    #[serde(default)]
-    is_coming_soon: Option<bool>,
-    #[serde(default)]
-    badge: Option<String>,
-    #[serde(default)]
-    yearly_discount_percent: Option<i32>,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, serde::Deserialize)]
-struct ApiPlanPricing {
-    monthly: f64,
-    yearly: f64,
-    #[serde(default)]
-    yearly_per_month: Option<f64>,
-}
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -364,34 +326,9 @@ impl ConnectApiClient {
         })
     }
 
-    /// Get available subscription plans.
+    /// Get available subscription plans (authenticated).
     pub async fn get_subscription_plans(&self) -> Result<PlansResponse> {
-        let api_response: ApiPlansResponse = self.get("/api/v1/subscription/plans").await?;
-
-        let plans = api_response
-            .plans
-            .into_iter()
-            .map(|p| SubscriptionPlan {
-                id: p.id,
-                name: p.name,
-                description: p.description,
-                features: p.features,
-                pricing: PlanPricingPeriods {
-                    monthly: PlanPricing {
-                        amount: p.pricing.monthly,
-                        currency: "USD".to_string(),
-                        price_id: None,
-                    },
-                    yearly: PlanPricing {
-                        amount: p.pricing.yearly,
-                        currency: "USD".to_string(),
-                        price_id: None,
-                    },
-                },
-            })
-            .collect();
-
-        Ok(PlansResponse { plans })
+        self.get("/api/v1/subscription/plans").await
     }
 
     /// Check if the current user has an active subscription.
@@ -567,6 +504,65 @@ impl BrokerApiClient for ConnectApiClient {
         // Brokerages are embedded in connections
         Ok(vec![])
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Public (Unauthenticated) API Functions
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Fetch subscription plans without authentication.
+///
+/// This function is used to display pricing information before the user logs in.
+/// The plans endpoint is public and does not require authentication.
+///
+/// # Arguments
+///
+/// * `base_url` - The base URL of the cloud API (e.g., "https://api.wealthfolio.app")
+///
+/// # Example
+///
+/// ```ignore
+/// let plans = fetch_subscription_plans_public("https://api.wealthfolio.app").await?;
+/// ```
+pub async fn fetch_subscription_plans_public(base_url: &str) -> Result<PlansResponse> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(DEFAULT_TIMEOUT_SECS))
+        .build()
+        .map_err(|e| Error::Unexpected(format!("Failed to initialize HTTP client: {}", e)))?;
+
+    let base_url = base_url.trim_end_matches('/');
+    let url = format!("{}/api/v1/subscription/plans", base_url);
+
+    debug!("[ConnectApi] GET {} (public)", url);
+
+    let response = client
+        .get(&url)
+        .header(CONTENT_TYPE, "application/json")
+        .send()
+        .await
+        .map_err(|e| Error::Unexpected(format!("Request failed: {}", e)))?;
+
+    let status = response.status();
+    let body = response
+        .text()
+        .await
+        .map_err(|e| Error::Unexpected(format!("Failed to read response: {}", e)))?;
+
+    debug!(
+        "[ConnectApi] Public plans response (status={}): {}",
+        status, &body
+    );
+
+    if !status.is_success() {
+        return Err(Error::Unexpected(format!(
+            "API error {}: {}",
+            status,
+            body.chars().take(200).collect::<String>()
+        )));
+    }
+
+    serde_json::from_str(&body)
+        .map_err(|e| Error::Unexpected(format!("Failed to parse plans response: {} - {}", e, body)))
 }
 
 #[cfg(test)]

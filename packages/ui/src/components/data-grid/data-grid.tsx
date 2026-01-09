@@ -1,7 +1,7 @@
 "use client";
 
-import { Plus } from "lucide-react";
 import * as React from "react";
+import { Icons } from "../ui/icons";
 import { cn } from "../../lib/utils";
 import { DataGridColumnHeader } from "./data-grid-column-header";
 import { DataGridContextMenu } from "./data-grid-context-menu";
@@ -250,7 +250,7 @@ export function DataGrid<TData>({
                 onKeyDown={onAddRowKeyDown}
               >
                 <div className="sticky start-0 flex items-center gap-2 px-3 text-muted-foreground">
-                  <Plus className="size-3.5" />
+                  <Icons.Plus className="size-3.5" />
                   <span className="text-sm">Add row</span>
                 </div>
               </div>

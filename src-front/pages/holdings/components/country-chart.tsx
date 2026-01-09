@@ -20,15 +20,28 @@ export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: Cou
 
     const countryMap = new Map<string, number>();
     holdings.forEach((holding) => {
-      const countries = holding.instrument?.countries;
       const marketValue = Number(holding.marketValue?.base) || 0;
 
-      if (countries && countries.length > 0 && !isNaN(marketValue)) {
-        countries.forEach((country: Country) => {
-          const currentValue = countryMap.get(country.name) || 0;
-          const weight = Number(country.weight) || 0;
-          const weightedValue = marketValue * (weight > 1 ? weight / 100 : weight);
-          countryMap.set(country.name, currentValue + weightedValue);
+      // Prefer taxonomy-based regions, fall back to legacy countries
+      const taxonomyRegions = holding.instrument?.classifications?.regions;
+      const regionsToProcess =
+        taxonomyRegions && taxonomyRegions.length > 0
+          ? taxonomyRegions.map((r) => ({
+              name: r.category.name,
+              weight: r.weight / 100, // taxonomy weight is 0-100, convert to decimal
+            }))
+          : holding.instrument?.countries && holding.instrument.countries.length > 0
+            ? holding.instrument.countries.map((c: Country) => ({
+                name: c.name,
+                weight: Number(c.weight) > 1 ? Number(c.weight) / 100 : Number(c.weight),
+              }))
+            : null;
+
+      if (regionsToProcess && !isNaN(marketValue)) {
+        regionsToProcess.forEach((region) => {
+          const currentValue = countryMap.get(region.name) || 0;
+          const weightedValue = marketValue * region.weight;
+          countryMap.set(region.name, currentValue + weightedValue);
         });
       }
     });

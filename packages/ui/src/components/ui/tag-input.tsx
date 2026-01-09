@@ -1,7 +1,7 @@
 import { Badge } from "./badge";
 import { Button } from "./button";
 import { cn } from "../../lib/utils";
-import { XIcon } from "lucide-react";
+import { Icons } from "./icons";
 import * as React from "react";
 
 type InputProps = React.ComponentProps<"input">;
@@ -51,7 +51,7 @@ const InputTags = React.forwardRef<HTMLInputElement, InputTagsProps>(
                 onChange(value.filter((i: string) => i !== item));
               }}
             >
-              <XIcon className="w-3" />
+              <Icons.X className="w-3" />
             </Button>
           </Badge>
         ))}

@@ -1,3 +1,4 @@
+use crate::assets::CASH_PREFIX;
 use crate::errors::{CalculatorError, Error as CoreError, Result as CoreResult};
 use crate::fx::currency::normalize_currency_code;
 use crate::fx::FxServiceTrait;
@@ -185,6 +186,8 @@ impl ValuationServiceTrait for ValuationService {
         let calculation_end_date = snapshots_to_process.last().unwrap().snapshot_date;
 
         let mut required_asset_ids = HashSet::new();
+        // Track the first date each asset appears (for optimized quote fetching)
+        let mut asset_first_appearance: HashMap<String, NaiveDate> = HashMap::new();
         let mut required_fx_pairs = HashSet::new();
         let base_curr = {
             let base_guard = self.base_currency.read().unwrap();
@@ -202,6 +205,10 @@ impl ValuationServiceTrait for ValuationService {
             }
             for (asset_id, position) in &snapshot.positions {
                 required_asset_ids.insert(asset_id.clone());
+                // Track first appearance for optimized quote fetching
+                asset_first_appearance
+                    .entry(asset_id.clone())
+                    .or_insert(snapshot.snapshot_date);
                 let position_currency = normalize_currency_code(&position.currency);
                 if position_currency != account_curr {
                     required_fx_pairs
@@ -221,13 +228,14 @@ impl ValuationServiceTrait for ValuationService {
 
         let account_curr = normalized_account_currency.unwrap_or_else(|| base_curr.clone());
 
-        let quotes_vec = self
-            .quote_service
-            .get_quotes_in_range_filled(
-                &required_asset_ids,
-                actual_calculation_start_date,
-                calculation_end_date,
-            )?;
+        // Fetch quotes with single call, passing first appearance dates
+        // to suppress debug messages for dates before an asset was in the portfolio
+        let quotes_vec = self.quote_service.get_quotes_in_range_filled(
+            &required_asset_ids,
+            actual_calculation_start_date,
+            calculation_end_date,
+            &asset_first_appearance,
+        )?;
 
         for quote in &quotes_vec {
             let normalized_quote_currency = normalize_currency_code(&quote.currency);
@@ -275,6 +283,8 @@ impl ValuationServiceTrait for ValuationService {
                     .iter()
                     .filter(|(_, position)| !position.quantity.is_zero())
                     .map(|(symbol, _)| symbol)
+                    // Cash assets don't need quotes (valued at 1:1)
+                    .filter(|symbol| !symbol.starts_with(CASH_PREFIX))
                     .filter(|symbol| !quotes_for_current_date.contains_key(*symbol))
                     .cloned()
                     .collect();
@@ -287,7 +297,13 @@ impl ValuationServiceTrait for ValuationService {
                     return None;
                 }
 
-                if quotes_for_current_date.is_empty() && !holdings_snapshot.positions.is_empty() {
+                // Check if there are any non-cash positions that need quotes
+                let has_non_cash_positions = holdings_snapshot
+                    .positions
+                    .keys()
+                    .any(|symbol| !symbol.starts_with(CASH_PREFIX));
+
+                if quotes_for_current_date.is_empty() && has_non_cash_positions {
                     debug!(
                         "No quotes for date {} (account '{}'). Skipping day.",
                         current_date, account_id_clone

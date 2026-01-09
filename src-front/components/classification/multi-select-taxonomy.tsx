@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Command,
@@ -106,7 +106,6 @@ export function MultiSelectTaxonomy({
   const [pendingCategory, setPendingCategory] = useState<PendingCategory | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState("");
-  const weightInputRef = useRef<HTMLInputElement>(null);
 
   const { data: taxonomyData, isLoading: isLoadingTaxonomy } = useTaxonomy(taxonomyId);
   const { data: allAssignments = [], isLoading: isLoadingAssignments } =
@@ -146,12 +145,6 @@ export function MultiSelectTaxonomy({
     return assignments.reduce((sum, a) => sum + a.weight, 0) / 100;
   }, [assignments]);
 
-  useEffect(() => {
-    if (pendingCategory && weightInputRef.current) {
-      weightInputRef.current.focus();
-      weightInputRef.current.select();
-    }
-  }, [pendingCategory]);
 
   const handleSelectCategory = (category: CategoryNode) => {
     if (assignedCategoryIds.has(category.id) || isPending) return;
@@ -276,7 +269,6 @@ export function MultiSelectTaxonomy({
                     <label className="text-muted-foreground text-xs">Weight:</label>
                     <div className="relative flex-1">
                       <Input
-                        ref={weightInputRef}
                         type="text"
                         value={pendingCategory.weight}
                         onChange={(e) =>
@@ -286,6 +278,8 @@ export function MultiSelectTaxonomy({
                           if (e.key === "Enter") handleConfirmCategory();
                           if (e.key === "Escape") handleCancelPending();
                         }}
+                        onFocus={(e) => e.target.select()}
+                        autoFocus
                         className="h-8 pr-6 text-sm"
                         placeholder="100"
                       />
