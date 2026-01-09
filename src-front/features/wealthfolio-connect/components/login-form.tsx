@@ -1,5 +1,6 @@
 import { isDesktop, openUrlInBrowser } from "@/adapters";
 import { getPreferredProvider, savePreferredProvider } from "@/lib/cookie-utils";
+import { QueryKeys } from "@/lib/query-keys";
 import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
@@ -19,8 +20,12 @@ import { Input } from "@wealthfolio/ui/components/ui/input";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@wealthfolio/ui/components/ui/input-otp";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { Separator } from "@wealthfolio/ui/components/ui/separator";
+import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useWealthfolioConnect } from "../providers/wealthfolio-connect-provider";
+import { getSubscriptionPlansPublic } from "../services/broker-service";
+import type { SubscriptionPlan } from "../types";
 import { ProviderButton } from "./provider-button";
 
 // OAuth is only available on desktop/mobile (Tauri) where we can handle deep links
@@ -99,13 +104,117 @@ function FeaturesSection() {
 // Plans Preview Section
 // ─────────────────────────────────────────────────────────────────────────────
 
-const plans = [
-  { name: "Essentials", price: "$7.99", accounts: "5 connections", users: "1 user" },
-  { name: "Duo", price: "$12.99", accounts: "12 connections", users: "2 users", popular: true },
-  { name: "Plus", price: "$24.99", accounts: "Unlimited", users: "2 users" },
-];
+function formatPrice(price: number): string {
+  return `$${price.toFixed(2)}`;
+}
+
+function formatConnections(connections: number | "unlimited"): string {
+  if (connections === "unlimited") return "Unlimited";
+  return `${connections} connections`;
+}
+
+function formatUsers(householdSize: number): string {
+  return householdSize === 1 ? "1 user" : `${householdSize} users`;
+}
+
+function PlanCard({ plan }: { plan: SubscriptionPlan }) {
+  const isPopular = plan.badge === "Popular";
+
+  return (
+    <div
+      className={`relative rounded-lg border p-3 ${
+        isPopular ? "border-primary bg-primary/5" : "bg-muted/30"
+      }`}
+    >
+      {isPopular && (
+        <span className="bg-primary text-primary-foreground absolute -top-2 left-3 rounded-full px-2 py-0.5 text-[9px] font-medium sm:left-1/2 sm:-translate-x-1/2">
+          Popular
+        </span>
+      )}
+      {/* Mobile: horizontal layout */}
+      <div className="flex items-center justify-between sm:hidden">
+        <div>
+          <p className="text-sm font-semibold">{plan.name}</p>
+          <p className="text-muted-foreground text-xs">
+            {formatConnections(plan.limits.institutionConnections)} ·{" "}
+            {formatUsers(plan.limits.householdSize)}
+          </p>
+        </div>
+        <div className="text-right">
+          <span className="text-lg font-bold">{formatPrice(plan.pricing.monthly)}</span>
+          <span className="text-muted-foreground text-xs">/mo</span>
+        </div>
+      </div>
+      {/* Desktop: vertical layout */}
+      <div className="hidden text-center sm:block">
+        <p className="text-xs font-semibold">{plan.name}</p>
+        <p className="mt-1 text-lg font-bold">{formatPrice(plan.pricing.monthly)}</p>
+        <p className="text-muted-foreground text-[10px]">/month</p>
+        <div className="mt-2 space-y-0.5">
+          <p className="text-muted-foreground text-[10px]">
+            {formatConnections(plan.limits.institutionConnections)}
+          </p>
+          <p className="text-muted-foreground text-[10px]">
+            {formatUsers(plan.limits.householdSize)}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlansPreviewSkeleton() {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="mb-4 text-center">
+          <Skeleton className="mx-auto h-4 w-48" />
+          <Skeleton className="mx-auto mt-2 h-3 w-56" />
+        </div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-muted/30 rounded-lg border p-3">
+              <div className="hidden text-center sm:block">
+                <Skeleton className="mx-auto h-3 w-16" />
+                <Skeleton className="mx-auto mt-2 h-6 w-12" />
+                <Skeleton className="mx-auto mt-1 h-2 w-10" />
+                <div className="mt-2 space-y-1">
+                  <Skeleton className="mx-auto h-2 w-20" />
+                  <Skeleton className="mx-auto h-2 w-12" />
+                </div>
+              </div>
+              <div className="flex items-center justify-between sm:hidden">
+                <div className="space-y-1">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+                <Skeleton className="h-6 w-16" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 function PlansPreviewSection() {
+  const { data, isLoading, error } = useQuery({
+    queryKey: [QueryKeys.SUBSCRIPTION_PLANS_PUBLIC],
+    queryFn: getSubscriptionPlansPublic,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    retry: 2,
+  });
+
+  if (isLoading) {
+    return <PlansPreviewSkeleton />;
+  }
+
+  // If error or no plans, don't show the section (fail silently)
+  if (error || !data?.plans?.length) {
+    return null;
+  }
+
   return (
     <Card>
       <CardContent className="p-4">
@@ -117,42 +226,8 @@ function PlansPreviewSection() {
         </div>
 
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          {plans.map((plan) => (
-            <div
-              key={plan.name}
-              className={`relative rounded-lg border p-3 ${
-                plan.popular ? "border-primary bg-primary/5" : "bg-muted/30"
-              }`}
-            >
-              {plan.popular && (
-                <span className="bg-primary text-primary-foreground absolute -top-2 left-3 rounded-full px-2 py-0.5 text-[9px] font-medium sm:left-1/2 sm:-translate-x-1/2">
-                  Popular
-                </span>
-              )}
-              {/* Mobile: horizontal layout */}
-              <div className="flex items-center justify-between sm:hidden">
-                <div>
-                  <p className="text-sm font-semibold">{plan.name}</p>
-                  <p className="text-muted-foreground text-xs">
-                    {plan.accounts} · {plan.users}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span className="text-lg font-bold">{plan.price}</span>
-                  <span className="text-muted-foreground text-xs">/mo</span>
-                </div>
-              </div>
-              {/* Desktop: vertical layout */}
-              <div className="hidden text-center sm:block">
-                <p className="text-xs font-semibold">{plan.name}</p>
-                <p className="mt-1 text-lg font-bold">{plan.price}</p>
-                <p className="text-muted-foreground text-[10px]">/month</p>
-                <div className="mt-2 space-y-0.5">
-                  <p className="text-muted-foreground text-[10px]">{plan.accounts}</p>
-                  <p className="text-muted-foreground text-[10px]">{plan.users}</p>
-                </div>
-              </div>
-            </div>
+          {data.plans.map((plan) => (
+            <PlanCard key={plan.id} plan={plan} />
           ))}
         </div>
 

@@ -223,28 +223,6 @@ impl QuoteValidator {
             });
         }
 
-        // Open between Low and High
-        if self.config.reject_invalid_ohlc && (open < low || open > high) {
-            issues.push(ValidationIssue {
-                severity: ValidationSeverity::Soft,
-                message: format!(
-                    "Open ({}) is outside High/Low range ({}-{})",
-                    open, low, high
-                ),
-            });
-        }
-
-        // Close between Low and High
-        if self.config.reject_invalid_ohlc && (quote.close < low || quote.close > high) {
-            issues.push(ValidationIssue {
-                severity: ValidationSeverity::Soft,
-                message: format!(
-                    "Close ({}) is outside High/Low range ({}-{})",
-                    quote.close, low, high
-                ),
-            });
-        }
-
         // Validate individual prices are non-negative
         if self.config.reject_negative_prices {
             if high < Decimal::ZERO {

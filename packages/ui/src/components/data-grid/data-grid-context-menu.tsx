@@ -7,8 +7,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
+import { Icons } from "../ui/icons";
 import type { ColumnDef, TableMeta } from "@tanstack/react-table";
-import { CopyIcon, EraserIcon, ScissorsIcon, Trash2Icon } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 import type { ContextMenuState, UpdateCell } from "./data-grid-types";
@@ -201,22 +201,22 @@ function ContextMenuImpl<TData>({
         onCloseAutoFocus={onCloseAutoFocus}
       >
         <DropdownMenuItem onSelect={onCopy}>
-          <CopyIcon />
+          <Icons.Copy />
           Copy
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onCut} disabled={tableMeta?.readOnly}>
-          <ScissorsIcon />
+          <Icons.Scissors />
           Cut
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onClear} disabled={tableMeta?.readOnly}>
-          <EraserIcon />
+          <Icons.Eraser />
           Clear
         </DropdownMenuItem>
         {onRowsDelete && (
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onSelect={onDelete}>
-              <Trash2Icon />
+              <Icons.Trash2 />
               Delete rows
             </DropdownMenuItem>
           </>

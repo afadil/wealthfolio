@@ -1,31 +1,30 @@
 import { getAssetProfile } from "@/commands/market-data";
 import { getHolding } from "@/commands/portfolio";
-import { ClassificationSheet } from "@/components/classification/classification-sheet";
+import { AssetEditSheet } from "./asset-edit-sheet";
 import { MobileActionsMenu } from "@/components/mobile-actions-menu";
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { ValueHistoryDataGrid } from "@/features/alternative-assets";
-import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Input } from "@wealthfolio/ui/components/ui/input";
-import { Separator } from "@wealthfolio/ui/components/ui/separator";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Tabs, TabsContent } from "@wealthfolio/ui/components/ui/tabs";
-import { InputTags } from "@wealthfolio/ui/components/ui/tag-input";
 import { useHapticFeedback } from "@/hooks";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { useQuoteHistory } from "@/hooks/use-quote-history";
 import { useSyncMarketDataMutation } from "@/hooks/use-sync-market-data";
+import { useAssetTaxonomyAssignments, useTaxonomy } from "@/hooks/use-taxonomies";
+import { useAssetProfileMutations } from "./hooks/use-asset-profile-mutations";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
-import { Asset, AssetKind, Country, Holding, Quote, Sector } from "@/lib/types";
+import { Asset, AssetKind, Holding, Quote } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatedToggleGroup, Page, PageContent, PageHeader, SwipableView } from "@wealthfolio/ui";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import AssetDetailCard from "./asset-detail-card";
 import AssetHistoryCard from "./asset-history-card";
 import AssetLotsTable from "./asset-lots-table";
-import { useAssetProfileMutations } from "./hooks/use-asset-profile-mutations";
 import { useQuoteMutations } from "./hooks/use-quote-mutations";
 import { QuoteHistoryDataGrid } from "./quote-history-data-grid";
 
@@ -44,14 +43,18 @@ const isAlternativeAsset = (kind: AssetKind | undefined | null): boolean => {
   return ALTERNATIVE_ASSET_KINDS.includes(kind);
 };
 
-interface AssetProfileFormData {
-  name: string;
-  sectors: Sector[];
-  countries: Country[];
-  assetClass: string;
-  assetSubClass: string;
-  notes: string;
-}
+// Helper to parse JSON field that might be a string or already an object
+const parseJsonField = (value: unknown): unknown => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }
+  return value;
+};
 
 interface AssetDetailData {
   numShares: number;
@@ -84,20 +87,11 @@ export const AssetProfilePage = () => {
   const queryParams = new URLSearchParams(location.search);
   const defaultTab = (queryParams.get("tab") as AssetTab) ?? "overview";
   const [activeTab, setActiveTab] = useState<AssetTab>(defaultTab);
-  const [isEditing, setIsEditing] = useState(false);
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
-  const [classificationSheetOpen, setClassificationSheetOpen] = useState(false);
+  const [editSheetOpen, setEditSheetOpen] = useState(false);
+  const [editSheetDefaultTab, setEditSheetDefaultTab] = useState<"general" | "classification" | "market-data">("general");
   const triggerHaptic = useHapticFeedback();
   const isMobile = useIsMobileViewport();
-  const [formData, setFormData] = useState<AssetProfileFormData>({
-    name: "",
-    sectors: [],
-    countries: [],
-    assetClass: "",
-    assetSubClass: "",
-    notes: "",
-  });
 
   const {
     data: assetProfile,
@@ -128,54 +122,82 @@ export const AssetProfilePage = () => {
     enabled: !!symbol,
   });
 
+  // Taxonomy data for category badges - use same approach as edit sheet
+  const { data: assignments = [], isLoading: isAssignmentsLoading } = useAssetTaxonomyAssignments(symbol);
+  const { updateAssetDataSourceMutation } = useAssetProfileMutations();
+
+  // Fetch taxonomy details for taxonomies with assignments
+  // We need the categories to get name and color
+  const { data: typeOfSecurityTaxonomy } = useTaxonomy(
+    assignments.find((a) => a.taxonomyId === "type_of_security")?.taxonomyId ?? null
+  );
+  const { data: riskCategoryTaxonomy } = useTaxonomy(
+    assignments.find((a) => a.taxonomyId === "risk_category")?.taxonomyId ?? null
+  );
+  const { data: assetClassesTaxonomy } = useTaxonomy(
+    assignments.find((a) => a.taxonomyId === "asset_classes")?.taxonomyId ?? null
+  );
+
+  const isClassificationsLoading = isAssignmentsLoading;
+
+  // Build category badges from assignments and taxonomy data
+  // Order: Class, Type, Risk
+  const categoryBadges = useMemo(() => {
+    const badges: Array<{ id: string; categoryName: string; categoryColor: string; taxonomyName: string }> = [];
+
+    // Asset Class badge (first)
+    const assetClassAssignment = assignments.find((a) => a.taxonomyId === "asset_classes");
+    if (assetClassAssignment && assetClassesTaxonomy?.categories) {
+      const category = assetClassesTaxonomy.categories.find((c) => c.id === assetClassAssignment.categoryId);
+      if (category) {
+        badges.push({
+          id: category.id,
+          categoryName: category.name,
+          categoryColor: category.color,
+          taxonomyName: "Class",
+        });
+      }
+    }
+
+    // Type of Security badge (second)
+    const typeAssignment = assignments.find((a) => a.taxonomyId === "type_of_security");
+    if (typeAssignment && typeOfSecurityTaxonomy?.categories) {
+      const category = typeOfSecurityTaxonomy.categories.find((c) => c.id === typeAssignment.categoryId);
+      if (category) {
+        badges.push({
+          id: category.id,
+          categoryName: category.name === "Exchange Traded Fund (ETF)" ? "ETF" : category.name,
+          categoryColor: category.color,
+          taxonomyName: "Type",
+        });
+      }
+    }
+
+    // Risk Category badge (third)
+    const riskAssignment = assignments.find((a) => a.taxonomyId === "risk_category");
+    if (riskAssignment && riskCategoryTaxonomy?.categories) {
+      const category = riskCategoryTaxonomy.categories.find((c) => c.id === riskAssignment.categoryId);
+      if (category) {
+        badges.push({
+          id: category.id,
+          categoryName: `Risk: ${category.name}`,
+          categoryColor: category.color,
+          taxonomyName: "Risk",
+        });
+      }
+    }
+
+    return badges;
+  }, [assignments, assetClassesTaxonomy, typeOfSecurityTaxonomy, riskCategoryTaxonomy]);
+
   const quote = useMemo(() => {
     // Backend returns quotes in descending order (newest first)
     // So .at(0) gives the latest quote
     return quoteHistory?.at(0) ?? null;
   }, [quoteHistory]);
 
-  const { updateAssetProfileMutation, updateAssetDataSourceMutation } = useAssetProfileMutations();
   const { saveQuoteMutation, deleteQuoteMutation } = useQuoteMutations(symbol);
   const syncMarketDataMutation = useSyncMarketDataMutation();
-
-  useEffect(() => {
-    const instrument = holding?.instrument;
-    const asset = assetProfile;
-
-    // Helper to safely parse JSON or return array
-    const parseSectors = (data: string | Sector[] | null | undefined): Sector[] => {
-      if (!data) return [];
-      if (typeof data === "string") {
-        try {
-          return JSON.parse(data) as Sector[];
-        } catch {
-          return [];
-        }
-      }
-      return data;
-    };
-
-    const parseCountries = (data: string | Country[] | null | undefined): Country[] => {
-      if (!data) return [];
-      if (typeof data === "string") {
-        try {
-          return JSON.parse(data) as Country[];
-        } catch {
-          return [];
-        }
-      }
-      return data;
-    };
-
-    setFormData({
-      name: instrument?.name ?? asset?.name ?? "",
-      sectors: parseSectors(instrument?.sectors ?? asset?.profile?.sectors),
-      countries: parseCountries(instrument?.countries ?? asset?.profile?.countries),
-      assetSubClass: instrument?.assetSubclass ?? asset?.assetSubClass ?? "",
-      assetClass: instrument?.assetClass ?? asset?.assetClass ?? "",
-      notes: instrument?.notes ?? asset?.notes ?? "",
-    });
-  }, [holding, assetProfile]);
 
   // Determine if manual tracking based on asset's pricingMode
   const isManualPricingMode = assetProfile?.pricingMode === "MANUAL";
@@ -194,6 +216,12 @@ export const AssetProfilePage = () => {
     const totalGainPercent = holding?.totalGainPct ?? 0;
     const calculatedAt = holding?.asOfDate;
 
+    // Legacy data is in asset.metadata.legacy (for migration purposes)
+    // New data should come from taxonomies
+    const legacy = asset?.metadata?.legacy as
+      | { sectors?: string | null; countries?: string | null }
+      | undefined;
+
     return {
       id: instrument?.id ?? asset?.id ?? "",
       symbol: instrument?.symbol ?? asset?.symbol ?? symbol,
@@ -201,13 +229,13 @@ export const AssetProfilePage = () => {
       isin: null,
       assetType: null,
       symbolMapping: null,
-      assetClass: instrument?.assetClass ?? asset?.assetClass ?? "",
-      assetSubClass: instrument?.assetSubclass ?? asset?.assetSubClass ?? "",
+      assetClass: instrument?.assetClass ?? "",
+      assetSubClass: instrument?.assetSubclass ?? "",
       notes: instrument?.notes ?? asset?.notes ?? null,
       countries:
         typeof instrument?.countries === "string"
           ? instrument.countries
-          : JSON.stringify(instrument?.countries ?? (asset?.profile?.countries ? JSON.parse(asset.profile.countries) : [])),
+          : JSON.stringify(instrument?.countries ?? parseJsonField(legacy?.countries) ?? []),
       categories: null,
       classes: null,
       attributes: null,
@@ -217,7 +245,7 @@ export const AssetProfilePage = () => {
       sectors:
         typeof instrument?.sectors === "string"
           ? instrument.sectors
-          : JSON.stringify(instrument?.sectors ?? (asset?.profile?.sectors ? JSON.parse(asset.profile.sectors) : [])),
+          : JSON.stringify(instrument?.sectors ?? parseJsonField(legacy?.sectors) ?? []),
       url: null,
       marketPrice: quote?.close ?? 0,
       totalGainAmount,
@@ -264,73 +292,6 @@ export const AssetProfilePage = () => {
     };
   }, [holding, quote]);
 
-  const handleSave = useCallback(() => {
-    if (!profile) return;
-    updateAssetProfileMutation.mutate({
-      symbol,
-      name: formData.name,
-      sectors: JSON.stringify(formData.sectors),
-      countries: JSON.stringify(formData.countries),
-      notes: formData.notes,
-      assetSubClass: formData.assetSubClass,
-      assetClass: formData.assetClass,
-    });
-    setIsEditing(false);
-  }, [profile, symbol, formData, updateAssetProfileMutation]);
-
-  const handleSaveTitle = useCallback(() => {
-    if (!profile) return;
-    updateAssetProfileMutation.mutate({
-      symbol,
-      name: formData.name,
-      sectors: JSON.stringify(formData.sectors),
-      countries: JSON.stringify(formData.countries),
-      notes: formData.notes,
-      assetSubClass: formData.assetSubClass,
-      assetClass: formData.assetClass,
-    });
-  }, [profile, symbol, formData, updateAssetProfileMutation]);
-
-  const handleCancel = useCallback(() => {
-    setIsEditing(false);
-    const instrument = holding?.instrument;
-    const asset = assetProfile;
-
-    // Helper to safely parse JSON or return array
-    const parseSectors = (data: string | Sector[] | null | undefined): Sector[] => {
-      if (!data) return [];
-      if (typeof data === "string") {
-        try {
-          return JSON.parse(data) as Sector[];
-        } catch {
-          return [];
-        }
-      }
-      return data;
-    };
-
-    const parseCountries = (data: string | Country[] | null | undefined): Country[] => {
-      if (!data) return [];
-      if (typeof data === "string") {
-        try {
-          return JSON.parse(data) as Country[];
-        } catch {
-          return [];
-        }
-      }
-      return data;
-    };
-
-    setFormData({
-      name: instrument?.name ?? asset?.name ?? "",
-      sectors: parseSectors(instrument?.sectors ?? asset?.profile?.sectors),
-      countries: parseCountries(instrument?.countries ?? asset?.profile?.countries),
-      assetSubClass: instrument?.assetSubclass ?? asset?.assetSubClass ?? "",
-      assetClass: instrument?.assetClass ?? asset?.assetClass ?? "",
-      notes: instrument?.notes ?? asset?.notes ?? "",
-    });
-  }, [holding, assetProfile]);
-
   // Build toggle items dynamically based on available data
   const toggleItems = useMemo(() => {
     const items: { value: AssetTab; label: string }[] = [];
@@ -372,153 +333,67 @@ export const AssetProfilePage = () => {
               )}
             </div>
 
-            <div className="group relative">
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold">About</h3>
-                {!isEditing && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-bold">About</h3>
+
+              {/* Category badges */}
+              <div className="flex flex-wrap items-center gap-2">
+                {isClassificationsLoading ? (
+                  <>
+                    <Skeleton className="h-6 w-16 rounded-full" />
+                    <Skeleton className="h-6 w-20 rounded-full" />
+                  </>
+                ) : categoryBadges.length > 0 ? (
+                  <>
+                    {categoryBadges.map((badge) => (
+                      <Badge
+                        key={badge.id}
+                        variant="secondary"
+                        className="gap-1.5"
+                        style={{
+                          backgroundColor: `${badge.categoryColor}20`,
+                          color: badge.categoryColor,
+                          borderColor: badge.categoryColor,
+                        }}
+                      >
+                        <span
+                          className="h-2 w-2 rounded-full"
+                          style={{ backgroundColor: badge.categoryColor }}
+                        />
+                        {badge.categoryName}
+                      </Badge>
+                    ))}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-xs"
+                      onClick={() => {
+                        setEditSheetDefaultTab("classification");
+                        setEditSheetOpen(true);
+                      }}
+                    >
+                      More
+                    </Button>
+                  </>
+                ) : (
                   <Button
                     variant="ghost"
-                    size="icon"
-                    onClick={() => setIsEditing(true)}
-                    className="h-6 w-6 md:opacity-0 md:group-hover:opacity-100"
+                    size="sm"
+                    className="h-6 text-xs text-muted-foreground"
+                    onClick={() => {
+                      setEditSheetDefaultTab("classification");
+                      setEditSheetOpen(true);
+                    }}
                   >
-                    <Icons.Pencil className="h-3 w-3" />
+                    + Add classifications
                   </Button>
                 )}
               </div>
-              <div className="flex flex-row items-center space-x-2 py-4">
-                {isEditing ? (
-                  <Input
-                    value={formData.assetClass}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, assetClass: e.target.value }))
-                    }
-                    placeholder="Enter asset class"
-                    className="w-[180px]"
-                  />
-                ) : (
-                  formData.assetClass && (
-                    <Badge variant="secondary" className="flex-none uppercase">
-                      {formData.assetClass}
-                    </Badge>
-                  )
-                )}
-                {isEditing ? (
-                  <Input
-                    value={formData.assetSubClass}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, assetSubClass: e.target.value }))
-                    }
-                    placeholder="Enter sub-class"
-                    className="w-[180px]"
-                  />
-                ) : (
-                  formData.assetSubClass && (
-                    <Badge variant="secondary" className="flex-none uppercase">
-                      {formData.assetSubClass}
-                    </Badge>
-                  )
-                )}
-                {(formData.assetClass || formData.assetSubClass) && formData.sectors.length > 0 && (
-                  <Separator orientation="vertical" />
-                )}
-                {isEditing ? (
-                  <InputTags
-                    value={formData.sectors.map(
-                      (s) => `${s.name}:${s.weight <= 1 ? (s.weight * 100).toFixed(0) : s.weight}%`,
-                    )}
-                    placeholder="sector:weight"
-                    onChange={(values) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        sectors: (values as string[]).map((value) => {
-                          const [name, weightStr] = value.split(":");
-                          return { name: name?.trim(), weight: parseFloat(weightStr) || 0 };
-                        }),
-                      }))
-                    }
-                  />
-                ) : (
-                  <div className="flex flex-wrap">
-                    {formData.sectors.map((sector) => (
-                      <Badge
-                        variant="secondary"
-                        key={sector.name}
-                        className="dark:text-primary-foreground m-1 cursor-help bg-blue-100 uppercase"
-                        title={`${sector.name}: ${sector.weight <= 1 ? (sector.weight * 100).toFixed(2) : sector.weight}%`}
-                      >
-                        {sector.name}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                {formData.sectors.length > 0 && formData.countries.length > 0 && (
-                  <Separator orientation="vertical" />
-                )}
-                {isEditing ? (
-                  <InputTags
-                    placeholder="country:weight"
-                    value={formData.countries.map(
-                      (c) => `${c.name}:${c.weight <= 1 ? (c.weight * 100).toFixed(0) : c.weight}%`,
-                    )}
-                    onChange={(values) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        countries: (values as string[]).map((value) => {
-                          const [name, weightStr] = value.split(":");
-                          return { name: name?.trim(), weight: parseFloat(weightStr) || 0 };
-                        }),
-                      }))
-                    }
-                  />
-                ) : (
-                  <div className="flex flex-wrap">
-                    {formData.countries.map((country) => (
-                      <Badge
-                        variant="secondary"
-                        key={country.name}
-                        className="dark:text-primary-foreground m-1 bg-purple-100 uppercase"
-                        title={`${country.name}: ${country.weight <= 1 ? (country.weight * 100).toFixed(2) : country.weight}%`}
-                      >
-                        {country.name}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                {(formData.sectors.length > 0 || formData.countries.length > 0) && (
-                  <Separator orientation="vertical" />
-                )}
-                {isEditing && (
-                  <>
-                    <Button variant="default" size="icon" className="min-w-10" onClick={handleSave}>
-                      <Icons.Check className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="min-w-10"
-                      onClick={handleCancel}
-                    >
-                      <Icons.Close className="h-4 w-4" />
-                    </Button>
-                  </>
-                )}
-              </div>
-              <div className="mt-2">
-                {isEditing ? (
-                  <textarea
-                    className="mt-12 w-full rounded-md border border-neutral-200 p-2 text-sm"
-                    value={formData.notes}
-                    placeholder="Symbol/Company description"
-                    rows={6}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
-                  />
-                ) : (
-                  <p className="text-muted-foreground text-sm font-light">
-                    {formData.notes || "No description available."}
-                  </p>
-                )}
-              </div>
+
+              {/* Notes section */}
+              <p className="text-muted-foreground text-sm">
+                {assetProfile?.notes || holding?.instrument?.notes || "No notes added."}
+              </p>
             </div>
           </div>
         ),
@@ -564,7 +439,7 @@ export const AssetProfilePage = () => {
             if (profile) {
               updateAssetDataSourceMutation.mutate({
                 symbol,
-                dataSource: isManual ? "MANUAL" : "YAHOO",
+                dataSource: isManual ? "MANUAL" : "MARKET",
               });
             }
           }}
@@ -578,17 +453,15 @@ export const AssetProfilePage = () => {
     holding,
     symbolHolding,
     quoteHistory,
-    isEditing,
-    formData,
     saveQuoteMutation,
     deleteQuoteMutation,
-    updateAssetDataSourceMutation,
     symbol,
-    handleCancel,
-    handleSave,
     isAltAsset,
     isLiability,
     isManualPricingMode,
+    categoryBadges,
+    isClassificationsLoading,
+    assetProfile,
   ]);
 
   const isLoading = isHoldingLoading || isQuotesLoading || isAssetProfileLoading;
@@ -706,10 +579,10 @@ export const AssetProfilePage = () => {
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => setClassificationSheetOpen(true)}
-                title="Classify Asset"
+                onClick={() => setEditSheetOpen(true)}
+                title="Edit Asset"
               >
-                <Icons.Tag className="h-4 w-4" />
+                <Icons.Pencil className="h-4 w-4" />
               </Button>
               <AnimatedToggleGroup
                 items={toggleItems}
@@ -748,10 +621,10 @@ export const AssetProfilePage = () => {
                     onClick: handleRefreshQuotes,
                   },
                   {
-                    icon: "Tag",
-                    label: "Classify",
-                    description: "Assign categories to this asset",
-                    onClick: () => setClassificationSheetOpen(true),
+                    icon: "Pencil",
+                    label: "Edit",
+                    description: "Edit asset details and settings",
+                    onClick: () => setEditSheetOpen(true),
                   },
                 ]}
               />
@@ -767,42 +640,13 @@ export const AssetProfilePage = () => {
             />
           )}
           <div className="flex min-w-0 flex-col">
-            {isEditingTitle ? (
-              <Input
-                value={formData.name}
-                onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                placeholder="Enter asset name"
-                className="font-heading text-xl font-bold tracking-tight"
-                onBlur={() => {
-                  setIsEditingTitle(false);
-                  handleSaveTitle();
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    setIsEditingTitle(false);
-                    handleSaveTitle();
-                  }
-                  if (e.key === "Escape") {
-                    setIsEditingTitle(false);
-                    setFormData((prev) => ({
-                      ...prev,
-                      name: holding?.instrument?.name ?? assetProfile?.name ?? "",
-                    }));
-                  }
-                }}
-                autoFocus
-              />
-            ) : (
-              <>
-                <h1 className="text-lg font-semibold md:text-xl">
-                  {formData.name ?? holding?.instrument?.symbol ?? symbol ?? "-"}
-                </h1>
-                {formData.name && (holding?.instrument?.symbol ?? symbol) && (
-                  <p className="text-muted-foreground text-sm md:text-base">
-                    {holding?.instrument?.symbol ?? symbol}
-                  </p>
-                )}
-              </>
+            <h1 className="text-lg font-semibold md:text-xl">
+              {assetProfile?.name ?? holding?.instrument?.name ?? symbol ?? "-"}
+            </h1>
+            {(assetProfile?.name || holding?.instrument?.name) && (
+              <p className="text-muted-foreground text-sm md:text-base">
+                {holding?.instrument?.symbol ?? symbol}
+              </p>
             )}
           </div>
         </div>
@@ -846,163 +690,67 @@ export const AssetProfilePage = () => {
                   )}
                 </div>
 
-                <div className="group relative">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-bold">About</h3>
-                    {!isEditing && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-bold">About</h3>
+
+                  {/* Category badges */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {isClassificationsLoading ? (
+                      <>
+                        <Skeleton className="h-6 w-16 rounded-full" />
+                        <Skeleton className="h-6 w-20 rounded-full" />
+                      </>
+                    ) : categoryBadges.length > 0 ? (
+                      <>
+                        {categoryBadges.map((badge) => (
+                          <Badge
+                            key={badge.id}
+                            variant="secondary"
+                            className="gap-1.5"
+                            style={{
+                              backgroundColor: `${badge.categoryColor}20`,
+                              color: badge.categoryColor,
+                              borderColor: badge.categoryColor,
+                            }}
+                          >
+                            <span
+                              className="h-2 w-2 rounded-full"
+                              style={{ backgroundColor: badge.categoryColor }}
+                            />
+                            {badge.categoryName}
+                          </Badge>
+                        ))}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs"
+                          onClick={() => {
+                            setEditSheetDefaultTab("classification");
+                            setEditSheetOpen(true);
+                          }}
+                        >
+                          More
+                        </Button>
+                      </>
+                    ) : (
                       <Button
                         variant="ghost"
-                        size="icon"
-                        onClick={() => setIsEditing(true)}
-                        className="h-6 w-6 md:opacity-0 md:group-hover:opacity-100"
+                        size="sm"
+                        className="h-6 text-xs text-muted-foreground"
+                        onClick={() => {
+                          setEditSheetDefaultTab("classification");
+                          setEditSheetOpen(true);
+                        }}
                       >
-                        <Icons.Pencil className="h-3 w-3" />
+                        + Add classifications
                       </Button>
                     )}
                   </div>
-                  <div className="flex flex-row items-center space-x-2 py-4">
-                    {isEditing ? (
-                      <Input
-                        value={formData.assetClass}
-                        onChange={(e) =>
-                          setFormData((prev) => ({ ...prev, assetClass: e.target.value }))
-                        }
-                        placeholder="Enter asset class"
-                        className="w-[180px]"
-                      />
-                    ) : (
-                      formData.assetClass && (
-                        <Badge variant="secondary" className="flex-none uppercase">
-                          {formData.assetClass}
-                        </Badge>
-                      )
-                    )}
-                    {isEditing ? (
-                      <Input
-                        value={formData.assetSubClass}
-                        onChange={(e) =>
-                          setFormData((prev) => ({ ...prev, assetSubClass: e.target.value }))
-                        }
-                        placeholder="Enter sub-class"
-                        className="w-[180px]"
-                      />
-                    ) : (
-                      formData.assetSubClass && (
-                        <Badge variant="secondary" className="flex-none uppercase">
-                          {formData.assetSubClass}
-                        </Badge>
-                      )
-                    )}
-                    {(formData.assetClass || formData.assetSubClass) &&
-                      formData.sectors.length > 0 && <Separator orientation="vertical" />}
-                    {isEditing ? (
-                      <InputTags
-                        value={formData.sectors.map(
-                          (s) =>
-                            `${s.name}:${s.weight <= 1 ? (s.weight * 100).toFixed(0) : s.weight}%`,
-                        )}
-                        placeholder="sector:weight"
-                        onChange={(values) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            sectors: (values as string[]).map((value) => {
-                              const [name, weightStr] = value.split(":");
-                              // Keep original weight parsing logic, assuming input like 'Sector:75'
-                              return { name: name?.trim(), weight: parseFloat(weightStr) || 0 };
-                            }),
-                          }))
-                        }
-                      />
-                    ) : (
-                      <div className="flex flex-wrap">
-                        {formData.sectors.map((sector) => (
-                          <Badge
-                            variant="secondary"
-                            key={sector.name}
-                            className="dark:text-primary-foreground m-1 cursor-help bg-blue-100 uppercase"
-                            title={`${sector.name}: ${sector.weight <= 1 ? (sector.weight * 100).toFixed(2) : sector.weight}%`}
-                          >
-                            {sector.name}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                    {formData.sectors.length > 0 && formData.countries.length > 0 && (
-                      <Separator orientation="vertical" />
-                    )}
-                    {isEditing ? (
-                      <InputTags
-                        placeholder="country:weight"
-                        value={formData.countries.map(
-                          (c) =>
-                            `${c.name}:${c.weight <= 1 ? (c.weight * 100).toFixed(0) : c.weight}%`,
-                        )}
-                        onChange={(values) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            countries: (values as string[]).map((value) => {
-                              const [name, weightStr] = value.split(":");
-                              // Keep original weight parsing logic
-                              return { name: name?.trim(), weight: parseFloat(weightStr) || 0 };
-                            }),
-                          }))
-                        }
-                      />
-                    ) : (
-                      <div className="flex flex-wrap">
-                        {formData.countries.map((country) => (
-                          <Badge
-                            variant="secondary"
-                            key={country.name}
-                            className="dark:text-primary-foreground m-1 bg-purple-100 uppercase"
-                            title={`${country.name}: ${country.weight <= 1 ? (country.weight * 100).toFixed(2) : country.weight}%`}
-                          >
-                            {country.name}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                    {(formData.sectors.length > 0 || formData.countries.length > 0) && (
-                      <Separator orientation="vertical" />
-                    )}
-                    {isEditing && (
-                      <>
-                        <Button
-                          variant="default"
-                          size="icon"
-                          className="min-w-10"
-                          onClick={handleSave}
-                        >
-                          <Icons.Check className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="min-w-10"
-                          onClick={handleCancel}
-                        >
-                          <Icons.Close className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                  <div className="mt-2">
-                    {isEditing ? (
-                      <textarea
-                        className="mt-12 w-full rounded-md border border-neutral-200 p-2 text-sm"
-                        value={formData.notes}
-                        placeholder="Symbol/Company description"
-                        rows={6}
-                        onChange={(e) =>
-                          setFormData((prev) => ({ ...prev, notes: e.target.value }))
-                        }
-                      />
-                    ) : (
-                      <p className="text-muted-foreground text-sm font-light">
-                        {formData.notes || "No description available."}
-                      </p>
-                    )}
-                  </div>
+
+                  {/* Notes section */}
+                  <p className="text-muted-foreground text-sm">
+                    {assetProfile?.notes || holding?.instrument?.notes || "No notes added."}
+                  </p>
                 </div>
               </TabsContent>
             )}
@@ -1054,13 +802,13 @@ export const AssetProfilePage = () => {
         )}
       </PageContent>
 
-      {/* Classification Sheet */}
-      <ClassificationSheet
-        open={classificationSheetOpen}
-        onOpenChange={setClassificationSheetOpen}
-        assetId={assetProfile?.id ?? ""}
-        assetSymbol={symbol}
-        assetName={formData.name || (assetProfile?.name ?? undefined)}
+      {/* Edit Sheet */}
+      <AssetEditSheet
+        open={editSheetOpen}
+        onOpenChange={setEditSheetOpen}
+        asset={assetProfile ?? null}
+        latestQuote={quote}
+        defaultTab={editSheetDefaultTab}
       />
     </Page>
   );

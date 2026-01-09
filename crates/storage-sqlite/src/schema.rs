@@ -20,147 +20,37 @@ diesel::table! {
 }
 
 diesel::table! {
-    // UPDATED: Now has composite primary key
-    brokers_sync_state (account_id, provider) {
-        account_id -> Text,
-        provider -> Text,
-        checkpoint_json -> Nullable<Text>,
-        last_attempted_at -> Nullable<Text>,
-        last_successful_at -> Nullable<Text>,
-        last_error -> Nullable<Text>,
-        last_run_id -> Nullable<Text>,
-        sync_status -> Text,
-        created_at -> Text,
-        updated_at -> Text,
-    }
-}
-
-diesel::table! {
-    // COMPLETELY REDESIGNED
     activities (id) {
         id -> Text,
         account_id -> Text,
-        asset_id -> Nullable<Text>,  // NOW NULLABLE
-
-        // Classification
+        asset_id -> Nullable<Text>,
         activity_type -> Text,
         activity_type_override -> Nullable<Text>,
         source_type -> Nullable<Text>,
         subtype -> Nullable<Text>,
         status -> Text,
-
-        // Timing
         activity_date -> Text,
         settlement_date -> Nullable<Text>,
-
-        // Quantities
         quantity -> Nullable<Text>,
         unit_price -> Nullable<Text>,
         amount -> Nullable<Text>,
         fee -> Nullable<Text>,
         currency -> Text,
         fx_rate -> Nullable<Text>,
-
-        // Metadata
         notes -> Nullable<Text>,
         metadata -> Nullable<Text>,
-
-        // Source identity
         source_system -> Nullable<Text>,
         source_record_id -> Nullable<Text>,
         source_group_id -> Nullable<Text>,
         idempotency_key -> Nullable<Text>,
         import_run_id -> Nullable<Text>,
-
-        // Sync flags
         is_user_modified -> Integer,
         needs_review -> Integer,
-
-        // Audit
         created_at -> Text,
         updated_at -> Text,
     }
 }
 
-// NEW TABLE
-diesel::table! {
-    import_runs (id) {
-        id -> Text,
-        account_id -> Text,
-        source_system -> Text,
-        run_type -> Text,
-        mode -> Text,
-        status -> Text,
-        started_at -> Text,
-        finished_at -> Nullable<Text>,
-        review_mode -> Text,
-        applied_at -> Nullable<Text>,
-        checkpoint_in -> Nullable<Text>,
-        checkpoint_out -> Nullable<Text>,
-        summary -> Nullable<Text>,
-        warnings -> Nullable<Text>,
-        error -> Nullable<Text>,
-        created_at -> Text,
-        updated_at -> Text,
-    }
-}
-
-diesel::table! {
-    // Provider-agnostic asset model per spec:
-    // - No data_source (source belongs on quotes)
-    // - No quote_symbol (use provider_overrides instead)
-    // - kind is NOT NULL
-    // - pricing_mode is NOT NULL
-    assets (id) {
-        id -> Text,
-
-        // Core identity
-        kind -> Text,                    // AssetKind enum (NOT NULL)
-        name -> Nullable<Text>,
-        symbol -> Text,                  // Canonical ticker (no provider suffix)
-
-        // Market identity (for SECURITY)
-        exchange_mic -> Nullable<Text>,  // ISO 10383 MIC code
-
-        // Currency
-        currency -> Text,
-
-        // Pricing configuration
-        pricing_mode -> Text,            // MARKET, MANUAL, DERIVED, NONE (NOT NULL)
-        preferred_provider -> Nullable<Text>,
-        provider_overrides -> Nullable<Text>,  // JSON: provider_id -> provider params
-
-        // Classification
-        isin -> Nullable<Text>,
-        asset_class -> Nullable<Text>,
-        asset_sub_class -> Nullable<Text>,
-
-        // Metadata
-        notes -> Nullable<Text>,
-        profile -> Nullable<Text>,       // JSON: sectors, countries, website, etc.
-        metadata -> Nullable<Text>,
-
-        // Status
-        is_active -> Integer,
-        created_at -> Timestamp,
-        updated_at -> Timestamp,
-    }
-}
-
-diesel::table! {
-    platforms (id) {
-        id -> Text,
-        name -> Nullable<Text>,
-        url -> Text,
-        external_id -> Nullable<Text>,
-        // NEW FIELDS
-        kind -> Text,
-        website_url -> Nullable<Text>,
-        logo_url -> Nullable<Text>,
-    }
-}
-
-// Keep all other tables unchanged...
 diesel::table! {
     activity_import_profiles (account_id) {
         account_id -> Text,
@@ -177,6 +67,53 @@ diesel::table! {
     app_settings (setting_key) {
         setting_key -> Text,
         setting_value -> Text,
+    }
+}
+
+diesel::table! {
+    asset_taxonomy_assignments (id) {
+        id -> Text,
+        asset_id -> Text,
+        taxonomy_id -> Text,
+        category_id -> Text,
+        weight -> Integer,
+        source -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    assets (id) {
+        id -> Text,
+        kind -> Text,
+        name -> Nullable<Text>,
+        symbol -> Text,
+        exchange_mic -> Nullable<Text>,
+        currency -> Text,
+        pricing_mode -> Text,
+        preferred_provider -> Nullable<Text>,
+        provider_overrides -> Nullable<Text>,
+        notes -> Nullable<Text>,
+        metadata -> Nullable<Text>,
+        is_active -> Integer,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    brokers_sync_state (account_id, provider) {
+        account_id -> Text,
+        provider -> Text,
+        checkpoint_json -> Nullable<Text>,
+        last_attempted_at -> Nullable<Text>,
+        last_successful_at -> Nullable<Text>,
+        last_error -> Nullable<Text>,
+        last_run_id -> Nullable<Text>,
+        sync_status -> Text,
+        created_at -> Text,
+        updated_at -> Text,
     }
 }
 
@@ -248,6 +185,28 @@ diesel::table! {
 }
 
 diesel::table! {
+    import_runs (id) {
+        id -> Text,
+        account_id -> Text,
+        source_system -> Text,
+        run_type -> Text,
+        mode -> Text,
+        status -> Text,
+        started_at -> Text,
+        finished_at -> Nullable<Text>,
+        review_mode -> Text,
+        applied_at -> Nullable<Text>,
+        checkpoint_in -> Nullable<Text>,
+        checkpoint_out -> Nullable<Text>,
+        summary -> Nullable<Text>,
+        warnings -> Nullable<Text>,
+        error -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
     market_data_providers (id) {
         id -> Text,
         name -> Text,
@@ -263,8 +222,20 @@ diesel::table! {
 }
 
 diesel::table! {
+    platforms (id) {
+        id -> Text,
+        name -> Nullable<Text>,
+        url -> Text,
+        external_id -> Nullable<Text>,
+        kind -> Text,
+        website_url -> Nullable<Text>,
+        logo_url -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
     quote_sync_state (asset_id) {
-        asset_id -> Text,
+        asset_id -> Nullable<Text>,
         is_active -> Integer,
         first_activity_date -> Nullable<Text>,
         last_activity_date -> Nullable<Text>,
@@ -306,16 +277,16 @@ diesel::table! {
         name -> Text,
         color -> Text,
         description -> Nullable<Text>,
-        is_system -> Bool,
-        is_single_select -> Bool,
+        is_system -> Integer,
+        is_single_select -> Integer,
         sort_order -> Integer,
-        created_at -> Timestamp,
-        updated_at -> Timestamp,
+        created_at -> Text,
+        updated_at -> Text,
     }
 }
 
 diesel::table! {
-    taxonomy_categories (taxonomy_id, id) {
+    taxonomy_categories (id, taxonomy_id) {
         id -> Text,
         taxonomy_id -> Text,
         parent_id -> Nullable<Text>,
@@ -324,42 +295,32 @@ diesel::table! {
         color -> Text,
         description -> Nullable<Text>,
         sort_order -> Integer,
-        created_at -> Timestamp,
-        updated_at -> Timestamp,
+        created_at -> Text,
+        updated_at -> Text,
     }
 }
 
-diesel::table! {
-    asset_taxonomy_assignments (id) {
-        id -> Text,
-        asset_id -> Text,
-        taxonomy_id -> Text,
-        category_id -> Text,
-        weight -> Integer,  // basis points: 10000 = 100%
-        source -> Text,
-        created_at -> Timestamp,
-        updated_at -> Timestamp,
-    }
-}
-
-// Joinable relationships
 diesel::joinable!(accounts -> platforms (platform_id));
+diesel::joinable!(activities -> accounts (account_id));
+diesel::joinable!(activities -> assets (asset_id));
+diesel::joinable!(activities -> import_runs (import_run_id));
+diesel::joinable!(asset_taxonomy_assignments -> assets (asset_id));
+diesel::joinable!(brokers_sync_state -> accounts (account_id));
+diesel::joinable!(brokers_sync_state -> import_runs (last_run_id));
 diesel::joinable!(goals_allocation -> accounts (account_id));
 diesel::joinable!(goals_allocation -> goals (goal_id));
-diesel::joinable!(quotes -> assets (asset_id));
 diesel::joinable!(import_runs -> accounts (account_id));
+diesel::joinable!(quotes -> assets (asset_id));
 diesel::joinable!(taxonomy_categories -> taxonomies (taxonomy_id));
-diesel::joinable!(asset_taxonomy_assignments -> assets (asset_id));
-diesel::joinable!(asset_taxonomy_assignments -> taxonomies (taxonomy_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
-    asset_taxonomy_assignments,
-    brokers_sync_state,
     activities,
     activity_import_profiles,
     app_settings,
+    asset_taxonomy_assignments,
     assets,
+    brokers_sync_state,
     contribution_limits,
     daily_account_valuation,
     goals,

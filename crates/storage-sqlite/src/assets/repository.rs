@@ -105,6 +105,15 @@ impl AssetRepositoryTrait for AssetRepository {
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<Asset> {
+                // First, get the existing asset to preserve its metadata
+                let existing: AssetDB = assets::table
+                    .filter(assets::id.eq(&asset_id_owned))
+                    .first(conn)
+                    .map_err(StorageError::from)?;
+
+                // Preserve existing metadata (includes legacy data from migration)
+                let metadata_json = existing.metadata;
+
                 // Serialize kind to string if present
                 let kind_str = payload_owned.kind.as_ref().map(|k| k.as_db_str().to_string());
 
@@ -120,20 +129,11 @@ impl AssetRepositoryTrait for AssetRepository {
                     .as_ref()
                     .map(|po| serde_json::to_string(po).unwrap_or_default());
 
-                // Build profile JSON from sectors, countries if present
-                let profile_json = {
-                    let mut obj = serde_json::Map::new();
-                    if let Some(ref s) = payload_owned.sectors {
-                        obj.insert("sectors".to_string(), serde_json::Value::String(s.clone()));
-                    }
-                    if let Some(ref c) = payload_owned.countries {
-                        obj.insert("countries".to_string(), serde_json::Value::String(c.clone()));
-                    }
-                    if obj.is_empty() {
-                        None
-                    } else {
-                        Some(serde_json::to_string(&serde_json::Value::Object(obj)).unwrap_or_default())
-                    }
+                // Determine exchange_mic - use payload if present, otherwise keep existing
+                let exchange_mic_value = if payload_owned.exchange_mic.is_some() {
+                    payload_owned.exchange_mic.clone()
+                } else {
+                    existing.exchange_mic.clone()
                 };
 
                 // Build the update query - only include kind if it's provided
@@ -142,10 +142,9 @@ impl AssetRepositoryTrait for AssetRepository {
                         .set((
                             assets::name.eq(&payload_owned.name),
                             assets::kind.eq(kind_value),
-                            assets::profile.eq(&profile_json),
+                            assets::exchange_mic.eq(&exchange_mic_value),
                             assets::notes.eq(&payload_owned.notes),
-                            assets::asset_sub_class.eq(&payload_owned.asset_sub_class),
-                            assets::asset_class.eq(&payload_owned.asset_class),
+                            assets::metadata.eq(&metadata_json),
                             assets::pricing_mode.eq(pricing_mode_str.clone().unwrap_or_else(|| "MARKET".to_string())),
                             assets::provider_overrides.eq(&provider_overrides_str),
                         ))
@@ -155,10 +154,9 @@ impl AssetRepositoryTrait for AssetRepository {
                     diesel::update(assets::table.filter(assets::id.eq(&asset_id_owned)))
                         .set((
                             assets::name.eq(&payload_owned.name),
-                            assets::profile.eq(&profile_json),
+                            assets::exchange_mic.eq(&exchange_mic_value),
                             assets::notes.eq(&payload_owned.notes),
-                            assets::asset_sub_class.eq(&payload_owned.asset_sub_class),
-                            assets::asset_class.eq(&payload_owned.asset_class),
+                            assets::metadata.eq(&metadata_json),
                             assets::pricing_mode.eq(pricing_mode_str.unwrap_or_else(|| "MARKET".to_string())),
                             assets::provider_overrides.eq(&provider_overrides_str),
                         ))

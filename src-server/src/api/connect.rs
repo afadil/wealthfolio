@@ -21,7 +21,7 @@ use wealthfolio_connect::{
         BrokerApiClient, PlansResponse, SyncAccountsResponse, SyncActivitiesResponse,
         SyncConnectionsResponse, UserInfo,
     },
-    ConnectApiClient, DEFAULT_CLOUD_API_URL,
+    fetch_subscription_plans_public, ConnectApiClient, DEFAULT_CLOUD_API_URL,
 };
 
 // Storage key for refresh token (without prefix - the SecretStore adds "wealthfolio_" prefix)
@@ -416,6 +416,18 @@ async fn get_subscription_plans(
     Ok(Json(plans))
 }
 
+async fn get_subscription_plans_public() -> ApiResult<Json<PlansResponse>> {
+    info!("[Connect] Getting subscription plans (public)...");
+
+    let base_url = cloud_api_base_url();
+
+    let plans = fetch_subscription_plans_public(&base_url)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    Ok(Json(plans))
+}
+
 async fn get_user_info(State(state): State<Arc<AppState>>) -> ApiResult<Json<UserInfo>> {
     info!("[Connect] Getting user info...");
 
@@ -445,5 +457,6 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/connect/sync/activities", post(sync_broker_activities))
         // User & Subscription
         .route("/connect/plans", get(get_subscription_plans))
+        .route("/connect/plans/public", get(get_subscription_plans_public))
         .route("/connect/user", get(get_user_info))
 }

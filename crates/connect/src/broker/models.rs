@@ -241,6 +241,8 @@ pub struct AccountUniversalActivityCurrency {
 pub struct AccountUniversalActivityExchange {
     pub id: Option<String>,
     pub code: Option<String>,
+    /// MIC (Market Identifier Code) - prefer this over code for exchange_mic field
+    pub mic_code: Option<String>,
     pub name: Option<String>,
 }
 
@@ -527,27 +529,63 @@ impl BrokerAccount {
 
 /// Pricing information for a subscription plan
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PlanPricing {
-    pub amount: f64,
-    pub currency: String,
-    pub price_id: Option<String>,
+    pub monthly: f64,
+    pub yearly: f64,
+    #[serde(default)]
+    pub yearly_per_month: Option<f64>,
 }
 
-/// Pricing for monthly and yearly billing periods
+/// Plan limits/quotas
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlanPricingPeriods {
-    pub monthly: PlanPricing,
-    pub yearly: PlanPricing,
+#[serde(rename_all = "camelCase")]
+pub struct PlanLimits {
+    pub household_size: i32,
+    pub institution_connections: PlanLimitValue,
+    pub devices: i32,
+}
+
+/// A plan limit value that can be a number or "unlimited"
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum PlanLimitValue {
+    Limited(i32),
+    Unlimited(String),
+}
+
+impl PlanLimitValue {
+    pub fn display(&self) -> String {
+        match self {
+            PlanLimitValue::Limited(n) => n.to_string(),
+            PlanLimitValue::Unlimited(_) => "Unlimited".to_string(),
+        }
+    }
 }
 
 /// A subscription plan
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SubscriptionPlan {
     pub id: String,
     pub name: String,
+    #[serde(default)]
+    pub tagline: Option<String>,
     pub description: String,
+    pub pricing: PlanPricing,
+    pub limits: PlanLimits,
+    #[serde(default)]
     pub features: Vec<String>,
-    pub pricing: PlanPricingPeriods,
+    #[serde(default)]
+    pub features_extended: Option<Vec<String>>,
+    #[serde(default)]
+    pub is_available: bool,
+    #[serde(default)]
+    pub is_coming_soon: bool,
+    #[serde(default)]
+    pub badge: Option<String>,
+    #[serde(default)]
+    pub yearly_discount_percent: Option<i32>,
 }
 
 /// Response containing subscription plans

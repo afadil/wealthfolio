@@ -71,6 +71,7 @@ export const QueryKeys = {
   PLATFORMS: "platforms",
   SYNCED_ACCOUNTS: "syncedAccounts",
   SUBSCRIPTION_PLANS: "subscriptionPlans",
+  SUBSCRIPTION_PLANS_PUBLIC: "subscriptionPlansPublic",
   USER_INFO: "userInfo",
   BROKER_SYNC_STATES: "brokerSyncStates",
   IMPORT_RUNS: "importRuns",
@@ -96,4 +97,5 @@ export const QueryKeys = {
   taxonomy: (id: string) => [QueryKeys.TAXONOMY, id],
   ASSET_TAXONOMY_ASSIGNMENTS: "assetTaxonomyAssignments",
   assetTaxonomyAssignments: (assetId: string) => [QueryKeys.ASSET_TAXONOMY_ASSIGNMENTS, assetId],
+  ASSET_CLASSIFICATIONS: "asset-classifications",
 } as const;

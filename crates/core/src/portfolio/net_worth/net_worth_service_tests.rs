@@ -345,6 +345,7 @@ impl QuoteServiceTrait for MockMarketDataRepository {
         symbols: &HashSet<String>,
         start: NaiveDate,
         end: NaiveDate,
+        _first_appearance: &HashMap<String, NaiveDate>,
     ) -> Result<Vec<Quote>> {
         // For testing, just return the raw quotes in range
         // The actual implementation would fill gaps

@@ -1,7 +1,5 @@
 import { useMemo, useState } from "react";
 
-import { ClassificationSheet } from "@/components/classification/classification-sheet";
-
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,30 +10,22 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@wealthfolio/ui/components/ui/alert-dialog";
-import { Dialog, DialogContent } from "@wealthfolio/ui/components/ui/dialog";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@wealthfolio/ui/components/ui/sheet";
 import { Separator } from "@wealthfolio/ui";
 
-import { useIsMobileViewport } from "@/hooks/use-platform";
 import { useSyncMarketDataMutation } from "@/hooks/use-sync-market-data";
 import { SettingsHeader } from "../settings/settings-header";
-import { AssetForm, AssetFormValues, buildAssetUpdatePayload } from "./asset-form";
+import { AssetEditSheet } from "./asset-edit-sheet";
 import { ParsedAsset, toParsedAsset } from "./asset-utils";
 import { AssetsTable } from "./assets-table";
 import { AssetsTableMobile } from "./assets-table-mobile";
 import { useAssetManagement } from "./hooks/use-asset-management";
 import { useAssets } from "./hooks/use-assets";
 import { useLatestQuotes } from "./hooks/use-latest-quotes";
+import { useIsMobileViewport } from "@/hooks/use-platform";
 
 export default function AssetsPage() {
   const { assets, isLoading } = useAssets();
-  const { updateAssetMutation, deleteAssetMutation } = useAssetManagement();
+  const { deleteAssetMutation } = useAssetManagement();
   const refetchQuotesMutation = useSyncMarketDataMutation(true);
   const updateQuotesMutation = useSyncMarketDataMutation(false);
   const isMobileViewport = useIsMobileViewport();
@@ -46,19 +36,6 @@ export default function AssetsPage() {
 
   const [editingAsset, setEditingAsset] = useState<ParsedAsset | null>(null);
   const [assetPendingDelete, setAssetPendingDelete] = useState<ParsedAsset | null>(null);
-  const [classifyAsset, setClassifyAsset] = useState<{id: string, symbol: string, name?: string} | null>(null);
-
-  const closeEditor = () => setEditingAsset(null);
-
-  const handleSubmit = async (values: AssetFormValues) => {
-    const payload = buildAssetUpdatePayload(values);
-    await updateAssetMutation.mutateAsync({
-      assetId: values.symbol,
-      payload,
-      preferredProvider: values.preferredProvider,
-    });
-    closeEditor();
-  };
 
   const handleDelete = async () => {
     if (!assetPendingDelete) return;
@@ -83,7 +60,6 @@ export default function AssetsPage() {
             onDelete={(asset) => setAssetPendingDelete(asset)}
             onUpdateQuotes={(asset) => updateQuotesMutation.mutate([asset.symbol])}
             onRefetchQuotes={(asset) => refetchQuotesMutation.mutate([asset.symbol])}
-            onClassify={(asset) => setClassifyAsset({ id: asset.id, symbol: asset.symbol, name: asset.name ?? undefined })}
             isUpdatingQuotes={updateQuotesMutation.isPending}
             isRefetchingQuotes={refetchQuotesMutation.isPending}
           />
@@ -96,68 +72,22 @@ export default function AssetsPage() {
             onDelete={(asset) => setAssetPendingDelete(asset)}
             onUpdateQuotes={(asset) => updateQuotesMutation.mutate([asset.symbol])}
             onRefetchQuotes={(asset) => refetchQuotesMutation.mutate([asset.symbol])}
-            onClassify={(asset) => setClassifyAsset({ id: asset.id, symbol: asset.symbol, name: asset.name ?? undefined })}
             isUpdatingQuotes={updateQuotesMutation.isPending}
             isRefetchingQuotes={refetchQuotesMutation.isPending}
           />
         )}
       </div>
 
-      {isMobileViewport ? (
-        <Dialog
-          open={!!editingAsset}
-          onOpenChange={(open) => {
-            if (!open) {
-              closeEditor();
-            }
-          }}
-          useIsMobile={useIsMobileViewport}
-        >
-          {editingAsset ? (
-            <DialogContent className="mx-1 max-h-[90vh] overflow-y-auto rounded-t-4xl sm:max-w-[720px]">
-              <SheetHeader>
-                <SheetTitle>Edit Security</SheetTitle>
-              </SheetHeader>
-              <div className="px-6 py-4">
-                <AssetForm
-                  asset={editingAsset}
-                  onSubmit={handleSubmit}
-                  onCancel={closeEditor}
-                  isSaving={updateAssetMutation.isPending}
-                />
-              </div>
-            </DialogContent>
-          ) : null}
-        </Dialog>
-      ) : (
-        <Sheet
-          open={!!editingAsset}
-          onOpenChange={(open) => {
-            if (!open) {
-              closeEditor();
-            }
-          }}
-        >
-          {editingAsset ? (
-            <SheetContent className="sm:max-w-[740px]">
-              <SheetHeader className="border-border border-b px-6 pt-6 pb-4">
-                <SheetTitle>Edit Security</SheetTitle>
-                <SheetDescription>
-                  Update security information and market data settings
-                </SheetDescription>
-              </SheetHeader>
-              <div className="max-h-[calc(90vh-7rem)] overflow-y-auto px-6 py-4">
-                <AssetForm
-                  asset={editingAsset}
-                  onSubmit={handleSubmit}
-                  onCancel={closeEditor}
-                  isSaving={updateAssetMutation.isPending}
-                />
-              </div>
-            </SheetContent>
-          ) : null}
-        </Sheet>
-      )}
+      <AssetEditSheet
+        asset={editingAsset}
+        latestQuote={editingAsset ? latestQuotes[editingAsset.symbol] : null}
+        open={!!editingAsset}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingAsset(null);
+          }
+        }}
+      />
 
       <AlertDialog
         open={!!assetPendingDelete}
@@ -188,18 +118,6 @@ export default function AssetsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <ClassificationSheet
-        assetId={classifyAsset?.id ?? ""}
-        assetSymbol={classifyAsset?.symbol}
-        assetName={classifyAsset?.name}
-        open={classifyAsset !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setClassifyAsset(null);
-          }
-        }}
-      />
     </div>
   );
 }

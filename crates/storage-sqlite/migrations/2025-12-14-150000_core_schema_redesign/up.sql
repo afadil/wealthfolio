@@ -1,25 +1,24 @@
--- Activity System Redesign Migration
--- Transforms the activities system to support new types, sync, and provider integration
+-- Core Schema Redesign Migration
+-- Transforms assets, activities, accounts, and platforms to new schema
+--
+-- Key changes:
+-- - Assets: Final schema with metadata JSON (no legacy columns)
+-- - Activities: New sync-aware schema
+-- - New tables: import_runs, brokers_sync_state
+-- - Platform/Account updates for provider integration
 --
 -- IMPORTANT: We use PRAGMA legacy_alter_table=ON to prevent SQLite from automatically
--- updating foreign key references when tables are renamed. Without this, renaming
--- "assets" to "assets_old" would update FK references in "quotes" and "activities"
--- to point to "assets_old", causing errors after "assets_old" is dropped.
--- See: https://www.sqlite.org/lang_altertable.html
+-- updating foreign key references when tables are renamed.
 
--- Prevent SQLite from auto-updating FK references during table renames
 PRAGMA legacy_alter_table = ON;
 
 -- ============================================================================
 -- STEP 0: CLEAN UP ORPHANED DATA
--- Remove activities referencing non-existent accounts or assets to prevent FK issues
 -- ============================================================================
 
--- Delete activities with non-existent accounts (orphaned due to account deletion)
 DELETE FROM activities
 WHERE NOT EXISTS (SELECT 1 FROM accounts WHERE id = activities.account_id);
 
--- Nullify asset references for activities pointing to non-existent assets
 UPDATE activities
 SET asset_id = NULL
 WHERE asset_id IS NOT NULL
@@ -54,7 +53,7 @@ CREATE INDEX ix_import_runs_account_id ON import_runs(account_id);
 CREATE INDEX ix_import_runs_status ON import_runs(status);
 
 -- ============================================================================
--- STEP 2: CREATE BROKERS_SYNC_STATE WITH COMPOSITE PRIMARY KEY
+-- STEP 2: CREATE BROKERS_SYNC_STATE TABLE
 -- ============================================================================
 
 CREATE TABLE brokers_sync_state (
@@ -76,52 +75,40 @@ CREATE TABLE brokers_sync_state (
 CREATE INDEX ix_brokers_sync_state_provider ON brokers_sync_state(provider);
 
 -- ============================================================================
--- STEP 3: UPDATE ASSETS TABLE (MUST BE DONE BEFORE ACTIVITIES!)
--- Provider-agnostic asset model per spec:
--- - Removes data_source (source belongs on quotes)
--- - Removes quote_symbol (replaced by provider_overrides)
--- - Makes kind NOT NULL
--- - Adds JSON validity checks
+-- STEP 3: UPDATE ASSETS TABLE - FINAL SCHEMA
+-- No legacy columns (isin, asset_class, asset_sub_class, profile)
+-- Legacy data stored in metadata.legacy JSON
 -- ============================================================================
 
--- Rename old table
 ALTER TABLE assets RENAME TO assets_old;
 
--- Create new clean table (no legacy columns)
 CREATE TABLE assets (
     id TEXT NOT NULL PRIMARY KEY,
 
     -- Identity
-    kind TEXT NOT NULL,                  -- AssetKind enum (SCREAMING_SNAKE_CASE)
-    name TEXT,                           -- Display name
-    symbol TEXT NOT NULL,                -- Canonical ticker/label (no provider suffix)
+    kind TEXT NOT NULL,
+    name TEXT,
+    symbol TEXT NOT NULL,
 
     -- Market Identity (for SECURITY)
-    exchange_mic TEXT,                   -- ISO 10383 MIC (XTSE, XNAS, XLON)
+    exchange_mic TEXT,
 
     -- Currency
-    currency TEXT NOT NULL,              -- Native/valuation currency
-                                         -- For FX/CRYPTO: quote currency (USD in EUR/USD)
+    currency TEXT NOT NULL,
 
     -- Pricing Configuration
-    pricing_mode TEXT NOT NULL DEFAULT 'MARKET',  -- MARKET, MANUAL, DERIVED, NONE
-    preferred_provider TEXT,                       -- Optional hint (YAHOO, ALPHA_VANTAGE)
-    provider_overrides TEXT,                       -- JSON: provider_id -> ProviderInstrument params
+    pricing_mode TEXT NOT NULL DEFAULT 'MARKET',
+    preferred_provider TEXT,
+    provider_overrides TEXT,
 
-    -- Classification
-    isin TEXT,
-    asset_class TEXT,                    -- Equity, Fixed Income, etc.
-    asset_sub_class TEXT,                -- Stock, ETF, Bond, etc.
-
-    -- Metadata
+    -- Metadata (includes legacy data for migration)
     notes TEXT,
-    profile TEXT,                        -- JSON: sectors, countries, website, description, etc.
-    metadata TEXT,                       -- Kind-specific extensions (OptionSpec, property terms)
+    metadata TEXT,
 
     -- Status
     is_active INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP),
-    updated_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 
     -- Constraints
     CHECK (kind IN ('SECURITY', 'CRYPTO', 'CASH', 'FX_RATE', 'OPTION', 'COMMODITY',
@@ -130,35 +117,91 @@ CREATE TABLE assets (
     CHECK (pricing_mode IN ('MARKET', 'MANUAL', 'DERIVED', 'NONE')),
     CHECK (is_active IN (0, 1)),
     CHECK (provider_overrides IS NULL OR json_valid(provider_overrides)),
-    CHECK (profile IS NULL OR json_valid(profile)),
     CHECK (metadata IS NULL OR json_valid(metadata))
 );
 
 -- Copy data with proper migration
 -- Converts old schema to provider-agnostic model
--- Migrates legacy columns (countries, sectors, url) into profile JSON
--- FX assets are converted to canonical format: id="EUR/USD", symbol="EUR", currency="USD"
+-- Stores ALL legacy data in metadata.legacy JSON
+-- NEW: Asset IDs use {primary}:{qualifier} format
 INSERT INTO assets (
     id, kind, name, symbol, exchange_mic, currency,
     pricing_mode, preferred_provider, provider_overrides,
-    isin, asset_class, asset_sub_class, notes, profile, metadata,
-    is_active, created_at, updated_at
+    notes, metadata, is_active, created_at, updated_at
 )
 SELECT
-    -- id: for FX assets, convert to canonical format (EUR/USD)
+    -- id: New canonical format {primary}:{qualifier}
+    -- FX: EUR:USD (base:quote)
+    -- Crypto: BTC:USD (base:quote)
+    -- Cash: CASH:USD (prefix:currency)
+    -- Security with suffix: SHOP:XTSE (symbol:mic)
+    -- Security without suffix (US): AAPL:XNAS (symbol:mic, default to XNAS)
+    -- Alternative assets: Keep existing ID but replace - with : (PROP-abc -> PROP:abc)
     CASE
-        WHEN asset_type IN ('Forex', 'Currency') AND symbol LIKE '%=X' THEN
-            substr(replace(symbol, '=X', ''), 1, 3) || '/' || substr(replace(symbol, '=X', ''), 4, 3)
-        WHEN asset_type IN ('Forex', 'Currency') AND length(symbol) = 6 THEN
-            substr(symbol, 1, 3) || '/' || substr(symbol, 4, 3)
+        -- FX: base:quote
+        WHEN asset_type IN ('Forex', 'Currency', 'FOREX') AND symbol LIKE '%=X' THEN
+            substr(replace(symbol, '=X', ''), 1, 3) || ':' || substr(replace(symbol, '=X', ''), 4, 3)
+        WHEN asset_type IN ('Forex', 'Currency', 'FOREX') AND length(symbol) = 6 AND symbol NOT LIKE '%.%' THEN
+            substr(symbol, 1, 3) || ':' || substr(symbol, 4, 3)
+        -- Crypto: base:quote (BTC-CAD -> BTC:CAD)
+        WHEN asset_type IN ('Cryptocurrency', 'Crypto', 'CRYPTOCURRENCY', 'CRYPTO') AND symbol LIKE '%-%' THEN
+            substr(symbol, 1, instr(symbol, '-') - 1) || ':' || currency
+        -- Cash: CASH:currency
+        WHEN asset_type IN ('Cash', 'CASH') OR id LIKE '$CASH-%' THEN
+            'CASH:' || currency
+        -- Alternative assets: PROP-xxx -> PROP:xxx, VEH-xxx -> VEH:xxx, etc.
+        WHEN id LIKE 'PROP-%' THEN 'PROP:' || substr(id, 6)
+        WHEN id LIKE 'VEH-%' THEN 'VEH:' || substr(id, 5)
+        WHEN id LIKE 'COLL-%' THEN 'COLL:' || substr(id, 6)
+        WHEN id LIKE 'PREC-%' THEN 'PREC:' || substr(id, 6)
+        WHEN id LIKE 'LIAB-%' THEN 'LIAB:' || substr(id, 6)
+        WHEN id LIKE 'ALT-%' THEN 'ALT:' || substr(id, 5)
+        -- Security with exchange suffix: symbol:MIC
+        WHEN symbol LIKE '%.TO' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XTSE'
+        WHEN symbol LIKE '%.V' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XTSX'
+        WHEN symbol LIKE '%.CN' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XCNQ'
+        WHEN symbol LIKE '%.L' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XLON'
+        WHEN symbol LIKE '%.DE' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XETR'
+        WHEN symbol LIKE '%.PA' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XPAR'
+        WHEN symbol LIKE '%.AS' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XAMS'
+        WHEN symbol LIKE '%.MI' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XMIL'
+        WHEN symbol LIKE '%.MC' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XMAD'
+        WHEN symbol LIKE '%.ST' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XSTO'
+        WHEN symbol LIKE '%.HE' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XHEL'
+        WHEN symbol LIKE '%.CO' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XCSE'
+        WHEN symbol LIKE '%.OL' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XOSL'
+        WHEN symbol LIKE '%.SW' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XSWX'
+        WHEN symbol LIKE '%.VI' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XWBO'
+        WHEN symbol LIKE '%.T' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XTKS'
+        WHEN symbol LIKE '%.HK' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XHKG'
+        WHEN symbol LIKE '%.SS' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XSHG'
+        WHEN symbol LIKE '%.SZ' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XSHE'
+        WHEN symbol LIKE '%.AX' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XASX'
+        WHEN symbol LIKE '%.NZ' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XNZE'
+        WHEN symbol LIKE '%.SA' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':BVMF'
+        WHEN symbol LIKE '%.NS' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XNSE'
+        WHEN symbol LIKE '%.BO' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XBOM'
+        WHEN symbol LIKE '%.TW' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XTAI'
+        WHEN symbol LIKE '%.SI' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XSES'
+        WHEN symbol LIKE '%.KS' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XKRX'
+        WHEN symbol LIKE '%.KQ' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XKOS'
+        WHEN symbol LIKE '%.BK' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XBKK'
+        WHEN symbol LIKE '%.JK' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XIDX'
+        WHEN symbol LIKE '%.KL' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XKLS'
+        WHEN symbol LIKE '%.TA' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XTAE'
+        -- US stocks without suffix: default to XNAS (Yahoo's NMS -> XNAS)
+        WHEN asset_type IN ('Stock', 'Equity', 'ETF', 'Etf', 'Mutual Fund', 'MutualFund', 'STOCK', 'EQUITY', 'ETF', 'MUTUALFUND')
+             AND symbol NOT LIKE '%.%' THEN
+            symbol || ':XNAS'
+        -- Fallback: keep original id (shouldn't happen with proper data)
         ELSE id
     END,
     -- kind: derive from asset_type (NOT NULL)
     CASE
-        WHEN asset_type IN ('Stock', 'Equity', 'ETF', 'Etf', 'Mutual Fund', 'MutualFund') THEN 'SECURITY'
-        WHEN asset_type IN ('Cryptocurrency', 'Crypto') THEN 'CRYPTO'
-        WHEN asset_type = 'Cash' THEN 'CASH'
-        WHEN asset_type IN ('Forex', 'Currency') THEN 'FX_RATE'
+        WHEN asset_type IN ('Stock', 'Equity', 'ETF', 'Etf', 'Mutual Fund', 'MutualFund', 'STOCK', 'EQUITY', 'ETF', 'MUTUALFUND') THEN 'SECURITY'
+        WHEN asset_type IN ('Cryptocurrency', 'Crypto', 'CRYPTOCURRENCY', 'CRYPTO') THEN 'CRYPTO'
+        WHEN asset_type IN ('Cash', 'CASH') THEN 'CASH'
+        WHEN asset_type IN ('Forex', 'Currency', 'FOREX', 'CURRENCY') THEN 'FX_RATE'
         WHEN asset_type = 'Option' THEN 'OPTION'
         WHEN asset_type = 'Commodity' THEN 'COMMODITY'
         WHEN asset_type IN ('Property', 'Real Estate') THEN 'PROPERTY'
@@ -167,14 +210,14 @@ SELECT
         ELSE 'SECURITY'
     END,
     name,
-    -- symbol: for FX assets, use base currency only; for securities, strip provider suffix
+    -- symbol: for FX assets, use base currency only; for crypto, extract base from "BTC-CAD"; for securities, strip provider suffix
     CASE
-        -- FX assets: extract base currency (first 3 chars)
-        WHEN asset_type IN ('Forex', 'Currency') AND symbol LIKE '%=X' THEN
+        WHEN asset_type IN ('Forex', 'Currency', 'FOREX') AND symbol LIKE '%=X' THEN
             substr(replace(symbol, '=X', ''), 1, 3)
-        WHEN asset_type IN ('Forex', 'Currency') AND length(symbol) = 6 THEN
+        WHEN asset_type IN ('Forex', 'Currency', 'FOREX') AND length(symbol) = 6 AND symbol NOT LIKE '%.%' THEN
             substr(symbol, 1, 3)
-        -- For YAHOO symbols with .XX suffix, strip the suffix
+        WHEN asset_type IN ('Cryptocurrency', 'Crypto', 'CRYPTOCURRENCY', 'CRYPTO') AND symbol LIKE '%-%' THEN
+            substr(symbol, 1, instr(symbol, '-') - 1)
         WHEN symbol LIKE '%.TO' OR symbol LIKE '%.V' OR symbol LIKE '%.CN'
              OR symbol LIKE '%.L' OR symbol LIKE '%.DE' OR symbol LIKE '%.PA'
              OR symbol LIKE '%.AS' OR symbol LIKE '%.MI' OR symbol LIKE '%.MC'
@@ -189,7 +232,7 @@ SELECT
             substr(symbol, 1, instr(symbol, '.') - 1)
         ELSE symbol
     END,
-    -- exchange_mic: infer from symbol suffix
+    -- exchange_mic: infer from symbol suffix OR default to XNAS for US securities
     CASE
         WHEN symbol LIKE '%.TO' THEN 'XTSE'
         WHEN symbol LIKE '%.V' THEN 'XTSX'
@@ -223,53 +266,40 @@ SELECT
         WHEN symbol LIKE '%.JK' THEN 'XIDX'
         WHEN symbol LIKE '%.KL' THEN 'XKLS'
         WHEN symbol LIKE '%.TA' THEN 'XTAE'
-        -- US exchanges (no suffix) - default to XNAS for now
-        WHEN asset_type IN ('Stock', 'Equity', 'ETF', 'Etf', 'Mutual Fund', 'MutualFund')
-             AND symbol NOT LIKE '%.%' AND symbol NOT LIKE '%=X' THEN NULL
+        -- US stocks without suffix: default to XNAS (Yahoo's NMS -> XNAS)
+        WHEN asset_type IN ('Stock', 'Equity', 'ETF', 'Etf', 'Mutual Fund', 'MutualFund', 'STOCK', 'EQUITY', 'ETF', 'MUTUALFUND')
+             AND symbol NOT LIKE '%.%' THEN 'XNAS'
         ELSE NULL
     END,
     -- currency: for FX assets, use quote currency (last 3 chars); otherwise keep original
     CASE
-        WHEN asset_type IN ('Forex', 'Currency') AND symbol LIKE '%=X' THEN
+        WHEN asset_type IN ('Forex', 'Currency', 'FOREX') AND symbol LIKE '%=X' THEN
             substr(replace(symbol, '=X', ''), 4, 3)
-        WHEN asset_type IN ('Forex', 'Currency') AND length(symbol) = 6 THEN
+        WHEN asset_type IN ('Forex', 'Currency', 'FOREX') AND length(symbol) = 6 AND symbol NOT LIKE '%.%' THEN
             substr(symbol, 4, 3)
         ELSE currency
     END,
-    -- pricing_mode: derive from data_source
+    -- pricing_mode
     CASE
-        WHEN asset_type = 'Cash' THEN 'NONE'
+        WHEN asset_type IN ('Cash', 'CASH') THEN 'NONE'
         WHEN data_source = 'MANUAL' THEN 'MANUAL'
         ELSE 'MARKET'
     END,
-    -- preferred_provider: from data_source
+    -- preferred_provider
     CASE
         WHEN data_source IN ('YAHOO', 'ALPHA_VANTAGE', 'MARKETDATA_APP', 'METAL_PRICE_API') THEN data_source
         ELSE NULL
     END,
-    -- provider_overrides: migrate to JSON format
-    -- FX assets: create Yahoo-specific override with EURUSD=X format
-    -- Other assets: migrate symbol_mapping if present
+    -- provider_overrides
     CASE
-        -- FX assets: create provider_overrides with Yahoo FX symbol format
-        WHEN asset_type IN ('Forex', 'Currency') AND symbol LIKE '%=X' THEN
-            json_object(
-                'YAHOO',
-                json_object('type', 'fx_symbol', 'symbol', symbol)
-            )
-        WHEN asset_type IN ('Forex', 'Currency') AND length(symbol) = 6 THEN
-            json_object(
-                'YAHOO',
-                json_object('type', 'fx_symbol', 'symbol', symbol || '=X')
-            )
-        -- Other assets with symbol_mapping: migrate to equity_symbol format
+        WHEN asset_type IN ('Forex', 'Currency', 'FOREX') AND symbol LIKE '%=X' THEN
+            json_object('YAHOO', json_object('type', 'fx_symbol', 'symbol', symbol))
+        WHEN asset_type IN ('Forex', 'Currency', 'FOREX') AND length(symbol) = 6 AND symbol NOT LIKE '%.%' THEN
+            json_object('YAHOO', json_object('type', 'fx_symbol', 'symbol', symbol || '=X'))
+        WHEN asset_type IN ('Cryptocurrency', 'Crypto', 'CRYPTOCURRENCY', 'CRYPTO') AND symbol LIKE '%-%' THEN
+            json_object('YAHOO', json_object('type', 'crypto_symbol', 'symbol', symbol))
         WHEN symbol_mapping IS NOT NULL AND symbol_mapping != '' AND symbol_mapping != symbol THEN
-            json_object(
-                COALESCE(data_source, 'YAHOO'),
-                json_object('type', 'equity_symbol', 'symbol', symbol_mapping)
-            )
-        -- Securities with exchange suffix: store original Yahoo symbol in provider_overrides
-        -- This preserves the full symbol (e.g., XEQT.TO) for Yahoo Finance lookups
+            json_object(COALESCE(data_source, 'YAHOO'), json_object('type', 'equity_symbol', 'symbol', symbol_mapping))
         WHEN symbol LIKE '%.TO' OR symbol LIKE '%.V' OR symbol LIKE '%.CN'
              OR symbol LIKE '%.L' OR symbol LIKE '%.DE' OR symbol LIKE '%.PA'
              OR symbol LIKE '%.AS' OR symbol LIKE '%.MI' OR symbol LIKE '%.MC'
@@ -281,41 +311,42 @@ SELECT
              OR symbol LIKE '%.TW' OR symbol LIKE '%.SI' OR symbol LIKE '%.KS'
              OR symbol LIKE '%.KQ' OR symbol LIKE '%.BK' OR symbol LIKE '%.JK'
              OR symbol LIKE '%.KL' OR symbol LIKE '%.TA' THEN
-            json_object(
-                'YAHOO',
-                json_object('type', 'equity_symbol', 'symbol', symbol)
-            )
+            json_object('YAHOO', json_object('type', 'equity_symbol', 'symbol', symbol))
         ELSE NULL
     END,
-    isin,
-    asset_class,
-    asset_sub_class,
     notes,
-    -- profile: migrate legacy columns (countries, sectors, url) into JSON
-    CASE
-        WHEN countries IS NOT NULL OR sectors IS NOT NULL OR url IS NOT NULL THEN
-            json_object(
-                'countries', countries,
-                'sectors', sectors,
-                'website', url
-            )
-        ELSE NULL
-    END,
-    NULL, -- metadata
+    -- metadata: store ALL legacy data for later user-initiated migration + old_id for rollback
+    json_object(
+        'legacy', json_object(
+            'old_id', id,  -- Always store old_id for rollback
+            'isin', isin,
+            'asset_class', asset_class,
+            'asset_sub_class', asset_sub_class,
+            'sectors', CASE WHEN sectors IS NOT NULL AND json_valid(sectors) THEN json(sectors) ELSE sectors END,
+            'countries', CASE WHEN countries IS NOT NULL AND json_valid(countries) THEN json(countries) ELSE countries END,
+            'website', url,
+            'id_migrated_at', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+        )
+    ),
     1, -- is_active
-    created_at,
-    updated_at
+    -- Convert datetime format: try to parse and reformat, or use as-is if already RFC3339
+    CASE
+        WHEN created_at LIKE '%T%' THEN created_at  -- Already RFC3339
+        ELSE replace(created_at, ' ', 'T') || 'Z'   -- Convert SQLite format
+    END,
+    CASE
+        WHEN updated_at LIKE '%T%' THEN updated_at  -- Already RFC3339
+        ELSE replace(updated_at, ' ', 'T') || 'Z'   -- Convert SQLite format
+    END
 FROM assets_old;
 
--- Drop old table
 DROP TABLE assets_old;
 
--- Indexes per spec
+-- Asset indexes
 CREATE INDEX IF NOT EXISTS idx_assets_kind_active ON assets(kind, is_active);
 CREATE INDEX IF NOT EXISTS idx_assets_symbol ON assets(symbol);
 CREATE INDEX IF NOT EXISTS idx_assets_exchange_mic ON assets(exchange_mic);
 
--- Uniqueness constraints per spec
 CREATE UNIQUE INDEX IF NOT EXISTS uq_assets_security
 ON assets(symbol, exchange_mic)
 WHERE kind = 'SECURITY' AND exchange_mic IS NOT NULL AND pricing_mode = 'MARKET';
@@ -333,8 +364,21 @@ ON assets(kind, currency)
 WHERE kind = 'CASH';
 
 -- ============================================================================
--- STEP 4: RECREATE ACTIVITIES TABLE WITH NEW SCHEMA
--- Now that assets table exists with correct schema, activities FK will reference it
+-- STEP 4: CREATE ASSET ID MAPPING TABLE
+-- Maps old asset IDs to new format for FK updates
+-- ============================================================================
+
+CREATE TEMP TABLE asset_id_mapping AS
+SELECT
+    json_extract(metadata, '$.legacy.old_id') AS old_id,
+    id AS new_id
+FROM assets
+WHERE json_extract(metadata, '$.legacy.old_id') IS NOT NULL;
+
+CREATE INDEX idx_asset_id_mapping_old ON asset_id_mapping(old_id);
+
+-- ============================================================================
+-- STEP 5: RECREATE ACTIVITIES TABLE WITH NEW SCHEMA
 -- ============================================================================
 
 ALTER TABLE activities RENAME TO activities_old;
@@ -344,7 +388,6 @@ CREATE TABLE activities (
     account_id TEXT NOT NULL,
     asset_id TEXT,
 
-    -- Classification
     activity_type TEXT NOT NULL CHECK (activity_type IN (
         'BUY', 'SELL', 'SPLIT',
         'DIVIDEND', 'INTEREST', 'DEPOSIT', 'WITHDRAWAL',
@@ -356,11 +399,9 @@ CREATE TABLE activities (
     subtype TEXT,
     status TEXT NOT NULL DEFAULT 'POSTED',
 
-    -- Timing
     activity_date TEXT NOT NULL,
     settlement_date TEXT,
 
-    -- Quantities
     quantity TEXT,
     unit_price TEXT,
     amount TEXT,
@@ -368,22 +409,18 @@ CREATE TABLE activities (
     currency TEXT NOT NULL,
     fx_rate TEXT,
 
-    -- Metadata
     notes TEXT,
     metadata TEXT,
 
-    -- Source identity
     source_system TEXT,
     source_record_id TEXT,
     source_group_id TEXT,
     idempotency_key TEXT,
     import_run_id TEXT,
 
-    -- Sync flags
     is_user_modified INTEGER NOT NULL DEFAULT 0,
     needs_review INTEGER NOT NULL DEFAULT 0,
 
-    -- Audit
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
 
@@ -392,60 +429,59 @@ CREATE TABLE activities (
     FOREIGN KEY (import_run_id) REFERENCES import_runs(id) ON DELETE SET NULL
 );
 
--- Copy data from old table (original schema without sync columns)
+-- Copy data from old table with asset_id mapped to new format
 INSERT INTO activities (
     id, account_id, asset_id, activity_type, status,
     activity_date, quantity, unit_price, amount, fee, currency,
     notes, is_user_modified, needs_review, created_at, updated_at
 )
 SELECT
-    id,
-    account_id,
-    asset_id,  -- Keep $CASH-* asset_ids for cash transfers
+    a.id,
+    a.account_id,
+    -- Map old asset_id to new format, or NULL if not found
+    COALESCE(m.new_id, a.asset_id) AS asset_id,
     CASE
-        -- Convert ADD_HOLDING to TRANSFER_IN (will be marked external below)
-        WHEN activity_type = 'ADD_HOLDING' THEN 'TRANSFER_IN'
-        -- Convert REMOVE_HOLDING to TRANSFER_OUT (will be marked external below)
-        WHEN activity_type = 'REMOVE_HOLDING' THEN 'TRANSFER_OUT'
-        WHEN activity_type IN ('BUY', 'SELL', 'SPLIT',
+        WHEN a.activity_type = 'ADD_HOLDING' THEN 'TRANSFER_IN'
+        WHEN a.activity_type = 'REMOVE_HOLDING' THEN 'TRANSFER_OUT'
+        WHEN a.activity_type IN ('BUY', 'SELL', 'SPLIT',
                                'DIVIDEND', 'INTEREST', 'DEPOSIT', 'WITHDRAWAL',
                                'TRANSFER_IN', 'TRANSFER_OUT', 'FEE', 'TAX', 'CREDIT')
-        THEN activity_type
+        THEN a.activity_type
         ELSE 'UNKNOWN'
     END,
-    'POSTED',  -- All activities are posted (is_draft column dropped)
-    activity_date,
-    quantity,
-    unit_price,
-    amount,
-    fee,
-    currency,
-    comment,
+    'POSTED',
+    a.activity_date,
+    a.quantity,
+    a.unit_price,
+    a.amount,
+    a.fee,
+    a.currency,
+    a.comment,
     0,
     0,
-    created_at,
-    updated_at
-FROM activities_old;
+    -- Convert datetime format
+    CASE
+        WHEN a.created_at LIKE '%T%' THEN a.created_at
+        ELSE replace(a.created_at, ' ', 'T') || 'Z'
+    END,
+    CASE
+        WHEN a.updated_at LIKE '%T%' THEN a.updated_at
+        ELSE replace(a.updated_at, ' ', 'T') || 'Z'
+    END
+FROM activities_old a
+LEFT JOIN asset_id_mapping m ON a.asset_id = m.old_id;
 
 DROP TABLE activities_old;
+DROP TABLE asset_id_mapping;
 
--- Indexes for activities
+-- Activity indexes
 CREATE INDEX ix_activities_account_id ON activities(account_id);
 CREATE INDEX ix_activities_asset_id ON activities(asset_id);
 CREATE INDEX ix_activities_activity_date ON activities(activity_date);
 CREATE INDEX ix_activities_status ON activities(status);
 CREATE UNIQUE INDEX ux_activities_idempotency_key ON activities(idempotency_key) WHERE idempotency_key IS NOT NULL;
 
--- ============================================================================
--- STEP 4.5: MIGRATE EXISTING TRANSFER_IN/OUT TO PRESERVE BEHAVIOR
--- Mark existing transfers as external (affecting net_contribution) to maintain
--- backward compatibility. This includes:
--- 1. Original TRANSFER_IN/TRANSFER_OUT activities
--- 2. Converted ADD_HOLDING -> TRANSFER_IN (from step 4 above)
--- 3. Converted REMOVE_HOLDING -> TRANSFER_OUT (from step 4 above)
--- New transfers will default to internal (is_external = false).
--- ============================================================================
-
+-- Mark existing transfers as external
 UPDATE activities
 SET metadata = json_set(
     COALESCE(metadata, '{}'),
@@ -456,7 +492,7 @@ WHERE activity_type IN ('TRANSFER_IN', 'TRANSFER_OUT')
   AND status = 'POSTED';
 
 -- ============================================================================
--- STEP 5: UPDATE PLATFORMS TABLE
+-- STEP 6: UPDATE PLATFORMS TABLE
 -- ============================================================================
 
 ALTER TABLE platforms ADD COLUMN external_id TEXT;
@@ -465,7 +501,7 @@ ALTER TABLE platforms ADD COLUMN website_url TEXT;
 ALTER TABLE platforms ADD COLUMN logo_url TEXT;
 
 -- ============================================================================
--- STEP 6: UPDATE ACCOUNTS TABLE
+-- STEP 7: UPDATE ACCOUNTS TABLE
 -- ============================================================================
 
 ALTER TABLE accounts ADD COLUMN account_number TEXT;
@@ -475,67 +511,19 @@ ALTER TABLE accounts ADD COLUMN provider_account_id TEXT;
 
 CREATE INDEX ix_accounts_provider ON accounts(provider, provider_account_id) WHERE provider IS NOT NULL;
 
-
-
-
--- Add cached cash total fields to holdings_snapshots
--- These columns cache the sum of all cash balances to avoid JSON parsing on read
+-- ============================================================================
+-- STEP 8: UPDATE HOLDINGS_SNAPSHOTS
+-- ============================================================================
 
 ALTER TABLE holdings_snapshots ADD COLUMN cash_total_account_currency TEXT NOT NULL DEFAULT '0';
 ALTER TABLE holdings_snapshots ADD COLUMN cash_total_base_currency TEXT NOT NULL DEFAULT '0';
 
--- Clear existing snapshots to force recalculation with new columns populated
+-- Clear snapshots to force recalculation
 DELETE FROM holdings_snapshots;
 DELETE FROM daily_account_valuation;
 
 -- ============================================================================
--- STEP 7: CREATE QUOTE_SYNC_STATE TABLE
--- Tracks sync status for each symbol to optimize quote fetching
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS quote_sync_state (
-    symbol TEXT PRIMARY KEY,
-    is_active INTEGER NOT NULL DEFAULT 1,
-    first_activity_date TEXT,
-    last_activity_date TEXT,
-    position_closed_date TEXT,
-    last_synced_at TEXT,
-    last_quote_date TEXT,
-    earliest_quote_date TEXT,
-    data_source TEXT NOT NULL DEFAULT 'YAHOO',
-    sync_priority INTEGER NOT NULL DEFAULT 0,
-    error_count INTEGER NOT NULL DEFAULT 0,
-    last_error TEXT,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_quote_sync_state_active ON quote_sync_state(is_active);
-CREATE INDEX IF NOT EXISTS idx_quote_sync_state_priority ON quote_sync_state(sync_priority DESC);
-CREATE INDEX IF NOT EXISTS idx_quote_sync_state_dates ON quote_sync_state(first_activity_date, earliest_quote_date);
-
--- ============================================================================
--- STEP 8: ADD QUOTE INDEXES FOR ALTERNATIVE ASSETS
--- Enables efficient manual valuation queries
--- ============================================================================
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_quotes_symbol_source_timestamp
-ON quotes (symbol, data_source, timestamp);
-
-CREATE INDEX IF NOT EXISTS idx_quotes_manual_symbol
-ON quotes (symbol, timestamp DESC)
-WHERE data_source = 'MANUAL';
-
--- ============================================================================
--- STEP 9: ADD NOTES COLUMN TO QUOTES TABLE
--- Enables manual notes for alternative asset valuations
--- ============================================================================
-
-ALTER TABLE quotes ADD COLUMN notes TEXT;
-
--- ============================================================================
--- STEP 10: RESET PRAGMA
--- Restore default behavior for future operations
+-- STEP 9: RESTORE PRAGMA
 -- ============================================================================
 
 PRAGMA legacy_alter_table = OFF;

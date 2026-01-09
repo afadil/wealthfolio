@@ -15,9 +15,15 @@ import {
   getAssetTaxonomyAssignments,
   assignAssetToCategory,
   removeAssetTaxonomyAssignment,
+  getAssetClassifications,
+  getMigrationStatus,
+  migrateLegacyClassifications,
 } from "@/commands/taxonomy";
 import type {
+  AssetClassifications,
   AssetTaxonomyAssignment,
+  MigrationResult,
+  MigrationStatus,
   NewAssetTaxonomyAssignment,
   NewTaxonomy,
   NewTaxonomyCategory,
@@ -197,6 +203,36 @@ export function useRemoveAssetTaxonomyAssignment() {
       queryClient.invalidateQueries({
         queryKey: QueryKeys.assetTaxonomyAssignments(variables.assetId),
       });
+    },
+  });
+}
+
+// ============================================================================
+// Classification Queries
+// ============================================================================
+
+export function useAssetClassifications(assetId: string) {
+  return useQuery<AssetClassifications, Error>({
+    queryKey: [QueryKeys.ASSET_CLASSIFICATIONS, assetId],
+    queryFn: () => getAssetClassifications(assetId),
+    enabled: !!assetId,
+  });
+}
+
+export function useMigrationStatus() {
+  return useQuery<MigrationStatus, Error>({
+    queryKey: ["migration-status"],
+    queryFn: getMigrationStatus,
+  });
+}
+
+export function useMigrateLegacyClassifications() {
+  const queryClient = useQueryClient();
+  return useMutation<MigrationResult, Error>({
+    mutationFn: migrateLegacyClassifications,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["migration-status"] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSET_TAXONOMY_ASSIGNMENTS] });
     },
   });
 }

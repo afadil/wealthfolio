@@ -159,31 +159,76 @@ WHERE a.asset_sub_class IS NOT NULL
 **Files to modify:**
 - `crates/storage-sqlite/migrations/2026-01-07-120000_taxonomies/up.sql`
 
-#### Task 1.2: Create Rust Migration Service for Complex Data
+#### Task 1.2: User-Initiated Migration for Complex Data
 
-For `sectors` and `countries` (JSON with weights), create a Rust service to handle the migration since SQL-only approach is complex:
+For `sectors` and `countries` (JSON with weights), migration will be **user-initiated** rather than automatic:
 
-**New file:** `crates/core/src/taxonomies/migration_service.rs`
+**Approach:**
+1. SQL migration only creates schema + seed data + migrates simple fields (asset_class, asset_sub_class)
+2. Complex JSON migrations (sectors → industries_gics, countries → regions) are triggered by user
+3. User sees a prompt in Settings or on first launch after migration
+4. Migration runs in background, user can check status later
 
+**UI Flow:**
+1. After DB migration, show banner: "New classification system available. Migrate existing data?"
+2. User clicks "Start Migration" button
+3. Show progress: "Migrating sectors... Migrating countries..."
+4. On completion: "Migration complete. X sectors, Y countries migrated."
+5. User can manually review/adjust in ClassificationSheet
+
+**Backend Command:**
 ```rust
-pub async fn migrate_profile_sectors_to_taxonomies(
-    conn: &SqliteConnection,
-    taxonomy_repo: &TaxonomyRepository,
-) -> Result<MigrationStats>;
+// In src-tauri/src/commands/taxonomy.rs
+#[tauri::command]
+pub async fn migrate_legacy_classifications(
+    state: State<'_, AppState>,
+) -> Result<MigrationResult, String> {
+    // 1. Get all assets with profile.sectors or profile.countries
+    // 2. For each asset, parse JSON and find matching taxonomy categories
+    // 3. Create assignments with weights
+    // 4. Return stats: { sectors_migrated, countries_migrated, errors }
+}
 
-pub async fn migrate_profile_countries_to_taxonomies(
-    conn: &SqliteConnection,
-    taxonomy_repo: &TaxonomyRepository,
-) -> Result<MigrationStats>;
+#[tauri::command]
+pub async fn get_migration_status(
+    state: State<'_, AppState>,
+) -> Result<MigrationStatus, String> {
+    // Check if migration is needed/complete
+    // Return: { needed: bool, completed: bool, stats: Option<MigrationStats> }
+}
 ```
 
-**Logic:**
-1. Query all assets with non-null `profile->sectors` or `profile->countries`
-2. Parse JSON array `[{name: "Technology", weight: 0.40}, ...]`
-3. For each sector/country:
-   - Find matching category in `industries_gics` or `regions` taxonomy by name
-   - Create assignment with weight (converted to basis points)
-4. Mark source as `"migrated_profile"`
+**Frontend Components:**
+
+**New file:** `src-front/pages/settings/taxonomies/migration-banner.tsx`
+```tsx
+export function MigrationBanner() {
+  const { data: status } = useQuery({
+    queryKey: ["migration-status"],
+    queryFn: getMigrationStatus,
+  });
+  const migrateMutation = useMutation({ mutationFn: migrateLegacyClassifications });
+
+  if (!status?.needed || status?.completed) return null;
+
+  return (
+    <Alert>
+      <AlertTitle>Migrate Legacy Classifications</AlertTitle>
+      <AlertDescription>
+        Your existing sectors and countries can be migrated to the new taxonomy system.
+      </AlertDescription>
+      <Button onClick={() => migrateMutation.mutate()} disabled={migrateMutation.isPending}>
+        {migrateMutation.isPending ? "Migrating..." : "Start Migration"}
+      </Button>
+    </Alert>
+  );
+}
+```
+
+**Migration Logic (simplified):**
+- Sectors: Match by name similarity to GICS sector names (11 top-level sectors)
+- Countries: Match by name/alias to `country_XX` category IDs
+- Unmatched items: Skip and log for user to manually assign later
 
 ---
 
@@ -699,8 +744,9 @@ Update asset update command to not accept deprecated fields.
 
 | Task ID | Description | Files | Estimated Complexity |
 |---------|-------------|-------|---------------------|
-| DB-1 | Update taxonomy migration with sector/country data migration SQL | `migrations/2026-01-07-120000_taxonomies/up.sql` | Medium |
-| DB-2 | Add migration stats tracking | `migrations/2026-01-07-120000_taxonomies/up.sql` | Low |
+| DB-1 | Add legacy data preservation SQL | `migrations/2026-01-07-120000_taxonomies/up.sql` | Low |
+| DB-2 | Add asset_class → asset_classes migration SQL | `migrations/2026-01-07-120000_taxonomies/up.sql` | Medium |
+| DB-3 | Add asset_sub_class → type_of_security migration SQL | `migrations/2026-01-07-120000_taxonomies/up.sql` | Medium |
 
 ### Agent Group 2: Backend Services
 **Dependencies:** DB-1
@@ -711,6 +757,8 @@ Update asset update command to not accept deprecated fields.
 | BE-2 | Update Instrument model with classifications | `crates/core/src/portfolio/holdings/holding_model.rs` | Low |
 | BE-3 | Update HoldingService to populate classifications | `crates/core/src/portfolio/holdings/holding_service.rs` | Medium |
 | BE-4 | Add Tauri command for asset classifications | `src-tauri/src/commands/taxonomy.rs` | Low |
+| BE-5 | Add `migrate_legacy_classifications` Tauri command | `src-tauri/src/commands/taxonomy.rs` | Medium |
+| BE-6 | Add `get_migration_status` Tauri command | `src-tauri/src/commands/taxonomy.rs` | Low |
 
 ### Agent Group 3: Frontend Types & Hooks
 **Dependencies:** BE-2
@@ -719,41 +767,51 @@ Update asset update command to not accept deprecated fields.
 |---------|-------------|-------|---------------------|
 | FE-1 | Update TypeScript types | `src-front/lib/types.ts` | Low |
 | FE-2 | Create `useAssetClassifications` hook | `src-front/hooks/use-taxonomies.ts` | Low |
+| FE-3 | Add migration commands to `src-front/commands/taxonomy.ts` | `src-front/commands/taxonomy.ts` | Low |
+
+### Agent Group 3b: Migration UI
+**Dependencies:** FE-3, BE-5, BE-6
+
+| Task ID | Description | Files | Estimated Complexity |
+|---------|-------------|-------|---------------------|
+| MIG-1 | Create MigrationBanner component | `src-front/pages/settings/taxonomies/migration-banner.tsx` | Medium |
+| MIG-2 | Add useMigrationStatus hook | `src-front/hooks/use-taxonomies.ts` | Low |
+| MIG-3 | Integrate MigrationBanner in taxonomies settings page | `src-front/pages/settings/taxonomies/` | Low |
 
 ### Agent Group 4: Frontend - Asset Form & Profile Page
 **Dependencies:** FE-1, FE-2
 
 | Task ID | Description | Files | Estimated Complexity |
 |---------|-------------|-------|---------------------|
-| FE-3 | Remove legacy fields from asset-form.tsx schema | `src-front/pages/asset/asset-form.tsx` | Low |
-| FE-4 | Remove legacy field JSX from asset-form.tsx | `src-front/pages/asset/asset-form.tsx` | Medium |
-| FE-5 | Update buildAssetUpdatePayload | `src-front/pages/asset/asset-form.tsx` | Low |
-| FE-6 | Enhance Classifications section layout | `src-front/pages/asset/asset-form.tsx` | Medium |
-| FE-7 | Remove legacy fields from AssetProfileFormData | `src-front/pages/asset/asset-profile-page.tsx` | Low |
-| FE-8 | Simplify handleSave/handleCancel | `src-front/pages/asset/asset-profile-page.tsx` | Medium |
-| FE-9 | Replace "About" section inline editing | `src-front/pages/asset/asset-profile-page.tsx` | High |
-| FE-10 | Create AssetClassificationsSummary component | `src-front/pages/asset/asset-classifications-summary.tsx` | Medium |
-| FE-11 | Remove unused imports (InputTags, etc.) | Both files | Low |
+| FORM-1 | Remove legacy fields from asset-form.tsx schema | `src-front/pages/asset/asset-form.tsx` | Low |
+| FORM-2 | Remove legacy field JSX from asset-form.tsx | `src-front/pages/asset/asset-form.tsx` | Medium |
+| FORM-3 | Update buildAssetUpdatePayload | `src-front/pages/asset/asset-form.tsx` | Low |
+| FORM-4 | Enhance Classifications section layout | `src-front/pages/asset/asset-form.tsx` | Medium |
+| PROF-1 | Remove legacy fields from AssetProfileFormData | `src-front/pages/asset/asset-profile-page.tsx` | Low |
+| PROF-2 | Simplify handleSave/handleCancel | `src-front/pages/asset/asset-profile-page.tsx` | Medium |
+| PROF-3 | Replace "About" section inline editing | `src-front/pages/asset/asset-profile-page.tsx` | High |
+| PROF-4 | Create AssetClassificationsSummary component | `src-front/pages/asset/asset-classifications-summary.tsx` | Medium |
+| PROF-5 | Remove unused imports (InputTags, etc.) | Both files | Low |
 
 ### Agent Group 5: Frontend - Analytics
 **Dependencies:** FE-1, FE-2
 
 | Task ID | Description | Files | Estimated Complexity |
 |---------|-------------|-------|---------------------|
-| FE-12 | Update sectors-chart.tsx | `src-front/pages/holdings/components/sectors-chart.tsx` | Medium |
-| FE-13 | Update country-chart.tsx | `src-front/pages/holdings/components/country-chart.tsx` | Medium |
-| FE-14 | Update classes-chart.tsx | `src-front/pages/holdings/components/classes-chart.tsx` | Low |
-| FE-15 | Update holdings-table.tsx filters | `src-front/pages/holdings/components/holdings-table.tsx` | Medium |
-| FE-16 | Update holdings-insights-page.tsx | `src-front/pages/holdings/holdings-insights-page.tsx` | Medium |
+| CHART-1 | Update sectors-chart.tsx | `src-front/pages/holdings/components/sectors-chart.tsx` | Medium |
+| CHART-2 | Update country-chart.tsx | `src-front/pages/holdings/components/country-chart.tsx` | Medium |
+| CHART-3 | Update classes-chart.tsx | `src-front/pages/holdings/components/classes-chart.tsx` | Low |
+| CHART-4 | Update holdings-table.tsx filters | `src-front/pages/holdings/components/holdings-table.tsx` | Medium |
+| CHART-5 | Update holdings-insights-page.tsx | `src-front/pages/holdings/holdings-insights-page.tsx` | Medium |
 
 ### Agent Group 6: Frontend - Assets Table
 **Dependencies:** FE-1, FE-2
 
 | Task ID | Description | Files | Estimated Complexity |
 |---------|-------------|-------|---------------------|
-| FE-17 | Update assets-table.tsx columns | `src-front/pages/asset/assets-table.tsx` | Medium |
-| FE-18 | Update assets-table.tsx filters | `src-front/pages/asset/assets-table.tsx` | Medium |
-| FE-19 | Update assets-table-mobile.tsx | `src-front/pages/asset/assets-table-mobile.tsx` | Low |
+| TABLE-1 | Update assets-table.tsx columns | `src-front/pages/asset/assets-table.tsx` | Medium |
+| TABLE-2 | Update assets-table.tsx filters | `src-front/pages/asset/assets-table.tsx` | Medium |
+| TABLE-3 | Update assets-table-mobile.tsx | `src-front/pages/asset/assets-table-mobile.tsx` | Low |
 
 ### Agent Group 7: Cleanup (After All Above)
 **Dependencies:** All above tasks

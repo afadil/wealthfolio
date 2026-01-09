@@ -1,8 +1,9 @@
+// Lucide icons - centralized imports for the application
+// Using barrel import with optimizeDeps.include in vite.config.ts for dev performance
 import {
   Activity,
   AlertCircle,
   AlertTriangle,
-  AlignLeft,
   ArrowDown,
   ArrowLeft,
   ArrowLeftRight,
@@ -11,15 +12,18 @@ import {
   ArrowUp,
   BadgeDollarSign,
   BarChart,
+  Baseline,
   Bitcoin,
   Blocks,
   Briefcase,
   Building2,
+  Calendar,
   CalendarDays,
-  Camera,
   Car,
+  CaseSensitive,
   Check,
   CheckCircle2,
+  CheckSquare,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -28,28 +32,34 @@ import {
   ChevronsUpDown,
   ChevronUp,
   Circle,
-  CircleGauge,
   Clock,
   Cloud,
-  CloudSync,
+  CloudCog,
   Coins,
   Copy,
   CreditCard,
   DatabaseBackup,
   DatabaseZap,
   DollarSign,
+  Dot,
   Download,
   Eraser,
   ExternalLink,
   Eye,
   EyeOff,
+  File,
+  FileArchive,
+  FileAudio,
+  FileImage,
+  FileSpreadsheet,
   FileText,
-  FileUp,
+  FileVideo,
   FileX,
+  Folder,
+  FolderOpen,
   Fullscreen,
-  GaugeCircle,
   Gem,
-  Globe2,
+  Globe,
   Goal,
   Grid3x3,
   Group,
@@ -59,17 +69,15 @@ import {
   History,
   Home,
   Info,
-  Keyboard,
-  Laptop,
   LayoutDashboard,
   Link,
+  List,
   ListChecks,
   ListCollapse,
   ListFilter,
   Loader,
   Loader2,
   Mail,
-  Menu,
   MinusCircle,
   Monitor,
   Moon,
@@ -83,31 +91,28 @@ import {
   Pencil,
   Percent,
   PieChart,
+  Pin,
+  PinOff,
   Plus,
   PlusCircle,
+  Presentation,
   QrCode,
   Receipt,
-  ReceiptText,
   RectangleEllipsis,
   RefreshCcw,
   RefreshCw,
-  RotateCcw,
   Rows3,
   Save,
-  ScrollText,
+  Scissors,
   Search,
   Settings2,
   Shield,
   ShieldAlert,
   ShieldCheck,
-  ShieldOff,
-  ShieldX,
   Smartphone,
   Sparkles,
-  Split,
   Star,
   Store,
-  StretchHorizontal,
   Sun,
   Trash,
   Trash2,
@@ -115,14 +120,10 @@ import {
   TrendingUp,
   Type,
   Undo2,
-  Ungroup,
-  UnplugIcon,
   Upload,
   User,
   Users,
   Wallet,
-  WalletCards,
-  Wifi,
   X,
   XCircle,
 } from "lucide-react";
@@ -160,7 +161,7 @@ const IconsInternal = {
   CheckCircle: CheckCircle2,
   Clock: Clock,
   Cloud: Cloud,
-  CloudSync: CloudSync,
+  CloudSync: CloudCog,
   ListChecks: ListChecks,
   LayoutDashboard: LayoutDashboard,
   HandCoins: HandCoins,
@@ -172,24 +173,22 @@ const IconsInternal = {
   ArrowLeft: ArrowLeft,
   ArrowDown: ArrowDown,
   ArrowUp: ArrowUp,
-  Billing: CreditCard,
   CreditCard: CreditCard,
   Bitcoin: Bitcoin,
   Briefcase: Briefcase,
   Search: Search,
   Save: Save,
   Group: Group,
-  Ungroup: Ungroup,
-  Globe: Globe2,
+  Globe: Globe,
   Close: X,
   Eye: Eye,
   Info: Info,
   EyeOff: EyeOff,
   Refresh: RefreshCcw,
   RefreshCw: RefreshCw,
-  RotateCcw: RotateCcw,
   PanelLeftOpen: PanelLeftOpen,
   Download: Download,
+  Dot: Dot,
   Activity2: Activity,
   DollarSign: DollarSign,
   Users: Users,
@@ -209,11 +208,7 @@ const IconsInternal = {
   MinusCircle: MinusCircle,
   PauseCircle: PauseCircle,
   Monitor: Monitor,
-  Laptop: Laptop,
-  Keyboard: Keyboard,
   QrCode: QrCode,
-  Camera: Camera,
-  Wifi: Wifi,
   Smartphone: Smartphone,
   PieChart: PieChart,
   BarChart: BarChart,
@@ -225,34 +220,22 @@ const IconsInternal = {
   Trash2: Trash2,
   Hash: Hash,
   Type: Type,
-  AlignLeft: AlignLeft,
   Wallet: Wallet,
-  WalletCards: WalletCards,
-  StretchHorizontal: StretchHorizontal,
-  Menu: Menu,
   Import: Upload,
   FileText: FileText,
   FileX: FileX,
   XCircle: XCircle,
-  ScrollText: ScrollText,
-  GaugeCircle,
   ListCollapse: ListCollapse,
-  CircleGauge: CircleGauge,
   ArrowRightLeft: ArrowRightLeft,
   ArrowLeftRight: ArrowLeftRight,
   Receipt: Receipt,
-  ReceiptText: ReceiptText,
   Percent: Percent,
-  Split: Split,
-  FileUp: FileUp,
   Store: Store,
   Package: Package,
   Star: Star,
   Shield: Shield,
   ShieldAlert: ShieldAlert,
   ShieldCheck: ShieldCheck,
-  ShieldOff: ShieldOff,
-  ShieldX: ShieldX,
   ExternalLink: ExternalLink,
   TrendingUp: TrendingUp,
   TrendingDown: TrendingDown,
@@ -268,12 +251,31 @@ const IconsInternal = {
   Sun: Sun,
   ListFilter: ListFilter,
   Undo: Undo2,
-  Unplug: UnplugIcon,
   Fullscreen: Fullscreen,
   RectangleEllipsis: RectangleEllipsis,
   Mail: Mail,
   OctagonX: OctagonX,
   Settings2: Settings2,
+  // Additional icons for UI components
+  Baseline: Baseline,
+  CalendarIcon: Calendar,
+  CaseSensitive: CaseSensitive,
+  CheckSquare: CheckSquare,
+  File: File,
+  FileArchive: FileArchive,
+  FileAudio: FileAudio,
+  FileImage: FileImage,
+  FileSpreadsheet: FileSpreadsheet,
+  FileVideo: FileVideo,
+  Folder: Folder,
+  FolderOpen: FolderOpen,
+  List: List,
+  Pin: Pin,
+  PinOff: PinOff,
+  Presentation: Presentation,
+  Scissors: Scissors,
+  X: X,
+  Upload: Upload,
   Dashboard: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -288,20 +290,6 @@ const IconsInternal = {
         opacity="0.2"
       ></path>
       <path d="M207.06,72.67A111.24,111.24,0,0,0,128,40h-.4C66.07,40.21,16,91,16,153.13V176a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V152A111.25,111.25,0,0,0,207.06,72.67ZM224,176H119.71l54.76-75.3a8,8,0,0,0-12.94-9.42L99.92,176H32V153.13c0-3.08.15-6.12.43-9.13H56a8,8,0,0,0,0-16H35.27c10.32-38.86,44-68.24,84.73-71.66V80a8,8,0,0,0,16,0V56.33A96.14,96.14,0,0,1,221,128H200a8,8,0,0,0,0,16h23.67c.21,2.65.33,5.31.33,8Z"></path>
-    </svg>
-  ),
-
-  Performance: ({ size, ...props }: IconProps) => (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width={size ?? 32}
-      height={size ?? 32}
-      fill="currentColor"
-      viewBox="0 0 256 256"
-      {...props}
-    >
-      <path d="M224,56V208H32V48H216A8,8,0,0,1,224,56Z" opacity="0.2"></path>
-      <path d="M232,208a8,8,0,0,1-8,8H32a8,8,0,0,1-8-8V48a8,8,0,0,1,16,0V156.69l50.34-50.35a8,8,0,0,1,11.32,0L128,132.69,180.69,80H160a8,8,0,0,1,0-16h40a8,8,0,0,1,8,8v40a8,8,0,0,1-16,0V91.31l-58.34,58.35a8,8,0,0,1-11.32,0L96,123.31l-56,56V200H224A8,8,0,0,1,232,208Z"></path>
     </svg>
   ),
 
@@ -470,30 +458,6 @@ const IconsInternal = {
     </svg>
   ),
 
-  Logo: ({ size, ...props }: IconProps) => (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width={size ?? 65}
-      height={size ?? 65}
-      fill="none"
-      viewBox="0 0 65 65"
-      {...props}
-    >
-      <path
-        fill="orange"
-        d="M37 5c0 2.21-2.015 4-4.5 4S28 7.21 28 5s2.015-4 4.5-4S37 2.79 37 5zM56 13c0 2.21-2.015 4-4.5 4S47 15.21 47 13s2.015-4 4.5-4 4.5 1.79 4.5 4zM64 32.5a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM56 51.5a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM37 59.5a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18 52a5 5 0 11-10 0 5 5 0 0110 0zM10 32.5a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM17 13a4 4 0 11-8 0 4 4 0 018 0z"
-      ></path>
-      <path
-        fill="#FECC81"
-        d="M48 32.5C48 41.06 41.06 48 32.5 48 23.94 48 17 41.06 17 32.5 17 23.94 23.94 17 32.5 17 41.06 17 48 23.94 48 32.5z"
-      ></path>
-      <path
-        fill="#111"
-        d="M37.566 5.134C37.566 2.303 35.252 0 32.407 0c-2.844 0-5.158 2.303-5.158 5.134 0 2.83 2.314 5.134 5.158 5.134 2.845 0 5.159-2.303 5.159-5.134zm-8.696 0c0-1.938 1.587-3.514 3.537-3.514 1.951 0 3.538 1.576 3.538 3.514 0 1.937-1.587 3.513-3.538 3.513-1.95 0-3.537-1.576-3.537-3.513zM13.147 7.976h-.015a5.138 5.138 0 00-3.64 1.516 5.138 5.138 0 00-1.516 3.64 5.087 5.087 0 001.499 3.637 5.086 5.086 0 003.623 1.499h.014a5.134 5.134 0 003.64-1.516 5.134 5.134 0 001.516-3.64 5.086 5.086 0 00-1.499-3.637 5.086 5.086 0 00-3.622-1.499zm2.46 7.63a3.525 3.525 0 01-2.5 1.042 3.448 3.448 0 01-2.486-1.024 3.479 3.479 0 01-1.025-2.487 3.529 3.529 0 011.042-2.5 3.529 3.529 0 012.499-1.04h.01c.937 0 1.816.363 2.477 1.024a3.478 3.478 0 011.024 2.487 3.525 3.525 0 01-1.042 2.498zM0 32.407c0 2.845 2.303 5.159 5.134 5.159 2.83 0 5.134-2.314 5.134-5.159 0-2.844-2.303-5.158-5.134-5.158C2.303 27.25 0 29.563 0 32.407zm8.647 0c0 1.951-1.576 3.538-3.513 3.538-1.938 0-3.514-1.587-3.514-3.538 0-1.95 1.576-3.537 3.514-3.537 1.937 0 3.513 1.587 3.513 3.537zM13.132 56.839h.015c1.37 0 2.656-.532 3.622-1.5a5.086 5.086 0 001.499-3.636 5.134 5.134 0 00-1.516-3.64 5.134 5.134 0 00-3.64-1.516c-1.34.013-2.667.528-3.637 1.498a5.087 5.087 0 00-1.499 3.638 5.138 5.138 0 001.516 3.64 5.138 5.138 0 003.64 1.516zM10.62 49.19a3.478 3.478 0 012.476-1.024h.01c.943.003 1.83.372 2.5 1.041a3.525 3.525 0 011.04 2.5c.003.94-.36 1.823-1.023 2.486a3.48 3.48 0 01-2.478 1.024h-.01a3.53 3.53 0 01-2.498-1.04 3.529 3.529 0 01-1.042-2.5 3.478 3.478 0 011.025-2.487zM27.25 59.681c0 2.831 2.313 5.134 5.157 5.134 2.845 0 5.159-2.303 5.159-5.134 0-2.83-2.314-5.134-5.159-5.134-2.844 0-5.158 2.303-5.158 5.134zm8.695 0c0 1.937-1.587 3.513-3.538 3.513-1.95 0-3.537-1.576-3.537-3.513 0-1.938 1.587-3.514 3.537-3.514 1.951 0 3.538 1.576 3.538 3.514zM48.063 48.063a5.134 5.134 0 00-1.516 3.64 5.086 5.086 0 001.498 3.637 5.086 5.086 0 003.623 1.499h.015a5.138 5.138 0 003.64-1.516 5.137 5.137 0 001.516-3.64 5.087 5.087 0 00-1.5-3.638 5.024 5.024 0 00-3.636-1.498 5.134 5.134 0 00-3.64 1.516zm3.654.104c.937 0 1.816.363 2.477 1.024a3.478 3.478 0 011.024 2.487 3.53 3.53 0 01-1.04 2.5 3.53 3.53 0 01-2.5 1.04h-.01a3.479 3.479 0 01-2.477-1.024 3.478 3.478 0 01-1.024-2.487 3.525 3.525 0 011.041-2.498 3.524 3.524 0 012.5-1.042h.01zM59.681 27.25c-2.83 0-5.134 2.313-5.134 5.157 0 2.845 2.303 5.159 5.134 5.159 2.831 0 5.134-2.314 5.134-5.159 0-2.844-2.303-5.158-5.134-5.158zm0 8.695c-1.938 0-3.514-1.587-3.514-3.538 0-1.95 1.576-3.537 3.514-3.537 1.937 0 3.513 1.587 3.513 3.537 0 1.951-1.576 3.538-3.513 3.538zM51.683 7.976h-.015c-1.37 0-2.656.532-3.623 1.499a5.086 5.086 0 00-1.498 3.637 5.134 5.134 0 001.516 3.64 5.134 5.134 0 003.64 1.516h.014c1.37 0 2.656-.532 3.623-1.499a5.087 5.087 0 001.499-3.637 5.138 5.138 0 00-1.516-3.64 5.138 5.138 0 00-3.64-1.516zm2.511 7.648a3.479 3.479 0 01-2.477 1.024h-.01a3.525 3.525 0 01-2.498-1.042 3.525 3.525 0 01-1.042-2.498 3.478 3.478 0 011.024-2.487 3.479 3.479 0 012.477-1.025h.01c.943.003 1.83.373 2.5 1.042a3.53 3.53 0 011.04 2.499 3.478 3.478 0 01-1.024 2.487zM45.28 9.28a.81.81 0 10.79-1.415 27.954 27.954 0 00-5.64-2.378.811.811 0 00-.461 1.553 26.35 26.35 0 015.311 2.24zM19.503 9.19c.13 0 .263-.03.385-.097a26.391 26.391 0 015.34-2.171.81.81 0 10-.442-1.559 27.985 27.985 0 00-5.67 2.305.81.81 0 00.387 1.523zM5.588 24.283a.81.81 0 001.553.462 26.35 26.35 0 012.24-5.312.81.81 0 10-1.414-.79 27.95 27.95 0 00-2.38 5.64zM9.194 44.825a26.391 26.391 0 01-2.17-5.34.81.81 0 10-1.56.443 27.989 27.989 0 002.306 5.669.81.81 0 101.425-.772zM19.535 55.332a.81.81 0 10-.79 1.415 27.954 27.954 0 005.639 2.379.807.807 0 001.008-.546.81.81 0 00-.546-1.007 26.35 26.35 0 01-5.311-2.241zM44.926 55.52a26.395 26.395 0 01-5.34 2.17.81.81 0 10.443 1.56 27.98 27.98 0 005.669-2.306.81.81 0 00-.772-1.425zM55.746 46.281a.81.81 0 001.102-.313 27.95 27.95 0 002.379-5.638.81.81 0 10-1.553-.462 26.348 26.348 0 01-2.24 5.31.81.81 0 00.312 1.103zM55.62 19.787a26.395 26.395 0 012.172 5.34.81.81 0 101.558-.442 27.985 27.985 0 00-2.305-5.67.81.81 0 00-1.425.771zM32.407 48.611c8.935 0 16.204-7.269 16.204-16.204 0-8.934-7.269-16.203-16.204-16.203-8.934 0-16.203 7.269-16.203 16.203 0 8.935 7.269 16.204 16.203 16.204zm0-30.787c8.042 0 14.584 6.542 14.584 14.583 0 8.042-6.542 14.584-14.584 14.584-8.04 0-14.583-6.542-14.583-14.584 0-8.04 6.542-14.583 14.583-14.583z"
-      ></path>
-    </svg>
-  ),
-
   ChartBar: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -537,23 +501,6 @@ const IconsInternal = {
       <path d="M80,40a40,40,0,1,0,40,40A40,40,0,0,0,80,40Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,80,104Zm96,16a40,40,0,1,0-40-40A40,40,0,0,0,176,120Zm0-64a24,24,0,1,1-24,24A24,24,0,0,1,176,56ZM80,136a40,40,0,1,0,40,40A40,40,0,0,0,80,136Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,80,200Zm96-64a40,40,0,1,0,40,40A40,40,0,0,0,176,136Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,176,200Z"></path>
     </svg>
   ),
-  Money: ({ size, ...props }: IconProps) => (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      {...props}
-      width={size ?? 32}
-      height={size ?? 32}
-      fill="currentColor"
-      viewBox="0 0 256 256"
-    >
-      <path
-        d="M160,128a32,32,0,1,1-32-32A32,32,0,0,1,160,128Zm40-64a48.85,48.85,0,0,0,40,40V64Zm0,128h40V152A48.85,48.85,0,0,0,200,192ZM16,152v40H56A48.85,48.85,0,0,0,16,152Zm0-48A48.85,48.85,0,0,0,56,64H16Z"
-        opacity="0.2"
-      ></path>
-      <path d="M128,88a40,40,0,1,0,40,40A40,40,0,0,0,128,88Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,128,152ZM240,56H16a8,8,0,0,0-8,8V192a8,8,0,0,0,8,8H240a8,8,0,0,0,8-8V64A8,8,0,0,0,240,56ZM24,72H45.37A40.81,40.81,0,0,1,24,93.37Zm0,112V162.63A40.81,40.81,0,0,1,45.37,184Zm208,0H210.63A40.81,40.81,0,0,1,232,162.63Zm0-38.35A56.78,56.78,0,0,0,193.65,184H62.35A56.78,56.78,0,0,0,24,145.65v-35.3A56.78,56.78,0,0,0,62.35,72h131.3A56.78,56.78,0,0,0,232,110.35Zm0-52.28A40.81,40.81,0,0,1,210.63,72H232Z"></path>
-    </svg>
-  ),
-
   Addons: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -585,23 +532,6 @@ const IconsInternal = {
         opacity="0.2"
       ></path>
       <path d="M208,80H176V56a48,48,0,0,0-96,0V80H48A16,16,0,0,0,32,96V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V96A16,16,0,0,0,208,80ZM96,56a32,32,0,0,1,64,0V80H96ZM208,208H48V96H208V208Zm-80-96a28,28,0,0,0-8,54.83V184a8,8,0,0,0,16,0V166.83A28,28,0,0,0,128,112Zm0,40a12,12,0,1,1,12-12A12,12,0,0,1,128,152Z"></path>
-    </svg>
-  ),
-
-  Launcher: ({ size, ...props }: IconProps) => (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      {...props}
-      width={size ?? 32}
-      height={size ?? 32}
-      fill="currentColor"
-      viewBox="0 0 256 256"
-    >
-      <path
-        d="M208,76h0a28,28,0,0,1-28,28H152V76a28,28,0,0,1,28-28h0A28,28,0,0,1,208,76ZM76,48h0A28,28,0,0,0,48,76h0a28,28,0,0,0,28,28h28V76A28,28,0,0,0,76,48ZM180,152H152v28a28,28,0,0,0,28,28h0a28,28,0,0,0,28-28h0A28,28,0,0,0,180,152ZM48,180h0a28,28,0,0,0,28,28h0a28,28,0,0,0,28-28V152H76A28,28,0,0,0,48,180Z"
-        opacity="0.2"
-      ></path>
-      <path d="M180,144H160V112h20a36,36,0,1,0-36-36V96H112V76a36,36,0,1,0-36,36H96v32H76a36,36,0,1,0,36,36V160h32v20a36,36,0,1,0,36-36ZM160,76a20,20,0,1,1,20,20H160ZM56,76a20,20,0,0,1,40,0V96H76A20,20,0,0,1,56,76ZM96,180a20,20,0,1,1-20-20H96Zm16-68h32v32H112Zm68,88a20,20,0,0,1-20-20V160h20a20,20,0,0,1,0,40Z"></path>
     </svg>
   ),
 
@@ -736,14 +666,12 @@ export type IconName =
   | "ArrowLeft"
   | "ArrowDown"
   | "ArrowUp"
-  | "Billing"
   | "CreditCard"
   | "Bitcoin"
   | "Briefcase"
   | "Search"
   | "Save"
   | "Group"
-  | "Ungroup"
   | "Globe"
   | "Close"
   | "Eye"
@@ -751,9 +679,9 @@ export type IconName =
   | "EyeOff"
   | "Refresh"
   | "RefreshCw"
-  | "RotateCcw"
   | "PanelLeftOpen"
   | "Download"
+  | "Dot"
   | "Activity2"
   | "DollarSign"
   | "Users"
@@ -773,11 +701,7 @@ export type IconName =
   | "MinusCircle"
   | "PauseCircle"
   | "Monitor"
-  | "Laptop"
-  | "Keyboard"
   | "QrCode"
-  | "Camera"
-  | "Wifi"
   | "Smartphone"
   | "PieChart"
   | "BarChart"
@@ -790,34 +714,22 @@ export type IconName =
   | "Tag"
   | "Hash"
   | "Type"
-  | "AlignLeft"
   | "Wallet"
-  | "WalletCards"
-  | "StretchHorizontal"
-  | "Menu"
   | "Import"
   | "FileText"
   | "FileX"
   | "XCircle"
-  | "ScrollText"
-  | "GaugeCircle"
   | "ListCollapse"
-  | "CircleGauge"
   | "ArrowRightLeft"
   | "ArrowLeftRight"
   | "Receipt"
-  | "ReceiptText"
   | "Percent"
-  | "Split"
-  | "FileUp"
   | "Store"
   | "Package"
   | "Star"
   | "Shield"
   | "ShieldAlert"
   | "ShieldCheck"
-  | "ShieldOff"
-  | "ShieldX"
   | "ExternalLink"
   | "TrendingUp"
   | "TrendingDown"
@@ -833,14 +745,12 @@ export type IconName =
   | "Sun"
   | "ListFilter"
   | "Undo"
-  | "Unplug"
   | "Fullscreen"
   | "RectangleEllipsis"
   | "Mail"
   | "OctagonX"
   | "Settings2"
   | "Dashboard"
-  | "Performance"
   | "Goals"
   | "Database"
   | "FileCsv"
@@ -851,14 +761,11 @@ export type IconName =
   | "Settings"
   | "Invoice"
   | "Income"
-  | "Logo"
   | "ChartBar"
   | "InfoCircle"
   | "CirclesFour"
-  | "Money"
   | "Addons"
   | "LogOut"
-  | "Launcher"
   | "Search2"
   | "Insight"
   | "Google"
@@ -866,7 +773,27 @@ export type IconName =
   | "CloudSync2"
   | "CloudOff"
   | "Devices"
-  | "UserSwitch";
+  | "UserSwitch"
+  // Additional icons for UI components
+  | "Baseline"
+  | "CalendarIcon"
+  | "CaseSensitive"
+  | "CheckSquare"
+  | "File"
+  | "FileArchive"
+  | "FileAudio"
+  | "FileImage"
+  | "FileSpreadsheet"
+  | "FileVideo"
+  | "Folder"
+  | "FolderOpen"
+  | "List"
+  | "Pin"
+  | "PinOff"
+  | "Presentation"
+  | "Scissors"
+  | "X"
+  | "Upload";
 
 /**
  * Icons object with unified typing - all icons have the same Icon type

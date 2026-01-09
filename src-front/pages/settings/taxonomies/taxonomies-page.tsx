@@ -4,6 +4,7 @@ import { TreeView, buildCategoryTree, type TreeNode } from "@wealthfolio/ui/comp
 import { useTaxonomies, useTaxonomy, useExportTaxonomy } from "@/hooks/use-taxonomies";
 import { SettingsHeader } from "../settings-header";
 import { CategoryForm } from "./components/category-form";
+import { MigrationBanner } from "./migration-banner";
 import { toast } from "sonner";
 
 export default function TaxonomiesPage() {
@@ -76,6 +77,8 @@ export default function TaxonomiesPage() {
         heading="Classifications"
         text="Manage asset classification hierarchies like sectors, regions, and asset classes."
       />
+
+      <MigrationBanner />
 
       {/* Taxonomy tabs */}
       {isLoadingTaxonomies ? (

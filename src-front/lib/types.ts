@@ -326,6 +326,9 @@ export interface Instrument {
   assetSubclass?: string | null;
   countries?: Country[] | null;
   sectors?: Sector[] | null;
+
+  // NEW: Taxonomy-based classifications
+  classifications?: AssetClassifications | null;
 }
 
 export interface MonetaryValue {
@@ -393,6 +396,8 @@ export interface Holding {
 
 /**
  * Asset interface matching the new provider-agnostic backend model
+ * Note: Legacy fields (assetClass, assetSubClass, isin, profile) are stored in metadata.legacy
+ * for migration purposes only. Use taxonomy system for classifications.
  */
 export interface Asset {
   id: string;
@@ -404,11 +409,6 @@ export interface Asset {
 
   // Market identity
   exchangeMic?: string | null; // ISO 10383 MIC code
-
-  // Classification
-  assetClass?: string | null;
-  assetSubClass?: string | null;
-  isin?: string | null;
   currency: string;
 
   // Pricing configuration
@@ -418,26 +418,16 @@ export interface Asset {
 
   // Metadata
   notes?: string | null;
-  profile?: AssetProfileData | null; // Contains: sectors, countries, website
 
   // Status
   isActive?: boolean;
 
-  // Extensions
+  // Extensions (includes legacy data in $.legacy for migration service)
   metadata?: Record<string, unknown>;
 
   // Audit
   createdAt: string; // ISO date string
   updatedAt: string; // ISO date string
-}
-
-/**
- * Profile data for an asset (sectors, countries, website)
- */
-export interface AssetProfileData {
-  sectors?: string | null;
-  countries?: string | null;
-  website?: string | null;
 }
 
 export interface Quote {
@@ -646,12 +636,12 @@ export interface PerformanceMetrics {
 
 export interface UpdateAssetProfile {
   symbol: string;
-  name?: string;
-  sectors: string;
-  countries: string;
+  name?: string | null;
   notes: string;
-  assetClass: string;
-  assetSubClass: string;
+  kind?: AssetKind | null;
+  exchangeMic?: string | null;
+  pricingMode?: "MARKET" | "MANUAL" | "DERIVED" | "NONE" | null;
+  providerOverrides?: Record<string, unknown> | null;
 }
 
 // Rename ComparisonItem to TrackedItem
@@ -1162,4 +1152,33 @@ export interface TaxonomyInstrumentMappingJson {
   symbol?: string | null;
   categoryKey: string;
   weight: number;
+}
+
+// Asset classifications from taxonomy system
+export interface AssetClassifications {
+  assetType?: TaxonomyCategory | null;
+  riskCategory?: TaxonomyCategory | null;
+  assetClasses: CategoryWithWeight[];
+  sectors: CategoryWithWeight[];
+  regions: CategoryWithWeight[];
+  customGroups: CategoryWithWeight[];
+}
+
+export interface CategoryWithWeight {
+  category: TaxonomyCategory;
+  weight: number; // 0-100 percentage
+}
+
+// Migration status
+export interface MigrationStatus {
+  needed: boolean;
+  assetsWithLegacyData: number;
+  assetsAlreadyMigrated: number;
+}
+
+export interface MigrationResult {
+  sectorsMigrated: number;
+  countriesMigrated: number;
+  assetsProcessed: number;
+  errors: string[];
 }

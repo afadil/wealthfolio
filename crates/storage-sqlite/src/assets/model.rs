@@ -1,14 +1,49 @@
 //! Database model for assets.
 //! Provider-agnostic: no data_source or quote_symbol (use provider_overrides instead)
+//! FINAL SCHEMA: No legacy columns (isin, asset_class, asset_sub_class, profile)
+//! Legacy data stored in metadata.legacy JSON
 
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
+use log::error;
 use serde::{Deserialize, Serialize};
 
 use wealthfolio_core::assets::{Asset, AssetKind, NewAsset, PricingMode};
 
-/// Database model for assets
-/// Matches the new schema: no data_source, no quote_symbol, kind/pricing_mode are NOT NULL
+/// Helper to parse datetime string to NaiveDateTime.
+///
+/// Supports multiple formats:
+/// - RFC3339: `2024-01-06T16:51:39Z` or `2024-01-06T16:51:39+00:00`
+/// - SQLite CURRENT_TIMESTAMP: `2024-01-06 16:51:39`
+/// - Date only: `2024-01-06`
+fn text_to_datetime(s: &str) -> NaiveDateTime {
+    // Try RFC3339 first (preferred format)
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(s) {
+        return dt.naive_utc();
+    }
+
+    // Try SQLite CURRENT_TIMESTAMP format: "YYYY-MM-DD HH:MM:SS"
+    if let Ok(dt) = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S") {
+        return dt;
+    }
+
+    // Try ISO 8601 without timezone: "YYYY-MM-DDTHH:MM:SS"
+    if let Ok(dt) = NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S") {
+        return dt;
+    }
+
+    // Try date only: "YYYY-MM-DD"
+    if let Ok(date) = chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d") {
+        return date.and_hms_opt(0, 0, 0).unwrap_or_else(|| chrono::Utc::now().naive_utc());
+    }
+
+    error!("Failed to parse datetime '{}': unsupported format", s);
+    chrono::Utc::now().naive_utc()
+}
+
+/// Database model for assets - FINAL SCHEMA
+/// No legacy columns (isin, asset_class, asset_sub_class, profile)
+/// Legacy data stored in metadata.legacy JSON
 #[derive(
     Queryable,
     Identifiable,
@@ -43,20 +78,14 @@ pub struct AssetDB {
     pub preferred_provider: Option<String>,
     pub provider_overrides: Option<String>, // JSON for per-provider overrides
 
-    // Classification
-    pub isin: Option<String>,
-    pub asset_class: Option<String>,
-    pub asset_sub_class: Option<String>,
-
-    // Metadata
+    // Metadata (includes legacy data in $.legacy)
     pub notes: Option<String>,
-    pub profile: Option<String>,  // JSON: sectors, countries, website, etc.
-    pub metadata: Option<String>,
+    pub metadata: Option<String>,  // JSON: includes $.legacy.{isin, asset_class, asset_sub_class, sectors, countries, website}
 
     // Status
     pub is_active: i32,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 // Conversion implementations
@@ -89,7 +118,7 @@ impl From<AssetDB> for Asset {
             _ => PricingMode::Market,
         };
 
-        // Parse metadata JSON if present
+        // Parse metadata JSON if present (includes legacy data for migration service)
         let metadata = db
             .metadata
             .as_ref()
@@ -98,12 +127,6 @@ impl From<AssetDB> for Asset {
         // Parse provider_overrides JSON if present
         let provider_overrides = db
             .provider_overrides
-            .as_ref()
-            .and_then(|s| serde_json::from_str(s).ok());
-
-        // Parse profile JSON if present
-        let profile = db
-            .profile
             .as_ref()
             .and_then(|s| serde_json::from_str(s).ok());
 
@@ -117,32 +140,22 @@ impl From<AssetDB> for Asset {
             pricing_mode,
             preferred_provider: db.preferred_provider,
             provider_overrides,
-            isin: db.isin,
-            asset_class: db.asset_class,
-            asset_sub_class: db.asset_sub_class,
             notes: db.notes,
-            profile,
             metadata,
             is_active: db.is_active != 0,
-            created_at: db.created_at,
-            updated_at: db.updated_at,
+            created_at: text_to_datetime(&db.created_at),
+            updated_at: text_to_datetime(&db.updated_at),
         }
     }
 }
 
 impl From<NewAsset> for AssetDB {
     fn from(domain: NewAsset) -> Self {
-        let now = chrono::Utc::now().naive_utc();
+        let now = chrono::Utc::now().to_rfc3339();
 
         // Convert enums to database strings using as_db_str()
         let kind = domain.kind.as_db_str().to_string();
         let pricing_mode = domain.pricing_mode.as_db_str().to_string();
-
-        // Serialize metadata to JSON string
-        let metadata = domain
-            .metadata
-            .as_ref()
-            .and_then(|v| serde_json::to_string(v).ok());
 
         // Serialize provider_overrides to JSON string
         let provider_overrides = domain
@@ -150,9 +163,9 @@ impl From<NewAsset> for AssetDB {
             .as_ref()
             .and_then(|v| serde_json::to_string(v).ok());
 
-        // Serialize profile to JSON string
-        let profile = domain
-            .profile
+        // Serialize metadata to JSON string (may include legacy data for migration)
+        let metadata = domain
+            .metadata
             .as_ref()
             .and_then(|v| serde_json::to_string(v).ok());
 
@@ -166,14 +179,10 @@ impl From<NewAsset> for AssetDB {
             pricing_mode,
             preferred_provider: domain.preferred_provider,
             provider_overrides,
-            isin: domain.isin,
-            asset_class: domain.asset_class,
-            asset_sub_class: domain.asset_sub_class,
             notes: domain.notes,
-            profile,
             metadata,
             is_active: if domain.is_active { 1 } else { 0 },
-            created_at: now,
+            created_at: now.clone(),
             updated_at: now,
         }
     }

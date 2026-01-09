@@ -1,6 +1,6 @@
 import { ComponentProps } from "react";
 import { getLocalTimeZone, today } from "@internationalized/date";
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { Icons } from "./icons";
 import {
   Button,
   CalendarCell as CalendarCellRac,
@@ -30,14 +30,14 @@ function CalendarHeader() {
         slot="previous"
         className="text-muted-foreground/80 hover:bg-accent hover:text-foreground focus-visible:ring-ring/50 flex size-9 items-center justify-center rounded-md transition-[color,box-shadow] outline-none focus-visible:ring-[3px]"
       >
-        <ChevronLeftIcon size={16} />
+        <Icons.ChevronLeft size={16} />
       </Button>
       <HeadingRac className="grow text-center text-sm font-medium" />
       <Button
         slot="next"
         className="text-muted-foreground/80 hover:bg-accent hover:text-foreground focus-visible:ring-ring/50 flex size-9 items-center justify-center rounded-md transition-[color,box-shadow] outline-none focus-visible:ring-[3px]"
       >
-        <ChevronRightIcon size={16} />
+        <Icons.ChevronRight size={16} />
       </Button>
     </header>
   );

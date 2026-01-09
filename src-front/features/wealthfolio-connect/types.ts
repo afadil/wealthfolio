@@ -108,20 +108,30 @@ export type PlanId = "essentials" | "duo" | "plus";
 export type BillingPeriod = "monthly" | "yearly";
 
 export interface PlanPricing {
-  amount: number;
-  currency: string;
-  priceId: string | undefined;
+  monthly: number;
+  yearly: number;
+  yearlyPerMonth?: number;
+}
+
+export interface PlanLimits {
+  householdSize: number;
+  institutionConnections: number | "unlimited";
+  devices: number;
 }
 
 export interface SubscriptionPlan {
   id: PlanId;
   name: string;
+  tagline?: string;
   description: string;
+  pricing: PlanPricing;
+  limits: PlanLimits;
   features: string[];
-  pricing: {
-    monthly: PlanPricing;
-    yearly: PlanPricing;
-  };
+  featuresExtended?: string[];
+  isAvailable: boolean;
+  isComingSoon: boolean;
+  badge?: string;
+  yearlyDiscountPercent?: number;
 }
 
 export interface PlansResponse {

@@ -556,7 +556,7 @@ impl NetWorthServiceTrait for NetWorthService {
         // Get quotes in the date range
         let quotes_vec = self
             .quote_service
-            .get_quotes_in_range_filled(&all_alt_symbols, start_date, end_date)?;
+            .get_quotes_in_range_filled(&all_alt_symbols, start_date, end_date, &HashMap::new())?;
 
         // Organize quotes by date -> symbol -> value (converted to base currency)
         let mut quotes_by_date: BTreeMap<NaiveDate, HashMap<String, Decimal>> = BTreeMap::new();

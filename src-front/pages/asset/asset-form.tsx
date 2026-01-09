@@ -14,7 +14,6 @@ import {
 } from "@wealthfolio/ui/components/ui/form";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Input } from "@wealthfolio/ui/components/ui/input";
-import { InputTags } from "@wealthfolio/ui/components/ui/tag-input";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
 import { DataSource } from "@/lib/constants";
 import { UpdateAssetProfile } from "@/lib/types";
@@ -23,18 +22,14 @@ import { SingleSelectTaxonomy } from "@/components/classification/single-select-
 import { MultiSelectTaxonomy } from "@/components/classification/multi-select-taxonomy";
 import { useTaxonomies } from "@/hooks/use-taxonomies";
 
-import { ParsedAsset, formatBreakdownTags, tagsToBreakdown } from "./asset-utils";
+import { ParsedAsset } from "./asset-utils";
 
 const assetFormSchema = z.object({
   symbol: z.string().min(1),
   name: z.string().optional(),
-  assetClass: z.string().optional(),
-  assetSubClass: z.string().optional(),
   currency: z.string().min(1),
   preferredProvider: z.enum([DataSource.YAHOO, DataSource.MANUAL]),
   notes: z.string().optional(),
-  sectors: z.array(z.string()),
-  countries: z.array(z.string()),
 });
 
 export type AssetFormValues = z.infer<typeof assetFormSchema>;
@@ -66,13 +61,9 @@ export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProp
   const defaultValues: AssetFormValues = {
     symbol: asset.id,
     name: asset.name ?? "",
-    assetClass: asset.assetClass ?? "",
-    assetSubClass: asset.assetSubClass ?? "",
     currency: asset.currency,
     preferredProvider: (asset.preferredProvider as DataSource) ?? DataSource.YAHOO,
     notes: asset.notes ?? "",
-    sectors: formatBreakdownTags(asset.sectorsList),
-    countries: formatBreakdownTags(asset.countriesList),
   };
 
   const form = useForm<AssetFormValues>({
@@ -133,32 +124,6 @@ export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProp
           />
           <FormField
             control={form.control}
-            name="assetClass"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Class</FormLabel>
-                <FormControl>
-                  <Input placeholder="Equity, Bond, Cash..." {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="assetSubClass"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Sub-class</FormLabel>
-                <FormControl>
-                  <Input placeholder="ETF, Stock, Fund..." {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
             name="preferredProvider"
             render={({ field }) => (
               <FormItem>
@@ -172,56 +137,6 @@ export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProp
                     sheetTitle="Pick a data provider"
                     sheetDescription="Choose how prices are loaded for this asset."
                   />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        <div className="grid gap-4">
-          <FormField
-            control={form.control}
-            name="sectors"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Sectors (use sector:weight)</FormLabel>
-                <FormControl>
-                  <InputTags
-                    value={field.value}
-                    onChange={(values) => field.onChange(values)}
-                    placeholder="Technology:40%, Healthcare:20%"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="countries"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Countries (use country:weight)</FormLabel>
-                <FormControl>
-                  <InputTags
-                    value={field.value}
-                    onChange={(values) => field.onChange(values)}
-                    placeholder="United States:50%, Canada:25%"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="notes"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Notes</FormLabel>
-                <FormControl>
-                  <Textarea rows={5} placeholder="Add any context or links" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -256,6 +171,22 @@ export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProp
           </div>
         )}
 
+        <div className="grid gap-4">
+          <FormField
+            control={form.control}
+            name="notes"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Notes</FormLabel>
+                <FormControl>
+                  <Textarea rows={5} placeholder="Add any context or links" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
         <div className="flex justify-end gap-3">
           {onCancel ? (
             <Button type="button" variant="ghost" onClick={onCancel} disabled={isSaving}>
@@ -280,9 +211,5 @@ export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProp
 export const buildAssetUpdatePayload = (values: AssetFormValues): UpdateAssetProfile => ({
   symbol: values.symbol,
   name: values.name || "",
-  sectors: values.sectors.length ? JSON.stringify(tagsToBreakdown(values.sectors)) : "",
-  countries: values.countries.length ? JSON.stringify(tagsToBreakdown(values.countries)) : "",
   notes: values.notes ?? "",
-  assetSubClass: values.assetSubClass || "",
-  assetClass: values.assetClass || "",
 });

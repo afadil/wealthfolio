@@ -98,6 +98,15 @@ export const getSubscriptionPlans = async (): Promise<PlansResponse> => {
   }
 };
 
+export const getSubscriptionPlansPublic = async (): Promise<PlansResponse> => {
+  try {
+    return await invoke("get_subscription_plans_public");
+  } catch (error) {
+    logger.error(`Error getting subscription plans (public): ${error}`);
+    throw error;
+  }
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // User Info
 // ─────────────────────────────────────────────────────────────────────────────

@@ -11,18 +11,28 @@ function getSectorsData(holdings: Holding[]) {
   if (!holdings) return [];
   const sectors = holdings?.reduce(
     (acc, holding) => {
-      const assetSectors = holding.instrument?.sectors;
       const marketValue = Number(holding.marketValue?.base) || 0;
 
+      // Prefer taxonomy-based classifications, fall back to legacy sectors
+      const taxonomySectors = holding.instrument?.classifications?.sectors;
       const sectorsToProcess =
-        assetSectors && assetSectors.length > 0 ? assetSectors : [{ name: "Others", weight: 1 }];
+        taxonomySectors && taxonomySectors.length > 0
+          ? taxonomySectors.map((s) => ({
+              name: s.category.name,
+              weight: s.weight / 100, // taxonomy weight is 0-100, convert to decimal
+            }))
+          : holding.instrument?.sectors && holding.instrument.sectors.length > 0
+            ? holding.instrument.sectors.map((s: Sector) => ({
+                name: s.name,
+                weight: Number(s.weight) > 1 ? Number(s.weight) / 100 : Number(s.weight),
+              }))
+            : [{ name: "Others", weight: 1 }];
 
       if (isNaN(marketValue)) return acc;
 
-      sectorsToProcess.forEach((sector: Sector) => {
+      sectorsToProcess.forEach((sector) => {
         const current = acc[sector.name] || 0;
-        const weight = Number(sector.weight) || 0;
-        acc[sector.name] = current + marketValue * (weight > 1 ? weight / 100 : weight);
+        acc[sector.name] = current + marketValue * sector.weight;
       });
       return acc;
     },

@@ -82,11 +82,11 @@ impl TaxonomyRepositoryTrait for TaxonomyRepository {
                     name: taxonomy.name,
                     color: taxonomy.color,
                     description: taxonomy.description,
-                    is_system: taxonomy.is_system,
-                    is_single_select: taxonomy.is_single_select,
+                    is_system: if taxonomy.is_system { 1 } else { 0 },
+                    is_single_select: if taxonomy.is_single_select { 1 } else { 0 },
                     sort_order: taxonomy.sort_order,
-                    created_at: taxonomy.created_at,
-                    updated_at: chrono::Utc::now().naive_utc(),
+                    created_at: taxonomy.created_at.format("%Y-%m-%dT%H:%M:%S%.fZ").to_string(),
+                    updated_at: chrono::Utc::now().to_rfc3339(),
                 };
 
                 diesel::update(taxonomies::table.find(&id))
@@ -167,8 +167,8 @@ impl TaxonomyRepositoryTrait for TaxonomyRepository {
                     color: category.color,
                     description: category.description,
                     sort_order: category.sort_order,
-                    created_at: category.created_at,
-                    updated_at: chrono::Utc::now().naive_utc(),
+                    created_at: category.created_at.format("%Y-%m-%dT%H:%M:%S%.fZ").to_string(),
+                    updated_at: chrono::Utc::now().to_rfc3339(),
                 };
 
                 diesel::update(

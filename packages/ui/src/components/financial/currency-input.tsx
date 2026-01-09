@@ -1,4 +1,3 @@
-import { Check, ChevronsUpDown } from "lucide-react";
 import { forwardRef, useRef, useState } from "react";
 import { useIsMobile as defaultUseIsMobile } from "../../hooks/use-mobile";
 import { worldCurrencies } from "../../lib/currencies";
@@ -81,7 +80,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
             {...props}
           >
             <span className="truncate">{mobileDisplayText}</span>
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetContent side="bottom" className="mx-1 h-[85vh] rounded-t-4xl p-0">
@@ -191,7 +190,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
             {...props}
           >
             {buttonLabel}
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-full p-0">
@@ -210,7 +209,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
                       }}
                     >
                       {currency.label}
-                      <Check
+                      <Icons.Check
                         className={cn("ml-auto h-4 w-4", currency.value === value ? "opacity-100" : "opacity-0")}
                       />
                     </CommandItem>

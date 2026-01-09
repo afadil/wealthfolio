@@ -1,10 +1,8 @@
-use crate::assets::{
-    Asset, AssetKind, AssetServiceTrait, Country as AssetCountry, Sector as AssetSector,
-};
+use crate::assets::{Asset, AssetKind, AssetServiceTrait};
 use crate::errors::{CalculatorError, Error as CoreError, Result};
 use crate::fx::currency::{get_normalization_rule, normalize_currency_code};
 use crate::portfolio::holdings::holdings_model::{
-    Country, Holding, HoldingType, Instrument, MonetaryValue, Sector,
+    Holding, HoldingType, Instrument, MonetaryValue,
 };
 use crate::portfolio::snapshot::{self, Position, SnapshotServiceTrait};
 use async_trait::async_trait;
@@ -170,10 +168,6 @@ impl HoldingsServiceTrait for HoldingsService {
                 Ok(assets) => assets
                     .into_iter()
                     .map(|asset: Asset| {
-                        // Extract countries and sectors from profile JSON
-                        let (countries_vec, sectors_vec) =
-                            extract_countries_sectors_from_profile(&asset);
-
                         // Extract metadata (already a Value, no parsing needed)
                         let metadata: Option<Value> = asset.metadata.clone();
 
@@ -191,6 +185,7 @@ impl HoldingsServiceTrait for HoldingsService {
                                 })
                             });
 
+                        // Note: asset_class, asset_subclass, sectors, countries now come from taxonomies
                         let instrument = Instrument {
                             id: asset.id.clone(),
                             symbol: asset.symbol.clone(),
@@ -198,24 +193,11 @@ impl HoldingsServiceTrait for HoldingsService {
                             currency: asset.currency,
                             notes: asset.notes,
                             preferred_provider: asset.preferred_provider.clone(),
-                            asset_class: asset.asset_class,
-                            asset_subclass: asset.asset_sub_class,
-                            countries: countries_vec.map(|c| {
-                                c.iter()
-                                    .map(|country| Country {
-                                        name: country.name.clone(),
-                                        weight: country.weight,
-                                    })
-                                    .collect()
-                            }),
-                            sectors: sectors_vec.map(|s| {
-                                s.iter()
-                                    .map(|sector| Sector {
-                                        name: sector.name.clone(),
-                                        weight: sector.weight,
-                                    })
-                                    .collect()
-                            }),
+                            asset_class: None,
+                            asset_subclass: None,
+                            countries: None,
+                            sectors: None,
+                            classifications: None,
                         };
 
                         let asset_info = AssetInfo {
@@ -453,9 +435,6 @@ impl HoldingsServiceTrait for HoldingsService {
             )))
         })?;
 
-        // Extract countries and sectors from profile JSON
-        let (countries_vec, sectors_vec) = extract_countries_sectors_from_profile(&asset_details);
-
         // Extract metadata (already a Value, no parsing needed)
         let metadata: Option<Value> = asset_details.metadata.clone();
 
@@ -472,6 +451,7 @@ impl HoldingsServiceTrait for HoldingsService {
             })
         });
 
+        // Note: asset_class, asset_subclass, sectors, countries now come from taxonomies
         let instrument = Instrument {
             id: asset_details.id.clone(),
             symbol: asset_details.symbol.clone(),
@@ -479,24 +459,11 @@ impl HoldingsServiceTrait for HoldingsService {
             currency: asset_details.currency,
             notes: asset_details.notes,
             preferred_provider: asset_details.preferred_provider.clone(),
-            asset_class: asset_details.asset_class,
-            asset_subclass: asset_details.asset_sub_class,
-            countries: countries_vec.map(|c| {
-                c.iter()
-                    .map(|country| Country {
-                        name: country.name.clone(),
-                        weight: country.weight,
-                    })
-                    .collect()
-            }),
-            sectors: sectors_vec.map(|s| {
-                s.iter()
-                    .map(|sector| Sector {
-                        name: sector.name.clone(),
-                        weight: sector.weight,
-                    })
-                    .collect()
-            }),
+            asset_class: None,
+            asset_subclass: None,
+            countries: None,
+            sectors: None,
+            classifications: None,
         };
 
         // Determine holding type based on asset kind
@@ -568,47 +535,6 @@ impl HoldingsServiceTrait for HoldingsService {
     }
 }
 
-/// Helper function to extract countries and sectors from the asset's profile JSON.
-/// Returns (countries, sectors) as Option<Vec<T>> values.
-fn extract_countries_sectors_from_profile(
-    asset: &Asset,
-) -> (Option<Vec<AssetCountry>>, Option<Vec<AssetSector>>) {
-    let profile = match &asset.profile {
-        Some(p) => p,
-        None => return (None, None),
-    };
-
-    // Extract countries from profile.countries (stored as JSON string)
-    let countries_vec = profile.get("countries").and_then(|c| {
-        if let Some(s) = c.as_str() {
-            serde_json::from_str::<Option<Vec<AssetCountry>>>(s)
-                .map_err(|e| {
-                    warn!("Failed to parse countries for {}: {}", asset.symbol, e);
-                })
-                .ok()
-                .flatten()
-        } else {
-            None
-        }
-    });
-
-    // Extract sectors from profile.sectors (stored as JSON string)
-    let sectors_vec = profile.get("sectors").and_then(|s| {
-        if let Some(str_val) = s.as_str() {
-            serde_json::from_str::<Option<Vec<AssetSector>>>(str_val)
-                .map_err(|e| {
-                    warn!("Failed to parse sectors for {}: {}", asset.symbol, e);
-                })
-                .ok()
-                .flatten()
-        } else {
-            None
-        }
-    });
-
-    (countries_vec, sectors_vec)
-}
-
 #[cfg(test)]
 mod tests {
     use crate::snapshot::Lot;
@@ -637,6 +563,7 @@ mod tests {
                 asset_subclass: None,
                 countries: None,
                 sectors: None,
+                classifications: None,
             }),
             asset_kind: None,
             quantity: dec!(1),
