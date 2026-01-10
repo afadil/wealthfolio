@@ -12,6 +12,7 @@ import {
 } from "@wealthfolio/ui/components/ui/sheet";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { QuoteSummary } from "@/lib/types";
+import { getExchangeDisplayName } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -205,7 +206,9 @@ export function BenchmarkSymbolSelectorMobile({
                             <span className="text-muted-foreground text-xs">{ticker.symbol}</span>
                           </div>
                           {ticker.exchange && (
-                            <div className="text-muted-foreground text-sm">{ticker.exchange}</div>
+                            <div className="text-muted-foreground text-sm">
+                              {ticker.exchangeName || getExchangeDisplayName(ticker.exchange)}
+                            </div>
                           )}
                         </div>
                         <Icons.ChevronRight className="text-muted-foreground h-5 w-5 flex-shrink-0" />

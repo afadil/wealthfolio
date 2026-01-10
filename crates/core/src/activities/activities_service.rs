@@ -3,10 +3,11 @@ use log::debug;
 use std::sync::Arc;
 
 use crate::accounts::{Account, AccountServiceTrait};
+use crate::activities::activities_constants::is_cash_activity;
 use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
 use crate::activities::{ActivityRepositoryTrait, ActivityServiceTrait};
-use crate::assets::AssetServiceTrait;
+use crate::assets::{canonical_asset_id, AssetKind, AssetServiceTrait};
 use crate::fx::FxServiceTrait;
 use crate::Result;
 use uuid::Uuid;
@@ -37,22 +38,149 @@ impl ActivityService {
 }
 
 impl ActivityService {
+    /// Resolves the asset_id for an activity.
+    ///
+    /// Priority:
+    /// 1. If asset_id is provided, use it (backward compatibility, editing existing activities)
+    /// 2. If symbol + exchange_mic are provided, generate canonical ID using canonical_asset_id()
+    /// 3. For cash activities without symbol, generate CASH:{currency}
+    /// 4. For non-cash activities without symbol, return error
+    fn resolve_asset_id(
+        &self,
+        asset_id: Option<&str>,
+        symbol: Option<&str>,
+        exchange_mic: Option<&str>,
+        asset_kind_hint: Option<&str>,
+        activity_type: &str,
+        currency: &str,
+    ) -> Result<Option<String>> {
+        // 1. If asset_id is explicitly provided, use it (backward compatibility for updates)
+        if let Some(id) = asset_id {
+            if !id.is_empty() {
+                return Ok(Some(id.to_string()));
+            }
+        }
+
+        // 2. If symbol is provided, generate canonical asset_id
+        if let Some(sym) = symbol {
+            if !sym.is_empty() {
+                let kind = self.infer_asset_kind(sym, exchange_mic, asset_kind_hint);
+                let generated_id = canonical_asset_id(&kind, sym, exchange_mic, currency);
+                return Ok(Some(generated_id));
+            }
+        }
+
+        // 3. For cash activities without symbol, generate CASH:{currency}
+        if is_cash_activity(activity_type) {
+            // Generate canonical CASH asset ID for cash activities
+            let cash_id = canonical_asset_id(&AssetKind::Cash, currency, None, currency);
+            return Ok(Some(cash_id));
+        }
+
+        // 4. For non-cash activities (BUY, SELL, DIVIDEND, etc.), we need either asset_id or symbol
+        Err(ActivityError::InvalidData(
+            "Non-cash activities require either asset_id or symbol to be provided".to_string(),
+        )
+        .into())
+    }
+
+    /// Infers the asset kind from symbol, exchange, and hints.
+    fn infer_asset_kind(
+        &self,
+        symbol: &str,
+        exchange_mic: Option<&str>,
+        asset_kind_hint: Option<&str>,
+    ) -> AssetKind {
+        // 1. If explicit hint is provided, use it
+        if let Some(hint) = asset_kind_hint {
+            match hint.to_uppercase().as_str() {
+                "SECURITY" => return AssetKind::Security,
+                "CRYPTO" => return AssetKind::Crypto,
+                "CASH" => return AssetKind::Cash,
+                "FX_RATE" | "FX" => return AssetKind::FxRate,
+                "OPTION" | "OPT" => return AssetKind::Option,
+                "COMMODITY" | "CMDTY" => return AssetKind::Commodity,
+                "PROPERTY" | "PROP" => return AssetKind::Property,
+                "VEHICLE" | "VEH" => return AssetKind::Vehicle,
+                "COLLECTIBLE" | "COLL" => return AssetKind::Collectible,
+                "PHYSICAL_PRECIOUS" | "PREC" => return AssetKind::PhysicalPrecious,
+                "PRIVATE_EQUITY" | "PEQ" => return AssetKind::PrivateEquity,
+                "LIABILITY" | "LIAB" => return AssetKind::Liability,
+                "OTHER" | "ALT" => return AssetKind::Other,
+                _ => {} // Fall through to inference
+            }
+        }
+
+        // 2. If exchange MIC is provided, it's a security
+        if exchange_mic.is_some() {
+            return AssetKind::Security;
+        }
+
+        // 3. Common crypto symbols heuristic
+        let upper_symbol = symbol.to_uppercase();
+        let common_crypto = [
+            "BTC", "ETH", "XRP", "LTC", "BCH", "ADA", "DOT", "LINK", "XLM", "DOGE", "UNI", "SOL",
+            "AVAX", "MATIC", "ATOM", "ALGO", "VET", "FIL", "TRX", "ETC", "XMR", "AAVE", "MKR",
+            "COMP", "SNX", "YFI", "SUSHI", "CRV",
+        ];
+        if common_crypto.contains(&upper_symbol.as_str()) {
+            return AssetKind::Crypto;
+        }
+
+        // 4. If symbol contains "-USD", "-CAD", etc., likely crypto
+        if upper_symbol.contains("-USD")
+            || upper_symbol.contains("-CAD")
+            || upper_symbol.contains("-EUR")
+            || upper_symbol.contains("-GBP")
+        {
+            return AssetKind::Crypto;
+        }
+
+        // 5. Default to Security (most common case)
+        AssetKind::Security
+    }
+
     async fn prepare_new_activity(&self, mut activity: NewActivity) -> Result<NewActivity> {
         let account: Account = self.account_service.get_account(&activity.account_id)?;
 
-        let asset_context_currency = if !activity.currency.is_empty() {
+        // Determine currency (needed for asset ID generation)
+        let currency = if !activity.currency.is_empty() {
             activity.currency.clone()
         } else {
             account.currency.clone()
         };
 
-        // Only process asset if asset_id is provided (not a pure cash movement)
-        if let Some(ref asset_id) = activity.asset_id {
+        // For NEW activities: prioritize symbol over asset_id to ensure canonical ID generation.
+        // This prevents clients from accidentally sending raw symbols (e.g., "AAPL") as asset_id.
+        // If symbol is provided, ignore asset_id and generate canonical ID.
+        let effective_asset_id = if activity.symbol.as_ref().is_some_and(|s| !s.is_empty()) {
+            // Symbol is provided, ignore any asset_id and let resolve_asset_id generate canonical ID
+            None
+        } else {
+            // No symbol provided, fall back to asset_id (backward compatibility for edge cases)
+            activity.asset_id.as_deref()
+        };
+
+        // Resolve asset_id using canonical_asset_id() if symbol is provided
+        let resolved_asset_id = self.resolve_asset_id(
+            effective_asset_id,
+            activity.symbol.as_deref(),
+            activity.exchange_mic.as_deref(),
+            activity.asset_kind.as_deref(),
+            &activity.activity_type,
+            &currency,
+        )?;
+
+        // Update activity with resolved asset_id
+        activity.asset_id = resolved_asset_id.clone();
+
+        // Process asset if asset_id is resolved
+        if let Some(ref asset_id) = resolved_asset_id {
             let asset = self
                 .asset_service
                 .get_or_create_minimal_asset(
                     asset_id,
-                    Some(asset_context_currency),
+                    Some(currency.clone()),
                     activity.asset_metadata.clone(),
                 )
                 .await?;
@@ -112,18 +240,32 @@ impl ActivityService {
     ) -> Result<ActivityUpdate> {
         let account: Account = self.account_service.get_account(&activity.account_id)?;
 
-        let asset_context_currency = if !activity.currency.is_empty() {
+        // Determine currency (needed for asset ID generation)
+        let currency = if !activity.currency.is_empty() {
             activity.currency.clone()
         } else {
             account.currency.clone()
         };
 
-        // Only process asset if asset_id is provided (not a pure cash movement)
-        if let Some(ref asset_id) = activity.asset_id {
+        // Resolve asset_id using canonical_asset_id() if symbol is provided
+        let resolved_asset_id = self.resolve_asset_id(
+            activity.asset_id.as_deref(),
+            activity.symbol.as_deref(),
+            activity.exchange_mic.as_deref(),
+            activity.asset_kind.as_deref(),
+            &activity.activity_type,
+            &currency,
+        )?;
+
+        // Update activity with resolved asset_id
+        activity.asset_id = resolved_asset_id.clone();
+
+        // Process asset if asset_id is resolved
+        if let Some(ref asset_id) = resolved_asset_id {
             // Updates don't carry asset metadata - pass None
             let asset = self
                 .asset_service
-                .get_or_create_minimal_asset(asset_id, Some(asset_context_currency), None)
+                .get_or_create_minimal_asset(asset_id, Some(currency.clone()), None)
                 .await?;
 
             if let Some(requested_source) = activity.asset_data_source.as_ref() {
@@ -342,10 +484,21 @@ impl ActivityServiceTrait for ActivityService {
                 account.currency.clone()
             };
 
+            // Generate canonical asset ID for the symbol
+            // CSV imports don't include exchange info, so we infer kind and use UNKNOWN qualifier
+            let inferred_kind =
+                self.infer_asset_kind(&activity.symbol, None, None);
+            let canonical_id = canonical_asset_id(
+                &inferred_kind,
+                &activity.symbol,
+                None, // CSV imports don't have exchange MIC
+                &asset_context_currency,
+            );
+
             // CSV imports don't carry asset metadata - pass None
             let symbol_profile_result = self
                 .asset_service
-                .get_or_create_minimal_asset(&activity.symbol, Some(asset_context_currency), None)
+                .get_or_create_minimal_asset(&canonical_id, Some(asset_context_currency), None)
                 .await;
 
             let (mut is_valid, mut error_message) = (true, None);
@@ -409,6 +562,8 @@ impl ActivityServiceTrait for ActivityService {
         account_id: String,
         activities: Vec<ActivityImport>,
     ) -> Result<Vec<ActivityImport>> {
+        let account = self.account_service.get_account(&account_id)?;
+
         let validated_activities = self
             .check_activities_import(account_id.clone(), activities)
             .await?;
@@ -427,32 +582,54 @@ impl ActivityServiceTrait for ActivityService {
 
         let new_activities: Vec<NewActivity> = validated_activities
             .iter()
-            .map(|activity| NewActivity {
-                id: activity.id.clone(),
-                account_id: activity.account_id.clone().unwrap_or_default(),
-                asset_id: Some(activity.symbol.clone()),
-                asset_data_source: None,
-                asset_metadata: None, // CSV imports don't carry asset metadata
-                activity_type: activity.activity_type.clone(),
-                subtype: None,
-                activity_date: activity.date.clone(),
-                quantity: Some(activity.quantity),
-                unit_price: Some(activity.unit_price),
-                currency: activity.currency.clone(),
-                fee: Some(activity.fee),
-                amount: activity.amount,
-                status: if activity.is_draft {
-                    Some(crate::activities::ActivityStatus::Draft)
+            .map(|activity| {
+                // Determine currency for canonical ID generation
+                let currency = if !activity.currency.is_empty() {
+                    &activity.currency
                 } else {
-                    Some(crate::activities::ActivityStatus::Posted)
-                },
-                notes: activity.comment.clone(),
-                fx_rate: None,
-                metadata: None,
-                needs_review: None,
-                source_system: Some("CSV".to_string()),
-                source_record_id: None,
-                source_group_id: None,
+                    &account.currency
+                };
+
+                // Generate canonical asset ID (same logic as check_activities_import)
+                let inferred_kind = self.infer_asset_kind(&activity.symbol, None, None);
+                let canonical_id = canonical_asset_id(
+                    &inferred_kind,
+                    &activity.symbol,
+                    None, // CSV imports don't have exchange MIC
+                    currency,
+                );
+
+                NewActivity {
+                    id: activity.id.clone(),
+                    account_id: activity.account_id.clone().unwrap_or_default(),
+                    // Use the canonical asset ID generated above
+                    asset_id: Some(canonical_id),
+                    symbol: Some(activity.symbol.clone()),
+                    exchange_mic: None, // CSV imports don't typically include exchange info
+                    asset_kind: None,   // Already used for canonical ID generation
+                    asset_data_source: None,
+                    asset_metadata: None, // CSV imports don't carry asset metadata
+                    activity_type: activity.activity_type.clone(),
+                    subtype: None,
+                    activity_date: activity.date.clone(),
+                    quantity: Some(activity.quantity),
+                    unit_price: Some(activity.unit_price),
+                    currency: activity.currency.clone(),
+                    fee: Some(activity.fee),
+                    amount: activity.amount,
+                    status: if activity.is_draft {
+                        Some(crate::activities::ActivityStatus::Draft)
+                    } else {
+                        Some(crate::activities::ActivityStatus::Posted)
+                    },
+                    notes: activity.comment.clone(),
+                    fx_rate: None,
+                    metadata: None,
+                    needs_review: None,
+                    source_system: Some("CSV".to_string()),
+                    source_record_id: None,
+                    source_group_id: None,
+                }
             })
             .collect();
 

@@ -1,6 +1,6 @@
 use crate::activities::{Activity, ActivityType};
 use crate::assets::AssetRepositoryTrait;
-use crate::constants::CASH_ASSET_PREFIX;
+use crate::assets::is_cash_asset_id;
 use crate::errors::{CalculatorError, Error, Result};
 use crate::fx::FxServiceTrait;
 use crate::portfolio::snapshot::AccountStateSnapshot;
@@ -477,7 +477,7 @@ impl HoldingsCalculator {
         // Check if this is an EXTERNAL transfer (affects net_contribution)
         let is_external = self.is_external_transfer(activity);
 
-        if asset_id.starts_with(CASH_ASSET_PREFIX) || asset_id.is_empty() {
+        if is_cash_asset_id(asset_id) || asset_id.is_empty() {
             // Cash transfer: book in ACTIVITY currency
             let net_amount = activity_amount - activity.fee_amt();
             add_cash(state, activity_currency, net_amount);
@@ -607,7 +607,7 @@ impl HoldingsCalculator {
         // Check if this is an EXTERNAL transfer (affects net_contribution)
         let is_external = self.is_external_transfer(activity);
 
-        if asset_id.starts_with(CASH_ASSET_PREFIX) || asset_id.is_empty() {
+        if is_cash_asset_id(asset_id) || asset_id.is_empty() {
             // Cash transfer: book outflow in ACTIVITY currency (amount + fee)
             let net_amount = activity_amount + activity.fee_amt();
             add_cash(state, activity_currency, -net_amount);
@@ -832,7 +832,7 @@ impl HoldingsCalculator {
         date: DateTime<Utc>,
         cache: &mut HashMap<String, (String, bool)>,
     ) -> std::result::Result<&'a mut Position, CalculatorError> {
-        if asset_id.is_empty() || asset_id.starts_with(CASH_ASSET_PREFIX) {
+        if asset_id.is_empty() || is_cash_asset_id(asset_id) {
             return Err(CalculatorError::InvalidActivity(format!(
                 "Invalid asset_id for position: {}",
                 asset_id

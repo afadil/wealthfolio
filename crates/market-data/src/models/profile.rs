@@ -11,6 +11,11 @@ pub struct AssetProfile {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 
+    /// Asset/quote type from provider (e.g., "EQUITY", "ETF", "CRYPTOCURRENCY")
+    /// Used to determine AssetKind during enrichment
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quote_type: Option<String>,
+
     /// Business sector (e.g., "Technology")
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sector: Option<String>,
@@ -38,14 +43,6 @@ pub struct AssetProfile {
     /// Logo URL
     #[serde(skip_serializing_if = "Option::is_none")]
     pub logo_url: Option<String>,
-
-    /// Asset class (e.g., "Equity", "Fixed Income")
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub asset_class: Option<String>,
-
-    /// Asset sub-class (e.g., "Stock", "ETF", "Bond")
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub asset_sub_class: Option<String>,
 
     /// Market capitalization
     #[serde(skip_serializing_if = "Option::is_none")]

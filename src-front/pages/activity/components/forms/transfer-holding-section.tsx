@@ -156,7 +156,8 @@ export function TransferHoldingSection({ onSuccess }: TransferHoldingSectionProp
           accountId: data.accountId!,
           activityType,
           activityDate: new Date(data.activityDate).toISOString(),
-          assetId: data.assetId,
+          // Use symbol instead of assetId - backend generates canonical ID
+          symbol: data.assetId,
           quantity: data.quantity,
           unitPrice: data.unitPrice,
           currency: account?.currency || "USD",
@@ -174,7 +175,8 @@ export function TransferHoldingSection({ onSuccess }: TransferHoldingSectionProp
           accountId: data.fromAccountId!,
           activityType: ActivityType.TRANSFER_OUT,
           activityDate: new Date(data.activityDate).toISOString(),
-          assetId: data.assetId,
+          // Use symbol instead of assetId - backend generates canonical ID
+          symbol: data.assetId,
           quantity: data.quantity,
           unitPrice: data.unitPrice,
           currency: fromAcct?.currency || "USD",
@@ -189,7 +191,8 @@ export function TransferHoldingSection({ onSuccess }: TransferHoldingSectionProp
           accountId: data.toAccountId!,
           activityType: ActivityType.TRANSFER_IN,
           activityDate: new Date(data.activityDate).toISOString(),
-          assetId: data.assetId,
+          // Use symbol instead of assetId - backend generates canonical ID
+          symbol: data.assetId,
           quantity: data.quantity,
           unitPrice: data.unitPrice,
           currency: toAcct?.currency || "USD",

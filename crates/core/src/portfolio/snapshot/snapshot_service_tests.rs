@@ -162,11 +162,7 @@ mod tests {
                     pricing_mode: PricingMode::Market,
                     preferred_provider: None,
                     provider_overrides: None,
-                    isin: Some("US0378331005".to_string()),
-                    asset_class: Some("EQUITY".to_string()),
-                    asset_sub_class: Some("LARGE_CAP".to_string()),
                     notes: None,
-                    profile: None,
                     metadata: None,
                     is_active: true,
                     created_at: chrono::Utc::now().naive_utc(),
@@ -186,11 +182,7 @@ mod tests {
                     pricing_mode: PricingMode::Market,
                     preferred_provider: None,
                     provider_overrides: None,
-                    isin: Some("CA82509L1076".to_string()),
-                    asset_class: Some("EQUITY".to_string()),
-                    asset_sub_class: Some("LARGE_CAP".to_string()),
                     notes: None,
-                    profile: None,
                     metadata: None,
                     is_active: true,
                     created_at: chrono::Utc::now().naive_utc(),
@@ -250,6 +242,10 @@ mod tests {
                 .filter(|asset| symbols.contains(&asset.symbol))
                 .cloned()
                 .collect())
+        }
+
+        fn search_by_symbol(&self, _query: &str) -> AppResult<Vec<Asset>> {
+            Ok(Vec::new())
         }
     }
 

@@ -3,7 +3,7 @@ mod tests {
     use crate::accounts::{Account, AccountServiceTrait, AccountUpdate, NewAccount};
     use crate::activities::activities_model::*;
     use crate::activities::{ActivityRepositoryTrait, ActivityService, ActivityServiceTrait};
-    use crate::assets::{Asset, AssetServiceTrait, NewAsset, UpdateAssetProfile};
+    use crate::assets::{Asset, AssetServiceTrait, UpdateAssetProfile};
     use crate::errors::Result;
     use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
     use async_trait::async_trait;
@@ -502,6 +502,9 @@ mod tests {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
             asset_id: Some("NESN".to_string()),
+            symbol: None,
+            exchange_mic: None,
+            asset_kind: None,
             asset_data_source: None,
             asset_metadata: None,
             activity_type: "BUY".to_string(),
@@ -569,6 +572,9 @@ mod tests {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
             asset_id: Some("NESN".to_string()),
+            symbol: None,
+            exchange_mic: None,
+            asset_kind: None,
             asset_data_source: None,
             asset_metadata: None,
             activity_type: "BUY".to_string(),
@@ -636,6 +642,9 @@ mod tests {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
             asset_id: Some("AAPL".to_string()),
+            symbol: None,
+            exchange_mic: None,
+            asset_kind: None,
             asset_data_source: None,
             asset_metadata: None,
             activity_type: "BUY".to_string(),
@@ -672,6 +681,680 @@ mod tests {
         );
     }
 
+    // ==========================================================================
+    // resolve_asset_id() and infer_asset_kind() Tests (via create_activity)
+    // ==========================================================================
+
+    /// Test: When symbol + exchange_mic are provided, generates canonical SEC:SYMBOL:MIC
+    #[tokio::test]
+    async fn test_resolve_asset_id_with_symbol_and_exchange() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        // Add asset with canonical ID that will be generated
+        let asset = create_test_asset("SEC:AAPL:XNAS", "USD");
+        asset_service.add_asset(asset);
+
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+        );
+
+        let new_activity = NewActivity {
+            id: Some("activity-1".to_string()),
+            account_id: "acc-1".to_string(),
+            asset_id: None, // No asset_id provided
+            symbol: Some("AAPL".to_string()),
+            exchange_mic: Some("XNAS".to_string()),
+            asset_kind: None,
+            asset_data_source: None,
+            asset_metadata: None,
+            activity_type: "BUY".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(dec!(10)),
+            unit_price: Some(dec!(150)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(1500)),
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+        };
+
+        let result = activity_service.create_activity(new_activity).await;
+        assert!(result.is_ok());
+
+        let created = result.unwrap();
+        assert_eq!(
+            created.asset_id,
+            Some("SEC:AAPL:XNAS".to_string()),
+            "Should generate canonical SEC:SYMBOL:MIC format"
+        );
+    }
+
+    /// Test: When symbol is provided without exchange, generates SEC:SYMBOL:UNKNOWN
+    #[tokio::test]
+    async fn test_resolve_asset_id_symbol_without_exchange() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        // Add asset with UNKNOWN exchange
+        let asset = create_test_asset("SEC:TSLA:UNKNOWN", "USD");
+        asset_service.add_asset(asset);
+
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+        );
+
+        let new_activity = NewActivity {
+            id: Some("activity-1".to_string()),
+            account_id: "acc-1".to_string(),
+            asset_id: None,
+            symbol: Some("TSLA".to_string()),
+            exchange_mic: None, // No exchange provided
+            asset_kind: None,
+            asset_data_source: None,
+            asset_metadata: None,
+            activity_type: "BUY".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(dec!(5)),
+            unit_price: Some(dec!(200)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(1000)),
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+        };
+
+        let result = activity_service.create_activity(new_activity).await;
+        assert!(result.is_ok());
+
+        let created = result.unwrap();
+        assert_eq!(
+            created.asset_id,
+            Some("SEC:TSLA:UNKNOWN".to_string()),
+            "Should default to UNKNOWN exchange"
+        );
+    }
+
+    /// Test: For NEW activities, symbol takes priority over asset_id to ensure canonical ID generation
+    /// This is intentional - for new activities we always want canonical IDs
+    #[tokio::test]
+    async fn test_resolve_asset_id_backward_compatibility() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        // Asset with canonical ID format
+        let asset = create_test_asset("SEC:AAPL:XNAS", "USD");
+        asset_service.add_asset(asset);
+
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+        );
+
+        let new_activity = NewActivity {
+            id: Some("activity-1".to_string()),
+            account_id: "acc-1".to_string(),
+            asset_id: Some("IGNORED".to_string()), // Should be ignored when symbol is provided
+            symbol: Some("AAPL".to_string()),
+            exchange_mic: Some("XNAS".to_string()),
+            asset_kind: None,
+            asset_data_source: None,
+            asset_metadata: None,
+            activity_type: "BUY".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(dec!(10)),
+            unit_price: Some(dec!(150)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(1500)),
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+        };
+
+        let result = activity_service.create_activity(new_activity).await;
+        assert!(result.is_ok());
+
+        let created = result.unwrap();
+        assert_eq!(
+            created.asset_id,
+            Some("SEC:AAPL:XNAS".to_string()),
+            "For NEW activities, symbol + exchange_mic generates canonical ID, ignoring asset_id"
+        );
+    }
+
+    /// Test: Cash activity (DEPOSIT) generates CASH:{currency} asset ID
+    #[tokio::test]
+    async fn test_resolve_asset_id_cash_deposit_no_asset() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        // Cash asset should be created
+        let cash_asset = create_test_asset("CASH:USD", "USD");
+        asset_service.add_asset(cash_asset);
+
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+        );
+
+        let new_activity = NewActivity {
+            id: Some("activity-1".to_string()),
+            account_id: "acc-1".to_string(),
+            asset_id: None,
+            symbol: None,
+            exchange_mic: None,
+            asset_kind: None,
+            asset_data_source: None,
+            asset_metadata: None,
+            activity_type: "DEPOSIT".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: None,
+            unit_price: None,
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(1000)),
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+        };
+
+        let result = activity_service.create_activity(new_activity).await;
+        assert!(result.is_ok());
+
+        let created = result.unwrap();
+        assert_eq!(
+            created.asset_id,
+            Some("CASH:USD".to_string()),
+            "DEPOSIT should generate CASH:USD asset ID"
+        );
+    }
+
+    /// Test: Cash activity (WITHDRAWAL) generates CASH:{currency} asset ID
+    #[tokio::test]
+    async fn test_resolve_asset_id_cash_withdrawal_no_asset() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        // Cash asset should be created
+        let cash_asset = create_test_asset("CASH:USD", "USD");
+        asset_service.add_asset(cash_asset);
+
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+        );
+
+        let new_activity = NewActivity {
+            id: Some("activity-1".to_string()),
+            account_id: "acc-1".to_string(),
+            asset_id: None,
+            symbol: None,
+            exchange_mic: None,
+            asset_kind: None,
+            asset_data_source: None,
+            asset_metadata: None,
+            activity_type: "WITHDRAWAL".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: None,
+            unit_price: None,
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(500)),
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+        };
+
+        let result = activity_service.create_activity(new_activity).await;
+        assert!(result.is_ok());
+
+        let created = result.unwrap();
+        assert_eq!(
+            created.asset_id,
+            Some("CASH:USD".to_string()),
+            "WITHDRAWAL should generate CASH:USD asset ID"
+        );
+    }
+
+    /// Test: Non-cash activity (BUY) without symbol or asset_id fails
+    #[tokio::test]
+    async fn test_resolve_asset_id_buy_without_symbol_fails() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+        );
+
+        let new_activity = NewActivity {
+            id: Some("activity-1".to_string()),
+            account_id: "acc-1".to_string(),
+            asset_id: None,
+            symbol: None, // No symbol
+            exchange_mic: None,
+            asset_kind: None,
+            asset_data_source: None,
+            asset_metadata: None,
+            activity_type: "BUY".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(dec!(10)),
+            unit_price: Some(dec!(150)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(1500)),
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+        };
+
+        let result = activity_service.create_activity(new_activity).await;
+        assert!(result.is_err(), "BUY without symbol or asset_id should fail");
+    }
+
+    /// Test: Crypto symbol (BTC) without exchange infers CRYPTO kind
+    #[tokio::test]
+    async fn test_infer_asset_kind_common_crypto_symbol() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        // Add crypto asset
+        let asset = create_test_asset("CRYPTO:BTC:USD", "USD");
+        asset_service.add_asset(asset);
+
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+        );
+
+        let new_activity = NewActivity {
+            id: Some("activity-1".to_string()),
+            account_id: "acc-1".to_string(),
+            asset_id: None,
+            symbol: Some("BTC".to_string()),
+            exchange_mic: None, // No exchange - should infer crypto
+            asset_kind: None,
+            asset_data_source: None,
+            asset_metadata: None,
+            activity_type: "BUY".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(dec!(1)),
+            unit_price: Some(dec!(50000)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(50000)),
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+        };
+
+        let result = activity_service.create_activity(new_activity).await;
+        assert!(result.is_ok());
+
+        let created = result.unwrap();
+        assert_eq!(
+            created.asset_id,
+            Some("CRYPTO:BTC:USD".to_string()),
+            "BTC should be inferred as crypto"
+        );
+    }
+
+    /// Test: Crypto pattern (BTC-USD) infers CRYPTO kind
+    #[tokio::test]
+    async fn test_infer_asset_kind_crypto_pattern() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        // Add crypto asset with pattern-based ID
+        let asset = create_test_asset("CRYPTO:BTC-USD:USD", "USD");
+        asset_service.add_asset(asset);
+
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+        );
+
+        let new_activity = NewActivity {
+            id: Some("activity-1".to_string()),
+            account_id: "acc-1".to_string(),
+            asset_id: None,
+            symbol: Some("BTC-USD".to_string()), // Crypto pattern
+            exchange_mic: None,
+            asset_kind: None,
+            asset_data_source: None,
+            asset_metadata: None,
+            activity_type: "BUY".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(dec!(1)),
+            unit_price: Some(dec!(50000)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(50000)),
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+        };
+
+        let result = activity_service.create_activity(new_activity).await;
+        assert!(result.is_ok());
+
+        let created = result.unwrap();
+        assert!(
+            created
+                .asset_id
+                .as_ref()
+                .map(|id| id.starts_with("CRYPTO:"))
+                .unwrap_or(false),
+            "BTC-USD pattern should be inferred as crypto"
+        );
+    }
+
+    /// Test: Explicit kind hint overrides inference
+    #[tokio::test]
+    async fn test_infer_asset_kind_explicit_hint() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        // BTC would normally be inferred as crypto, but we're forcing security
+        let asset = create_test_asset("SEC:BTC:XNAS", "USD");
+        asset_service.add_asset(asset);
+
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+        );
+
+        let new_activity = NewActivity {
+            id: Some("activity-1".to_string()),
+            account_id: "acc-1".to_string(),
+            asset_id: None,
+            symbol: Some("BTC".to_string()),
+            exchange_mic: Some("XNAS".to_string()),
+            asset_kind: Some("SECURITY".to_string()), // Explicit hint
+            asset_data_source: None,
+            asset_metadata: None,
+            activity_type: "BUY".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(dec!(100)),
+            unit_price: Some(dec!(50)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(5000)),
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+        };
+
+        let result = activity_service.create_activity(new_activity).await;
+        assert!(result.is_ok());
+
+        let created = result.unwrap();
+        assert_eq!(
+            created.asset_id,
+            Some("SEC:BTC:XNAS".to_string()),
+            "Explicit SECURITY hint should override crypto inference"
+        );
+    }
+
+    /// Test: Exchange MIC presence forces Security kind
+    #[tokio::test]
+    async fn test_infer_asset_kind_exchange_mic_forces_security() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "CAD");
+        account_service.add_account(account);
+
+        let asset = create_test_asset("SEC:ETH:XTSE", "CAD");
+        asset_service.add_asset(asset);
+
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+        );
+
+        // ETH would be inferred as crypto, but exchange_mic forces security
+        let new_activity = NewActivity {
+            id: Some("activity-1".to_string()),
+            account_id: "acc-1".to_string(),
+            asset_id: None,
+            symbol: Some("ETH".to_string()),
+            exchange_mic: Some("XTSE".to_string()), // Has exchange = security
+            asset_kind: None,
+            asset_data_source: None,
+            asset_metadata: None,
+            activity_type: "BUY".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(dec!(100)),
+            unit_price: Some(dec!(30)),
+            currency: "CAD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(3000)),
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+        };
+
+        let result = activity_service.create_activity(new_activity).await;
+        assert!(result.is_ok());
+
+        let created = result.unwrap();
+        assert_eq!(
+            created.asset_id,
+            Some("SEC:ETH:XTSE".to_string()),
+            "Exchange MIC should force security kind"
+        );
+    }
+
+    /// Test: All cash activity types generate CASH:{currency} asset_id
+    #[tokio::test]
+    async fn test_all_cash_activity_types_no_asset() {
+        let cash_types = [
+            "DEPOSIT",
+            "WITHDRAWAL",
+            "INTEREST",
+            "TAX",
+            "FEE",
+            "TRANSFER_IN",
+            "TRANSFER_OUT",
+        ];
+
+        for activity_type in cash_types {
+            let account_service = Arc::new(MockAccountService::new());
+            let asset_service = Arc::new(MockAssetService::new());
+            let fx_service = Arc::new(MockFxService::new());
+            let activity_repository = Arc::new(MockActivityRepository::new());
+
+            let account = create_test_account("acc-1", "USD");
+            account_service.add_account(account);
+
+            // Cash asset should be created
+            let cash_asset = create_test_asset("CASH:USD", "USD");
+            asset_service.add_asset(cash_asset);
+
+            let activity_service = ActivityService::new(
+                activity_repository.clone(),
+                account_service,
+                asset_service,
+                fx_service,
+            );
+
+            let new_activity = NewActivity {
+                id: Some(format!("activity-{}", activity_type)),
+                account_id: "acc-1".to_string(),
+                asset_id: None,
+                symbol: None,
+                exchange_mic: None,
+                asset_kind: None,
+                asset_data_source: None,
+                asset_metadata: None,
+                activity_type: activity_type.to_string(),
+                subtype: None,
+                activity_date: "2024-01-15".to_string(),
+                quantity: None,
+                unit_price: None,
+                currency: "USD".to_string(),
+                fee: Some(dec!(0)),
+                amount: Some(dec!(100)),
+                status: None,
+                notes: None,
+                fx_rate: None,
+                metadata: None,
+                needs_review: None,
+                source_system: None,
+                source_record_id: None,
+                source_group_id: None,
+            };
+
+            let result = activity_service.create_activity(new_activity).await;
+            assert!(
+                result.is_ok(),
+                "{} should succeed without asset_id",
+                activity_type
+            );
+
+            let created = result.unwrap();
+            assert_eq!(
+                created.asset_id,
+                Some("CASH:USD".to_string()),
+                "{} should generate CASH:USD asset_id",
+                activity_type
+            );
+        }
+    }
+
     /// Test: Bulk mutation also registers FX pairs correctly
     #[tokio::test]
     async fn test_bulk_mutate_registers_fx_pair_for_asset_currency() {
@@ -703,6 +1386,9 @@ mod tests {
                 id: Some("activity-1".to_string()),
                 account_id: "acc-1".to_string(),
                 asset_id: Some("NESN".to_string()),
+                symbol: None,
+                exchange_mic: None,
+                asset_kind: None,
                 asset_data_source: None,
                 asset_metadata: None,
                 activity_type: "BUY".to_string(),

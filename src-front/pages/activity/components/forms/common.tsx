@@ -218,6 +218,10 @@ export function AssetSymbolInput({
 
   const handleTickerSelect = (symbol: string, quoteSummary?: QuoteSummary) => {
     field.onChange(symbol);
+    // Capture exchangeMic from search result for canonical asset ID generation
+    if (quoteSummary?.exchangeMic) {
+      setValue("exchangeMic", quoteSummary.exchangeMic);
+    }
     // If the selected ticker is a custom/manual entry, automatically enable skip lookup
     if (quoteSummary?.dataSource === DataSource.MANUAL) {
       setValue("assetDataSource", DataSource.MANUAL);

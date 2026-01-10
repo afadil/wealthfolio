@@ -16,6 +16,8 @@ export interface SymbolSearchResult {
   shortName?: string;
   longName?: string;
   exchange?: string;
+  /** Canonical exchange MIC code (e.g., "XNAS", "XTSE") */
+  exchangeMic?: string;
   score: number;
   dataSource?: string;
 }
@@ -68,7 +70,8 @@ export type CellOpts =
   | {
       variant: "symbol";
       onSearch: (query: string) => Promise<SymbolSearchResult[]>;
-      onSelect?: (symbol: string, result?: SymbolSearchResult) => void;
+      /** Called when a symbol is selected. Receives rowIndex, symbol, and full result */
+      onSelect?: (rowIndex: number, symbol: string, result?: SymbolSearchResult) => void;
     }
   | {
       variant: "currency";

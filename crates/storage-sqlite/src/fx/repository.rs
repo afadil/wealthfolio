@@ -480,14 +480,6 @@ impl FxRepository {
                     None
                 };
 
-                // Build metadata with legacy classification
-                let metadata = serde_json::json!({
-                    "legacy": {
-                        "asset_class": "Cash",
-                        "asset_sub_class": "Cash"
-                    }
-                }).to_string();
-
                 let asset_db = AssetDB {
                     id: asset_id,
                     symbol: from_owned.clone(), // Base currency only (EUR)
@@ -497,7 +489,7 @@ impl FxRepository {
                     preferred_provider: Some(source_owned.to_string()),
                     provider_overrides,
                     notes: Some(notes),
-                    metadata: Some(metadata.clone()),
+                    metadata: None,
                     currency: to_owned.to_string(), // Quote currency (USD)
                     created_at: now_rfc3339.clone(),
                     updated_at: now_rfc3339.clone(),

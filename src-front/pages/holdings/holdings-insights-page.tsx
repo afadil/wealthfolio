@@ -85,12 +85,10 @@ export const HoldingsInsightsPage = () => {
       case "class":
         filteredHoldings = holdings.filter((h) => {
           const isCash = h.holdingType === HoldingType.CASH;
-          // Check taxonomy assetType first, fall back to legacy assetSubclass
+          // Use taxonomy assetType classification
           const assetType = isCash
             ? "Cash"
-            : h.instrument?.classifications?.assetType?.name ??
-              h.instrument?.assetSubclass ??
-              "Other";
+            : h.instrument?.classifications?.assetType?.name ?? "Other";
           return assetType === sheetFilterName;
         });
         break;
@@ -121,10 +119,9 @@ export const HoldingsInsightsPage = () => {
         if (sheetCompositionFilter) {
           filteredHoldings = holdings.filter((h) => h.instrument?.id === sheetCompositionFilter);
         } else if (sheetFilterName) {
+          // Use taxonomy classifications for filtering
           filteredHoldings = holdings.filter(
-            (h) =>
-              h.instrument?.assetSubclass === sheetFilterName ||
-              h.instrument?.assetClass === sheetFilterName,
+            (h) => h.instrument?.classifications?.assetType?.name === sheetFilterName,
           );
         }
         break;

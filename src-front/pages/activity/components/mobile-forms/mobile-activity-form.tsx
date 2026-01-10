@@ -86,14 +86,21 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
       const { showCurrencySelect: _showCurrencySelect, id, ...submitData } = data;
       const account = accounts.find((a) => a.value === submitData.accountId);
 
-      // For cash activities and fees, set assetId to $CASH-accountCurrency
+      // For cash activities (DEPOSIT, WITHDRAWAL, INTEREST, FEE, TAX, TRANSFER_IN, TRANSFER_OUT):
+      // Don't send assetId - backend will generate CASH:{currency} from account currency
+      // Just ensure currency is set for the backend to use
       if (
         ["DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE", "TAX", "TRANSFER_IN", "TRANSFER_OUT"].includes(
           submitData.activityType,
         )
       ) {
-        if (account) {
-          submitData.assetId = `$CASH-${account.currency}`;
+        // Clear assetId - let backend generate it
+        if ("assetId" in submitData) {
+          delete (submitData as Record<string, unknown>).assetId;
+        }
+        // Ensure currency is set for backend to derive cash asset
+        if (account && !submitData.currency) {
+          submitData.currency = account.currency;
         }
       }
 

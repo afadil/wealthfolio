@@ -12,6 +12,7 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { QuoteSummary } from "@/lib/types";
+import { getExchangeDisplayName } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -242,7 +243,9 @@ export function BenchmarkSymbolSelector({
                           </span>
                         </div>
                         {ticker.exchange && (
-                          <span className="text-muted-foreground text-xs">{ticker.exchange}</span>
+                          <span className="text-muted-foreground text-xs">
+                            {ticker.exchangeName || getExchangeDisplayName(ticker.exchange)}
+                          </span>
                         )}
                       </div>
                       <Icons.Check

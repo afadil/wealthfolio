@@ -77,6 +77,35 @@ impl AssetRepository {
 
         Ok(results.into_iter().map(Asset::from).collect())
     }
+
+    /// Search for assets by symbol (case-insensitive partial match).
+    pub fn search_by_symbol_impl(&self, query: &str) -> Result<Vec<Asset>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        // Use LIKE for case-insensitive partial matching
+        let pattern = format!("%{}%", query.to_uppercase());
+
+        let results = assets::table
+            .select(AssetDB::as_select())
+            .filter(
+                diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
+                    "UPPER(symbol) LIKE '{}'",
+                    pattern.replace('\'', "''")
+                ))
+            )
+            .or_filter(
+                diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
+                    "UPPER(name) LIKE '{}'",
+                    pattern.replace('\'', "''")
+                ))
+            )
+            .order(assets::symbol.asc())
+            .limit(50) // Limit results to avoid huge result sets
+            .load::<AssetDB>(&mut conn)
+            .map_err(StorageError::from)?;
+
+        Ok(results.into_iter().map(Asset::from).collect())
+    }
 }
 
 #[async_trait]
@@ -233,5 +262,9 @@ impl AssetRepositoryTrait for AssetRepository {
                 Ok(())
             })
             .await
+    }
+
+    fn search_by_symbol(&self, query: &str) -> Result<Vec<Asset>> {
+        self.search_by_symbol_impl(query)
     }
 }

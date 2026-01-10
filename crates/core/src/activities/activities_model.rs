@@ -182,7 +182,14 @@ impl Activity {
 pub struct NewActivity {
     pub id: Option<String>,
     pub account_id: String,
-    pub asset_id: Option<String>, // NOW OPTIONAL - NULL for pure cash movements
+
+    // Asset identification - prefer symbol + exchange_mic for new activities
+    // Backend will generate canonical asset_id from these fields
+    pub asset_id: Option<String>, // Optional - can be provided for backward compatibility
+    pub symbol: Option<String>,   // Symbol (e.g., "AAPL", "BTC")
+    pub exchange_mic: Option<String>, // Exchange MIC code (e.g., "XNAS", "XTSE") for securities
+    pub asset_kind: Option<String>, // Asset kind hint (e.g., "SECURITY", "CRYPTO") - if not provided, inferred
+
     pub asset_data_source: Option<String>,
     pub asset_metadata: Option<AssetMetadata>, // Optional asset hints for inline creation
     pub activity_type: String,
@@ -238,7 +245,14 @@ impl NewActivity {
 pub struct ActivityUpdate {
     pub id: String,
     pub account_id: String,
-    pub asset_id: Option<String>, // NOW OPTIONAL - NULL for pure cash movements
+
+    // Asset identification - prefer symbol + exchange_mic for new activities
+    // Backend will generate canonical asset_id from these fields
+    pub asset_id: Option<String>, // Optional - can be provided for backward compatibility
+    pub symbol: Option<String>,   // Symbol (e.g., "AAPL", "BTC")
+    pub exchange_mic: Option<String>, // Exchange MIC code (e.g., "XNAS", "XTSE") for securities
+    pub asset_kind: Option<String>, // Asset kind hint (e.g., "SECURITY", "CRYPTO") - if not provided, inferred
+
     pub asset_data_source: Option<String>,
     pub activity_type: String,
     pub subtype: Option<String>, // Semantic variation (DRIP, STAKING_REWARD, etc.)

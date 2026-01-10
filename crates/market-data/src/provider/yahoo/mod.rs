@@ -299,11 +299,10 @@ impl YahooProvider {
             .and_then(|r| r.price.as_ref())
             .ok_or_else(|| MarketDataError::SymbolNotFound(symbol.to_string()))?;
 
-        // Extract currency: API response > suffix mapping > context hint
+        // Extract currency: API response > context hint (derived from MIC)
         let currency = price
             .currency
             .clone()
-            .or_else(|| get_currency_for_suffix(symbol).map(String::from))
             .unwrap_or_else(|| self.get_currency(context));
 
         let close = price
@@ -423,8 +422,6 @@ impl YahooProvider {
             .find(|q| q.symbol == symbol)
             .ok_or_else(|| MarketDataError::SymbolNotFound(symbol.to_string()))?;
 
-        let (asset_class, asset_sub_class) = parse_asset_class(&item.quote_type, &item.short_name);
-
         Ok(AssetProfile {
             source: Some("YAHOO".to_string()),
             name: Some(format_name(
@@ -433,8 +430,7 @@ impl YahooProvider {
                 Some(&item.short_name),
                 symbol,
             )),
-            asset_class: Some(asset_class),
-            asset_sub_class: Some(asset_sub_class),
+            quote_type: Some(item.quote_type.to_uppercase()),
             ..Default::default()
         })
     }
@@ -449,18 +445,11 @@ impl YahooProvider {
         let summary = result.summary_profile.as_ref();
         let detail = result.summary_detail.as_ref();
 
-        // Get quote type for asset class parsing
+        // Get quote type for name formatting
         let quote_type = price
             .and_then(|p| p.quote_type.as_ref())
             .map(|s| s.as_str())
             .unwrap_or("");
-
-        let short_name = price
-            .and_then(|p| p.short_name.as_ref())
-            .map(|s| s.as_str())
-            .unwrap_or("");
-
-        let (asset_class, asset_sub_class) = parse_asset_class(quote_type, short_name);
 
         // Format name
         let name = format_name(
@@ -478,6 +467,9 @@ impl YahooProvider {
         Ok(AssetProfile {
             source: Some("YAHOO".to_string()),
             name: Some(name),
+            quote_type: price
+                .and_then(|p| p.quote_type.clone())
+                .map(|t| t.to_uppercase()),
             sector,
             industry: summary.and_then(|s| s.industry.clone()),
             website: summary.and_then(|s| s.website.clone()),
@@ -485,8 +477,6 @@ impl YahooProvider {
                 .and_then(|s| s.long_business_summary.clone().or(s.description.clone())),
             country: summary.and_then(|s| s.country.clone()),
             employees: summary.and_then(|s| s.full_time_employees),
-            asset_class: Some(asset_class),
-            asset_sub_class: Some(asset_sub_class),
             // Financial metrics from summaryDetail
             market_cap: detail.and_then(|d| d.market_cap),
             pe_ratio: detail.and_then(|d| d.trailing_pe),
@@ -684,101 +674,6 @@ impl MarketDataProvider for YahooProvider {
 // Helper Functions
 // ============================================================================
 
-/// Get currency for a Yahoo Finance symbol based on its exchange suffix.
-/// Used as fallback when the API doesn't return currency information.
-fn get_currency_for_suffix(symbol: &str) -> Option<&'static str> {
-    if !symbol.contains('.') {
-        return None;
-    }
-
-    let suffix = symbol.rsplit('.').next()?;
-
-    match suffix.to_uppercase().as_str() {
-        // European exchanges
-        "L" | "IL" => Some("GBP"),                                             // London
-        "PA" => Some("EUR"),                                                   // Paris
-        "AS" => Some("EUR"),                                                   // Amsterdam
-        "BR" => Some("EUR"),                                                   // Brussels
-        "DE" | "F" | "BE" | "DU" | "HM" | "HA" | "MU" | "SG" => Some("EUR"),   // German
-        "MI" => Some("EUR"),                                                   // Milan
-        "MC" => Some("EUR"),                                                   // Madrid
-        "LS" => Some("EUR"),                                                   // Lisbon
-        "VI" => Some("EUR"),                                                   // Vienna
-        "HE" => Some("EUR"),                                                   // Helsinki
-        "IR" => Some("EUR"),                                                   // Dublin
-        "AT" => Some("EUR"),                                                   // Athens
-        "SW" => Some("CHF"),                                                   // Swiss
-        "OL" => Some("NOK"),                                                   // Oslo
-        "ST" => Some("SEK"),                                                   // Stockholm
-        "CO" => Some("DKK"),                                                   // Copenhagen
-        "IC" => Some("ISK"),                                                   // Iceland
-
-        // Americas
-        "TO" | "V" | "CN" | "NE" => Some("CAD"), // Canadian
-        "MX" => Some("MXN"),                     // Mexico
-        "SA" => Some("BRL"),                     // Brazil
-        "BA" => Some("ARS"),                     // Argentina
-        "SN" => Some("CLP"),                     // Chile
-
-        // Asia-Pacific
-        "AX" => Some("AUD"),         // Australia
-        "NZ" => Some("NZD"),         // New Zealand
-        "HK" => Some("HKD"),         // Hong Kong
-        "SS" | "SZ" => Some("CNY"),  // China
-        "T" | "TYO" => Some("JPY"),  // Japan
-        "KS" | "KQ" => Some("KRW"),  // Korea
-        "TW" | "TWO" => Some("TWD"), // Taiwan
-        "SI" => Some("SGD"),         // Singapore
-        "BK" => Some("THB"),         // Thailand
-        "JK" => Some("IDR"),         // Indonesia
-        "KL" => Some("MYR"),         // Malaysia
-        "BO" | "NS" => Some("INR"),  // India
-
-        // Middle East & Africa
-        "TA" => Some("ILS"),  // Israel
-        "CA" => Some("EGP"),  // Egypt
-        "SAU" => Some("SAR"), // Saudi Arabia
-        "QA" => Some("QAR"),  // Qatar
-        "AE" => Some("AED"),  // UAE
-
-        // Other
-        "IS" => Some("TRY"), // Turkey
-        "PR" => Some("CZK"), // Prague
-        "WA" => Some("PLN"), // Warsaw
-        "BD" => Some("HUF"), // Budapest
-
-        _ => None,
-    }
-}
-
-/// Parse Yahoo quote_type into asset class and sub-class.
-fn parse_asset_class(quote_type: &str, short_name: &str) -> (String, String) {
-    let qt = quote_type.to_lowercase();
-    let sn = short_name.to_lowercase();
-
-    match qt.as_str() {
-        "cryptocurrency" => ("Cryptocurrency".to_string(), "Cryptocurrency".to_string()),
-        "equity" => ("Equity".to_string(), "Stock".to_string()),
-        "etf" => ("Equity".to_string(), "ETF".to_string()),
-        "mutualfund" => ("Equity".to_string(), "Mutual Fund".to_string()),
-        "future" => {
-            let sub = if sn.starts_with("gold")
-                || sn.starts_with("silver")
-                || sn.starts_with("platinum")
-                || sn.starts_with("palladium")
-            {
-                "Precious Metal"
-            } else {
-                "Commodity"
-            };
-            ("Commodity".to_string(), sub.to_string())
-        }
-        "index" => ("Index".to_string(), "Index".to_string()),
-        "currency" => ("Currency".to_string(), "FX".to_string()),
-        _ => ("Alternative".to_string(), "Alternative".to_string()),
-    }
-}
-
 /// Clean up fund names by removing common prefixes.
 fn format_name(
     long_name: Option<&str>,
@@ -850,40 +745,6 @@ mod tests {
     use super::*;
     use std::borrow::Cow;
     use std::sync::Arc;
-
-    #[test]
-    fn test_get_currency_for_suffix() {
-        assert_eq!(get_currency_for_suffix("SHOP.TO"), Some("CAD"));
-        assert_eq!(get_currency_for_suffix("VOD.L"), Some("GBP"));
-        assert_eq!(get_currency_for_suffix("SAP.DE"), Some("EUR"));
-        assert_eq!(get_currency_for_suffix("7203.T"), Some("JPY"));
-        assert_eq!(get_currency_for_suffix("AAPL"), None); // No suffix
-        assert_eq!(get_currency_for_suffix("BTC-USD"), None); // Crypto format
-    }
-
-    #[test]
-    fn test_parse_asset_class() {
-        assert_eq!(
-            parse_asset_class("EQUITY", "Apple Inc."),
-            ("Equity".to_string(), "Stock".to_string())
-        );
-        assert_eq!(
-            parse_asset_class("ETF", "SPDR S&P 500"),
-            ("Equity".to_string(), "ETF".to_string())
-        );
-        assert_eq!(
-            parse_asset_class("CRYPTOCURRENCY", "Bitcoin"),
-            ("Cryptocurrency".to_string(), "Cryptocurrency".to_string())
-        );
-        assert_eq!(
-            parse_asset_class("FUTURE", "Gold Aug 2024"),
-            ("Commodity".to_string(), "Precious Metal".to_string())
-        );
-        assert_eq!(
-            parse_asset_class("FUTURE", "Crude Oil Sep 2024"),
-            ("Commodity".to_string(), "Commodity".to_string())
-        );
-    }
 
     #[test]
     fn test_format_name() {

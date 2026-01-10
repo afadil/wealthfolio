@@ -57,7 +57,7 @@ export function AssetsTableMobile({
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDataSources, setSelectedDataSources] = useState<string[]>([]);
-  const [selectedAssetSubClasses, setSelectedAssetSubClasses] = useState<string[]>([]);
+  const [selectedAssetKinds, setSelectedAssetKinds] = useState<string[]>([]);
   const [selectedPriceStatus, setSelectedPriceStatus] = useState<string[]>([]);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
 
@@ -84,12 +84,12 @@ export function AssetsTableMobile({
     return Array.from(sources);
   }, [assets]);
 
-  // Get unique asset sub classes
-  const assetSubClassOptions = useMemo(() => {
-    const subClasses = new Set(
-      assets.map((asset) => asset.assetSubClass).filter((c): c is string => !!c),
+  // Get unique asset kinds
+  const assetKindOptions = useMemo(() => {
+    const kinds = new Set(
+      assets.map((asset) => asset.kind).filter((k) => !!k),
     );
-    return Array.from(subClasses).sort();
+    return Array.from(kinds).sort();
   }, [assets]);
 
   const filteredAssets = useMemo(() => {
@@ -99,7 +99,7 @@ export function AssetsTableMobile({
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter((asset) =>
-        [asset.symbol, asset.name ?? "", asset.assetClass ?? "", asset.assetSubClass ?? ""].some(
+        [asset.symbol, asset.name ?? "", asset.kind ?? ""].some(
           (value) => value.toLowerCase().includes(query),
         ),
       );
@@ -112,10 +112,10 @@ export function AssetsTableMobile({
       );
     }
 
-    // Filter by asset sub class
-    if (selectedAssetSubClasses.length > 0) {
+    // Filter by asset kind
+    if (selectedAssetKinds.length > 0) {
       filtered = filtered.filter(
-        (asset) => asset.assetSubClass && selectedAssetSubClasses.includes(asset.assetSubClass),
+        (asset) => asset.kind && selectedAssetKinds.includes(asset.kind),
       );
     }
 
@@ -136,19 +136,19 @@ export function AssetsTableMobile({
     assets,
     searchQuery,
     selectedDataSources,
-    selectedAssetSubClasses,
+    selectedAssetKinds,
     selectedPriceStatus,
     latestQuotes,
   ]);
 
   const hasActiveFilters =
     selectedDataSources.length > 0 ||
-    selectedAssetSubClasses.length > 0 ||
+    selectedAssetKinds.length > 0 ||
     selectedPriceStatus.length > 0;
 
   const handleResetFilters = () => {
     setSelectedDataSources([]);
-    setSelectedAssetSubClasses([]);
+    setSelectedAssetKinds([]);
     setSelectedPriceStatus([]);
   };
 
@@ -266,8 +266,7 @@ export function AssetsTableMobile({
               <Badge variant="secondary" className="uppercase">
                 {asset.currency}
               </Badge>
-              {asset.assetClass ? <Badge variant="outline">{asset.assetClass}</Badge> : null}
-              {asset.assetSubClass ? <Badge variant="outline">{asset.assetSubClass}</Badge> : null}
+              {asset.kind ? <Badge variant="outline">{asset.kind}</Badge> : null}
               <Badge variant="secondary" className="uppercase">
                 {asset.preferredProvider ?? "MANUAL"}
               </Badge>
@@ -376,34 +375,34 @@ export function AssetsTableMobile({
 
               <Separator />
 
-              {/* Asset Class Filter */}
+              {/* Asset Kind Filter */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
-                    Asset Class
+                    Asset Kind
                   </h4>
-                  {selectedAssetSubClasses.length > 0 && (
+                  {selectedAssetKinds.length > 0 && (
                     <Button
                       variant="ghost"
                       size="sm"
                       className="h-auto p-0 text-xs"
-                      onClick={() => setSelectedAssetSubClasses([])}
+                      onClick={() => setSelectedAssetKinds([])}
                     >
                       Clear
                     </Button>
                   )}
                 </div>
                 <div className="space-y-2">
-                  {assetSubClassOptions.map((subClass) => {
-                    const isSelected = selectedAssetSubClasses.includes(subClass);
-                    const count = assets.filter((a) => a.assetSubClass === subClass).length;
+                  {assetKindOptions.map((kind) => {
+                    const isSelected = selectedAssetKinds.includes(kind);
+                    const count = assets.filter((a) => a.kind === kind).length;
                     return (
                       <button
-                        key={subClass}
+                        key={kind}
                         type="button"
                         onClick={() => {
-                          setSelectedAssetSubClasses((prev) =>
-                            isSelected ? prev.filter((s) => s !== subClass) : [...prev, subClass],
+                          setSelectedAssetKinds((prev) =>
+                            isSelected ? prev.filter((s) => s !== kind) : [...prev, kind],
                           );
                         }}
                         className={cn(
@@ -424,7 +423,7 @@ export function AssetsTableMobile({
                           >
                             {isSelected && <Icons.Check className="text-secondary h-3 w-3" />}
                           </div>
-                          <span className="font-medium uppercase">{subClass}</span>
+                          <span className="font-medium uppercase">{kind}</span>
                         </div>
                         <Badge variant="secondary" className="ml-auto">
                           {count}

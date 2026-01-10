@@ -3,7 +3,7 @@ import { useSettingsContext } from "@/lib/settings-provider";
 import type { Account, ActivityDetails } from "@/lib/types";
 import { useAssets } from "@/pages/asset/hooks/use-assets";
 import type { SortingState, Updater } from "@tanstack/react-table";
-import { DataGrid, useDataGrid } from "@wealthfolio/ui";
+import { DataGrid, useDataGrid, type SymbolSearchResult } from "@wealthfolio/ui";
 import { useCallback, useMemo } from "react";
 import { ActivityDataGridPagination } from "./activity-data-grid-pagination";
 import { ActivityDataGridToolbar } from "./activity-data-grid-toolbar";
@@ -144,12 +144,31 @@ export function ActivityDataGrid({
     [markForDeletion],
   );
 
+  // Handle symbol selection to capture exchangeMic from search result
+  const handleSymbolSelect = useCallback(
+    (rowIndex: number, result: SymbolSearchResult) => {
+      setLocalTransactions((prev) => {
+        const updated = [...prev];
+        if (updated[rowIndex]) {
+          updated[rowIndex] = {
+            ...updated[rowIndex],
+            exchangeMic: result.exchangeMic,
+            assetDataSource: result.dataSource as ActivityDetails["assetDataSource"],
+          };
+        }
+        return updated;
+      });
+    },
+    [setLocalTransactions],
+  );
+
   // Column definitions
   const columns = useActivityColumns({
     accounts,
     onEditActivity,
     onDuplicate: handleDuplicate,
     onDelete: handleDelete,
+    onSymbolSelect: handleSymbolSelect,
   });
 
   // Data change handler - processes changes from the data grid

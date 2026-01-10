@@ -132,6 +132,69 @@ impl AssetKind {
         }
     }
 
+    /// Returns the ID prefix for canonical asset ID format.
+    ///
+    /// All asset IDs use typed prefixes: `{PREFIX}:{symbol}:{qualifier}`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use wealthfolio_core::assets::AssetKind;
+    ///
+    /// assert_eq!(AssetKind::Security.id_prefix(), "SEC");
+    /// assert_eq!(AssetKind::Crypto.id_prefix(), "CRYPTO");
+    /// assert_eq!(AssetKind::Cash.id_prefix(), "CASH");
+    /// ```
+    pub const fn id_prefix(&self) -> &'static str {
+        match self {
+            AssetKind::Security => "SEC",
+            AssetKind::Crypto => "CRYPTO",
+            AssetKind::Cash => "CASH",
+            AssetKind::FxRate => "FX",
+            AssetKind::Option => "OPT",
+            AssetKind::Commodity => "CMDTY",
+            AssetKind::PrivateEquity => "PEQ",
+            AssetKind::Property => "PROP",
+            AssetKind::Vehicle => "VEH",
+            AssetKind::Collectible => "COLL",
+            AssetKind::PhysicalPrecious => "PREC",
+            AssetKind::Liability => "LIAB",
+            AssetKind::Other => "ALT",
+        }
+    }
+
+    /// Parses an asset kind from an ID prefix.
+    ///
+    /// Returns `None` if the prefix is not recognized.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use wealthfolio_core::assets::AssetKind;
+    ///
+    /// assert_eq!(AssetKind::from_id_prefix("SEC"), Some(AssetKind::Security));
+    /// assert_eq!(AssetKind::from_id_prefix("CRYPTO"), Some(AssetKind::Crypto));
+    /// assert_eq!(AssetKind::from_id_prefix("INVALID"), None);
+    /// ```
+    pub fn from_id_prefix(prefix: &str) -> Option<Self> {
+        match prefix {
+            "SEC" => Some(AssetKind::Security),
+            "CRYPTO" => Some(AssetKind::Crypto),
+            "CASH" => Some(AssetKind::Cash),
+            "FX" => Some(AssetKind::FxRate),
+            "OPT" => Some(AssetKind::Option),
+            "CMDTY" => Some(AssetKind::Commodity),
+            "PEQ" => Some(AssetKind::PrivateEquity),
+            "PROP" => Some(AssetKind::Property),
+            "VEH" => Some(AssetKind::Vehicle),
+            "COLL" => Some(AssetKind::Collectible),
+            "PREC" => Some(AssetKind::PhysicalPrecious),
+            "LIAB" => Some(AssetKind::Liability),
+            "ALT" => Some(AssetKind::Other),
+            _ => None,
+        }
+    }
+
     /// Check if this asset kind is an alternative asset (Property, Vehicle, Collectible, etc.)
     /// Alternative assets are excluded from TWR/IRR performance calculations.
     pub fn is_alternative(&self) -> bool {
@@ -286,8 +349,6 @@ pub struct ProviderProfile {
     pub asset_type: Option<String>,
     pub symbol: String,
     pub quote_symbol: Option<String>, // Symbol for quote fetching (replaces symbol_mapping)
-    pub asset_class: Option<String>,
-    pub asset_sub_class: Option<String>,
     pub notes: Option<String>,
     pub countries: Option<String>,
     pub categories: Option<String>,
@@ -440,12 +501,6 @@ impl From<ProviderProfile> for NewAsset {
             let mut legacy = serde_json::Map::new();
             if let Some(ref isin) = profile.isin {
                 legacy.insert("isin".to_string(), serde_json::Value::String(isin.clone()));
-            }
-            if let Some(ref ac) = profile.asset_class {
-                legacy.insert("asset_class".to_string(), serde_json::Value::String(ac.clone()));
-            }
-            if let Some(ref asc) = profile.asset_sub_class {
-                legacy.insert("asset_sub_class".to_string(), serde_json::Value::String(asc.clone()));
             }
             if let Some(ref s) = profile.sectors {
                 legacy.insert("sectors".to_string(), serde_json::Value::String(s.clone()));

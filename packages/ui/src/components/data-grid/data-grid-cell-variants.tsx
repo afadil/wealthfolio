@@ -2423,7 +2423,7 @@ export function SymbolCell<TData>({
       const normalized = symbol.trim().toUpperCase();
       setValue(normalized);
       tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: normalized });
-      onSelectCallback?.(normalized, result);
+      onSelectCallback?.(rowIndex, normalized, result);
       setSearchQuery("");
       setOptions([]);
       tableMeta?.onCellEditingStop?.();

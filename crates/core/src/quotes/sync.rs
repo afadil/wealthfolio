@@ -32,7 +32,7 @@ use super::constants::*;
 use super::store::QuoteStore;
 use super::sync_state::{QuoteSyncState, SyncCategory, SyncStateStore, SymbolSyncPlan};
 use super::types::{AssetId, Day, ProviderId};
-use crate::assets::{Asset, AssetKind, AssetRepositoryTrait, PricingMode};
+use crate::assets::{is_cash_asset_id, is_fx_asset_id, Asset, AssetKind, AssetRepositoryTrait, PricingMode};
 use crate::errors::Result;
 
 // =============================================================================
@@ -231,18 +231,13 @@ where
 
     /// Check if an asset should be synced.
     fn should_sync_asset(&self, asset: &Asset) -> bool {
-        // Skip cash assets
-        if asset.kind == AssetKind::Cash {
+        // Skip cash and FX assets - they don't need quote syncing
+        if asset.kind == AssetKind::Cash || asset.kind == AssetKind::FxRate {
             return false;
         }
 
-        // Skip manual pricing mode
-        if asset.pricing_mode == PricingMode::Manual {
-            return false;
-        }
-
-        // Skip assets with no pricing needed
-        if asset.pricing_mode == PricingMode::None {
+        // Only sync market-priced assets
+        if asset.pricing_mode != PricingMode::Market {
             return false;
         }
 
@@ -670,7 +665,8 @@ where
     async fn handle_activity_created(&self, asset_id: &AssetId, activity_date: Day) -> Result<()> {
         let symbol = asset_id.as_str();
 
-        if symbol.is_empty() || symbol.starts_with("$CASH") {
+        // Skip assets that don't need quote syncing (cash, FX)
+        if symbol.is_empty() || is_cash_asset_id(symbol) || is_fx_asset_id(symbol) {
             return Ok(());
         }
 
@@ -707,9 +703,9 @@ where
 
             self.sync_state_store.upsert(&state).await?;
         } else {
-            // Check if asset should be synced
+            // Check if asset should be synced (only market-priced assets)
             if let Ok(asset) = self.asset_repo.get_by_id(symbol) {
-                if asset.pricing_mode == PricingMode::Manual {
+                if asset.pricing_mode != PricingMode::Market {
                     return Ok(());
                 }
 
@@ -734,7 +730,8 @@ where
     async fn handle_activity_deleted(&self, asset_id: &AssetId) -> Result<()> {
         let symbol = asset_id.as_str();
 
-        if symbol.is_empty() || symbol.starts_with("$CASH") {
+        // Skip assets that don't need quote syncing (cash, FX)
+        if symbol.is_empty() || is_cash_asset_id(symbol) || is_fx_asset_id(symbol) {
             return Ok(());
         }
 

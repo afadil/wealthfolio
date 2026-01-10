@@ -473,12 +473,10 @@ impl FinnhubProvider {
             )));
         }
 
-        // Determine asset class/sub-class (Finnhub mainly provides stocks)
-        let (asset_class, asset_sub_class) = ("Equity".to_string(), "Stock".to_string());
-
         Ok(AssetProfile {
             source: Some(PROVIDER_ID.to_string()),
             name: response.name,
+            quote_type: Some("EQUITY".to_string()), // Finnhub only supports equities
             sector: response.finnhub_industry.clone(),
             industry: response.finnhub_industry,
             website: response.weburl,
@@ -486,8 +484,6 @@ impl FinnhubProvider {
             country: response.country,
             employees: response.employee_total.map(|e| e as u64),
             logo_url: response.logo,
-            asset_class: Some(asset_class),
-            asset_sub_class: Some(asset_sub_class),
             market_cap: response.market_capitalization.map(|mc| mc * 1_000_000.0), // Finnhub returns in millions
             pe_ratio: None, // Not available in profile endpoint
             dividend_yield: None,
@@ -665,7 +661,7 @@ mod tests {
         let caps = provider.capabilities();
         assert!(caps.instrument_kinds.contains(&InstrumentKind::Equity));
         assert!(caps.supports_latest);
-        assert!(caps.supports_historical);
+        assert!(!caps.supports_historical); // Historical candles require premium subscription
         assert!(caps.supports_search);
         assert!(caps.supports_profile);
     }

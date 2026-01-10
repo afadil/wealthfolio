@@ -663,3 +663,43 @@ export const HOLDING_GROUP_ORDER: Record<string, number> = {
   Liabilities: 7,
   Cash: 8,
 };
+
+// =============================================================================
+// Exchange Mapping (Fallback)
+// =============================================================================
+
+/**
+ * Fallback display names for exchange codes not enriched by backend.
+ *
+ * The backend enriches search results with exchangeName via mic_to_exchange_name().
+ * This mapping only handles special cases where the backend doesn't provide a name.
+ *
+ * NOTE: Most Yahoo codes (NMS, TOR, etc.) and MIC codes (XNAS, XTSE, etc.) are
+ * handled by the backend. Only add entries here for truly special cases.
+ */
+export const EXCHANGE_DISPLAY_NAMES: Record<string, string> = {
+  // Special values not handled by backend
+  MANUAL: "Manual",
+  CCC: "Crypto",
+  CCY: "FX",
+  // OTC markets (may not have MIC mapping)
+  PNK: "OTC",
+  OTC: "OTC",
+  OTCQX: "OTCQX",
+  OTCQB: "OTCQB",
+};
+
+/**
+ * Get a friendly display name for an exchange code.
+ *
+ * This is a fallback - the backend should provide exchangeName in most cases.
+ * Falls back to the original code if no mapping exists.
+ *
+ * @param exchangeCode - Exchange code (typically from backend when exchangeName is missing)
+ * @returns Friendly display name or original code if not mapped
+ */
+export function getExchangeDisplayName(exchangeCode: string | undefined | null): string {
+  if (!exchangeCode) return "";
+  const upperCode = exchangeCode.toUpperCase();
+  return EXCHANGE_DISPLAY_NAMES[upperCode] ?? exchangeCode;
+}

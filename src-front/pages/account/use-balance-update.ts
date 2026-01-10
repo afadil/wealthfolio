@@ -31,11 +31,12 @@ export const useBalanceUpdate = (account?: AccountValuation | null) => {
     const activityType = difference > 0 ? "DEPOSIT" : "WITHDRAWAL";
     const amount = parseFloat(Math.abs(difference).toFixed(2));
 
+    // Don't set assetId - backend generates CASH:{currency} for cash activities
     const newActivity: ActivityCreate = {
       accountId: account.accountId,
       activityType,
       activityDate: new Date().toISOString(),
-      assetId: `$CASH-${account.accountCurrency}`,
+      // assetId omitted - backend generates CASH:{currency}
       currency: account.accountCurrency,
       amount: amount,
       comment: "Balance updated manually",

@@ -168,6 +168,7 @@ fn handle_resource_change(handle: AppHandle, payload_str: &str) {
 
 /// Handles asset enrichment requests for newly synced assets.
 /// Fetches additional profile data (sectors, countries, etc.) from market data providers.
+/// Uses quote_sync_state.profile_enriched_at to track which assets have been enriched.
 fn handle_assets_enrichment(handle: AppHandle, payload_str: &str) {
     match serde_json::from_str::<AssetsEnrichPayload>(payload_str) {
         Ok(payload) => {
@@ -193,10 +194,27 @@ fn handle_assets_enrichment(handle: AppHandle, payload_str: &str) {
 
             spawn(async move {
                 let asset_service = context.asset_service();
+                let quote_service = context.quote_service();
 
                 for asset_id in unique_ids {
-                    // Enrichment failures are expected for some assets, ignore silently
-                    let _ = asset_service.enrich_asset_profile(&asset_id).await;
+                    // Check sync state to see if enrichment is needed
+                    let needs_enrichment = match quote_service.get_sync_state(&asset_id) {
+                        Ok(Some(state)) => state.needs_profile_enrichment(),
+                        Ok(None) => true, // No sync state yet, try enrichment
+                        Err(_) => true,   // Error checking state, try enrichment
+                    };
+
+                    if !needs_enrichment {
+                        continue;
+                    }
+
+                    // Try to enrich the asset profile
+                    if asset_service.enrich_asset_profile(&asset_id).await.is_ok() {
+                        // Mark as enriched in sync state
+                        if let Err(e) = quote_service.mark_profile_enriched(&asset_id).await {
+                            warn!("Failed to mark profile enriched for {}: {}", asset_id, e);
+                        }
+                    }
                 }
             });
         }

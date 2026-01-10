@@ -37,6 +37,7 @@ use crate::quotes::Quote;
 use crate::secrets::SecretStore;
 
 use wealthfolio_market_data::{
+    mic_to_currency, mic_to_exchange_name, yahoo_exchange_to_mic, yahoo_suffix_to_mic,
     AlphaVantageProvider, AssetProfile as MarketAssetProfile, FinnhubProvider,
     MarketDataAppProvider, MetalPriceApiProvider, ProviderId, ProviderRegistry,
     Quote as MarketQuote, QuoteContext, ResolverChain, SearchResult as MarketSearchResult,
@@ -290,11 +291,16 @@ impl MarketDataClient {
             wealthfolio_market_data::ProviderOverrides::from_json(json).ok()
         });
 
-        // Currency hint from asset
+        // Currency hint: prefer asset.currency, fall back to MIC-derived currency
         let currency_hint: Option<Cow<'static, str>> = if !asset.currency.is_empty() {
             Some(Cow::Owned(asset.currency.clone()))
         } else {
-            None
+            // Derive currency from exchange MIC (single source of truth)
+            asset
+                .exchange_mic
+                .as_ref()
+                .and_then(|mic| mic_to_currency(mic))
+                .map(|c| Cow::Borrowed(c))
         };
 
         // Preferred provider from asset
@@ -465,14 +471,52 @@ impl MarketDataClient {
     }
 
     /// Convert a market-data SearchResult to core QuoteSummary.
+    ///
+    /// Enriches the result with canonical MIC codes and friendly exchange names:
+    /// 1. Try mapping from Yahoo's exchange code (e.g., "NMS" -> "XNAS")
+    /// 2. Try extracting MIC from symbol suffix (e.g., "SHOP.TO" -> "XTSE")
+    /// 3. Look up friendly exchange name from MIC
+    /// 4. Infer currency from MIC if not provided
     fn convert_search_result(result: MarketSearchResult) -> QuoteSummary {
+        // Try to determine MIC from Yahoo's exchange code first
+        let mut exchange_mic = yahoo_exchange_to_mic(&result.exchange)
+            .map(|mic| mic.to_string());
+
+        // If no MIC from exchange code, try extracting from symbol suffix
+        if exchange_mic.is_none() {
+            if let Some(dot_pos) = result.symbol.rfind('.') {
+                let suffix = &result.symbol[dot_pos + 1..];
+                exchange_mic = yahoo_suffix_to_mic(suffix).map(String::from);
+            }
+        }
+
+        // Get friendly exchange name from MIC
+        let exchange_name = exchange_mic
+            .as_ref()
+            .and_then(|mic| mic_to_exchange_name(mic))
+            .map(String::from);
+
+        // Infer currency from MIC if not provided
+        let currency = result.currency.or_else(|| {
+            exchange_mic
+                .as_ref()
+                .and_then(|mic| mic_to_currency(mic))
+                .map(String::from)
+        });
+
         QuoteSummary {
             symbol: result.symbol,
             short_name: result.name.clone(),
             long_name: result.name,
             exchange: result.exchange,
+            exchange_mic,
+            exchange_name,
             quote_type: result.asset_type,
             type_display: String::new(),
+            currency,
+            data_source: result.data_source.or_else(|| Some("YAHOO".to_string())),
+            is_existing: false,
+            existing_asset_id: None,
             index: String::new(),
             score: result.score.unwrap_or(0.0),
         }
@@ -529,14 +573,12 @@ impl MarketDataClient {
             id: Some(symbol.to_string()),
             isin: None,
             name: profile.name,
-            asset_type: profile.asset_class.clone(),
+            asset_type: profile.quote_type, // Maps to AssetKind during enrichment
             symbol: symbol.to_string(),
             quote_symbol: Some(symbol.to_string()),
             currency: String::new(),
             // Use provider source from profile, fallback to YAHOO for backwards compatibility
             data_source: profile.source.unwrap_or_else(|| "YAHOO".to_string()),
-            asset_class: profile.asset_class,
-            asset_sub_class: profile.asset_sub_class,
             notes: profile.description,
             countries: profile
                 .country

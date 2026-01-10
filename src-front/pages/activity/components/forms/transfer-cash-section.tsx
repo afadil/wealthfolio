@@ -130,6 +130,7 @@ export function TransferCashSection({ onSuccess }: TransferCashSectionProps) {
 
       if (data.isExternal) {
         // External transfer - single activity
+        // Don't set assetId - backend will generate CASH:{currency}
         const activityType = data.direction === "in"
           ? ActivityType.TRANSFER_IN
           : ActivityType.TRANSFER_OUT;
@@ -140,7 +141,7 @@ export function TransferCashSection({ onSuccess }: TransferCashSectionProps) {
           accountId: data.accountId!,
           activityType,
           activityDate: new Date(data.activityDate).toISOString(),
-          assetId: `$CASH-${currency}`,
+          // assetId omitted - backend generates CASH:{currency}
           quantity: data.amount,
           unitPrice: 1,
           currency,
@@ -150,6 +151,7 @@ export function TransferCashSection({ onSuccess }: TransferCashSectionProps) {
         });
       } else {
         // Internal transfer - create both activities with group_id
+        // Don't set assetId - backend will generate CASH:{currency}
         const fromAcct = accounts.find((a) => a.id === data.fromAccountId);
         const toAcct = accounts.find((a) => a.id === data.toAccountId);
         const fromCurrency = fromAcct?.currency || "USD";
@@ -160,7 +162,7 @@ export function TransferCashSection({ onSuccess }: TransferCashSectionProps) {
           accountId: data.fromAccountId!,
           activityType: ActivityType.TRANSFER_OUT,
           activityDate: new Date(data.activityDate).toISOString(),
-          assetId: `$CASH-${fromCurrency}`,
+          // assetId omitted - backend generates CASH:{currency}
           quantity: data.amount,
           unitPrice: 1,
           currency: fromCurrency,
@@ -180,7 +182,7 @@ export function TransferCashSection({ onSuccess }: TransferCashSectionProps) {
           accountId: data.toAccountId!,
           activityType: ActivityType.TRANSFER_IN,
           activityDate: new Date(data.activityDate).toISOString(),
-          assetId: `$CASH-${toCurrency}`,
+          // assetId omitted - backend generates CASH:{currency}
           quantity: destinationAmount,
           unitPrice: 1,
           currency: toCurrency,

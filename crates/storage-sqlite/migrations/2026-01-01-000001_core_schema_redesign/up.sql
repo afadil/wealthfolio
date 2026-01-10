@@ -425,7 +425,7 @@ CREATE TABLE activities (
     updated_at TEXT NOT NULL,
 
     FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
-    FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE SET NULL,
+    FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE SET NULL ON UPDATE CASCADE,
     FOREIGN KEY (import_run_id) REFERENCES import_runs(id) ON DELETE SET NULL
 );
 

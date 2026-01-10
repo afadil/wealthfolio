@@ -1,39 +1,50 @@
 //! Asset ID generation, parsing, and validation.
 //!
 //! This module provides utilities for generating, parsing, and validating asset IDs
-//! using a uniform `{primary}:{qualifier}` format.
+//! using a canonical typed prefix format: `{TYPE}:{symbol}:{qualifier}`
 //!
-//! ## ID Format
+//! ## Canonical ID Format (New)
 //!
-//! All asset IDs follow the format: `{PRIMARY}:{QUALIFIER}`
+//! All asset IDs use typed prefixes to make asset kind explicit:
 //!
-//! | Asset Kind | Pattern | Examples |
-//! |------------|---------|----------|
-//! | Security | `{ticker}:{exchange_mic}` | `SPY:XNYS`, `SHOP:XTSE`, `AAPL:XNAS` |
-//! | Crypto | `{base}:{quote_currency}` | `BTC:USD`, `ETH:CAD`, `SOL:USD` |
-//! | FX Rate | `{base}:{quote_currency}` | `EUR:USD`, `GBP:CAD` |
-//! | Cash | `CASH:{currency}` | `CASH:USD`, `CASH:CAD` |
-//! | Property | `PROP:{nanoid}` | `PROP:a1b2c3d4` |
-//! | Vehicle | `VEH:{nanoid}` | `VEH:x9y8z7w6` |
-//! | Collectible | `COLL:{nanoid}` | `COLL:m2n3o4p5` |
-//! | PhysicalPrecious | `PREC:{nanoid}` | `PREC:q6r7s8t9` |
-//! | Liability | `LIAB:{nanoid}` | `LIAB:u0v1w2x3` |
-//! | Other | `ALT:{nanoid}` | `ALT:abcd1234` |
+//! | Asset Kind | Prefix | Format | Example |
+//! |------------|--------|--------|---------|
+//! | Security | `SEC` | `SEC:{symbol}:{mic}` | `SEC:AAPL:XNAS` |
+//! | Crypto | `CRYPTO` | `CRYPTO:{symbol}:{quote}` | `CRYPTO:BTC:USD` |
+//! | FX Rate | `FX` | `FX:{base}:{quote}` | `FX:EUR:USD` |
+//! | Cash | `CASH` | `CASH:{currency}` | `CASH:CAD` |
+//! | Option | `OPT` | `OPT:{symbol}:{mic}` | `OPT:AAPL240119C00150000:XNAS` |
+//! | Commodity | `CMDTY` | `CMDTY:{symbol}` | `CMDTY:GC` |
+//! | Private Equity | `PEQ` | `PEQ:{random}` | `PEQ:a1b2c3d4` |
+//! | Property | `PROP` | `PROP:{random}` | `PROP:a1b2c3d4` |
+//! | Vehicle | `VEH` | `VEH:{random}` | `VEH:x9y8z7w6` |
+//! | Collectible | `COLL` | `COLL:{random}` | `COLL:m3n4o5p6` |
+//! | Precious Metal | `PREC` | `PREC:{random}` | `PREC:g1h2i3j4` |
+//! | Liability | `LIAB` | `LIAB:{random}` | `LIAB:q7r8s9t0` |
+//! | Other | `ALT` | `ALT:{random}` | `ALT:u1v2w3x4` |
+//!
+//! ## Legacy ID Format
+//!
+//! For backward compatibility, the module also supports legacy formats:
+//! - `{ticker}:{mic}` for securities (e.g., `AAPL:XNAS`)
+//! - `{base}:{quote}` for crypto/FX (e.g., `BTC:USD`, `EUR:USD`)
+//! - `CASH:{currency}` for cash (e.g., `CASH:USD`)
 //!
 //! ## Examples
 //!
 //! ```
-//! use wealthfolio_core::assets::{AssetKind, security_id, crypto_id, cash_id, parse_asset_id};
+//! use wealthfolio_core::assets::{AssetKind, canonical_asset_id, kind_from_asset_id};
 //!
-//! // Generate IDs for different asset types
-//! assert_eq!(security_id("AAPL", "XNAS"), "AAPL:XNAS");
-//! assert_eq!(crypto_id("BTC", "USD"), "BTC:USD");
-//! assert_eq!(cash_id("USD"), "CASH:USD");
+//! // Generate canonical IDs
+//! let sec_id = canonical_asset_id(&AssetKind::Security, "AAPL", Some("XNAS"), "USD");
+//! assert_eq!(sec_id, "SEC:AAPL:XNAS");
 //!
-//! // Parse an asset ID
-//! let parsed = parse_asset_id("AAPL:XNAS").unwrap();
-//! assert_eq!(parsed.primary, "AAPL");
-//! assert_eq!(parsed.qualifier, "XNAS");
+//! let crypto_id = canonical_asset_id(&AssetKind::Crypto, "BTC", None, "USD");
+//! assert_eq!(crypto_id, "CRYPTO:BTC:USD");
+//!
+//! // Parse kind from ID
+//! assert_eq!(kind_from_asset_id("SEC:AAPL:XNAS"), Some(AssetKind::Security));
+//! assert_eq!(kind_from_asset_id("CRYPTO:BTC:USD"), Some(AssetKind::Crypto));
 //! ```
 
 use super::AssetKind;
@@ -48,8 +59,21 @@ use uuid::Uuid;
 /// The delimiter used in all asset IDs (colon)
 pub const ASSET_ID_DELIMITER: char = ':';
 
+// Typed prefixes for canonical asset IDs
+/// Prefix for Security assets (stocks, ETFs, bonds)
+pub const SECURITY_PREFIX: &str = "SEC";
+/// Prefix for Crypto assets
+pub const CRYPTO_PREFIX: &str = "CRYPTO";
 /// Prefix for Cash assets
 pub const CASH_PREFIX: &str = "CASH";
+/// Prefix for FX Rate assets
+pub const FX_PREFIX: &str = "FX";
+/// Prefix for Option assets
+pub const OPTION_PREFIX: &str = "OPT";
+/// Prefix for Commodity assets
+pub const COMMODITY_PREFIX: &str = "CMDTY";
+/// Prefix for Private Equity assets
+pub const PRIVATE_EQUITY_PREFIX: &str = "PEQ";
 /// Prefix for Property assets
 pub const PROPERTY_PREFIX: &str = "PROP";
 /// Prefix for Vehicle assets
@@ -62,6 +86,33 @@ pub const PRECIOUS_PREFIX: &str = "PREC";
 pub const LIABILITY_PREFIX: &str = "LIAB";
 /// Prefix for Other (catch-all) assets
 pub const OTHER_PREFIX: &str = "ALT";
+
+/// Legacy prefix for cash assets (e.g., `$CASH-USD`)
+pub const LEGACY_CASH_PREFIX: &str = "$CASH";
+
+/// Checks if an asset ID represents a cash asset.
+/// Handles both canonical format (`CASH:USD`) and legacy format (`$CASH-USD`).
+///
+/// # Examples
+/// ```
+/// use wealthfolio_core::assets::is_cash_asset_id;
+///
+/// assert!(is_cash_asset_id("CASH:USD"));
+/// assert!(is_cash_asset_id("CASH:EUR"));
+/// assert!(is_cash_asset_id("$CASH-USD"));
+/// assert!(is_cash_asset_id("$CASH-EUR"));
+/// assert!(!is_cash_asset_id("SEC:AAPL:XNAS"));
+/// assert!(!is_cash_asset_id("AAPL"));
+/// ```
+pub fn is_cash_asset_id(asset_id: &str) -> bool {
+    asset_id.starts_with("CASH:") || asset_id.starts_with("$CASH")
+}
+
+/// Checks if an asset ID represents an FX rate asset.
+/// Handles both canonical format (`FX:EUR:USD`) and legacy format (`EUR/USD`).
+pub fn is_fx_asset_id(asset_id: &str) -> bool {
+    asset_id.starts_with("FX:") || asset_id.contains('/')
+}
 
 /// Length of the random portion of alternative asset IDs
 const RANDOM_ID_LENGTH: usize = 8;
@@ -106,14 +157,28 @@ lazy_static! {
 // ============================================================================
 
 /// Represents a parsed asset ID with its components.
+///
+/// For canonical format IDs (`SEC:AAPL:XNAS`):
+/// - `kind`: The asset kind from the prefix
+/// - `symbol`: The symbol/ticker (e.g., "AAPL")
+/// - `qualifier`: The qualifier (e.g., "XNAS" for MIC, "USD" for quote currency)
+///
+/// For legacy format IDs (`AAPL:XNAS`):
+/// - `kind`: Inferred from the ID pattern
+/// - `symbol`: Same as `primary` field
+/// - `qualifier`: Same as the second component
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedAssetId {
     /// The primary component (ticker, base currency, or prefix)
+    /// For legacy IDs: the first part before the colon
+    /// For canonical IDs: same as `symbol`
     pub primary: String,
     /// The qualifier component (exchange MIC, quote currency, or nanoid)
     pub qualifier: String,
-    /// The inferred asset kind (if determinable from the ID)
+    /// The inferred or explicit asset kind
     pub kind: Option<AssetKind>,
+    /// The symbol extracted from the ID (same as primary for legacy, extracted for canonical)
+    pub symbol: String,
 }
 
 // ============================================================================
@@ -258,10 +323,271 @@ pub fn alternative_id(prefix: &str, nanoid: &str) -> String {
 }
 
 // ============================================================================
-// ID PARSING
+// CANONICAL ID GENERATION (New Typed Prefix Format)
+// ============================================================================
+
+/// Generates a random 8-character alphanumeric suffix for alternative asset IDs.
+///
+/// Uses UUID v4 as the source of randomness, then maps bytes to the alphanumeric alphabet.
+///
+/// # Examples
+///
+/// ```
+/// use wealthfolio_core::assets::random_suffix;
+///
+/// let suffix = random_suffix();
+/// assert_eq!(suffix.len(), 8);
+/// assert!(suffix.chars().all(|c| c.is_ascii_alphanumeric()));
+/// ```
+pub fn random_suffix() -> String {
+    let uuid = Uuid::new_v4();
+    let bytes = uuid.as_bytes();
+
+    // Take 8 bytes from the UUID and map each to an alphanumeric character
+    bytes
+        .iter()
+        .take(RANDOM_ID_LENGTH)
+        .map(|&b| {
+            let index = (b as usize) % ALPHABET.len();
+            ALPHABET[index] as char
+        })
+        .collect()
+}
+
+/// Generate canonical asset ID with typed prefix.
+///
+/// All asset IDs use the format: `{TYPE}:{symbol}:{qualifier}` where TYPE is a
+/// typed prefix that makes the asset kind explicit.
+///
+/// # Arguments
+///
+/// * `kind` - The asset kind (determines the prefix)
+/// * `symbol` - The symbol/ticker (e.g., "AAPL", "BTC", "EUR")
+/// * `exchange_mic` - Optional exchange MIC code for securities/options
+/// * `currency` - The currency (used as quote currency for crypto/FX, or for cash)
+///
+/// # Returns
+///
+/// A canonical asset ID string with typed prefix.
+///
+/// # Examples
+///
+/// ```
+/// use wealthfolio_core::assets::{AssetKind, canonical_asset_id};
+///
+/// // Securities: SEC:{symbol}:{mic}
+/// assert_eq!(
+///     canonical_asset_id(&AssetKind::Security, "AAPL", Some("XNAS"), "USD"),
+///     "SEC:AAPL:XNAS"
+/// );
+///
+/// // Crypto: CRYPTO:{symbol}:{quote}
+/// assert_eq!(
+///     canonical_asset_id(&AssetKind::Crypto, "BTC", None, "USD"),
+///     "CRYPTO:BTC:USD"
+/// );
+///
+/// // FX: FX:{base}:{quote}
+/// assert_eq!(
+///     canonical_asset_id(&AssetKind::FxRate, "EUR", None, "USD"),
+///     "FX:EUR:USD"
+/// );
+///
+/// // Cash: CASH:{currency}
+/// assert_eq!(
+///     canonical_asset_id(&AssetKind::Cash, "CAD", None, "CAD"),
+///     "CASH:CAD"
+/// );
+/// ```
+pub fn canonical_asset_id(
+    kind: &AssetKind,
+    symbol: &str,
+    exchange_mic: Option<&str>,
+    currency: &str,
+) -> String {
+    let sym = symbol.trim().to_uppercase();
+    let ccy = currency.trim().to_uppercase();
+
+    match kind {
+        AssetKind::Cash => format!("{}:{}", CASH_PREFIX, ccy),
+
+        AssetKind::FxRate => {
+            // sym is base (EUR), ccy is quote (USD)
+            format!("{}:{}:{}", FX_PREFIX, sym, ccy)
+        }
+
+        AssetKind::Crypto => {
+            // BTC:USD - include quote currency
+            format!("{}:{}:{}", CRYPTO_PREFIX, sym, ccy)
+        }
+
+        AssetKind::Security => {
+            let mic = exchange_mic
+                .map(|m| m.trim().to_uppercase())
+                .unwrap_or_else(|| "UNKNOWN".to_string());
+            format!("{}:{}:{}", SECURITY_PREFIX, sym, mic)
+        }
+
+        AssetKind::Option => {
+            let mic = exchange_mic
+                .map(|m| m.trim().to_uppercase())
+                .unwrap_or_else(|| "UNKNOWN".to_string());
+            format!("{}:{}:{}", OPTION_PREFIX, sym, mic)
+        }
+
+        AssetKind::Commodity => format!("{}:{}", COMMODITY_PREFIX, sym),
+
+        AssetKind::PrivateEquity => format!("{}:{}", PRIVATE_EQUITY_PREFIX, random_suffix()),
+        AssetKind::Property => format!("{}:{}", PROPERTY_PREFIX, random_suffix()),
+        AssetKind::Vehicle => format!("{}:{}", VEHICLE_PREFIX, random_suffix()),
+        AssetKind::Collectible => format!("{}:{}", COLLECTIBLE_PREFIX, random_suffix()),
+        AssetKind::PhysicalPrecious => format!("{}:{}", PRECIOUS_PREFIX, random_suffix()),
+        AssetKind::Liability => format!("{}:{}", LIABILITY_PREFIX, random_suffix()),
+        AssetKind::Other => format!("{}:{}", OTHER_PREFIX, random_suffix()),
+    }
+}
+
+/// Parse asset kind from ID prefix (trivial with typed prefixes).
+///
+/// This function extracts the asset kind from a canonical asset ID by looking
+/// at the typed prefix. It uses `AssetKind::from_id_prefix()` for the actual
+/// prefix matching.
+///
+/// # Arguments
+///
+/// * `asset_id` - The asset ID to parse
+///
+/// # Returns
+///
+/// `Some(AssetKind)` if the prefix is recognized, `None` otherwise.
+///
+/// # Examples
+///
+/// ```
+/// use wealthfolio_core::assets::{AssetKind, kind_from_asset_id};
+///
+/// assert_eq!(kind_from_asset_id("SEC:AAPL:XNAS"), Some(AssetKind::Security));
+/// assert_eq!(kind_from_asset_id("CRYPTO:BTC:USD"), Some(AssetKind::Crypto));
+/// assert_eq!(kind_from_asset_id("CASH:CAD"), Some(AssetKind::Cash));
+/// assert_eq!(kind_from_asset_id("FX:EUR:USD"), Some(AssetKind::FxRate));
+/// assert_eq!(kind_from_asset_id("PROP:a1b2c3d4"), Some(AssetKind::Property));
+/// ```
+pub fn kind_from_asset_id(asset_id: &str) -> Option<AssetKind> {
+    let prefix = asset_id.split(ASSET_ID_DELIMITER).next()?;
+    AssetKind::from_id_prefix(prefix)
+}
+
+/// Parse components from a canonical asset ID.
+///
+/// This function parses both canonical format IDs (e.g., `SEC:AAPL:XNAS`) and
+/// legacy format IDs (e.g., `AAPL:XNAS`).
+///
+/// # Arguments
+///
+/// * `asset_id` - The asset ID to parse
+///
+/// # Returns
+///
+/// `Some(ParsedAssetId)` with the extracted components, or `None` if the ID is invalid.
+///
+/// # Examples
+///
+/// ```
+/// use wealthfolio_core::assets::{AssetKind, parse_canonical_asset_id};
+///
+/// // Canonical format
+/// let parsed = parse_canonical_asset_id("SEC:AAPL:XNAS").unwrap();
+/// assert_eq!(parsed.kind, Some(AssetKind::Security));
+/// assert_eq!(parsed.symbol, "AAPL");
+/// assert_eq!(parsed.qualifier, "XNAS");
+///
+/// // Cash (2-part canonical)
+/// let parsed = parse_canonical_asset_id("CASH:USD").unwrap();
+/// assert_eq!(parsed.kind, Some(AssetKind::Cash));
+/// assert_eq!(parsed.symbol, "USD");
+/// ```
+pub fn parse_canonical_asset_id(asset_id: &str) -> Option<ParsedAssetId> {
+    let parts: Vec<&str> = asset_id.split(ASSET_ID_DELIMITER).collect();
+
+    if parts.is_empty() || parts.len() > 3 {
+        return None;
+    }
+
+    // Try to get kind from the first part (typed prefix)
+    let kind = AssetKind::from_id_prefix(parts[0]);
+
+    if let Some(ref k) = kind {
+        // Canonical format with typed prefix
+        match k {
+            // 2-part formats: CASH:{currency}, CMDTY:{symbol}, PEQ/PROP/VEH/COLL/PREC/LIAB/ALT:{random}
+            AssetKind::Cash => {
+                if parts.len() != 2 {
+                    return None;
+                }
+                Some(ParsedAssetId {
+                    primary: parts[0].to_string(),
+                    qualifier: parts[1].to_string(),
+                    kind: Some(k.clone()),
+                    symbol: parts[1].to_string(), // Currency code is the "symbol" for cash
+                })
+            }
+            AssetKind::Commodity => {
+                if parts.len() != 2 {
+                    return None;
+                }
+                Some(ParsedAssetId {
+                    primary: parts[0].to_string(),
+                    qualifier: String::new(),
+                    kind: Some(k.clone()),
+                    symbol: parts[1].to_string(),
+                })
+            }
+            AssetKind::PrivateEquity
+            | AssetKind::Property
+            | AssetKind::Vehicle
+            | AssetKind::Collectible
+            | AssetKind::PhysicalPrecious
+            | AssetKind::Liability
+            | AssetKind::Other => {
+                if parts.len() != 2 {
+                    return None;
+                }
+                Some(ParsedAssetId {
+                    primary: parts[0].to_string(),
+                    qualifier: parts[1].to_string(), // The random suffix
+                    kind: Some(k.clone()),
+                    symbol: parts[1].to_string(), // Random ID as symbol
+                })
+            }
+            // 3-part formats: SEC/OPT:{symbol}:{mic}, CRYPTO/FX:{base}:{quote}
+            AssetKind::Security | AssetKind::Option | AssetKind::Crypto | AssetKind::FxRate => {
+                if parts.len() != 3 {
+                    return None;
+                }
+                Some(ParsedAssetId {
+                    primary: parts[0].to_string(),
+                    qualifier: parts[2].to_string(),
+                    kind: Some(k.clone()),
+                    symbol: parts[1].to_string(),
+                })
+            }
+        }
+    } else {
+        // Legacy format (no typed prefix) - delegate to the original parse function
+        // This handles formats like AAPL:XNAS, BTC:USD, EUR:USD
+        None
+    }
+}
+
+// ============================================================================
+// ID PARSING (Legacy Support)
 // ============================================================================
 
 /// Parses an asset ID into its components.
+///
+/// This function handles both canonical format IDs (e.g., `SEC:AAPL:XNAS`) and
+/// legacy format IDs (e.g., `AAPL:XNAS`). For canonical IDs, it uses the typed
+/// prefix to determine the kind. For legacy IDs, it uses heuristics.
 ///
 /// # Arguments
 ///
@@ -276,17 +602,25 @@ pub fn alternative_id(prefix: &str, nanoid: &str) -> String {
 /// ```
 /// use wealthfolio_core::assets::{AssetKind, parse_asset_id};
 ///
-/// // Security
+/// // Canonical format
+/// let parsed = parse_asset_id("SEC:AAPL:XNAS").unwrap();
+/// assert_eq!(parsed.kind, Some(AssetKind::Security));
+/// assert_eq!(parsed.symbol, "AAPL");
+/// assert_eq!(parsed.qualifier, "XNAS");
+///
+/// // Legacy security format
 /// let parsed = parse_asset_id("AAPL:XNAS").unwrap();
 /// assert_eq!(parsed.primary, "AAPL");
 /// assert_eq!(parsed.qualifier, "XNAS");
 /// assert_eq!(parsed.kind, Some(AssetKind::Security));
+/// assert_eq!(parsed.symbol, "AAPL");
 ///
 /// // Cash
 /// let parsed = parse_asset_id("CASH:USD").unwrap();
 /// assert_eq!(parsed.primary, "CASH");
 /// assert_eq!(parsed.qualifier, "USD");
 /// assert_eq!(parsed.kind, Some(AssetKind::Cash));
+/// assert_eq!(parsed.symbol, "USD");
 ///
 /// // Alternative asset
 /// let parsed = parse_asset_id("PROP:a1b2c3d4").unwrap();
@@ -295,6 +629,12 @@ pub fn alternative_id(prefix: &str, nanoid: &str) -> String {
 /// assert_eq!(parsed.kind, Some(AssetKind::Property));
 /// ```
 pub fn parse_asset_id(id: &str) -> Option<ParsedAssetId> {
+    // First, try to parse as canonical format (with typed prefix)
+    if let Some(parsed) = parse_canonical_asset_id(id) {
+        return Some(parsed);
+    }
+
+    // Fall back to legacy format parsing (2-part IDs)
     let parts: Vec<&str> = id.split(ASSET_ID_DELIMITER).collect();
     if parts.len() != 2 {
         return None;
@@ -306,10 +646,18 @@ pub fn parse_asset_id(id: &str) -> Option<ParsedAssetId> {
     // Determine the asset kind based on the ID format
     let kind = infer_kind_from_id(id, &primary);
 
+    // For legacy format, symbol is the same as primary
+    let symbol = if primary == CASH_PREFIX {
+        qualifier.clone() // For CASH:USD, the symbol is the currency
+    } else {
+        primary.clone() // For AAPL:XNAS, the symbol is the ticker
+    };
+
     Some(ParsedAssetId {
         primary,
         qualifier,
         kind,
+        symbol,
     })
 }
 
@@ -904,5 +1252,540 @@ mod tests {
                 random_part
             );
         }
+    }
+
+    // ------------------------------------------------------------------------
+    // Canonical Asset ID Tests (New Typed Prefix Format)
+    // ------------------------------------------------------------------------
+
+    #[test]
+    fn test_random_suffix() {
+        let suffix = random_suffix();
+        assert_eq!(suffix.len(), 8);
+        assert!(suffix.chars().all(|c| c.is_ascii_alphanumeric()));
+
+        // Verify uniqueness
+        let suffix2 = random_suffix();
+        assert_ne!(suffix, suffix2);
+    }
+
+    #[test]
+    fn test_canonical_asset_id_security() {
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Security, "AAPL", Some("XNAS"), "USD"),
+            "SEC:AAPL:XNAS"
+        );
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Security, "aapl", Some("xnas"), "USD"),
+            "SEC:AAPL:XNAS"
+        );
+        // Without exchange, defaults to UNKNOWN
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Security, "AAPL", None, "USD"),
+            "SEC:AAPL:UNKNOWN"
+        );
+    }
+
+    #[test]
+    fn test_canonical_asset_id_crypto() {
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Crypto, "BTC", None, "USD"),
+            "CRYPTO:BTC:USD"
+        );
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Crypto, "eth", None, "cad"),
+            "CRYPTO:ETH:CAD"
+        );
+    }
+
+    #[test]
+    fn test_canonical_asset_id_fx() {
+        assert_eq!(
+            canonical_asset_id(&AssetKind::FxRate, "EUR", None, "USD"),
+            "FX:EUR:USD"
+        );
+        assert_eq!(
+            canonical_asset_id(&AssetKind::FxRate, "gbp", None, "cad"),
+            "FX:GBP:CAD"
+        );
+    }
+
+    #[test]
+    fn test_canonical_asset_id_cash() {
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Cash, "CAD", None, "CAD"),
+            "CASH:CAD"
+        );
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Cash, "usd", None, "usd"),
+            "CASH:USD"
+        );
+    }
+
+    #[test]
+    fn test_canonical_asset_id_option() {
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Option, "AAPL240119C00150000", Some("XNAS"), "USD"),
+            "OPT:AAPL240119C00150000:XNAS"
+        );
+    }
+
+    #[test]
+    fn test_canonical_asset_id_commodity() {
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Commodity, "GC", None, "USD"),
+            "CMDTY:GC"
+        );
+    }
+
+    #[test]
+    fn test_canonical_asset_id_alternative_assets() {
+        // Alternative assets get random suffixes
+        let prop_id = canonical_asset_id(&AssetKind::Property, "House", None, "USD");
+        assert!(prop_id.starts_with("PROP:"));
+        assert_eq!(prop_id.len(), 13); // "PROP:" (5) + 8 random
+
+        let veh_id = canonical_asset_id(&AssetKind::Vehicle, "Car", None, "USD");
+        assert!(veh_id.starts_with("VEH:"));
+
+        let coll_id = canonical_asset_id(&AssetKind::Collectible, "Art", None, "USD");
+        assert!(coll_id.starts_with("COLL:"));
+
+        let prec_id = canonical_asset_id(&AssetKind::PhysicalPrecious, "Gold", None, "USD");
+        assert!(prec_id.starts_with("PREC:"));
+
+        let liab_id = canonical_asset_id(&AssetKind::Liability, "Mortgage", None, "USD");
+        assert!(liab_id.starts_with("LIAB:"));
+
+        let other_id = canonical_asset_id(&AssetKind::Other, "Other", None, "USD");
+        assert!(other_id.starts_with("ALT:"));
+
+        let peq_id = canonical_asset_id(&AssetKind::PrivateEquity, "Startup", None, "USD");
+        assert!(peq_id.starts_with("PEQ:"));
+    }
+
+    #[test]
+    fn test_kind_from_asset_id_canonical() {
+        assert_eq!(kind_from_asset_id("SEC:AAPL:XNAS"), Some(AssetKind::Security));
+        assert_eq!(kind_from_asset_id("CRYPTO:BTC:USD"), Some(AssetKind::Crypto));
+        assert_eq!(kind_from_asset_id("FX:EUR:USD"), Some(AssetKind::FxRate));
+        assert_eq!(kind_from_asset_id("CASH:CAD"), Some(AssetKind::Cash));
+        assert_eq!(kind_from_asset_id("OPT:AAPL240119C00150000:XNAS"), Some(AssetKind::Option));
+        assert_eq!(kind_from_asset_id("CMDTY:GC"), Some(AssetKind::Commodity));
+        assert_eq!(kind_from_asset_id("PEQ:a1b2c3d4"), Some(AssetKind::PrivateEquity));
+        assert_eq!(kind_from_asset_id("PROP:a1b2c3d4"), Some(AssetKind::Property));
+        assert_eq!(kind_from_asset_id("VEH:a1b2c3d4"), Some(AssetKind::Vehicle));
+        assert_eq!(kind_from_asset_id("COLL:a1b2c3d4"), Some(AssetKind::Collectible));
+        assert_eq!(kind_from_asset_id("PREC:a1b2c3d4"), Some(AssetKind::PhysicalPrecious));
+        assert_eq!(kind_from_asset_id("LIAB:a1b2c3d4"), Some(AssetKind::Liability));
+        assert_eq!(kind_from_asset_id("ALT:a1b2c3d4"), Some(AssetKind::Other));
+
+        // Legacy formats don't have typed prefixes, so kind_from_asset_id returns None
+        assert_eq!(kind_from_asset_id("AAPL:XNAS"), None);
+        assert_eq!(kind_from_asset_id("BTC:USD"), None);
+    }
+
+    #[test]
+    fn test_parse_canonical_asset_id_security() {
+        let parsed = parse_canonical_asset_id("SEC:AAPL:XNAS").unwrap();
+        assert_eq!(parsed.kind, Some(AssetKind::Security));
+        assert_eq!(parsed.symbol, "AAPL");
+        assert_eq!(parsed.qualifier, "XNAS");
+        assert_eq!(parsed.primary, "SEC");
+    }
+
+    #[test]
+    fn test_parse_canonical_asset_id_crypto() {
+        let parsed = parse_canonical_asset_id("CRYPTO:BTC:USD").unwrap();
+        assert_eq!(parsed.kind, Some(AssetKind::Crypto));
+        assert_eq!(parsed.symbol, "BTC");
+        assert_eq!(parsed.qualifier, "USD");
+    }
+
+    #[test]
+    fn test_parse_canonical_asset_id_fx() {
+        let parsed = parse_canonical_asset_id("FX:EUR:USD").unwrap();
+        assert_eq!(parsed.kind, Some(AssetKind::FxRate));
+        assert_eq!(parsed.symbol, "EUR");
+        assert_eq!(parsed.qualifier, "USD");
+    }
+
+    #[test]
+    fn test_parse_canonical_asset_id_cash() {
+        let parsed = parse_canonical_asset_id("CASH:USD").unwrap();
+        assert_eq!(parsed.kind, Some(AssetKind::Cash));
+        assert_eq!(parsed.symbol, "USD");
+        assert_eq!(parsed.qualifier, "USD");
+    }
+
+    #[test]
+    fn test_parse_canonical_asset_id_commodity() {
+        let parsed = parse_canonical_asset_id("CMDTY:GC").unwrap();
+        assert_eq!(parsed.kind, Some(AssetKind::Commodity));
+        assert_eq!(parsed.symbol, "GC");
+        assert_eq!(parsed.qualifier, "");
+    }
+
+    #[test]
+    fn test_parse_canonical_asset_id_alternative() {
+        let parsed = parse_canonical_asset_id("PROP:a1b2c3d4").unwrap();
+        assert_eq!(parsed.kind, Some(AssetKind::Property));
+        assert_eq!(parsed.symbol, "a1b2c3d4");
+        assert_eq!(parsed.qualifier, "a1b2c3d4");
+    }
+
+    #[test]
+    fn test_parse_canonical_asset_id_returns_none_for_legacy() {
+        // Legacy format IDs should return None from parse_canonical_asset_id
+        assert!(parse_canonical_asset_id("AAPL:XNAS").is_none());
+        assert!(parse_canonical_asset_id("BTC:USD").is_none());
+    }
+
+    #[test]
+    fn test_parse_asset_id_canonical_formats() {
+        // parse_asset_id should handle both canonical and legacy formats
+
+        // Canonical format
+        let parsed = parse_asset_id("SEC:AAPL:XNAS").unwrap();
+        assert_eq!(parsed.kind, Some(AssetKind::Security));
+        assert_eq!(parsed.symbol, "AAPL");
+
+        let parsed = parse_asset_id("CRYPTO:BTC:USD").unwrap();
+        assert_eq!(parsed.kind, Some(AssetKind::Crypto));
+        assert_eq!(parsed.symbol, "BTC");
+
+        let parsed = parse_asset_id("CASH:CAD").unwrap();
+        assert_eq!(parsed.kind, Some(AssetKind::Cash));
+        assert_eq!(parsed.symbol, "CAD");
+    }
+
+    #[test]
+    fn test_parse_asset_id_legacy_formats() {
+        // Legacy format should still work
+        let parsed = parse_asset_id("AAPL:XNAS").unwrap();
+        assert_eq!(parsed.primary, "AAPL");
+        assert_eq!(parsed.qualifier, "XNAS");
+        assert_eq!(parsed.symbol, "AAPL");
+        assert_eq!(parsed.kind, Some(AssetKind::Security));
+    }
+
+    #[test]
+    fn test_asset_kind_id_prefix() {
+        assert_eq!(AssetKind::Security.id_prefix(), "SEC");
+        assert_eq!(AssetKind::Crypto.id_prefix(), "CRYPTO");
+        assert_eq!(AssetKind::Cash.id_prefix(), "CASH");
+        assert_eq!(AssetKind::FxRate.id_prefix(), "FX");
+        assert_eq!(AssetKind::Option.id_prefix(), "OPT");
+        assert_eq!(AssetKind::Commodity.id_prefix(), "CMDTY");
+        assert_eq!(AssetKind::PrivateEquity.id_prefix(), "PEQ");
+        assert_eq!(AssetKind::Property.id_prefix(), "PROP");
+        assert_eq!(AssetKind::Vehicle.id_prefix(), "VEH");
+        assert_eq!(AssetKind::Collectible.id_prefix(), "COLL");
+        assert_eq!(AssetKind::PhysicalPrecious.id_prefix(), "PREC");
+        assert_eq!(AssetKind::Liability.id_prefix(), "LIAB");
+        assert_eq!(AssetKind::Other.id_prefix(), "ALT");
+    }
+
+    #[test]
+    fn test_asset_kind_from_id_prefix() {
+        assert_eq!(AssetKind::from_id_prefix("SEC"), Some(AssetKind::Security));
+        assert_eq!(AssetKind::from_id_prefix("CRYPTO"), Some(AssetKind::Crypto));
+        assert_eq!(AssetKind::from_id_prefix("CASH"), Some(AssetKind::Cash));
+        assert_eq!(AssetKind::from_id_prefix("FX"), Some(AssetKind::FxRate));
+        assert_eq!(AssetKind::from_id_prefix("OPT"), Some(AssetKind::Option));
+        assert_eq!(AssetKind::from_id_prefix("CMDTY"), Some(AssetKind::Commodity));
+        assert_eq!(AssetKind::from_id_prefix("PEQ"), Some(AssetKind::PrivateEquity));
+        assert_eq!(AssetKind::from_id_prefix("PROP"), Some(AssetKind::Property));
+        assert_eq!(AssetKind::from_id_prefix("VEH"), Some(AssetKind::Vehicle));
+        assert_eq!(AssetKind::from_id_prefix("COLL"), Some(AssetKind::Collectible));
+        assert_eq!(AssetKind::from_id_prefix("PREC"), Some(AssetKind::PhysicalPrecious));
+        assert_eq!(AssetKind::from_id_prefix("LIAB"), Some(AssetKind::Liability));
+        assert_eq!(AssetKind::from_id_prefix("ALT"), Some(AssetKind::Other));
+        assert_eq!(AssetKind::from_id_prefix("INVALID"), None);
+        assert_eq!(AssetKind::from_id_prefix(""), None);
+    }
+
+    // ------------------------------------------------------------------------
+    // Edge Case Tests: Whitespace, Empty, and Case Handling
+    // ------------------------------------------------------------------------
+
+    #[test]
+    fn test_canonical_asset_id_trims_whitespace() {
+        // Symbol with leading/trailing whitespace
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Security, "  AAPL  ", Some("XNAS"), "USD"),
+            "SEC:AAPL:XNAS"
+        );
+        // Exchange MIC with whitespace
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Security, "AAPL", Some("  XNAS  "), "USD"),
+            "SEC:AAPL:XNAS"
+        );
+        // Currency with whitespace
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Crypto, "BTC", None, "  USD  "),
+            "CRYPTO:BTC:USD"
+        );
+        // All fields with whitespace
+        assert_eq!(
+            canonical_asset_id(&AssetKind::FxRate, "  EUR  ", None, "  USD  "),
+            "FX:EUR:USD"
+        );
+    }
+
+    #[test]
+    fn test_canonical_asset_id_handles_empty_symbol() {
+        // Empty symbol results in empty uppercase string
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Security, "", Some("XNAS"), "USD"),
+            "SEC::XNAS"
+        );
+        // Whitespace-only symbol is trimmed to empty
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Security, "   ", Some("XNAS"), "USD"),
+            "SEC::XNAS"
+        );
+    }
+
+    #[test]
+    fn test_canonical_asset_id_handles_empty_currency() {
+        // Empty currency results in empty uppercase string
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Crypto, "BTC", None, ""),
+            "CRYPTO:BTC:"
+        );
+        // Whitespace-only currency is trimmed
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Crypto, "BTC", None, "   "),
+            "CRYPTO:BTC:"
+        );
+    }
+
+    #[test]
+    fn test_canonical_asset_id_handles_empty_exchange() {
+        // Empty exchange MIC falls back to UNKNOWN
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Security, "AAPL", Some(""), "USD"),
+            "SEC:AAPL:"
+        );
+        // Whitespace-only exchange MIC is trimmed to empty (not UNKNOWN)
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Security, "AAPL", Some("   "), "USD"),
+            "SEC:AAPL:"
+        );
+        // None exchange falls back to UNKNOWN
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Security, "AAPL", None, "USD"),
+            "SEC:AAPL:UNKNOWN"
+        );
+    }
+
+    #[test]
+    fn test_canonical_asset_id_mixed_case() {
+        // All lowercase
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Security, "aapl", Some("xnas"), "usd"),
+            "SEC:AAPL:XNAS"
+        );
+        // Mixed case
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Security, "AaPl", Some("XnAs"), "Usd"),
+            "SEC:AAPL:XNAS"
+        );
+        // Crypto mixed case
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Crypto, "Btc", None, "Usd"),
+            "CRYPTO:BTC:USD"
+        );
+        // FX mixed case
+        assert_eq!(
+            canonical_asset_id(&AssetKind::FxRate, "eUr", None, "uSd"),
+            "FX:EUR:USD"
+        );
+        // Cash mixed case
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Cash, "cAd", None, "cad"),
+            "CASH:CAD"
+        );
+    }
+
+    #[test]
+    fn test_asset_kind_from_id_prefix_case_sensitive() {
+        // from_id_prefix is case-sensitive - lowercase should return None
+        assert_eq!(AssetKind::from_id_prefix("sec"), None);
+        assert_eq!(AssetKind::from_id_prefix("Sec"), None);
+        assert_eq!(AssetKind::from_id_prefix("crypto"), None);
+        assert_eq!(AssetKind::from_id_prefix("Crypto"), None);
+        assert_eq!(AssetKind::from_id_prefix("cash"), None);
+        assert_eq!(AssetKind::from_id_prefix("fx"), None);
+        assert_eq!(AssetKind::from_id_prefix("prop"), None);
+    }
+
+    #[test]
+    fn test_kind_from_asset_id_case_sensitive() {
+        // kind_from_asset_id is case-sensitive for the prefix
+        assert_eq!(kind_from_asset_id("sec:AAPL:XNAS"), None);
+        assert_eq!(kind_from_asset_id("Sec:AAPL:XNAS"), None);
+        assert_eq!(kind_from_asset_id("crypto:BTC:USD"), None);
+        // Correct uppercase works
+        assert_eq!(kind_from_asset_id("SEC:AAPL:XNAS"), Some(AssetKind::Security));
+    }
+
+    // ------------------------------------------------------------------------
+    // Round-Trip Tests: Generate → Parse → Verify
+    // ------------------------------------------------------------------------
+
+    #[test]
+    fn test_round_trip_security_id() {
+        let id = canonical_asset_id(&AssetKind::Security, "AAPL", Some("XNAS"), "USD");
+        let parsed = parse_canonical_asset_id(&id).unwrap();
+
+        assert_eq!(parsed.kind, Some(AssetKind::Security));
+        assert_eq!(parsed.symbol, "AAPL");
+        assert_eq!(parsed.qualifier, "XNAS");
+    }
+
+    #[test]
+    fn test_round_trip_security_unknown_exchange() {
+        let id = canonical_asset_id(&AssetKind::Security, "TSLA", None, "USD");
+        assert_eq!(id, "SEC:TSLA:UNKNOWN");
+
+        let parsed = parse_canonical_asset_id(&id).unwrap();
+        assert_eq!(parsed.kind, Some(AssetKind::Security));
+        assert_eq!(parsed.symbol, "TSLA");
+        assert_eq!(parsed.qualifier, "UNKNOWN");
+    }
+
+    #[test]
+    fn test_round_trip_crypto_id() {
+        let id = canonical_asset_id(&AssetKind::Crypto, "BTC", None, "USD");
+        let parsed = parse_canonical_asset_id(&id).unwrap();
+
+        assert_eq!(parsed.kind, Some(AssetKind::Crypto));
+        assert_eq!(parsed.symbol, "BTC");
+        assert_eq!(parsed.qualifier, "USD");
+    }
+
+    #[test]
+    fn test_round_trip_fx_id() {
+        let id = canonical_asset_id(&AssetKind::FxRate, "EUR", None, "CAD");
+        let parsed = parse_canonical_asset_id(&id).unwrap();
+
+        assert_eq!(parsed.kind, Some(AssetKind::FxRate));
+        assert_eq!(parsed.symbol, "EUR");
+        assert_eq!(parsed.qualifier, "CAD");
+    }
+
+    #[test]
+    fn test_round_trip_cash_id() {
+        let id = canonical_asset_id(&AssetKind::Cash, "CAD", None, "CAD");
+        let parsed = parse_canonical_asset_id(&id).unwrap();
+
+        assert_eq!(parsed.kind, Some(AssetKind::Cash));
+        assert_eq!(parsed.symbol, "CAD");
+        assert_eq!(parsed.qualifier, "CAD");
+    }
+
+    #[test]
+    fn test_round_trip_option_id() {
+        let id = canonical_asset_id(&AssetKind::Option, "AAPL240119C00150000", Some("XCBO"), "USD");
+        let parsed = parse_canonical_asset_id(&id).unwrap();
+
+        assert_eq!(parsed.kind, Some(AssetKind::Option));
+        assert_eq!(parsed.symbol, "AAPL240119C00150000");
+        assert_eq!(parsed.qualifier, "XCBO");
+    }
+
+    #[test]
+    fn test_round_trip_commodity_id() {
+        let id = canonical_asset_id(&AssetKind::Commodity, "GC", None, "USD");
+        let parsed = parse_canonical_asset_id(&id).unwrap();
+
+        assert_eq!(parsed.kind, Some(AssetKind::Commodity));
+        assert_eq!(parsed.symbol, "GC");
+        assert_eq!(parsed.qualifier, "");
+    }
+
+    #[test]
+    fn test_round_trip_alternative_assets() {
+        // Property
+        let prop_id = canonical_asset_id(&AssetKind::Property, "House", None, "USD");
+        let parsed = parse_canonical_asset_id(&prop_id).unwrap();
+        assert_eq!(parsed.kind, Some(AssetKind::Property));
+        assert!(prop_id.starts_with("PROP:"));
+
+        // Vehicle
+        let veh_id = canonical_asset_id(&AssetKind::Vehicle, "Car", None, "USD");
+        let parsed = parse_canonical_asset_id(&veh_id).unwrap();
+        assert_eq!(parsed.kind, Some(AssetKind::Vehicle));
+
+        // Private Equity
+        let peq_id = canonical_asset_id(&AssetKind::PrivateEquity, "Startup", None, "USD");
+        let parsed = parse_canonical_asset_id(&peq_id).unwrap();
+        assert_eq!(parsed.kind, Some(AssetKind::PrivateEquity));
+
+        // Liability
+        let liab_id = canonical_asset_id(&AssetKind::Liability, "Mortgage", None, "USD");
+        let parsed = parse_canonical_asset_id(&liab_id).unwrap();
+        assert_eq!(parsed.kind, Some(AssetKind::Liability));
+    }
+
+    #[test]
+    fn test_round_trip_preserves_kind() {
+        // Test all asset kinds through round-trip
+        let test_cases = vec![
+            (AssetKind::Security, "AAPL", Some("XNAS"), "USD"),
+            (AssetKind::Crypto, "BTC", None, "USD"),
+            (AssetKind::FxRate, "EUR", None, "USD"),
+            (AssetKind::Cash, "CAD", None, "CAD"),
+            (AssetKind::Option, "AAPL240119C", Some("XCBO"), "USD"),
+            (AssetKind::Commodity, "GC", None, "USD"),
+        ];
+
+        for (kind, symbol, exchange, currency) in test_cases {
+            let id = canonical_asset_id(&kind, symbol, exchange, currency);
+            let parsed_kind = kind_from_asset_id(&id);
+            assert_eq!(
+                parsed_kind, Some(kind.clone()),
+                "Round-trip failed for {:?}: {} -> {:?}",
+                kind, id, parsed_kind
+            );
+        }
+    }
+
+    #[test]
+    fn test_parse_invalid_formats() {
+        // Too few parts
+        assert!(parse_canonical_asset_id("SEC").is_none());
+        assert!(parse_canonical_asset_id("SEC:AAPL").is_none()); // 3-part format needs 3 parts
+
+        // Too many parts
+        assert!(parse_canonical_asset_id("SEC:AAPL:XNAS:EXTRA").is_none());
+
+        // Empty string
+        assert!(parse_canonical_asset_id("").is_none());
+
+        // Just delimiters
+        assert!(parse_canonical_asset_id("::").is_none());
+        assert!(parse_canonical_asset_id(":").is_none());
+
+        // Wrong format for cash (3 parts instead of 2)
+        assert!(parse_canonical_asset_id("CASH:USD:EXTRA").is_none());
+    }
+
+    #[test]
+    fn test_parse_asset_id_handles_all_valid_formats() {
+        // Canonical formats via parse_asset_id (not parse_canonical_asset_id)
+        assert!(parse_asset_id("SEC:AAPL:XNAS").is_some());
+        assert!(parse_asset_id("CRYPTO:BTC:USD").is_some());
+        assert!(parse_asset_id("FX:EUR:USD").is_some());
+        assert!(parse_asset_id("CASH:CAD").is_some());
+        assert!(parse_asset_id("CMDTY:GC").is_some());
+        assert!(parse_asset_id("PROP:a1b2c3d4").is_some());
+
+        // Legacy 2-part formats
+        assert!(parse_asset_id("AAPL:XNAS").is_some());
+        assert!(parse_asset_id("BTC:USD").is_some());
+        assert!(parse_asset_id("EUR:USD").is_some());
     }
 }

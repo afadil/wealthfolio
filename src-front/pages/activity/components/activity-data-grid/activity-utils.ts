@@ -4,6 +4,7 @@ import type { Account } from "@/lib/types";
 import { parseDecimalInput, parseLocalDateTime } from "@/lib/utils";
 import type {
   ActivityCreatePayload,
+  ActivityUpdatePayload,
   CurrencyResolutionOptions,
   LocalTransaction,
   SavePayloadResult,
@@ -77,24 +78,26 @@ export function valuesAreEqual(field: string, prevValue: unknown, nextValue: unk
 }
 
 /**
- * Resolves the asset ID for a transaction, handling cash activities specially
+ * Resolves the asset ID for a transaction.
+ * For cash activities, returns undefined - backend will generate CASH:{currency}.
+ * For market activities, returns the existing assetId if present.
+ *
+ * NOTE: This function no longer generates $CASH-{currency} IDs.
+ * The backend is now the sole generator of canonical asset IDs.
  */
 export function resolveAssetIdForTransaction(
   transaction: LocalTransaction,
-  fallbackCurrency: string,
+  _fallbackCurrency: string,
 ): string | undefined {
+  // For cash activities, don't return an assetId - backend will generate CASH:{currency}
+  if (isCashActivity(transaction.activityType)) {
+    return undefined;
+  }
+
+  // For market activities, return the existing assetId if present
   const existingAssetId = transaction.assetId?.trim() || transaction.assetSymbol?.trim();
   if (existingAssetId) {
     return existingAssetId;
-  }
-
-  if (isCashActivity(transaction.activityType)) {
-    const currency = (transaction.currency || transaction.accountCurrency || fallbackCurrency)
-      .toUpperCase()
-      .trim();
-    if (currency.length > 0) {
-      return `$CASH-${currency}`;
-    }
   }
 
   return undefined;
@@ -139,7 +142,9 @@ export function createDraftTransaction(
 }
 
 /**
- * Applies cash activity defaults (sets asset to $CASH-{currency})
+ * Applies cash activity defaults for display purposes.
+ * NOTE: Does NOT set assetId - backend will generate CASH:{currency} on save.
+ * Just sets display-friendly values for the grid.
  * Returns a new transaction object with the defaults applied (immutable)
  */
 function applyCashDefaults(
@@ -151,11 +156,14 @@ function applyCashDefaults(
     return transaction;
   }
   const derivedCurrency = resolveTransactionCurrency(transaction) ?? fallbackCurrency;
-  const cashSymbol = `$CASH-${derivedCurrency.toUpperCase()}`;
+  // Display "CASH" as symbol for UI clarity, but don't set assetId
+  // Backend will generate the canonical CASH:{currency} ID
   return {
     ...transaction,
-    assetSymbol: cashSymbol,
-    assetId: cashSymbol,
+    assetSymbol: "CASH",
+    // Clear assetId - backend generates the canonical ID
+    assetId: "",
+    currency: derivedCurrency.toUpperCase(),
     quantity: 0,
     unitPrice: 0,
   };
@@ -229,7 +237,10 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
     }
   } else if (field === "assetSymbol") {
     const upper = (typeof value === "string" ? value : "").trim().toUpperCase();
-    updated = { ...updated, assetSymbol: upper, assetId: upper };
+    // Only update assetSymbol, NOT assetId
+    // For new activities, backend generates canonical assetId from symbol + exchangeMic
+    // For existing activities, assetId is preserved from the original data
+    updated = { ...updated, assetSymbol: upper };
 
     // Auto-fill currency: asset currency → account currency → base currency
     const assetKey = upper;
@@ -280,7 +291,7 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
 /**
  * Creates a currency resolution function for a given context.
  * Resolution order:
- * 1. Asset currency (from assetCurrencyLookup or $CASH- prefix)
+ * 1. Asset currency (from assetCurrencyLookup or cash asset ID format)
  * 2. Account currency (from transaction.accountCurrency)
  * 3. App base currency (fallbackCurrency)
  */
@@ -299,8 +310,14 @@ export function createCurrencyResolver(
 
     // 1. Try to get currency from the asset
     const assetKey = (transaction.assetId ?? transaction.assetSymbol ?? "").trim().toUpperCase();
-    const isCashAsset = assetKey.startsWith("$CASH-");
-    const cashCurrency = isCashAsset ? assetKey.replace("$CASH-", "") : undefined;
+
+    // Support both old format ($CASH-CAD) and new format (CASH:CAD)
+    let cashCurrency: string | undefined;
+    if (assetKey.startsWith("$CASH-")) {
+      cashCurrency = assetKey.replace("$CASH-", "");
+    } else if (assetKey.startsWith("CASH:")) {
+      cashCurrency = assetKey.replace("CASH:", "");
+    }
     const assetCurrency = cashCurrency ?? assetCurrencyLookup.get(assetKey);
 
     if (assetCurrency) {
@@ -321,7 +338,13 @@ export function createCurrencyResolver(
 }
 
 /**
- * Builds the save payload from dirty and deleted transactions
+ * Builds the save payload from dirty and deleted transactions.
+ *
+ * Asset identification strategy:
+ * - For NEW activities: send symbol + exchangeMic, backend generates canonical ID
+ *   (assetId is NOT sent for creates)
+ * - For EDITING existing: send assetId (for backward compatibility)
+ * - For CASH activities: don't send symbol/assetId, backend generates CASH:{currency}
  */
 export function buildSavePayload(
   localTransactions: LocalTransaction[],
@@ -336,7 +359,7 @@ export function buildSavePayload(
   fallbackCurrency: string,
 ): SavePayloadResult {
   const creates: ActivityCreatePayload[] = [];
-  const updates: ActivityCreatePayload[] = [];
+  const updates: ActivityUpdatePayload[] = [];
   const deleteIds = Array.from(pendingDeleteIds);
 
   const dirtyTransactions = localTransactions.filter((transaction) =>
@@ -355,7 +378,11 @@ export function buildSavePayload(
       ? currencyFallback
       : undefined);
 
-    const payload: ActivityCreatePayload = {
+    const isCash = isCashActivity(transaction.activityType);
+    const isNew = transaction.isNew === true;
+
+    // Common payload fields (shared between create and update)
+    const basePayload = {
       id: transaction.id,
       accountId: transaction.accountId,
       activityType: transaction.activityType,
@@ -363,8 +390,7 @@ export function buildSavePayload(
         transaction.date instanceof Date
           ? transaction.date.toISOString()
           : new Date(transaction.date).toISOString(),
-      assetId: resolveAssetIdForTransaction(transaction, fallbackCurrency),
-      assetDataSource: transaction.assetDataSource,
+      // Activity data
       quantity: toDecimalString(transaction.quantity),
       unitPrice: toDecimalString(transaction.unitPrice),
       amount: toDecimalString(transaction.amount),
@@ -372,24 +398,47 @@ export function buildSavePayload(
       fee: toDecimalString(transaction.fee),
       fxRate: transaction.fxRate != null ? toDecimalString(transaction.fxRate) : null,
       comment: transaction.comment ?? undefined,
+      assetDataSource: transaction.assetDataSource,
     };
 
-    // Handle cash activities without asset ID
-    if (!payload.assetId && isCashActivity(payload.activityType as ActivityType)) {
-      const cashCurrency = (resolvedCurrency ?? currencyFallback).toUpperCase().trim();
-      payload.assetId = `$CASH-${cashCurrency}`;
-    }
-
     // Remove quantity/unitPrice for split activities
-    if (payload.activityType === ActivityType.SPLIT) {
-      delete payload.quantity;
-      delete payload.unitPrice;
+    if (basePayload.activityType === ActivityType.SPLIT) {
+      delete basePayload.quantity;
+      delete basePayload.unitPrice;
     }
 
-    if (transaction.isNew) {
-      creates.push(payload);
+    if (isNew) {
+      // Build CREATE payload - NO assetId allowed, only symbol + exchangeMic
+      const createPayload: ActivityCreatePayload = { ...basePayload };
+
+      if (!isCash) {
+        // For NEW market activities: send symbol + exchangeMic
+        // Backend will generate the canonical ID
+        const symbol = (transaction.assetSymbol || "").trim().toUpperCase();
+        if (symbol) {
+          createPayload.symbol = symbol;
+          // Include exchangeMic if available from symbol search selection
+          if (transaction.exchangeMic) {
+            createPayload.exchangeMic = transaction.exchangeMic;
+          }
+        }
+      }
+      // For cash activities: don't send symbol - backend generates CASH:{currency}
+
+      creates.push(createPayload);
     } else {
-      updates.push(payload);
+      // Build UPDATE payload - can include assetId for backward compatibility
+      const updatePayload: ActivityUpdatePayload = { ...basePayload };
+
+      if (!isCash) {
+        // For EXISTING activities: send assetId for backward compatibility
+        const existingAssetId = resolveAssetIdForTransaction(transaction, fallbackCurrency);
+        if (existingAssetId) {
+          updatePayload.assetId = existingAssetId;
+        }
+      }
+
+      updates.push(updatePayload);
     }
   }
 
@@ -421,7 +470,7 @@ export const TRACKED_FIELDS: (keyof LocalTransaction)[] = [
  * Column IDs that should be pinned to the left/right of the grid
  */
 export const PINNED_COLUMNS = {
-  left: ["select", "status", "activityType"] as const,
+  left: ["select", "status", "date", "accountName", "activityType"] as const,
   right: ["actions"] as const,
 };
 
