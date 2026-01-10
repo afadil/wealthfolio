@@ -12,6 +12,7 @@ import {
 } from "@wealthfolio/ui/components/ui/sheet";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { QuoteSummary } from "@/lib/types";
+import { getExchangeDisplayName } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { forwardRef, useState } from "react";
@@ -155,7 +156,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                           </div>
                           {ticker.exchange && (
                             <div className="text-muted-foreground mt-0.5 text-sm">
-                              {ticker.exchange}
+                              {ticker.exchangeName || getExchangeDisplayName(ticker.exchange)}
                             </div>
                           )}
                         </div>

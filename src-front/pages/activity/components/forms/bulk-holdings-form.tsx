@@ -123,6 +123,10 @@ const HoldingRow = memo(
         } else {
           setValue(`holdings.${index}.assetDataSource`, DataSource.YAHOO, { shouldDirty: true });
         }
+        // Capture exchangeMic for canonical asset ID generation
+        if (quoteSummary?.exchangeMic) {
+          setValue(`holdings.${index}.exchangeMic`, quoteSummary.exchangeMic, { shouldDirty: true });
+        }
         setFocus(`holdings.${index}.sharesOwned`);
       },
       [index, setFocus, setValue],

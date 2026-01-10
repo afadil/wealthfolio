@@ -250,6 +250,14 @@ mod tests {
             unimplemented!()
         }
 
+        async fn search_symbol_with_currency(
+            &self,
+            _query: &str,
+            _account_currency: Option<&str>,
+        ) -> Result<Vec<QuoteSummary>> {
+            unimplemented!()
+        }
+
         async fn get_asset_profile(&self, _symbol: &str) -> Result<ProviderProfile> {
             unimplemented!()
         }
@@ -300,6 +308,18 @@ mod tests {
         }
 
         fn get_symbols_needing_sync(&self) -> Result<Vec<QuoteSyncState>> {
+            Ok(Vec::new())
+        }
+
+        fn get_sync_state(&self, _symbol: &str) -> Result<Option<QuoteSyncState>> {
+            Ok(None)
+        }
+
+        async fn mark_profile_enriched(&self, _symbol: &str) -> Result<()> {
+            Ok(())
+        }
+
+        fn get_assets_needing_profile_enrichment(&self) -> Result<Vec<QuoteSyncState>> {
             Ok(Vec::new())
         }
 
@@ -372,13 +392,11 @@ mod tests {
     ) -> Holding {
         let instrument = if holding_type == HoldingType::Security {
             Some(Instrument {
-                id: format!("inst_{}", symbol_or_cash_code),
+                id: symbol_or_cash_code.to_string(), // Use symbol as ID to match mock quote keys
                 symbol: symbol_or_cash_code.to_string(),
                 name: Some(name.unwrap_or(symbol_or_cash_code).to_string()),
                 currency: local_currency.to_string(),
                 notes: None,
-                asset_class: None,
-                asset_subclass: None,
                 countries: None,
                 sectors: None,
                 preferred_provider: None,

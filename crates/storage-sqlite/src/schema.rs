@@ -247,6 +247,7 @@ diesel::table! {
         sync_priority -> Integer,
         error_count -> Integer,
         last_error -> Nullable<Text>,
+        profile_enriched_at -> Nullable<Text>,
         created_at -> Text,
         updated_at -> Text,
     }

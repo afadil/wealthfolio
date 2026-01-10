@@ -529,7 +529,41 @@ impl SyncStateStore for QuoteSyncStateRepository {
             })
             .await
     }
-}
 
-// Note: SyncStateStore is implemented above directly.
-// The implementation provides all methods required by the SyncStateStore trait.
+    async fn mark_profile_enriched(&self, symbol: &str) -> Result<()> {
+        let symbol_owned = symbol.to_string();
+        let now = Utc::now().to_rfc3339();
+
+        debug!("Marking profile enriched for symbol {}", symbol);
+
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                let update = QuoteSyncStateUpdateDB {
+                    profile_enriched_at: Some(Some(now.clone())),
+                    updated_at: Some(now),
+                    ..Default::default()
+                };
+
+                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&symbol_owned)))
+                    .set(&update)
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+
+                Ok(())
+            })
+            .await
+    }
+
+    fn get_assets_needing_profile_enrichment(&self) -> Result<Vec<QuoteSyncState>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        // Get assets where profile_enriched_at is NULL
+        let results = qss_dsl::quote_sync_state
+            .filter(qss_dsl::profile_enriched_at.is_null())
+            .order(qss_dsl::sync_priority.desc())
+            .load::<QuoteSyncStateDB>(&mut conn)
+            .map_err(StorageError::from)?;
+
+        Ok(results.into_iter().map(QuoteSyncState::from).collect())
+    }
+}

@@ -91,17 +91,17 @@ export interface SavePayloadResult {
 }
 
 /**
- * Payload for creating an activity
+ * Base activity payload fields (shared between create and update)
  * Note: Decimal fields (quantity, unitPrice, amount, fee, fxRate) use strings
  * to preserve precision for very small values like 0.000000099
  */
-export interface ActivityCreatePayload {
+interface ActivityBasePayload {
   id: string;
   accountId: string;
   activityType: string;
   activityDate: string;
-  assetId?: string;
-  assetDataSource?: DataSource;
+
+  // Activity data
   quantity?: string;
   unitPrice?: string;
   amount?: string;
@@ -109,12 +109,41 @@ export interface ActivityCreatePayload {
   fee?: string;
   fxRate?: string | null;
   comment?: string;
+  assetDataSource?: DataSource;
 }
 
 /**
- * Payload for updating an activity (same as create but id is required)
+ * Payload for creating a NEW activity
+ *
+ * Asset identification:
+ * - Send symbol + exchangeMic, backend generates the canonical ID
+ * - For CASH activities: don't send symbol, backend generates CASH:{currency}
+ *
+ * IMPORTANT: assetId is NOT allowed for creates - backend generates canonical IDs
  */
-export type ActivityUpdatePayload = ActivityCreatePayload & { id: string };
+export interface ActivityCreatePayload extends ActivityBasePayload {
+  // Asset identification (backend generates ID from these)
+  symbol?: string; // e.g., "AAPL" or undefined for cash
+  exchangeMic?: string; // e.g., "XNAS" or undefined
+  assetKind?: string; // e.g., "Security", "Crypto" - helps backend determine ID format
+  // NOTE: No assetId field - backend generates canonical ID from symbol + exchangeMic
+}
+
+/**
+ * Payload for updating an EXISTING activity
+ *
+ * Asset identification:
+ * - Send assetId for existing assets (backward compatibility)
+ * - Or send symbol + exchangeMic to re-resolve the asset
+ */
+export interface ActivityUpdatePayload extends ActivityBasePayload {
+  // For existing activities: use the existing assetId
+  assetId?: string;
+  // Or re-resolve from symbol + exchangeMic
+  symbol?: string;
+  exchangeMic?: string;
+  assetKind?: string;
+}
 
 /**
  * Options for resolving transaction currency

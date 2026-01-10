@@ -9,20 +9,51 @@ use wealthfolio_core::activities::{
     Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityImport,
     ActivitySearchResponse, ActivityUpdate, ImportMappingData, NewActivity, Sort,
 };
+use wealthfolio_core::assets::{is_cash_asset_id, is_fx_asset_id};
 
 use serde_json::json;
 
 /// Determines if an asset should be enriched based on its ID pattern.
-/// Excludes cash placeholders, unknown placeholders, and alternative assets.
+/// Only enriches market-priced assets (securities, crypto, options).
+/// Excludes cash, FX, alternative assets, and legacy placeholders.
 fn should_enrich_asset(asset_id: &str) -> bool {
-    !asset_id.starts_with("$CASH-")
-        && !asset_id.starts_with("$UNKNOWN-")
-        && !asset_id.starts_with("PROP-")
-        && !asset_id.starts_with("VEH-")
-        && !asset_id.starts_with("COLL-")
-        && !asset_id.starts_with("PREC-")
-        && !asset_id.starts_with("LIAB-")
-        && !asset_id.starts_with("ALT-")
+    // Canonical format assets that SHOULD be enriched (market data available)
+    if asset_id.starts_with("SEC:") || asset_id.starts_with("CRYPTO:") || asset_id.starts_with("OPT:") {
+        return true;
+    }
+
+    // Cash and FX assets should NOT be enriched (handles both legacy and canonical formats)
+    if is_cash_asset_id(asset_id) || is_fx_asset_id(asset_id) {
+        return false;
+    }
+
+    // Canonical format assets that should NOT be enriched (alternative assets)
+    if asset_id.starts_with("CMDTY:")
+        || asset_id.starts_with("PEQ:")
+        || asset_id.starts_with("PROP:")
+        || asset_id.starts_with("VEH:")
+        || asset_id.starts_with("COLL:")
+        || asset_id.starts_with("PREC:")
+        || asset_id.starts_with("LIAB:")
+        || asset_id.starts_with("ALT:")
+    {
+        return false;
+    }
+
+    // Legacy format exclusions (alternative assets)
+    if asset_id.starts_with("$UNKNOWN-")
+        || asset_id.starts_with("PROP-")
+        || asset_id.starts_with("VEH-")
+        || asset_id.starts_with("COLL-")
+        || asset_id.starts_with("PREC-")
+        || asset_id.starts_with("LIAB-")
+        || asset_id.starts_with("ALT-")
+    {
+        return false;
+    }
+
+    // Legacy format without typed prefix - attempt enrichment (e.g., "AAPL", "AAPL.TO")
+    true
 }
 
 #[tauri::command]

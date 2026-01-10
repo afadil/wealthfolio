@@ -5,6 +5,7 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { QuoteSummary } from "@/lib/types";
+import { getExchangeDisplayName } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { Command as CommandPrimitive } from "cmdk";
@@ -67,6 +68,8 @@ const SearchResults = memo(
         )}
 
         {results?.map((ticker) => {
+          // Use exchangeName if available (from backend), otherwise map exchange code to friendly name
+          const exchangeDisplay = ticker.exchangeName || getExchangeDisplayName(ticker.exchange);
           return (
             <CommandItem
               key={ticker.symbol}
@@ -80,7 +83,7 @@ const SearchResults = memo(
                   selectedResult?.symbol === ticker.symbol ? "opacity-100" : "opacity-0",
                 )}
               />
-              {ticker.symbol} - {ticker.longName} ({ticker.exchange})
+              {ticker.symbol} - {ticker.longName} ({exchangeDisplay})
             </CommandItem>
           );
         })}
@@ -108,7 +111,10 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
     const [debouncedQuery, setDebouncedQuery] = useState("");
     const [selected, setSelected] = useState(() => {
       if (selectedResult) {
-        return `${selectedResult.symbol} - ${selectedResult.longName}`;
+        // Show symbol - name (exchange) for better context
+        const exchangeDisplay = selectedResult.exchangeName || getExchangeDisplayName(selectedResult.exchange);
+        const exchangeSuffix = exchangeDisplay ? ` (${exchangeDisplay})` : "";
+        return `${selectedResult.symbol} - ${selectedResult.longName}${exchangeSuffix}`;
       }
       if (defaultValue) {
         return defaultValue;
@@ -141,7 +147,10 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
     const handleSelectResult = useCallback(
       (ticker: QuoteSummary) => {
         onSelectResult(ticker?.symbol, ticker);
-        const displayText = ticker ? `${ticker.symbol} - ${ticker.longName}` : "";
+        // Show symbol - name (exchange) for better context, using friendly exchange name
+        const exchangeDisplay = ticker?.exchangeName || getExchangeDisplayName(ticker?.exchange);
+        const exchangeSuffix = exchangeDisplay ? ` (${exchangeDisplay})` : "";
+        const displayText = ticker ? `${ticker.symbol} - ${ticker.longName}${exchangeSuffix}` : "";
         setSearchQuery(displayText);
         setSelected(displayText);
         setOpen(false);

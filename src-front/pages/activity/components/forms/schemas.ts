@@ -13,6 +13,8 @@ export const baseActivitySchema = z.object({
     .positive({ message: "FX rate must be a positive number." })
     .optional()
     .nullable(),
+  // Exchange MIC for canonical asset ID generation (e.g., "XNAS", "XTSE")
+  exchangeMic: z.string().optional(),
 });
 
 // Holdings schema: TRANSFER_IN/OUT with is_external=true represents add/remove holding
@@ -61,6 +63,8 @@ export const bulkHoldingRowSchema = z.object({
   totalValue: z.number().optional(),
   assetId: z.string().optional(),
   assetDataSource: z.enum([DataSource.YAHOO, DataSource.MANUAL]).optional(),
+  // Exchange MIC for canonical asset ID generation (e.g., "XNAS", "XTSE")
+  exchangeMic: z.string().optional(),
 });
 
 export const bulkHoldingsFormSchema = baseActivitySchema.extend({

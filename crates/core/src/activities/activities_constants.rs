@@ -60,6 +60,25 @@ pub const TRADING_ACTIVITY_TYPES: [&str; 3] =
 /// Income activity types
 pub const INCOME_ACTIVITY_TYPES: [&str; 2] = [ACTIVITY_TYPE_DIVIDEND, ACTIVITY_TYPE_INTEREST];
 
+/// Cash-only activity types (no asset/security involved)
+/// These activities can have asset_id = None, and will use CASH:{currency} format when needed.
+pub const CASH_ACTIVITY_TYPES: [&str; 8] = [
+    ACTIVITY_TYPE_DEPOSIT,
+    ACTIVITY_TYPE_WITHDRAWAL,
+    ACTIVITY_TYPE_INTEREST,
+    ACTIVITY_TYPE_TRANSFER_IN,
+    ACTIVITY_TYPE_TRANSFER_OUT,
+    ACTIVITY_TYPE_TAX,
+    ACTIVITY_TYPE_FEE,
+    ACTIVITY_TYPE_CREDIT,
+];
+
+/// Checks if an activity type is a cash-only activity (no security involved).
+/// Cash activities can have asset_id = None and will use CASH:{currency} format when needed.
+pub fn is_cash_activity(activity_type: &str) -> bool {
+    CASH_ACTIVITY_TYPES.contains(&activity_type)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Activity Subtypes
 // ─────────────────────────────────────────────────────────────────────────────
@@ -85,3 +104,40 @@ pub const ACTIVITY_SUBTYPE_STOCK_DIVIDEND: &str = "STOCK_DIVIDEND";
 /// Opening Position: Initial position for manual/alternative assets (property, vehicle, etc.).
 /// Passes through unchanged as TRANSFER_IN - no expansion needed.
 pub const ACTIVITY_SUBTYPE_OPENING_POSITION: &str = "OPENING_POSITION";
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_cash_activity_returns_true_for_cash_types() {
+        // All cash activity types should return true
+        assert!(is_cash_activity(ACTIVITY_TYPE_DEPOSIT));
+        assert!(is_cash_activity(ACTIVITY_TYPE_WITHDRAWAL));
+        assert!(is_cash_activity(ACTIVITY_TYPE_INTEREST));
+        assert!(is_cash_activity(ACTIVITY_TYPE_TRANSFER_IN));
+        assert!(is_cash_activity(ACTIVITY_TYPE_TRANSFER_OUT));
+        assert!(is_cash_activity(ACTIVITY_TYPE_TAX));
+        assert!(is_cash_activity(ACTIVITY_TYPE_FEE));
+        assert!(is_cash_activity(ACTIVITY_TYPE_CREDIT));
+    }
+
+    #[test]
+    fn test_is_cash_activity_returns_false_for_non_cash_types() {
+        // Non-cash activity types should return false
+        assert!(!is_cash_activity(ACTIVITY_TYPE_BUY));
+        assert!(!is_cash_activity(ACTIVITY_TYPE_SELL));
+        assert!(!is_cash_activity(ACTIVITY_TYPE_DIVIDEND));
+        assert!(!is_cash_activity(ACTIVITY_TYPE_SPLIT));
+        assert!(!is_cash_activity(ACTIVITY_TYPE_ADJUSTMENT));
+        assert!(!is_cash_activity(ACTIVITY_TYPE_UNKNOWN));
+    }
+
+    #[test]
+    fn test_is_cash_activity_returns_false_for_invalid_types() {
+        // Invalid/unknown types should return false
+        assert!(!is_cash_activity("INVALID"));
+        assert!(!is_cash_activity(""));
+        assert!(!is_cash_activity("buy")); // lowercase
+    }
+}

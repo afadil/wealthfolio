@@ -229,8 +229,6 @@ export const AssetProfilePage = () => {
       isin: null,
       assetType: null,
       symbolMapping: null,
-      assetClass: instrument?.assetClass ?? "",
-      assetSubClass: instrument?.assetSubclass ?? "",
       notes: instrument?.notes ?? asset?.notes ?? null,
       countries:
         typeof instrument?.countries === "string"

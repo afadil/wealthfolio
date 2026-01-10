@@ -18,12 +18,10 @@ function getClassData(holdings: Holding[]) {
   const classes = holdings.reduce(
     (acc, holding) => {
       const isCash = holding.holdingType === HoldingType.CASH;
-      // Prefer taxonomy-based assetType, fall back to legacy assetSubclass
+      // Use taxonomy-based assetType classification
       const assetType = isCash
         ? "Cash"
-        : holding.instrument?.classifications?.assetType?.name ||
-          holding.instrument?.assetSubclass ||
-          "Other";
+        : holding.instrument?.classifications?.assetType?.name || "Other";
 
       const current = acc[assetType] || 0;
       const value = Number(holding.marketValue?.base) || 0;

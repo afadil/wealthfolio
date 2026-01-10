@@ -166,12 +166,12 @@ export const HoldingsPage = () => {
     }
 
     // Apply asset type filter (from mobile filter sheet)
+    // Uses taxonomy classifications assetType if available
     if (selectedTypes.length > 0) {
-      filtered = filtered.filter(
-        (holding) =>
-          holding.instrument?.assetSubclass &&
-          selectedTypes.includes(holding.instrument.assetSubclass),
-      );
+      filtered = filtered.filter((holding) => {
+        const assetType = holding.instrument?.classifications?.assetType?.name;
+        return assetType && selectedTypes.includes(assetType);
+      });
     }
 
     return { nonCashHoldings: nonCash, filteredHoldings: filtered };

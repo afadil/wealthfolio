@@ -88,7 +88,8 @@ export const HoldingsTable = ({
   const uniqueTypesSet = new Set();
   const assetsTypes: { label: string; value: string }[] = holdings.reduce(
     (result: { label: string; value: string }[], asset) => {
-      const type = asset.instrument?.assetSubclass; // Use instrument.assetSubclass
+      // Use taxonomy-based assetType classification
+      const type = asset.instrument?.classifications?.assetType?.name;
       if (type && !uniqueTypesSet.has(type)) {
         uniqueTypesSet.add(type);
         result.push({ label: type.toUpperCase(), value: type });
@@ -396,7 +397,7 @@ const getColumns = (
   },
   {
     id: "holdingType",
-    accessorFn: (row) => row.instrument?.assetSubclass,
+    accessorFn: (row) => row.instrument?.classifications?.assetType?.name,
     meta: {
       label: "Asset Type",
     },

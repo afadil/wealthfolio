@@ -11,8 +11,18 @@ pub struct SearchResult {
     /// Short display name (e.g., "Apple Inc")
     pub name: String,
 
-    /// Exchange name or MIC (e.g., "NASDAQ", "XNAS")
+    /// Exchange name or code from provider (e.g., "NASDAQ", "TOR")
     pub exchange: String,
+
+    /// Canonical exchange MIC code (e.g., "XNAS", "XTSE")
+    /// Mapped from provider's exchange code or symbol suffix
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exchange_mic: Option<String>,
+
+    /// Friendly exchange name (e.g., "NASDAQ", "TSX")
+    /// Derived from exchange_mic lookup
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exchange_name: Option<String>,
 
     /// Asset type (e.g., "EQUITY", "ETF", "MUTUALFUND")
     pub asset_type: String,
@@ -24,6 +34,10 @@ pub struct SearchResult {
     /// Relevance score from provider (higher = better match)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub score: Option<f64>,
+
+    /// Data source provider (e.g., "YAHOO", "MANUAL")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_source: Option<String>,
 }
 
 impl SearchResult {
@@ -38,9 +52,12 @@ impl SearchResult {
             symbol: symbol.into(),
             name: name.into(),
             exchange: exchange.into(),
+            exchange_mic: None,
+            exchange_name: None,
             asset_type: asset_type.into(),
             currency: None,
             score: None,
+            data_source: None,
         }
     }
 
@@ -53,6 +70,24 @@ impl SearchResult {
     /// Set the relevance score.
     pub fn with_score(mut self, score: f64) -> Self {
         self.score = Some(score);
+        self
+    }
+
+    /// Set the canonical exchange MIC.
+    pub fn with_exchange_mic(mut self, mic: impl Into<String>) -> Self {
+        self.exchange_mic = Some(mic.into());
+        self
+    }
+
+    /// Set the friendly exchange name.
+    pub fn with_exchange_name(mut self, name: impl Into<String>) -> Self {
+        self.exchange_name = Some(name.into());
+        self
+    }
+
+    /// Set the data source.
+    pub fn with_data_source(mut self, data_source: impl Into<String>) -> Self {
+        self.data_source = Some(data_source.into());
         self
     }
 }

@@ -71,7 +71,7 @@ const OnboardingPage = () => {
       </header>
 
       {/* Main content - centered vertically in remaining space */}
-      <main className="flex flex-1 flex-col items-center justify-start overflow-y-auto px-4 pt-8 sm:px-6 sm:pt-12">
+      <main className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 sm:px-6">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={currentStep}

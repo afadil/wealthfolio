@@ -68,6 +68,9 @@ pub struct QuoteSyncState {
     pub sync_priority: i32,
     pub error_count: i32,
     pub last_error: Option<String>,
+    /// Timestamp when asset profile was last enriched from provider.
+    /// NULL means the asset needs profile enrichment.
+    pub profile_enriched_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -97,9 +100,21 @@ impl QuoteSyncState {
             sync_priority: SyncCategory::New.default_priority(),
             error_count: 0,
             last_error: None,
+            profile_enriched_at: None,
             created_at: now,
             updated_at: now,
         }
+    }
+
+    /// Returns true if the asset profile needs enrichment (profile_enriched_at is None).
+    pub fn needs_profile_enrichment(&self) -> bool {
+        self.profile_enriched_at.is_none()
+    }
+
+    /// Mark profile as enriched.
+    pub fn mark_profile_enriched(&mut self) {
+        self.profile_enriched_at = Some(Utc::now());
+        self.updated_at = Utc::now();
     }
 
     /// Determine the sync category based on current state.
@@ -246,6 +261,7 @@ pub struct QuoteSyncStateUpdate {
     pub sync_priority: Option<i32>,
     pub error_count: Option<i32>,
     pub last_error: Option<Option<String>>,
+    pub profile_enriched_at: Option<Option<DateTime<Utc>>>,
     pub updated_at: Option<DateTime<Utc>>,
 }
 
@@ -334,6 +350,12 @@ pub trait SyncStateStore: Send + Sync {
     /// Refresh earliest_quote_date for all sync states from the quotes table.
     /// This ensures earliest_quote_date reflects the actual minimum quote date.
     async fn refresh_earliest_quote_dates(&self) -> Result<usize>;
+
+    /// Mark asset profile as enriched (sets profile_enriched_at timestamp).
+    async fn mark_profile_enriched(&self, symbol: &str) -> Result<()>;
+
+    /// Get assets that need profile enrichment (profile_enriched_at is NULL).
+    fn get_assets_needing_profile_enrichment(&self) -> Result<Vec<QuoteSyncState>>;
 }
 
 #[cfg(test)]

@@ -1,4 +1,5 @@
 import { logger } from "@/adapters";
+import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Form } from "@wealthfolio/ui/components/ui/form";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@wealthfolio/ui/components/ui/hover-card";
@@ -114,14 +115,24 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
     try {
       const { showCurrencySelect: _showCurrencySelect, id, ...submitData } = data;
       const account = accounts.find((a) => a.value === submitData.accountId);
-      // For cash activities and fees, set assetId to $CASH-accountCurrency
-      if (
-        ["DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE", "TAX", "TRANSFER_IN", "TRANSFER_OUT"].includes(
-          submitData.activityType,
-        )
-      ) {
-        if (account) {
-          submitData.assetId = `$CASH-${account.currency}`;
+
+      // For pure cash activities (DEPOSIT, WITHDRAWAL) without an asset:
+      // Don't send assetId - backend will generate CASH:{currency} from account currency
+      // Note: TRANSFER_IN/TRANSFER_OUT can be used for holdings (with assetId) or cash (without)
+      // INTEREST, FEE, TAX can also have an asset attached
+      const isPureCashActivity =
+        ["DEPOSIT", "WITHDRAWAL"].includes(submitData.activityType) ||
+        (["INTEREST", "FEE", "TAX", "TRANSFER_IN", "TRANSFER_OUT"].includes(submitData.activityType) &&
+          !("assetId" in submitData && submitData.assetId));
+
+      if (isPureCashActivity) {
+        // Clear assetId - let backend generate it
+        if ("assetId" in submitData) {
+          delete (submitData as Record<string, unknown>).assetId;
+        }
+        // Ensure currency is set for backend to derive cash asset
+        if (account && !submitData.currency) {
+          submitData.currency = account.currency;
         }
       }
 
@@ -238,6 +249,17 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
                   <OtherForm accounts={accounts} />
                 </TabsContent>
               </div>
+
+              {/* Display mutation error */}
+              {(addActivityMutation.isError || updateActivityMutation.isError) && (
+                <Alert variant="error">
+                  <Icons.AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>
+                    {String(addActivityMutation.error || updateActivityMutation.error)}
+                  </AlertDescription>
+                </Alert>
+              )}
 
               {!isTransferMode && (
                 <SheetFooter>

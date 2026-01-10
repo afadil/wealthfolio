@@ -179,6 +179,8 @@ export interface ActivityDetails {
   assetSymbol: string;
   assetName?: string;
   assetDataSource?: DataSource;
+  /** Canonical exchange MIC code for asset identification */
+  exchangeMic?: string;
   // Sync/source metadata
   sourceSystem?: string;
   sourceRecordId?: string;
@@ -195,13 +197,26 @@ export interface ActivitySearchResponse {
   };
 }
 
+/**
+ * Payload for creating a NEW activity.
+ *
+ * Asset identification:
+ * - Send symbol + exchangeMic, backend generates the canonical asset ID
+ * - For CASH activities: don't send symbol, backend generates CASH:{currency}
+ *
+ * IMPORTANT: assetId is NOT allowed for creates - backend generates canonical IDs
+ */
 export interface ActivityCreate {
   id?: string;
   accountId: string;
   activityType: string;
   subtype?: string | null; // Semantic variation (DRIP, STAKING_REWARD, etc.)
   activityDate: string | Date;
-  assetId?: string;
+  // Asset identification (backend generates ID from these)
+  symbol?: string; // e.g., "AAPL" or undefined for cash
+  exchangeMic?: string; // e.g., "XNAS" or undefined
+  assetKind?: string; // e.g., "Security", "Crypto" - helps backend determine ID format
+  // NOTE: No assetId field - backend generates canonical ID from symbol + exchangeMic
   assetDataSource?: DataSource;
   quantity?: number;
   unitPrice?: number;
@@ -210,10 +225,39 @@ export interface ActivityCreate {
   fee?: number;
   comment?: string | null;
   fxRate?: number | null;
-  metadata?: Record<string, unknown>; // Additional metadata (e.g., flow.is_external for external transfers)
+  metadata?: string | Record<string, unknown>; // Metadata (serialized to JSON string before sending)
 }
 
-export type ActivityUpdate = ActivityCreate & { id: string };
+/**
+ * Payload for updating an EXISTING activity.
+ *
+ * Asset identification:
+ * - Send assetId for existing assets (backward compatibility)
+ * - Or send symbol + exchangeMic to re-resolve the asset
+ */
+export interface ActivityUpdate {
+  id: string;
+  accountId: string;
+  activityType: string;
+  subtype?: string | null;
+  activityDate: string | Date;
+  // For existing activities: use the existing assetId
+  assetId?: string;
+  // Or re-resolve from symbol + exchangeMic
+  symbol?: string;
+  exchangeMic?: string;
+  assetKind?: string;
+  assetDataSource?: DataSource;
+  quantity?: number;
+  unitPrice?: number;
+  amount?: number;
+  currency?: string;
+  fee?: number;
+  comment?: string | null;
+  fxRate?: number | null;
+  metadata?: string | Record<string, unknown>; // Metadata (serialized to JSON string before sending)
+}
+
 export interface ActivityBulkMutationRequest {
   creates?: ActivityCreate[];
   updates?: ActivityUpdate[];
@@ -255,6 +299,10 @@ export interface CsvRowError {
 
 export interface QuoteSummary {
   exchange: string;
+  /** Canonical exchange MIC code (e.g., "XNAS", "XTSE") */
+  exchangeMic?: string;
+  /** Friendly exchange name (e.g., "NASDAQ" instead of "NMS" or "XNAS") */
+  exchangeName?: string;
   shortName: string;
   quoteType: string;
   symbol: string;
@@ -322,12 +370,10 @@ export interface Instrument {
   currency: string;
   notes?: string | null;
   preferredProvider?: string | null;
-  assetClass?: string | null;
-  assetSubclass?: string | null;
   countries?: Country[] | null;
   sectors?: Sector[] | null;
 
-  // NEW: Taxonomy-based classifications
+  // Taxonomy-based classifications
   classifications?: AssetClassifications | null;
 }
 

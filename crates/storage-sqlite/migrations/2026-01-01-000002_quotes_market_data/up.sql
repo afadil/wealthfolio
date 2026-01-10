@@ -97,6 +97,7 @@ CREATE TABLE quote_sync_state (
     sync_priority INTEGER NOT NULL DEFAULT 1,
     error_count INTEGER NOT NULL DEFAULT 0,
     last_error TEXT,
+    profile_enriched_at TEXT,  -- NULL = needs enrichment, set after successful enrichment
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
@@ -113,7 +114,53 @@ VALUES
     ('FINNHUB', 'Finnhub', 'Finnhub provides real-time stock, forex, and cryptocurrency data with global coverage. Free tier includes 60 API calls/minute.', 'https://finnhub.io/', 4, FALSE, 'finnhub.png', NULL, NULL, NULL);
 
 -- ============================================================================
--- STEP 4: RESTORE PRAGMAS
+-- STEP 4: EXCHANGES REFERENCE TABLE
+-- ============================================================================
+
+CREATE TABLE exchanges (
+    mic_code TEXT PRIMARY KEY,        -- ISO 10383 MIC (Market Identifier Code)
+    name TEXT NOT NULL,               -- Full exchange name (e.g., "New York Stock Exchange")
+    short_name TEXT,                  -- Short/common name (e.g., "NYSE")
+    country_code TEXT,                -- ISO 3166-1 alpha-2 country code (e.g., "US")
+    currency TEXT                     -- Primary trading currency (e.g., "USD")
+);
+
+-- Seed data: common exchanges
+-- United States
+INSERT INTO exchanges (mic_code, name, short_name, country_code, currency) VALUES
+    ('XNYS', 'New York Stock Exchange', 'NYSE', 'US', 'USD'),
+    ('XNAS', 'NASDAQ', 'NASDAQ', 'US', 'USD'),
+    ('ARCX', 'NYSE Arca', 'ARCA', 'US', 'USD'),
+    ('BATS', 'Cboe BZX Exchange', 'BATS', 'US', 'USD');
+
+-- Canada
+INSERT INTO exchanges (mic_code, name, short_name, country_code, currency) VALUES
+    ('XTSE', 'Toronto Stock Exchange', 'TSX', 'CA', 'CAD'),
+    ('XTSX', 'TSX Venture Exchange', 'TSX-V', 'CA', 'CAD'),
+    ('XCNQ', 'Canadian Securities Exchange', 'CSE', 'CA', 'CAD');
+
+-- United Kingdom
+INSERT INTO exchanges (mic_code, name, short_name, country_code, currency) VALUES
+    ('XLON', 'London Stock Exchange', 'LSE', 'GB', 'GBP');
+
+-- Europe
+INSERT INTO exchanges (mic_code, name, short_name, country_code, currency) VALUES
+    ('XETR', 'Deutsche Boerse Xetra', 'XETRA', 'DE', 'EUR'),
+    ('XPAR', 'Euronext Paris', 'EPA', 'FR', 'EUR'),
+    ('XAMS', 'Euronext Amsterdam', 'AMS', 'NL', 'EUR');
+
+-- Switzerland
+INSERT INTO exchanges (mic_code, name, short_name, country_code, currency) VALUES
+    ('XSWX', 'SIX Swiss Exchange', 'SWX', 'CH', 'CHF');
+
+-- Asia Pacific
+INSERT INTO exchanges (mic_code, name, short_name, country_code, currency) VALUES
+    ('XHKG', 'Hong Kong Stock Exchange', 'HKEX', 'HK', 'HKD'),
+    ('XTKS', 'Tokyo Stock Exchange', 'TSE', 'JP', 'JPY'),
+    ('XASX', 'Australian Securities Exchange', 'ASX', 'AU', 'AUD');
+
+-- ============================================================================
+-- STEP 5: RESTORE PRAGMAS
 -- ============================================================================
 
 PRAGMA legacy_alter_table = OFF;

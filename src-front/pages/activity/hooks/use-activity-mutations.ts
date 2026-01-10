@@ -7,7 +7,6 @@ import {
 } from "@/commands/activity";
 import { updateQuote } from "@/commands/market-data";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
-import { isCashActivity } from "@/lib/activity-utils";
 import { DataSource } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import {
@@ -27,17 +26,19 @@ export function useActivityMutations(
   const queryClient = useQueryClient();
 
   const createQuoteFromActivity = async (data: ActivityCreate | ActivityUpdate) => {
+    // Get symbol from either symbol (creates) or assetId (updates)
+    const symbolOrAssetId = ("symbol" in data && data.symbol) || ("assetId" in data && data.assetId);
     if (
       "assetDataSource" in data &&
       data.assetDataSource === DataSource.MANUAL &&
-      data.assetId &&
+      symbolOrAssetId &&
       "unitPrice" in data &&
       data.unitPrice &&
       "quantity" in data &&
       data.quantity
     ) {
       const quote: Omit<Quote, "id" | "createdAt"> & { id?: string; createdAt?: string } = {
-        symbol: data.assetId,
+        symbol: symbolOrAssetId,
         timestamp: new Date(data.activityDate).toISOString(),
         open: data.unitPrice,
         high: data.unitPrice,
@@ -93,8 +94,23 @@ export function useActivityMutations(
 
   const addActivityMutation = useMutation({
     mutationFn: async (data: NewActivityFormValues) => {
-      const { ...rest } = data;
-      const activity = await createActivity(rest);
+      // Convert form's assetId to symbol for new activities
+      // Backend generates canonical asset ID from symbol + exchangeMic
+      const { assetId, exchangeMic, metadata, ...rest } = data as NewActivityFormValues & {
+        assetId?: string;
+        exchangeMic?: string;
+        metadata?: Record<string, unknown>;
+      };
+      const createPayload: ActivityCreate = {
+        ...rest,
+        // Use symbol instead of assetId for creates
+        symbol: assetId,
+        // Pass exchangeMic for canonical ID generation (e.g., "XNAS", "XTSE")
+        exchangeMic,
+        // Serialize metadata object to JSON string for backend
+        metadata: metadata ? JSON.stringify(metadata) : undefined,
+      };
+      const activity = await createActivity(createPayload);
       await createQuoteFromActivity(data);
       return activity;
     },
@@ -103,7 +119,17 @@ export function useActivityMutations(
 
   const updateActivityMutation = useMutation({
     mutationFn: async (data: NewActivityFormValues & { id: string }) => {
-      const activity = await updateActivity(data);
+      // Extract metadata to serialize it
+      const { metadata, ...rest } = data as NewActivityFormValues & {
+        id: string;
+        metadata?: Record<string, unknown>;
+      };
+      const updatePayload: ActivityUpdate = {
+        ...rest,
+        // Serialize metadata object to JSON string for backend
+        metadata: metadata ? JSON.stringify(metadata) : undefined,
+      };
+      const activity = await updateActivity(updatePayload);
       await createQuoteFromActivity(data);
       return activity;
     },
@@ -122,16 +148,21 @@ export function useActivityMutations(
       updatedAt: _updatedAt,
       comment: _comment,
       date,
+      assetId: _assetId,
+      assetSymbol,
       ...restOfActivityData
     } = activityToDuplicate;
 
-    const newActivityData: NewActivityFormValues = {
+    // For duplicating, use symbol instead of assetId - backend generates canonical ID
+    const createPayload: ActivityCreate = {
       ...restOfActivityData,
       activityDate: date,
       comment: "Duplicated",
-    } as NewActivityFormValues;
+      // Use symbol for creates, not assetId
+      symbol: assetSymbol,
+    };
 
-    return await createActivity(newActivityData);
+    return await createActivity(createPayload);
   };
 
   const duplicateActivityMutation = useMutation({
@@ -141,30 +172,32 @@ export function useActivityMutations(
 
   const saveActivitiesMutation = useMutation({
     mutationFn: async (request: ActivityBulkMutationRequest) => {
-      const normalizeActivity = <T extends ActivityCreate | ActivityUpdate>(activity: T): T => {
-        if (!activity.assetId && isCashActivity(activity.activityType)) {
-          const currency = (activity.currency ?? "").toUpperCase().trim();
-          if (currency.length > 0) {
-            return {
-              ...activity,
-              assetId: `$CASH-${currency}`,
-            };
-          }
+      // NOTE: No longer normalizing cash activities to $CASH-{currency} here.
+      // Backend is now responsible for generating canonical asset IDs:
+      // - For cash activities: backend generates CASH:{currency}
+      // - For market activities: backend generates SEC:{symbol}:{mic} from symbol + exchangeMic
+
+      // Serialize metadata objects to JSON strings for backend
+      const serializeMetadata = (
+        item: ActivityCreate | ActivityUpdate,
+      ): ActivityCreate | ActivityUpdate => {
+        if (item.metadata && typeof item.metadata !== "string") {
+          return { ...item, metadata: JSON.stringify(item.metadata) };
         }
-        return activity;
+        return item;
       };
 
       const normalizedRequest: ActivityBulkMutationRequest = {
-        creates: (request.creates ?? []).map((activity) => normalizeActivity(activity)),
-        updates: (request.updates ?? []).map((activity) => normalizeActivity(activity)),
-        deleteIds: request.deleteIds ?? [],
+        creates: request.creates?.map(serializeMetadata) as ActivityCreate[],
+        updates: request.updates?.map(serializeMetadata) as ActivityUpdate[],
+        deleteIds: request.deleteIds,
       };
 
       const result = await saveActivities(normalizedRequest);
 
       const quoteCandidates: (ActivityCreate | ActivityUpdate)[] = [
-        ...(normalizedRequest.creates ?? []),
-        ...(normalizedRequest.updates ?? []),
+        ...(request.creates ?? []),
+        ...(request.updates ?? []),
       ];
       for (const candidate of quoteCandidates) {
         await createQuoteFromActivity(candidate);

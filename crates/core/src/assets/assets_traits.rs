@@ -50,4 +50,8 @@ pub trait AssetRepositoryTrait: Send + Sync {
     fn list_cash_assets(&self, base_currency: &str) -> Result<Vec<Asset>>;
     fn list_by_symbols(&self, symbols: &[String]) -> Result<Vec<Asset>>;
     async fn delete(&self, asset_id: &str) -> Result<()>;
+
+    /// Search for assets by symbol (case-insensitive partial match).
+    /// Used for merging existing assets into search results.
+    fn search_by_symbol(&self, query: &str) -> Result<Vec<Asset>>;
 }

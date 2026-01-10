@@ -47,7 +47,6 @@ mod tests {
                 symbol: symbol.to_string(),
                 currency: currency.to_string(),
                 name: Some(format!("Mock Asset {}", symbol)),
-                asset_class: Some("EQUITY".to_string()),
                 kind: AssetKind::Security,
                 pricing_mode: PricingMode::Market,
                 created_at: Utc::now().naive_utc(),
@@ -100,6 +99,10 @@ mod tests {
                 .iter()
                 .filter_map(|symbol| self.assets.get(symbol).cloned())
                 .collect())
+        }
+
+        fn search_by_symbol(&self, _query: &str) -> Result<Vec<Asset>> {
+            Ok(Vec::new())
         }
     }
 

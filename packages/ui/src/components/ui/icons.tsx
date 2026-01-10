@@ -32,6 +32,7 @@ import {
   ChevronsUpDown,
   ChevronUp,
   Circle,
+  CircleGauge,
   Clock,
   Cloud,
   CloudCog,
@@ -98,6 +99,7 @@ import {
   Presentation,
   QrCode,
   Receipt,
+  ReceiptText,
   RectangleEllipsis,
   RefreshCcw,
   RefreshCw,
@@ -111,6 +113,7 @@ import {
   ShieldCheck,
   Smartphone,
   Sparkles,
+  Split,
   Star,
   Store,
   Sun,
@@ -229,6 +232,7 @@ const IconsInternal = {
   ArrowRightLeft: ArrowRightLeft,
   ArrowLeftRight: ArrowLeftRight,
   Receipt: Receipt,
+  ReceiptText: ReceiptText,
   Percent: Percent,
   Store: Store,
   Package: Package,
@@ -274,6 +278,8 @@ const IconsInternal = {
   PinOff: PinOff,
   Presentation: Presentation,
   Scissors: Scissors,
+  Split: Split,
+  CircleGauge: CircleGauge,
   X: X,
   Upload: Upload,
   Dashboard: ({ size, ...props }: IconProps) => (
@@ -723,6 +729,7 @@ export type IconName =
   | "ArrowRightLeft"
   | "ArrowLeftRight"
   | "Receipt"
+  | "ReceiptText"
   | "Percent"
   | "Store"
   | "Package"
@@ -792,6 +799,8 @@ export type IconName =
   | "PinOff"
   | "Presentation"
   | "Scissors"
+  | "Split"
+  | "CircleGauge"
   | "X"
   | "Upload";
 

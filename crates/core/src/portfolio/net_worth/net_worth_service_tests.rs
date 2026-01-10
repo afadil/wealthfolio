@@ -13,7 +13,7 @@ use crate::quotes::{
     QuoteSyncState, SymbolSyncPlan, SyncResult,
 };
 use async_trait::async_trait;
-use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -125,6 +125,10 @@ impl AssetRepositoryTrait for MockAssetRepository {
 
     async fn delete(&self, _asset_id: &str) -> Result<()> {
         unimplemented!()
+    }
+
+    fn search_by_symbol(&self, _query: &str) -> Result<Vec<Asset>> {
+        Ok(Vec::new())
     }
 }
 
@@ -385,6 +389,14 @@ impl QuoteServiceTrait for MockMarketDataRepository {
         unimplemented!()
     }
 
+    async fn search_symbol_with_currency(
+        &self,
+        _query: &str,
+        _account_currency: Option<&str>,
+    ) -> Result<Vec<QuoteSummary>> {
+        unimplemented!()
+    }
+
     async fn get_asset_profile(&self, _symbol: &str) -> Result<ProviderProfile> {
         unimplemented!()
     }
@@ -438,6 +450,18 @@ impl QuoteServiceTrait for MockMarketDataRepository {
         Ok(Vec::new())
     }
 
+    fn get_sync_state(&self, _symbol: &str) -> Result<Option<QuoteSyncState>> {
+        Ok(None)
+    }
+
+    async fn mark_profile_enriched(&self, _symbol: &str) -> Result<()> {
+        Ok(())
+    }
+
+    fn get_assets_needing_profile_enrichment(&self) -> Result<Vec<QuoteSyncState>> {
+        Ok(Vec::new())
+    }
+
     // =========================================================================
     // Provider Settings
     // =========================================================================
@@ -469,6 +493,7 @@ impl QuoteServiceTrait for MockMarketDataRepository {
 }
 
 struct MockFxService {
+    #[allow(dead_code)]
     base_currency: String,
 }
 
@@ -680,11 +705,8 @@ fn create_test_asset(id: &str, kind: AssetKind, currency: &str) -> Asset {
     let now = Utc::now().naive_utc();
     Asset {
         id: id.to_string(),
-        isin: None,
         name: Some(format!("Asset {}", id)),
         symbol: id.to_string(),
-        asset_class: None,
-        asset_sub_class: None,
         notes: None,
         created_at: now,
         updated_at: now,
@@ -694,7 +716,6 @@ fn create_test_asset(id: &str, kind: AssetKind, currency: &str) -> Asset {
         pricing_mode: PricingMode::default(),
         preferred_provider: None,
         provider_overrides: None,
-        profile: None,
         is_active: true,
         metadata: None,
     }

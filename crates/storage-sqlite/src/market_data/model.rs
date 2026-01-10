@@ -132,6 +132,8 @@ pub struct QuoteSyncStateDB {
     pub error_count: i32,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub last_error: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub profile_enriched_at: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub created_at: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
@@ -153,6 +155,7 @@ pub struct QuoteSyncStateUpdateDB {
     pub sync_priority: Option<i32>,
     pub error_count: Option<i32>,
     pub last_error: Option<Option<String>>,
+    pub profile_enriched_at: Option<Option<String>>,
     pub updated_at: Option<String>,
 }
 
@@ -285,6 +288,7 @@ impl From<QuoteSyncStateDB> for QuoteSyncState {
             sync_priority: db.sync_priority,
             error_count: db.error_count,
             last_error: db.last_error,
+            profile_enriched_at: db.profile_enriched_at.as_deref().map(parse_datetime),
             created_at: parse_datetime(&db.created_at),
             updated_at: parse_datetime(&db.updated_at),
         }
@@ -317,6 +321,7 @@ impl From<&QuoteSyncState> for QuoteSyncStateDB {
             sync_priority: state.sync_priority,
             error_count: state.error_count,
             last_error: state.last_error.clone(),
+            profile_enriched_at: state.profile_enriched_at.map(|dt| dt.to_rfc3339()),
             created_at: state.created_at.to_rfc3339(),
             updated_at: state.updated_at.to_rfc3339(),
         }

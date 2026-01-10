@@ -240,18 +240,20 @@ impl CompanyOverviewResponse {
 
     /// Convert to AssetProfile
     fn to_asset_profile(&self) -> AssetProfile {
-        // Parse asset class/sub-class from AssetType
-        let (asset_class, asset_sub_class) = match self.asset_type.as_deref() {
-            Some("Common Stock") => (Some("Equity".to_string()), Some("Stock".to_string())),
-            Some("ETF") => (Some("Equity".to_string()), Some("ETF".to_string())),
-            Some("Mutual Fund") => (Some("Equity".to_string()), Some("Mutual Fund".to_string())),
-            Some(other) => (Some(other.to_string()), None),
-            None => (None, None),
-        };
+        // Normalize Alpha Vantage asset types to standard format
+        // Alpha Vantage returns: "Common Stock", "ETF", "Mutual Fund", etc.
+        let quote_type = self.asset_type.as_ref().map(|t| {
+            match t.to_uppercase().as_str() {
+                "COMMON STOCK" => "EQUITY".to_string(),
+                "MUTUAL FUND" => "MUTUALFUND".to_string(),
+                other => other.to_string(),
+            }
+        });
 
         AssetProfile {
             source: Some(PROVIDER_ID.to_string()),
             name: self.name.clone(),
+            quote_type,
             sector: self.sector.clone(),
             industry: self.industry.clone(),
             website: None, // Alpha Vantage doesn't provide website
@@ -259,8 +261,6 @@ impl CompanyOverviewResponse {
             country: self.country.clone(),
             employees: None, // Alpha Vantage doesn't provide employee count
             logo_url: None,
-            asset_class,
-            asset_sub_class,
             market_cap: Self::parse_f64(&self.market_capitalization),
             pe_ratio: Self::parse_f64(&self.pe_ratio)
                 .or_else(|| Self::parse_f64(&self.trailing_pe)),
@@ -957,8 +957,6 @@ mod tests {
             Some("COMPUTER & OFFICE EQUIPMENT".to_string())
         );
         assert_eq!(profile.country, Some("USA".to_string()));
-        assert_eq!(profile.asset_class, Some("Equity".to_string()));
-        assert_eq!(profile.asset_sub_class, Some("Stock".to_string()));
         assert_eq!(profile.market_cap, Some(191234567890.0));
         assert_eq!(profile.pe_ratio, Some(22.5));
         assert_eq!(profile.dividend_yield, Some(0.0455));
@@ -982,8 +980,6 @@ mod tests {
         let profile = response.to_asset_profile();
 
         assert_eq!(profile.name, Some("Test ETF".to_string()));
-        assert_eq!(profile.asset_class, Some("Equity".to_string()));
-        assert_eq!(profile.asset_sub_class, Some("ETF".to_string()));
         // "None" and "-" and "0" values should be parsed as None
         assert_eq!(profile.sector, Some("None".to_string())); // Raw string preserved
         assert_eq!(profile.pe_ratio, None); // Parsed as None

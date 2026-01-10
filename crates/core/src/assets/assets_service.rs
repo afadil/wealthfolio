@@ -7,17 +7,24 @@ use super::assets_model::{Asset, AssetKind, NewAsset, PricingMode, UpdateAssetPr
 use super::assets_traits::{AssetRepositoryTrait, AssetServiceTrait};
 use crate::errors::{DatabaseError, Error, Result};
 
-/// Infers asset kind from symbol pattern.
+// Import mic_to_currency for resolving exchange trading currencies
+use wealthfolio_market_data::mic_to_currency;
+
+/// Infers asset kind from asset ID.
 ///
 /// Design principles:
-/// 1. Only match system-defined prefixes (deterministic, no guessing)
-/// 2. Default to Security for unknown patterns
-/// 3. Let async enrichment correct the kind based on provider data
-///
-/// This avoids hardcoded lists that become stale (e.g., crypto symbols).
-fn infer_asset_kind(symbol: &str) -> AssetKind {
-    // System-defined prefixes (deterministic patterns)
-    match symbol {
+/// 1. First try to parse from canonical ID format (e.g., "SEC:AAPL:XNAS", "CASH:USD")
+/// 2. Fall back to legacy system-defined prefixes
+/// 3. Default to Security for unknown patterns
+/// 4. Let async enrichment correct the kind based on provider data
+fn infer_asset_kind(asset_id: &str) -> AssetKind {
+    // First try to parse from canonical ID format (e.g., "SEC:AAPL:XNAS", "CASH:USD")
+    if let Some(kind) = super::kind_from_asset_id(asset_id) {
+        return kind;
+    }
+
+    // Legacy system-defined prefixes (deterministic patterns)
+    match asset_id {
         s if s.starts_with("$CASH-") => AssetKind::Cash,
         s if s.starts_with("$UNKNOWN-") => AssetKind::Security,
         // Alternative asset prefixes (user-created convention)
@@ -197,26 +204,64 @@ impl AssetServiceTrait for AssetService {
             _ => PricingMode::Manual,
         };
 
-        // Use context currency or default to USD
-        let currency = context_currency
-            .filter(|c| !c.is_empty())
-            .unwrap_or_else(|| "USD".to_string());
-
         // Extract optional fields from metadata
-        let (name, exchange_mic) = metadata
+        let (name, exchange_mic_from_metadata) = metadata
             .map(|m| (m.name, m.exchange_mic))
             .unwrap_or_default();
 
-        // For crypto assets, extract base symbol from "BTC-CAD" format
-        // The asset_id remains "BTC-CAD" but symbol should be just "BTC"
-        let symbol = if kind == AssetKind::Crypto && asset_id.contains('-') {
-            asset_id
-                .split('-')
-                .next()
-                .unwrap_or(asset_id)
-                .to_string()
+        // Extract symbol from canonical asset ID format (e.g., "SEC:AAPL:XNAS" -> "AAPL")
+        // Falls back to asset_id if parsing fails (for legacy IDs)
+        let (symbol, exchange_mic_from_id) =
+            if let Some(parsed) = super::parse_canonical_asset_id(asset_id) {
+                let mic = if parsed.qualifier.is_empty()
+                    || parsed.qualifier == "UNKNOWN"
+                    || kind == AssetKind::Cash
+                    || kind == AssetKind::Crypto
+                    || kind == AssetKind::FxRate
+                {
+                    None
+                } else {
+                    Some(parsed.qualifier)
+                };
+                (parsed.symbol, mic)
+            } else if kind == AssetKind::Crypto && asset_id.contains('-') {
+                // Legacy crypto format: "BTC-CAD" -> symbol "BTC"
+                let base = asset_id
+                    .split('-')
+                    .next()
+                    .unwrap_or(asset_id)
+                    .to_string();
+                (base, None)
+            } else {
+                // Fallback for legacy IDs
+                (asset_id.to_string(), None)
+            };
+
+        // Prefer metadata exchange_mic over one parsed from ID
+        let exchange_mic = exchange_mic_from_metadata.or(exchange_mic_from_id);
+
+        // Determine currency:
+        // 1. For market-priced assets with an exchange MIC, use the exchange's trading currency
+        // 2. Fall back to context_currency (account currency) or USD
+        let currency = if pricing_mode == PricingMode::Market {
+            exchange_mic
+                .as_ref()
+                .and_then(|mic| mic_to_currency(mic))
+                .map(|c| c.to_string())
+                .or_else(|| context_currency.filter(|c| !c.is_empty()))
+                .unwrap_or_else(|| "USD".to_string())
         } else {
-            asset_id.to_string()
+            // Non-market assets use context currency or USD
+            context_currency
+                .filter(|c| !c.is_empty())
+                .unwrap_or_else(|| "USD".to_string())
+        };
+
+        // Set preferred provider based on pricing mode
+        let preferred_provider = match pricing_mode {
+            PricingMode::Market => Some("YAHOO".to_string()),
+            PricingMode::Manual => Some("MANUAL".to_string()),
+            PricingMode::None | PricingMode::Derived => None, // Cash/derived assets don't need a provider
         };
 
         // Create minimal asset with optional metadata
@@ -228,7 +273,7 @@ impl AssetServiceTrait for AssetService {
             exchange_mic,
             currency,
             pricing_mode,
-            preferred_provider: Some("YAHOO".to_string()),
+            preferred_provider,
             is_active: true,
             ..Default::default()
         };
@@ -267,13 +312,14 @@ impl AssetServiceTrait for AssetService {
             return Ok(existing_asset);
         }
 
-        // Fetch profile from provider
-        let provider_profile = match self.quote_service.get_asset_profile(asset_id).await {
+        // Fetch profile from provider using the symbol, not the canonical asset_id
+        // The provider expects symbols like "AAPL", not "SEC:AAPL:XNAS"
+        let provider_profile = match self.quote_service.get_asset_profile(&existing_asset.symbol).await {
             Ok(profile) => profile,
             Err(e) => {
                 debug!(
-                    "Could not fetch profile for asset {}: {}",
-                    asset_id, e
+                    "Could not fetch profile for asset {} (symbol: {}): {}",
+                    asset_id, existing_asset.symbol, e
                 );
                 return Ok(existing_asset);
             }

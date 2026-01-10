@@ -70,11 +70,10 @@ export const HoldingsTableMobile = ({
     let result = [...holdings];
 
     if (selectedTypes.length > 0) {
-      result = result.filter(
-        (holding) =>
-          holding.instrument?.assetSubclass &&
-          selectedTypes.includes(holding.instrument.assetSubclass),
-      );
+      result = result.filter((holding) => {
+        const assetType = holding.instrument?.classifications?.assetType?.name;
+        return assetType && selectedTypes.includes(assetType);
+      });
     }
 
     if (searchQuery) {

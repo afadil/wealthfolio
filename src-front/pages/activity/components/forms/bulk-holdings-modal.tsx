@@ -116,7 +116,10 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
         accountId: data.accountId,
         activityType: ActivityType.TRANSFER_IN,
         activityDate: activityDate.toISOString(),
-        assetId: (holding.assetId || holding.ticker || "").toUpperCase().trim(),
+        // Use symbol instead of assetId - backend generates canonical ID
+        symbol: (holding.assetId || holding.ticker || "").toUpperCase().trim(),
+        // Pass exchangeMic for canonical ID generation (e.g., "XNAS", "XTSE")
+        exchangeMic: holding.exchangeMic,
         assetDataSource: holding.assetDataSource ?? DataSource.YAHOO,
         quantity: Number(holding.sharesOwned),
         unitPrice: Number(holding.averageCost),

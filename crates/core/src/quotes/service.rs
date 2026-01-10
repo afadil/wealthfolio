@@ -23,9 +23,11 @@ use super::store::{ProviderSettingsStore, QuoteStore};
 use super::sync::{QuoteSyncService, QuoteSyncServiceTrait, SyncResult};
 use super::sync_state::{QuoteSyncState, SyncStateStore, SymbolSyncPlan};
 use super::types::{AssetId, Day};
-use crate::assets::{AssetRepositoryTrait, ProviderProfile, CASH_PREFIX};
+use crate::assets::{Asset, AssetKind, AssetRepositoryTrait, ProviderProfile, CASH_PREFIX};
 use crate::errors::Result;
 use crate::secrets::SecretStore;
+
+use wealthfolio_market_data::{exchanges_for_currency, mic_to_exchange_name};
 
 /// Provider information combining static info with settings.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -134,7 +136,28 @@ pub trait QuoteServiceTrait: Send + Sync {
     // =========================================================================
 
     /// Search for symbols.
+    ///
+    /// Returns search results merged with existing assets. Existing assets are
+    /// returned first, followed by provider results. Results are deduplicated
+    /// by symbol+exchange and sorted by relevance to account_currency.
     async fn search_symbol(&self, query: &str) -> Result<Vec<QuoteSummary>>;
+
+    /// Search for symbols with account currency for relevance sorting.
+    ///
+    /// # Arguments
+    /// * `query` - Search query string
+    /// * `account_currency` - Optional currency to sort results by exchange relevance
+    ///
+    /// # Returns
+    /// Search results merged with existing assets, sorted by:
+    /// 1. Existing assets first
+    /// 2. Then by exchange relevance to account_currency (e.g., CAD account prefers TSX)
+    /// 3. Then by provider relevance score
+    async fn search_symbol_with_currency(
+        &self,
+        query: &str,
+        account_currency: Option<&str>,
+    ) -> Result<Vec<QuoteSummary>>;
 
     /// Get asset profile from provider.
     async fn get_asset_profile(&self, symbol: &str) -> Result<ProviderProfile>;
@@ -174,6 +197,15 @@ pub trait QuoteServiceTrait: Send + Sync {
 
     /// Get symbols needing sync.
     fn get_symbols_needing_sync(&self) -> Result<Vec<QuoteSyncState>>;
+
+    /// Get sync state for a specific symbol.
+    fn get_sync_state(&self, symbol: &str) -> Result<Option<QuoteSyncState>>;
+
+    /// Mark asset profile as enriched.
+    async fn mark_profile_enriched(&self, symbol: &str) -> Result<()>;
+
+    /// Get assets that need profile enrichment.
+    fn get_assets_needing_profile_enrichment(&self) -> Result<Vec<QuoteSyncState>>;
 
     // =========================================================================
     // Provider Settings
@@ -329,6 +361,42 @@ where
             notes: None,
         })
     }
+
+    /// Convert an existing Asset to a QuoteSummary for search results.
+    ///
+    /// Marks the result as existing and includes the asset ID.
+    fn asset_to_quote_summary(asset: &Asset) -> QuoteSummary {
+        let exchange_name = asset
+            .exchange_mic
+            .as_ref()
+            .and_then(|mic| mic_to_exchange_name(mic))
+            .map(String::from);
+
+        let quote_type = match asset.kind {
+            AssetKind::Security => "EQUITY",
+            AssetKind::Crypto => "CRYPTOCURRENCY",
+            AssetKind::Option => "OPTION",
+            AssetKind::Commodity => "COMMODITY",
+            _ => "OTHER",
+        };
+
+        QuoteSummary {
+            symbol: asset.symbol.clone(),
+            short_name: asset.name.clone().unwrap_or_else(|| asset.symbol.clone()),
+            long_name: asset.name.clone().unwrap_or_else(|| asset.symbol.clone()),
+            exchange: exchange_name.clone().unwrap_or_default(),
+            exchange_mic: asset.exchange_mic.clone(),
+            exchange_name,
+            quote_type: quote_type.to_string(),
+            type_display: quote_type.to_string(),
+            currency: Some(asset.currency.clone()),
+            data_source: asset.preferred_provider.clone().or_else(|| Some("MANUAL".to_string())),
+            is_existing: true,
+            existing_asset_id: Some(asset.id.clone()),
+            index: String::new(),
+            score: 100.0, // High score for existing assets
+        }
+    }
 }
 
 #[async_trait]
@@ -469,7 +537,82 @@ where
     // =========================================================================
 
     async fn search_symbol(&self, query: &str) -> Result<Vec<QuoteSummary>> {
-        self.client.read().await.search(query).await
+        self.search_symbol_with_currency(query, None).await
+    }
+
+    async fn search_symbol_with_currency(
+        &self,
+        query: &str,
+        account_currency: Option<&str>,
+    ) -> Result<Vec<QuoteSummary>> {
+        // 1. Search existing assets in user's database
+        let existing_assets = self.asset_repo.search_by_symbol(query).unwrap_or_default();
+
+        // 2. Search provider for external results
+        let provider_results = self.client.read().await.search(query).await.unwrap_or_default();
+
+        // 3. Convert existing assets to QuoteSummary with is_existing flag
+        let existing_summaries: Vec<QuoteSummary> = existing_assets
+            .iter()
+            .filter(|a| a.kind != AssetKind::Cash && a.kind != AssetKind::FxRate)
+            .map(|asset| Self::asset_to_quote_summary(asset))
+            .collect();
+
+        // 4. Build a set of existing (symbol, exchange_mic) pairs for deduplication
+        let existing_keys: HashSet<(String, Option<String>)> = existing_summaries
+            .iter()
+            .map(|s| (s.symbol.clone(), s.exchange_mic.clone()))
+            .collect();
+
+        // 5. Filter provider results to exclude duplicates
+        let new_provider_results: Vec<QuoteSummary> = provider_results
+            .into_iter()
+            .filter(|r| {
+                // Check if this symbol+exchange combo already exists
+                !existing_keys.contains(&(r.symbol.clone(), r.exchange_mic.clone()))
+            })
+            .collect();
+
+        // 6. Merge existing assets first, then provider results
+        let mut merged = Vec::with_capacity(existing_summaries.len() + new_provider_results.len());
+        merged.extend(existing_summaries);
+        merged.extend(new_provider_results);
+
+        // 7. Sort by currency relevance if account_currency is provided
+        if let Some(currency) = account_currency {
+            let preferred_exchanges = exchanges_for_currency(currency);
+
+            merged.sort_by(|a, b| {
+                // Existing assets always come first
+                match (a.is_existing, b.is_existing) {
+                    (true, false) => return std::cmp::Ordering::Less,
+                    (false, true) => return std::cmp::Ordering::Greater,
+                    _ => {}
+                }
+
+                // Then sort by exchange relevance
+                let a_rank = a
+                    .exchange_mic
+                    .as_ref()
+                    .and_then(|mic| preferred_exchanges.iter().position(|e| *e == mic.as_str()))
+                    .unwrap_or(usize::MAX);
+                let b_rank = b
+                    .exchange_mic
+                    .as_ref()
+                    .and_then(|mic| preferred_exchanges.iter().position(|e| *e == mic.as_str()))
+                    .unwrap_or(usize::MAX);
+
+                match a_rank.cmp(&b_rank) {
+                    std::cmp::Ordering::Equal => {
+                        // If same exchange rank, sort by provider score (descending)
+                        b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal)
+                    }
+                    other => other,
+                }
+            });
+        }
+
+        Ok(merged)
     }
 
     async fn get_asset_profile(&self, symbol: &str) -> Result<ProviderProfile> {
@@ -543,6 +686,18 @@ where
     fn get_symbols_needing_sync(&self) -> Result<Vec<QuoteSyncState>> {
         self.sync_state_store
             .get_symbols_needing_sync(super::constants::CLOSED_POSITION_GRACE_PERIOD_DAYS)
+    }
+
+    fn get_sync_state(&self, symbol: &str) -> Result<Option<QuoteSyncState>> {
+        self.sync_state_store.get_by_symbol(symbol)
+    }
+
+    async fn mark_profile_enriched(&self, symbol: &str) -> Result<()> {
+        self.sync_state_store.mark_profile_enriched(symbol).await
+    }
+
+    fn get_assets_needing_profile_enrichment(&self) -> Result<Vec<QuoteSyncState>> {
+        self.sync_state_store.get_assets_needing_profile_enrichment()
     }
 
     // =========================================================================

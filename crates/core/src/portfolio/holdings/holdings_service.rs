@@ -185,7 +185,6 @@ impl HoldingsServiceTrait for HoldingsService {
                                 })
                             });
 
-                        // Note: asset_class, asset_subclass, sectors, countries now come from taxonomies
                         let instrument = Instrument {
                             id: asset.id.clone(),
                             symbol: asset.symbol.clone(),
@@ -193,8 +192,6 @@ impl HoldingsServiceTrait for HoldingsService {
                             currency: asset.currency,
                             notes: asset.notes,
                             preferred_provider: asset.preferred_provider.clone(),
-                            asset_class: None,
-                            asset_subclass: None,
                             countries: None,
                             sectors: None,
                             classifications: None,
@@ -451,7 +448,6 @@ impl HoldingsServiceTrait for HoldingsService {
             })
         });
 
-        // Note: asset_class, asset_subclass, sectors, countries now come from taxonomies
         let instrument = Instrument {
             id: asset_details.id.clone(),
             symbol: asset_details.symbol.clone(),
@@ -459,8 +455,6 @@ impl HoldingsServiceTrait for HoldingsService {
             currency: asset_details.currency,
             notes: asset_details.notes,
             preferred_provider: asset_details.preferred_provider.clone(),
-            asset_class: None,
-            asset_subclass: None,
             countries: None,
             sectors: None,
             classifications: None,
@@ -559,8 +553,6 @@ mod tests {
                 currency: "GBp".to_string(),
                 notes: None,
                 preferred_provider: None,
-                asset_class: None,
-                asset_subclass: None,
                 countries: None,
                 sectors: None,
                 classifications: None,

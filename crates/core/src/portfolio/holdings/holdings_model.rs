@@ -43,10 +43,6 @@ pub struct Instrument {
     pub notes: Option<String>,
     pub preferred_provider: Option<String>,
 
-    // Classification
-    pub asset_class: Option<String>,
-    pub asset_subclass: Option<String>,
-
     // Display categorization
     pub countries: Option<Vec<Country>>,
     pub sectors: Option<Vec<Sector>>,
