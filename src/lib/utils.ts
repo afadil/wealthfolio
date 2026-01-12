@@ -4,6 +4,13 @@ import { format, isValid, parse, parseISO } from "date-fns";
 import { twMerge } from "tailwind-merge";
 import { AccountValuation } from "./types";
 
+// Decimal precision constants (match backend src-core/src/constants.rs)
+const DECIMAL_PRECISION = 8;
+const DISPLAY_DECIMAL_PRECISION = 2;
+
+// Export for use in other modules
+export { DECIMAL_PRECISION, DISPLAY_DECIMAL_PRECISION };
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -220,8 +227,8 @@ export function formatDateTimeDisplay(date: Date | string | undefined): string {
   return format(value, "yyyy/MM/dd HH:mm");
 }
 const DECIMAL_FORMAT_OPTIONS: Intl.NumberFormatOptions = {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
+  minimumFractionDigits: DISPLAY_DECIMAL_PRECISION,
+  maximumFractionDigits: DISPLAY_DECIMAL_PRECISION,
 };
 
 const decimalFormatter = new Intl.NumberFormat("en-US", DECIMAL_FORMAT_OPTIONS);
@@ -368,10 +375,10 @@ export function calculatePerformanceMetrics(
 /**
  * Rounds a decimal number to a specified precision.
  * @param value The number to round
- * @param precision The number of decimal places (default: 6)
+ * @param precision The number of decimal places (default: 8)
  * @returns The rounded number, or 0 if the value is not finite
  */
-export function roundDecimal(value: number, precision = 6): number {
+export function roundDecimal(value: number, precision = DECIMAL_PRECISION): number {
   if (!Number.isFinite(value)) {
     return 0;
   }
@@ -382,10 +389,10 @@ export function roundDecimal(value: number, precision = 6): number {
 /**
  * Parses a string or number input as a decimal with specified precision.
  * @param value The value to parse (string or number)
- * @param precision The number of decimal places (default: 6)
+ * @param precision The number of decimal places (default: 8)
  * @returns The parsed and rounded number, or 0 if parsing fails
  */
-export function parseDecimalInput(value: string | number, precision = 6): number {
+export function parseDecimalInput(value: string | number, precision = DECIMAL_PRECISION): number {
   const parsed =
     typeof value === "number" ? value : typeof value === "string" ? Number.parseFloat(value) : NaN;
   return Number.isFinite(parsed) ? roundDecimal(parsed, precision) : 0;
@@ -442,10 +449,10 @@ export function toFiniteNumberOrUndefined(value: unknown): number | undefined {
 /**
  * Converts an unknown value to a rounded number suitable for API payloads.
  * @param value The value to convert
- * @param precision The number of decimal places (default: 6)
+ * @param precision The number of decimal places (default: 8)
  * @returns A rounded number if valid, undefined otherwise
  */
-export function toPayloadNumber(value: unknown, precision = 6): number | undefined {
+export function toPayloadNumber(value: unknown, precision = DECIMAL_PRECISION): number | undefined {
   const parsed = toFiniteNumberOrUndefined(value);
   if (parsed === undefined) {
     return undefined;
