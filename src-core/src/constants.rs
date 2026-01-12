@@ -5,7 +5,7 @@ pub const PORTFOLIO_TOTAL_ACCOUNT_ID: &str = "TOTAL";
 pub const CASH_ASSET_PREFIX: &str = "$CASH";
 
 /// Decimal precision for valuation calculations
-pub const DECIMAL_PRECISION: u32 = 6;
+pub const DECIMAL_PRECISION: u32 = 8;
 
 /// Decimal precision for display
 pub const DISPLAY_DECIMAL_PRECISION: u32 = 2;
