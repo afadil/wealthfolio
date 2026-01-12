@@ -1,3 +1,4 @@
+use crate::constants::DECIMAL_PRECISION;
 use crate::market_data::market_data_model::{DataSource, Quote};
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
@@ -65,7 +66,7 @@ fn serialize_decimal_6<S>(decimal: &Decimal, serializer: S) -> Result<S::Ok, S::
 where
     S: serde::Serializer,
 {
-    let rounded = decimal.round_dp(6);
+    let rounded = decimal.round_dp(DECIMAL_PRECISION);
     serializer.serialize_str(&rounded.to_string())
 }
 

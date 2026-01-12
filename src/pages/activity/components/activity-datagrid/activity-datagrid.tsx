@@ -15,6 +15,7 @@ import {
 } from "@/lib/types";
 import {
   cn,
+  DECIMAL_PRECISION,
   formatDateTimeDisplay,
   formatDateTimeLocal,
   getNumericCellValue,
@@ -130,7 +131,7 @@ const formatAmountDisplay = (
   }
   try {
     return formatAmount(
-      roundDecimal(numericValue, 6),
+      roundDecimal(numericValue, DECIMAL_PRECISION),
       currency ?? fallbackCurrency,
       displayCurrency,
     );
@@ -1239,7 +1240,7 @@ const TransactionRow = memo(function TransactionRow({
 
   const accountLabel =
     accountLookup.get(transaction.accountId)?.name ?? transaction.accountName ?? "";
-  const totalValue = roundDecimal(calculateActivityValue(transaction), 6);
+  const totalValue = roundDecimal(calculateActivityValue(transaction), DECIMAL_PRECISION);
   const currency = resolvedCurrency || fallbackCurrency;
   const normalizedCurrency = currency.toUpperCase();
   const assetSymbolDisplay =

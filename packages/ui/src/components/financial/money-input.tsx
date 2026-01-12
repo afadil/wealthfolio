@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cn } from "../../lib/utils";
+import { DECIMAL_PRECISION } from "../../lib/constants";
 import { Input } from "../ui/input";
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -8,7 +9,7 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
 }
 
 const MoneyInput = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, maxDecimalPlaces = 6, value, onChange, ...props }, ref) => {
+  ({ className, maxDecimalPlaces = DECIMAL_PRECISION, value, onChange, ...props }, ref) => {
     const { placeholder = "0.00" } = props;
 
     // Ensure value is always a string

@@ -1,6 +1,8 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
+import { DECIMAL_PRECISION, DISPLAY_DECIMAL_PRECISION } from "./constants";
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -9,8 +11,8 @@ export function cn(...inputs: ClassValue[]) {
  * Format amount with currency support, including special handling for pence (GBp/GBX)
  */
 const DECIMAL_FORMAT_OPTIONS: Intl.NumberFormatOptions = {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
+  minimumFractionDigits: DISPLAY_DECIMAL_PRECISION,
+  maximumFractionDigits: DISPLAY_DECIMAL_PRECISION,
 };
 
 const decimalFormatter = new Intl.NumberFormat("en-US", DECIMAL_FORMAT_OPTIONS);
@@ -74,11 +76,11 @@ export function formatPercent(value: number | null | undefined) {
   }
 }
 
-export function formatQuantity(quantity: string | number) {
+export function formatQuantity(quantity: string | number, precision = DECIMAL_PRECISION) {
   const numQuantity = parseFloat(String(quantity));
   if (Number.isInteger(numQuantity)) {
     return numQuantity.toString();
   } else {
-    return numQuantity.toFixed(6);
+    return numQuantity.toFixed(precision);
   }
 }
