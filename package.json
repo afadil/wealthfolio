@@ -91,6 +91,7 @@
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^5.0.2",
+    "@vitest/coverage-v8": "^3.2.4",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.35.0",
     "eslint-config-prettier": "^10.1.8",
