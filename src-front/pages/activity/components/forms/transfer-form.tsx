@@ -1,9 +1,12 @@
+import { useMemo } from "react";
 import { useForm, FormProvider, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { ActivityType, PricingMode } from "@/lib/constants";
+import { useSettings } from "@/hooks/use-settings";
 import {
   AccountSelect,
   SymbolSearch,
@@ -11,9 +14,9 @@ import {
   AmountInput,
   QuantityInput,
   NotesInput,
+  AdvancedOptionsSection,
   type AccountSelectOption,
 } from "./fields";
-import { PricingMode } from "@/lib/constants";
 
 // Zod schema for TransferForm validation
 export const transferFormSchema = z
@@ -37,6 +40,9 @@ export const transferFormSchema = z
       .optional()
       .nullable(),
     comment: z.string().optional().nullable(),
+    // Advanced options
+    currency: z.string().optional(),
+    subtype: z.string().optional().nullable(),
     // Internal field for manual pricing mode
     pricingMode: z.enum([PricingMode.MARKET, PricingMode.MANUAL]).default(PricingMode.MARKET),
     exchangeMic: z.string().optional(),
@@ -55,6 +61,8 @@ interface TransferFormProps {
   onCancel?: () => void;
   isLoading?: boolean;
   isEditing?: boolean;
+  /** Asset currency (from selected symbol) for advanced options */
+  assetCurrency?: string;
 }
 
 export function TransferForm({
@@ -64,7 +72,11 @@ export function TransferForm({
   onCancel,
   isLoading = false,
   isEditing = false,
+  assetCurrency,
 }: TransferFormProps) {
+  const { data: settings } = useSettings();
+  const baseCurrency = settings?.baseCurrency;
+
   const form = useForm<TransferFormValues>({
     resolver: zodResolver(transferFormSchema) as Resolver<TransferFormValues>,
     mode: "onBlur", // Validate on blur
@@ -76,6 +88,8 @@ export function TransferForm({
       assetId: null,
       quantity: null,
       comment: null,
+      currency: undefined,
+      subtype: null,
       pricingMode: PricingMode.MARKET,
       exchangeMic: undefined,
       ...defaultValues,
@@ -86,6 +100,13 @@ export function TransferForm({
   const fromAccountId = watch("fromAccountId");
   const pricingMode = watch("pricingMode");
   const isManualAsset = pricingMode === PricingMode.MANUAL;
+
+  // Get account currency from selected source account
+  const selectedAccount = useMemo(
+    () => accounts.find((a) => a.value === fromAccountId),
+    [accounts, fromAccountId],
+  );
+  const accountCurrency = selectedAccount?.currency;
 
   // Filter destination accounts to exclude source account
   const toAccountOptions = accounts.filter((acc) => acc.value !== fromAccountId);
@@ -136,6 +157,16 @@ export function TransferForm({
 
             {/* Optional Quantity for security transfers */}
             <QuantityInput name="quantity" label="Quantity (optional)" />
+
+            {/* Advanced Options */}
+            <AdvancedOptionsSection
+              currencyName="currency"
+              subtypeName="subtype"
+              activityType={ActivityType.TRANSFER_IN}
+              assetCurrency={assetCurrency}
+              accountCurrency={accountCurrency}
+              baseCurrency={baseCurrency}
+            />
 
             {/* Notes */}
             <NotesInput name="comment" label="Notes" placeholder="Add an optional note..." />

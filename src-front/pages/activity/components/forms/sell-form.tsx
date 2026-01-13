@@ -6,7 +6,8 @@ import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { PricingMode } from "@/lib/constants";
+import { ActivityType, PricingMode } from "@/lib/constants";
+import { useSettings } from "@/hooks/use-settings";
 import { useHoldings } from "@/hooks/use-holdings";
 import {
   AccountSelect,
@@ -15,6 +16,7 @@ import {
   AmountInput,
   QuantityInput,
   NotesInput,
+  AdvancedOptionsSection,
   type AccountSelectOption,
 } from "./fields";
 
@@ -48,6 +50,9 @@ export const sellFormSchema = z.object({
     .min(0, { message: "Fee must be non-negative." })
     .default(0),
   comment: z.string().optional().nullable(),
+  // Advanced options
+  currency: z.string().optional(),
+  subtype: z.string().optional().nullable(),
   // Internal fields
   pricingMode: z.enum([PricingMode.MARKET, PricingMode.MANUAL]).default(PricingMode.MARKET),
   exchangeMic: z.string().optional(),
@@ -62,6 +67,8 @@ interface SellFormProps {
   onCancel?: () => void;
   isLoading?: boolean;
   isEditing?: boolean;
+  /** Asset currency (from selected symbol) for advanced options */
+  assetCurrency?: string;
 }
 
 /**
@@ -91,7 +98,10 @@ function isAmountDifferenceSignificant(
   return percentDiff > thresholdPercent;
 }
 
-export function SellForm({ accounts, defaultValues, onSubmit, onCancel, isLoading = false, isEditing = false }: SellFormProps) {
+export function SellForm({ accounts, defaultValues, onSubmit, onCancel, isLoading = false, isEditing = false, assetCurrency }: SellFormProps) {
+  const { data: settings } = useSettings();
+  const baseCurrency = settings?.baseCurrency;
+
   const form = useForm<SellFormValues>({
     resolver: zodResolver(sellFormSchema) as Resolver<SellFormValues>,
     mode: "onBlur", // Validate on blur
@@ -108,6 +118,8 @@ export function SellForm({ accounts, defaultValues, onSubmit, onCancel, isLoadin
       amount: undefined,
       fee: 0,
       comment: null,
+      currency: undefined,
+      subtype: null,
       pricingMode: PricingMode.MARKET,
       exchangeMic: undefined,
       ...defaultValues,
@@ -123,6 +135,13 @@ export function SellForm({ accounts, defaultValues, onSubmit, onCancel, isLoadin
   const amount = watch("amount");
   const pricingMode = watch("pricingMode");
   const isManualAsset = pricingMode === PricingMode.MANUAL;
+
+  // Get account currency from selected account
+  const selectedAccount = useMemo(
+    () => accounts.find((a) => a.value === accountId),
+    [accounts, accountId],
+  );
+  const accountCurrency = selectedAccount?.currency;
 
   // Fetch holdings for the selected account to check available quantity
   const { holdings } = useHoldings(accountId);
@@ -228,6 +247,16 @@ export function SellForm({ accounts, defaultValues, onSubmit, onCancel, isLoadin
                 </Alert>
               )}
             </div>
+
+            {/* Advanced Options */}
+            <AdvancedOptionsSection
+              currencyName="currency"
+              subtypeName="subtype"
+              activityType={ActivityType.SELL}
+              assetCurrency={assetCurrency}
+              accountCurrency={accountCurrency}
+              baseCurrency={baseCurrency}
+            />
 
             {/* Notes */}
             <NotesInput name="comment" label="Notes" placeholder="Add an optional note..." />

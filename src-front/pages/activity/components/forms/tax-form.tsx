@@ -1,14 +1,18 @@
+import { useMemo } from "react";
 import { useForm, FormProvider, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { ActivityType } from "@/lib/constants";
+import { useSettings } from "@/hooks/use-settings";
 import {
   AccountSelect,
   DatePicker,
   AmountInput,
   NotesInput,
+  AdvancedOptionsSection,
   type AccountSelectOption,
 } from "./fields";
 
@@ -23,6 +27,9 @@ export const taxFormSchema = z.object({
     })
     .positive({ message: "Amount must be greater than 0." }),
   comment: z.string().optional().nullable(),
+  // Advanced options
+  currency: z.string().optional(),
+  subtype: z.string().optional().nullable(),
 });
 
 export type TaxFormValues = z.infer<typeof taxFormSchema>;
@@ -37,6 +44,9 @@ interface TaxFormProps {
 }
 
 export function TaxForm({ accounts, defaultValues, onSubmit, onCancel, isLoading = false, isEditing = false }: TaxFormProps) {
+  const { data: settings } = useSettings();
+  const baseCurrency = settings?.baseCurrency;
+
   const form = useForm<TaxFormValues>({
     resolver: zodResolver(taxFormSchema) as Resolver<TaxFormValues>,
     mode: "onBlur", // Validate on blur
@@ -45,9 +55,21 @@ export function TaxForm({ accounts, defaultValues, onSubmit, onCancel, isLoading
       activityDate: new Date(),
       amount: undefined,
       comment: null,
+      currency: undefined,
+      subtype: null,
       ...defaultValues,
     },
   });
+
+  const { watch } = form;
+  const accountId = watch("accountId");
+
+  // Get account currency from selected account
+  const selectedAccount = useMemo(
+    () => accounts.find((a) => a.value === accountId),
+    [accounts, accountId],
+  );
+  const accountCurrency = selectedAccount?.currency;
 
   const handleSubmit = form.handleSubmit(async (data) => {
     await onSubmit(data);
@@ -66,6 +88,15 @@ export function TaxForm({ accounts, defaultValues, onSubmit, onCancel, isLoading
 
             {/* Amount */}
             <AmountInput name="amount" label="Amount" />
+
+            {/* Advanced Options */}
+            <AdvancedOptionsSection
+              currencyName="currency"
+              subtypeName="subtype"
+              activityType={ActivityType.TAX}
+              accountCurrency={accountCurrency}
+              baseCurrency={baseCurrency}
+            />
 
             {/* Notes */}
             <NotesInput name="comment" label="Notes" placeholder="Add an optional note..." />
