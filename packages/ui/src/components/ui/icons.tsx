@@ -5,11 +5,13 @@ import {
   AlertCircle,
   AlertTriangle,
   ArrowDown,
+  ArrowDownLeft,
   ArrowLeft,
   ArrowLeftRight,
   ArrowRight,
   ArrowRightLeft,
   ArrowUp,
+  ArrowUpRight,
   BadgeDollarSign,
   BarChart,
   Baseline,
@@ -175,7 +177,9 @@ const IconsInternal = {
   ArrowRight: ArrowRight,
   ArrowLeft: ArrowLeft,
   ArrowDown: ArrowDown,
+  ArrowDownLeft: ArrowDownLeft,
   ArrowUp: ArrowUp,
+  ArrowUpRight: ArrowUpRight,
   CreditCard: CreditCard,
   Bitcoin: Bitcoin,
   Briefcase: Briefcase,
@@ -671,7 +675,9 @@ export type IconName =
   | "ArrowRight"
   | "ArrowLeft"
   | "ArrowDown"
+  | "ArrowDownLeft"
   | "ArrowUp"
+  | "ArrowUpRight"
   | "CreditCard"
   | "Bitcoin"
   | "Briefcase"
