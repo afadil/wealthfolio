@@ -6,7 +6,8 @@ import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { PricingMode } from "@/lib/constants";
+import { ActivityType, PricingMode } from "@/lib/constants";
+import { useSettings } from "@/hooks/use-settings";
 import {
   AccountSelect,
   SymbolSearch,
@@ -14,6 +15,7 @@ import {
   AmountInput,
   QuantityInput,
   NotesInput,
+  AdvancedOptionsSection,
   type AccountSelectOption,
 } from "./fields";
 
@@ -47,6 +49,9 @@ export const buyFormSchema = z.object({
     .min(0, { message: "Fee must be non-negative." })
     .default(0),
   comment: z.string().optional().nullable(),
+  // Advanced options
+  currency: z.string().optional(),
+  subtype: z.string().optional().nullable(),
   // Internal fields
   pricingMode: z.enum([PricingMode.MARKET, PricingMode.MANUAL]).default(PricingMode.MARKET),
   exchangeMic: z.string().optional(),
@@ -61,6 +66,8 @@ interface BuyFormProps {
   onCancel?: () => void;
   isLoading?: boolean;
   isEditing?: boolean;
+  /** Asset currency (from selected symbol) for advanced options */
+  assetCurrency?: string;
 }
 
 /**
@@ -90,7 +97,10 @@ function isAmountDifferenceSignificant(
   return percentDiff > thresholdPercent;
 }
 
-export function BuyForm({ accounts, defaultValues, onSubmit, onCancel, isLoading = false, isEditing = false }: BuyFormProps) {
+export function BuyForm({ accounts, defaultValues, onSubmit, onCancel, isLoading = false, isEditing = false, assetCurrency }: BuyFormProps) {
+  const { data: settings } = useSettings();
+  const baseCurrency = settings?.baseCurrency;
+
   const form = useForm<BuyFormValues>({
     resolver: zodResolver(buyFormSchema) as Resolver<BuyFormValues>,
     mode: "onBlur", // Validate on blur
@@ -107,6 +117,8 @@ export function BuyForm({ accounts, defaultValues, onSubmit, onCancel, isLoading
       amount: undefined,
       fee: 0,
       comment: null,
+      currency: undefined,
+      subtype: null,
       pricingMode: PricingMode.MARKET,
       exchangeMic: undefined,
       ...defaultValues,
@@ -114,12 +126,20 @@ export function BuyForm({ accounts, defaultValues, onSubmit, onCancel, isLoading
   });
 
   const { watch, setValue } = form;
+  const accountId = watch("accountId");
   const quantity = watch("quantity");
   const unitPrice = watch("unitPrice");
   const fee = watch("fee");
   const amount = watch("amount");
   const pricingMode = watch("pricingMode");
   const isManualAsset = pricingMode === PricingMode.MANUAL;
+
+  // Get account currency from selected account
+  const selectedAccount = useMemo(
+    () => accounts.find((a) => a.value === accountId),
+    [accounts, accountId],
+  );
+  const accountCurrency = selectedAccount?.currency;
 
   // Calculate expected amount
   const calculatedAmount = useMemo(
@@ -191,6 +211,16 @@ export function BuyForm({ accounts, defaultValues, onSubmit, onCancel, isLoading
                 </Alert>
               )}
             </div>
+
+            {/* Advanced Options */}
+            <AdvancedOptionsSection
+              currencyName="currency"
+              subtypeName="subtype"
+              activityType={ActivityType.BUY}
+              assetCurrency={assetCurrency}
+              accountCurrency={accountCurrency}
+              baseCurrency={baseCurrency}
+            />
 
             {/* Notes */}
             <NotesInput name="comment" label="Notes" placeholder="Add an optional note..." />

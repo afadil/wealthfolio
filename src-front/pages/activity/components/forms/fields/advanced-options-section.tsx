@@ -1,0 +1,197 @@
+import { useState, useMemo } from "react";
+import { useFormContext, type FieldPath, type FieldValues } from "react-hook-form";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@wealthfolio/ui/components/ui/collapsible";
+import {
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@wealthfolio/ui";
+import { CurrencyInput } from "@wealthfolio/ui/components/financial";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import {
+  SUBTYPES_BY_ACTIVITY_TYPE,
+  SUBTYPE_DISPLAY_NAMES,
+  type ActivityType,
+} from "@/lib/constants";
+
+interface AdvancedOptionsSectionProps<TFieldValues extends FieldValues = FieldValues> {
+  /** Field name for the currency value */
+  currencyName?: FieldPath<TFieldValues>;
+  /** Field name for the subtype value */
+  subtypeName?: FieldPath<TFieldValues>;
+  /** Activity type to determine available subtypes */
+  activityType?: ActivityType;
+  /** Asset currency (from selected symbol) */
+  assetCurrency?: string;
+  /** Account currency (from selected account) */
+  accountCurrency?: string;
+  /** Base currency (user's default) */
+  baseCurrency?: string;
+  /** Whether to show the currency field */
+  showCurrency?: boolean;
+  /** Whether to show the subtype field */
+  showSubtype?: boolean;
+  /** Default open state */
+  defaultOpen?: boolean;
+}
+
+/**
+ * Advanced options section with collapsible FX Rate (currency) and Subtype fields.
+ * Currency options are ordered by: asset currency, account currency, base currency.
+ */
+export function AdvancedOptionsSection<TFieldValues extends FieldValues = FieldValues>({
+  currencyName,
+  subtypeName,
+  activityType,
+  assetCurrency,
+  accountCurrency,
+  baseCurrency,
+  showCurrency = true,
+  showSubtype = true,
+  defaultOpen = false,
+}: AdvancedOptionsSectionProps<TFieldValues>) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const { control } = useFormContext<TFieldValues>();
+
+  // Get available subtypes for the current activity type
+  const availableSubtypes = useMemo(() => {
+    if (!activityType || !showSubtype) return [];
+    return SUBTYPES_BY_ACTIVITY_TYPE[activityType] || [];
+  }, [activityType, showSubtype]);
+
+  // Get prioritized currency list: asset currency, account currency, base currency
+  // Remove duplicates while preserving order
+  const prioritizedCurrencies = useMemo(() => {
+    const currencies: string[] = [];
+    if (assetCurrency && !currencies.includes(assetCurrency)) {
+      currencies.push(assetCurrency);
+    }
+    if (accountCurrency && !currencies.includes(accountCurrency)) {
+      currencies.push(accountCurrency);
+    }
+    if (baseCurrency && !currencies.includes(baseCurrency)) {
+      currencies.push(baseCurrency);
+    }
+    return currencies;
+  }, [assetCurrency, accountCurrency, baseCurrency]);
+
+  // Don't render if nothing to show
+  const hasContent = (showCurrency && currencyName) || (showSubtype && subtypeName && availableSubtypes.length > 0);
+  if (!hasContent) {
+    return null;
+  }
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full">
+      <CollapsibleTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          type="button"
+          className="text-muted-foreground hover:text-foreground flex w-full items-center justify-between px-0 py-2"
+        >
+          <span className="text-sm font-medium">Advanced Options</span>
+          <Icons.ChevronDown
+            className={`h-4 w-4 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+          />
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-4 pt-2">
+        <div className="grid grid-cols-2 gap-4">
+          {/* Currency (FX Rate) Field */}
+          {showCurrency && currencyName && (
+            <FormField
+              control={control}
+              name={currencyName}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Currency</FormLabel>
+                  <FormControl>
+                    <CurrencyInput
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      placeholder="Select currency"
+                      className="w-full"
+                    />
+                  </FormControl>
+                  {prioritizedCurrencies.length > 0 && (
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {prioritizedCurrencies.map((currency, index) => (
+                        <button
+                          key={currency}
+                          type="button"
+                          onClick={() => field.onChange(currency)}
+                          className={`rounded px-2 py-0.5 text-xs transition-colors ${
+                            field.value === currency
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                          }`}
+                          title={
+                            index === 0 && assetCurrency === currency
+                              ? "Asset currency"
+                              : index <= 1 && accountCurrency === currency
+                                ? "Account currency"
+                                : "Base currency"
+                          }
+                        >
+                          {currency}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+
+          {/* Subtype Field */}
+          {showSubtype && subtypeName && availableSubtypes.length > 0 && (
+            <FormField
+              control={control}
+              name={subtypeName}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Subtype</FormLabel>
+                  <FormControl>
+                    <Select
+                      onValueChange={(value) => field.onChange(value === "__none__" ? null : value)}
+                      value={field.value ?? "__none__"}
+                    >
+                      <SelectTrigger aria-label="Subtype">
+                        <SelectValue placeholder="Select subtype" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">
+                          <span className="text-muted-foreground">None</span>
+                        </SelectItem>
+                        {availableSubtypes.map((subtype) => (
+                          <SelectItem key={subtype} value={subtype}>
+                            {SUBTYPE_DISPLAY_NAMES[subtype] || subtype}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}

@@ -1,14 +1,17 @@
+import { useMemo } from "react";
 import { useForm, FormProvider, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { useSettings } from "@/hooks/use-settings";
 import {
   AccountSelect,
   DatePicker,
   AmountInput,
   NotesInput,
+  AdvancedOptionsSection,
   type AccountSelectOption,
 } from "./fields";
 
@@ -23,6 +26,8 @@ export const depositFormSchema = z.object({
     })
     .positive({ message: "Amount must be greater than 0." }),
   comment: z.string().optional().nullable(),
+  // Advanced options
+  currency: z.string().optional(),
 });
 
 export type DepositFormValues = z.infer<typeof depositFormSchema>;
@@ -37,6 +42,9 @@ interface DepositFormProps {
 }
 
 export function DepositForm({ accounts, defaultValues, onSubmit, onCancel, isLoading = false, isEditing = false }: DepositFormProps) {
+  const { data: settings } = useSettings();
+  const baseCurrency = settings?.baseCurrency;
+
   const form = useForm<DepositFormValues>({
     resolver: zodResolver(depositFormSchema) as Resolver<DepositFormValues>,
     mode: "onBlur", // Validate on blur
@@ -45,9 +53,20 @@ export function DepositForm({ accounts, defaultValues, onSubmit, onCancel, isLoa
       activityDate: new Date(),
       amount: undefined,
       comment: null,
+      currency: undefined,
       ...defaultValues,
     },
   });
+
+  const { watch } = form;
+  const accountId = watch("accountId");
+
+  // Get account currency from selected account
+  const selectedAccount = useMemo(
+    () => accounts.find((a) => a.value === accountId),
+    [accounts, accountId],
+  );
+  const accountCurrency = selectedAccount?.currency;
 
   const handleSubmit = form.handleSubmit(async (data) => {
     await onSubmit(data);
@@ -66,6 +85,14 @@ export function DepositForm({ accounts, defaultValues, onSubmit, onCancel, isLoa
 
             {/* Amount */}
             <AmountInput name="amount" label="Amount" />
+
+            {/* Advanced Options - Currency only (no subtypes for deposits) */}
+            <AdvancedOptionsSection
+              currencyName="currency"
+              accountCurrency={accountCurrency}
+              baseCurrency={baseCurrency}
+              showSubtype={false}
+            />
 
             {/* Notes */}
             <NotesInput name="comment" label="Notes" placeholder="Add an optional note..." />
