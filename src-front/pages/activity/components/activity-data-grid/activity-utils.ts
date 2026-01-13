@@ -135,7 +135,7 @@ export function createDraftTransaction(
     accountCurrency: defaultAccount?.currency ?? fallbackCurrency,
     assetSymbol: "",
     assetName: "",
-    assetDataSource: undefined,
+    assetPricingMode: undefined,
     subRows: undefined,
     isNew: true,
   };
@@ -398,7 +398,7 @@ export function buildSavePayload(
       fee: toDecimalString(transaction.fee),
       fxRate: transaction.fxRate != null ? toDecimalString(transaction.fxRate) : null,
       comment: transaction.comment ?? undefined,
-      assetDataSource: transaction.assetDataSource,
+      pricingMode: transaction.assetPricingMode,
     };
 
     // Remove quantity/unitPrice for split activities

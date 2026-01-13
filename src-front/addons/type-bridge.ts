@@ -71,7 +71,7 @@ export interface InternalHostAPI {
   syncHistoryQuotes(): Promise<void>;
   getAssetProfile(assetId: string): Promise<Asset>;
   updateAssetProfile(payload: UpdateAssetProfile): Promise<Asset>;
-  updateAssetDataSource(symbol: string, dataSource: string): Promise<Asset>;
+  updatePricingMode(assetId: string, pricingMode: string): Promise<Asset>;
   updateQuote(symbol: string, quote: Quote): Promise<void>;
   syncMarketData(symbols: string[], refetchAll: boolean): Promise<void>;
   getQuoteHistory(symbol: string): Promise<Quote[]>;
@@ -217,7 +217,7 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: s
     assets: {
       getProfile: internalAPI.getAssetProfile,
       updateProfile: internalAPI.updateAssetProfile,
-      updateDataSource: internalAPI.updateAssetDataSource,
+      updatePricingMode: internalAPI.updatePricingMode,
     },
     quotes: {
       update: internalAPI.updateQuote,

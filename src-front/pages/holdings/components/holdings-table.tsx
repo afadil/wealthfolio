@@ -10,7 +10,7 @@ import {
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { safeDivide } from "@/lib/utils";
 import type { ColumnDef } from "@tanstack/react-table";
-import { GainPercent } from "@wealthfolio/ui";
+import { GainPercent, Badge } from "@wealthfolio/ui";
 
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
@@ -196,14 +196,24 @@ const getColumns = (
       };
 
       const isCash = symbol.startsWith("$CASH");
+      const isManual = holding.instrument?.pricingMode === "MANUAL";
       const content = (
         <div className="flex items-center">
           <TickerAvatar symbol={avatarSymbol} className="mr-2 h-8 w-8" />
           <div className="flex flex-col">
-            <span className="font-medium">{displaySymbol}</span>
-            <span className="text-muted-foreground line-clamp-1 text-xs">
-              {holding.instrument?.name || holding.id}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="font-medium">{displaySymbol}</span>
+              {isManual && (
+                <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4">
+                  Manual
+                </Badge>
+              )}
+            </div>
+            {holding.instrument?.name && (
+              <span className="text-muted-foreground line-clamp-1 text-xs">
+                {holding.instrument.name}
+              </span>
+            )}
           </div>
         </div>
       );

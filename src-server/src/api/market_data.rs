@@ -70,15 +70,15 @@ async fn update_quote(
     State(state): State<Arc<AppState>>,
     Json(mut quote): Json<Quote>,
 ) -> ApiResult<StatusCode> {
-    // Ensure symbol matches body
-    quote.symbol = symbol;
-    let target_symbol = quote.symbol.clone();
+    // Ensure asset_id matches path parameter
+    quote.asset_id = symbol;
+    let target_asset_id = quote.asset_id.clone();
     state.quote_service.update_quote(quote).await?;
     enqueue_portfolio_job(
         state.clone(),
         PortfolioJobConfig {
             account_ids: None,
-            symbols: Some(vec![target_symbol]),
+            symbols: Some(vec![target_asset_id]),
             refetch_all_market_data: true,
             force_full_recalculation: false,
         },

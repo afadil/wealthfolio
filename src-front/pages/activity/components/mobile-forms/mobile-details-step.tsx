@@ -4,7 +4,7 @@ import { Checkbox } from "@wealthfolio/ui/components/ui/checkbox";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { ScrollArea } from "@wealthfolio/ui/components/ui/scroll-area";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
-import { DataSource } from "@/lib/constants";
+import { PricingMode } from "@/lib/constants";
 import {
   Button,
   DatePickerInput,
@@ -34,7 +34,7 @@ interface MobileDetailsStepProps {
 
 export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepProps) {
   const { control, watch, setValue } = useFormContext<NewActivityFormValues>();
-  const isManualAsset = watch("assetDataSource") === DataSource.MANUAL;
+  const isManualAsset = watch("pricingMode") === PricingMode.MANUAL;
   const showCurrencySelect = watch("showCurrencySelect");
   const accountId = watch("accountId");
   const [accountSheetOpen, setAccountSheetOpen] = useState(false);
@@ -133,21 +133,21 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
             {showSkipSymbolLookup && (
               <FormField
                 control={control}
-                name="assetDataSource"
+                name="pricingMode"
                 render={({ field }) => (
                   <FormItem>
                     <div className="flex items-center justify-between">
                       <label
-                        htmlFor="use-lookup-checkbox"
+                        htmlFor="manual-pricing-checkbox"
                         className="cursor-pointer text-sm font-medium"
                       >
-                        Skip Symbol Lookup
+                        Manual Pricing
                       </label>
                       <Checkbox
-                        id="use-lookup-checkbox"
-                        checked={field.value === DataSource.MANUAL}
+                        id="manual-pricing-checkbox"
+                        checked={field.value === PricingMode.MANUAL}
                         onCheckedChange={(checked) => {
-                          field.onChange(checked ? DataSource.MANUAL : DataSource.YAHOO);
+                          field.onChange(checked ? PricingMode.MANUAL : PricingMode.MARKET);
                         }}
                         className="h-6 w-6"
                       />

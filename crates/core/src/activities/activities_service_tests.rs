@@ -108,14 +108,6 @@ mod tests {
                 .ok_or_else(|| crate::errors::Error::Unexpected("Asset not found".to_string()))
         }
 
-        async fn get_or_create_asset(
-            &self,
-            asset_id: &str,
-            _context_currency: Option<String>,
-        ) -> Result<Asset> {
-            self.get_asset_by_id(asset_id)
-        }
-
         async fn delete_asset(&self, _asset_id: &str) -> Result<()> {
             unimplemented!()
         }
@@ -136,10 +128,10 @@ mod tests {
             unimplemented!()
         }
 
-        async fn update_asset_data_source(
+        async fn update_pricing_mode(
             &self,
             _asset_id: &str,
-            _data_source: String,
+            _pricing_mode: &str,
         ) -> Result<Asset> {
             // Return a dummy asset
             Ok(Asset::default())
@@ -505,7 +497,7 @@ mod tests {
             symbol: None,
             exchange_mic: None,
             asset_kind: None,
-            asset_data_source: None,
+            pricing_mode: None,
             asset_metadata: None,
             activity_type: "BUY".to_string(),
             subtype: None,
@@ -575,7 +567,7 @@ mod tests {
             symbol: None,
             exchange_mic: None,
             asset_kind: None,
-            asset_data_source: None,
+            pricing_mode: None,
             asset_metadata: None,
             activity_type: "BUY".to_string(),
             subtype: None,
@@ -645,7 +637,7 @@ mod tests {
             symbol: None,
             exchange_mic: None,
             asset_kind: None,
-            asset_data_source: None,
+            pricing_mode: None,
             asset_metadata: None,
             activity_type: "BUY".to_string(),
             subtype: None,
@@ -714,7 +706,7 @@ mod tests {
             symbol: Some("AAPL".to_string()),
             exchange_mic: Some("XNAS".to_string()),
             asset_kind: None,
-            asset_data_source: None,
+            pricing_mode: None,
             asset_metadata: None,
             activity_type: "BUY".to_string(),
             subtype: None,
@@ -774,7 +766,7 @@ mod tests {
             symbol: Some("TSLA".to_string()),
             exchange_mic: None, // No exchange provided
             asset_kind: None,
-            asset_data_source: None,
+            pricing_mode: None,
             asset_metadata: None,
             activity_type: "BUY".to_string(),
             subtype: None,
@@ -835,7 +827,7 @@ mod tests {
             symbol: Some("AAPL".to_string()),
             exchange_mic: Some("XNAS".to_string()),
             asset_kind: None,
-            asset_data_source: None,
+            pricing_mode: None,
             asset_metadata: None,
             activity_type: "BUY".to_string(),
             subtype: None,
@@ -895,7 +887,7 @@ mod tests {
             symbol: None,
             exchange_mic: None,
             asset_kind: None,
-            asset_data_source: None,
+            pricing_mode: None,
             asset_metadata: None,
             activity_type: "DEPOSIT".to_string(),
             subtype: None,
@@ -955,7 +947,7 @@ mod tests {
             symbol: None,
             exchange_mic: None,
             asset_kind: None,
-            asset_data_source: None,
+            pricing_mode: None,
             asset_metadata: None,
             activity_type: "WITHDRAWAL".to_string(),
             subtype: None,
@@ -1011,7 +1003,7 @@ mod tests {
             symbol: None, // No symbol
             exchange_mic: None,
             asset_kind: None,
-            asset_data_source: None,
+            pricing_mode: None,
             asset_metadata: None,
             activity_type: "BUY".to_string(),
             subtype: None,
@@ -1064,7 +1056,7 @@ mod tests {
             symbol: Some("BTC".to_string()),
             exchange_mic: None, // No exchange - should infer crypto
             asset_kind: None,
-            asset_data_source: None,
+            pricing_mode: None,
             asset_metadata: None,
             activity_type: "BUY".to_string(),
             subtype: None,
@@ -1124,7 +1116,7 @@ mod tests {
             symbol: Some("BTC-USD".to_string()), // Crypto pattern
             exchange_mic: None,
             asset_kind: None,
-            asset_data_source: None,
+            pricing_mode: None,
             asset_metadata: None,
             activity_type: "BUY".to_string(),
             subtype: None,
@@ -1187,7 +1179,7 @@ mod tests {
             symbol: Some("BTC".to_string()),
             exchange_mic: Some("XNAS".to_string()),
             asset_kind: Some("SECURITY".to_string()), // Explicit hint
-            asset_data_source: None,
+            pricing_mode: None,
             asset_metadata: None,
             activity_type: "BUY".to_string(),
             subtype: None,
@@ -1247,7 +1239,7 @@ mod tests {
             symbol: Some("ETH".to_string()),
             exchange_mic: Some("XTSE".to_string()), // Has exchange = security
             asset_kind: None,
-            asset_data_source: None,
+            pricing_mode: None,
             asset_metadata: None,
             activity_type: "BUY".to_string(),
             subtype: None,
@@ -1318,7 +1310,7 @@ mod tests {
                 symbol: None,
                 exchange_mic: None,
                 asset_kind: None,
-                asset_data_source: None,
+                pricing_mode: None,
                 asset_metadata: None,
                 activity_type: activity_type.to_string(),
                 subtype: None,
@@ -1389,7 +1381,7 @@ mod tests {
                 symbol: None,
                 exchange_mic: None,
                 asset_kind: None,
-                asset_data_source: None,
+                pricing_mode: None,
                 asset_metadata: None,
                 activity_type: "BUY".to_string(),
                 subtype: None,

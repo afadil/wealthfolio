@@ -299,12 +299,12 @@ export function ActivityDetailSheet({
                 }
               />
             )}
-            {activity.assetDataSource && (
+            {activity.assetPricingMode && (
               <DetailRow
-                label="Data Source"
+                label="Pricing Mode"
                 value={
                   <Badge variant="secondary" className="text-xs">
-                    {activity.assetDataSource}
+                    {activity.assetPricingMode}
                   </Badge>
                 }
               />

@@ -6,8 +6,8 @@ import {
   ActivityType,
   ACTIVITY_TYPE_DISPLAY_NAMES,
   AssetKind,
-  DataSource,
   HoldingType,
+  PricingMode,
   SUBTYPE_DISPLAY_NAMES,
 } from "./constants";
 
@@ -32,6 +32,7 @@ export {
   HoldingType,
   ImportFormat,
   isAlternativeAssetType,
+  PricingMode,
   isLiabilityType,
   SUBTYPE_DISPLAY_NAMES,
 } from "./constants";
@@ -76,7 +77,7 @@ export interface ActivityLegacy {
   createdAt: Date | string;
   symbolProfileId: string;
   updatedAt: Date | string;
-  assetDataSource?: DataSource;
+  pricingMode?: PricingMode;
 }
 
 /**
@@ -178,7 +179,7 @@ export interface ActivityDetails {
   accountCurrency: string;
   assetSymbol: string;
   assetName?: string;
-  assetDataSource?: DataSource;
+  assetPricingMode?: PricingMode;
   /** Canonical exchange MIC code for asset identification */
   exchangeMic?: string;
   // Sync/source metadata
@@ -217,7 +218,7 @@ export interface ActivityCreate {
   exchangeMic?: string; // e.g., "XNAS" or undefined
   assetKind?: string; // e.g., "Security", "Crypto" - helps backend determine ID format
   // NOTE: No assetId field - backend generates canonical ID from symbol + exchangeMic
-  assetDataSource?: DataSource;
+  pricingMode?: PricingMode;
   quantity?: number;
   unitPrice?: number;
   amount?: number;
@@ -247,7 +248,7 @@ export interface ActivityUpdate {
   symbol?: string;
   exchangeMic?: string;
   assetKind?: string;
-  assetDataSource?: DataSource;
+  pricingMode?: PricingMode;
   quantity?: number;
   unitPrice?: number;
   amount?: number;
@@ -369,6 +370,7 @@ export interface Instrument {
   name?: string | null;
   currency: string;
   notes?: string | null;
+  pricingMode: PricingMode;
   preferredProvider?: string | null;
   countries?: Country[] | null;
   sectors?: Sector[] | null;
@@ -468,7 +470,7 @@ export interface Asset {
   // Status
   isActive?: boolean;
 
-  // Extensions (includes legacy data in $.legacy for migration service)
+  // Extensions - JSON metadata with $.identifiers.isin (optional)
   metadata?: Record<string, unknown>;
 
   // Audit
@@ -481,7 +483,7 @@ export interface Quote {
   createdAt: string;
   dataSource: string;
   timestamp: string;
-  symbol: string;
+  assetId: string;
   open: number;
   high: number;
   low: number;
@@ -494,7 +496,7 @@ export interface Quote {
 
 export interface QuoteUpdate {
   timestamp: string;
-  symbol: string;
+  assetId: string;
   open: number;
   high: number;
   low: number;

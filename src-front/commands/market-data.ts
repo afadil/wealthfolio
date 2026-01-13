@@ -97,11 +97,11 @@ export const deleteAsset = async (id: string): Promise<void> => {
   }
 };
 
-export const updateAssetDataSource = async (symbol: string, dataSource: string): Promise<Asset> => {
+export const updatePricingMode = async (assetId: string, pricingMode: string): Promise<Asset> => {
   try {
-    return await invoke("update_asset_data_source", { id: symbol, dataSource });
+    return await invoke("update_pricing_mode", { id: assetId, pricingMode });
   } catch (error) {
-    logger.error("Error updating asset data source.");
+    logger.error("Error updating asset pricing mode.");
     throw error;
   }
 };

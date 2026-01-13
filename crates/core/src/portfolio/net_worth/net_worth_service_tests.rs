@@ -89,7 +89,7 @@ impl AssetRepositoryTrait for MockAssetRepository {
         unimplemented!()
     }
 
-    async fn update_data_source(&self, _asset_id: &str, _data_source: String) -> Result<Asset> {
+    async fn update_pricing_mode(&self, _asset_id: &str, _pricing_mode: &str) -> Result<Asset> {
         unimplemented!()
     }
 
@@ -278,7 +278,7 @@ impl QuoteServiceTrait for MockMarketDataRepository {
     fn get_latest_quote(&self, symbol: &str) -> Result<Quote> {
         self.quotes
             .iter()
-            .filter(|q| q.symbol == symbol)
+            .filter(|q| q.asset_id == symbol)
             .max_by_key(|q| q.timestamp)
             .cloned()
             .ok_or_else(|| crate::errors::Error::Repository(format!("Quote not found for {}", symbol)))
@@ -290,7 +290,7 @@ impl QuoteServiceTrait for MockMarketDataRepository {
             if let Some(quote) = self
                 .quotes
                 .iter()
-                .filter(|q| &q.symbol == symbol)
+                .filter(|q| &q.asset_id == symbol)
                 .max_by_key(|q| q.timestamp)
             {
                 result.insert(symbol.clone(), quote.clone());
@@ -310,7 +310,7 @@ impl QuoteServiceTrait for MockMarketDataRepository {
         Ok(self
             .quotes
             .iter()
-            .filter(|q| q.symbol == symbol)
+            .filter(|q| q.asset_id == symbol)
             .cloned()
             .collect())
     }
@@ -320,7 +320,7 @@ impl QuoteServiceTrait for MockMarketDataRepository {
         for quote in &self.quotes {
             let date = quote.timestamp.date_naive();
             result
-                .entry(quote.symbol.clone())
+                .entry(quote.asset_id.clone())
                 .or_default()
                 .push((date, quote.clone()));
         }
@@ -338,7 +338,7 @@ impl QuoteServiceTrait for MockMarketDataRepository {
             .iter()
             .filter(|q| {
                 let date = q.timestamp.date_naive();
-                symbols.contains(&q.symbol) && date >= start && date <= end
+                symbols.contains(&q.asset_id) && date >= start && date <= end
             })
             .cloned()
             .collect())
@@ -397,7 +397,7 @@ impl QuoteServiceTrait for MockMarketDataRepository {
         unimplemented!()
     }
 
-    async fn get_asset_profile(&self, _symbol: &str) -> Result<ProviderProfile> {
+    async fn get_asset_profile(&self, _asset: &Asset) -> Result<ProviderProfile> {
         unimplemented!()
     }
 
@@ -763,7 +763,7 @@ fn create_test_snapshot(account_id: &str, positions: Vec<Position>, cash: HashMa
 fn create_test_quote(symbol: &str, price: Decimal, date: NaiveDate, currency: &str) -> Quote {
     Quote {
         id: format!("{}-{}", symbol, date),
-        symbol: symbol.to_string(),
+        asset_id: symbol.to_string(),
         timestamp: DateTime::from_naive_utc_and_offset(
             date.and_hms_opt(16, 0, 0).unwrap(),
             Utc,

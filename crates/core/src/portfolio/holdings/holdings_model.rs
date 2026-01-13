@@ -41,6 +41,7 @@ pub struct Instrument {
     pub name: Option<String>,
     pub currency: String,
     pub notes: Option<String>,
+    pub pricing_mode: String,
     pub preferred_provider: Option<String>,
 
     // Display categorization

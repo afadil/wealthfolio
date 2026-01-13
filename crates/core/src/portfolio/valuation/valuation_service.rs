@@ -258,7 +258,7 @@ impl ValuationServiceTrait for ValuationService {
             for quote in quotes_vec {
                 map.entry(quote.timestamp.date_naive())
                     .or_insert_with(HashMap::new)
-                    .insert(quote.symbol.clone(), quote);
+                    .insert(quote.asset_id.clone(), quote);
             }
             map
         };

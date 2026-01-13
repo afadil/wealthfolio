@@ -198,7 +198,7 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
         let quote_id = Uuid::new_v4().to_string();
         let quote = Quote {
             id: quote_id.clone(),
-            symbol: asset_id.clone(),
+            asset_id: asset_id.clone(),
             timestamp: Utc.from_utc_datetime(&request.value_date.and_hms_opt(12, 0, 0).unwrap()),
             open: request.current_value,
             high: request.current_value,
@@ -259,7 +259,7 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
         let quote_id = Uuid::new_v4().to_string();
         let quote = Quote {
             id: quote_id.clone(),
-            symbol: request.asset_id.clone(),
+            asset_id: request.asset_id.clone(),
             timestamp: Utc
                 .from_utc_datetime(&request.date.and_hms_opt(12, 0, 0).unwrap()),
             open: request.value,

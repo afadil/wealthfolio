@@ -264,7 +264,7 @@ pub fn run() {
             commands::asset::get_asset_profile,
             commands::asset::get_assets,
             commands::asset::update_asset_profile,
-            commands::asset::update_asset_data_source,
+            commands::asset::update_pricing_mode,
             commands::asset::delete_asset,
             // Alternative asset commands
             commands::alternative_assets::create_alternative_asset,

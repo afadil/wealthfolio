@@ -189,7 +189,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
             className={cn("h-11 w-full justify-between rounded-md", !value && "text-muted-foreground", className)}
             {...props}
           >
-            {buttonLabel}
+            <span className="truncate">{buttonLabel}</span>
             <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>

@@ -134,14 +134,17 @@ impl AssetRepositoryTrait for AssetRepository {
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<Asset> {
-                // First, get the existing asset to preserve its metadata
+                // First, get the existing asset to preserve its metadata if not provided
                 let existing: AssetDB = assets::table
                     .filter(assets::id.eq(&asset_id_owned))
                     .first(conn)
                     .map_err(StorageError::from)?;
 
-                // Preserve existing metadata (includes legacy data from migration)
-                let metadata_json = existing.metadata;
+                // Use payload metadata if provided, otherwise preserve existing
+                let metadata_json = match &payload_owned.metadata {
+                    Some(new_metadata) => Some(serde_json::to_string(new_metadata).unwrap_or_default()),
+                    None => existing.metadata.clone(),
+                };
 
                 // Serialize kind to string if present
                 let kind_str = payload_owned.kind.as_ref().map(|k| k.as_db_str().to_string());
@@ -197,14 +200,14 @@ impl AssetRepositoryTrait for AssetRepository {
             .await
     }
 
-    /// Updates the preferred provider of an asset
-    /// Note: data_source column no longer exists; this now updates preferred_provider
-    async fn update_data_source(&self, asset_id: &str, data_source: String) -> Result<Asset> {
+    /// Updates the pricing mode of an asset (MARKET, MANUAL, DERIVED, NONE)
+    async fn update_pricing_mode(&self, asset_id: &str, pricing_mode: &str) -> Result<Asset> {
         let asset_id_owned = asset_id.to_string();
+        let pricing_mode_owned = pricing_mode.to_string();
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<Asset> {
                 let result_db = diesel::update(assets::table.filter(assets::id.eq(asset_id_owned)))
-                    .set(assets::preferred_provider.eq(Some(data_source)))
+                    .set(assets::pricing_mode.eq(pricing_mode_owned))
                     .get_result::<AssetDB>(conn)
                     .map_err(StorageError::from)?;
                 Ok(result_db.into())

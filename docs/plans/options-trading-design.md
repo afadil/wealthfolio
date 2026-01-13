@@ -2,14 +2,24 @@
 
 ## Executive Summary
 
-Add full options tracking to Wealthfolio using the existing asset model (`AssetKind::Option`, `OptionSpec`) and the existing subtype + compiler expansion pattern. The compiler runs in-memory during calculation and expands semantic option events (exercise/assignment/expiration) into canonical trading postings that the holdings calculator already understands.
+Add full options tracking to Wealthfolio using the existing asset model (`AssetKind::Option`, `OptionSpec`) and a minimal canonical activity type system. The design keeps the holdings calculator simple by using only 5 canonical position-affecting types, with option semantics layered on top via subtypes for labeling/filtering only.
 
 **Key Constraints:**
 - No schema changes
-- Quantity is always absolute (>= 0); never use negative quantity to represent short
+- Quantity is always absolute (≥ 0); never use negative quantity to represent short
 - Short direction is represented by canonical activity types (`SELL_SHORT` / `BUY_COVER`)
-- Option lifecycle events are represented by subtypes (`OPTION_EXERCISE` / `OPTION_ASSIGNMENT` / `OPTION_EXPIRATION`)
-- Option closures use canonical close-at-0 trades to realize premium P&L without special ADJUSTMENT behavior
+- Compiler only expands truly multi-leg events (`OPTION_EXERCISE` / `OPTION_ASSIGNMENT`)
+- Expiration is stored directly as canonical `SELL @ 0` (long) or `BUY_COVER @ 0` (short) with optional `OPTION_EXPIRATION` subtype for labeling
+- Option closures use close-at-0 trades to realize premium P&L without special ADJUSTMENT behavior
+
+**Canonical Activity Types (Holdings Calculator Understands Only These):**
+```
+Buy        // increase long, pay cash
+Sell       // decrease long, receive cash
+SellShort  // increase short, receive cash
+BuyCover   // decrease short, pay cash
+Split      // share count transform, no cash
+```
 
 **Accounting Conventions (v1):**
 
@@ -18,13 +28,21 @@ Add full options tracking to Wealthfolio using the existing asset model (`AssetK
 | **Activity.quantity** | Always absolute (≥ 0). Direction comes from `activity_type`, never from sign. |
 | **Position.lots** | `VecDeque<Lot>` for long lots (ownership). Each lot has positive `quantity`. |
 | **Position.short_lots** | `VecDeque<ShortLot>` for short lots (obligation). Each lot has positive `quantity`. |
-| **net_quantity** | `long_quantity() − short_quantity()`. **Can be negative** (net short exposure). |
-| **cost_basis (long)** | `Σ lot.cost_basis` = total cash paid to acquire long lots. Always positive. |
-| **cost_basis (short)** | `Σ short_lot.premium_received` = total cash received to open shorts. Stored positive, represents inflow. |
-| **market_value** | `sign(net_quantity) × abs(net_quantity) × price × multiplier`. **Negative** when net short. |
-| **unrealized_gain (long)** | `market_value − cost_basis`. Positive = profit, negative = loss. |
-| **unrealized_gain (short)** | `premium_received − abs(market_value)`. Profit when MV (liability) < premium received. |
-| **Multiplier** | Required for options. Do NOT silently default to 100; require it or flag `needs_review`. |
+| **long_quantity** | `Σ lot.quantity` = total quantity in long lots. |
+| **short_quantity** | `Σ short_lot.quantity` = total quantity in short lots. |
+| **net_quantity** | `long_quantity − short_quantity`. **Can be negative** (net short exposure). Used for exposure display only. |
+| **long_cost_basis** | `Σ lot.cost_basis` = total cash paid to acquire long lots. Always positive. |
+| **total_premium_received** | `Σ short_lot.premium_received` = total cash received to open shorts. Stored positive, represents inflow. |
+| **market_value** | `net_quantity × price × multiplier`. **Negative** when net short. |
+| **unrealized_gain (long)** | `long_market_value − long_cost_basis`. Positive = profit, negative = loss. |
+| **unrealized_gain (short)** | `total_premium_received − abs(short_market_value)`. Profit when MV (liability) < premium received. |
+| **Multiplier** | **Required** in `OptionSpec`. Engine never silently assumes 100. Missing = data error; calculations skipped until corrected. |
+
+**Critical Invariants:**
+1. `quantity >= 0` for all activities
+2. `Sell` may only consume `lots`, never create `short_lots` (error if closing more than owned)
+3. Only `SellShort` and `BuyCover` mutate `short_lots`
+4. `cost_basis` in generic views is long-only; short economics come from `premium_received`
 
 ---
 
@@ -83,7 +101,8 @@ This section provides context on the existing Wealthfolio calculation architectu
 │  │  │  • DRIP → DIVIDEND + BUY                                             │    │    │
 │  │  │  • STAKING_REWARD → INTEREST + BUY                                   │    │    │
 │  │  │  • OPTION_EXERCISE → underlying trade + SELL option @ 0   [NEW]     │    │    │
-│  │  │  • OPTION_EXPIRATION → SELL/BUY_COVER @ 0                 [NEW]     │    │    │
+│  │  │  • OPTION_ASSIGNMENT → underlying + BUY_COVER option @ 0  [NEW]     │    │    │
+│  │  │  (OPTION_EXPIRATION: stored as canonical SELL/BUY_COVER, no expand) │    │    │
 │  │  └──────────────────────────────┬──────────────────────────────────────┘    │    │
 │  │                                 │                                           │    │
 │  │                                 ▼                                           │    │
@@ -490,16 +509,15 @@ This section provides context on the existing Wealthfolio calculation architectu
 │  ┌───────────────────────────────────────────────────────────────────────────────┐  │
 │  │ COMPILER          compiler.rs                                                  │  │
 │  │                                                                                │  │
-│  │                   compile() method:                                            │  │
+│  │                   compile() method (ONLY multi-leg events):                   │  │
 │  │                   + match OPTION_EXERCISE:                                     │  │
 │  │                       if CALL: emit BUY underlying + SELL option @ 0          │  │
 │  │                       if PUT:  emit SELL underlying + SELL option @ 0         │  │
 │  │                   + match OPTION_ASSIGNMENT:                                   │  │
 │  │                       if CALL: emit SELL underlying + BUY_COVER option @ 0    │  │
 │  │                       if PUT:  emit BUY underlying + BUY_COVER option @ 0     │  │
-│  │                   + match OPTION_EXPIRATION:                                   │  │
-│  │                       if LONG:  emit SELL option @ 0                          │  │
-│  │                       if SHORT: emit BUY_COVER option @ 0                     │  │
+│  │                                                                                │  │
+│  │                   OPTION_EXPIRATION: NO EXPANSION (stored as canonical)       │  │
 │  └───────────────────────────────────────────────────────────────────────────────┘  │
 │                                           │                                          │
 │                                           ▼                                          │
@@ -576,7 +594,7 @@ pub struct OptionSpec {
 1. **Option is an "investment" asset** - included in TWR/IRR calculations (`is_investment() = true`)
 2. **Pricing Mode**: Options return `None` from `to_instrument_id()` - no automatic market data lookup
 3. **subtype** exists and is used for DRIP, STAKING_REWARD, etc.
-4. **Activity economics fields** (`quantity`, `unit_price`, `amount`, `fee`) are optional
+4. **Activity economics fields** (`quantity`, `unit_price`, `amount`, `fee`) are optional in general, but **for option trading activities, `quantity` and `unit_price` are required** - missing values result in calculation errors
 5. **`effective_type()`** is the authoritative type for compiler/calculator
 6. **`Activity::get_meta(key)`** only reads top-level keys in metadata (no dotted paths)
 7. **Compiler runs in-memory** during calculation, so expansion must be deterministic and ideally stateless
@@ -624,18 +642,27 @@ pub struct OptionSpec {
 
 ## 3. Proposed Design
 
-### 3.1 New Canonical Activity Types
+### 3.1 Canonical Activity Types (Position-Affecting)
 
-Add two canonical types to represent short direction explicitly:
+The holdings calculator understands exactly **5 canonical activity types** that affect positions. Everything options-specific is semantics layered on top of these, not new types.
 
 ```rust
-// In activities_constants.rs
+// In activities_constants.rs - The ONLY types the calculator processes for positions
 
-/// Open or increase a short position. Receives cash (premium for options).
+/// Increase long position, pay cash
+pub const ACTIVITY_TYPE_BUY: &str = "BUY";
+
+/// Decrease long position, receive cash
+pub const ACTIVITY_TYPE_SELL: &str = "SELL";
+
+/// Increase short position, receive cash (premium for options)
 pub const ACTIVITY_TYPE_SELL_SHORT: &str = "SELL_SHORT";
 
-/// Close or decrease a short position. Pays cash (premium for options).
+/// Decrease short position, pay cash (premium for options)
 pub const ACTIVITY_TYPE_BUY_COVER: &str = "BUY_COVER";
+
+/// Share count transform, no cash (applies to any asset including options)
+pub const ACTIVITY_TYPE_SPLIT: &str = "SPLIT";
 ```
 
 Update trading types list:
@@ -650,38 +677,65 @@ pub const TRADING_ACTIVITY_TYPES: [&str; 5] = [
 ];
 ```
 
-**v1 Restriction**: `SELL_SHORT` and `BUY_COVER` are allowed only when `asset.kind == AssetKind::Option`.
+**v1 Restriction**: `SELL_SHORT` and `BUY_COVER` are allowed only when `asset.kind == AssetKind::Option`. Design should allow stocks later (v2+).
 
-**Rationale**: With absolute quantities, `SELL` cannot distinguish "sell-to-close long" from "sell-to-open short". These two canonicals keep the calculator simple and avoid "infer intent from state" bugs.
+**Rationale**: With absolute quantities, `SELL` cannot distinguish "sell-to-close long" from "sell-to-open short". These canonicals keep the calculator simple and avoid "infer intent from state" bugs.
 
-### 3.2 Option Lifecycle Subtypes (Compiler Inputs)
+**Important**: Option-specific events (expiration, exercise, assignment) are NOT new canonical types - they are either:
+1. Stored directly as canonical types (`SELL @ 0` for long expiration)
+2. Expanded by the compiler into canonical types (exercise/assignment → underlying trade + option close)
 
-Add these subtypes:
+### 3.2 Option Lifecycle Subtypes
+
+Add these subtypes for semantic labeling and compiler inputs:
 
 ```rust
 // In activities_constants.rs
 
 /// Option exercise: Long holder exercises their option right
-/// CALL: Expands to BUY underlying + SELL option @ 0
-/// PUT: Expands to SELL underlying + SELL option @ 0
+/// COMPILER-EXPANDED: CALL → BUY underlying + SELL option @ 0
+///                    PUT  → SELL underlying + SELL option @ 0
 pub const ACTIVITY_SUBTYPE_OPTION_EXERCISE: &str = "OPTION_EXERCISE";
 
 /// Option assignment: Short writer is assigned
-/// CALL: Expands to SELL underlying + BUY_COVER option @ 0
-/// PUT: Expands to BUY underlying + BUY_COVER option @ 0
+/// COMPILER-EXPANDED: CALL → SELL underlying + BUY_COVER option @ 0
+///                    PUT  → BUY underlying + BUY_COVER option @ 0
 pub const ACTIVITY_SUBTYPE_OPTION_ASSIGNMENT: &str = "OPTION_ASSIGNMENT";
 
 /// Option expiration: Contract expires worthless (OTM at expiry)
-/// Long: Expands to SELL option @ 0 (realizes loss)
-/// Short: Expands to BUY_COVER option @ 0 (realizes gain)
+/// NOT COMPILER-EXPANDED - stored directly as canonical:
+///   Long expiration  → SELL @ 0 with subtype=OPTION_EXPIRATION
+///   Short expiration → BUY_COVER @ 0 with subtype=OPTION_EXPIRATION
+/// The subtype is INFORMATIONAL ONLY - compiler ignores it, calculator ignores it.
+/// Used by UI/reports for chips, filters, and grouping.
 pub const ACTIVITY_SUBTYPE_OPTION_EXPIRATION: &str = "OPTION_EXPIRATION";
 ```
 
+**Key Design Decision - Expiration is Canonical Only:**
+
+Expiration is represented canonically as `SELL @ 0` (long) or `BUY_COVER @ 0` (short), with optional `subtype=OPTION_EXPIRATION` for labeling. This eliminates the need for:
+- Compiler expansion logic for expiration
+- `metadata.option.position_type` requirement for expiration
+- Any "is this long or short?" inference bugs
+
+The compiler passes through activities with `subtype=OPTION_EXPIRATION` unchanged - they are already in canonical form.
+
 **Note**: No separate `AUTO_EXERCISE` needed in v1; it's a UI/origin detail, not an accounting primitive.
 
-### 3.3 Activity Metadata for Options
+### 3.3 Metadata Structure (Simplified)
 
-Store option details nested under a top-level `"option"` key (compatible with `get_meta("option")`):
+> **⚠️ IMPORTANT - Metadata Contract:**
+>
+> Activity `metadata.option.*` fields are **NOT part of the core model contract**.
+> The engine only reads option structure from the Asset's `OptionSpec`.
+> Activity-level option fields are permitted only as raw source data for the importer
+> (to initially populate the Asset), but are **ignored at runtime**.
+
+**Design Principle**: Option structural info belongs on the **Asset**, not the Activity. Activity metadata only stores source traceability and compiler bookkeeping.
+
+#### Asset Metadata (Primary Source)
+
+All option structural info is stored in `assets.metadata.option`:
 
 ```json
 {
@@ -691,14 +745,26 @@ Store option details nested under a top-level `"option"` key (compatible with `g
     "right": "CALL",
     "expiration": "2024-12-20",
     "multiplier": "100",
-    "position_type": "LONG|SHORT"
-  },
+    "occ_symbol": "AAPL  241220C00150000"
+  }
+}
+```
+
+This maps to `OptionSpec` in the code. The compiler and calculator always read option details from the Asset via `asset.option_spec()`.
+
+#### Activity Metadata (Minimal)
+
+Activity metadata only contains:
+1. **Source traceability** - original broker data for import debugging
+2. **Compiler bookkeeping** - tracking for expanded legs (virtual only, not persisted)
+
+```json
+{
   "source": {
     "raw_option_type": "BTO",
     "broker_description": "Buy to Open AAPL 12/20/24 150 Call"
   },
   "compiler": {
-    "reason": "EXERCISE|ASSIGNMENT|EXPIRATION",
     "compiled_from_activity_id": "ACT123",
     "compiled_group_id": "uuid-or-hash",
     "compiled_leg_index": 0
@@ -706,30 +772,51 @@ Store option details nested under a top-level `"option"` key (compatible with `g
 }
 ```
 
+**What NOT to store in Activity metadata:**
+- `option.underlying_asset_id` - use `asset_id → Asset.option_spec().underlying_asset_id`
+- `option.strike` - use `asset_id → Asset.option_spec().strike`
+- `option.right` - use `asset_id → Asset.option_spec().right`
+- `option.expiration` - use `asset_id → Asset.option_spec().expiration`
+- `option.multiplier` - use `asset_id → Asset.option_spec().multiplier`
+- `option.position_type` - not needed; the compiler validates using position state, not metadata
+
+**Important - State-Based Validation:**
+
+The compiler never relies on `metadata.position_type`. Instead, it reads the current position to validate:
+- `OPTION_EXERCISE`: requires `net_quantity > 0` (must have a long position)
+- `OPTION_ASSIGNMENT`: requires `net_quantity < 0` (must have a short position)
+
+This keeps the system self-consistent and state-driven, eliminating the possibility of metadata/state disagreement.
+
 **Metadata Fields:**
 
-| Key | Purpose | Required |
-|-----|---------|----------|
-| `option.underlying_asset_id` | Reference to underlying security | Yes |
-| `option.strike` | Strike price (string for precision) | Yes |
-| `option.right` | `"CALL"` or `"PUT"` | Yes |
-| `option.expiration` | Expiry date (YYYY-MM-DD) | Yes |
-| `option.multiplier` | Contracts multiplier (default 100 for equities) | Yes |
-| `option.position_type` | `"LONG"` or `"SHORT"` (required for OPTION_EXPIRATION) | For expiration |
-| `source.raw_option_type` | Original broker option type (BTO, STO, BTC, STC, etc.) | For traceability |
-| `source.broker_description` | Original broker description | For debugging |
-| `compiler.*` | Compiler expansion tracking | Virtual only |
+| Key | Location | Purpose | Required |
+|-----|----------|---------|----------|
+| `option.*` | **Asset only** | All structural option info via `OptionSpec` | Yes for options |
+| `source.raw_option_type` | Activity | Original broker option type (BTO, STO, BTC, STC) | For traceability |
+| `source.broker_description` | Activity | Original broker description | For debugging |
+| `compiler.*` | Activity (virtual) | Expansion tracking for grouped display | Virtual only |
 
-The `compiler.*` fields are optional; they help UI grouping/debugging. Since compilation is in-memory, these can be virtual-only (not persisted).
-
-The `source.*` fields preserve original broker data for traceability and debugging import issues.
+The `compiler.*` fields are virtual-only (not persisted). They help UI grouping/debugging for exercise/assignment legs.
 
 ### 3.4 Activity Compiler Expansion Rules
 
-The compiler runs on-the-fly while calculating, so it expands subtypes into **virtual postings** (not persisted), then passes them to the holdings calculator.
+The compiler runs on-the-fly while calculating, expanding subtypes into **virtual postings** (not persisted), then passes them to the holdings calculator.
+
+**Compiler Scope - Only Multi-Leg Events:**
+
+The compiler should only handle events that **truly must fan out into multiple legs**:
+- `OPTION_EXERCISE` - emits underlying trade + close option @ 0
+- `OPTION_ASSIGNMENT` - emits underlying trade + close option @ 0
+- `DRIP` - emits DIVIDEND + BUY (already implemented)
+- Future: `MERGER`, `SPINOFF`, etc.
+
+**What the Compiler Does NOT Expand:**
+- `OPTION_EXPIRATION` - stored directly as canonical `SELL @ 0` or `BUY_COVER @ 0`
+- Regular trades - passed through unchanged
 
 **Key Design Decision - Close at 0 Pattern**:
-To avoid special-case ADJUSTMENT realizing/erasing P&L, close option positions via a "close at 0 premium" trade, which naturally realizes premium P&L through existing lot logic.
+Close option positions via a "close at 0 premium" trade, which naturally realizes premium P&L through existing lot logic. No special ADJUSTMENT handling required.
 
 #### Virtual Posting Identity
 Each emitted posting carries:
@@ -737,68 +824,39 @@ Each emitted posting carries:
 - `compiled_leg_index` (0..n-1)
 - `compiled_group_id` (stable hash/uuid for grouping)
 
-#### OPTION_EXPIRATION
+#### OPTION_EXPIRATION (NO COMPILER EXPANSION)
 
-**Statelessness Requirement**: The compiler must NOT inspect current position state to determine long vs short. The activity metadata MUST include `position_type`:
+Expiration is represented canonically - **no compiler expansion needed**:
+- Long expiration → `SELL` option @ price=0, subtype=OPTION_EXPIRATION
+- Short expiration → `BUY_COVER` option @ price=0, subtype=OPTION_EXPIRATION
 
+The `subtype=OPTION_EXPIRATION` is **informational only** - compiler ignores it, calculator ignores it. Used by UI/reports for chips, filters, and grouping.
+
+**Storage Examples:**
+
+Long option expires worthless:
 ```json
 {
-  "option": {
-    "position_type": "LONG"  // or "SHORT" - REQUIRED for OPTION_EXPIRATION
-  }
+  "activity_type": "SELL",
+  "subtype": "OPTION_EXPIRATION",
+  "asset_id": "OPT_AAPL_20241220_C_150",
+  "quantity": 2,
+  "unit_price": 0
 }
 ```
+Effect: Realizes loss equal to original premium paid.
 
-If `position_type` is missing, the compiler should reject with an error or emit a `needs_review` flag.
-
-**Alternative**: Instead of using `OPTION_EXPIRATION` subtype, users/importers can directly record the canonical close legs:
-- Long expiration → `SELL` option @ price=0
-- Short expiration → `BUY_COVER` option @ price=0
-
-This alternative avoids subtype expansion entirely and is equally valid.
-
-**Long option expires worthless:**
-```
-Input: OPTION_EXPIRATION for 2 AAPL 150 CALLs
-       metadata.option.position_type = "LONG"
-Output:
-  Leg 0: SELL option: qty=2, unit_price=0, subtype=OPTION_EXPIRATION
-Effect: Realizes loss equal to original premium paid
-```
-
-**Short option expires worthless:**
-```
-Input: OPTION_EXPIRATION for 1 AAPL 150 PUT
-       metadata.option.position_type = "SHORT"
-Output:
-  Leg 0: BUY_COVER option: qty=1, unit_price=0, subtype=OPTION_EXPIRATION
-Effect: Realizes gain equal to original premium received
-```
-
-**Compiler Pseudocode:**
-```rust
-fn expand_option_expiration(activity: &Activity) -> Result<Vec<VirtualPosting>> {
-    let position_type = activity.get_meta("option")
-        .and_then(|o| o.get("position_type"))
-        .ok_or_else(|| CompilerError::MissingRequiredField(
-            "OPTION_EXPIRATION requires metadata.option.position_type"
-        ))?;
-
-    let close_type = match position_type.as_str() {
-        Some("LONG") => ActivityType::Sell,
-        Some("SHORT") => ActivityType::BuyCover,
-        _ => return Err(CompilerError::InvalidPositionType),
-    };
-
-    Ok(vec![VirtualPosting {
-        activity_type: close_type,
-        asset_id: activity.asset_id.clone(),
-        quantity: activity.quantity,
-        unit_price: Decimal::ZERO,
-        ..from_parent(activity)
-    }])
+Short option expires worthless:
+```json
+{
+  "activity_type": "BUY_COVER",
+  "subtype": "OPTION_EXPIRATION",
+  "asset_id": "OPT_AAPL_20241220_P_140",
+  "quantity": 1,
+  "unit_price": 0
 }
 ```
+Effect: Realizes gain equal to original premium received.
 
 #### OPTION_EXERCISE (Long Positions Only)
 
@@ -848,12 +906,31 @@ Effect: Forced to buy 100 shares at strike, close short option
 
 ### 3.5 Holdings Calculator Changes
 
+#### Critical Invariants (Hard-Enforced)
+
+These invariants must be enforced in code and tests:
+
+1. **`quantity >= 0` for all activities**
+   - Reject any trading activity with negative quantity
+   - Direction comes from activity type, never from sign
+
+2. **`Sell` may only consume `lots`, never create `short_lots`**
+   - If closing more than owned → error (not auto-short)
+   - Prevents accidental short positions from overselling
+
+3. **Only `SellShort` and `BuyCover` mutate `short_lots`**
+   - `SellShort` adds to `short_lots`
+   - `BuyCover` removes from `short_lots` (FIFO)
+   - `Buy`/`Sell` never touch `short_lots`
+
+4. **Negative position is always derived, never stored**
+   - `net_quantity = long_quantity - short_quantity` (can be negative)
+   - Individual lots always have positive quantity
+
 #### Enforce Absolute Quantities
 
-Reject negative `quantity` in trading activities. The direction comes from canonical type, not sign.
-
 ```rust
-// In handle_buy, handle_sell, etc.
+// In handle_buy, handle_sell, handle_sell_short, handle_buy_cover
 if activity.qty() < Decimal::ZERO {
     return Err(CalculatorError::InvalidActivity(
         "Quantity must be non-negative".to_string()
@@ -861,13 +938,33 @@ if activity.qty() < Decimal::ZERO {
 }
 ```
 
+#### Enforce Sell Cannot Create Short Positions
+
+```rust
+// In handle_sell
+fn handle_sell(&mut self, activity: &Activity, ...) -> Result<()> {
+    let qty_to_sell = activity.qty();
+    let position = self.get_or_create_position(activity.asset_id.clone());
+
+    // CRITICAL: Sell can only consume existing long lots
+    if qty_to_sell > position.long_quantity() {
+        return Err(CalculatorError::InvalidActivity(format!(
+            "Cannot sell {} units - only {} owned. Use SELL_SHORT to open short position.",
+            qty_to_sell, position.long_quantity()
+        )));
+    }
+
+    // Proceed with FIFO lot consumption...
+}
+```
+
 #### Add Handlers for SELL_SHORT and BUY_COVER
 
-**v1 Restriction**: Options only
+**v1 Restriction**: Options only (design allows stocks in v2+)
 
 ```rust
 ActivityType::SellShort => {
-    // Validate: options only in v1
+    // v1: options only; v2+ may allow stocks
     if asset.kind != AssetKind::Option {
         return Err(CalculatorError::InvalidActivity(
             "SELL_SHORT only supported for options in v1".to_string()
@@ -877,7 +974,7 @@ ActivityType::SellShort => {
 }
 
 ActivityType::BuyCover => {
-    // Validate: options only in v1
+    // v1: options only; v2+ may allow stocks
     if asset.kind != AssetKind::Option {
         return Err(CalculatorError::InvalidActivity(
             "BUY_COVER only supported for options in v1".to_string()
@@ -888,18 +985,18 @@ ActivityType::BuyCover => {
 ```
 
 **SELL_SHORT Handler**:
-- Creates/increases short lots
+- Creates/increases `short_lots` only (never touches `lots`)
 - Applies cash inflow (premium received)
-- Track lots with negative cost basis (premium received, not paid)
+- Creates `ShortLot` with `premium_received` tracking
 
 **BUY_COVER Handler**:
-- Consumes short lots FIFO
+- Consumes `short_lots` FIFO only (never touches `lots`)
 - Applies cash outflow (premium paid to close)
 - Realizes P&L = premium received - premium paid to close
 
 #### Option Multiplier Handling (Must-Have)
 
-Any time the calculator computes notional/trade value for an option:
+**Multiplier is the PRIMARY source on the Asset, never the activity.**
 
 ```rust
 // notional = qty * unit_price * multiplier
@@ -913,11 +1010,13 @@ fn calculate_option_notional(
             format!("Option asset {} missing OptionSpec", asset.id)
         ))?;
 
-    // Multiplier is REQUIRED - do NOT silently default to 100
+    // Multiplier is REQUIRED - engine NEVER silently assumes 100
     let multiplier = option_spec.multiplier;
     if multiplier == Decimal::ZERO {
         return Err(CalculatorError::InvalidAsset(
-            format!("Option {} has zero or missing multiplier - please set multiplier in asset metadata", asset.id)
+            format!("Option {} has zero or missing multiplier. \
+                     Missing multiplier is a data error; calculations skipped until corrected.",
+                    asset.id)
         ));
     }
 
@@ -925,11 +1024,29 @@ fn calculate_option_notional(
 }
 ```
 
-**Multiplier Safety Rules:**
-1. **Never silently default** to 100 - this hides data errors
-2. **Require multiplier** in `OptionSpec` for all option assets
-3. If multiplier is missing/zero during import, set `activity.needs_review = true` and use 100 as placeholder
-4. UI must prompt user to confirm/edit multiplier before calculations proceed
+**Multiplier Safety Rules (Hard Requirements):**
+
+1. **`OptionSpec.multiplier` is REQUIRED on the asset**
+   - All calculator/valuation paths use `asset.option_spec().multiplier`
+   - `activity.metadata.option.multiplier` is **ignored at runtime**
+
+2. **Engine NEVER silently assumes 100**
+   - Missing or zero multiplier = data error
+   - Affected positions are flagged
+   - Calculations for those contracts are skipped or marked invalid until corrected
+
+3. **UI must surface missing multiplier prominently**
+   - Show warning badge on affected positions
+   - Block export/reports until resolved
+
+**Runtime Rules:**
+- The calculator and valuation **always** use `asset.option_spec().multiplier`
+- `activity.metadata.option.multiplier` is **ignored** at runtime
+
+**Import Rules:**
+- If an activity carries a multiplier and the asset has none, the importer should **populate** `OptionSpec.multiplier` from the activity
+- If both exist and differ, importer should **raise an error** and require manual fix
+- If multiplier is unknown, fail asset creation or mark as `needs_setup`
 
 Apply this consistently for `BUY`, `SELL`, `SELL_SHORT`, `BUY_COVER` when `asset.kind == Option`.
 
@@ -979,9 +1096,7 @@ pub struct Position {
 }
 
 impl Position {
-    pub fn net_quantity(&self) -> Decimal {
-        self.long_quantity() - self.short_quantity()
-    }
+    // === Quantity Metrics ===
 
     pub fn long_quantity(&self) -> Decimal {
         self.lots.iter().map(|l| l.quantity).sum()
@@ -991,10 +1106,45 @@ impl Position {
         self.short_lots.iter().map(|l| l.quantity).sum()
     }
 
+    /// Net quantity for exposure display. Can be negative (net short).
+    pub fn net_quantity(&self) -> Decimal {
+        self.long_quantity() - self.short_quantity()
+    }
+
+    // === Cost/Premium Metrics ===
+
+    /// Total cost basis for long positions (cash paid to acquire)
+    pub fn long_cost_basis(&self) -> Decimal {
+        self.lots.iter().map(|l| l.cost_basis).sum()
+    }
+
+    /// Total premium received for short positions (cash received to open)
     pub fn total_premium_received(&self) -> Decimal {
         self.short_lots.iter().map(|l| l.premium_received).sum()
     }
 }
+```
+
+**P&L Calculation (Explicit Long vs Short):**
+
+```rust
+impl Position {
+    /// Long unrealized P&L: market_value - cost_basis
+    pub fn long_unrealized_gain(&self, price: Decimal, multiplier: Decimal) -> Decimal {
+        let long_market_value = self.long_quantity() * price * multiplier;
+        long_market_value - self.long_cost_basis()
+    }
+
+    /// Short unrealized P&L: premium_received - |short_market_value|
+    /// Profit when current MV (liability) < premium received
+    pub fn short_unrealized_gain(&self, price: Decimal, multiplier: Decimal) -> Decimal {
+        let short_market_value = self.short_quantity() * price * multiplier;
+        self.total_premium_received() - short_market_value
+    }
+}
+```
+
+**Important**: In generic views (e.g., Holdings table), `cost_basis` refers to **long-only** cost basis. Short economics come from `premium_received`. If users have mixed long+short on the same contract, calculate and display long MV and short MV separately, then net for total exposure.
 ```
 
 ### 3.7 Option Asset Creation
@@ -1087,9 +1237,43 @@ If an option position exists where `expiration < today` and `net_quantity != 0`:
 
 ### 3.8 Option Valuation
 
-**Market Value Calculation**:
+**Valuation Formulas (Explicit):**
 
-The holding's `net_quantity` (from `Position::net_quantity()`) is signed: positive for net long, negative for net short. Market value preserves this sign to correctly represent exposure.
+```
+premium = quote.close
+net_qty = long_quantity - short_quantity
+
+market_value = net_qty × premium × multiplier
+```
+
+- Net long → positive MV (asset)
+- Net short → negative MV (liability)
+
+**Holding.quantity Sign Semantics:**
+
+```
+For non-option assets: Holding.quantity is always >= 0
+
+For options: Holding.quantity is the SIGNED net quantity
+  (long_quantity - short_quantity) and MAY BE NEGATIVE (net short).
+  Valuation uses this signed quantity directly.
+```
+
+This is **by design** - do NOT "fix" it to `abs()`. The negative quantity correctly represents short exposure.
+
+```rust
+// Guard in code to document intent
+match asset.kind {
+    AssetKind::Option => {
+        // quantity may be negative, by design (net short)
+    }
+    _ => {
+        debug_assert!(holding.quantity >= Decimal::ZERO);
+    }
+}
+```
+
+**Implementation:**
 
 ```rust
 async fn calculate_option_valuation(
@@ -1103,11 +1287,11 @@ async fn calculate_option_valuation(
             format!("Option asset {} missing OptionSpec", asset.id)
         ))?;
 
-    // Multiplier is REQUIRED - do not silently default
+    // Multiplier is REQUIRED - engine never silently assumes 100
     let multiplier = option_spec.multiplier;
     if multiplier == Decimal::ZERO {
         return Err(CalculatorError::InvalidAsset(
-            format!("Option {} has zero multiplier", asset.id)
+            format!("Option {} has zero multiplier - data error", asset.id)
         ));
     }
 
@@ -1124,9 +1308,6 @@ async fn calculate_option_valuation(
         holding.market_value.local = net_qty * premium * multiplier;
     }
 
-    // Unrealized gain for display:
-    // Long:  market_value - cost_basis
-    // Short: premium_received - |market_value| (stored separately)
     Ok(())
 }
 ```
@@ -1138,9 +1319,49 @@ async fn calculate_option_valuation(
 | Short 1 contract | -1 | -$500 | Liability of $500 |
 | Mixed (3L, 1S) | +2 | +$1,000 | Net asset exposure |
 
+**Net Worth Impact:**
+
+For net worth calculations, option positions contribute `market_value` which **may be negative** for net short positions (liabilities). UI should label negative market values as "short exposure" so users aren't surprised.
+
+```rust
+// In net worth calculation
+total_net_worth = cash_balances
+    + Σ(stock_positions.market_value)      // always positive
+    + Σ(option_positions.market_value);    // can be negative!
+```
+
 **No Greeks/Black-Scholes in v1.**
 
-### 3.9 Known v1 Limitations
+### 3.9 Lifecycle Behavior: Close-at-0 and Basis (v1 Decision)
+
+**Confirmed Design:**
+- Close options at 0 on exercise/assignment/expiration
+- Do NOT roll option premium into underlying basis in v1
+
+**Why This Works:**
+
+Option P&L is fully realized on the option side (via premium vs close @ 0). Underlying basis on exercise/assignment is pure `strike × shares` in v1. This matches economic P&L; tax-style basis folding can be layered on in v2.
+
+Example (Long Call Exercise):
+```
+Original: BUY 1 AAPL 150C @ $5.00 → cost_basis = $500
+Exercise:
+  - Leg 0: BUY 100 AAPL @ $150 → AAPL cost_basis = $15,000
+  - Leg 1: SELL option @ $0 → realizes -$500 (loss on option)
+
+Total economic result:
+  - Paid: $500 (premium) + $15,000 (shares) = $15,500
+  - Own: 100 AAPL worth (say) $18,000
+  - Profit: $2,500
+
+Tax-style basis (v2 enhancement):
+  - Effective AAPL basis = $15,000 + $500 = $15,500
+  - But for v1, we show: AAPL basis = $15,000, Option realized P&L = -$500
+```
+
+**v2 Enhancement**: Optionally add "effective basis" metric that folds in option P&L purely for display/tax reporting.
+
+### 3.10 Known v1 Limitations
 
 > **Scope Boundaries**: The following are explicitly out of scope for v1. They may be addressed in future versions.
 
@@ -1198,60 +1419,77 @@ pub enum ActivityType {
 
 ## 5. Implementation Phases
 
-### Phase 1: Long Options + Lifecycle
+### Phase 1: Canonicals + Core Model
 **Priority: High | Effort: Medium**
 
-1. Add option subtypes to `activities_constants.rs`:
-   - `OPTION_EXERCISE`
-   - `OPTION_EXPIRATION`
-2. Implement in-memory compiler expansion in `compiler.rs`:
-   - `EXPIRATION` => `SELL` option @ 0 (long)
-   - `EXERCISE` => underlying leg + `SELL` option @ 0
-3. Ensure holdings calculator applies option multiplier to trade value
-4. Add option asset creation helpers
+1. Introduce `SellShort` / `BuyCover` canonical types
+2. Enforce `quantity >= 0` for all activities
+3. Enforce `Sell` never creates short (error if closing more than owned)
+4. Add `ShortLot` model and `short_lots` to Position
+5. Implement FIFO logic for `short_lots`
+6. Add multiplier-aware notional helper that **requires** `OptionSpec`
 
 **Files to modify**:
 - `crates/core/src/activities/activities_constants.rs`
 - `crates/core/src/activities/activities_model.rs` (ActivityType enum)
-- `crates/core/src/activities/compiler.rs`
+- `crates/core/src/portfolio/snapshot/positions_model.rs`
 - `crates/core/src/portfolio/snapshot/holdings_calculator.rs`
 - `crates/core/src/assets/assets_service.rs`
 
-### Phase 2: Short Options
+**Tests to add**:
+- Quantity validation (reject negative)
+- Sell cannot exceed owned quantity
+- SellShort/BuyCover only for options (v1)
+- Multiplier required, zero rejected
+
+### Phase 2: Options Lifecycle
 **Priority: High | Effort: Medium**
 
-1. Add canonical types: `SELL_SHORT`, `BUY_COVER`
-2. Add `ShortLot` model and `short_lots` to Position
-3. Calculator handlers for `SELL_SHORT` and `BUY_COVER` (options-only)
-4. Implement compiler expansion:
-   - `ASSIGNMENT` => underlying leg + `BUY_COVER` option @ 0
-   - `EXPIRATION` => `BUY_COVER` option @ 0 (short)
+1. Implement compiler expansion for `OPTION_EXERCISE`:
+   - CALL: BUY underlying + SELL option @ 0
+   - PUT: SELL underlying + SELL option @ 0
+2. Implement compiler expansion for `OPTION_ASSIGNMENT`:
+   - CALL: SELL underlying + BUY_COVER option @ 0
+   - PUT: BUY underlying + BUY_COVER option @ 0
+3. Represent expiration as canonical `SELL`/`BUY_COVER` @ 0 (NO compiler expansion)
+4. Add `OPTION_EXPIRATION` subtype for labeling (informational only)
 
 **Files to modify**:
 - `crates/core/src/activities/activities_constants.rs`
-- `crates/core/src/activities/activities_model.rs`
-- `crates/core/src/portfolio/snapshot/positions_model.rs`
-- `crates/core/src/portfolio/snapshot/holdings_calculator.rs`
 - `crates/core/src/activities/compiler.rs`
 
-### Phase 3: Option Valuation
+**Tests to add**:
+- Exercise expansion (call and put)
+- Assignment expansion (call and put)
+- Expiration stored directly as canonical (no expansion)
+
+### Phase 3: Valuation
 **Priority: Medium | Effort: Low**
 
-1. Add option-specific valuation logic
-2. Apply `premium * contracts * multiplier` formula
-3. Handle short position exposure display
+1. Implement option valuation with signed `net_quantity` and multiplier
+2. Handle negative market values for short positions
+3. Add `long_unrealized_gain` / `short_unrealized_gain` methods
 
 **Files to modify**:
 - `crates/core/src/portfolio/holdings/holdings_valuation_service.rs`
 - `crates/core/src/portfolio/holdings/holdings_model.rs`
 
-### Phase 4: UI Components
+**Tests to add**:
+- Long position valuation
+- Short position valuation (negative MV)
+- Mixed long+short same contract
+
+### Phase 4: UI / Options Tab
 **Priority: Medium | Effort: High**
 
-1. Option activity forms (buy/sell/write options)
-2. Exercise/assignment/expiration action flows
-3. Option chain viewer (grouped by underlying/expiry/strike)
-4. Show compiled legs grouped (using `compiled_group_id`)
+1. Option trade forms mapped to 4 canonicals:
+   - Buy to Open (BUY)
+   - Sell to Close (SELL)
+   - Sell to Open (SELL_SHORT)
+   - Buy to Close (BUY_COVER)
+2. Exercise/assignment flows that create semantic activity + let compiler expand
+3. "Expired" quick actions that generate canonical close @ 0
+4. Option chain viewer (grouped by underlying/expiry/strike)
 5. Options P&L summary
 
 **Files to create**:
@@ -1266,6 +1504,34 @@ pub enum ActivityType {
 3. Strategy linking (spreads, covered calls)
 4. Expiration calendar/alerts
 5. Greeks display (if data available)
+6. Extend `SellShort`/`BuyCover` to stocks (short selling)
+
+---
+
+## 5.1 Golden Tests Matrix
+
+**CRITICAL**: These tests ensure correctness across all option scenarios. Each should cross-check cash + positions + P&L.
+
+| Test Case | Activity Sequence | Expected Result |
+|-----------|-------------------|-----------------|
+| **BTO → STC (profit)** | BUY option @ $5, SELL @ $8 | +$300 realized gain per contract |
+| **BTO → STC (loss)** | BUY option @ $5, SELL @ $2 | -$300 realized loss per contract |
+| **STO → BTC (profit)** | SELL_SHORT @ $3, BUY_COVER @ $1 | +$200 realized gain per contract |
+| **STO → BTC (loss)** | SELL_SHORT @ $3, BUY_COVER @ $5 | -$200 realized loss per contract |
+| **STO put → assignment** | SELL_SHORT put @ $3, ASSIGNMENT | +100 shares, option closed, +$300 premium realized |
+| **BTO call → exercise** | BUY call @ $5, EXERCISE | +100 shares @ strike, option closed, -$500 premium realized |
+| **Long expiration** | BUY @ $5, SELL @ $0 (exp) | -$500 realized loss |
+| **Short expiration** | SELL_SHORT @ $3, BUY_COVER @ $0 (exp) | +$300 realized gain |
+| **Multi-lot FIFO** | BUY 2 @ $3, BUY 1 @ $5, SELL 2 @ $6 | First 2 lots closed, $600 gain |
+| **Partial close** | BUY 5 @ $4, SELL 2 @ $7 | 3 remaining, $600 realized on closed |
+| **Mixed long+short** | BUY 3 @ $4, SELL_SHORT 1 @ $3 | net_qty=2, separate P&L tracking |
+
+**Test Invariants to Verify:**
+- `cash_delta` matches expected for each activity
+- `position.long_quantity()` + `position.short_quantity()` always ≥ 0
+- `net_quantity = long_quantity - short_quantity`
+- All realized P&L flows through lot consumption
+- Multiplier applied correctly (100× for equity options)
 
 ---
 
@@ -1285,16 +1551,15 @@ pub enum ActivityType {
   "currency": "USD",
   "fee": 1.30,
   "metadata": {
-    "option": {
-      "underlying_asset_id": "AAPL",
-      "right": "CALL",
-      "strike": "150.00",
-      "expiration": "2024-12-20",
-      "multiplier": "100"
+    "source": {
+      "raw_option_type": "BTO",
+      "broker_description": "Buy to Open AAPL 12/20/24 150 Call"
     }
   }
 }
 ```
+
+> **Note**: Option structure (strike, expiration, multiplier) is read from the Asset's `OptionSpec`, not activity metadata.
 
 **Holdings Impact**:
 - Position: +2 contracts (long lots)
@@ -1315,12 +1580,9 @@ pub enum ActivityType {
   "currency": "USD",
   "fee": 0.65,
   "metadata": {
-    "option": {
-      "underlying_asset_id": "AAPL",
-      "right": "PUT",
-      "strike": "140.00",
-      "expiration": "2024-12-20",
-      "multiplier": "100"
+    "source": {
+      "raw_option_type": "STO",
+      "broker_description": "Sell to Open AAPL 12/20/24 140 Put"
     }
   }
 }
@@ -1344,15 +1606,14 @@ pub enum ActivityType {
   "quantity": 1,
   "currency": "USD",
   "metadata": {
-    "option": {
-      "underlying_asset_id": "AAPL",
-      "strike": "150.00",
-      "multiplier": "100",
-      "position_type": "LONG"
+    "source": {
+      "broker_description": "Exercise AAPL 12/20/24 150 Call"
     }
   }
 }
 ```
+
+> **Validation**: Compiler reads option structure from Asset's `OptionSpec`. Exercise requires `net_quantity > 0` (long position).
 
 **Compiler Expands To**:
 ```
@@ -1379,15 +1640,14 @@ Leg 1: SELL OPT_AAPL_20241220_C_150, qty=1, unit_price=0
   "quantity": 1,
   "currency": "USD",
   "metadata": {
-    "option": {
-      "underlying_asset_id": "AAPL",
-      "strike": "140.00",
-      "multiplier": "100",
-      "position_type": "SHORT"
+    "source": {
+      "broker_description": "Assignment AAPL 12/20/24 140 Put"
     }
   }
 }
 ```
+
+> **Validation**: Assignment requires `net_quantity < 0` (short position).
 
 **Compiler Expands To**:
 ```
@@ -1415,12 +1675,14 @@ Leg 1: BUY_COVER OPT_AAPL_20241220_P_140, qty=1, unit_price=0
   "unit_price": 0,
   "currency": "USD",
   "metadata": {
-    "option": {
-      "position_type": "LONG"
+    "source": {
+      "broker_description": "Expired worthless AAPL 12/20/24 150 Call"
     }
   }
 }
 ```
+
+> **Note**: The `activity_type` (`SELL` for long, `BUY_COVER` for short) already encodes the direction. No `position_type` field needed.
 
 **Compiler Output**: Pass-through (already canonical)
 
@@ -1434,11 +1696,12 @@ Leg 1: BUY_COVER OPT_AAPL_20241220_P_140, qty=1, unit_price=0
 ## 7. Risk Considerations
 
 ### Validation Rules
-- **OPTION_EXERCISE** requires net long option position
-- **OPTION_ASSIGNMENT** requires net short option position
+- **OPTION_EXERCISE** requires `net_quantity > 0` (must have long position) - state-based validation
+- **OPTION_ASSIGNMENT** requires `net_quantity < 0` (must have short position) - state-based validation
 - **v1 restriction**: `SELL_SHORT`/`BUY_COVER` rejected for non-options
-- **Multiplier must be present** or defaulted; otherwise P&L off by 100x
+- **Multiplier must be present** in `OptionSpec` - missing = data error, calculations skipped
 - **Quantity must be non-negative** in all trading activities
+- **Sell cannot exceed owned quantity** - error if attempting to close more than long_quantity
 
 ### Edge Cases
 1. **Partial Exercise**: Allow exercising fewer contracts than held
@@ -1565,35 +1828,25 @@ Leg 1: BUY_COVER OPT_AAPL_20241220_P_140, qty=1, unit_price=0
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                    COMPILER EXPANSION RULES                                  │
+│                 (ONLY Multi-Leg Events Are Expanded)                         │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  INPUT (Stored Activity)              OUTPUT (Virtual Postings)             │
 │  ──────────────────────               ─────────────────────────             │
 │                                                                              │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │ OPTION_EXPIRATION (Long)                                             │   │
+│  │ OPTION_EXPIRATION - NOT COMPILER-EXPANDED                            │   │
 │  │                                                                       │   │
-│  │   { subtype: "OPTION_EXPIRATION",    ──▶   Leg 0: SELL option        │   │
-│  │     asset_id: "OPT_AAPL...",                 qty: N                  │   │
-│  │     quantity: N,                             unit_price: 0           │   │
-│  │     position_type: "LONG" }                                          │   │
+│  │   Stored directly as canonical:                                       │   │
+│  │   • Long expiration:  SELL @ 0, subtype=OPTION_EXPIRATION            │   │
+│  │   • Short expiration: BUY_COVER @ 0, subtype=OPTION_EXPIRATION       │   │
 │  │                                                                       │   │
-│  │   Effect: Realizes LOSS = original premium paid                      │   │
+│  │   The subtype is INFORMATIONAL ONLY for UI/reports.                  │   │
+│  │   Compiler passes through unchanged.                                  │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                              │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │ OPTION_EXPIRATION (Short)                                            │   │
-│  │                                                                       │   │
-│  │   { subtype: "OPTION_EXPIRATION",    ──▶   Leg 0: BUY_COVER option   │   │
-│  │     asset_id: "OPT_AAPL...",                 qty: N                  │   │
-│  │     quantity: N,                             unit_price: 0           │   │
-│  │     position_type: "SHORT" }                                         │   │
-│  │                                                                       │   │
-│  │   Effect: Realizes GAIN = original premium received                  │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │ OPTION_EXERCISE (Long CALL)                                          │   │
+│  │ OPTION_EXERCISE (Long CALL) - COMPILER-EXPANDED                      │   │
 │  │                                                                       │   │
 │  │   { subtype: "OPTION_EXERCISE",      ──▶   Leg 0: BUY underlying     │   │
 │  │     asset_id: "OPT_AAPL_C_150",              qty: N × multiplier     │   │
@@ -1852,11 +2105,16 @@ Leg 1: BUY_COVER OPT_AAPL_20241220_P_140, qty=1, unit_price=0
 │  └───────────────────────────────────────────────────────────────────────┘  │
 │                                                                              │
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │ MULTIPLIER SOURCES (in order of preference)                           │  │
+│  │ MULTIPLIER SOURCE (Single Source of Truth)                            │  │
 │  │                                                                        │  │
-│  │   1. asset.metadata.option.multiplier  (explicit)                     │  │
-│  │   2. activity.metadata.option.multiplier  (activity-level override)   │  │
-│  │   3. Default: 100  (standard equity option)                           │  │
+│  │   Runtime: asset.option_spec().multiplier (via OptionSpec)            │  │
+│  │                                                                        │  │
+│  │   ⚠️  There is NO runtime default of 100.                             │  │
+│  │   ⚠️  Missing multiplier is a DATA ERROR - calculations are skipped.  │  │
+│  │                                                                        │  │
+│  │   Import: activity.metadata.option.multiplier may be used only        │  │
+│  │   at import-time to POPULATE OptionSpec, but the calculator/          │  │
+│  │   valuation NEVER read it at runtime.                                 │  │
 │  └───────────────────────────────────────────────────────────────────────┘  │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -1870,38 +2128,45 @@ Leg 1: BUY_COVER OPT_AAPL_20241220_P_140, qty=1, unit_price=0
 
 | Aspect | Design Decision |
 |--------|-----------------|
-| **Direction** | Canonicals encode direction (`BUY`/`SELL` for long, `SELL_SHORT`/`BUY_COVER` for short) |
-| **Quantity** | Always absolute (>= 0); never negative |
-| **Lifecycle Events** | Subtypes (`OPTION_EXERCISE`, `OPTION_ASSIGNMENT`, `OPTION_EXPIRATION`) compile to canonical postings |
+| **Canonical Types** | Only 5: `Buy`, `Sell`, `SellShort`, `BuyCover`, `Split` - nothing else affects positions |
+| **Direction** | Canonicals encode direction; quantity is always ≥ 0 |
+| **Sell Invariant** | `Sell` can only consume long lots, never create short (error if over-selling) |
+| **Short Invariant** | Only `SellShort`/`BuyCover` mutate `short_lots` |
+| **Compiler Scope** | Only multi-leg events (`OPTION_EXERCISE`, `OPTION_ASSIGNMENT`); expiration is NOT expanded |
+| **Expiration** | Stored as canonical `SELL @ 0` or `BUY_COVER @ 0` with optional subtype for labeling |
 | **Option Closures** | Close-at-0 trades realize premium P&L through existing lot logic |
-| **Multiplier** | Mandatory for correctness; default 100 |
+| **Multiplier** | **Required** in `OptionSpec` on asset; engine never assumes 100; missing = error |
+| **Metadata** | Option structure on Asset only; Activity metadata only for source traceability |
+| **P&L** | Long: `market_value - cost_basis`; Short: `premium_received - |market_value|` |
 | **Schema** | No changes; all data in existing metadata JSON |
-| **v1 Restrictions** | `SELL_SHORT`/`BUY_COVER` only for options |
+| **v1 Restrictions** | `SellShort`/`BuyCover` only for options (design allows stocks in v2+) |
 
 ### Implementation Checklist
 
 ```
-Phase 1: Long Options + Lifecycle
-├── [ ] Add OPTION_EXERCISE, OPTION_EXPIRATION subtypes
-├── [ ] Implement compiler expansion for long positions
-├── [ ] Add multiplier-aware notional calculation
-└── [ ] Add option asset creation helpers
-
-Phase 2: Short Options
+Phase 1: Canonicals + Core Model
 ├── [ ] Add SELL_SHORT, BUY_COVER canonical types
-├── [ ] Add ShortLot model to Position
-├── [ ] Implement calculator handlers for short types
-├── [ ] Implement compiler expansion for OPTION_ASSIGNMENT
-└── [ ] Add short expiration handling (BUY_COVER @ 0)
+├── [ ] Enforce quantity >= 0 for all activities
+├── [ ] Enforce Sell cannot create short positions
+├── [ ] Add ShortLot model and short_lots to Position
+├── [ ] Implement FIFO for short_lots
+└── [ ] Add multiplier-aware notional (REQUIRES OptionSpec)
+
+Phase 2: Options Lifecycle
+├── [ ] Implement compiler for OPTION_EXERCISE (call + put)
+├── [ ] Implement compiler for OPTION_ASSIGNMENT (call + put)
+├── [ ] Expiration as canonical SELL/BUY_COVER @ 0 (NO compiler expansion)
+└── [ ] Add OPTION_EXPIRATION subtype for labeling
 
 Phase 3: Valuation
-├── [ ] Add option-specific valuation logic
-├── [ ] Apply premium × contracts × multiplier formula
-└── [ ] Handle short position exposure display
+├── [ ] Implement option valuation with signed net_quantity
+├── [ ] Handle negative market values for short positions
+└── [ ] Add long_unrealized_gain / short_unrealized_gain
 
-Phase 4: UI Components
-├── [ ] Option activity forms
-├── [ ] Exercise/assignment/expiration flows
+Phase 4: UI / Options Tab
+├── [ ] Option trade forms (BTO, STC, STO, BTC)
+├── [ ] Exercise/assignment flows
+├── [ ] "Expired" quick actions (generate canonical @ 0)
 ├── [ ] Option chain viewer
 └── [ ] Options P&L summary
 ```
@@ -1926,4 +2191,23 @@ crates/core/src/portfolio/holdings/
 └── holdings_valuation_service.rs  # Option valuation
 ```
 
-This design leverages existing infrastructure (subtypes, metadata, compiler) to add comprehensive options support with minimal changes while maintaining accounting correctness through the established lot-based P&L model.
+### How This Answers User Feature Requests
+
+With this design:
+
+| User Request | How It's Handled |
+|--------------|------------------|
+| **"Negative positions"** | Derived `net_quantity < 0` from `short_lots` → surfaces as short positions in UI |
+| **"Credit from sell put/call"** | `SellShort` on option asset → cash inflow from premium |
+| **"Debit to buy put/call"** | `Buy` on option asset → cash outflow from premium |
+| **"Track option expiration"** | Stored as `SELL @ 0` or `BUY_COVER @ 0` → realizes P&L correctly |
+| **"Exercise my call"** | `OPTION_EXERCISE` subtype → compiler expands to BUY shares + close option |
+| **"Got assigned on put"** | `OPTION_ASSIGNMENT` subtype → compiler expands to BUY shares + close option |
+| **"Show option P&L"** | Close-at-0 pattern naturally realizes premium P&L through lot logic |
+| **"Options value in net worth"** | `market_value = net_qty × premium × multiplier` (can be negative for shorts) |
+
+This design:
+- Stays consistent with the existing calculation pipeline
+- Avoids overloading subtypes with accounting semantics
+- Is easier to implement and test
+- Matches what power users actually want for options tracking

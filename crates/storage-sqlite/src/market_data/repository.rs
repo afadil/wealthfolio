@@ -260,7 +260,7 @@ impl QuoteStore for MarketDataRepository {
             let quote = Quote::from(quote_db);
 
             if current_asset_quotes.is_empty()
-                || quote.symbol == current_asset_quotes[0].symbol
+                || quote.asset_id == current_asset_quotes[0].asset_id
             {
                 current_asset_quotes.push(quote);
             } else {
@@ -272,7 +272,7 @@ impl QuoteStore for MarketDataRepository {
                         None
                     };
                     result_map.insert(
-                        AssetId::new(latest_quote.symbol.clone()),
+                        AssetId::new(latest_quote.asset_id.clone()),
                         LatestQuotePair {
                             latest: latest_quote,
                             previous: previous_quote,
@@ -292,7 +292,7 @@ impl QuoteStore for MarketDataRepository {
                 None
             };
             result_map.insert(
-                AssetId::new(latest_quote.symbol.clone()),
+                AssetId::new(latest_quote.asset_id.clone()),
                 LatestQuotePair {
                     latest: latest_quote,
                     previous: previous_quote,
@@ -399,43 +399,43 @@ impl QuoteStore for MarketDataRepository {
         let ranked_quotes_db: Vec<QuoteDB> = query_builder.load::<QuoteDB>(&mut conn).into_core()?;
 
         let mut result_map: HashMap<String, LatestQuotePair> = HashMap::new();
-        let mut current_symbol_quotes: Vec<Quote> = Vec::new();
+        let mut current_asset_quotes: Vec<Quote> = Vec::new();
 
         for quote_db in ranked_quotes_db {
             let quote = Quote::from(quote_db);
 
-            if current_symbol_quotes.is_empty() || quote.symbol == current_symbol_quotes[0].symbol {
-                current_symbol_quotes.push(quote);
+            if current_asset_quotes.is_empty() || quote.asset_id == current_asset_quotes[0].asset_id {
+                current_asset_quotes.push(quote);
             } else {
-                if !current_symbol_quotes.is_empty() {
-                    let latest_quote = current_symbol_quotes.remove(0);
-                    let previous_quote = if !current_symbol_quotes.is_empty() {
-                        Some(current_symbol_quotes.remove(0))
+                if !current_asset_quotes.is_empty() {
+                    let latest_quote = current_asset_quotes.remove(0);
+                    let previous_quote = if !current_asset_quotes.is_empty() {
+                        Some(current_asset_quotes.remove(0))
                     } else {
                         None
                     };
                     result_map.insert(
-                        latest_quote.symbol.clone(),
+                        latest_quote.asset_id.clone(),
                         LatestQuotePair {
                             latest: latest_quote,
                             previous: previous_quote,
                         },
                     );
                 }
-                current_symbol_quotes.clear();
-                current_symbol_quotes.push(quote);
+                current_asset_quotes.clear();
+                current_asset_quotes.push(quote);
             }
         }
 
-        if !current_symbol_quotes.is_empty() {
-            let latest_quote = current_symbol_quotes.remove(0);
-            let previous_quote = if !current_symbol_quotes.is_empty() {
-                Some(current_symbol_quotes.remove(0))
+        if !current_asset_quotes.is_empty() {
+            let latest_quote = current_asset_quotes.remove(0);
+            let previous_quote = if !current_asset_quotes.is_empty() {
+                Some(current_asset_quotes.remove(0))
             } else {
                 None
             };
             result_map.insert(
-                latest_quote.symbol.clone(),
+                latest_quote.asset_id.clone(),
                 LatestQuotePair {
                     latest: latest_quote,
                     previous: previous_quote,

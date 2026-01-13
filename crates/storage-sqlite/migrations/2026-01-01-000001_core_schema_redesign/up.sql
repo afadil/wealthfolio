@@ -315,19 +315,29 @@ SELECT
         ELSE NULL
     END,
     notes,
-    -- metadata: store ALL legacy data for later user-initiated migration + old_id for rollback
-    json_object(
-        'legacy', json_object(
-            'old_id', id,  -- Always store old_id for rollback
-            'isin', isin,
-            'asset_class', asset_class,
-            'asset_sub_class', asset_sub_class,
-            'sectors', CASE WHEN sectors IS NOT NULL AND json_valid(sectors) THEN json(sectors) ELSE sectors END,
-            'countries', CASE WHEN countries IS NOT NULL AND json_valid(countries) THEN json(countries) ELSE countries END,
-            'website', url,
-            'id_migrated_at', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-        )
-    ),
+    -- metadata: Contains both temporary $.legacy structure and permanent $.identifiers
+    -- $.legacy: Used by 000001 (FK mapping), 000002 (quote mapping), 000003 (taxonomy classification)
+    -- $.identifiers: Permanent structure for asset identifiers (ISIN, etc.)
+    -- Cleanup: $.legacy is removed at end of 000003_taxonomies, $.identifiers is preserved
+    CASE
+        WHEN isin IS NOT NULL AND isin != '' THEN
+            json_object(
+                'legacy', json_object(
+                    'old_id', id,  -- Used for FK mapping (temp table) and quote mapping
+                    'asset_class', asset_class,  -- Used for taxonomy classification, then removed
+                    'asset_sub_class', asset_sub_class  -- Used for taxonomy classification, then removed
+                ),
+                'identifiers', json_object('isin', isin)  -- Permanent: preserved after cleanup
+            )
+        ELSE
+            json_object(
+                'legacy', json_object(
+                    'old_id', id,  -- Used for FK mapping (temp table) and quote mapping
+                    'asset_class', asset_class,  -- Used for taxonomy classification, then removed
+                    'asset_sub_class', asset_sub_class  -- Used for taxonomy classification, then removed
+                )
+            )
+    END,
     1, -- is_active
     -- Convert datetime format: try to parse and reformat, or use as-is if already RFC3339
     CASE

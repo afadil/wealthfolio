@@ -89,7 +89,7 @@ const toQuote = (entry: QuoteEntry, symbol: string): Quote => {
     createdAt: new Date().toISOString(),
     dataSource: "MANUAL",
     timestamp: entry.date.toISOString(),
-    symbol: symbol,
+    assetId: symbol,
     open: entry.open,
     high: entry.high,
     low: entry.low,

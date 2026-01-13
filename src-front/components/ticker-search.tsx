@@ -1,6 +1,6 @@
 import { searchTicker } from "@/commands/market-data";
 import { Button } from "@wealthfolio/ui/components/ui/button";
-import { Command, CommandInput, CommandItem, CommandList } from "@wealthfolio/ui/components/ui/command";
+import { Command, CommandInput, CommandItem, CommandList, CommandSeparator } from "@wealthfolio/ui/components/ui/command";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
@@ -11,6 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Command as CommandPrimitive } from "cmdk";
 import { debounce } from "lodash";
 import { forwardRef, memo, useCallback, useMemo, useRef, useState } from "react";
+import { CreateCustomAssetDialog } from "./create-custom-asset-dialog";
 
 interface SearchProps {
   selectedResult?: QuoteSummary;
@@ -19,6 +20,8 @@ interface SearchProps {
   placeholder?: string;
   onSelectResult: (symbol: string, quoteSummary?: QuoteSummary) => void;
   className?: string;
+  /** Default currency to use for custom assets (typically from account) */
+  defaultCurrency?: string;
 }
 
 interface SearchResultsProps {
@@ -28,26 +31,14 @@ interface SearchResultsProps {
   isError?: boolean;
   selectedResult: SearchProps["selectedResult"];
   onSelect: (symbol: QuoteSummary) => void;
+  onCreateCustomAsset: () => void;
 }
 
 // Memoize search results component
 const SearchResults = memo(
-  ({ results, query, isLoading, selectedResult, onSelect }: SearchResultsProps) => {
-    const handleCustomSymbol = () => {
-      if (query.trim()) {
-        onSelect({
-          symbol: query.trim().toUpperCase(),
-          longName: query.trim().toUpperCase(),
-          shortName: query.trim().toUpperCase(),
-          exchange: "MANUAL",
-          quoteType: "EQUITY",
-          index: "MANUAL",
-          typeDisplay: "Manual Entry",
-          dataSource: "MANUAL",
-          score: 0,
-        });
-      }
-    };
+  ({ results, query, isLoading, selectedResult, onSelect, onCreateCustomAsset }: SearchResultsProps) => {
+    const hasResults = results && results.length > 0;
+    const showNoResults = !isLoading && !hasResults && query.length > 1;
 
     return (
       <CommandList>
@@ -60,33 +51,51 @@ const SearchResults = memo(
             </div>
           </CommandPrimitive.Loading>
         ) : null}
-        {!isLoading && !results?.length && query.length > 1 && (
-          <CommandItem onSelect={handleCustomSymbol} value={query} className="h-11 rounded-none">
-            <Icons.Plus className="mr-2 h-4 w-4" />
-            Use custom symbol: <strong className="ml-1">{query.toUpperCase()}</strong>
-          </CommandItem>
+
+        {/* No results message */}
+        {showNoResults && (
+          <div className="text-muted-foreground px-2 py-3 text-center text-sm">
+            No matches found for "{query}"
+          </div>
         )}
 
-        {results?.map((ticker) => {
-          // Use exchangeName if available (from backend), otherwise map exchange code to friendly name
-          const exchangeDisplay = ticker.exchangeName || getExchangeDisplayName(ticker.exchange);
-          return (
+        {/* Search results */}
+        {hasResults &&
+          results.map((ticker) => {
+            // Use exchangeName if available (from backend), otherwise map exchange code to friendly name
+            const exchangeDisplay = ticker.exchangeName || getExchangeDisplayName(ticker.exchange);
+            return (
+              <CommandItem
+                key={ticker.symbol}
+                onSelect={() => onSelect(ticker)}
+                value={ticker.symbol}
+                className="h-11 rounded-none"
+              >
+                <Icons.Check
+                  className={cn(
+                    "mr-2 h-4 w-4",
+                    selectedResult?.symbol === ticker.symbol ? "opacity-100" : "opacity-0",
+                  )}
+                />
+                {ticker.symbol} - {ticker.longName} ({exchangeDisplay})
+              </CommandItem>
+            );
+          })}
+
+        {/* Create custom asset option - always visible when user has typed something */}
+        {!isLoading && query.length > 0 && (
+          <>
+            {hasResults && <CommandSeparator />}
             <CommandItem
-              key={ticker.symbol}
-              onSelect={() => onSelect(ticker)}
-              value={ticker.symbol}
-              className="h-11 rounded-none"
+              onSelect={onCreateCustomAsset}
+              value={`create-custom-${query}`}
+              className="text-muted-foreground hover:text-foreground h-11 rounded-none"
             >
-              <Icons.Check
-                className={cn(
-                  "mr-2 h-4 w-4",
-                  selectedResult?.symbol === ticker.symbol ? "opacity-100" : "opacity-0",
-                )}
-              />
-              {ticker.symbol} - {ticker.longName} ({exchangeDisplay})
+              <Icons.Plus className="mr-2 h-4 w-4" />
+              Create custom asset{query.trim() ? `: "${query.trim().toUpperCase()}"` : "..."}
             </CommandItem>
-          );
-        })}
+          </>
+        )}
       </CommandList>
     );
   },
@@ -103,10 +112,12 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       placeholder = "Select symbol...",
       onSelectResult,
       className,
+      defaultCurrency,
     },
     ref,
   ) => {
     const [open, setOpen] = useState(false);
+    const [customAssetDialogOpen, setCustomAssetDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState(defaultValue ?? value ?? "");
     const [debouncedQuery, setDebouncedQuery] = useState("");
     const [selected, setSelected] = useState(() => {
@@ -159,6 +170,21 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       [onSelectResult, debouncedSearch],
     );
 
+    // Handle "Create custom asset" click
+    const handleCreateCustomAsset = useCallback(() => {
+      setOpen(false); // Close the popover
+      setCustomAssetDialogOpen(true); // Open the custom asset dialog
+    }, []);
+
+    // Handle custom asset created from dialog
+    const handleCustomAssetCreated = useCallback(
+      (quoteSummary: QuoteSummary) => {
+        // Select the newly created custom asset
+        handleSelectResult(quoteSummary);
+      },
+      [handleSelectResult],
+    );
+
     // Use debounced query for API call
     const { data, isLoading, isError } = useQuery<QuoteSummary[], Error>({
       queryKey: ["ticker-search", debouncedQuery],
@@ -204,51 +230,63 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
     }, []);
 
     return (
-      <Popover open={open} onOpenChange={handleOpenChange}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            className={cn(
-              "w-full justify-between truncate rounded-md",
-              open && "ring-ring ring-2",
-              className,
-            )}
-            ref={ref}
-            aria-expanded={open}
-            aria-haspopup="listbox"
+      <>
+        <Popover open={open} onOpenChange={handleOpenChange}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              className={cn(
+                "w-full justify-between truncate rounded-md",
+                open && "ring-ring ring-2",
+                className,
+              )}
+              ref={ref}
+              aria-expanded={open}
+              aria-haspopup="listbox"
+            >
+              {displayName}
+              <Icons.Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+
+          <PopoverContent
+            side="bottom"
+            align="start"
+            className="h-auto w-(--radix-popover-trigger-width) p-0"
+            onOpenAutoFocus={handleOpenAutoFocus}
+            onCloseAutoFocus={handleCloseAutoFocus}
           >
-            {displayName}
-            <Icons.Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
+            <Command shouldFilter={false} className="border-none">
+              <CommandInput
+                ref={inputRef}
+                value={searchQuery}
+                onValueChange={handleSearchChange}
+                placeholder="Search for symbol"
+              />
 
-        <PopoverContent
-          side="bottom"
-          align="start"
-          className="h-auto w-(--radix-popover-trigger-width) p-0"
-          onOpenAutoFocus={handleOpenAutoFocus}
-          onCloseAutoFocus={handleCloseAutoFocus}
-        >
-          <Command shouldFilter={false} className="border-none">
-            <CommandInput
-              ref={inputRef}
-              value={searchQuery}
-              onValueChange={handleSearchChange}
-              placeholder="Search for symbol"
-            />
+              <SearchResults
+                isLoading={isLoading}
+                isError={isError}
+                query={debouncedQuery}
+                results={sortedTickers}
+                selectedResult={selectedResult}
+                onSelect={handleSelectResult}
+                onCreateCustomAsset={handleCreateCustomAsset}
+              />
+            </Command>
+          </PopoverContent>
+        </Popover>
 
-            <SearchResults
-              isLoading={isLoading}
-              isError={isError}
-              query={debouncedQuery}
-              results={sortedTickers}
-              selectedResult={selectedResult}
-              onSelect={handleSelectResult}
-            />
-          </Command>
-        </PopoverContent>
-      </Popover>
+        {/* Custom Asset Creation Dialog */}
+        <CreateCustomAssetDialog
+          open={customAssetDialogOpen}
+          onOpenChange={setCustomAssetDialogOpen}
+          onAssetCreated={handleCustomAssetCreated}
+          defaultSymbol={searchQuery.trim()}
+          defaultCurrency={defaultCurrency}
+        />
+      </>
     );
   },
 );

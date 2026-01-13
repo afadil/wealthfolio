@@ -94,9 +94,14 @@ pub async fn initialize_context(
         .await?,
     );
 
-    let asset_service = Arc::new(AssetService::new(
+    // Create taxonomy service before asset service (needed for auto-classification)
+    let taxonomy_repository = Arc::new(TaxonomyRepository::new(pool.clone(), writer.clone()));
+    let taxonomy_service = Arc::new(TaxonomyService::new(taxonomy_repository));
+
+    let asset_service = Arc::new(AssetService::with_taxonomy_service(
         asset_repository.clone(),
         quote_service.clone(),
+        taxonomy_service.clone(),
     )?);
 
     let account_service = Arc::new(AccountService::new(
@@ -168,9 +173,6 @@ pub async fn initialize_context(
 
     let alternative_asset_repository =
         Arc::new(AlternativeAssetRepository::new(pool.clone(), writer.clone()));
-
-    let taxonomy_repository = Arc::new(TaxonomyRepository::new(pool.clone(), writer.clone()));
-    let taxonomy_service = Arc::new(TaxonomyService::new(taxonomy_repository));
 
     let sync_service = Arc::new(BrokerSyncService::new(
         account_service.clone(),

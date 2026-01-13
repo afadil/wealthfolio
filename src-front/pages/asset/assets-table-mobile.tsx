@@ -76,12 +76,10 @@ export function AssetsTableMobile({
     );
   };
 
-  // Get unique data sources (preferredProvider)
-  const dataSourceOptions = useMemo(() => {
-    const sources = new Set(
-      assets.map((asset) => asset.preferredProvider ?? "MANUAL").filter((s): s is string => !!s),
-    );
-    return Array.from(sources);
+  // Get unique pricing modes
+  const pricingModeOptions = useMemo(() => {
+    const modes = new Set(assets.map((asset) => asset.pricingMode).filter(Boolean));
+    return Array.from(modes);
   }, [assets]);
 
   // Get unique asset kinds
@@ -105,10 +103,10 @@ export function AssetsTableMobile({
       );
     }
 
-    // Filter by data source
+    // Filter by pricing mode
     if (selectedDataSources.length > 0) {
       filtered = filtered.filter((asset) =>
-        selectedDataSources.includes(asset.preferredProvider ?? "MANUAL"),
+        selectedDataSources.includes(asset.pricingMode),
       );
     }
 
@@ -268,7 +266,7 @@ export function AssetsTableMobile({
               </Badge>
               {asset.kind ? <Badge variant="outline">{asset.kind}</Badge> : null}
               <Badge variant="secondary" className="uppercase">
-                {asset.preferredProvider ?? "MANUAL"}
+                {asset.pricingMode}
               </Badge>
             </div>
 
@@ -330,18 +328,16 @@ export function AssetsTableMobile({
                   )}
                 </div>
                 <div className="space-y-2">
-                  {dataSourceOptions.map((source) => {
-                    const isSelected = selectedDataSources.includes(source);
-                    const count = assets.filter(
-                      (a) => (a.preferredProvider ?? "MANUAL") === source,
-                    ).length;
+                  {pricingModeOptions.map((mode) => {
+                    const isSelected = selectedDataSources.includes(mode);
+                    const count = assets.filter((a) => a.pricingMode === mode).length;
                     return (
                       <button
-                        key={source}
+                        key={mode}
                         type="button"
                         onClick={() => {
                           setSelectedDataSources((prev) =>
-                            isSelected ? prev.filter((s) => s !== source) : [...prev, source],
+                            isSelected ? prev.filter((s) => s !== mode) : [...prev, mode],
                           );
                         }}
                         className={cn(
@@ -362,7 +358,7 @@ export function AssetsTableMobile({
                           >
                             {isSelected && <Icons.Check className="text-secondary h-3 w-3" />}
                           </div>
-                          <span className="font-medium uppercase">{source}</span>
+                          <span className="font-medium uppercase">{mode}</span>
                         </div>
                         <Badge variant="secondary" className="ml-auto">
                           {count}

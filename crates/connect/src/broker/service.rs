@@ -493,7 +493,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 symbol: None, // Not using new symbol-based resolution for broker sync
                 exchange_mic: None,
                 asset_kind: None,
-                asset_data_source: None,
+                pricing_mode: None,
                 asset_metadata: None, // Broker sync uses enrichment events instead
                 activity_type,
                 subtype,

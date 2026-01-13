@@ -124,7 +124,7 @@ export const AssetProfilePage = () => {
 
   // Taxonomy data for category badges - use same approach as edit sheet
   const { data: assignments = [], isLoading: isAssignmentsLoading } = useAssetTaxonomyAssignments(symbol);
-  const { updateAssetDataSourceMutation } = useAssetProfileMutations();
+  const { updatePricingModeMutation } = useAssetProfileMutations();
 
   // Fetch taxonomy details for taxonomies with assignments
   // We need the categories to get name and color
@@ -136,6 +136,12 @@ export const AssetProfilePage = () => {
   );
   const { data: assetClassesTaxonomy } = useTaxonomy(
     assignments.find((a) => a.taxonomyId === "asset_classes")?.taxonomyId ?? null
+  );
+  const { data: industriesTaxonomy } = useTaxonomy(
+    assignments.find((a) => a.taxonomyId === "industries_gics")?.taxonomyId ?? null
+  );
+  const { data: regionsTaxonomy } = useTaxonomy(
+    assignments.find((a) => a.taxonomyId === "regions")?.taxonomyId ?? null
   );
 
   const isClassificationsLoading = isAssignmentsLoading;
@@ -187,8 +193,46 @@ export const AssetProfilePage = () => {
       }
     }
 
+    // Industries (GICS) - top 2 by weight
+    const industryAssignments = assignments
+      .filter((a) => a.taxonomyId === "industries_gics")
+      .sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0))
+      .slice(0, 2);
+    if (industriesTaxonomy?.categories) {
+      for (const assignment of industryAssignments) {
+        const category = industriesTaxonomy.categories.find((c) => c.id === assignment.categoryId);
+        if (category) {
+          badges.push({
+            id: `industry-${category.id}`,
+            categoryName: category.name,
+            categoryColor: category.color,
+            taxonomyName: "Industry",
+          });
+        }
+      }
+    }
+
+    // Regions - top 2 by weight
+    const regionAssignments = assignments
+      .filter((a) => a.taxonomyId === "regions")
+      .sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0))
+      .slice(0, 2);
+    if (regionsTaxonomy?.categories) {
+      for (const assignment of regionAssignments) {
+        const category = regionsTaxonomy.categories.find((c) => c.id === assignment.categoryId);
+        if (category) {
+          badges.push({
+            id: `region-${category.id}`,
+            categoryName: category.name,
+            categoryColor: category.color,
+            taxonomyName: "Region",
+          });
+        }
+      }
+    }
+
     return badges;
-  }, [assignments, assetClassesTaxonomy, typeOfSecurityTaxonomy, riskCategoryTaxonomy]);
+  }, [assignments, assetClassesTaxonomy, typeOfSecurityTaxonomy, riskCategoryTaxonomy, industriesTaxonomy, regionsTaxonomy]);
 
   const quote = useMemo(() => {
     // Backend returns quotes in descending order (newest first)
@@ -435,9 +479,9 @@ export const AssetProfilePage = () => {
           onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
           onChangeDataSource={(isManual) => {
             if (profile) {
-              updateAssetDataSourceMutation.mutate({
-                symbol,
-                dataSource: isManual ? "MANUAL" : "MARKET",
+              updatePricingModeMutation.mutate({
+                assetId: symbol,
+                pricingMode: isManual ? "MANUAL" : "MARKET",
               });
             }
           }}
@@ -514,9 +558,9 @@ export const AssetProfilePage = () => {
             onSaveQuote={(quote: Quote) => saveQuoteMutation.mutate(quote)}
             onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
             onChangeDataSource={(isManual) => {
-              updateAssetDataSourceMutation.mutate({
-                symbol,
-                dataSource: isManual ? "MANUAL" : "YAHOO",
+              updatePricingModeMutation.mutate({
+                assetId: symbol,
+                pricingMode: isManual ? "MANUAL" : "MARKET",
               });
             }}
           />
@@ -787,9 +831,9 @@ export const AssetProfilePage = () => {
                   onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
                   onChangeDataSource={(isManual) => {
                     if (profile) {
-                      updateAssetDataSourceMutation.mutate({
-                        symbol,
-                        dataSource: isManual ? "MANUAL" : "YAHOO",
+                      updatePricingModeMutation.mutate({
+                        assetId: symbol,
+                        pricingMode: isManual ? "MANUAL" : "MARKET",
                       });
                     }
                   }}

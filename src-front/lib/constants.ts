@@ -203,6 +203,7 @@ export function isCashAssetId(assetId: string): boolean {
   return assetId.startsWith(CASH_ASSET_ID_PREFIX);
 }
 
+// DataSource: Where quote data comes from (used on Quote objects)
 export const DataSource = {
   YAHOO: "YAHOO",
   MANUAL: "MANUAL",
@@ -212,6 +213,24 @@ export type DataSource = (typeof DataSource)[keyof typeof DataSource];
 
 // Zod schema for data source validation
 export const dataSourceSchema = z.enum([DataSource.YAHOO, DataSource.MANUAL]);
+
+// PricingMode: How an asset's price is determined (used on Asset/Activity objects)
+export const PricingMode = {
+  MARKET: "MARKET", // Auto-fetch prices from market data providers
+  MANUAL: "MANUAL", // User manages prices manually
+  DERIVED: "DERIVED", // Calculated from other assets
+  NONE: "NONE", // No pricing needed (e.g., cash)
+} as const;
+
+export type PricingMode = (typeof PricingMode)[keyof typeof PricingMode];
+
+// Zod schema for pricing mode validation
+export const pricingModeSchema = z.enum([
+  PricingMode.MARKET,
+  PricingMode.MANUAL,
+  PricingMode.DERIVED,
+  PricingMode.NONE,
+]);
 
 export const ImportFormat = {
   DATE: "date",

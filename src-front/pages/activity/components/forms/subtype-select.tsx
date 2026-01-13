@@ -68,7 +68,7 @@ export function SubtypeSelect({ activityType }: SubtypeSelectProps) {
                   role="combobox"
                   aria-expanded={open}
                   className={cn(
-                    "w-full justify-between font-normal",
+                    "h-10 w-full justify-between rounded-lg font-normal",
                     !field.value && "text-muted-foreground"
                   )}
                 >

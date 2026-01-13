@@ -100,7 +100,7 @@ mod tests {
         async fn delete_quotes_for_asset(&self, asset_id: &AssetId) -> Result<usize> {
             let mut quotes = self.quotes.lock().unwrap();
             let original_len = quotes.len();
-            quotes.retain(|q| q.symbol != asset_id.as_str());
+            quotes.retain(|q| q.asset_id != asset_id.as_str());
             Ok(original_len - quotes.len())
         }
 
@@ -108,7 +108,7 @@ mod tests {
             let quotes = self.quotes.lock().unwrap();
             Ok(quotes
                 .iter()
-                .filter(|q| q.symbol == asset_id.as_str())
+                .filter(|q| q.asset_id == asset_id.as_str())
                 .max_by_key(|q| q.timestamp)
                 .cloned())
         }
@@ -124,7 +124,7 @@ mod tests {
             Ok(quotes
                 .iter()
                 .filter(|q| {
-                    q.symbol == asset_id.as_str()
+                    q.asset_id == asset_id.as_str()
                         && q.timestamp.date_naive() >= start.date()
                         && q.timestamp.date_naive() <= end.date()
                 })
@@ -142,7 +142,7 @@ mod tests {
             for asset_id in asset_ids {
                 if let Some(quote) = quotes
                     .iter()
-                    .filter(|q| q.symbol == asset_id.as_str())
+                    .filter(|q| q.asset_id == asset_id.as_str())
                     .max_by_key(|q| q.timestamp)
                 {
                     result.insert(asset_id.clone(), quote.clone());
@@ -160,7 +160,7 @@ mod tests {
             for asset_id in asset_ids {
                 let mut symbol_quotes: Vec<_> = quotes
                     .iter()
-                    .filter(|q| q.symbol == asset_id.as_str())
+                    .filter(|q| q.asset_id == asset_id.as_str())
                     .collect();
                 symbol_quotes.sort_by_key(|q| q.timestamp);
 
@@ -209,7 +209,7 @@ mod tests {
             let quotes = self.quotes.lock().unwrap();
             Ok(quotes
                 .iter()
-                .filter(|q| q.symbol == symbol)
+                .filter(|q| q.asset_id == symbol)
                 .cloned()
                 .collect())
         }
@@ -228,7 +228,7 @@ mod tests {
             Ok(quotes
                 .iter()
                 .filter(|q| {
-                    q.symbol == symbol
+                    q.asset_id == symbol
                         && q.timestamp.date_naive() >= start
                         && q.timestamp.date_naive() <= end
                 })
@@ -240,7 +240,7 @@ mod tests {
             let quotes = self.quotes.lock().unwrap();
             Ok(quotes
                 .iter()
-                .filter(|q| q.symbol == symbol && q.timestamp.date_naive() == date)
+                .filter(|q| q.asset_id == symbol && q.timestamp.date_naive() == date)
                 .cloned()
                 .collect())
         }
@@ -256,7 +256,7 @@ mod tests {
             created_at: Utc::now(),
             data_source: DataSource::Yahoo,
             timestamp: Utc.from_utc_datetime(&date.and_hms_opt(16, 0, 0).unwrap()),
-            symbol: symbol.to_string(),
+            asset_id: symbol.to_string(),
             open: close,
             high: close,
             low: close,

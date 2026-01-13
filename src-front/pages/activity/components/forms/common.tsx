@@ -2,7 +2,7 @@ import TickerSearchInput from "@/components/ticker-search";
 import { Checkbox } from "@wealthfolio/ui/components/ui/checkbox";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
-import { DataSource } from "@/lib/constants";
+import { DataSource, PricingMode } from "@/lib/constants";
 import type { QuoteSummary } from "@/lib/types";
 import {
   CurrencyInput,
@@ -37,24 +37,24 @@ export const ConfigurationCheckbox = ({
       {shouldShowSymbolLookup && (
         <FormField
           control={control}
-          name="assetDataSource"
+          name="pricingMode"
           render={({ field }) => (
             <FormItem className="mt-2 space-y-1">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <label
-                    htmlFor="use-lookup-checkbox"
+                    htmlFor="manual-pricing-checkbox"
                     className="text-muted-foreground hover:text-foreground cursor-pointer text-sm"
                   >
-                    Skip Symbol Lookup
+                    Manual Pricing
                   </label>
                   <Checkbox
-                    id="use-lookup-checkbox"
-                    checked={field.value === DataSource.MANUAL}
+                    id="manual-pricing-checkbox"
+                    checked={field.value === PricingMode.MANUAL}
                     onCheckedChange={(checked) => {
-                      field.onChange(checked ? DataSource.MANUAL : DataSource.YAHOO);
+                      field.onChange(checked ? PricingMode.MANUAL : PricingMode.MARKET);
                     }}
-                    defaultChecked={field.value === DataSource.MANUAL}
+                    defaultChecked={field.value === PricingMode.MANUAL}
                     className="h-4 w-4"
                   />
                 </div>
@@ -207,6 +207,17 @@ export const CommonFields = ({ accounts }: { accounts: AccountSelectOption[] }) 
   );
 };
 
+/**
+ * Strip exchange suffix from symbol (e.g., "VFV.TO" -> "VFV")
+ * Yahoo and other providers add exchange suffixes like .TO, .L, .PA, .DE
+ * Since we capture exchangeMic separately, we should use the base symbol
+ */
+function stripExchangeSuffix(symbol: string): string {
+  // Common exchange suffixes from Yahoo Finance
+  const suffixPattern = /\.(TO|L|PA|DE|SW|AS|MI|MC|BR|HK|T|SI|AX|NZ|TA|JO|SA|SN|MX|VI|ST|OL|CO|HE|IC|PR|WA|AT|LI|LS|IR|KQ|KS|TW|TWO|V|CN|F|BE|DU|HA|HM|MU|SG)$/i;
+  return symbol.replace(suffixPattern, '');
+}
+
 export function AssetSymbolInput({
   field,
   isManualAsset,
@@ -217,14 +228,18 @@ export function AssetSymbolInput({
   const { setValue } = useFormContext();
 
   const handleTickerSelect = (symbol: string, quoteSummary?: QuoteSummary) => {
-    field.onChange(symbol);
+    // Strip exchange suffix when we have exchangeMic (e.g., "VFV.TO" -> "VFV")
+    // Backend generates canonical ID as SEC:{symbol}:{mic}, so we need the base symbol
+    const baseSymbol = quoteSummary?.exchangeMic ? stripExchangeSuffix(symbol) : symbol;
+    field.onChange(baseSymbol);
+
     // Capture exchangeMic from search result for canonical asset ID generation
     if (quoteSummary?.exchangeMic) {
       setValue("exchangeMic", quoteSummary.exchangeMic);
     }
-    // If the selected ticker is a custom/manual entry, automatically enable skip lookup
+    // If the selected ticker is a custom/manual entry, automatically enable manual pricing
     if (quoteSummary?.dataSource === DataSource.MANUAL) {
-      setValue("assetDataSource", DataSource.MANUAL);
+      setValue("pricingMode", PricingMode.MANUAL);
     }
   };
 

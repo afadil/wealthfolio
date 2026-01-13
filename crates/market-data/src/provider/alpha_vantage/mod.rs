@@ -224,6 +224,120 @@ struct CompanyOverviewResponse {
     // that are not currently mapped to AssetProfile
 }
 
+/// ETF_PROFILE response for ETF fundamentals
+/// Provides sector weightings and holdings data for ETFs
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)] // Some fields reserved for future use
+struct EtfProfileResponse {
+    // Note: Alpha Vantage ETF_PROFILE returns sectors as an array
+    #[serde(default)]
+    sectors: Vec<EtfSectorWeight>,
+
+    // Holdings data (not currently used but available)
+    #[serde(default)]
+    holdings: Vec<EtfHolding>,
+
+    // Fund metadata
+    net_assets: Option<String>,
+    net_expense_ratio: Option<String>,
+    dividend_yield: Option<String>,
+
+    // Error handling
+    #[serde(rename = "Error Message")]
+    error_message: Option<String>,
+    #[serde(rename = "Note")]
+    note: Option<String>,
+    #[serde(rename = "Information")]
+    information: Option<String>,
+}
+
+/// Sector weight entry from ETF_PROFILE
+#[derive(Debug, Deserialize)]
+struct EtfSectorWeight {
+    sector: String,
+    weight: String, // e.g., "51.1%" or "0.511"
+}
+
+/// Holding entry from ETF_PROFILE (for future use)
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct EtfHolding {
+    #[serde(default)]
+    symbol: Option<String>,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    weight: Option<String>,
+}
+
+impl EtfProfileResponse {
+    /// Check if the response indicates an error or no data
+    fn has_error(&self) -> bool {
+        self.error_message.is_some()
+            || self.information.as_ref().map_or(false, |i| i.contains("demo"))
+            || self.sectors.is_empty()
+    }
+
+    /// Parse weight string (handles both "51.1%" and "0.511" formats)
+    fn parse_weight(s: &str) -> Option<f64> {
+        let trimmed = s.trim();
+        if trimmed.ends_with('%') {
+            // Convert percentage to decimal: "51.1%" -> 0.511
+            trimmed.trim_end_matches('%').parse::<f64>().ok().map(|v| v / 100.0)
+        } else {
+            trimmed.parse::<f64>().ok()
+        }
+    }
+
+    /// Convert sector weights to JSON array format
+    fn sectors_to_json(&self) -> Option<String> {
+        if self.sectors.is_empty() {
+            return None;
+        }
+
+        let sector_data: Vec<serde_json::Value> = self
+            .sectors
+            .iter()
+            .filter_map(|sw| {
+                let weight = Self::parse_weight(&sw.weight)?;
+                Some(serde_json::json!({
+                    "name": sw.sector,
+                    "weight": weight
+                }))
+            })
+            .collect();
+
+        if sector_data.is_empty() {
+            None
+        } else {
+            serde_json::to_string(&sector_data).ok()
+        }
+    }
+
+    /// Convert to AssetProfile
+    fn to_asset_profile(&self, _symbol: &str) -> AssetProfile {
+        AssetProfile {
+            source: Some(PROVIDER_ID.to_string()),
+            name: None, // ETF_PROFILE doesn't include name
+            quote_type: Some("ETF".to_string()),
+            sector: None, // ETFs have multiple sectors
+            sectors: self.sectors_to_json(),
+            industry: None,
+            website: None,
+            description: None,
+            country: None, // ETF_PROFILE doesn't include country
+            employees: None,
+            logo_url: None,
+            market_cap: None,
+            pe_ratio: None,
+            dividend_yield: self.dividend_yield.as_ref()
+                .and_then(|s| Self::parse_weight(s)),
+            week_52_high: None,
+            week_52_low: None,
+        }
+    }
+}
+
 impl CompanyOverviewResponse {
     /// Parse a string field as f64, handling "None" and "-" values
     fn parse_f64(s: &Option<String>) -> Option<f64> {
@@ -255,6 +369,7 @@ impl CompanyOverviewResponse {
             name: self.name.clone(),
             quote_type,
             sector: self.sector.clone(),
+            sectors: None, // Alpha Vantage doesn't provide weighted sectors
             industry: self.industry.clone(),
             website: None, // Alpha Vantage doesn't provide website
             description: self.description.clone(),
@@ -632,6 +747,47 @@ impl AlphaVantageProvider {
 
         Ok(response.to_asset_profile())
     }
+
+    /// Fetch ETF profile using ETF_PROFILE endpoint.
+    /// Returns sector weightings and holdings data for ETFs.
+    async fn fetch_etf_profile(
+        &self,
+        symbol: &str,
+    ) -> Result<AssetProfile, MarketDataError> {
+        let params = [("function", "ETF_PROFILE"), ("symbol", symbol)];
+
+        let text = self.fetch(&params).await?;
+
+        // Try to parse as ETF profile response
+        let response: EtfProfileResponse =
+            serde_json::from_str(&text).map_err(|e| MarketDataError::ProviderError {
+                provider: PROVIDER_ID.to_string(),
+                message: format!("Failed to parse ETF profile response: {}", e),
+            })?;
+
+        // Check for API-level errors
+        Self::check_api_error(
+            &response.error_message,
+            &response.note,
+            &response.information,
+        )?;
+
+        // Check if we got actual data
+        if response.has_error() {
+            return Err(MarketDataError::SymbolNotFound(format!(
+                "No ETF profile data for symbol: {}",
+                symbol
+            )));
+        }
+
+        debug!(
+            "Alpha Vantage: fetched ETF profile for {} with {} sectors",
+            symbol,
+            response.sectors.len()
+        );
+
+        Ok(response.to_asset_profile(symbol))
+    }
 }
 
 // ============================================================================
@@ -791,7 +947,41 @@ impl MarketDataProvider for AlphaVantageProvider {
 
     async fn get_profile(&self, symbol: &str) -> Result<AssetProfile, MarketDataError> {
         debug!("Fetching profile for {} from Alpha Vantage", symbol);
-        self.fetch_company_overview(symbol).await
+
+        // First, try OVERVIEW endpoint for basic company/fund info
+        let mut profile = self.fetch_company_overview(symbol).await?;
+
+        // If it's an ETF, also fetch ETF_PROFILE for sector weightings
+        if let Some(ref quote_type) = profile.quote_type {
+            if quote_type == "ETF" || quote_type == "MUTUALFUND" {
+                match self.fetch_etf_profile(symbol).await {
+                    Ok(etf_profile) => {
+                        // Merge ETF-specific data (sector weightings)
+                        if etf_profile.sectors.is_some() {
+                            profile.sectors = etf_profile.sectors;
+                            profile.sector = None; // Clear single sector when we have weighted sectors
+                        }
+                        // Merge dividend yield if available from ETF profile
+                        if etf_profile.dividend_yield.is_some() {
+                            profile.dividend_yield = etf_profile.dividend_yield;
+                        }
+                        debug!(
+                            "Alpha Vantage: merged ETF profile data for {}",
+                            symbol
+                        );
+                    }
+                    Err(e) => {
+                        // ETF_PROFILE failed, continue with OVERVIEW data only
+                        warn!(
+                            "Alpha Vantage: ETF_PROFILE failed for {}, using OVERVIEW only: {}",
+                            symbol, e
+                        );
+                    }
+                }
+            }
+        }
+
+        Ok(profile)
     }
 }
 
@@ -994,5 +1184,49 @@ mod tests {
         assert_eq!(CompanyOverviewResponse::parse_f64(&Some("0".to_string())), None);
         assert_eq!(CompanyOverviewResponse::parse_f64(&Some("".to_string())), None);
         assert_eq!(CompanyOverviewResponse::parse_f64(&None), None);
+    }
+
+    #[test]
+    fn test_etf_profile_parsing() {
+        let json = r#"{
+            "sectors": [
+                {"sector": "Information Technology", "weight": "51.1%"},
+                {"sector": "Communication Services", "weight": "16.3%"},
+                {"sector": "Consumer Discretionary", "weight": "12.3%"},
+                {"sector": "Healthcare", "weight": "5.3%"}
+            ],
+            "holdings": [],
+            "dividend_yield": "0.46%"
+        }"#;
+
+        let response: EtfProfileResponse = serde_json::from_str(json).unwrap();
+        let profile = response.to_asset_profile("QQQ");
+
+        assert_eq!(profile.source, Some("ALPHA_VANTAGE".to_string()));
+        assert_eq!(profile.quote_type, Some("ETF".to_string()));
+        assert!(profile.sectors.is_some());
+
+        // Verify sectors JSON is properly formatted
+        let sectors_json = profile.sectors.unwrap();
+        let sectors: Vec<serde_json::Value> = serde_json::from_str(&sectors_json).unwrap();
+        assert_eq!(sectors.len(), 4);
+        assert_eq!(sectors[0]["name"], "Information Technology");
+        assert!((sectors[0]["weight"].as_f64().unwrap() - 0.511).abs() < 0.001);
+
+        // Verify dividend yield is parsed from percentage
+        assert!((profile.dividend_yield.unwrap() - 0.0046).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_etf_profile_parse_weight() {
+        // Test percentage format
+        assert!((EtfProfileResponse::parse_weight("51.1%").unwrap() - 0.511).abs() < 0.001);
+        assert!((EtfProfileResponse::parse_weight("0.46%").unwrap() - 0.0046).abs() < 0.0001);
+
+        // Test decimal format
+        assert!((EtfProfileResponse::parse_weight("0.511").unwrap() - 0.511).abs() < 0.001);
+
+        // Test edge cases
+        assert!(EtfProfileResponse::parse_weight("invalid").is_none());
     }
 }

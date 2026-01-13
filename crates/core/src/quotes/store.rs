@@ -7,12 +7,11 @@
 //! # Strong Types
 //!
 //! This module uses strong types from `super::types` to enforce clear boundaries:
-//! - `AssetId` - Our internal database identity (not provider symbols)
+//! - `AssetId` - Canonical asset identifier (e.g., "SEC:AAPL:XNAS")
 //! - `Day` - UTC date bucket for daily quotes
 //! - `QuoteSource` - Manual or Provider(ProviderId)
 //!
-//! The `Quote` struct still uses `symbol: String` internally for backward compatibility,
-//! but the trait API uses strong types for cleaner interfaces.
+//! The `Quote` struct uses `asset_id: String` which stores the canonical asset identifier.
 
 use async_trait::async_trait;
 use chrono::NaiveDate;
@@ -37,7 +36,7 @@ use crate::errors::Result;
 /// - Sync methods are used for simple queries that are typically fast
 /// - Batch operations (upsert_quotes) are provided for efficiency
 /// - Strong types (`AssetId`, `Day`) are used for cleaner APIs
-/// - The `Quote` struct still uses `symbol: String` internally for backward compat
+/// - The `Quote` struct uses `asset_id: String` for canonical asset identifiers
 ///
 /// # Method Naming Convention
 ///

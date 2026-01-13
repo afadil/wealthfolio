@@ -567,3 +567,18 @@ WHERE json_extract(a.metadata, '$.legacy.asset_sub_class') IS NOT NULL
     SELECT 1 FROM asset_taxonomy_assignments ata
     WHERE ata.asset_id = a.id AND ata.taxonomy_id = 'type_of_security'
   );
+
+-- ============================================================================
+-- CLEANUP: Remove legacy metadata, keep only identifiers
+-- Now that all classifications are created from legacy data, we can clean up
+-- the temporary $.legacy structure. The $.identifiers structure was already
+-- created in the correct format by 000001_core_schema_redesign.
+-- ============================================================================
+
+UPDATE assets
+SET metadata = CASE
+    WHEN json_extract(metadata, '$.identifiers') IS NOT NULL
+    THEN json_object('identifiers', json_extract(metadata, '$.identifiers'))
+    ELSE NULL
+END
+WHERE json_extract(metadata, '$.legacy') IS NOT NULL;

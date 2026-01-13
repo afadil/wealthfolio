@@ -4,7 +4,7 @@ import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Form } from "@wealthfolio/ui/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
 import { useIsMobileViewport } from "@/hooks/use-platform";
-import { ActivityType, DataSource } from "@/lib/constants";
+import { ActivityType, PricingMode } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { Account, ActivityDetails } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -133,7 +133,7 @@ const ActivityManagerPage = () => {
           return date;
         })(),
     currency: initialActivity?.currency ?? "",
-    assetDataSource: initialActivity?.assetDataSource ?? DataSource.YAHOO,
+    pricingMode: initialActivity?.assetPricingMode === "MANUAL" ? "MANUAL" : "MARKET",
     showCurrencySelect: false,
   };
 
@@ -168,8 +168,8 @@ const ActivityManagerPage = () => {
       }
 
       if (
-        "assetDataSource" in submitData &&
-        submitData.assetDataSource === DataSource.MANUAL &&
+        "pricingMode" in submitData &&
+        submitData.pricingMode === PricingMode.MANUAL &&
         account
       ) {
         submitData.currency = submitData.currency ?? account.currency;

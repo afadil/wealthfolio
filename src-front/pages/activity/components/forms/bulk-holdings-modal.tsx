@@ -1,5 +1,5 @@
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
-import { ActivityType, DataSource } from "@/lib/constants";
+import { ActivityType, PricingMode } from "@/lib/constants";
 import { Account, ActivityBulkMutationRequest, ActivityCreate } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -45,7 +45,7 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
           ticker: "",
           name: "",
           assetId: "",
-          assetDataSource: DataSource.YAHOO,
+          pricingMode: PricingMode.MARKET,
         },
       ],
     },
@@ -120,7 +120,7 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
         symbol: (holding.assetId || holding.ticker || "").toUpperCase().trim(),
         // Pass exchangeMic for canonical ID generation (e.g., "XNAS", "XTSE")
         exchangeMic: holding.exchangeMic,
-        assetDataSource: holding.assetDataSource ?? DataSource.YAHOO,
+        pricingMode: holding.pricingMode ?? PricingMode.MARKET,
         quantity: Number(holding.sharesOwned),
         unitPrice: Number(holding.averageCost),
         amount: Number(holding.sharesOwned) * Number(holding.averageCost),

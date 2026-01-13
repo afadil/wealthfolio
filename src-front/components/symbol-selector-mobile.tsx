@@ -2,6 +2,7 @@ import { searchTicker } from "@/commands/market-data";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { ScrollArea } from "@wealthfolio/ui/components/ui/scroll-area";
+import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import {
   Sheet,
   SheetContent,
@@ -16,14 +17,16 @@ import { getExchangeDisplayName } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { forwardRef, useState } from "react";
+import { CreateCustomAssetDialog } from "./create-custom-asset-dialog";
 
 interface SymbolSelectorMobileProps {
-  onSelect: (symbol: string) => void;
+  onSelect: (symbol: string, quoteSummary?: QuoteSummary) => void;
   value?: string;
   placeholder?: string;
   className?: string;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  defaultCurrency?: string;
 }
 
 export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelectorMobileProps>(
@@ -35,6 +38,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
       className,
       open: controlledOpen,
       onOpenChange,
+      defaultCurrency,
     },
     ref,
   ) => {
@@ -43,6 +47,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
     const setOpen = onOpenChange !== undefined ? onOpenChange : setInternalOpen;
 
     const [searchQuery, setSearchQuery] = useState("");
+    const [customAssetDialogOpen, setCustomAssetDialogOpen] = useState(false);
 
     // Query for dynamic ticker search
     const {
@@ -59,9 +64,18 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
     const sortedSearchResults = searchResults?.sort((a, b) => b.score - a.score) ?? [];
 
     const handleSymbolSelect = (ticker: QuoteSummary) => {
-      onSelect(ticker.symbol);
+      onSelect(ticker.symbol, ticker);
       setOpen(false);
       setSearchQuery("");
+    };
+
+    const handleCreateCustomAsset = () => {
+      setOpen(false);
+      setCustomAssetDialogOpen(true);
+    };
+
+    const handleCustomAssetCreated = (quoteSummary: QuoteSummary) => {
+      handleSymbolSelect(quoteSummary);
     };
 
     // Find the currently selected symbol's info
@@ -72,24 +86,25 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
       : value || placeholder;
 
     return (
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger asChild>
-          <Button
-            ref={ref}
-            variant="outline"
-            role="combobox"
-            size="lg"
-            className={cn(
-              "w-full justify-between truncate font-normal",
-              !value && "text-muted-foreground",
-              className,
-            )}
-          >
-            <span className="truncate">{displayText}</span>
-            <Icons.Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="bottom" className="mx-1 h-[85vh] rounded-t-4xl p-0">
+      <>
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetTrigger asChild>
+            <Button
+              ref={ref}
+              variant="outline"
+              role="combobox"
+              size="lg"
+              className={cn(
+                "w-full justify-between truncate font-normal",
+                !value && "text-muted-foreground",
+                className,
+              )}
+            >
+              <span className="truncate">{displayText}</span>
+              <Icons.Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="mx-1 h-[85vh] rounded-t-4xl p-0">
           <SheetHeader className="border-border border-b py-2">
             <SheetTitle>Select Symbol</SheetTitle>
             <SheetDescription>Search for a stock, ETF, crypto, or other asset</SheetDescription>
@@ -180,8 +195,9 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                 !isError &&
                 sortedSearchResults.length === 0 &&
                 searchQuery.length > 1 && (
-                  <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-                    No symbols found matching "{searchQuery}".
+                  <div className="text-muted-foreground py-8 text-center text-sm">
+                    <p>No matches found for "{searchQuery}"</p>
+                    <p className="mt-2 text-xs">You can create a custom asset below.</p>
                   </div>
                 )}
 
@@ -191,10 +207,44 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                   Type at least 2 characters to search.
                 </div>
               )}
-            </ScrollArea>
-          </div>
-        </SheetContent>
-      </Sheet>
+
+              {/* Create custom asset option - always visible when user has typed something */}
+              {searchQuery.length > 0 && !isLoading && (
+                <>
+                  {sortedSearchResults.length > 0 && <Separator className="my-4" />}
+                  <button
+                    onClick={handleCreateCustomAsset}
+                    className="card-mobile hover:bg-accent active:bg-accent/80 focus:border-primary flex w-full items-center gap-3 border border-dashed text-left transition-colors focus:outline-none"
+                  >
+                    <div className="bg-muted flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full">
+                      <Icons.Plus className="text-muted-foreground h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-foreground font-medium">Create custom asset</div>
+                      <div className="text-muted-foreground mt-0.5 text-sm">
+                        {searchQuery.trim()
+                          ? `Create "${searchQuery.trim().toUpperCase()}" with manual pricing`
+                          : "Track assets not found in market data"}
+                      </div>
+                    </div>
+                    <Icons.ChevronRight className="text-muted-foreground h-5 w-5 flex-shrink-0" />
+                  </button>
+                </>
+              )}
+              </ScrollArea>
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Custom Asset Creation Dialog */}
+        <CreateCustomAssetDialog
+          open={customAssetDialogOpen}
+          onOpenChange={setCustomAssetDialogOpen}
+          onAssetCreated={handleCustomAssetCreated}
+          defaultSymbol={searchQuery.trim()}
+          defaultCurrency={defaultCurrency}
+        />
+      </>
     );
   },
 );

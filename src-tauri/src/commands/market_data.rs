@@ -56,7 +56,7 @@ pub async fn update_quote(
         let payload = PortfolioRequestPayload::builder()
             .account_ids(None)
             .refetch_all_market_data(true)
-            .symbols(Some(vec![quote.symbol]))
+            .symbols(Some(vec![quote.asset_id]))
             .build();
         emit_portfolio_trigger_update(&handle, payload);
     });

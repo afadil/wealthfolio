@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ActivityType, DataSource } from "@/lib/constants";
+import { ActivityType, PricingMode } from "@/lib/constants";
 
 export const baseActivitySchema = z.object({
   id: z.string().optional(),
@@ -33,7 +33,7 @@ export const holdingsActivitySchema = baseActivitySchema.extend({
       invalid_type_error: "Average cost must be a number.",
     })
     .positive(),
-  assetDataSource: z.enum([DataSource.YAHOO, DataSource.MANUAL]).default(DataSource.YAHOO),
+  pricingMode: z.enum([PricingMode.MARKET, PricingMode.MANUAL]).default(PricingMode.MARKET),
   // Metadata to mark as external transfer (affects net_contribution)
   metadata: z
     .object({
@@ -62,7 +62,7 @@ export const bulkHoldingRowSchema = z.object({
     .positive({ message: "Average cost must be greater than 0" }),
   totalValue: z.number().optional(),
   assetId: z.string().optional(),
-  assetDataSource: z.enum([DataSource.YAHOO, DataSource.MANUAL]).optional(),
+  pricingMode: z.enum([PricingMode.MARKET, PricingMode.MANUAL]).optional(),
   // Exchange MIC for canonical asset ID generation (e.g., "XNAS", "XTSE")
   exchangeMic: z.string().optional(),
 });
@@ -93,7 +93,7 @@ export const tradeActivitySchema = baseActivitySchema.extend({
     })
     .min(0, { message: "Fee must be a non-negative number." })
     .default(0),
-  assetDataSource: z.enum([DataSource.YAHOO, DataSource.MANUAL]).default(DataSource.YAHOO),
+  pricingMode: z.enum([PricingMode.MARKET, PricingMode.MANUAL]).default(PricingMode.MARKET),
 });
 
 // Cash activity schema - DEPOSIT/WITHDRAWAL only
@@ -114,7 +114,7 @@ export const cashActivitySchema = baseActivitySchema.extend({
     .min(0, { message: "Fee must be a non-negative number." })
     .default(0)
     .optional(),
-  assetDataSource: z.enum([DataSource.YAHOO, DataSource.MANUAL]).default(DataSource.MANUAL),
+  pricingMode: z.enum([PricingMode.MARKET, PricingMode.MANUAL]).default(PricingMode.MANUAL),
 });
 
 export const incomeActivitySchema = baseActivitySchema.extend({

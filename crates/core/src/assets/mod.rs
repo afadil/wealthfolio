@@ -8,6 +8,7 @@ mod assets_constants;
 mod assets_model;
 mod assets_service;
 mod assets_traits;
+mod auto_classification;
 mod classification_service;
 
 #[cfg(test)]
@@ -46,4 +47,5 @@ pub use assets_model::{
 };
 pub use assets_service::AssetService;
 pub use assets_traits::{AssetRepositoryTrait, AssetServiceTrait};
+pub use auto_classification::{AutoClassificationService, ClassificationInput, ClassificationResult};
 pub use classification_service::{AssetClassificationService, AssetClassifications, CategoryWithWeight};
