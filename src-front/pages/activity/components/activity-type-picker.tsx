@@ -1,3 +1,4 @@
+import { useCallback, useRef } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,19 +42,71 @@ interface ActivityTypePickerProps {
 export function ActivityTypePicker({ value, onSelect }: ActivityTypePickerProps) {
   const selectedSecondaryType = SECONDARY_ACTIVITY_TYPES.find((t) => t.value === value);
   const isSecondarySelected = !!selectedSecondaryType;
+  const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // Handle keyboard navigation within the primary activity type grid
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent, index: number) => {
+      const totalPrimary = PRIMARY_ACTIVITY_TYPES.length;
+      let newIndex: number | null = null;
+
+      switch (e.key) {
+        case "ArrowRight":
+          e.preventDefault();
+          newIndex = (index + 1) % totalPrimary;
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          newIndex = (index - 1 + totalPrimary) % totalPrimary;
+          break;
+        case "ArrowDown":
+          e.preventDefault();
+          // Move down by 3 (grid column count on mobile) or wrap
+          newIndex = (index + 3) % totalPrimary;
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          // Move up by 3 or wrap
+          newIndex = (index - 3 + totalPrimary) % totalPrimary;
+          break;
+        case "Home":
+          e.preventDefault();
+          newIndex = 0;
+          break;
+        case "End":
+          e.preventDefault();
+          newIndex = totalPrimary - 1;
+          break;
+      }
+
+      if (newIndex !== null) {
+        buttonRefs.current[newIndex]?.focus();
+      }
+    },
+    [],
+  );
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 sm:gap-3">
-        {PRIMARY_ACTIVITY_TYPES.map((type) => {
+      <div
+        role="group"
+        aria-label="Primary activity types"
+        className="grid grid-cols-3 gap-2 sm:grid-cols-6 sm:gap-3"
+      >
+        {PRIMARY_ACTIVITY_TYPES.map((type, index) => {
           const Icon = Icons[type.icon];
           const isSelected = value === type.value;
 
           return (
             <button
               key={type.value}
+              ref={(el) => {
+                buttonRefs.current[index] = el;
+              }}
               type="button"
               onClick={() => onSelect(type.value)}
+              onKeyDown={(e) => handleKeyDown(e, index)}
+              aria-pressed={isSelected}
               className={cn(
                 "flex flex-col items-center justify-center gap-2 rounded-lg border p-4 transition-all",
                 "hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
