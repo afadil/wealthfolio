@@ -205,7 +205,7 @@ export function SellForm({ accounts, defaultValues, onSubmit, onCancel, isLoadin
             <DatePicker name="activityDate" label="Date" enableTime={true} />
 
             {/* Quantity, Price, Fee Row */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-2">
                 <QuantityInput name="quantity" label="Quantity" />
                 {currentHoldingQuantity > 0 && (
