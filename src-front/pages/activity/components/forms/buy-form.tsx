@@ -58,7 +58,9 @@ interface BuyFormProps {
   accounts: AccountSelectOption[];
   defaultValues?: Partial<BuyFormValues>;
   onSubmit: (data: BuyFormValues) => void | Promise<void>;
+  onCancel?: () => void;
   isLoading?: boolean;
+  isEditing?: boolean;
 }
 
 /**
@@ -88,7 +90,7 @@ function isAmountDifferenceSignificant(
   return percentDiff > thresholdPercent;
 }
 
-export function BuyForm({ accounts, defaultValues, onSubmit, isLoading = false }: BuyFormProps) {
+export function BuyForm({ accounts, defaultValues, onSubmit, onCancel, isLoading = false, isEditing = false }: BuyFormProps) {
   const form = useForm<BuyFormValues>({
     resolver: zodResolver(buyFormSchema) as Resolver<BuyFormValues>,
     mode: "onBlur", // Validate on blur
@@ -195,12 +197,21 @@ export function BuyForm({ accounts, defaultValues, onSubmit, isLoading = false }
           </CardContent>
         </Card>
 
-        {/* Submit Button */}
+        {/* Action Buttons */}
         <div className="flex justify-end gap-2">
+          {onCancel && (
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+              Cancel
+            </Button>
+          )}
           <Button type="submit" disabled={isLoading}>
             {isLoading && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
-            <Icons.Plus className="mr-2 h-4 w-4" />
-            Add Buy Activity
+            {isEditing ? (
+              <Icons.Check className="mr-2 h-4 w-4" />
+            ) : (
+              <Icons.Plus className="mr-2 h-4 w-4" />
+            )}
+            {isEditing ? "Update" : "Add Buy"}
           </Button>
         </div>
       </form>

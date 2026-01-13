@@ -31,10 +31,12 @@ interface InterestFormProps {
   accounts: AccountSelectOption[];
   defaultValues?: Partial<InterestFormValues>;
   onSubmit: (data: InterestFormValues) => void | Promise<void>;
+  onCancel?: () => void;
   isLoading?: boolean;
+  isEditing?: boolean;
 }
 
-export function InterestForm({ accounts, defaultValues, onSubmit, isLoading = false }: InterestFormProps) {
+export function InterestForm({ accounts, defaultValues, onSubmit, onCancel, isLoading = false, isEditing = false }: InterestFormProps) {
   const form = useForm<InterestFormValues>({
     resolver: zodResolver(interestFormSchema) as Resolver<InterestFormValues>,
     mode: "onBlur", // Validate on blur
@@ -70,12 +72,21 @@ export function InterestForm({ accounts, defaultValues, onSubmit, isLoading = fa
           </CardContent>
         </Card>
 
-        {/* Submit Button */}
+        {/* Action Buttons */}
         <div className="flex justify-end gap-2">
+          {onCancel && (
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+              Cancel
+            </Button>
+          )}
           <Button type="submit" disabled={isLoading}>
             {isLoading && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
-            <Icons.Plus className="mr-2 h-4 w-4" />
-            Add Interest
+            {isEditing ? (
+              <Icons.Check className="mr-2 h-4 w-4" />
+            ) : (
+              <Icons.Plus className="mr-2 h-4 w-4" />
+            )}
+            {isEditing ? "Update" : "Add Interest"}
           </Button>
         </div>
       </form>

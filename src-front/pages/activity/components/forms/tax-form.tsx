@@ -31,10 +31,12 @@ interface TaxFormProps {
   accounts: AccountSelectOption[];
   defaultValues?: Partial<TaxFormValues>;
   onSubmit: (data: TaxFormValues) => void | Promise<void>;
+  onCancel?: () => void;
   isLoading?: boolean;
+  isEditing?: boolean;
 }
 
-export function TaxForm({ accounts, defaultValues, onSubmit, isLoading = false }: TaxFormProps) {
+export function TaxForm({ accounts, defaultValues, onSubmit, onCancel, isLoading = false, isEditing = false }: TaxFormProps) {
   const form = useForm<TaxFormValues>({
     resolver: zodResolver(taxFormSchema) as Resolver<TaxFormValues>,
     mode: "onBlur", // Validate on blur
@@ -70,12 +72,21 @@ export function TaxForm({ accounts, defaultValues, onSubmit, isLoading = false }
           </CardContent>
         </Card>
 
-        {/* Submit Button */}
+        {/* Action Buttons */}
         <div className="flex justify-end gap-2">
+          {onCancel && (
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+              Cancel
+            </Button>
+          )}
           <Button type="submit" disabled={isLoading}>
             {isLoading && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
-            <Icons.Plus className="mr-2 h-4 w-4" />
-            Add Tax
+            {isEditing ? (
+              <Icons.Check className="mr-2 h-4 w-4" />
+            ) : (
+              <Icons.Plus className="mr-2 h-4 w-4" />
+            )}
+            {isEditing ? "Update" : "Add Tax"}
           </Button>
         </div>
       </form>

@@ -31,10 +31,12 @@ interface DepositFormProps {
   accounts: AccountSelectOption[];
   defaultValues?: Partial<DepositFormValues>;
   onSubmit: (data: DepositFormValues) => void | Promise<void>;
+  onCancel?: () => void;
   isLoading?: boolean;
+  isEditing?: boolean;
 }
 
-export function DepositForm({ accounts, defaultValues, onSubmit, isLoading = false }: DepositFormProps) {
+export function DepositForm({ accounts, defaultValues, onSubmit, onCancel, isLoading = false, isEditing = false }: DepositFormProps) {
   const form = useForm<DepositFormValues>({
     resolver: zodResolver(depositFormSchema) as Resolver<DepositFormValues>,
     mode: "onBlur", // Validate on blur
@@ -70,12 +72,21 @@ export function DepositForm({ accounts, defaultValues, onSubmit, isLoading = fal
           </CardContent>
         </Card>
 
-        {/* Submit Button */}
+        {/* Action Buttons */}
         <div className="flex justify-end gap-2">
+          {onCancel && (
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+              Cancel
+            </Button>
+          )}
           <Button type="submit" disabled={isLoading}>
             {isLoading && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
-            <Icons.Plus className="mr-2 h-4 w-4" />
-            Add Deposit
+            {isEditing ? (
+              <Icons.Check className="mr-2 h-4 w-4" />
+            ) : (
+              <Icons.Plus className="mr-2 h-4 w-4" />
+            )}
+            {isEditing ? "Update" : "Add Deposit"}
           </Button>
         </div>
       </form>
