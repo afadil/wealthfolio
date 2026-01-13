@@ -31,10 +31,12 @@ interface WithdrawalFormProps {
   accounts: AccountSelectOption[];
   defaultValues?: Partial<WithdrawalFormValues>;
   onSubmit: (data: WithdrawalFormValues) => void | Promise<void>;
+  onCancel?: () => void;
   isLoading?: boolean;
+  isEditing?: boolean;
 }
 
-export function WithdrawalForm({ accounts, defaultValues, onSubmit, isLoading = false }: WithdrawalFormProps) {
+export function WithdrawalForm({ accounts, defaultValues, onSubmit, onCancel, isLoading = false, isEditing = false }: WithdrawalFormProps) {
   const form = useForm<WithdrawalFormValues>({
     resolver: zodResolver(withdrawalFormSchema) as Resolver<WithdrawalFormValues>,
     mode: "onBlur", // Validate on blur
@@ -70,12 +72,21 @@ export function WithdrawalForm({ accounts, defaultValues, onSubmit, isLoading = 
           </CardContent>
         </Card>
 
-        {/* Submit Button */}
+        {/* Action Buttons */}
         <div className="flex justify-end gap-2">
+          {onCancel && (
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+              Cancel
+            </Button>
+          )}
           <Button type="submit" disabled={isLoading}>
             {isLoading && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
-            <Icons.MinusCircle className="mr-2 h-4 w-4" />
-            Add Withdrawal
+            {isEditing ? (
+              <Icons.Check className="mr-2 h-4 w-4" />
+            ) : (
+              <Icons.MinusCircle className="mr-2 h-4 w-4" />
+            )}
+            {isEditing ? "Update" : "Add Withdrawal"}
           </Button>
         </div>
       </form>

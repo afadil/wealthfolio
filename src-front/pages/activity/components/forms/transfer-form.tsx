@@ -52,14 +52,18 @@ interface TransferFormProps {
   accounts: AccountSelectOption[];
   defaultValues?: Partial<TransferFormValues>;
   onSubmit: (data: TransferFormValues) => void | Promise<void>;
+  onCancel?: () => void;
   isLoading?: boolean;
+  isEditing?: boolean;
 }
 
 export function TransferForm({
   accounts,
   defaultValues,
   onSubmit,
+  onCancel,
   isLoading = false,
+  isEditing = false,
 }: TransferFormProps) {
   const form = useForm<TransferFormValues>({
     resolver: zodResolver(transferFormSchema) as Resolver<TransferFormValues>,
@@ -138,12 +142,21 @@ export function TransferForm({
           </CardContent>
         </Card>
 
-        {/* Submit Button */}
+        {/* Action Buttons */}
         <div className="flex justify-end gap-2">
+          {onCancel && (
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+              Cancel
+            </Button>
+          )}
           <Button type="submit" disabled={isLoading}>
             {isLoading && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
-            <Icons.Plus className="mr-2 h-4 w-4" />
-            Add Transfer
+            {isEditing ? (
+              <Icons.Check className="mr-2 h-4 w-4" />
+            ) : (
+              <Icons.Plus className="mr-2 h-4 w-4" />
+            )}
+            {isEditing ? "Update" : "Add Transfer"}
           </Button>
         </div>
       </form>

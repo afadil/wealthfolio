@@ -33,7 +33,9 @@ interface SplitFormProps {
   accounts: AccountSelectOption[];
   defaultValues?: Partial<SplitFormValues>;
   onSubmit: (data: SplitFormValues) => void | Promise<void>;
+  onCancel?: () => void;
   isLoading?: boolean;
+  isEditing?: boolean;
   /** Whether to show manual symbol input instead of search */
   isManualSymbol?: boolean;
 }
@@ -42,7 +44,9 @@ export function SplitForm({
   accounts,
   defaultValues,
   onSubmit,
+  onCancel,
   isLoading = false,
+  isEditing = false,
   isManualSymbol = false,
 }: SplitFormProps) {
   const form = useForm<SplitFormValues>({
@@ -88,12 +92,21 @@ export function SplitForm({
           </CardContent>
         </Card>
 
-        {/* Submit Button */}
+        {/* Action Buttons */}
         <div className="flex justify-end gap-2">
+          {onCancel && (
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+              Cancel
+            </Button>
+          )}
           <Button type="submit" disabled={isLoading}>
             {isLoading && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
-            <Icons.Plus className="mr-2 h-4 w-4" />
-            Add Split
+            {isEditing ? (
+              <Icons.Check className="mr-2 h-4 w-4" />
+            ) : (
+              <Icons.Plus className="mr-2 h-4 w-4" />
+            )}
+            {isEditing ? "Update" : "Add Split"}
           </Button>
         </div>
       </form>

@@ -59,7 +59,9 @@ interface SellFormProps {
   accounts: AccountSelectOption[];
   defaultValues?: Partial<SellFormValues>;
   onSubmit: (data: SellFormValues) => void | Promise<void>;
+  onCancel?: () => void;
   isLoading?: boolean;
+  isEditing?: boolean;
 }
 
 /**
@@ -89,7 +91,7 @@ function isAmountDifferenceSignificant(
   return percentDiff > thresholdPercent;
 }
 
-export function SellForm({ accounts, defaultValues, onSubmit, isLoading = false }: SellFormProps) {
+export function SellForm({ accounts, defaultValues, onSubmit, onCancel, isLoading = false, isEditing = false }: SellFormProps) {
   const form = useForm<SellFormValues>({
     resolver: zodResolver(sellFormSchema) as Resolver<SellFormValues>,
     mode: "onBlur", // Validate on blur
@@ -232,12 +234,21 @@ export function SellForm({ accounts, defaultValues, onSubmit, isLoading = false 
           </CardContent>
         </Card>
 
-        {/* Submit Button */}
+        {/* Action Buttons */}
         <div className="flex justify-end gap-2">
+          {onCancel && (
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+              Cancel
+            </Button>
+          )}
           <Button type="submit" disabled={isLoading}>
             {isLoading && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
-            <Icons.Plus className="mr-2 h-4 w-4" />
-            Add Sell Activity
+            {isEditing ? (
+              <Icons.Check className="mr-2 h-4 w-4" />
+            ) : (
+              <Icons.Plus className="mr-2 h-4 w-4" />
+            )}
+            {isEditing ? "Update" : "Add Sell"}
           </Button>
         </div>
       </form>

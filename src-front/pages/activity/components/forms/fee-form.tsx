@@ -31,10 +31,12 @@ interface FeeFormProps {
   accounts: AccountSelectOption[];
   defaultValues?: Partial<FeeFormValues>;
   onSubmit: (data: FeeFormValues) => void | Promise<void>;
+  onCancel?: () => void;
   isLoading?: boolean;
+  isEditing?: boolean;
 }
 
-export function FeeForm({ accounts, defaultValues, onSubmit, isLoading = false }: FeeFormProps) {
+export function FeeForm({ accounts, defaultValues, onSubmit, onCancel, isLoading = false, isEditing = false }: FeeFormProps) {
   const form = useForm<FeeFormValues>({
     resolver: zodResolver(feeFormSchema) as Resolver<FeeFormValues>,
     mode: "onBlur", // Validate on blur
@@ -70,12 +72,21 @@ export function FeeForm({ accounts, defaultValues, onSubmit, isLoading = false }
           </CardContent>
         </Card>
 
-        {/* Submit Button */}
+        {/* Action Buttons */}
         <div className="flex justify-end gap-2">
+          {onCancel && (
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+              Cancel
+            </Button>
+          )}
           <Button type="submit" disabled={isLoading}>
             {isLoading && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
-            <Icons.Plus className="mr-2 h-4 w-4" />
-            Add Fee
+            {isEditing ? (
+              <Icons.Check className="mr-2 h-4 w-4" />
+            ) : (
+              <Icons.Plus className="mr-2 h-4 w-4" />
+            )}
+            {isEditing ? "Update" : "Add Fee"}
           </Button>
         </div>
       </form>
