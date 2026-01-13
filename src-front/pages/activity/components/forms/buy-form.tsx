@@ -187,7 +187,7 @@ export function BuyForm({ accounts, defaultValues, onSubmit, onCancel, isLoading
             <DatePicker name="activityDate" label="Date" enableTime={true} />
 
             {/* Quantity, Price, Fee Row */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <QuantityInput name="quantity" label="Quantity" />
               <AmountInput name="unitPrice" label="Price" maxDecimalPlaces={4} />
               <AmountInput name="fee" label="Fee" />
