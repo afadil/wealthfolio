@@ -160,7 +160,10 @@ pub trait QuoteServiceTrait: Send + Sync {
     ) -> Result<Vec<QuoteSummary>>;
 
     /// Get asset profile from provider.
-    async fn get_asset_profile(&self, symbol: &str) -> Result<ProviderProfile>;
+    ///
+    /// Uses the asset's exchange_mic to build provider-specific symbols
+    /// (e.g., "VFV.TO" for Yahoo when exchange_mic is XTSE).
+    async fn get_asset_profile(&self, asset: &Asset) -> Result<ProviderProfile>;
 
     /// Fetch historical quotes from provider.
     async fn fetch_quotes_from_provider(
@@ -350,7 +353,7 @@ where
             created_at: Utc::now(),
             data_source: DataSource::Manual,
             timestamp,
-            symbol: import.symbol.clone(),
+            asset_id: import.symbol.clone(),
             open: import.open_or_close(),
             high: import.high_or_close(),
             low: import.low_or_close(),
@@ -437,7 +440,7 @@ where
         for quote in quotes {
             let date = quote.timestamp.date_naive();
             grouped
-                .entry(quote.symbol.clone())
+                .entry(quote.asset_id.clone())
                 .or_default()
                 .push((date, quote));
         }
@@ -510,7 +513,7 @@ where
             daily
                 .entry(date)
                 .or_default()
-                .insert(quote.symbol.clone(), quote);
+                .insert(quote.asset_id.clone(), quote);
         }
 
         Ok(daily)
@@ -615,8 +618,8 @@ where
         Ok(merged)
     }
 
-    async fn get_asset_profile(&self, symbol: &str) -> Result<ProviderProfile> {
-        self.client.read().await.get_profile(symbol).await
+    async fn get_asset_profile(&self, asset: &Asset) -> Result<ProviderProfile> {
+        self.client.read().await.get_profile(asset).await
     }
 
     async fn fetch_quotes_from_provider(
@@ -685,11 +688,11 @@ where
 
     fn get_symbols_needing_sync(&self) -> Result<Vec<QuoteSyncState>> {
         self.sync_state_store
-            .get_symbols_needing_sync(super::constants::CLOSED_POSITION_GRACE_PERIOD_DAYS)
+            .get_assets_needing_sync(super::constants::CLOSED_POSITION_GRACE_PERIOD_DAYS)
     }
 
-    fn get_sync_state(&self, symbol: &str) -> Result<Option<QuoteSyncState>> {
-        self.sync_state_store.get_by_symbol(symbol)
+    fn get_sync_state(&self, asset_id: &str) -> Result<Option<QuoteSyncState>> {
+        self.sync_state_store.get_by_asset_id(asset_id)
     }
 
     async fn mark_profile_enriched(&self, symbol: &str) -> Result<()> {
@@ -908,7 +911,7 @@ fn fill_missing_quotes(
         quotes_by_date
             .entry(quote.timestamp.date_naive())
             .or_default()
-            .insert(quote.symbol.clone(), quote.clone());
+            .insert(quote.asset_id.clone(), quote.clone());
     }
 
     let mut all_filled_quotes = Vec::new();

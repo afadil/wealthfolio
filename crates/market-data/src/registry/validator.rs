@@ -117,6 +117,18 @@ impl QuoteValidator {
     /// Returns Ok(()) if the quote is valid, or Err with details if invalid.
     /// Warnings are logged but do not cause rejection.
     pub fn validate(&self, quote: &Quote) -> Result<(), MarketDataError> {
+        self.validate_for_instrument(quote, None)
+    }
+
+    /// Validate a quote with optional instrument context.
+    ///
+    /// For FX instruments, volume validation is skipped since forex rates
+    /// don't have meaningful volume data.
+    pub fn validate_for_instrument(
+        &self,
+        quote: &Quote,
+        instrument: Option<&InstrumentId>,
+    ) -> Result<(), MarketDataError> {
         let mut issues: Vec<ValidationIssue> = Vec::new();
 
         // Validate close price (required)
@@ -128,8 +140,11 @@ impl QuoteValidator {
         // Validate price range
         self.validate_price_range(quote, &mut issues);
 
-        // Validate volume
-        self.validate_volume(quote, &mut issues);
+        // Validate volume - skip for FX instruments (they don't have volume)
+        let is_fx = matches!(instrument, Some(InstrumentId::Fx { .. }));
+        if !is_fx {
+            self.validate_volume(quote, &mut issues);
+        }
 
         // Check for any errors
         let errors: Vec<_> = issues

@@ -16,9 +16,14 @@ pub struct AssetProfile {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub quote_type: Option<String>,
 
-    /// Business sector (e.g., "Technology")
+    /// Business sector (e.g., "Technology") - single sector for stocks
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sector: Option<String>,
+
+    /// Sector weightings as JSON array for ETFs/Mutual Funds
+    /// Format: [{"name": "Technology", "weight": 0.30}, {"name": "Healthcare", "weight": 0.15}]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sectors: Option<String>,
 
     /// Industry within sector (e.g., "Consumer Electronics")
     #[serde(skip_serializing_if = "Option::is_none")]

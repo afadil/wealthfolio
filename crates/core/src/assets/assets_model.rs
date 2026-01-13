@@ -98,7 +98,7 @@ pub struct Asset {
 
     // Metadata
     pub notes: Option<String>,
-    pub metadata: Option<Value>, // JSON for extensions (OptionSpec, legacy migration data, etc.)
+    pub metadata: Option<Value>, // JSON for extensions (OptionSpec, identifiers like ISIN, etc.)
 
     // Status
     #[serde(default = "default_is_active")]
@@ -357,7 +357,14 @@ pub struct ProviderProfile {
     pub currency: String,
     pub data_source: String,
     pub sectors: Option<String>,
+    pub industry: Option<String>,
     pub url: Option<String>,
+    // Financial metrics
+    pub market_cap: Option<f64>,
+    pub pe_ratio: Option<f64>,
+    pub dividend_yield: Option<f64>,
+    pub week_52_high: Option<f64>,
+    pub week_52_low: Option<f64>,
 }
 
 /// Input model for creating a new asset
@@ -386,7 +393,7 @@ pub struct NewAsset {
 
     // Metadata
     pub notes: Option<String>,
-    pub metadata: Option<Value>, // JSON for extensions (OptionSpec, legacy migration data, etc.)
+    pub metadata: Option<Value>, // JSON for extensions (OptionSpec, identifiers like ISIN, etc.)
 
     // Status
     #[serde(default = "default_is_active")]
@@ -406,6 +413,22 @@ impl NewAsset {
                 "Currency cannot be empty".to_string(),
             )));
         }
+
+        // Securities with MARKET pricing require exchange_mic for proper identification
+        // This ensures unique identification via the SEC:{symbol}:{exchange_mic} format
+        if self.kind == AssetKind::Security
+            && self.pricing_mode == PricingMode::Market
+            && self
+                .exchange_mic
+                .as_ref()
+                .map_or(true, |mic| mic.trim().is_empty())
+        {
+            return Err(Error::Validation(ValidationError::InvalidInput(
+                "Securities with MARKET pricing require an exchange MIC code (e.g., XNAS, XNYS)"
+                    .to_string(),
+            )));
+        }
+
         Ok(())
     }
 
@@ -496,27 +519,12 @@ impl From<ProviderProfile> for NewAsset {
             }
         });
 
-        // Build metadata.legacy from provider profile fields for migration purposes
-        let metadata = {
-            let mut legacy = serde_json::Map::new();
-            if let Some(ref isin) = profile.isin {
-                legacy.insert("isin".to_string(), serde_json::Value::String(isin.clone()));
-            }
-            if let Some(ref s) = profile.sectors {
-                legacy.insert("sectors".to_string(), serde_json::Value::String(s.clone()));
-            }
-            if let Some(ref c) = profile.countries {
-                legacy.insert("countries".to_string(), serde_json::Value::String(c.clone()));
-            }
-            if let Some(ref u) = profile.url {
-                legacy.insert("website".to_string(), serde_json::Value::String(u.clone()));
-            }
-            if legacy.is_empty() {
-                None
-            } else {
-                Some(serde_json::json!({ "legacy": legacy }))
-            }
-        };
+        // Build metadata.identifiers from provider profile (only ISIN for now)
+        let metadata = profile
+            .isin
+            .as_ref()
+            .filter(|isin| !isin.is_empty())
+            .map(|isin| serde_json::json!({ "identifiers": { "isin": isin } }));
 
         Self {
             id: profile.id,
@@ -547,6 +555,7 @@ pub struct UpdateAssetProfile {
     pub exchange_mic: Option<String>,       // ISO 10383 MIC code
     pub pricing_mode: Option<PricingMode>,
     pub provider_overrides: Option<Value>,  // JSON for per-provider overrides
+    pub metadata: Option<Value>,            // JSON for provider profile data (sector, industry, etc.)
 }
 
 /// Optional asset metadata that can be passed during activity creation.
@@ -572,17 +581,3 @@ impl UpdateAssetProfile {
     }
 }
 
-/// Domain model representing a quote summary
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
-pub struct QuoteSummary {
-    pub exchange: String,
-    pub short_name: String,
-    pub quote_type: String,
-    pub symbol: String,
-    pub index: String,
-    pub score: f64,
-    pub type_display: String,
-    pub long_name: String,
-}

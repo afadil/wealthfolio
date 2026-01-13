@@ -177,9 +177,11 @@ export const HoldingsTableMobile = ({
                     <TickerAvatar symbol={avatarSymbol} className="h-10 w-10" />
                     <div className="flex-1 overflow-hidden">
                       <p className="truncate font-semibold">{displaySymbol}</p>
-                      <p className="text-muted-foreground truncate text-sm">
-                        {holding.instrument?.name ?? "N/A"}
-                      </p>
+                      {holding.instrument?.name && (
+                        <p className="text-muted-foreground truncate text-sm">
+                          {holding.instrument.name}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="ml-2 text-right">

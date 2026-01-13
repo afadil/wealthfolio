@@ -10,7 +10,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@wealthfolio/ui/components/ui/sheet";
-import { DataSource } from "@/lib/constants";
+import { PricingMode } from "@/lib/constants";
 import type { ActivityDetails } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
@@ -70,7 +70,7 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
           return date;
         })(),
     currency: activity?.currency ?? "",
-    assetDataSource: activity?.assetDataSource ?? DataSource.YAHOO,
+    pricingMode: activity?.assetPricingMode === "MANUAL" ? "MANUAL" : "MARKET",
     showCurrencySelect: false,
   };
 
@@ -105,8 +105,8 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
       }
 
       if (
-        "assetDataSource" in submitData &&
-        submitData.assetDataSource === DataSource.MANUAL &&
+        "pricingMode" in submitData &&
+        submitData.pricingMode === PricingMode.MANUAL &&
         account
       ) {
         submitData.currency = submitData.currency ?? account.currency;

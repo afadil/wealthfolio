@@ -177,10 +177,11 @@ impl ProviderRegistry {
                     self.circuit_breaker.record_success(&provider_id);
 
                     // Validate quotes - store original count before drain
+                    // Pass instrument context to skip volume validation for FX
                     let original_count = quotes.len();
                     let mut valid_quotes = Vec::with_capacity(original_count);
                     for quote in quotes.drain(..) {
-                        match self.validator.validate(&quote) {
+                        match self.validator.validate_for_instrument(&quote, Some(&context.instrument)) {
                             Ok(()) => valid_quotes.push(quote),
                             Err(e) => {
                                 warn!(
@@ -280,7 +281,7 @@ impl ProviderRegistry {
                 Ok(quote) => {
                     self.circuit_breaker.record_success(&provider_id);
 
-                    if let Err(e) = self.validator.validate(&quote) {
+                    if let Err(e) = self.validator.validate_for_instrument(&quote, Some(&context.instrument)) {
                         warn!("Latest quote validation failed: {:?}", e);
                         last_error = Some(e);
                         continue;
@@ -505,10 +506,13 @@ impl ProviderRegistry {
         Err(last_error.unwrap_or(MarketDataError::AllProvidersFailed))
     }
 
-    /// Get asset profile for a symbol.
+    /// Get asset profile for an instrument.
+    ///
+    /// Uses the same resolver as quote fetching to build provider-specific symbols
+    /// (e.g., "VFV.TO" for Yahoo when the MIC is XTSE).
     ///
     /// Tries providers that support profiles until one succeeds.
-    pub async fn get_profile(&self, symbol: &str) -> Result<AssetProfile, MarketDataError> {
+    pub async fn get_profile(&self, context: &QuoteContext) -> Result<AssetProfile, MarketDataError> {
         let providers: Vec<_> = self
             .providers
             .iter()
@@ -531,9 +535,17 @@ impl ProviderRegistry {
                 continue;
             }
 
+            // Resolve the provider-specific symbol
+            let resolved = match self.resolver.resolve(&provider_id, context) {
+                Ok(r) => r,
+                Err(_) => continue, // Provider can't handle this instrument
+            };
+
+            let symbol = resolved.instrument.to_symbol_string();
+
             self.rate_limiter.acquire(&provider_id).await;
 
-            match provider.get_profile(symbol).await {
+            match provider.get_profile(&symbol).await {
                 Ok(profile) => {
                     self.circuit_breaker.record_success(&provider_id);
                     return Ok(profile);
@@ -555,7 +567,9 @@ impl ProviderRegistry {
             }
         }
 
-        Err(last_error.unwrap_or_else(|| MarketDataError::SymbolNotFound(symbol.to_string())))
+        Err(last_error.unwrap_or_else(|| {
+            MarketDataError::SymbolNotFound(format!("{:?}", context.instrument))
+        }))
     }
 
     /// Fetch quotes for an instrument with diagnostics.
@@ -616,7 +630,7 @@ impl ProviderRegistry {
                     let original_count = quotes.len();
                     let mut valid_quotes = Vec::with_capacity(original_count);
                     for quote in quotes.drain(..) {
-                        match self.validator.validate(&quote) {
+                        match self.validator.validate_for_instrument(&quote, Some(&context.instrument)) {
                             Ok(()) => valid_quotes.push(quote),
                             Err(e) => {
                                 warn!(
@@ -714,7 +728,7 @@ impl ProviderRegistry {
                 Ok(quote) => {
                     self.circuit_breaker.record_success(&provider_id);
 
-                    if let Err(e) = self.validator.validate(&quote) {
+                    if let Err(e) = self.validator.validate_for_instrument(&quote, Some(&context.instrument)) {
                         diagnostics.record_error(provider_id.clone(), format!("{:?}", e));
                         last_error = Some(e);
                         continue;

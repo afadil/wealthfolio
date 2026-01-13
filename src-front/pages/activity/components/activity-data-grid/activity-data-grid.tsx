@@ -153,7 +153,7 @@ export function ActivityDataGrid({
           updated[rowIndex] = {
             ...updated[rowIndex],
             exchangeMic: result.exchangeMic,
-            assetDataSource: result.dataSource as ActivityDetails["assetDataSource"],
+            assetPricingMode: result.dataSource === "MANUAL" ? "MANUAL" : "MARKET",
           };
         }
         return updated;

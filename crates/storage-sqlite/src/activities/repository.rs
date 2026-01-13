@@ -224,6 +224,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 accounts::currency,
                 assets::symbol.nullable(),
                 assets::name.nullable(),
+                assets::pricing_mode.nullable(),
             ))
             .limit(page_size)
             .offset(offset)

@@ -1,4 +1,4 @@
-import type { ActivityDetails, DataSource } from "@/lib/types";
+import type { ActivityDetails, PricingMode } from "@/lib/types";
 
 /**
  * Represents a local transaction that extends ActivityDetails with draft state
@@ -109,7 +109,7 @@ interface ActivityBasePayload {
   fee?: string;
   fxRate?: string | null;
   comment?: string;
-  assetDataSource?: DataSource;
+  pricingMode?: PricingMode;
 }
 
 /**

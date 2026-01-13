@@ -13,7 +13,7 @@ import { SubtypeSelect } from "./subtype-select";
 export const OtherForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
   const { control, watch } = useFormContext();
   const activityType = watch("activityType");
-  const isManualAsset = watch("assetDataSource") === "MANUAL";
+  const isManualAsset = watch("pricingMode") === "MANUAL";
 
   const otherTypes: ActivityTypeUI[] = [
     {

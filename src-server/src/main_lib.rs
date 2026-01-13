@@ -24,6 +24,7 @@ use wealthfolio_core::{
     quotes::{QuoteService, QuoteServiceTrait},
     secrets::SecretStore,
     settings::{SettingsService, SettingsServiceTrait},
+    taxonomies::TaxonomyService,
 };
 use wealthfolio_storage_sqlite::{
     accounts::AccountRepository,
@@ -36,6 +37,7 @@ use wealthfolio_storage_sqlite::{
     market_data::{MarketDataRepository, QuoteSyncStateRepository},
     portfolio::{snapshot::SnapshotRepository, valuation::ValuationRepository},
     settings::SettingsRepository,
+    taxonomies::TaxonomyRepository,
 };
 
 pub struct AppState {
@@ -143,9 +145,14 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         .await?,
     );
 
-    let asset_service = Arc::new(AssetService::new(
+    // Create taxonomy service for auto-classification
+    let taxonomy_repository = Arc::new(TaxonomyRepository::new(pool.clone(), writer.clone()));
+    let taxonomy_service = Arc::new(TaxonomyService::new(taxonomy_repository));
+
+    let asset_service = Arc::new(AssetService::with_taxonomy_service(
         asset_repository.clone(),
         quote_service.clone(),
+        taxonomy_service.clone(),
     )?);
     let snapshot_service = Arc::new(SnapshotService::new(
         base_currency.clone(),

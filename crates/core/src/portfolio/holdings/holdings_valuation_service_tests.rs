@@ -1,7 +1,7 @@
 // Test cases for HoldingsValuationService will go here.
 #[cfg(test)]
 mod tests {
-    use crate::assets::ProviderProfile;
+    use crate::assets::{Asset, ProviderProfile};
     use crate::errors::{Error, Result};
     use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
     use crate::quotes::{DataSource, MarketDataError};
@@ -258,7 +258,7 @@ mod tests {
             unimplemented!()
         }
 
-        async fn get_asset_profile(&self, _symbol: &str) -> Result<ProviderProfile> {
+        async fn get_asset_profile(&self, _asset: &Asset) -> Result<ProviderProfile> {
             unimplemented!()
         }
 
@@ -364,7 +364,7 @@ mod tests {
         let utc_timestamp = chrono::TimeZone::from_utc_datetime(&Utc, &naive_timestamp);
         Quote {
             id: format!("{}_{}", currency, date_str),
-            symbol: "".to_string(),
+            asset_id: "".to_string(),
             timestamp: utc_timestamp,
             close,
             open: close,
@@ -397,6 +397,7 @@ mod tests {
                 name: Some(name.unwrap_or(symbol_or_cash_code).to_string()),
                 currency: local_currency.to_string(),
                 notes: None,
+                pricing_mode: "MARKET".to_string(),
                 countries: None,
                 sectors: None,
                 preferred_provider: None,

@@ -34,6 +34,23 @@ pub enum ProviderInstrument {
     },
 }
 
+impl ProviderInstrument {
+    /// Extract the symbol string from this instrument.
+    ///
+    /// Converts the provider-specific instrument to a query string suitable
+    /// for API calls (quotes, profiles, search).
+    pub fn to_symbol_string(&self) -> String {
+        match self {
+            ProviderInstrument::EquitySymbol { symbol } => symbol.to_string(),
+            ProviderInstrument::CryptoSymbol { symbol } => symbol.to_string(),
+            ProviderInstrument::CryptoPair { symbol, market } => format!("{}-{}", symbol, market),
+            ProviderInstrument::FxSymbol { symbol } => symbol.to_string(),
+            ProviderInstrument::FxPair { from, to } => format!("{}{}=X", from, to),
+            ProviderInstrument::MetalSymbol { symbol, .. } => symbol.to_string(),
+        }
+    }
+}
+
 /// Provider-specific symbol overrides stored on Asset
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ProviderOverrides {

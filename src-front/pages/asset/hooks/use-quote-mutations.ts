@@ -29,7 +29,7 @@ export const useQuoteMutations = (symbol: string) => {
       await updateQuote(symbol, {
         ...quote,
         dataSource: "MANUAL",
-        symbol,
+        assetId: symbol,
         createdAt: quote.createdAt || new Date().toISOString(),
       });
     },

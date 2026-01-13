@@ -51,7 +51,7 @@ impl FxRepository {
         for quote_db in quotes_db {
             let quote = Quote::from(quote_db);
             grouped_quotes
-                .entry(quote.symbol.clone())
+                .entry(quote.asset_id.clone())
                 .or_default()
                 .push(quote);
         }
@@ -491,6 +491,7 @@ impl FxRepository {
                     notes: Some(notes),
                     metadata: None,
                     currency: to_owned.to_string(), // Quote currency (USD)
+                    is_active: 1, // FX assets should be active for quote syncing
                     created_at: now_rfc3339.clone(),
                     updated_at: now_rfc3339.clone(),
                     ..Default::default()

@@ -564,7 +564,7 @@ impl QuoteImportService {
 
         Quote {
             id,
-            symbol: validation.asset_id.0,
+            asset_id: validation.asset_id.0,
             timestamp,
             open: validation.open.unwrap_or(validation.close),
             high: validation.high.unwrap_or(validation.close),
@@ -896,7 +896,7 @@ mod tests {
     fn test_quote_export_from_quote() {
         let quote = Quote {
             id: "AAPL_2024-01-15_MANUAL".to_string(),
-            symbol: "AAPL".to_string(),
+            asset_id: "AAPL".to_string(),
             timestamp: chrono::DateTime::parse_from_rfc3339("2024-01-15T12:00:00Z")
                 .unwrap()
                 .with_timezone(&Utc),
@@ -925,7 +925,7 @@ mod tests {
     fn test_quote_export_zero_values() {
         let quote = Quote {
             id: "AAPL_2024-01-15_MANUAL".to_string(),
-            symbol: "AAPL".to_string(),
+            asset_id: "AAPL".to_string(),
             timestamp: chrono::DateTime::parse_from_rfc3339("2024-01-15T12:00:00Z")
                 .unwrap()
                 .with_timezone(&Utc),

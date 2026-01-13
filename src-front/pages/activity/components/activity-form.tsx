@@ -14,7 +14,7 @@ import {
   SheetTrigger,
 } from "@wealthfolio/ui/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
-import { DataSource } from "@/lib/constants";
+import { PricingMode } from "@/lib/constants";
 import type { ActivityDetails } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
@@ -68,7 +68,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
   };
   const defaultValues: Partial<NewActivityFormValues> = {
     id: activity?.id,
-    accountId: activity?.accountId || "",
+    accountId: activity?.accountId || (accounts.length === 1 ? accounts[0].value : ""),
     activityType: isValidActivityType(activity?.activityType) ? activity.activityType : undefined,
     amount: activity?.amount,
     quantity: activity?.quantity,
@@ -88,7 +88,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
 
     currency: activity?.currency || "",
     fxRate: activity?.fxRate ?? null,
-    assetDataSource: activity?.assetDataSource || DataSource.YAHOO,
+    pricingMode: activity?.assetPricingMode === "MANUAL" ? "MANUAL" : "MARKET",
     showCurrencySelect: Boolean(activity?.currency && activity?.fxRate),
   };
 
@@ -137,8 +137,8 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
       }
 
       if (
-        "assetDataSource" in submitData &&
-        submitData.assetDataSource === DataSource.MANUAL &&
+        "pricingMode" in submitData &&
+        submitData.pricingMode === PricingMode.MANUAL &&
         account
       ) {
         submitData.currency = submitData.currency || account.currency;

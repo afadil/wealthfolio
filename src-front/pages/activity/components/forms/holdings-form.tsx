@@ -66,7 +66,7 @@ interface HoldingsFormProps {
 
 export const HoldingsForm = ({ accounts, onSuccess, onTransferModeChange }: HoldingsFormProps) => {
   const { control, watch, setValue } = useFormContext();
-  const isManualAsset = watch("assetDataSource") === "MANUAL";
+  const isManualAsset = watch("pricingMode") === "MANUAL";
   const currentActivityType = watch("activityType");
   const currentMetadata = watch("metadata");
 

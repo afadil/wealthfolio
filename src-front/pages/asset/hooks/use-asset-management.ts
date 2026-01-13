@@ -1,15 +1,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { logger } from "@/adapters";
-import { deleteAsset, updateAssetDataSource, updateAssetProfile } from "@/commands/market-data";
+import { deleteAsset, updateAssetProfile } from "@/commands/market-data";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { QueryKeys } from "@/lib/query-keys";
 import { UpdateAssetProfile } from "@/lib/types";
 
 interface UpdateAssetArgs {
-  assetId: string;
   payload: UpdateAssetProfile;
-  preferredProvider?: string;
 }
 
 export const useAssetManagement = () => {
@@ -23,12 +21,8 @@ export const useAssetManagement = () => {
   };
 
   const updateAssetMutation = useMutation({
-    mutationFn: async ({ assetId, payload, preferredProvider }: UpdateAssetArgs) => {
-      let updated = await updateAssetProfile(payload);
-      if (preferredProvider && preferredProvider !== updated.preferredProvider) {
-        updated = await updateAssetDataSource(assetId, preferredProvider);
-      }
-      return updated;
+    mutationFn: async ({ payload }: UpdateAssetArgs) => {
+      return await updateAssetProfile(payload);
     },
     onSuccess: (asset) => {
       invalidateCaches(asset.id);

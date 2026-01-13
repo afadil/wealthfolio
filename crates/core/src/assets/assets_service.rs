@@ -1,10 +1,12 @@
-use log::{debug, error};
+use log::{debug, error, info};
 use std::sync::Arc;
 
 use crate::quotes::QuoteServiceTrait;
+use crate::taxonomies::TaxonomyServiceTrait;
 
 use super::assets_model::{Asset, AssetKind, NewAsset, PricingMode, UpdateAssetProfile};
 use super::assets_traits::{AssetRepositoryTrait, AssetServiceTrait};
+use super::auto_classification::{AutoClassificationService, ClassificationInput};
 use crate::errors::{DatabaseError, Error, Result};
 
 // Import mic_to_currency for resolving exchange trading currencies
@@ -68,6 +70,7 @@ fn parse_asset_kind_from_provider(asset_type: &str) -> Option<AssetKind> {
 pub struct AssetService {
     quote_service: Arc<dyn QuoteServiceTrait>,
     asset_repository: Arc<dyn AssetRepositoryTrait>,
+    taxonomy_service: Option<Arc<dyn TaxonomyServiceTrait>>,
 }
 
 impl AssetService {
@@ -79,8 +82,23 @@ impl AssetService {
         Ok(Self {
             quote_service,
             asset_repository,
+            taxonomy_service: None,
         })
     }
+
+    /// Creates a new AssetService instance with taxonomy service for auto-classification
+    pub fn with_taxonomy_service(
+        asset_repository: Arc<dyn AssetRepositoryTrait>,
+        quote_service: Arc<dyn QuoteServiceTrait>,
+        taxonomy_service: Arc<dyn TaxonomyServiceTrait>,
+    ) -> Result<Self> {
+        Ok(Self {
+            quote_service,
+            asset_repository,
+            taxonomy_service: Some(taxonomy_service),
+        })
+    }
+
 }
 
 // Implement the service trait
@@ -125,44 +143,6 @@ impl AssetServiceTrait for AssetService {
     /// Creates a new asset directly without network lookups.
     async fn create_asset(&self, new_asset: NewAsset) -> Result<Asset> {
         self.asset_repository.create(new_asset).await
-    }
-
-    /// Retrieves or creates an asset by its ID
-    async fn get_or_create_asset(
-        &self,
-        asset_id: &str,
-        context_currency: Option<String>,
-    ) -> Result<Asset> {
-        match self.asset_repository.get_by_id(asset_id) {
-            Ok(existing_asset) => Ok(existing_asset),
-            Err(Error::Database(DatabaseError::NotFound(_))) => {
-                debug!(
-                    "Asset not found locally, attempting to fetch from market data: {}",
-                    asset_id
-                );
-                let asset_profile_from_provider =
-                    self.quote_service.get_asset_profile(asset_id).await?;
-
-                let mut new_asset: NewAsset = asset_profile_from_provider.into();
-
-                // If the asset profile didn't provide a currency (e.g., generic manual asset)
-                // and a context currency is available, use the context currency.
-                if new_asset.currency.is_empty() {
-                    if let Some(curr) = context_currency {
-                        if !curr.is_empty() {
-                            new_asset.currency = curr;
-                        }
-                    }
-                }
-
-                // will ensure currency is not empty before insertion.
-                return self.asset_repository.create(new_asset).await;
-            }
-            Err(e) => {
-                error!("Error fetching asset by ID '{}': {}", asset_id, e);
-                Err(e)
-            }
-        }
     }
 
     /// Creates a minimal asset without network calls.
@@ -286,10 +266,10 @@ impl AssetServiceTrait for AssetService {
         self.asset_repository.create(new_asset).await
     }
 
-    /// Updates the data source for an asset
-    async fn update_asset_data_source(&self, asset_id: &str, data_source: String) -> Result<Asset> {
+    /// Updates the pricing mode for an asset (MARKET, MANUAL, DERIVED, NONE)
+    async fn update_pricing_mode(&self, asset_id: &str, pricing_mode: &str) -> Result<Asset> {
         self.asset_repository
-            .update_data_source(asset_id, data_source)
+            .update_pricing_mode(asset_id, pricing_mode)
             .await
     }
 
@@ -312,16 +292,21 @@ impl AssetServiceTrait for AssetService {
             return Ok(existing_asset);
         }
 
-        // Fetch profile from provider using the symbol, not the canonical asset_id
-        // The provider expects symbols like "AAPL", not "SEC:AAPL:XNAS"
-        let provider_profile = match self.quote_service.get_asset_profile(&existing_asset.symbol).await {
+        // Fetch profile from provider using the asset (resolver handles exchange suffix)
+        debug!(
+            "Fetching profile for asset {} (symbol: {}, exchange: {:?})",
+            asset_id, existing_asset.symbol, existing_asset.exchange_mic
+        );
+
+        let provider_profile = match self.quote_service.get_asset_profile(&existing_asset).await {
             Ok(profile) => profile,
             Err(e) => {
-                debug!(
-                    "Could not fetch profile for asset {} (symbol: {}): {}",
-                    asset_id, existing_asset.symbol, e
-                );
-                return Ok(existing_asset);
+                // Return error so caller knows enrichment failed and won't mark as enriched
+                // This allows retry on next sync cycle
+                return Err(Error::MarketData(crate::quotes::MarketDataError::ProviderError(
+                    format!("Could not fetch profile for asset {} (symbol: {}): {}",
+                        asset_id, existing_asset.symbol, e)
+                )));
             }
         };
 
@@ -340,8 +325,59 @@ impl AssetServiceTrait for AssetService {
             None // Keep existing non-default kind
         };
 
+        // Build provider profile metadata for storage
+        // This captures sector/industry/country/quote_type for display and future auto-classification
+        let mut profile_metadata = serde_json::Map::new();
+        // ProviderProfile uses JSON strings for sectors/countries (legacy format)
+        if let Some(ref sectors) = provider_profile.sectors {
+            profile_metadata.insert("sectors".to_string(), serde_json::Value::String(sectors.clone()));
+        }
+        if let Some(ref industry) = provider_profile.industry {
+            profile_metadata.insert("industry".to_string(), serde_json::Value::String(industry.clone()));
+        }
+        if let Some(ref countries) = provider_profile.countries {
+            profile_metadata.insert("countries".to_string(), serde_json::Value::String(countries.clone()));
+        }
+        if let Some(ref asset_type) = provider_profile.asset_type {
+            profile_metadata.insert("quoteType".to_string(), serde_json::Value::String(asset_type.clone()));
+        }
+        if let Some(ref url) = provider_profile.url {
+            profile_metadata.insert("website".to_string(), serde_json::Value::String(url.clone()));
+        }
+        if let Some(market_cap) = provider_profile.market_cap {
+            profile_metadata.insert("marketCap".to_string(), serde_json::json!(market_cap));
+        }
+        if let Some(pe_ratio) = provider_profile.pe_ratio {
+            profile_metadata.insert("peRatio".to_string(), serde_json::json!(pe_ratio));
+        }
+        if let Some(dividend_yield) = provider_profile.dividend_yield {
+            profile_metadata.insert("dividendYield".to_string(), serde_json::json!(dividend_yield));
+        }
+        if let Some(week_52_high) = provider_profile.week_52_high {
+            profile_metadata.insert("week52High".to_string(), serde_json::json!(week_52_high));
+        }
+        if let Some(week_52_low) = provider_profile.week_52_low {
+            profile_metadata.insert("week52Low".to_string(), serde_json::json!(week_52_low));
+        }
+
+        // Merge with existing metadata (preserving any non-profile fields like OptionSpec)
+        let updated_metadata = if profile_metadata.is_empty() {
+            existing_asset.metadata.clone()
+        } else {
+            let mut merged = match &existing_asset.metadata {
+                Some(existing) => match existing.as_object() {
+                    Some(obj) => obj.clone(),
+                    None => serde_json::Map::new(),
+                },
+                None => serde_json::Map::new(),
+            };
+            // Add/update profile data under a "profile" key to avoid conflicts
+            merged.insert("profile".to_string(), serde_json::Value::Object(profile_metadata));
+            Some(serde_json::Value::Object(merged))
+        };
+
         // Build profile update from provider data
-        // Note: sectors/countries/classifications now come from taxonomies, not stored on asset
+        // Note: sectors/countries/classifications come from taxonomies, but profile data is stored for reference
         let mut update = UpdateAssetProfile {
             symbol: existing_asset.symbol.clone(),
             name: provider_profile.name.or(existing_asset.name.clone()),
@@ -350,6 +386,7 @@ impl AssetServiceTrait for AssetService {
             exchange_mic: None, // Keep existing exchange_mic
             pricing_mode: Some(existing_asset.pricing_mode.clone()),
             provider_overrides: existing_asset.provider_overrides.clone(),
+            metadata: updated_metadata,
         };
 
         // Update notes with description if notes is empty and provider has notes
@@ -360,12 +397,46 @@ impl AssetServiceTrait for AssetService {
         }
 
         debug!(
-            "Enriching asset {} with provider profile: kind={:?}, name={:?}",
-            asset_id, update.kind, update.name
+            "Enriching asset {} with provider profile: kind={:?}, name={:?}, sectors={:?}, industry={:?}, countries={:?}, asset_type={:?}",
+            asset_id, update.kind, update.name, provider_profile.sectors, provider_profile.industry, provider_profile.countries, provider_profile.asset_type
         );
 
-        self.asset_repository
+        let updated_asset = self
+            .asset_repository
             .update_profile(asset_id, update)
-            .await
+            .await?;
+
+        // Auto-classify asset based on provider profile data
+        // Note: ProviderProfile already has sectors/countries as JSON arrays
+        // (convert_profile converts single sector/country to JSON arrays)
+        if let Some(taxonomy_service) = &self.taxonomy_service {
+            let classification_input = ClassificationInput::from_provider_profile(
+                provider_profile.asset_type.as_deref(),
+                None,                                   // Single sector (already in sectors JSON)
+                provider_profile.sectors.as_deref(),    // Sector weightings JSON
+                None,                                   // Single country (already in countries JSON)
+                provider_profile.countries.as_deref(),  // Country weightings JSON
+                existing_asset.exchange_mic.as_deref(), // Fallback for ETF region (fund domicile)
+            );
+
+            let auto_classifier = AutoClassificationService::new(Arc::clone(taxonomy_service));
+            match auto_classifier
+                .classify_asset(asset_id, &classification_input)
+                .await
+            {
+                Ok(result) => {
+                    info!(
+                        "Auto-classified asset {}: type={:?}, sectors={:?}, region={:?}",
+                        asset_id, result.security_type, result.sectors, result.region
+                    );
+                }
+                Err(e) => {
+                    // Log but don't fail - auto-classification is best-effort
+                    debug!("Auto-classification failed for {}: {}", asset_id, e);
+                }
+            }
+        }
+
+        Ok(updated_asset)
     }
 }

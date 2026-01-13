@@ -114,11 +114,11 @@ impl SyncStateStore for QuoteSyncStateRepository {
         Ok(results.into_iter().map(QuoteSyncState::from).collect())
     }
 
-    fn get_by_symbol(&self, symbol: &str) -> Result<Option<QuoteSyncState>> {
+    fn get_by_asset_id(&self, asset_id: &str) -> Result<Option<QuoteSyncState>> {
         let mut conn = get_connection(&self.pool)?;
 
         let result = qss_dsl::quote_sync_state
-            .filter(qss_dsl::asset_id.eq(symbol))
+            .filter(qss_dsl::asset_id.eq(asset_id))
             .first::<QuoteSyncStateDB>(&mut conn)
             .optional()
             .map_err(StorageError::from)?;
@@ -126,15 +126,15 @@ impl SyncStateStore for QuoteSyncStateRepository {
         Ok(result.map(QuoteSyncState::from))
     }
 
-    fn get_by_symbols(&self, symbols: &[String]) -> Result<HashMap<String, QuoteSyncState>> {
-        if symbols.is_empty() {
+    fn get_by_asset_ids(&self, asset_ids: &[String]) -> Result<HashMap<String, QuoteSyncState>> {
+        if asset_ids.is_empty() {
             return Ok(HashMap::new());
         }
 
         let mut conn = get_connection(&self.pool)?;
 
         let results = qss_dsl::quote_sync_state
-            .filter(qss_dsl::asset_id.eq_any(symbols))
+            .filter(qss_dsl::asset_id.eq_any(asset_ids))
             .load::<QuoteSyncStateDB>(&mut conn)
             .map_err(StorageError::from)?;
 
@@ -142,12 +142,12 @@ impl SyncStateStore for QuoteSyncStateRepository {
             .into_iter()
             .map(|db| {
                 let state = QuoteSyncState::from(db);
-                (state.symbol.clone(), state)
+                (state.asset_id.clone(), state)
             })
             .collect())
     }
 
-    fn get_active_symbols(&self) -> Result<Vec<QuoteSyncState>> {
+    fn get_active_assets(&self) -> Result<Vec<QuoteSyncState>> {
         let mut conn = get_connection(&self.pool)?;
 
         let results = qss_dsl::quote_sync_state
@@ -159,13 +159,13 @@ impl SyncStateStore for QuoteSyncStateRepository {
         Ok(results.into_iter().map(QuoteSyncState::from).collect())
     }
 
-    fn get_symbols_needing_sync(&self, grace_period_days: i64) -> Result<Vec<QuoteSyncState>> {
+    fn get_assets_needing_sync(&self, grace_period_days: i64) -> Result<Vec<QuoteSyncState>> {
         let mut conn = get_connection(&self.pool)?;
         let today = Utc::now().date_naive();
         let grace_cutoff = today - chrono::Duration::days(grace_period_days);
         let grace_cutoff_str = grace_cutoff.format("%Y-%m-%d").to_string();
 
-        // Get active symbols OR recently closed symbols (within grace period)
+        // Get active assets OR recently closed assets (within grace period)
         let results = qss_dsl::quote_sync_state
             .filter(
                 qss_dsl::is_active.eq(1).or(qss_dsl::is_active
@@ -224,12 +224,12 @@ impl SyncStateStore for QuoteSyncStateRepository {
 
     async fn update_after_sync(
         &self,
-        symbol: &str,
+        asset_id: &str,
         last_quote_date: NaiveDate,
         earliest_quote_date: Option<NaiveDate>,
         data_source: Option<&str>,
     ) -> Result<()> {
-        let symbol_owned = symbol.to_string();
+        let asset_id_owned = asset_id.to_string();
         let last_quote_str = last_quote_date.format("%Y-%m-%d").to_string();
         let earliest_quote_str = earliest_quote_date.map(|d| d.format("%Y-%m-%d").to_string());
         let data_source_owned = data_source.map(|s| s.to_string());
@@ -239,7 +239,7 @@ impl SyncStateStore for QuoteSyncStateRepository {
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
                 // Get current state to compare earliest_quote_date
                 let current: Option<QuoteSyncStateDB> = qss_dsl::quote_sync_state
-                    .filter(qss_dsl::asset_id.eq(&symbol_owned))
+                    .filter(qss_dsl::asset_id.eq(&asset_id_owned))
                     .first(conn)
                     .optional()
                     .map_err(StorageError::from)?;
@@ -269,7 +269,7 @@ impl SyncStateStore for QuoteSyncStateRepository {
                     }
                 }
 
-                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&symbol_owned)))
+                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&asset_id_owned)))
                     .set(&update)
                     .execute(conn)
                     .map_err(StorageError::from)?;
@@ -279,8 +279,8 @@ impl SyncStateStore for QuoteSyncStateRepository {
             .await
     }
 
-    async fn update_after_failure(&self, symbol: &str, error: &str) -> Result<()> {
-        let symbol_owned = symbol.to_string();
+    async fn update_after_failure(&self, asset_id: &str, error: &str) -> Result<()> {
+        let asset_id_owned = asset_id.to_string();
         let error_owned = error.to_string();
         let now = Utc::now().to_rfc3339();
 
@@ -288,7 +288,7 @@ impl SyncStateStore for QuoteSyncStateRepository {
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
                 // First get current error count
                 let current: Option<QuoteSyncStateDB> = qss_dsl::quote_sync_state
-                    .filter(qss_dsl::asset_id.eq(&symbol_owned))
+                    .filter(qss_dsl::asset_id.eq(&asset_id_owned))
                     .first(conn)
                     .optional()
                     .map_err(StorageError::from)?;
@@ -302,7 +302,7 @@ impl SyncStateStore for QuoteSyncStateRepository {
                     ..Default::default()
                 };
 
-                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&symbol_owned)))
+                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&asset_id_owned)))
                     .set(&update)
                     .execute(conn)
                     .map_err(StorageError::from)?;
@@ -312,14 +312,14 @@ impl SyncStateStore for QuoteSyncStateRepository {
             .await
     }
 
-    async fn mark_inactive(&self, symbol: &str, closed_date: NaiveDate) -> Result<()> {
-        let symbol_owned = symbol.to_string();
+    async fn mark_inactive(&self, asset_id: &str, closed_date: NaiveDate) -> Result<()> {
+        let asset_id_owned = asset_id.to_string();
         let closed_date_str = closed_date.format("%Y-%m-%d").to_string();
         let now = Utc::now().to_rfc3339();
 
         debug!(
-            "Marking symbol {} as inactive (closed: {})",
-            symbol, closed_date
+            "Marking asset {} as inactive (closed: {})",
+            asset_id, closed_date
         );
 
         self.writer
@@ -332,7 +332,7 @@ impl SyncStateStore for QuoteSyncStateRepository {
                     ..Default::default()
                 };
 
-                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&symbol_owned)))
+                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&asset_id_owned)))
                     .set(&update)
                     .execute(conn)
                     .map_err(StorageError::from)?;
@@ -342,11 +342,11 @@ impl SyncStateStore for QuoteSyncStateRepository {
             .await
     }
 
-    async fn mark_active(&self, symbol: &str) -> Result<()> {
-        let symbol_owned = symbol.to_string();
+    async fn mark_active(&self, asset_id: &str) -> Result<()> {
+        let asset_id_owned = asset_id.to_string();
         let now = Utc::now().to_rfc3339();
 
-        debug!("Marking symbol {} as active", symbol);
+        debug!("Marking asset {} as active", asset_id);
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
@@ -358,7 +358,7 @@ impl SyncStateStore for QuoteSyncStateRepository {
                     ..Default::default()
                 };
 
-                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&symbol_owned)))
+                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&asset_id_owned)))
                     .set(&update)
                     .execute(conn)
                     .map_err(StorageError::from)?;
@@ -370,18 +370,18 @@ impl SyncStateStore for QuoteSyncStateRepository {
 
     async fn update_activity_dates(
         &self,
-        symbol: &str,
+        asset_id: &str,
         first_date: Option<NaiveDate>,
         last_date: Option<NaiveDate>,
     ) -> Result<()> {
-        let symbol_owned = symbol.to_string();
+        let asset_id_owned = asset_id.to_string();
         let now = Utc::now().to_rfc3339();
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
                 // Get current state
                 let current: Option<QuoteSyncStateDB> = qss_dsl::quote_sync_state
-                    .filter(qss_dsl::asset_id.eq(&symbol_owned))
+                    .filter(qss_dsl::asset_id.eq(&asset_id_owned))
                     .first(conn)
                     .optional()
                     .map_err(StorageError::from)?;
@@ -419,7 +419,7 @@ impl SyncStateStore for QuoteSyncStateRepository {
                     }
                 }
 
-                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&symbol_owned)))
+                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&asset_id_owned)))
                     .set(&update)
                     .execute(conn)
                     .map_err(StorageError::from)?;
@@ -429,12 +429,12 @@ impl SyncStateStore for QuoteSyncStateRepository {
             .await
     }
 
-    async fn delete(&self, symbol: &str) -> Result<()> {
-        let symbol_owned = symbol.to_string();
+    async fn delete(&self, asset_id: &str) -> Result<()> {
+        let asset_id_owned = asset_id.to_string();
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
-                diesel::delete(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&symbol_owned)))
+                diesel::delete(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&asset_id_owned)))
                     .execute(conn)
                     .map_err(StorageError::from)?;
                 Ok(())
@@ -530,11 +530,11 @@ impl SyncStateStore for QuoteSyncStateRepository {
             .await
     }
 
-    async fn mark_profile_enriched(&self, symbol: &str) -> Result<()> {
-        let symbol_owned = symbol.to_string();
+    async fn mark_profile_enriched(&self, asset_id: &str) -> Result<()> {
+        let asset_id_owned = asset_id.to_string();
         let now = Utc::now().to_rfc3339();
 
-        debug!("Marking profile enriched for symbol {}", symbol);
+        debug!("Marking profile enriched for asset {}", asset_id);
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
@@ -544,7 +544,7 @@ impl SyncStateStore for QuoteSyncStateRepository {
                     ..Default::default()
                 };
 
-                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&symbol_owned)))
+                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&asset_id_owned)))
                     .set(&update)
                     .execute(conn)
                     .map_err(StorageError::from)?;

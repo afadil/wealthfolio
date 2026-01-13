@@ -558,12 +558,12 @@ impl NetWorthServiceTrait for NetWorthService {
             .quote_service
             .get_quotes_in_range_filled(&all_alt_symbols, start_date, end_date, &HashMap::new())?;
 
-        // Organize quotes by date -> symbol -> value (converted to base currency)
+        // Organize quotes by date -> asset_id -> value (converted to base currency)
         let mut quotes_by_date: BTreeMap<NaiveDate, HashMap<String, Decimal>> = BTreeMap::new();
         for quote in &quotes_vec {
             let date = quote.timestamp.date_naive();
             let asset_currency = asset_currency_map
-                .get(&quote.symbol)
+                .get(&quote.asset_id)
                 .cloned()
                 .unwrap_or_else(|| base_currency.clone());
 
@@ -579,7 +579,7 @@ impl NetWorthServiceTrait for NetWorthService {
             quotes_by_date
                 .entry(date)
                 .or_default()
-                .insert(quote.symbol.clone(), value_base);
+                .insert(quote.asset_id.clone(), value_base);
         }
 
         // =====================================================================

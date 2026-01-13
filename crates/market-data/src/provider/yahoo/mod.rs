@@ -17,7 +17,7 @@ use num_traits::FromPrimitive;
 use reqwest::header;
 use rust_decimal::Decimal;
 use time::OffsetDateTime;
-use tracing::{debug, warn};
+use log::{debug, info, warn};
 use urlencoding::encode;
 use yahoo_finance_api as yahoo;
 
@@ -359,7 +359,7 @@ impl YahooProvider {
         let crumb = self.ensure_crumb().await?;
 
         let url = format!(
-            "https://query1.finance.yahoo.com/v10/finance/quoteSummary/{}?modules=price,summaryProfile,summaryDetail&crumb={}",
+            "https://query1.finance.yahoo.com/v10/finance/quoteSummary/{}?modules=price,summaryProfile,summaryDetail,topHoldings&crumb={}",
             encode(symbol),
             encode(&crumb.crumb)
         );
@@ -387,7 +387,28 @@ impl YahooProvider {
             });
         }
 
-        let data: YahooQuoteSummaryResponse = response.json().await.map_err(|e| {
+        // Get response text first for debugging
+        let response_text = response.text().await.map_err(|e| {
+            MarketDataError::ProviderError {
+                provider: "YAHOO".to_string(),
+                message: format!("Failed to read profile response: {}", e),
+            }
+        })?;
+
+        // Log first 500 chars of response for debugging
+        info!(
+            "[YAHOO QUOTE_SUMMARY RAW] symbol={}, response_preview={}",
+            symbol,
+            &response_text[..response_text.len().min(500)]
+        );
+
+        let data: YahooQuoteSummaryResponse = serde_json::from_str(&response_text).map_err(|e| {
+            warn!(
+                "[YAHOO] Failed to parse quoteSummary for {}: {}. Response: {}",
+                symbol,
+                e,
+                &response_text[..response_text.len().min(1000)]
+            );
             MarketDataError::ProviderError {
                 provider: "YAHOO".to_string(),
                 message: format!("Failed to parse profile response: {}", e),
@@ -400,6 +421,15 @@ impl YahooProvider {
             .into_iter()
             .next()
             .ok_or_else(|| MarketDataError::SymbolNotFound(symbol.to_string()))?;
+
+        // Log raw Yahoo response for debugging
+        info!(
+            "[YAHOO PROFILE RAW] symbol={}, price={:?}, summary_profile={:?}, summary_detail={:?}",
+            symbol,
+            result.price,
+            result.summary_profile,
+            result.summary_detail
+        );
 
         self.map_quote_summary_to_profile(symbol, &result)
     }
@@ -444,12 +474,14 @@ impl YahooProvider {
         let price = result.price.as_ref();
         let summary = result.summary_profile.as_ref();
         let detail = result.summary_detail.as_ref();
+        let top_holdings = result.top_holdings.as_ref();
 
-        // Get quote type for name formatting
+        // Get quote type for name formatting and classification
         let quote_type = price
             .and_then(|p| p.quote_type.as_ref())
             .map(|s| s.as_str())
             .unwrap_or("");
+        let quote_type_upper = quote_type.to_uppercase();
 
         // Format name
         let name = format_name(
@@ -459,32 +491,82 @@ impl YahooProvider {
             symbol,
         );
 
-        // Build sector (formatted from snake_case if needed)
-        let sector = summary
-            .and_then(|s| s.sector.as_ref())
-            .map(|s| format_sector(s));
+        // Build sector/sectors based on asset type
+        let (sector, sectors) = match quote_type_upper.as_str() {
+            "ETF" | "MUTUALFUND" => {
+                // For ETFs/Mutual Funds: extract sector weightings from topHoldings
+                let sectors_json = top_holdings.and_then(|th| {
+                    if th.sector_weightings.is_empty() {
+                        return None;
+                    }
+                    let sector_data: Vec<serde_json::Value> = th
+                        .sector_weightings
+                        .iter()
+                        .flat_map(|sw| {
+                            sw.iter().filter_map(|(sector_name, weight)| {
+                                weight.raw.map(|w| {
+                                    serde_json::json!({
+                                        "name": format_sector(sector_name),
+                                        "weight": w
+                                    })
+                                })
+                            })
+                        })
+                        .collect();
+                    if sector_data.is_empty() {
+                        None
+                    } else {
+                        serde_json::to_string(&sector_data).ok()
+                    }
+                });
+                (None, sectors_json)
+            }
+            _ => {
+                // For stocks: use single sector from summaryProfile
+                let sector = summary
+                    .and_then(|s| s.sector.as_ref())
+                    .map(|s| format_sector(s));
+                (sector, None)
+            }
+        };
 
-        Ok(AssetProfile {
+        let profile = AssetProfile {
             source: Some("YAHOO".to_string()),
             name: Some(name),
             quote_type: price
                 .and_then(|p| p.quote_type.clone())
                 .map(|t| t.to_uppercase()),
             sector,
+            sectors,
             industry: summary.and_then(|s| s.industry.clone()),
             website: summary.and_then(|s| s.website.clone()),
             description: summary
                 .and_then(|s| s.long_business_summary.clone().or(s.description.clone())),
             country: summary.and_then(|s| s.country.clone()),
             employees: summary.and_then(|s| s.full_time_employees),
-            // Financial metrics from summaryDetail
-            market_cap: detail.and_then(|d| d.market_cap),
-            pe_ratio: detail.and_then(|d| d.trailing_pe),
-            dividend_yield: detail.and_then(|d| d.dividend_yield),
-            week_52_high: detail.and_then(|d| d.fifty_two_week_high),
-            week_52_low: detail.and_then(|d| d.fifty_two_week_low),
+            // Financial metrics from summaryDetail (extract .raw from YahooPriceDetail)
+            market_cap: detail.and_then(|d| d.market_cap.as_ref().and_then(|v| v.raw)),
+            pe_ratio: detail.and_then(|d| d.trailing_pe.as_ref().and_then(|v| v.raw)),
+            dividend_yield: detail.and_then(|d| d.dividend_yield.as_ref().and_then(|v| v.raw)),
+            week_52_high: detail.and_then(|d| d.fifty_two_week_high.as_ref().and_then(|v| v.raw)),
+            week_52_low: detail.and_then(|d| d.fifty_two_week_low.as_ref().and_then(|v| v.raw)),
             ..Default::default()
-        })
+        };
+
+        // Log mapped profile for debugging
+        info!(
+            "[YAHOO PROFILE MAPPED] symbol={}, name={:?}, quote_type={:?}, sector={:?}, sectors={:?}, industry={:?}, country={:?}, description_len={:?}",
+            symbol,
+            profile.name,
+            profile.quote_type,
+            profile.sector,
+            profile.sectors.as_ref().map(|s| if s.len() > 100 { format!("{}...", &s[..100]) } else { s.clone() }),
+            profile.industry,
+            profile.country,
+            profile.description.as_ref().map(|d| d.len())
+        );
+
+        Ok(profile)
     }
 }
 
@@ -652,13 +734,16 @@ impl MarketDataProvider for YahooProvider {
     }
 
     async fn get_profile(&self, symbol: &str) -> Result<AssetProfile, MarketDataError> {
-        debug!("Fetching profile for {} from Yahoo", symbol);
+        info!("[YAHOO] get_profile called for symbol: {}", symbol);
 
         // Try quoteSummary API first (richest data)
         match self.fetch_quote_summary_profile(symbol).await {
-            Ok(profile) => return Ok(profile),
+            Ok(profile) => {
+                info!("[YAHOO] quoteSummary succeeded for {}", symbol);
+                return Ok(profile);
+            }
             Err(e) => {
-                debug!(
+                warn!(
                     "quoteSummary failed for {}: {}, trying search fallback",
                     symbol, e
                 );
@@ -666,7 +751,13 @@ impl MarketDataProvider for YahooProvider {
         }
 
         // Last resort: search-based profile
-        self.fetch_search_profile(symbol).await
+        info!("[YAHOO] Falling back to search-based profile for {}", symbol);
+        let profile = self.fetch_search_profile(symbol).await?;
+        info!(
+            "[YAHOO PROFILE FROM SEARCH] symbol={}, name={:?}, quote_type={:?}",
+            symbol, profile.name, profile.quote_type
+        );
+        Ok(profile)
     }
 }
 

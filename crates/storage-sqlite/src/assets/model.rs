@@ -1,7 +1,6 @@
 //! Database model for assets.
 //! Provider-agnostic: no data_source or quote_symbol (use provider_overrides instead)
-//! FINAL SCHEMA: No legacy columns (isin, asset_class, asset_sub_class, profile)
-//! Legacy data stored in metadata.legacy JSON
+//! Clean schema: optional identifiers stored in metadata.identifiers JSON (e.g., ISIN)
 
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
@@ -41,9 +40,8 @@ fn text_to_datetime(s: &str) -> NaiveDateTime {
     chrono::Utc::now().naive_utc()
 }
 
-/// Database model for assets - FINAL SCHEMA
-/// No legacy columns (isin, asset_class, asset_sub_class, profile)
-/// Legacy data stored in metadata.legacy JSON
+/// Database model for assets
+/// Optional identifiers (ISIN) stored in metadata.identifiers JSON
 #[derive(
     Queryable,
     Identifiable,
@@ -78,9 +76,9 @@ pub struct AssetDB {
     pub preferred_provider: Option<String>,
     pub provider_overrides: Option<String>, // JSON for per-provider overrides
 
-    // Metadata (includes legacy data in $.legacy)
+    // Metadata
     pub notes: Option<String>,
-    pub metadata: Option<String>,  // JSON: includes $.legacy.{isin, asset_class, asset_sub_class, sectors, countries, website}
+    pub metadata: Option<String>,  // JSON: $.identifiers.isin (optional)
 
     // Status
     pub is_active: i32,
@@ -118,7 +116,7 @@ impl From<AssetDB> for Asset {
             _ => PricingMode::Market,
         };
 
-        // Parse metadata JSON if present (includes legacy data for migration service)
+        // Parse metadata JSON if present (includes identifiers like ISIN)
         let metadata = db
             .metadata
             .as_ref()
@@ -163,7 +161,7 @@ impl From<NewAsset> for AssetDB {
             .as_ref()
             .and_then(|v| serde_json::to_string(v).ok());
 
-        // Serialize metadata to JSON string (may include legacy data for migration)
+        // Serialize metadata to JSON string (includes identifiers like ISIN)
         let metadata = domain
             .metadata
             .as_ref()

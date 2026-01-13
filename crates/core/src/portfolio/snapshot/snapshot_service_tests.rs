@@ -208,12 +208,12 @@ mod tests {
             unimplemented!("update_profile not implemented for MockAssetRepository")
         }
 
-        async fn update_data_source(
+        async fn update_pricing_mode(
             &self,
             _asset_id: &str,
-            _data_source: String,
+            _pricing_mode: &str,
         ) -> AppResult<Asset> {
-            unimplemented!("update_data_source not implemented for MockAssetRepository")
+            unimplemented!("update_pricing_mode not implemented for MockAssetRepository")
         }
 
         async fn delete(&self, _asset_id: &str) -> AppResult<()> {

@@ -3,7 +3,7 @@ import { TickerAvatar } from "@/components/ticker-avatar";
 import TickerSearchInput from "@/components/ticker-search";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Account, QuoteSummary } from "@/lib/types";
-import { DataSource } from "@/lib/constants";
+import { PricingMode } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import {
   Button,
@@ -33,7 +33,7 @@ export interface BulkHoldingRow {
   averageCost: number | string;
   totalValue: number;
   assetId?: string;
-  assetDataSource?: DataSource;
+  pricingMode?: PricingMode;
 }
 
 interface BulkHoldingsFormProps {
@@ -118,10 +118,10 @@ const HoldingRow = memo(
 
     const handleTickerSelect = useCallback(
       (_symbol: string, quoteSummary?: QuoteSummary) => {
-        if (quoteSummary?.dataSource === DataSource.MANUAL) {
-          setValue(`holdings.${index}.assetDataSource`, DataSource.MANUAL, { shouldDirty: true });
+        if (quoteSummary?.dataSource === "MANUAL") {
+          setValue(`holdings.${index}.pricingMode`, PricingMode.MANUAL, { shouldDirty: true });
         } else {
-          setValue(`holdings.${index}.assetDataSource`, DataSource.YAHOO, { shouldDirty: true });
+          setValue(`holdings.${index}.pricingMode`, PricingMode.MARKET, { shouldDirty: true });
         }
         // Capture exchangeMic for canonical asset ID generation
         if (quoteSummary?.exchangeMic) {
@@ -275,7 +275,7 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
       ticker: "",
       name: "",
       assetId: "",
-      assetDataSource: DataSource.YAHOO,
+      pricingMode: PricingMode.MARKET,
       sharesOwned: 0,
       averageCost: 0,
     });

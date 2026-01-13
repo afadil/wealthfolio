@@ -38,16 +38,16 @@ impl SyncCategory {
     }
 }
 
-/// Plan for syncing a specific symbol.
+/// Plan for syncing a specific asset.
 #[derive(Debug, Clone)]
 pub struct SymbolSyncPlan {
-    pub symbol: String,
+    pub asset_id: String,
     pub category: SyncCategory,
     pub start_date: NaiveDate,
     pub end_date: NaiveDate,
     pub priority: i32,
     pub data_source: String,
-    /// Symbol used for quote fetching (may differ from asset symbol).
+    /// Provider-specific symbol for quote fetching (may differ from canonical symbol).
     pub quote_symbol: Option<String>,
     pub currency: String,
 }
@@ -56,7 +56,7 @@ pub struct SymbolSyncPlan {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QuoteSyncState {
-    pub symbol: String,
+    pub asset_id: String,
     pub is_active: bool,
     pub first_activity_date: Option<NaiveDate>,
     pub last_activity_date: Option<NaiveDate>,
@@ -84,11 +84,11 @@ impl QuoteSyncState {
     /// Should match BACKFILL_SAFETY_MARGIN_DAYS from constants.rs.
     const BACKFILL_SAFETY_MARGIN_DAYS: i64 = 7;
 
-    /// Create a new sync state for a symbol.
-    pub fn new(symbol: String, data_source: String) -> Self {
+    /// Create a new sync state for an asset.
+    pub fn new(asset_id: String, data_source: String) -> Self {
         let now = Utc::now();
         QuoteSyncState {
-            symbol,
+            asset_id,
             is_active: true,
             first_activity_date: None,
             last_activity_date: None,
@@ -292,17 +292,17 @@ pub trait SyncStateStore: Send + Sync {
     /// Get all sync states.
     fn get_all(&self) -> Result<Vec<QuoteSyncState>>;
 
-    /// Get sync state by symbol.
-    fn get_by_symbol(&self, symbol: &str) -> Result<Option<QuoteSyncState>>;
+    /// Get sync state by asset ID.
+    fn get_by_asset_id(&self, asset_id: &str) -> Result<Option<QuoteSyncState>>;
 
-    /// Get sync states for multiple symbols.
-    fn get_by_symbols(&self, symbols: &[String]) -> Result<HashMap<String, QuoteSyncState>>;
+    /// Get sync states for multiple asset IDs.
+    fn get_by_asset_ids(&self, asset_ids: &[String]) -> Result<HashMap<String, QuoteSyncState>>;
 
-    /// Get all active symbols (is_active = true).
-    fn get_active_symbols(&self) -> Result<Vec<QuoteSyncState>>;
+    /// Get all active assets (is_active = true).
+    fn get_active_assets(&self) -> Result<Vec<QuoteSyncState>>;
 
-    /// Get symbols that need syncing (active or recently closed).
-    fn get_symbols_needing_sync(&self, grace_period_days: i64) -> Result<Vec<QuoteSyncState>>;
+    /// Get assets that need syncing (active or recently closed).
+    fn get_assets_needing_sync(&self, grace_period_days: i64) -> Result<Vec<QuoteSyncState>>;
 
     /// Upsert a sync state (insert or update).
     async fn upsert(&self, state: &QuoteSyncState) -> Result<QuoteSyncState>;
@@ -313,31 +313,31 @@ pub trait SyncStateStore: Send + Sync {
     /// Update sync state after successful sync.
     async fn update_after_sync(
         &self,
-        symbol: &str,
+        asset_id: &str,
         last_quote_date: NaiveDate,
         earliest_quote_date: Option<NaiveDate>,
         data_source: Option<&str>,
     ) -> Result<()>;
 
     /// Update sync state after sync failure.
-    async fn update_after_failure(&self, symbol: &str, error: &str) -> Result<()>;
+    async fn update_after_failure(&self, asset_id: &str, error: &str) -> Result<()>;
 
-    /// Mark symbol as inactive (position closed).
-    async fn mark_inactive(&self, symbol: &str, closed_date: NaiveDate) -> Result<()>;
+    /// Mark asset as inactive (position closed).
+    async fn mark_inactive(&self, asset_id: &str, closed_date: NaiveDate) -> Result<()>;
 
-    /// Mark symbol as active.
-    async fn mark_active(&self, symbol: &str) -> Result<()>;
+    /// Mark asset as active.
+    async fn mark_active(&self, asset_id: &str) -> Result<()>;
 
-    /// Update activity dates for a symbol.
+    /// Update activity dates for an asset.
     async fn update_activity_dates(
         &self,
-        symbol: &str,
+        asset_id: &str,
         first_date: Option<NaiveDate>,
         last_date: Option<NaiveDate>,
     ) -> Result<()>;
 
-    /// Delete sync state for a symbol.
-    async fn delete(&self, symbol: &str) -> Result<()>;
+    /// Delete sync state for an asset.
+    async fn delete(&self, asset_id: &str) -> Result<()>;
 
     /// Delete all sync states (used for reset).
     async fn delete_all(&self) -> Result<usize>;
@@ -352,7 +352,7 @@ pub trait SyncStateStore: Send + Sync {
     async fn refresh_earliest_quote_dates(&self) -> Result<usize>;
 
     /// Mark asset profile as enriched (sets profile_enriched_at timestamp).
-    async fn mark_profile_enriched(&self, symbol: &str) -> Result<()>;
+    async fn mark_profile_enriched(&self, asset_id: &str) -> Result<()>;
 
     /// Get assets that need profile enrichment (profile_enriched_at is NULL).
     fn get_assets_needing_profile_enrichment(&self) -> Result<Vec<QuoteSyncState>>;

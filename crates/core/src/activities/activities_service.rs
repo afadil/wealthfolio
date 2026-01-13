@@ -185,16 +185,13 @@ impl ActivityService {
                 )
                 .await?;
 
-            if let Some(requested_source) = activity.asset_data_source.as_ref() {
-                let requested = requested_source.to_uppercase();
-                let current_provider = asset
-                    .preferred_provider
-                    .as_ref()
-                    .map(|p| p.to_uppercase())
-                    .unwrap_or_default();
-                if !requested.is_empty() && current_provider != requested {
+            // Update asset pricing mode if specified
+            if let Some(ref mode) = activity.pricing_mode {
+                let requested_mode = mode.to_uppercase();
+                let current_mode = asset.pricing_mode.as_db_str();
+                if requested_mode != current_mode {
                     self.asset_service
-                        .update_asset_data_source(&asset.id, requested)
+                        .update_pricing_mode(&asset.id, &requested_mode)
                         .await?;
                 }
             }
@@ -268,16 +265,13 @@ impl ActivityService {
                 .get_or_create_minimal_asset(asset_id, Some(currency.clone()), None)
                 .await?;
 
-            if let Some(requested_source) = activity.asset_data_source.as_ref() {
-                let requested = requested_source.to_uppercase();
-                let current_provider = asset
-                    .preferred_provider
-                    .as_ref()
-                    .map(|p| p.to_uppercase())
-                    .unwrap_or_default();
-                if !requested.is_empty() && current_provider != requested {
+            // Update asset pricing mode if specified
+            if let Some(ref mode) = activity.pricing_mode {
+                let requested_mode = mode.to_uppercase();
+                let current_mode = asset.pricing_mode.as_db_str();
+                if requested_mode != current_mode {
                     self.asset_service
-                        .update_asset_data_source(&asset.id, requested)
+                        .update_pricing_mode(&asset.id, &requested_mode)
                         .await?;
                 }
             }
@@ -607,7 +601,7 @@ impl ActivityServiceTrait for ActivityService {
                     symbol: Some(activity.symbol.clone()),
                     exchange_mic: None, // CSV imports don't typically include exchange info
                     asset_kind: None,   // Already used for canonical ID generation
-                    asset_data_source: None,
+                    pricing_mode: None, // CSV imports default to MARKET pricing
                     asset_metadata: None, // CSV imports don't carry asset metadata
                     activity_type: activity.activity_type.clone(),
                     subtype: None,

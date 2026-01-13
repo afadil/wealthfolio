@@ -343,7 +343,7 @@ impl MarketDataClient {
             created_at: Utc::now(),
             data_source,
             timestamp: market_quote.timestamp,
-            symbol: asset_id.to_string(),
+            asset_id: asset_id.to_string(),
             open: market_quote.open.unwrap_or(market_quote.close),
             high: market_quote.high.unwrap_or(market_quote.close),
             low: market_quote.low.unwrap_or(market_quote.close),
@@ -449,25 +449,30 @@ impl MarketDataClient {
         Ok(summaries)
     }
 
-    /// Get asset profile for a symbol.
+    /// Get asset profile for an asset.
+    ///
+    /// Uses the same resolver as quote fetching to build provider-specific symbols
+    /// (e.g., "VFV.TO" for Yahoo when the asset's exchange_mic is XTSE).
     ///
     /// # Arguments
     ///
-    /// * `symbol` - The symbol to get profile for
+    /// * `asset` - The asset to get profile for
     ///
     /// # Returns
     ///
     /// Asset profile from providers that support profiles.
-    pub async fn get_profile(&self, symbol: &str) -> Result<ProviderProfile> {
-        debug!("Fetching profile for '{}'", symbol);
+    pub async fn get_profile(&self, asset: &Asset) -> Result<ProviderProfile> {
+        debug!("Fetching profile for asset '{}'", asset.id);
+
+        let context = self.build_quote_context(asset)?;
 
         let profile = self
             .registry
-            .get_profile(symbol)
+            .get_profile(&context)
             .await
             .map_err(MarketDataClientError::from)?;
 
-        Ok(Self::convert_profile(profile, symbol))
+        Ok(Self::convert_profile(profile, &asset.symbol))
     }
 
     /// Convert a market-data SearchResult to core QuoteSummary.
@@ -569,6 +574,13 @@ impl MarketDataClient {
 
     /// Convert a market-data AssetProfile to core ProviderProfile.
     fn convert_profile(profile: MarketAssetProfile, symbol: &str) -> ProviderProfile {
+        // Prefer sectors (JSON array with weights for ETFs) over single sector
+        let sectors = profile.sectors.or_else(|| {
+            profile
+                .sector
+                .map(|s| format!("[{{\"name\":\"{}\",\"weight\":1}}]", s))
+        });
+
         ProviderProfile {
             id: Some(symbol.to_string()),
             isin: None,
@@ -583,13 +595,18 @@ impl MarketDataClient {
             countries: profile
                 .country
                 .map(|c| format!("[{{\"name\":\"{}\",\"weight\":1}}]", c)),
-            sectors: profile
-                .sector
-                .map(|s| format!("[{{\"name\":\"{}\",\"weight\":1}}]", s)),
+            sectors,
+            industry: profile.industry,
             categories: None,
             classes: None,
             attributes: None,
             url: profile.website,
+            // Financial metrics
+            market_cap: profile.market_cap,
+            pe_ratio: profile.pe_ratio,
+            dividend_yield: profile.dividend_yield,
+            week_52_high: profile.week_52_high,
+            week_52_low: profile.week_52_low,
         }
     }
 }
@@ -621,7 +638,7 @@ mod tests {
 
         let core_quote = MarketDataClient::convert_quote(market_quote, "AAPL");
 
-        assert_eq!(core_quote.symbol, "AAPL");
+        assert_eq!(core_quote.asset_id, "AAPL");
         assert_eq!(core_quote.id, "AAPL_2024-01-15_YAHOO");
         assert_eq!(core_quote.open, dec!(100));
         assert_eq!(core_quote.high, dec!(105));
@@ -645,7 +662,7 @@ mod tests {
 
         let core_quote = MarketDataClient::convert_quote(market_quote, "SHOP.TO");
 
-        assert_eq!(core_quote.symbol, "SHOP.TO");
+        assert_eq!(core_quote.asset_id, "SHOP.TO");
         assert_eq!(core_quote.id, "SHOP.TO_2024-06-20_ALPHA_VANTAGE");
         // OHLC should all be close when not provided
         assert_eq!(core_quote.open, dec!(150.50));
@@ -701,12 +718,12 @@ mod tests {
 
         // Test FX pair format
         let core_quote = MarketDataClient::convert_quote(market_quote.clone(), "EUR/USD");
-        assert_eq!(core_quote.symbol, "EUR/USD");
+        assert_eq!(core_quote.asset_id, "EUR/USD");
         assert_eq!(core_quote.id, "EUR/USD_2024-01-01_YAHOO");
 
         // Test crypto format
         let core_quote = MarketDataClient::convert_quote(market_quote, "BTC-USD");
-        assert_eq!(core_quote.symbol, "BTC-USD");
+        assert_eq!(core_quote.asset_id, "BTC-USD");
         assert_eq!(core_quote.id, "BTC-USD_2024-01-01_YAHOO");
     }
 

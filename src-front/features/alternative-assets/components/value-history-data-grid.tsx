@@ -63,7 +63,7 @@ const toQuote = (entry: ValueHistoryEntry, symbol: string): Quote => {
     createdAt: new Date().toISOString(),
     dataSource: "MANUAL",
     timestamp: entry.date.toISOString(),
-    symbol: symbol,
+    assetId: symbol,
     open: entry.value,
     high: entry.value,
     low: entry.value,
@@ -112,8 +112,8 @@ export function ValueHistoryDataGrid({
   // Track if there are unsaved changes
   const hasUnsavedChanges = dirtyIds.size > 0 || deletedIds.size > 0;
 
-  // Get symbol from first quote or use empty string
-  const symbol = data[0]?.symbol ?? "";
+  // Get assetId from first quote or use empty string
+  const symbol = data[0]?.assetId ?? "";
 
   // Column definitions
   const columnHelper = createColumnHelper<ValueHistoryEntry>();

@@ -478,6 +478,7 @@ impl FinnhubProvider {
             name: response.name,
             quote_type: Some("EQUITY".to_string()), // Finnhub only supports equities
             sector: response.finnhub_industry.clone(),
+            sectors: None, // Finnhub doesn't provide weighted sectors
             industry: response.finnhub_industry,
             website: response.weburl,
             description: response.description,

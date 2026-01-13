@@ -231,13 +231,18 @@ where
 
     /// Check if an asset should be synced.
     fn should_sync_asset(&self, asset: &Asset) -> bool {
-        // Skip cash and FX assets - they don't need quote syncing
-        if asset.kind == AssetKind::Cash || asset.kind == AssetKind::FxRate {
+        // Skip cash assets - they don't need quote syncing (always 1:1)
+        if asset.kind == AssetKind::Cash {
             return false;
         }
 
-        // Only sync market-priced assets
+        // Only sync market-priced assets (including FX rates for currency conversion)
         if asset.pricing_mode != PricingMode::Market {
+            return false;
+        }
+
+        // Only sync active assets
+        if !asset.is_active {
             return false;
         }
 
@@ -247,7 +252,7 @@ where
     /// Build sync plan for a single asset.
     fn build_asset_sync_plan(&self, asset: &Asset, today: NaiveDate) -> Option<SymbolSyncPlan> {
         // Get existing sync state
-        let state = self.sync_state_store.get_by_symbol(&asset.id).ok().flatten();
+        let state = self.sync_state_store.get_by_asset_id(&asset.id).ok().flatten();
 
         let category = state
             .as_ref()
@@ -267,7 +272,7 @@ where
         }
 
         Some(SymbolSyncPlan {
-            symbol: asset.id.clone(),
+            asset_id: asset.id.clone(),
             category,
             start_date,
             end_date,
@@ -448,14 +453,14 @@ where
         info!("Executing sync for {} assets", plans.len());
 
         // Get all assets for the plans
-        let symbols: Vec<String> = plans.iter().map(|p| p.symbol.clone()).collect();
-        let assets = match self.asset_repo.list_by_symbols(&symbols) {
+        let asset_ids: Vec<String> = plans.iter().map(|p| p.asset_id.clone()).collect();
+        let assets = match self.asset_repo.list_by_symbols(&asset_ids) {
             Ok(a) => a,
             Err(e) => {
                 error!("Failed to get assets for sync: {:?}", e);
                 let mut result = SyncResult::default();
                 for plan in &plans {
-                    result.failures.push((plan.symbol.clone(), e.to_string()));
+                    result.failures.push((plan.asset_id.clone(), e.to_string()));
                     result.failed += 1;
                 }
                 return result;
@@ -468,13 +473,13 @@ where
         let mut result = SyncResult::default();
 
         for plan in &plans {
-            if let Some(asset) = asset_map.get(&plan.symbol) {
+            if let Some(asset) = asset_map.get(&plan.asset_id) {
                 let asset_result = self.sync_asset(asset, plan).await;
                 result.add_result(asset_result);
             } else {
-                warn!("Asset not found for symbol: {}", plan.symbol);
+                warn!("Asset not found for asset_id: {}", plan.asset_id);
                 result.add_result(AssetSyncResult {
-                    asset_id: AssetId::new(&plan.symbol),
+                    asset_id: AssetId::new(&plan.asset_id),
                     quotes_added: 0,
                     status: SyncStatus::Failed,
                     error: Some("Asset not found".to_string()),
@@ -494,7 +499,7 @@ where
     fn generate_sync_plan(&self) -> Result<Vec<SymbolSyncPlan>> {
         let states = self
             .sync_state_store
-            .get_symbols_needing_sync(CLOSED_POSITION_GRACE_PERIOD_DAYS)?;
+            .get_assets_needing_sync(CLOSED_POSITION_GRACE_PERIOD_DAYS)?;
 
         let today = Utc::now().date_naive();
 
@@ -522,7 +527,7 @@ where
             }
 
             plans.push(SymbolSyncPlan {
-                symbol: state.symbol.clone(),
+                asset_id: state.asset_id.clone(),
                 category,
                 start_date,
                 end_date,
@@ -551,7 +556,7 @@ where
             .collect();
 
         for asset in syncable_assets {
-            let existing = self.sync_state_store.get_by_symbol(&asset.id)?;
+            let existing = self.sync_state_store.get_by_asset_id(&asset.id)?;
 
             if existing.is_none() {
                 // Create new sync state
@@ -636,7 +641,7 @@ where
             .map(|asset| {
                 let start_date = self
                     .sync_state_store
-                    .get_by_symbol(&asset.id)
+                    .get_by_asset_id(&asset.id)
                     .ok()
                     .flatten()
                     .and_then(|s| s.first_activity_date)
@@ -644,7 +649,7 @@ where
                     .unwrap_or_else(|| today - Duration::days(DEFAULT_HISTORY_DAYS));
 
                 SymbolSyncPlan {
-                    symbol: asset.id.clone(),
+                    asset_id: asset.id.clone(),
                     category: SyncCategory::Active,
                     start_date,
                     end_date: today,
@@ -675,7 +680,7 @@ where
             symbol, activity_date.0
         );
 
-        let existing = self.sync_state_store.get_by_symbol(symbol)?;
+        let existing = self.sync_state_store.get_by_asset_id(symbol)?;
 
         if let Some(mut state) = existing {
             // Check if we need backfill

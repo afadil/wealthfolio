@@ -17,7 +17,7 @@ pub struct ExchangeRate {
 
 impl ExchangeRate {
     pub fn from_quote(quote: &Quote) -> Self {
-        let (from_currency, to_currency) = Self::parse_fx_symbol(&quote.symbol);
+        let (from_currency, to_currency) = Self::parse_fx_symbol(&quote.asset_id);
 
         ExchangeRate {
             id: Self::make_fx_symbol(&from_currency, &to_currency),
@@ -31,10 +31,10 @@ impl ExchangeRate {
 
     pub fn to_quote(&self) -> Quote {
         let formatted_date = self.timestamp.format("%Y%m%d").to_string();
-        let symbol = Self::make_fx_symbol(&self.from_currency, &self.to_currency);
+        let asset_id = Self::make_fx_symbol(&self.from_currency, &self.to_currency);
         Quote {
-            id: format!("{}_{}", formatted_date, symbol),
-            symbol,
+            id: format!("{}_{}", formatted_date, asset_id),
+            asset_id,
             timestamp: self.timestamp,
             open: self.rate,
             high: self.rate,
@@ -105,10 +105,10 @@ impl NewExchangeRate {
     pub fn to_quote(&self) -> Quote {
         let now = Utc::now();
         let formatted_date = now.format("%Y%m%d").to_string();
-        let symbol = ExchangeRate::make_fx_symbol(&self.from_currency, &self.to_currency);
+        let asset_id = ExchangeRate::make_fx_symbol(&self.from_currency, &self.to_currency);
         Quote {
-            id: format!("{}_{}", formatted_date, symbol),
-            symbol,
+            id: format!("{}_{}", formatted_date, asset_id),
+            asset_id,
             timestamp: now,
             open: self.rate,
             high: self.rate,

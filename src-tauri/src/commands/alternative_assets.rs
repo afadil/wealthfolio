@@ -289,7 +289,7 @@ pub async fn create_alternative_asset(
 
     let quote = Quote {
         id: quote_id.clone(),
-        symbol: asset_id.clone(),
+        asset_id: asset_id.clone(),
         timestamp: quote_timestamp,
         open: current_value,
         high: current_value,
@@ -372,7 +372,7 @@ pub async fn update_alternative_asset_valuation(
 
     let quote = Quote {
         id: quote_id.clone(),
-        symbol: asset_id.clone(),
+        asset_id: asset_id.clone(),
         timestamp: quote_timestamp,
         open: value,
         high: value,

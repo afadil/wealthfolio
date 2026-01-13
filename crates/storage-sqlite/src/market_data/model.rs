@@ -177,8 +177,7 @@ impl From<QuoteDB> for Quote {
 
         Quote {
             id: db.id,
-            // Use asset_id for the symbol field (backward compatibility)
-            symbol: db.asset_id,
+            asset_id: db.asset_id,
             timestamp: parse_datetime(&db.timestamp),
             open: parse_optional_decimal(&db.open),
             high: parse_optional_decimal(&db.high),
@@ -210,7 +209,7 @@ impl From<&Quote> for QuoteDB {
 
         QuoteDB {
             id: quote.id.clone(),
-            asset_id: quote.symbol.clone(),
+            asset_id: quote.asset_id.clone(),
             day,
             source: quote.data_source.as_str().to_string(),
             open: decimal_to_optional(&quote.open),
@@ -275,8 +274,8 @@ impl From<QuoteSyncStateDB> for QuoteSyncState {
             |s: &str| -> Option<NaiveDate> { NaiveDate::parse_from_str(s, "%Y-%m-%d").ok() };
 
         QuoteSyncState {
-            // Use asset_id for the symbol field (schema has Nullable but shouldn't be null in practice)
-            symbol: db.asset_id.unwrap_or_default(),
+            // asset_id from DB (schema has Nullable but shouldn't be null in practice)
+            asset_id: db.asset_id.unwrap_or_default(),
             is_active: db.is_active != 0,
             first_activity_date: db.first_activity_date.as_deref().and_then(parse_date),
             last_activity_date: db.last_activity_date.as_deref().and_then(parse_date),
@@ -298,8 +297,8 @@ impl From<QuoteSyncStateDB> for QuoteSyncState {
 impl From<&QuoteSyncState> for QuoteSyncStateDB {
     fn from(state: &QuoteSyncState) -> Self {
         QuoteSyncStateDB {
-            // Map symbol to asset_id (schema has Nullable but we always have a value)
-            asset_id: Some(state.symbol.clone()),
+            // Map asset_id (schema has Nullable but we always have a value)
+            asset_id: Some(state.asset_id.clone()),
             is_active: if state.is_active { 1 } else { 0 },
             first_activity_date: state
                 .first_activity_date

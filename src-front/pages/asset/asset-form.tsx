@@ -15,7 +15,7 @@ import {
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
-import { DataSource } from "@/lib/constants";
+import { PricingMode } from "@/lib/constants";
 import { UpdateAssetProfile } from "@/lib/types";
 import { ResponsiveSelect, type ResponsiveSelectOption } from "@wealthfolio/ui";
 import { SingleSelectTaxonomy } from "@/components/classification/single-select-taxonomy";
@@ -28,15 +28,15 @@ const assetFormSchema = z.object({
   symbol: z.string().min(1),
   name: z.string().optional(),
   currency: z.string().min(1),
-  preferredProvider: z.enum([DataSource.YAHOO, DataSource.MANUAL]),
+  pricingMode: z.enum([PricingMode.MARKET, PricingMode.MANUAL]),
   notes: z.string().optional(),
 });
 
 export type AssetFormValues = z.infer<typeof assetFormSchema>;
 
-const providerOptions: ResponsiveSelectOption[] = [
-  { label: "Yahoo Finance", value: DataSource.YAHOO },
-  { label: "Manual", value: DataSource.MANUAL },
+const pricingModeOptions: ResponsiveSelectOption[] = [
+  { label: "Market Data", value: PricingMode.MARKET },
+  { label: "Manual", value: PricingMode.MANUAL },
 ];
 
 interface AssetFormProps {
@@ -62,7 +62,7 @@ export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProp
     symbol: asset.id,
     name: asset.name ?? "",
     currency: asset.currency,
-    preferredProvider: (asset.preferredProvider as DataSource) ?? DataSource.YAHOO,
+    pricingMode: asset.pricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET,
     notes: asset.notes ?? "",
   };
 
@@ -124,18 +124,18 @@ export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProp
           />
           <FormField
             control={form.control}
-            name="preferredProvider"
+            name="pricingMode"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Data provider</FormLabel>
+                <FormLabel>Pricing Mode</FormLabel>
                 <FormControl>
                   <ResponsiveSelect
                     value={field.value}
                     onValueChange={field.onChange}
-                    options={providerOptions}
-                    placeholder="Select a provider"
-                    sheetTitle="Pick a data provider"
-                    sheetDescription="Choose how prices are loaded for this asset."
+                    options={pricingModeOptions}
+                    placeholder="Select pricing mode"
+                    sheetTitle="Pricing Mode"
+                    sheetDescription="Choose how prices are managed for this asset."
                   />
                 </FormControl>
                 <FormMessage />

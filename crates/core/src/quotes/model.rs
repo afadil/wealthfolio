@@ -93,8 +93,8 @@ impl From<&str> for DataSource {
 ///
 /// # Fields
 ///
-/// * `id` - Unique identifier for the quote (typically `{symbol}_{date}`)
-/// * `symbol` - The ticker symbol (e.g., "AAPL", "BTC-USD")
+/// * `id` - Unique identifier for the quote (typically `{asset_id}_{date}_{source}`)
+/// * `asset_id` - Canonical asset identifier (e.g., "SEC:AAPL:XNAS", "CRYPTO:BTC:USD")
 /// * `timestamp` - The date/time this quote represents
 /// * `open`, `high`, `low`, `close` - Standard OHLC price data
 /// * `adjclose` - Split and dividend adjusted closing price
@@ -107,7 +107,7 @@ impl From<&str> for DataSource {
 #[serde(rename_all = "camelCase")]
 pub struct Quote {
     pub id: String,
-    pub symbol: String,
+    pub asset_id: String,
     pub timestamp: DateTime<Utc>,
     pub open: Decimal,
     pub high: Decimal,

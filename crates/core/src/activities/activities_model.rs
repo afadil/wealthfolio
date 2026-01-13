@@ -190,7 +190,7 @@ pub struct NewActivity {
     pub exchange_mic: Option<String>, // Exchange MIC code (e.g., "XNAS", "XTSE") for securities
     pub asset_kind: Option<String>, // Asset kind hint (e.g., "SECURITY", "CRYPTO") - if not provided, inferred
 
-    pub asset_data_source: Option<String>,
+    pub pricing_mode: Option<String>, // "MARKET" or "MANUAL" - controls how asset is priced
     pub asset_metadata: Option<AssetMetadata>, // Optional asset hints for inline creation
     pub activity_type: String,
     pub subtype: Option<String>, // Semantic variation (DRIP, STAKING_REWARD, etc.)
@@ -253,7 +253,7 @@ pub struct ActivityUpdate {
     pub exchange_mic: Option<String>, // Exchange MIC code (e.g., "XNAS", "XTSE") for securities
     pub asset_kind: Option<String>, // Asset kind hint (e.g., "SECURITY", "CRYPTO") - if not provided, inferred
 
-    pub asset_data_source: Option<String>,
+    pub pricing_mode: Option<String>, // "MARKET" or "MANUAL" - controls how asset is priced
     pub activity_type: String,
     pub subtype: Option<String>, // Semantic variation (DRIP, STAKING_REWARD, etc.)
     pub activity_date: String,
@@ -360,7 +360,7 @@ pub struct ActivityDetails {
     pub account_currency: String,
     pub asset_symbol: String,
     pub asset_name: Option<String>,
-    pub asset_data_source: String,
+    pub asset_pricing_mode: String, // MARKET, MANUAL, DERIVED, NONE
     // Sync/source metadata
     pub source_system: Option<String>,
     pub source_record_id: Option<String>,

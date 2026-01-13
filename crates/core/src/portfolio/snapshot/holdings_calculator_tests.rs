@@ -71,7 +71,7 @@ mod tests {
             unimplemented!("Not needed for tests")
         }
 
-        async fn update_data_source(&self, _asset_id: &str, _data_source: String) -> Result<Asset> {
+        async fn update_pricing_mode(&self, _asset_id: &str, _pricing_mode: &str) -> Result<Asset> {
             unimplemented!("Not needed for tests")
         }
 

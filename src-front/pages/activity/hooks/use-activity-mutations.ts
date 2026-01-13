@@ -7,7 +7,7 @@ import {
 } from "@/commands/activity";
 import { updateQuote } from "@/commands/market-data";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
-import { DataSource } from "@/lib/constants";
+import { DataSource, PricingMode } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import {
   ActivityBulkMutationRequest,
@@ -29,8 +29,8 @@ export function useActivityMutations(
     // Get symbol from either symbol (creates) or assetId (updates)
     const symbolOrAssetId = ("symbol" in data && data.symbol) || ("assetId" in data && data.assetId);
     if (
-      "assetDataSource" in data &&
-      data.assetDataSource === DataSource.MANUAL &&
+      "pricingMode" in data &&
+      data.pricingMode === PricingMode.MANUAL &&
       symbolOrAssetId &&
       "unitPrice" in data &&
       data.unitPrice &&
@@ -38,7 +38,7 @@ export function useActivityMutations(
       data.quantity
     ) {
       const quote: Omit<Quote, "id" | "createdAt"> & { id?: string; createdAt?: string } = {
-        symbol: symbolOrAssetId,
+        assetId: symbolOrAssetId,
         timestamp: new Date(data.activityDate).toISOString(),
         open: data.unitPrice,
         high: data.unitPrice,
@@ -53,13 +53,13 @@ export function useActivityMutations(
       const datePart = new Date(quote.timestamp).toISOString().slice(0, 10).replace(/-/g, "");
       const fullQuote: Quote = {
         ...quote,
-        id: `${datePart}_${quote.symbol.toUpperCase()}`,
+        id: `${datePart}_${quote.assetId.toUpperCase()}`,
         createdAt: new Date().toISOString(),
       };
 
       try {
-        await updateQuote(fullQuote.symbol, fullQuote);
-        queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSET_DATA, fullQuote.symbol] });
+        await updateQuote(fullQuote.assetId, fullQuote);
+        queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSET_DATA, fullQuote.assetId] });
         toast({
           title: "Quote added successfully.",
           variant: "success",
