@@ -24,7 +24,7 @@ import {
 } from "@wealthfolio/ui";
 import { useState } from "react";
 import { useFormContext } from "react-hook-form";
-import type { AccountSelectOption } from "../activity-form";
+import type { AccountSelectOption } from "../forms/fields";
 import type { NewActivityFormValues } from "../forms/schemas";
 
 interface MobileDetailsStepProps {

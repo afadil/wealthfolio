@@ -1,5 +1,5 @@
 import { useFormContext } from "react-hook-form";
-import type { AccountSelectOption } from "../activity-form";
+import type { AccountSelectOption } from "../forms/fields";
 import type { NewActivityFormValues } from "../forms/schemas";
 import { MobileActivityTypeStep } from "./mobile-activity-type-step";
 import { MobileDetailsStep } from "./mobile-details-step";
