@@ -1,48 +1,129 @@
 import { logger } from "@/adapters";
 import { getAccounts } from "@/commands/account";
-import { Button } from "@wealthfolio/ui/components/ui/button";
-import { Form } from "@wealthfolio/ui/components/ui/form";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { ActivityType, PricingMode } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { Account, ActivityDetails } from "@/lib/types";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, Icons, Page, PageContent, PageHeader } from "@wealthfolio/ui";
-import { useMemo, useState } from "react";
-import { useForm, type Resolver, type SubmitHandler } from "react-hook-form";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+  Button,
+  Card,
+  CardContent,
+  Icons,
+  Page,
+  PageContent,
+  PageHeader,
+} from "@wealthfolio/ui";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import type { AccountSelectOption } from "./components/activity-form";
-import { CashForm } from "./components/forms/cash-form";
-import { HoldingsForm } from "./components/forms/holdings-form";
-import { IncomeForm } from "./components/forms/income-form";
-import { OtherForm } from "./components/forms/other-form";
-import { newActivitySchema, type NewActivityFormValues } from "./components/forms/schemas";
-import { TradeForm } from "./components/forms/trade-form";
+import type { AccountSelectOption } from "./components/forms/fields";
+import { ActivityTypePicker, type ActivityType as PickerActivityType } from "./components/activity-type-picker";
+import { BuyForm, type BuyFormValues } from "./components/forms/buy-form";
+import { SellForm, type SellFormValues } from "./components/forms/sell-form";
+import { DepositForm, type DepositFormValues } from "./components/forms/deposit-form";
+import { WithdrawalForm, type WithdrawalFormValues } from "./components/forms/withdrawal-form";
+import { DividendForm, type DividendFormValues } from "./components/forms/dividend-form";
+import { TransferForm, type TransferFormValues } from "./components/forms/transfer-form";
+import { SplitForm, type SplitFormValues } from "./components/forms/split-form";
+import { FeeForm, type FeeFormValues } from "./components/forms/fee-form";
+import { InterestForm, type InterestFormValues } from "./components/forms/interest-form";
+import { TaxForm, type TaxFormValues } from "./components/forms/tax-form";
+import type { NewActivityFormValues } from "./components/forms/schemas";
 import { MobileActivityForm } from "./components/mobile-forms/mobile-activity-form";
 import { useActivityMutations } from "./hooks/use-activity-mutations";
 
-const ACTIVITY_TYPE_TO_TAB: Record<string, string> = {
-  BUY: "trade",
-  SELL: "trade",
-  DEPOSIT: "cash",
-  WITHDRAWAL: "cash",
-  INTEREST: "income",
-  DIVIDEND: "income",
-  SPLIT: "other",
-  TRANSFER_IN: "cash",
-  TRANSFER_OUT: "cash",
-  FEE: "other",
-  TAX: "other",
-  ADJUSTMENT: "other",
-};
+/**
+ * Maps an activity type from URL param to the picker activity type.
+ */
+function mapActivityTypeToPicker(activityType?: string | null): PickerActivityType | undefined {
+  if (!activityType) return undefined;
+  if (activityType === "TRANSFER_IN" || activityType === "TRANSFER_OUT") {
+    return "TRANSFER";
+  }
+  return activityType as PickerActivityType;
+}
+
+/**
+ * Creates default values for each form type based on activity data.
+ */
+function getDefaultValuesForActivity(
+  activity: Partial<ActivityDetails> | undefined,
+  accounts: AccountSelectOption[],
+) {
+  const baseDefaults = {
+    accountId: activity?.accountId ?? (accounts.length === 1 ? accounts[0].value : ""),
+    activityDate: activity?.date ? new Date(activity.date) : new Date(),
+    comment: activity?.comment ?? null,
+  };
+
+  return {
+    buy: {
+      ...baseDefaults,
+      assetId: activity?.assetSymbol ?? activity?.assetId ?? "",
+      quantity: activity?.quantity,
+      unitPrice: activity?.unitPrice,
+      amount: activity?.amount,
+      fee: activity?.fee ?? 0,
+      pricingMode: activity?.assetPricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET,
+    } as Partial<BuyFormValues>,
+    sell: {
+      ...baseDefaults,
+      assetId: activity?.assetSymbol ?? activity?.assetId ?? "",
+      quantity: activity?.quantity,
+      unitPrice: activity?.unitPrice,
+      amount: activity?.amount,
+      fee: activity?.fee ?? 0,
+      pricingMode: activity?.assetPricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET,
+    } as Partial<SellFormValues>,
+    deposit: {
+      ...baseDefaults,
+      amount: activity?.amount,
+    } as Partial<DepositFormValues>,
+    withdrawal: {
+      ...baseDefaults,
+      amount: activity?.amount,
+    } as Partial<WithdrawalFormValues>,
+    dividend: {
+      ...baseDefaults,
+      symbol: activity?.assetSymbol ?? activity?.assetId ?? "",
+      amount: activity?.amount,
+    } as Partial<DividendFormValues>,
+    transfer: {
+      fromAccountId: activity?.accountId ?? "",
+      toAccountId: "",
+      activityDate: activity?.date ? new Date(activity.date) : new Date(),
+      amount: activity?.amount,
+      assetId: activity?.assetSymbol ?? activity?.assetId ?? null,
+      quantity: activity?.quantity ?? null,
+      comment: activity?.comment ?? null,
+    } as Partial<TransferFormValues>,
+    split: {
+      ...baseDefaults,
+      symbol: activity?.assetSymbol ?? activity?.assetId ?? "",
+      splitRatio: activity?.quantity,
+    } as Partial<SplitFormValues>,
+    fee: {
+      ...baseDefaults,
+      amount: activity?.amount,
+    } as Partial<FeeFormValues>,
+    interest: {
+      ...baseDefaults,
+      amount: activity?.amount,
+    } as Partial<InterestFormValues>,
+    tax: {
+      ...baseDefaults,
+      amount: activity?.amount,
+    } as Partial<TaxFormValues>,
+  };
+}
 
 const ActivityManagerPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isMobileViewport = useIsMobileViewport();
-  const [isTransferMode, setIsTransferMode] = useState(false);
 
   // Parse URL parameters
   const typeParam = searchParams.get("type") as ActivityType | null;
@@ -68,13 +149,13 @@ const ActivityManagerPage = () => {
     [accountsData],
   );
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     if (redirectTo) {
       navigate(redirectTo);
       return;
     }
     navigate(-1);
-  };
+  }, [navigate, redirectTo]);
 
   const { addActivityMutation, updateActivityMutation } = useActivityMutations(handleClose);
 
@@ -100,94 +181,328 @@ const ActivityManagerPage = () => {
     }
 
     if (symbolParam) {
-      // Set the symbol as assetId - the form will handle the lookup
       activity.assetId = symbolParam;
     }
 
     return activity;
   }, [typeParam, accountParam, symbolParam]);
 
-  const isValidActivityType = (
-    type: string | undefined,
-  ): type is NewActivityFormValues["activityType"] => {
-    return type ? Object.keys(ACTIVITY_TYPE_TO_TAB).includes(type) : false;
-  };
+  const [selectedType, setSelectedType] = useState<PickerActivityType | undefined>(
+    mapActivityTypeToPicker(typeParam),
+  );
 
-  const defaultValues: Partial<NewActivityFormValues> = {
-    id: initialActivity?.id,
-    accountId: initialActivity?.accountId ?? "",
-    activityType: isValidActivityType(initialActivity?.activityType)
-      ? initialActivity.activityType
-      : undefined,
-    amount: initialActivity?.amount,
-    quantity: initialActivity?.quantity,
-    unitPrice: initialActivity?.unitPrice,
-    fee: initialActivity?.fee ?? 0,
-    comment: initialActivity?.comment ?? null,
-    assetId: initialActivity?.assetId,
-    activityDate: initialActivity?.date
-      ? new Date(initialActivity.date)
-      : (() => {
-          const date = new Date();
-          date.setHours(16, 0, 0, 0);
-          return date;
-        })(),
-    currency: initialActivity?.currency ?? "",
-    pricingMode: initialActivity?.assetPricingMode === "MANUAL" ? "MANUAL" : "MARKET",
-    showCurrencySelect: false,
-  };
+  // Update selected type when URL param changes
+  useEffect(() => {
+    setSelectedType(mapActivityTypeToPicker(typeParam));
+  }, [typeParam]);
 
-  const form = useForm<NewActivityFormValues>({
-    resolver: zodResolver(newActivitySchema) as Resolver<NewActivityFormValues>,
-    defaultValues,
-  });
-
+  const isEditing = !!initialActivity?.id;
   const isLoading = addActivityMutation.isPending || updateActivityMutation.isPending;
 
-  const onSubmit: SubmitHandler<NewActivityFormValues> = async (data) => {
-    try {
-      const { showCurrencySelect: _showCurrencySelect, id, ...submitData } = data;
-      const account = accountOptions.find((a) => a.value === submitData.accountId);
+  const defaultValues = getDefaultValuesForActivity(initialActivity, accountOptions);
 
-      // For cash activities (DEPOSIT, WITHDRAWAL, INTEREST, FEE, TAX, TRANSFER_IN, TRANSFER_OUT):
-      // Don't send assetId - backend will generate CASH:{currency} from account currency
-      // Just ensure currency is set for the backend to use
-      if (
-        ["DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE", "TAX", "TRANSFER_IN", "TRANSFER_OUT"].includes(
-          submitData.activityType,
-        )
-      ) {
-        // Clear assetId - let backend generate it
-        if ("assetId" in submitData) {
-          delete (submitData as Record<string, unknown>).assetId;
+  /**
+   * Generic submit handler that maps form data to NewActivityFormValues.
+   */
+  const handleFormSubmit = useCallback(
+    async <T extends Record<string, unknown>>(
+      formData: T,
+      activityType: string,
+      transformFn?: (data: T) => Partial<NewActivityFormValues>,
+    ) => {
+      try {
+        const basePayload = transformFn ? transformFn(formData) : formData;
+
+        // Get account currency for pure cash activities
+        const account = accountOptions.find((a) => a.value === formData.accountId);
+
+        // Determine if this is a pure cash activity (no asset involved)
+        const isPureCashActivity = ["DEPOSIT", "WITHDRAWAL", "FEE", "INTEREST", "TAX"].includes(
+          activityType,
+        );
+
+        const submitData: NewActivityFormValues = {
+          ...basePayload,
+          activityType: activityType as NewActivityFormValues["activityType"],
+          ...(isPureCashActivity && account ? { currency: account.currency } : {}),
+        } as NewActivityFormValues;
+
+        if (isEditing && initialActivity?.id) {
+          return await updateActivityMutation.mutateAsync({
+            id: initialActivity.id,
+            ...submitData,
+          });
         }
-        // Ensure currency is set for backend to derive cash asset
-        if (account && !submitData.currency) {
-          submitData.currency = account.currency;
-        }
+        return await addActivityMutation.mutateAsync(submitData);
+      } catch (error) {
+        logger.error(`Activity Form Submit Error: ${JSON.stringify({ error, formData })}`);
+        return;
       }
+    },
+    [accountOptions, initialActivity?.id, isEditing, addActivityMutation, updateActivityMutation],
+  );
 
-      if (
-        "pricingMode" in submitData &&
-        submitData.pricingMode === PricingMode.MANUAL &&
-        account
-      ) {
-        submitData.currency = submitData.currency ?? account.currency;
-      }
+  // Form submit handlers for each activity type
+  const handleBuySubmit = useCallback(
+    async (data: BuyFormValues) => {
+      await handleFormSubmit(data, ActivityType.BUY, (d) => ({
+        accountId: d.accountId,
+        activityDate: d.activityDate,
+        assetId: d.assetId,
+        quantity: d.quantity,
+        unitPrice: d.unitPrice,
+        amount: d.amount,
+        fee: d.fee,
+        comment: d.comment,
+        pricingMode: d.pricingMode,
+        exchangeMic: d.exchangeMic,
+      }));
+    },
+    [handleFormSubmit],
+  );
 
-      if (id) {
-        await updateActivityMutation.mutateAsync({ id, ...submitData });
-      } else {
-        await addActivityMutation.mutateAsync(submitData);
-      }
-    } catch (error) {
-      logger.error(
-        `Activity Form Submit Error: ${JSON.stringify({ error, formValues: form.getValues() })}`,
+  const handleSellSubmit = useCallback(
+    async (data: SellFormValues) => {
+      await handleFormSubmit(data, ActivityType.SELL, (d) => ({
+        accountId: d.accountId,
+        activityDate: d.activityDate,
+        assetId: d.assetId,
+        quantity: d.quantity,
+        unitPrice: d.unitPrice,
+        amount: d.amount,
+        fee: d.fee,
+        comment: d.comment,
+        pricingMode: d.pricingMode,
+        exchangeMic: d.exchangeMic,
+      }));
+    },
+    [handleFormSubmit],
+  );
+
+  const handleDepositSubmit = useCallback(
+    async (data: DepositFormValues) => {
+      await handleFormSubmit(data, ActivityType.DEPOSIT, (d) => ({
+        accountId: d.accountId,
+        activityDate: d.activityDate,
+        amount: d.amount,
+        comment: d.comment,
+      }));
+    },
+    [handleFormSubmit],
+  );
+
+  const handleWithdrawalSubmit = useCallback(
+    async (data: WithdrawalFormValues) => {
+      await handleFormSubmit(data, ActivityType.WITHDRAWAL, (d) => ({
+        accountId: d.accountId,
+        activityDate: d.activityDate,
+        amount: d.amount,
+        comment: d.comment,
+      }));
+    },
+    [handleFormSubmit],
+  );
+
+  const handleDividendSubmit = useCallback(
+    async (data: DividendFormValues) => {
+      await handleFormSubmit(data, ActivityType.DIVIDEND, (d) => ({
+        accountId: d.accountId,
+        activityDate: d.activityDate,
+        assetId: d.symbol,
+        amount: d.amount,
+        comment: d.comment,
+      }));
+    },
+    [handleFormSubmit],
+  );
+
+  const handleTransferSubmit = useCallback(
+    async (data: TransferFormValues) => {
+      await handleFormSubmit(data, ActivityType.TRANSFER_OUT, (d) => ({
+        accountId: d.fromAccountId,
+        activityDate: d.activityDate,
+        amount: d.amount,
+        assetId: d.assetId ?? undefined,
+        quantity: d.quantity ?? undefined,
+        comment: d.comment,
+      }));
+    },
+    [handleFormSubmit],
+  );
+
+  const handleSplitSubmit = useCallback(
+    async (data: SplitFormValues) => {
+      await handleFormSubmit(data, ActivityType.SPLIT, (d) => ({
+        accountId: d.accountId,
+        activityDate: d.activityDate,
+        assetId: d.symbol,
+        quantity: d.splitRatio,
+        comment: d.comment,
+      }));
+    },
+    [handleFormSubmit],
+  );
+
+  const handleFeeSubmit = useCallback(
+    async (data: FeeFormValues) => {
+      await handleFormSubmit(data, ActivityType.FEE, (d) => ({
+        accountId: d.accountId,
+        activityDate: d.activityDate,
+        amount: d.amount,
+        comment: d.comment,
+      }));
+    },
+    [handleFormSubmit],
+  );
+
+  const handleInterestSubmit = useCallback(
+    async (data: InterestFormValues) => {
+      await handleFormSubmit(data, ActivityType.INTEREST, (d) => ({
+        accountId: d.accountId,
+        activityDate: d.activityDate,
+        amount: d.amount,
+        comment: d.comment,
+      }));
+    },
+    [handleFormSubmit],
+  );
+
+  const handleTaxSubmit = useCallback(
+    async (data: TaxFormValues) => {
+      await handleFormSubmit(data, ActivityType.TAX, (d) => ({
+        accountId: d.accountId,
+        activityDate: d.activityDate,
+        amount: d.amount,
+        comment: d.comment,
+      }));
+    },
+    [handleFormSubmit],
+  );
+
+  const renderForm = () => {
+    if (!selectedType) {
+      return (
+        <div className="flex h-40 items-center justify-center text-muted-foreground">
+          Select an activity type above to continue
+        </div>
       );
     }
-  };
 
-  const defaultTab = ACTIVITY_TYPE_TO_TAB[initialActivity?.activityType ?? ""] ?? "trade";
+    switch (selectedType) {
+      case "BUY":
+        return (
+          <BuyForm
+            accounts={accountOptions}
+            defaultValues={defaultValues.buy}
+            onSubmit={handleBuySubmit}
+            onCancel={handleClose}
+            isLoading={isLoading}
+            isEditing={isEditing}
+          />
+        );
+      case "SELL":
+        return (
+          <SellForm
+            accounts={accountOptions}
+            defaultValues={defaultValues.sell}
+            onSubmit={handleSellSubmit}
+            onCancel={handleClose}
+            isLoading={isLoading}
+            isEditing={isEditing}
+          />
+        );
+      case "DEPOSIT":
+        return (
+          <DepositForm
+            accounts={accountOptions}
+            defaultValues={defaultValues.deposit}
+            onSubmit={handleDepositSubmit}
+            onCancel={handleClose}
+            isLoading={isLoading}
+            isEditing={isEditing}
+          />
+        );
+      case "WITHDRAWAL":
+        return (
+          <WithdrawalForm
+            accounts={accountOptions}
+            defaultValues={defaultValues.withdrawal}
+            onSubmit={handleWithdrawalSubmit}
+            onCancel={handleClose}
+            isLoading={isLoading}
+            isEditing={isEditing}
+          />
+        );
+      case "DIVIDEND":
+        return (
+          <DividendForm
+            accounts={accountOptions}
+            defaultValues={defaultValues.dividend}
+            onSubmit={handleDividendSubmit}
+            onCancel={handleClose}
+            isLoading={isLoading}
+            isEditing={isEditing}
+          />
+        );
+      case "TRANSFER":
+        return (
+          <TransferForm
+            accounts={accountOptions}
+            defaultValues={defaultValues.transfer}
+            onSubmit={handleTransferSubmit}
+            onCancel={handleClose}
+            isLoading={isLoading}
+            isEditing={isEditing}
+          />
+        );
+      case "SPLIT":
+        return (
+          <SplitForm
+            accounts={accountOptions}
+            defaultValues={defaultValues.split}
+            onSubmit={handleSplitSubmit}
+            onCancel={handleClose}
+            isLoading={isLoading}
+            isEditing={isEditing}
+          />
+        );
+      case "FEE":
+        return (
+          <FeeForm
+            accounts={accountOptions}
+            defaultValues={defaultValues.fee}
+            onSubmit={handleFeeSubmit}
+            onCancel={handleClose}
+            isLoading={isLoading}
+            isEditing={isEditing}
+          />
+        );
+      case "INTEREST":
+        return (
+          <InterestForm
+            accounts={accountOptions}
+            defaultValues={defaultValues.interest}
+            onSubmit={handleInterestSubmit}
+            onCancel={handleClose}
+            isLoading={isLoading}
+            isEditing={isEditing}
+          />
+        );
+      case "TAX":
+        return (
+          <TaxForm
+            accounts={accountOptions}
+            defaultValues={defaultValues.tax}
+            onSubmit={handleTaxSubmit}
+            onCancel={handleClose}
+            isLoading={isLoading}
+            isEditing={isEditing}
+          />
+        );
+      default:
+        return null;
+    }
+  };
 
   // For mobile, use the existing mobile form component
   if (isMobileViewport) {
@@ -215,7 +530,7 @@ const ActivityManagerPage = () => {
     );
   }
 
-  // Desktop inline form
+  // Desktop inline form with new activity type picker
   return (
     <Page>
       <PageHeader
@@ -243,132 +558,35 @@ const ActivityManagerPage = () => {
       <PageContent>
         <div className="mx-auto max-w-5xl">
           <Card>
-            <CardContent className="p-6">
-              <Tabs defaultValue={defaultTab} className="w-full">
-                {/* Transaction Type Tabs */}
-                {!initialActivity?.id && (
-                  <div className="mb-6">
-                    <TabsList className="grid h-auto w-full grid-cols-5 p-1">
-                      <TabsTrigger
-                        value="trade"
-                        className="data-[state=active]:bg-background flex flex-col items-center gap-1.5 rounded-lg px-4 py-3 data-[state=active]:shadow-sm"
-                      >
-                        <Icons.ArrowRightLeft className="h-5 w-5" />
-                        <span className="text-xs font-medium">Trade</span>
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="holdings"
-                        className="data-[state=active]:bg-background flex flex-col items-center gap-1.5 rounded-lg px-4 py-3 data-[state=active]:shadow-sm"
-                      >
-                        <Icons.Wallet className="h-5 w-5" />
-                        <span className="text-xs font-medium">Holdings</span>
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="cash"
-                        className="data-[state=active]:bg-background flex flex-col items-center gap-1.5 rounded-lg px-4 py-3 data-[state=active]:shadow-sm"
-                      >
-                        <Icons.DollarSign className="h-5 w-5" />
-                        <span className="text-xs font-medium">Cash</span>
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="income"
-                        className="data-[state=active]:bg-background flex flex-col items-center gap-1.5 rounded-lg px-4 py-3 data-[state=active]:shadow-sm"
-                      >
-                        <Icons.Income className="h-5 w-5" />
-                        <span className="text-xs font-medium">Income</span>
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="other"
-                        className="data-[state=active]:bg-background flex flex-col items-center gap-1.5 rounded-lg px-4 py-3 data-[state=active]:shadow-sm"
-                      >
-                        <Icons.FileText className="h-5 w-5" />
-                        <span className="text-xs font-medium">Other</span>
-                      </TabsTrigger>
-                    </TabsList>
-                  </div>
-                )}
+            <CardContent className="p-6 space-y-6">
+              {/* Activity Type Picker */}
+              {!isEditing && (
+                <ActivityTypePicker value={selectedType} onSelect={setSelectedType} />
+              )}
 
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                    {/* Error indicator */}
-                    {Object.keys(form.formState.errors).length > 0 && (
-                      <div className="bg-destructive/10 border-destructive/20 flex items-start gap-3 rounded-lg border p-4">
-                        <Icons.AlertCircle className="text-destructive mt-0.5 h-5 w-5 flex-shrink-0" />
-                        <div className="space-y-1">
-                          <h4 className="font-semibold">Please Review Your Entry</h4>
-                          <ul className="text-muted-foreground list-disc space-y-1 pl-4 text-sm">
-                            {Object.entries(form.formState.errors).map(([field, error]) => (
-                              <li key={field}>
-                                <span className="font-medium">
-                                  {field === "activityType" ? "Transaction Type" : field}
-                                </span>
-                                {": "}
-                                {error?.message?.toString() ?? "Invalid value"}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-                    )}
+              {/* When editing, show the activity type as a badge */}
+              {isEditing && selectedType && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Activity Type:</span>
+                  <span className="rounded-md bg-primary/10 px-2 py-1 font-medium text-primary">
+                    {selectedType}
+                  </span>
+                </div>
+              )}
 
-                    <TabsContent value="trade" className="mt-0">
-                      <TradeForm accounts={accountOptions} />
-                    </TabsContent>
-                    <TabsContent value="holdings" className="mt-0">
-                      <HoldingsForm accounts={accountOptions} onSuccess={handleClose} onTransferModeChange={setIsTransferMode} />
-                    </TabsContent>
-                    <TabsContent value="cash" className="mt-0">
-                      <CashForm accounts={accountOptions} onSuccess={handleClose} onTransferModeChange={setIsTransferMode} />
-                    </TabsContent>
-                    <TabsContent value="income" className="mt-0">
-                      <IncomeForm accounts={accountOptions} />
-                    </TabsContent>
-                    <TabsContent value="other" className="mt-0">
-                      <OtherForm accounts={accountOptions} />
-                    </TabsContent>
+              {/* Render the appropriate form */}
+              {renderForm()}
 
-                    {/* Action Footer - hidden when in transfer mode since transfer forms have their own submit */}
-                    {!isTransferMode && (
-                      <div className="border-border flex items-center justify-between border-t pt-6">
-                        <p className="text-muted-foreground text-sm">
-                          {initialActivity?.id
-                            ? "Update your transaction details"
-                            : "All fields are required unless marked as optional"}
-                        </p>
-                        <div className="flex gap-3">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleClose}
-                            disabled={isLoading}
-                            size="lg"
-                          >
-                            Cancel
-                          </Button>
-                          <Button type="submit" disabled={isLoading} size="lg">
-                            {isLoading ? (
-                              <>
-                                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                                Saving...
-                              </>
-                            ) : initialActivity?.id ? (
-                              <>
-                                <Icons.Check className="mr-2 h-4 w-4" />
-                                Update Transaction
-                              </>
-                            ) : (
-                              <>
-                                <Icons.Plus className="mr-2 h-4 w-4" />
-                                Add Transaction
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </form>
-                </Form>
-              </Tabs>
+              {/* Display mutation error */}
+              {(addActivityMutation.isError || updateActivityMutation.isError) && (
+                <Alert variant="destructive">
+                  <Icons.AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>
+                    {String(addActivityMutation.error ?? updateActivityMutation.error)}
+                  </AlertDescription>
+                </Alert>
+              )}
             </CardContent>
           </Card>
         </div>
