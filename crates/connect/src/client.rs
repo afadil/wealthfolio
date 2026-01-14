@@ -22,7 +22,7 @@ use super::broker::BrokerApiClient;
 const DEFAULT_TIMEOUT_SECS: u64 = 30;
 
 /// Default base URL for Wealthfolio Connect cloud service.
-pub const DEFAULT_CLOUD_API_URL: &str = "https://api.wealthfolio.app";
+pub const DEFAULT_CLOUD_API_URL: &str = "https://api-staging.wealthfolio.app";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // API Response Types (internal, for parsing cloud API responses)
@@ -65,7 +65,6 @@ struct ApiAccountsResponse {
     #[serde(default)]
     accounts: Vec<BrokerAccount>,
 }
-
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -205,9 +204,7 @@ impl ConnectApiClient {
         // Log raw response body for debugging
         debug!(
             "[ConnectApi] Response from {} (status={}): {}",
-            url,
-            status,
-            &body
+            url, status, &body
         );
 
         if !status.is_success() {
@@ -391,8 +388,9 @@ impl BrokerApiClient for ConnectApiClient {
             )));
         }
 
-        let api_response: ApiConnectionsResponse = serde_json::from_str(&body)
-            .map_err(|e| Error::Unexpected(format!("Failed to parse connections: {} - {}", e, body)))?;
+        let api_response: ApiConnectionsResponse = serde_json::from_str(&body).map_err(|e| {
+            Error::Unexpected(format!("Failed to parse connections: {} - {}", e, body))
+        })?;
 
         let connections: Vec<BrokerConnection> = api_response
             .connections
@@ -476,8 +474,9 @@ impl BrokerApiClient for ConnectApiClient {
             )));
         }
 
-        let api_response: ApiAccountsResponse = serde_json::from_str(&body)
-            .map_err(|e| Error::Unexpected(format!("Failed to parse accounts: {} - {}", e, body)))?;
+        let api_response: ApiAccountsResponse = serde_json::from_str(&body).map_err(|e| {
+            Error::Unexpected(format!("Failed to parse accounts: {} - {}", e, body))
+        })?;
 
         info!(
             "[ConnectApi] Parsed {} broker accounts from API",

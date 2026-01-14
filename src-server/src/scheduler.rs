@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::time::Duration as StdDuration;
 use tokio::time::{interval, Duration};
 use tracing::{debug, info, warn};
+use wealthfolio_connect::DEFAULT_CLOUD_API_URL;
 
 use crate::api::shared::{process_portfolio_job, PortfolioJobConfig};
 use crate::events::{ServerEvent, BROKER_SYNC_COMPLETE, BROKER_SYNC_START};
@@ -16,9 +17,6 @@ const SYNC_INTERVAL_SECS: u64 = 4 * 60 * 60;
 
 /// Initial delay before first sync (60 seconds to let server fully start)
 const INITIAL_DELAY_SECS: u64 = 60;
-
-/// Default base URL for Wealthfolio Connect cloud service.
-const DEFAULT_CLOUD_API_URL: &str = "https://api.wealthfolio.app";
 
 /// Default Supabase auth URL for token refresh
 const DEFAULT_SUPABASE_AUTH_URL: &str = "https://vvalcadcvxqwligwzxaw.supabase.co";

@@ -12,6 +12,7 @@ use axum::{
 };
 use serde::Deserialize;
 use tracing::{debug, info};
+use wealthfolio_connect::DEFAULT_CLOUD_API_URL;
 
 use crate::error::{ApiError, ApiResult};
 use crate::main_lib::AppState;
@@ -27,9 +28,6 @@ use wealthfolio_device_sync::{
 // Storage keys (without prefix - the SecretStore adds "wealthfolio_" prefix)
 const CLOUD_ACCESS_TOKEN_KEY: &str = "sync_access_token";
 const DEVICE_ID_KEY: &str = "sync_device_id";
-
-/// Default base URL for Wealthfolio Connect cloud service.
-const DEFAULT_CLOUD_API_URL: &str = "https://api.wealthfolio.app";
 
 fn cloud_api_base_url() -> String {
     std::env::var("CONNECT_API_URL")

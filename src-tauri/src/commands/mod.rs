@@ -4,6 +4,7 @@ pub mod addon;
 pub mod alternative_assets;
 pub mod asset;
 pub mod brokers_sync;
+pub mod device_enroll_service;
 pub mod device_sync;
 pub mod error;
 pub mod goal;

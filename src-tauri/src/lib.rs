@@ -347,7 +347,7 @@ pub fn run() {
             commands::brokers_sync::get_broker_sync_states,
             commands::brokers_sync::get_import_runs,
             // Device sync commands
-            commands::device_sync::register_device,
+            commands::device_sync::enroll_device,
             commands::device_sync::get_device,
             commands::device_sync::list_devices,
             commands::device_sync::update_device,
@@ -369,6 +369,11 @@ pub fn run() {
             commands::device_sync::claim_pairing,
             commands::device_sync::get_pairing_messages,
             commands::device_sync::confirm_pairing,
+            // Device enroll service (high-level commands)
+            commands::device_enroll_service::get_device_sync_state,
+            commands::device_enroll_service::enable_device_sync,
+            commands::device_enroll_service::clear_device_sync_data,
+            commands::device_enroll_service::reinitialize_device_sync,
             // Sync crypto commands
             commands::sync_crypto::sync_generate_root_key,
             commands::sync_crypto::sync_derive_dek,

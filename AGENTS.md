@@ -18,11 +18,11 @@ edits, clear reasoning, and validation via the existing scripts and tests.
 References:
 
 - `README.md`:1 — Project intro, features, dev, and Docker.
-- `src/App.tsx`:1 — App providers and QueryClient wiring.
-- `src/routes.tsx`:1 — Route map and dynamic addon routes.
-- `src/globals.css`:1 — Tailwind v4 CSS-first setup and theme tokens.
-- `src/adapters/index.ts`:1 — Runtime env (desktop/web) and invoke bridges.
-- `src/commands/portfolio.ts`:1 — Example web/Tauri command wrappers.
+- `src-front/App.tsx`:1 — App providers and QueryClient wiring.
+- `src-front/routes.tsx`:1 — Route map and dynamic addon routes.
+- `src-front/globals.css`:1 — Tailwind v4 CSS-first setup and theme tokens.
+- `src-front/adapters/index.ts`:1 — Runtime env (desktop/web) and invoke bridges.
+- `src-front/commands/portfolio.ts`:1 — Example web/Tauri command wrappers.
 - `src-server/src/main.rs`:1 — Axum server entrypoint.
 - `src-tauri/src/main.rs`:1 — Tauri desktop entrypoint.
 - `packages/ui/src/index.ts`:1 — Shared UI exports.
@@ -43,7 +43,7 @@ References:
 - Single test file: `pnpm test -- path/to/file.test.ts`
 - Test by name: `pnpm test -- -t "pattern"`
 - E2E tests: `pnpm test:e2e` | `pnpm test:e2e:ui`
-- Rust tests: `cargo test --manifest-path src-core/Cargo.toml`
+- Rust tests: `cargo test` (runs all workspace crates)
 
 ### Quality Checks
 
@@ -55,17 +55,22 @@ References:
 
 ## Code Layout
 
-- Frontend app: `src/`
-  - Pages: `src/pages/...`
-  - Components: `src/components/...`
-  - Hooks: `src/hooks/...`
-  - Core types/helpers: `src/lib/...`
-  - Commands (frontend bridges): `src/commands/...` (call into Tauri or Web
-    server based on runtime)
-  - Addons runtime: `src/addons/...`
-- Desktop (Tauri): `src-tauri/` (Rust commands, events, capabilities)
-- Core business logic (Rust): `src-core/` (models, services, repositories,
-  migrations)
+- Frontend app: `src-front/`
+  - Pages: `src-front/pages/...`
+  - Components: `src-front/components/...`
+  - Features: `src-front/features/...` (self-contained feature modules)
+  - Hooks: `src-front/hooks/...`
+  - Core types/helpers: `src-front/lib/...`
+  - Commands (frontend bridges): `src-front/commands/...` (call into Tauri or
+    Web server based on runtime)
+  - Addons runtime: `src-front/addons/...`
+- Desktop (Tauri): `src-tauri/` (Rust IPC commands, events, capabilities)
+- Rust crates: `crates/`
+  - `core/` — Core business logic (models, services, calculations)
+  - `storage-sqlite/` — SQLite storage layer (Diesel ORM, repositories)
+  - `market-data/` — Market data providers and sync
+  - `connect/` — External service integrations
+  - `device-sync/` — Device sync and E2EE functionality
 - HTTP Server (web mode): `src-server/`
 - Packages: `packages/`
   - `addon-sdk` — TypeScript SDK for addons
@@ -75,16 +80,16 @@ References:
 ## Architecture Notes
 
 - Runtime detection is centralized and selects between Tauri and Web adapters.
-  - `src/adapters/index.ts`:1 — `getRunEnv`, `invokeTauri`, `invokeWeb`.
+  - `src-front/adapters/index.ts`:1 — `getRunEnv`, `invokeTauri`, `invokeWeb`.
 - Frontend command wrappers must support both desktop and web:
-  - See `src/commands/portfolio.ts`:1 for a complete pattern (switch on
+  - See `src-front/commands/portfolio.ts`:1 for a complete pattern (switch on
     `RUN_ENV`, unified signatures, logging, error handling).
-- Web mode server routes (Axum) live in `src-server/src/api.rs` and wire to core
-  services in `src-core`.
-- Tauri commands live under `src-tauri/src/commands/*` and call into `src-core`
-  services.
+- Web mode server routes (Axum) live in `src-server/src/api/` and wire to
+  services in `crates/core`.
+- Tauri commands live under `src-tauri/src/commands/*` and call into
+  `crates/core` services.
 - Addons:
-  - Runtime host bridge: `src/addons/addons-runtime-context.ts`:1
+  - Runtime host bridge: `src-front/addons/addons-runtime-context.ts`:1
   - SDK: `packages/addon-sdk/src/*`
   - Dev tools: `packages/addon-dev-tools/*` (hot reload server, scaffolding)
 
@@ -93,8 +98,8 @@ References:
 - Use Tailwind v4 (CSS-first) and shared components from `@wealthfolio/ui`.
 - Prefer composition via `packages/ui/src/components/ui/*` and
   `packages/ui/src/components/common/*`.
-- Theme tokens are declared in `src/styles.css`:1 (light/dark, semantic colors,
-  charts, sidebar).
+- Theme tokens are declared in `src-front/globals.css`:1 (light/dark, semantic
+  colors, charts, sidebar).
 - Avoid ad-hoc global CSS; local, component-level styling should rely on
   Tailwind utilities.
 
@@ -135,34 +140,35 @@ When adding a new user-visible feature that needs backend data:
 
 1. Frontend route and UI
 
-- Add page under `src/pages/...` and route in `src/routes.tsx`:1.
+- Add page under `src-front/pages/...` and route in `src-front/routes.tsx`:1.
 - Build UI with components from `@wealthfolio/ui` and Tailwind.
 
 2. Frontend command wrapper
 
-- Add a function in `src/commands/<domain>.ts` following the `RUN_ENV` switch
-  pattern (see `src/commands/portfolio.ts`:1).
+- Add a function in `src-front/commands/<domain>.ts` following the `RUN_ENV`
+  switch pattern (see `src-front/commands/portfolio.ts`:1).
 
 3. Desktop backend (if needed)
 
 - Add Tauri command under `src-tauri/src/commands/*.rs` and wire it in
   `src-tauri/src/commands/mod.rs`.
-- Expose the command in `src-tauri/src/main.rs`:1.
+- Expose the command in `src-tauri/src/lib.rs`:1.
 
 4. Web server endpoint (if needed)
 
-- Add a handler in `src-server/src/api.rs` and route in its router.
-- Call into the appropriate `src-core` service.
+- Add a handler in `src-server/src/api/` and route in its router.
+- Call into the appropriate `crates/core` service.
 
 5. Core logic (shared)
 
-- Implement or update services/repos in `src-core/` as needed; add migrations if
-  schema changes.
+- Implement or update services/repos in `crates/core/` as needed.
+- Add migrations in `crates/storage-sqlite/` if schema changes.
 - Keep business rules and calculations in core, not UI layers.
 
 6. Tests
 
-- Add/extend vitest tests near changed TS modules (e.g., `src/lib/*.test.ts`).
+- Add/extend vitest tests near changed TS modules (e.g.,
+  `src-front/lib/*.test.ts`).
 - For Rust, add tests under the relevant crate when practical.
 
 Common UI tasks:
@@ -170,13 +176,13 @@ Common UI tasks:
 - Tables/charts: reuse components under `packages/ui/src/components/ui/*` and
   `packages/ui/src/components/common/*`.
 - Forms: use `react-hook-form` and validators via `zod` types from
-  `src/lib/schemas.ts`:1 when possible.
+  `src-front/lib/schemas.ts`:1 when possible.
 
 ## Useful Commands (Agent Discovery)
 
 - List files: `rg --files`
 - Search text: `rg "keyword"`
-- Rust check: `cargo check --manifest-path src-core/Cargo.toml`
+- Rust check: `cargo check` (workspace) or `cargo check -p wealthfolio-core`
 
 ## Addon Development (Quickstart)
 
@@ -185,8 +191,9 @@ Common UI tasks:
 - Run Wealthfolio (desktop) with addon dev mode:
   `VITE_ENABLE_ADDON_DEV_MODE=true pnpm tauri dev`
 - Add routes and sidebar via the addon context
-  (`src/addons/addons-runtime-context.ts`:1)
-- Use `ctx.api.*` for data, events, and query cache integration (see docs below)
+  (`src-front/addons/addons-runtime-context.ts`:1)
+- Use `ctx.api.*` for data, events, and query cache integration (see docs
+  below)
 
 Docs entry points:
 
@@ -197,7 +204,8 @@ Docs entry points:
 
 ## Frontend Rules (Cursor)
 
-- Scope: applies to `src/**`, `.tsx`, `.ts` files; complements repo conventions.
+- Scope: applies to `src-front/**`, `.tsx`, `.ts` files; complements repo
+  conventions.
 - Tech stack: Node.js, React, Vite, TanStack Query, Tailwind CSS; routing in
   this repo uses React Router (not TanStack Router).
 - General principles: write concise, technical TypeScript; avoid duplication;
@@ -244,7 +252,7 @@ Docs entry points:
 
 ## Backend Rules (Rust)
 
-- Scope: Rust code in `src-tauri/**`, `src-core/**`, and `src-server/**` (Axum).
+- Scope: Rust code in `src-tauri/**`, `crates/**`, and `src-server/**` (Axum).
   Source of truth: `.cursor/rules/rust-rules.mdc`.
 - Principles: write clear, idiomatic Rust; do only the requested task; prefer
   modularity and small, focused functions; expressive names (`is_ready`,
@@ -257,19 +265,25 @@ Docs entry points:
 - Concurrency & performance: respect ownership/borrowing; avoid unnecessary
   clones; prefer references and slices; be mindful of locking granularity.
 - Organization: separate concerns (network/api in `src-server`, desktop IPC in
-  `src-tauri`, business logic in `src-core` services/repos). Keep commands
-  thin—delegate to `src-core`.
-- Database: Diesel + SQLite; keep migrations in `src-core/migrations`; server
-  embeds and applies them automatically on startup.
+  `src-tauri`, business logic in `crates/core`, storage in
+  `crates/storage-sqlite`). Keep commands thin—delegate to crate services.
+- Database: Diesel + SQLite; migrations in `crates/storage-sqlite/migrations`;
+  server embeds and applies them automatically on startup.
 - Tauri: add new commands under `src-tauri/src/commands/*.rs`, register in
-  `mod.rs` and expose via `main.rs`. Keep IPC structs serde-friendly.
-- Axum server: add handlers in `src-server/src/api.rs`, convert to DTOs as
-  needed, and call `src-core` services. Validate/parse query/body (e.g., dates).
+  `mod.rs` and expose via `lib.rs`. Keep IPC structs serde-friendly.
+- Axum server: add handlers in `src-server/src/api/`, convert to DTOs as needed,
+  and call `crates/core` services. Validate/parse query/body (e.g., dates).
 - Testing: use `tokio::test` for async; prefer unit tests on services in
-  `src-core`; add integration tests in `src-server/tests` when touching HTTP.
+  `crates/core`; add integration tests in `src-server/tests` when touching HTTP.
   Use fakes/mocks for external deps.
 - Docs & cleanup: add Rustdoc where it clarifies intent; remove dead code during
   refactors.
+
+## Plan Mode
+
+- Make the plan extremely concise. Sacrifice grammar for the sake of concision.
+- At the end of each plan, give me a list of unresolved questions to answer, if
+  any.
 
 ---
 
