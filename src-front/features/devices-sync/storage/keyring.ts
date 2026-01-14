@@ -4,43 +4,44 @@
 
 import { getSecret, setSecret, deleteSecret } from "@/commands/secrets";
 
-// Single keychain key for all sync identity data
+// Storage key for sync identity in keychain
 const SYNC_IDENTITY_KEY = "sync_identity";
 
 // Current storage format version - increment when changing the structure
-const CURRENT_VERSION = 1;
+const CURRENT_VERSION = 2;
 
 /**
  * Device sync identity stored in keychain as a single JSON object
  */
-interface SyncIdentity {
-  version: number; // Storage format version for migrations
-  deviceId: string;
-  rootKey?: string; // base64 encoded
+export interface SyncIdentity {
+  /** Storage format version for migrations */
+  version: number;
+  /** Device nonce - UUID generated locally, stored ONLY in keychain (not in DB) */
+  deviceNonce: string;
+  /** Server-assigned device ID */
+  deviceId?: string;
+  /** E2EE root key (base64 encoded) */
+  rootKey?: string;
+  /** E2EE key version (epoch) */
   keyVersion?: number;
-  deviceSecretKey?: string; // base64 encoded
-  devicePublicKey?: string; // base64 encoded
+  /** Device Ed25519 secret key (base64 encoded) */
+  deviceSecretKey?: string;
+  /** Device Ed25519 public key (base64 encoded) */
+  devicePublicKey?: string;
 }
 
 /**
  * Migrate identity data from older versions if needed
  */
-function migrateIdentity(data: Record<string, unknown>): SyncIdentity {
+function migrateIdentity(data: Record<string, unknown>): SyncIdentity | null {
   const version = typeof data.version === "number" ? data.version : 0;
 
-  // Version 0 (no version field) -> Version 1: just add version field
-  if (version < 1) {
-    return {
-      version: CURRENT_VERSION,
-      deviceId: data.deviceId as string,
-      rootKey: data.rootKey as string | undefined,
-      keyVersion: data.keyVersion as number | undefined,
-      deviceSecretKey: data.deviceSecretKey as string | undefined,
-      devicePublicKey: data.devicePublicKey as string | undefined,
-    };
+  // Version 1 had deviceId but no deviceNonce - cannot migrate
+  // User needs to re-enroll
+  if (version < 2) {
+    return null;
   }
 
-  // Already current version
   return data as unknown as SyncIdentity;
 }
 
@@ -66,41 +67,66 @@ async function saveIdentity(identity: SyncIdentity): Promise<void> {
 }
 
 /**
- * Update specific fields in the sync identity
- */
-async function updateIdentity(updates: Partial<SyncIdentity>): Promise<void> {
-  const current = await getIdentity();
-  if (!current) {
-    throw new Error("No sync identity exists. Set device ID first.");
-  }
-  await saveIdentity({ ...current, ...updates });
-}
-
-/**
  * Sync-specific keyring storage wrapper
  * Stores all sync secrets in a single keychain entry as JSON
  */
 export const syncStorage = {
-  // Device ID
-  // ---------
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Device Nonce - Physical device identifier (NEVER transfers with DB)
+  // ─────────────────────────────────────────────────────────────────────────────
 
+  /**
+   * Get the device nonce from keychain.
+   * Returns null if not set.
+   */
+  async getDeviceNonce(): Promise<string | null> {
+    const identity = await getIdentity();
+    return identity?.deviceNonce ?? null;
+  },
+
+  /**
+   * Set the device nonce. This should only be called once when first enabling sync.
+   * Creates a new identity if one doesn't exist.
+   */
+  async setDeviceNonce(nonce: string): Promise<void> {
+    const current = await getIdentity();
+    if (current) {
+      await saveIdentity({ ...current, deviceNonce: nonce });
+    } else {
+      await saveIdentity({ version: CURRENT_VERSION, deviceNonce: nonce });
+    }
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Device ID - Server-assigned identifier
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Get the server-assigned device ID.
+   */
   async getDeviceId(): Promise<string | null> {
     const identity = await getIdentity();
     return identity?.deviceId ?? null;
   },
 
+  /**
+   * Set the device ID (received from server after enrollment).
+   */
   async setDeviceId(id: string): Promise<void> {
     const current = await getIdentity();
-    if (current) {
-      await saveIdentity({ ...current, deviceId: id });
-    } else {
-      await saveIdentity({ version: CURRENT_VERSION, deviceId: id });
+    if (!current) {
+      throw new Error("No sync identity exists. Set device nonce first.");
     }
+    await saveIdentity({ ...current, deviceId: id });
   },
 
+  // ─────────────────────────────────────────────────────────────────────────────
   // Device Keypair (for E2EE)
-  // -------------------------
+  // ─────────────────────────────────────────────────────────────────────────────
 
+  /**
+   * Get the device Ed25519 keypair.
+   */
   async getDeviceKeypair(): Promise<{ secretKey: string; publicKey: string } | null> {
     const identity = await getIdentity();
     if (!identity?.deviceSecretKey || !identity?.devicePublicKey) return null;
@@ -110,47 +136,81 @@ export const syncStorage = {
     };
   },
 
+  /**
+   * Set the device Ed25519 keypair.
+   */
   async setDeviceKeypair(secretKey: string, publicKey: string): Promise<void> {
-    await updateIdentity({ deviceSecretKey: secretKey, devicePublicKey: publicKey });
+    const current = await getIdentity();
+    if (!current) {
+      throw new Error("No sync identity exists. Set device nonce first.");
+    }
+    await saveIdentity({ ...current, deviceSecretKey: secretKey, devicePublicKey: publicKey });
   },
 
+  // ─────────────────────────────────────────────────────────────────────────────
   // Root Key (E2EE)
-  // ---------------
+  // ─────────────────────────────────────────────────────────────────────────────
 
+  /**
+   * Get the E2EE root key.
+   */
   async getRootKey(): Promise<string | null> {
     const identity = await getIdentity();
     return identity?.rootKey ?? null;
   },
 
+  /**
+   * Set the E2EE root key.
+   */
   async setRootKey(keyB64: string): Promise<void> {
-    await updateIdentity({ rootKey: keyB64 });
+    const current = await getIdentity();
+    if (!current) {
+      throw new Error("No sync identity exists. Set device nonce first.");
+    }
+    await saveIdentity({ ...current, rootKey: keyB64 });
   },
 
+  /**
+   * Clear only the root key (used during key rotation or re-pairing).
+   */
   async clearRootKey(): Promise<void> {
     const current = await getIdentity();
     if (current) {
-      const { rootKey: _, ...rest } = current;
+      const { rootKey: _, deviceSecretKey: __, devicePublicKey: ___, ...rest } = current;
       await saveIdentity(rest as SyncIdentity);
     }
   },
 
+  // ─────────────────────────────────────────────────────────────────────────────
   // Key Version
-  // -----------
+  // ─────────────────────────────────────────────────────────────────────────────
 
+  /**
+   * Get the E2EE key version (epoch).
+   */
   async getKeyVersion(): Promise<number | null> {
     const identity = await getIdentity();
     return identity?.keyVersion ?? null;
   },
 
+  /**
+   * Set the E2EE key version.
+   */
   async setKeyVersion(version: number): Promise<void> {
-    await updateIdentity({ keyVersion: version });
+    const current = await getIdentity();
+    if (!current) {
+      throw new Error("No sync identity exists. Set device nonce first.");
+    }
+    await saveIdentity({ ...current, keyVersion: version });
   },
 
-  // Bulk operations
-  // ---------------
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Bulk Operations
+  // ─────────────────────────────────────────────────────────────────────────────
 
   /**
-   * Clear all sync-related secrets from keyring
+   * Clear all sync-related secrets from keyring.
+   * This resets the device to FRESH state.
    */
   async clearAll(): Promise<void> {
     try {
@@ -161,25 +221,33 @@ export const syncStorage = {
   },
 
   /**
-   * Check if device is initialized (has device ID stored)
-   */
-  async isInitialized(): Promise<boolean> {
-    const identity = await getIdentity();
-    return identity?.deviceId != null;
-  },
-
-  /**
-   * Check if device has E2EE key material
-   */
-  async hasRootKey(): Promise<boolean> {
-    const identity = await getIdentity();
-    return identity?.rootKey != null;
-  },
-
-  /**
-   * Get full identity (for debugging/export)
+   * Get full identity (for state detection and debugging).
    */
   async getIdentity(): Promise<SyncIdentity | null> {
     return getIdentity();
+  },
+
+  /**
+   * Set E2EE credentials after bootstrap or pairing completion.
+   * This is an atomic operation that sets rootKey, keyVersion, and optionally keypair.
+   */
+  async setE2EECredentials(
+    rootKey: string,
+    keyVersion: number,
+    keypair?: { secretKey: string; publicKey: string },
+  ): Promise<void> {
+    const current = await getIdentity();
+    if (!current) {
+      throw new Error("No sync identity exists. Set device nonce first.");
+    }
+    await saveIdentity({
+      ...current,
+      rootKey,
+      keyVersion,
+      ...(keypair && {
+        deviceSecretKey: keypair.secretKey,
+        devicePublicKey: keypair.publicKey,
+      }),
+    });
   },
 };

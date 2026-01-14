@@ -10,6 +10,70 @@ export type KeyState = "ACTIVE" | "PENDING";
 export type EnrollmentMode = "BOOTSTRAP" | "PAIR" | "READY";
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Device Sync State Machine
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Device sync state machine constants.
+ *
+ * States:
+ * - FRESH: No deviceNonce in keychain (never enrolled on this physical device)
+ * - REGISTERED: Have deviceNonce + deviceId, but no E2EE credentials (rootKey/keyVersion)
+ * - READY: Fully operational - have deviceNonce + deviceId + rootKey + keyVersion
+ * - STALE: Have local E2EE credentials but server key version is higher (need re-pair)
+ * - RECOVERY: Device ID not found on server (was revoked/deleted from another device)
+ * - ORPHANED: Keys exist on server but no trusted devices to pair with (need reset)
+ */
+export const SyncStates = {
+  FRESH: "FRESH",
+  REGISTERED: "REGISTERED",
+  READY: "READY",
+  STALE: "STALE",
+  RECOVERY: "RECOVERY",
+  ORPHANED: "ORPHANED",
+} as const;
+
+export type DeviceSyncState = (typeof SyncStates)[keyof typeof SyncStates];
+
+/**
+ * Sync identity stored in keychain.
+ * This is the source of truth for device identity and E2EE credentials.
+ */
+export interface SyncIdentity {
+  /** Storage format version for migrations */
+  version?: number;
+  /** Device nonce - UUID generated locally, stored ONLY in keychain (not in DB).
+   *  May be undefined when fetched from backend (not exposed for security). */
+  deviceNonce?: string;
+  /** Server-assigned device ID */
+  deviceId?: string;
+  /** E2EE root key (base64 encoded) */
+  rootKey?: string;
+  /** E2EE key version (epoch) */
+  keyVersion?: number;
+  /** Device Ed25519 secret key (base64 encoded) */
+  deviceSecretKey?: string;
+  /** Device Ed25519 public key (base64 encoded) */
+  devicePublicKey?: string;
+}
+
+/**
+ * Result of detecting the current sync state.
+ */
+export interface StateDetectionResult {
+  /** Current state */
+  state: DeviceSyncState;
+  /** Identity from keychain (if any) */
+  identity: SyncIdentity | null;
+  /** Device info from server (if fetched) */
+  device: Device | null;
+  /** Server's E2EE key version (if known) */
+  serverKeyVersion: number | null;
+  /** Trusted devices for pairing (in REGISTERED state) */
+  trustedDevices: TrustedDeviceSummary[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Device Types
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -34,7 +98,7 @@ export interface Device {
 export interface RegisterDeviceRequest {
   displayName: string;
   platform: string;
-  instanceId: string;
+  deviceNonce: string;
   osVersion?: string;
   appVersion?: string;
 }
@@ -48,17 +112,18 @@ export interface TrustedDeviceSummary {
 }
 
 // Discriminated union for device enrollment response
+// Note: Uses snake_case to match Rust serde serialization
 export type EnrollDeviceResponse =
-  | { mode: "BOOTSTRAP"; deviceId: string; e2eeKeyVersion: number }
+  | { mode: "BOOTSTRAP"; device_id: string; e2ee_key_version: number }
   | {
       mode: "PAIR";
-      deviceId: string;
-      e2eeKeyVersion: number;
-      requireSas: boolean;
-      pairingTtlSeconds: number;
-      trustedDevices: TrustedDeviceSummary[];
+      device_id: string;
+      e2ee_key_version: number;
+      require_sas: boolean;
+      pairing_ttl_seconds: number;
+      trusted_devices: TrustedDeviceSummary[];
     }
-  | { mode: "READY"; deviceId: string; e2eeKeyVersion: number; trustState: TrustState };
+  | { mode: "READY"; device_id: string; e2ee_key_version: number; trust_state: TrustState };
 
 // Device update request
 export interface UpdateDeviceRequest {
@@ -71,16 +136,17 @@ export interface UpdateDeviceRequest {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Discriminated union for initializing team keys response
+// Note: Uses snake_case to match Rust serde serialization
 export type InitializeKeysResult =
-  | { mode: "BOOTSTRAP"; challenge: string; nonce: string; keyVersion: number }
+  | { mode: "BOOTSTRAP"; challenge: string; nonce: string; key_version: number }
   | {
       mode: "PAIRING_REQUIRED";
-      e2eeKeyVersion: number;
-      requireSas: boolean;
-      pairingTtlSeconds: number;
-      trustedDevices: TrustedDeviceSummary[];
+      e2ee_key_version: number;
+      require_sas: boolean;
+      pairing_ttl_seconds: number;
+      trusted_devices: TrustedDeviceSummary[];
     }
-  | { mode: "READY"; e2eeKeyVersion: number };
+  | { mode: "READY"; e2ee_key_version: number };
 
 // Request to commit team key initialization (Phase 2)
 export interface CommitInitializeKeysRequest {
@@ -258,36 +324,76 @@ export interface ClaimerSession {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Sync State
+// Sync State (Provider State)
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Sync state managed by the provider
+/**
+ * Sync state managed by the DeviceSyncProvider.
+ * Uses the state machine model for clear state transitions.
+ */
 export interface SyncState {
-  // Status
-  isInitialized: boolean;
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Core State Machine
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /** Current device sync state */
+  syncState: DeviceSyncState;
+
+  /** Whether state detection is in progress */
+  isDetecting: boolean;
+
+  /** Whether an operation is in progress (enable, pairing, etc.) */
   isLoading: boolean;
+
+  /** Current error (if any) */
   error: SyncError | null;
 
-  // Device
-  deviceId: string | null;
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Identity & Device
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /** Sync identity from keychain */
+  identity: SyncIdentity | null;
+
+  /** Device info from server (populated in READY state) */
   device: Device | null;
 
-  // Enrollment
-  enrollmentMode: EnrollmentMode | null;
-  trustedDevicesForPairing: TrustedDeviceSummary[];
+  /** Server's E2EE key version (for stale detection) */
+  serverKeyVersion: number | null;
 
-  // Team keys
-  localKeyVersion: number | null;
-  keysInitialized: boolean;
+  /** Trusted devices for pairing (in REGISTERED/PAIR mode) */
+  trustedDevices: TrustedDeviceSummary[];
 
-  // Pairing (Issuer)
-  pairingSession: PairingSession | null;
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Pairing State
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /** Current pairing role (if in pairing flow) */
   pairingRole: PairingRole | null;
-  claimResult: ClaimResult | null;
 
-  // Pairing (Claimer)
+  /** Pairing session state (issuer side) */
+  pairingSession: PairingSession | null;
+
+  /** Claimer session state (claimer side) */
   claimerSession: ClaimerSession | null;
 }
+
+/**
+ * Initial sync state - used when provider mounts.
+ */
+export const INITIAL_SYNC_STATE: SyncState = {
+  syncState: SyncStates.FRESH,
+  isDetecting: true,
+  isLoading: false,
+  error: null,
+  identity: null,
+  device: null,
+  serverKeyVersion: null,
+  trustedDevices: [],
+  pairingRole: null,
+  pairingSession: null,
+  claimerSession: null,
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Error Handling
@@ -295,19 +401,32 @@ export interface SyncState {
 
 // Known error codes
 export const SyncErrorCodes = {
+  // State-related errors
   DEVICE_NOT_FOUND: "DEVICE_NOT_FOUND",
-  LAST_TRUSTED_DEVICE: "LAST_TRUSTED_DEVICE",
+  DEVICE_REVOKED: "DEVICE_REVOKED",
   NO_DEVICE: "NO_DEVICE",
-  INIT_FAILED: "INIT_FAILED",
+  NO_ACCESS_TOKEN: "NO_ACCESS_TOKEN",
+
+  // Key-related errors
   KEYS_INIT_FAILED: "KEYS_INIT_FAILED",
   ROOT_KEY_NOT_FOUND: "ROOT_KEY_NOT_FOUND",
+  KEYS_ALREADY_INITIALIZED: "KEYS_ALREADY_INITIALIZED",
+  KEY_VERSION_MISMATCH: "KEY_VERSION_MISMATCH",
+  LAST_TRUSTED_DEVICE: "LAST_TRUSTED_DEVICE",
+
+  // Pairing errors
+  REQUIRES_PAIRING: "REQUIRES_PAIRING",
   NO_SESSION: "NO_SESSION",
   NO_CLAIM: "NO_CLAIM",
   INVALID_SESSION: "INVALID_SESSION",
   PAIRING_ENDED: "PAIRING_ENDED",
+  PAIRING_EXPIRED: "PAIRING_EXPIRED",
   CLAIMER_NOT_FOUND: "CLAIMER_NOT_FOUND",
-  KEYS_ALREADY_INITIALIZED: "KEYS_ALREADY_INITIALIZED",
-  REQUIRES_PAIRING: "REQUIRES_PAIRING",
+
+  // General errors
+  INIT_FAILED: "INIT_FAILED",
+  NETWORK_ERROR: "NETWORK_ERROR",
+  UNKNOWN_ERROR: "UNKNOWN_ERROR",
 } as const;
 
 // Custom error class for sync operations
@@ -319,6 +438,34 @@ export class SyncError extends Error {
   ) {
     super(message);
     this.name = "SyncError";
+  }
+
+  /**
+   * Create a SyncError from an unknown error.
+   */
+  static from(error: unknown, defaultCode: string = SyncErrorCodes.UNKNOWN_ERROR): SyncError {
+    if (error instanceof SyncError) return error;
+
+    const message = error instanceof Error ? error.message : String(error);
+
+    // Try to detect specific error types
+    if (SyncError.isDeviceNotFound(error)) {
+      return new SyncError(SyncErrorCodes.DEVICE_NOT_FOUND, message, true);
+    }
+    if (SyncError.isDeviceRevoked(error)) {
+      return new SyncError(SyncErrorCodes.DEVICE_REVOKED, message, true);
+    }
+    if (SyncError.isNoAccessToken(error)) {
+      return new SyncError(SyncErrorCodes.NO_ACCESS_TOKEN, message, true);
+    }
+    if (SyncError.isLastTrustedDevice(error)) {
+      return new SyncError(SyncErrorCodes.LAST_TRUSTED_DEVICE, message, false);
+    }
+    if (SyncError.isKeysAlreadyInitialized(error)) {
+      return new SyncError(SyncErrorCodes.KEYS_ALREADY_INITIALIZED, message, true);
+    }
+
+    return new SyncError(defaultCode, message, true);
   }
 
   static isDeviceNotFound(error: unknown): boolean {
@@ -334,6 +481,38 @@ export class SyncError extends Error {
         msg.includes('"code":"not_found"') ||
         msg.includes('"code":"device_not_found"') ||
         (msg.includes("404") && msg.includes("device"))
+      );
+    }
+    return false;
+  }
+
+  static isDeviceRevoked(error: unknown): boolean {
+    if (error instanceof SyncError) {
+      return error.code === SyncErrorCodes.DEVICE_REVOKED;
+    }
+    if (error instanceof Error) {
+      const msg = error.message.toLowerCase();
+      return (
+        msg.includes("device revoked") ||
+        msg.includes("device_revoked") ||
+        msg.includes("trust revoked") ||
+        msg.includes('"trustState":"revoked"')
+      );
+    }
+    return false;
+  }
+
+  static isNoAccessToken(error: unknown): boolean {
+    if (error instanceof SyncError) {
+      return error.code === SyncErrorCodes.NO_ACCESS_TOKEN;
+    }
+    if (error instanceof Error) {
+      const msg = error.message.toLowerCase();
+      return (
+        msg.includes("no access token") ||
+        msg.includes("please sign in") ||
+        msg.includes("401") ||
+        msg.includes("unauthorized")
       );
     }
     return false;
@@ -366,6 +545,14 @@ export class SyncError extends Error {
       );
     }
     return false;
+  }
+
+  /**
+   * Check if this error indicates the device needs recovery.
+   * This happens when the device ID exists locally but not on the server.
+   */
+  static needsRecovery(error: unknown): boolean {
+    return SyncError.isDeviceNotFound(error) || SyncError.isDeviceRevoked(error);
   }
 }
 

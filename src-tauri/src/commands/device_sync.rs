@@ -11,6 +11,7 @@ use tauri::State;
 use crate::context::ServiceContext;
 use crate::secret_store::KeyringSecretStore;
 use wealthfolio_core::secrets::SecretStore;
+use wealthfolio_connect::DEFAULT_CLOUD_API_URL;
 use wealthfolio_device_sync::{
     ClaimPairingRequest, ClaimPairingResponse, CommitInitializeKeysRequest,
     CommitInitializeKeysResponse, CommitRotateKeysRequest, CommitRotateKeysResponse,
@@ -22,9 +23,6 @@ use wealthfolio_device_sync::{
 
 // Storage keys (without prefix - the SecretStore adds "wealthfolio_" prefix)
 const CLOUD_ACCESS_TOKEN_KEY: &str = "sync_access_token";
-
-/// Default base URL for Wealthfolio Connect cloud service.
-const DEFAULT_CLOUD_API_URL: &str = "https://api.wealthfolio.app";
 
 fn cloud_api_base_url() -> String {
     std::env::var("CONNECT_API_URL")
@@ -46,7 +44,7 @@ fn get_access_token() -> Result<String, String> {
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct SyncIdentity {
-    device_id: String,
+    device_id: Option<String>,
 }
 
 /// Get the device ID from sync_identity in keyring.
@@ -54,19 +52,26 @@ fn get_device_id_from_store() -> Option<String> {
     const SYNC_IDENTITY_KEY: &str = "sync_identity";
 
     match KeyringSecretStore.get_secret(SYNC_IDENTITY_KEY) {
-        Ok(Some(json)) => match serde_json::from_str::<SyncIdentity>(&json) {
-            Ok(identity) => {
-                debug!(
-                    "[DeviceSync] Using device ID from sync_identity: {}",
+        Ok(Some(json)) => {
+            debug!("[DeviceSync] Raw sync_identity JSON: {}", json);
+            match serde_json::from_str::<SyncIdentity>(&json) {
+                Ok(identity) => {
+                    if let Some(ref device_id) = identity.device_id {
+                        debug!(
+                            "[DeviceSync] Using device ID from sync_identity: {}",
+                            device_id
+                        );
+                    } else {
+                        debug!("[DeviceSync] sync_identity exists but deviceId is not set");
+                    }
                     identity.device_id
-                );
-                Some(identity.device_id)
+                }
+                Err(e) => {
+                    log::warn!("[DeviceSync] Failed to parse sync_identity: {}", e);
+                    None
+                }
             }
-            Err(e) => {
-                log::warn!("[DeviceSync] Failed to parse sync_identity: {}", e);
-                None
-            }
-        },
+        }
         Ok(None) => {
             debug!("[DeviceSync] No sync_identity in keyring");
             None
@@ -219,9 +224,9 @@ fn get_app_version() -> Option<String> {
 /// - PAIR: E2EE already enabled - device must pair with existing trusted device
 /// - READY: Device is already trusted and ready to sync
 #[tauri::command(rename_all = "camelCase")]
-pub async fn register_device(
+pub async fn enroll_device(
+    device_nonce: String,
     display_name: String,
-    instance_id: String,
     _state: State<'_, Arc<ServiceContext>>,
 ) -> Result<EnrollDeviceResponse, String> {
     info!("[DeviceSync] Enrolling device: {}", display_name);
@@ -240,7 +245,7 @@ pub async fn register_device(
     );
 
     let request = RegisterDeviceRequest {
-        instance_id,
+        device_nonce,
         display_name,
         platform,
         os_version,

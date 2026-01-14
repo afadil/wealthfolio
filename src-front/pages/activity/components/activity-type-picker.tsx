@@ -1,10 +1,12 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@wealthfolio/ui/components/ui/dropdown-menu";
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+  type CarouselApi,
+} from "@wealthfolio/ui/components/ui/carousel";
 import { Icons, type IconName } from "@wealthfolio/ui/components/ui/icons";
 import { cn } from "@/lib/utils";
 
@@ -34,154 +36,242 @@ const SECONDARY_ACTIVITY_TYPES: ActivityTypeConfig<SecondaryActivityType>[] = [
   { value: "TAX", label: "Tax", icon: "ReceiptText" },
 ];
 
+const ALL_ACTIVITY_TYPES = [...PRIMARY_ACTIVITY_TYPES, ...SECONDARY_ACTIVITY_TYPES];
+
 interface ActivityTypePickerProps {
   value?: ActivityType;
   onSelect: (type: ActivityType) => void;
 }
 
-export function ActivityTypePicker({ value, onSelect }: ActivityTypePickerProps) {
-  const selectedSecondaryType = SECONDARY_ACTIVITY_TYPES.find((t) => t.value === value);
-  const isSecondarySelected = !!selectedSecondaryType;
-  const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+type ViewMode = "carousel" | "grid";
 
-  // Handle keyboard navigation within the primary activity type grid
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent, index: number) => {
-      const totalPrimary = PRIMARY_ACTIVITY_TYPES.length;
-      let newIndex: number | null = null;
+function ActivityTypeButton({
+  type,
+  isSelected,
+  onClick,
+  onKeyDown,
+  buttonRef,
+  compact = false,
+}: {
+  type: ActivityTypeConfig<ActivityType>;
+  isSelected: boolean;
+  onClick: () => void;
+  onKeyDown?: (e: React.KeyboardEvent) => void;
+  buttonRef?: (el: HTMLButtonElement | null) => void;
+  compact?: boolean;
+}) {
+  const Icon = Icons[type.icon];
 
-      switch (e.key) {
-        case "ArrowRight":
-          e.preventDefault();
-          newIndex = (index + 1) % totalPrimary;
-          break;
-        case "ArrowLeft":
-          e.preventDefault();
-          newIndex = (index - 1 + totalPrimary) % totalPrimary;
-          break;
-        case "ArrowDown":
-          e.preventDefault();
-          // Move down by 3 (grid column count on mobile) or wrap
-          newIndex = (index + 3) % totalPrimary;
-          break;
-        case "ArrowUp":
-          e.preventDefault();
-          // Move up by 3 or wrap
-          newIndex = (index - 3 + totalPrimary) % totalPrimary;
-          break;
-        case "Home":
-          e.preventDefault();
-          newIndex = 0;
-          break;
-        case "End":
-          e.preventDefault();
-          newIndex = totalPrimary - 1;
-          break;
-      }
+  return (
+    <button
+      ref={buttonRef}
+      type="button"
+      onClick={onClick}
+      onKeyDown={onKeyDown}
+      aria-pressed={isSelected}
+      className={cn(
+        "flex flex-col items-center justify-center gap-1.5 rounded-lg border-2 transition-all",
+        "hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+        "cursor-pointer",
+        compact ? "min-h-[72px] min-w-[80px] p-3" : "min-h-[80px] p-4",
+        isSelected && "border-foreground bg-primary/5",
+        !isSelected && "border-border",
+      )}
+    >
+      <Icon
+        className={cn(
+          "h-5 w-5 transition-colors",
+          isSelected ? "text-primary" : "text-muted-foreground",
+        )}
+      />
+      <span
+        className={cn(
+          "text-sm font-medium transition-colors whitespace-nowrap",
+          isSelected ? "text-primary" : "text-foreground",
+        )}
+      >
+        {type.label}
+      </span>
+    </button>
+  );
+}
 
-      if (newIndex !== null) {
-        buttonRefs.current[newIndex]?.focus();
+function CarouselView({
+  value,
+  onSelect,
+}: {
+  value?: ActivityType;
+  onSelect: (type: ActivityType) => void;
+}) {
+  const [canScrollPrev, setCanScrollPrev] = useState(false);
+  const [canScrollNext, setCanScrollNext] = useState(false);
+
+  // Set API and track scroll state
+  const handleSetApi = useCallback(
+    (api: CarouselApi) => {
+      if (!api) return;
+
+      const updateScrollState = () => {
+        setCanScrollPrev(api.canScrollPrev());
+        setCanScrollNext(api.canScrollNext());
+      };
+
+      updateScrollState();
+      api.on("select", updateScrollState);
+      api.on("reInit", updateScrollState);
+
+      // Scroll to selected item on mount
+      if (value) {
+        const selectedIndex = ALL_ACTIVITY_TYPES.findIndex((t) => t.value === value);
+        if (selectedIndex >= 0) {
+          setTimeout(() => api.scrollTo(selectedIndex), 0);
+        }
       }
     },
-    [],
+    [value],
   );
 
   return (
-    <div className="space-y-3">
+    <div className="relative overflow-hidden">
+      {/* Padding wrapper for selection ring and arrows */}
+      <div className="px-1 py-1">
+        <Carousel
+          opts={{
+            align: "start",
+            dragFree: true,
+            containScroll: "trimSnaps",
+          }}
+          setApi={handleSetApi}
+          className="w-full"
+        >
+          <CarouselContent className="-ml-2">
+            {ALL_ACTIVITY_TYPES.map((type) => (
+              <CarouselItem key={type.value} className="basis-auto pl-2">
+                <ActivityTypeButton
+                  type={type}
+                  isSelected={value === type.value}
+                  onClick={() => onSelect(type.value)}
+                  compact
+                />
+              </CarouselItem>
+            ))}
+          </CarouselContent>
+
+          {canScrollPrev && (
+            <CarouselPrevious className="left-0 h-7 w-7" />
+          )}
+          {canScrollNext && (
+            <CarouselNext className="right-0 h-7 w-7" />
+          )}
+        </Carousel>
+      </div>
+    </div>
+  );
+}
+
+function GridView({
+  value,
+  onSelect,
+}: {
+  value?: ActivityType;
+  onSelect: (type: ActivityType) => void;
+}) {
+  const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent, index: number) => {
+    const total = ALL_ACTIVITY_TYPES.length;
+    const cols = 5; // 5 columns in grid
+    let newIndex: number | null = null;
+
+    switch (e.key) {
+      case "ArrowRight":
+        e.preventDefault();
+        newIndex = (index + 1) % total;
+        break;
+      case "ArrowLeft":
+        e.preventDefault();
+        newIndex = (index - 1 + total) % total;
+        break;
+      case "ArrowDown":
+        e.preventDefault();
+        newIndex = (index + cols) % total;
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        newIndex = (index - cols + total) % total;
+        break;
+      case "Home":
+        e.preventDefault();
+        newIndex = 0;
+        break;
+      case "End":
+        e.preventDefault();
+        newIndex = total - 1;
+        break;
+    }
+
+    if (newIndex !== null) {
+      buttonRefs.current[newIndex]?.focus();
+    }
+  }, []);
+
+  return (
+    <div className="p-1">
       <div
         role="group"
-        aria-label="Primary activity types"
-        className="grid grid-cols-3 gap-2 sm:grid-cols-6 sm:gap-3"
+        aria-label="All activity types"
+        className="grid grid-cols-5 gap-2"
       >
-        {PRIMARY_ACTIVITY_TYPES.map((type, index) => {
-          const Icon = Icons[type.icon];
-          const isSelected = value === type.value;
-
-          return (
-            <button
-              key={type.value}
-              ref={(el) => {
-                buttonRefs.current[index] = el;
-              }}
-              type="button"
-              onClick={() => onSelect(type.value)}
-              onKeyDown={(e) => handleKeyDown(e, index)}
-              aria-pressed={isSelected}
-              className={cn(
-                "flex flex-col items-center justify-center gap-2 rounded-lg border p-4 transition-all",
-                "hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                "min-h-[80px] cursor-pointer",
-                isSelected && "border-primary bg-primary/5 ring-1 ring-primary",
-                !isSelected && "border-border",
-              )}
-            >
-              <Icon
-                className={cn(
-                  "h-5 w-5 transition-colors",
-                  isSelected ? "text-primary" : "text-muted-foreground",
-                )}
-              />
-              <span
-                className={cn(
-                  "text-sm font-medium transition-colors",
-                  isSelected ? "text-primary" : "text-foreground",
-                )}
-              >
-                {type.label}
-              </span>
-            </button>
-          );
-        })}
+        {ALL_ACTIVITY_TYPES.map((type, index) => (
+          <ActivityTypeButton
+            key={type.value}
+            type={type}
+            isSelected={value === type.value}
+            onClick={() => onSelect(type.value)}
+            onKeyDown={(e) => handleKeyDown(e, index)}
+            buttonRef={(el) => {
+              buttonRefs.current[index] = el;
+            }}
+            compact
+          />
+        ))}
       </div>
+    </div>
+  );
+}
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
+export function ActivityTypePicker({ value, onSelect }: ActivityTypePickerProps) {
+  const [viewMode, setViewMode] = useState<ViewMode>("carousel");
+
+  const toggleViewMode = useCallback(() => {
+    setViewMode((prev) => (prev === "carousel" ? "grid" : "carousel"));
+  }, []);
+
+  return (
+    <div className="space-y-1 overflow-hidden">
+      {/* Activity type selector */}
+      {viewMode === "carousel" ? (
+        <CarouselView value={value} onSelect={onSelect} />
+      ) : (
+        <GridView value={value} onSelect={onSelect} />
+      )}
+
+      {/* View toggle at bottom */}
+      <div className="flex justify-center">
+        <button
+          type="button"
+          onClick={toggleViewMode}
+          className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors py-1"
+          aria-label={viewMode === "carousel" ? "Expand to show all types" : "Collapse"}
+        >
+          <Icons.ChevronDown
             className={cn(
-              "flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-2 transition-all",
-              "hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              "cursor-pointer text-sm",
-              isSecondarySelected && "border-primary bg-primary/5 ring-1 ring-primary",
-              !isSecondarySelected && "border-border",
+              "h-4 w-4 transition-transform duration-200",
+              viewMode === "grid" && "rotate-180",
             )}
-          >
-            {isSecondarySelected ? (
-              <>
-                {(() => {
-                  const Icon = Icons[selectedSecondaryType.icon];
-                  return <Icon className="h-4 w-4 text-primary" />;
-                })()}
-                <span className="font-medium text-primary">{selectedSecondaryType.label}</span>
-              </>
-            ) : (
-              <>
-                <Icons.MoreVertical className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">More</span>
-              </>
-            )}
-            <Icons.ChevronDown className="ml-1 h-4 w-4 text-muted-foreground" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="center" className="w-48">
-          {SECONDARY_ACTIVITY_TYPES.map((type) => {
-            const Icon = Icons[type.icon];
-            const isSelected = value === type.value;
-
-            return (
-              <DropdownMenuItem
-                key={type.value}
-                onClick={() => onSelect(type.value)}
-                className={cn(isSelected && "bg-primary/5 text-primary")}
-              >
-                <Icon className={cn("mr-2 h-4 w-4", isSelected && "text-primary")} />
-                <span className={cn(isSelected && "font-medium")}>{type.label}</span>
-                {isSelected && <Icons.Check className="ml-auto h-4 w-4" />}
-              </DropdownMenuItem>
-            );
-          })}
-        </DropdownMenuContent>
-      </DropdownMenu>
+          />
+        </button>
+      </div>
     </div>
   );
 }

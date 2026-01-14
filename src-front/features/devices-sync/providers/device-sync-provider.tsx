@@ -1,7 +1,7 @@
 // DeviceSyncProvider
 // React context provider for device sync state and actions
-// Uses the new REST API via sync-service
-// =========================================================
+// Uses state machine model: FRESH → REGISTERED → READY (+ STALE, RECOVERY)
+// ===========================================================================
 
 import {
   createContext,
@@ -9,101 +9,91 @@ import {
   useReducer,
   useEffect,
   useCallback,
+  useRef,
   type ReactNode,
 } from "react";
 import { useWealthfolioConnect } from "@/features/wealthfolio-connect";
-import { logger } from "@/adapters";
-import { syncService } from "../services/sync-service";
+import { syncService, type EnableSyncResult } from "../services/sync-service";
 import * as crypto from "../crypto";
 import type {
   SyncState,
   PairingSession,
   ClaimerSession,
-  ClaimResult,
-  PairingRole,
   Device,
   TrustedDeviceSummary,
-  EnrollmentMode,
+  DeviceSyncState,
+  SyncIdentity,
   KeyBundlePayload,
 } from "../types";
-import { SyncError, SyncErrorCodes } from "../types";
+import { SyncError, SyncErrorCodes, INITIAL_SYNC_STATE } from "../types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // State Management
 // ─────────────────────────────────────────────────────────────────────────────
 
 type SyncAction =
-  | { type: "INIT_START" }
+  // State detection
+  | { type: "DETECT_START" }
   | {
-      type: "INIT_SUCCESS";
-      deviceId: string;
+      type: "DETECT_SUCCESS";
+      syncState: DeviceSyncState;
+      identity: SyncIdentity | null;
       device: Device | null;
-      enrollmentMode: EnrollmentMode;
-      trustedDevices?: TrustedDeviceSummary[];
+      serverKeyVersion: number | null;
+      trustedDevices: TrustedDeviceSummary[];
     }
-  | { type: "INIT_ERROR"; error: SyncError }
-  | { type: "SET_KEY_STATUS"; keysInitialized: boolean; keyVersion: number | null }
-  | { type: "PAIRING_STARTED"; session: PairingSession; role: PairingRole }
+  | { type: "DETECT_ERROR"; error: SyncError }
+
+  // Operations
+  | { type: "OPERATION_START" }
+  | { type: "OPERATION_END" }
+
+  // Pairing - Issuer
+  | { type: "PAIRING_STARTED"; session: PairingSession }
   | { type: "PAIRING_CLAIMED"; claimerPublicKey: string; claimerDeviceId: string; sessionKey: string }
-  | { type: "PAIRING_CLAIM_RESULT"; result: ClaimResult }
   | { type: "PAIRING_APPROVED" }
-  | { type: "PAIRING_COMPLETED" }
   | { type: "PAIRING_CANCELED" }
   | { type: "PAIRING_ERROR"; error: SyncError }
-  // Claimer-side actions
+
+  // Pairing - Claimer
   | { type: "CLAIMER_SESSION_STARTED"; session: ClaimerSession }
   | { type: "CLAIMER_KEY_RECEIVED"; keyBundle: KeyBundlePayload }
-  | { type: "CLAIMER_CONFIRMED"; keyVersion: number }
-  | { type: "CLEAR_ERROR" }
-  | { type: "RESET" };
 
-const initialState: SyncState = {
-  isInitialized: false,
-  isLoading: true,
-  error: null,
-  deviceId: null,
-  device: null,
-  enrollmentMode: null,
-  trustedDevicesForPairing: [],
-  localKeyVersion: null,
-  keysInitialized: false,
-  pairingSession: null,
-  pairingRole: null,
-  claimResult: null,
-  claimerSession: null,
-};
+  // Common
+  | { type: "CLEAR_ERROR" }
+  | { type: "CLEAR_PAIRING_STATE" }
+  | { type: "RESET" };
 
 function syncReducer(state: SyncState, action: SyncAction): SyncState {
   switch (action.type) {
-    case "INIT_START":
+    case "DETECT_START":
+      return { ...state, isDetecting: true, error: null };
+
+    case "DETECT_SUCCESS":
+      return {
+        ...state,
+        isDetecting: false,
+        syncState: action.syncState,
+        identity: action.identity,
+        device: action.device,
+        serverKeyVersion: action.serverKeyVersion,
+        trustedDevices: action.trustedDevices,
+      };
+
+    case "DETECT_ERROR":
+      return { ...state, isDetecting: false, error: action.error };
+
+    case "OPERATION_START":
       return { ...state, isLoading: true, error: null };
 
-    case "INIT_SUCCESS":
-      return {
-        ...state,
-        isInitialized: true,
-        isLoading: false,
-        deviceId: action.deviceId,
-        device: action.device,
-        enrollmentMode: action.enrollmentMode,
-        trustedDevicesForPairing: action.trustedDevices ?? [],
-      };
-
-    case "INIT_ERROR":
-      return { ...state, isLoading: false, error: action.error };
-
-    case "SET_KEY_STATUS":
-      return {
-        ...state,
-        keysInitialized: action.keysInitialized,
-        localKeyVersion: action.keyVersion,
-      };
+    case "OPERATION_END":
+      return { ...state, isLoading: false };
 
     case "PAIRING_STARTED":
       return {
         ...state,
         pairingSession: action.session,
-        pairingRole: action.role,
+        pairingRole: "issuer",
         error: null,
       };
 
@@ -121,9 +111,6 @@ function syncReducer(state: SyncState, action: SyncAction): SyncState {
           : null,
       };
 
-    case "PAIRING_CLAIM_RESULT":
-      return { ...state, claimResult: action.result };
-
     case "PAIRING_APPROVED":
       return {
         ...state,
@@ -132,30 +119,17 @@ function syncReducer(state: SyncState, action: SyncAction): SyncState {
           : null,
       };
 
-    case "PAIRING_COMPLETED":
-      return {
-        ...state,
-        keysInitialized: true,
-        enrollmentMode: "READY",
-        pairingSession: null,
-        pairingRole: null,
-        claimResult: null,
-        claimerSession: null,
-      };
-
     case "PAIRING_CANCELED":
       return {
         ...state,
         pairingSession: null,
         pairingRole: null,
-        claimResult: null,
         claimerSession: null,
       };
 
     case "PAIRING_ERROR":
       return { ...state, error: action.error };
 
-    // Claimer-side actions
     case "CLAIMER_SESSION_STARTED":
       return {
         ...state,
@@ -172,21 +146,19 @@ function syncReducer(state: SyncState, action: SyncAction): SyncState {
           : null,
       };
 
-    case "CLAIMER_CONFIRMED":
+    case "CLEAR_PAIRING_STATE":
       return {
         ...state,
-        keysInitialized: true,
-        enrollmentMode: "READY",
-        localKeyVersion: action.keyVersion,
-        claimerSession: null,
+        pairingSession: null,
         pairingRole: null,
+        claimerSession: null,
       };
 
     case "CLEAR_ERROR":
       return { ...state, error: null };
 
     case "RESET":
-      return { ...initialState, isLoading: false };
+      return { ...INITIAL_SYNC_STATE, isDetecting: false };
 
     default:
       return state;
@@ -197,16 +169,17 @@ function syncReducer(state: SyncState, action: SyncAction): SyncState {
 // Context
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Result type for initializeKeys action
-type InitKeysResult =
-  | { status: "initialized"; keyVersion: number }
-  | { status: "requires_pairing"; keyVersion: number | null; trustedDevices: TrustedDeviceSummary[] };
-
 interface SyncContextValue {
   state: SyncState;
   actions: {
-    // E2EE key initialization
-    initializeKeys: () => Promise<InitKeysResult>;
+    // State management
+    refreshState: () => Promise<void>;
+
+    // Enable sync (FRESH state)
+    enableSync: () => Promise<EnableSyncResult>;
+
+    // E2EE key initialization (BOOTSTRAP mode)
+    initializeKeys: () => Promise<{ keyVersion: number }>;
 
     // Pairing - Issuer (trusted device)
     startPairing: () => Promise<PairingSession>;
@@ -222,16 +195,19 @@ interface SyncContextValue {
     // Pairing - Common
     cancelPairing: () => Promise<void>;
 
+    // Recovery
+    handleRecovery: () => Promise<void>;
+
     // Device management
     renameDevice: (deviceId: string, name: string) => Promise<void>;
     revokeDevice: (deviceId: string) => Promise<void>;
 
     // Sync reset
     resetSync: () => Promise<void>;
+    reinitializeSync: () => Promise<void>;
 
     // Utils
     computeSAS: () => Promise<string | null>;
-    refreshDevice: () => Promise<void>;
     clearError: () => void;
     clearSyncData: () => Promise<void>;
   };
@@ -245,12 +221,12 @@ const DeviceSyncContext = createContext<SyncContextValue | null>(null);
 
 export function DeviceSyncProvider({ children }: { children: ReactNode }) {
   const { isConnected, isEnabled, userInfo } = useWealthfolioConnect();
-  const [state, dispatch] = useReducer(syncReducer, initialState);
+  const [state, dispatch] = useReducer(syncReducer, INITIAL_SYNC_STATE);
 
   // Check if user has a subscription (team)
   const hasSubscription = !!userInfo?.team?.plan;
 
-  // Initialize on mount (when connected AND has subscription)
+  // Detect state on mount (when connected AND has subscription)
   useEffect(() => {
     if (!isEnabled || !isConnected || !hasSubscription) {
       dispatch({ type: "RESET" });
@@ -259,60 +235,38 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
 
     let cancelled = false;
 
-    async function init() {
-      dispatch({ type: "INIT_START" });
+    async function detectState() {
+      dispatch({ type: "DETECT_START" });
       try {
-        const enrollmentResult = await syncService.initialize();
+        const result = await syncService.detectState();
         if (cancelled) return;
 
-        // Get current device info
-        let device: Device | null = null;
-        try {
-          device = await syncService.getCurrentDevice();
-        } catch {
-          // Device may not exist yet
-        }
-
         dispatch({
-          type: "INIT_SUCCESS",
-          deviceId: enrollmentResult.deviceId,
-          device,
-          enrollmentMode: enrollmentResult.mode,
-          trustedDevices: enrollmentResult.trustedDevices,
+          type: "DETECT_SUCCESS",
+          syncState: result.state,
+          identity: result.identity,
+          device: result.device,
+          serverKeyVersion: result.serverKeyVersion,
+          trustedDevices: result.trustedDevices,
         });
-
-        // Check key status
-        try {
-          const keyStatus = await syncService.checkKeyStatus();
-          if (cancelled) return;
-
-          dispatch({
-            type: "SET_KEY_STATUS",
-            keysInitialized: !keyStatus.needsInitialization && !keyStatus.needsPairing,
-            keyVersion: keyStatus.keyVersion,
-          });
-        } catch (err) {
-          logger.warn(`[DeviceSyncProvider] Failed to check key status: ${err}`);
-        }
       } catch (err) {
         if (cancelled) return;
 
-        // Handle DEVICE_NOT_FOUND - device was unpaired
-        if (SyncError.isDeviceNotFound(err)) {
+        // Check if this is an auth error (no access token)
+        if (SyncError.isNoAccessToken(err)) {
+          // Not signed in - reset to initial state
           dispatch({ type: "RESET" });
-          // Re-run init to register a new device
-          if (!cancelled) void init();
           return;
         }
 
         dispatch({
-          type: "INIT_ERROR",
-          error: err instanceof SyncError ? err : new SyncError(SyncErrorCodes.INIT_FAILED, String(err)),
+          type: "DETECT_ERROR",
+          error: SyncError.from(err),
         });
       }
     }
 
-    void init();
+    void detectState();
 
     return () => {
       cancelled = true;
@@ -320,68 +274,75 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
   }, [isConnected, isEnabled, hasSubscription]);
 
   // Actions
-  const initializeKeys = useCallback(async (): Promise<InitKeysResult> => {
-    // Use the new attemptInitializeTeamKeys which returns discriminated union
-    const result = await syncService.attemptInitializeTeamKeys();
-
-    if (result.mode === "BOOTSTRAP") {
-      // This is the first device - initialize keys
-      const initResult = await syncService.initializeTeamKeys();
-
-      // Refresh device to get updated trust state from server
-      try {
-        const device = await syncService.getCurrentDevice();
-        dispatch({
-          type: "INIT_SUCCESS",
-          deviceId: device.id,
-          device,
-          enrollmentMode: "READY",
-        });
-      } catch {
-        // If refresh fails, still update key status
-        logger.warn("[DeviceSyncProvider] Failed to refresh device after key init");
-      }
-
+  const refreshState = useCallback(async () => {
+    dispatch({ type: "DETECT_START" });
+    try {
+      const result = await syncService.detectState();
       dispatch({
-        type: "SET_KEY_STATUS",
-        keysInitialized: true,
-        keyVersion: initResult.keyVersion,
+        type: "DETECT_SUCCESS",
+        syncState: result.state,
+        identity: result.identity,
+        device: result.device,
+        serverKeyVersion: result.serverKeyVersion,
+        trustedDevices: result.trustedDevices,
       });
-      return { status: "initialized", keyVersion: initResult.keyVersion };
-    } else if (result.mode === "PAIRING_REQUIRED") {
-      // Keys exist but this device doesn't have them
+    } catch (err) {
       dispatch({
-        type: "SET_KEY_STATUS",
-        keysInitialized: false,
-        keyVersion: result.keyVersion ?? null,
+        type: "DETECT_ERROR",
+        error: SyncError.from(err),
       });
-      return {
-        status: "requires_pairing",
-        keyVersion: result.keyVersion ?? null,
-        trustedDevices: result.trustedDevices ?? [],
-      };
-    } else {
-      // READY - Device already has keys
-      dispatch({
-        type: "SET_KEY_STATUS",
-        keysInitialized: true,
-        keyVersion: result.keyVersion ?? null,
-      });
-      return { status: "initialized", keyVersion: result.keyVersion! };
     }
   }, []);
+
+  const enableSync = useCallback(async (): Promise<EnableSyncResult> => {
+    dispatch({ type: "OPERATION_START" });
+    try {
+      const result = await syncService.enableSync();
+      // Refresh state from backend to get authoritative state
+      await refreshState();
+      return result;
+    } catch (err) {
+      dispatch({ type: "OPERATION_END" });
+      throw SyncError.from(err);
+    }
+  }, [refreshState]);
+
+  const initializeKeys = useCallback(async (): Promise<{ keyVersion: number }> => {
+    dispatch({ type: "OPERATION_START" });
+    try {
+      // This is now handled by enableSync() in the backend.
+      const result = await syncService.initializeKeys();
+      await refreshState();
+      return result;
+    } catch (err) {
+      dispatch({ type: "OPERATION_END" });
+      throw SyncError.from(err);
+    }
+  }, [refreshState]);
 
   const startPairing = useCallback(async () => {
     const session = await syncService.createPairingSession();
-    dispatch({ type: "PAIRING_STARTED", session, role: "issuer" });
+    dispatch({ type: "PAIRING_STARTED", session });
     return session;
   }, []);
 
+  // Use refs to avoid stale closure in polling - always access latest session
+  const pairingSessionRef = useRef(state.pairingSession);
+  useEffect(() => {
+    pairingSessionRef.current = state.pairingSession;
+  }, [state.pairingSession]);
+
+  const claimerSessionRef = useRef(state.claimerSession);
+  useEffect(() => {
+    claimerSessionRef.current = state.claimerSession;
+  }, [state.claimerSession]);
+
   const pollForClaimerConnection = useCallback(async () => {
-    if (!state.pairingSession) {
+    const session = pairingSessionRef.current;
+    if (!session) {
       throw new SyncError(SyncErrorCodes.NO_SESSION, "No active pairing session");
     }
-    const result = await syncService.pollForClaimerConnection(state.pairingSession);
+    const result = await syncService.pollForClaimerConnection(session);
     if (result.claimed && result.claimerPublicKey && result.claimerDeviceId && result.sessionKey) {
       dispatch({
         type: "PAIRING_CLAIMED",
@@ -392,7 +353,7 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
       return true;
     }
     return false;
-  }, [state.pairingSession]);
+  }, []); // No dependencies - uses ref for latest session
 
   const approvePairing = useCallback(async () => {
     if (!state.pairingSession) {
@@ -403,15 +364,14 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
   }, [state.pairingSession]);
 
   const completePairing = useCallback(async () => {
-    logger.debug(
-      `[DeviceSyncProvider] completePairing called, ready: ${!!(state.pairingSession?.claimerPublicKey && state.pairingSession?.sessionKey)}`,
-    );
     if (!state.pairingSession) {
       throw new SyncError(SyncErrorCodes.NO_SESSION, "No active pairing session");
     }
     await syncService.completePairing(state.pairingSession);
-    logger.debug("[DeviceSyncProvider] completePairing completed successfully");
-    dispatch({ type: "PAIRING_COMPLETED" });
+    dispatch({ type: "CLEAR_PAIRING_STATE" });
+    // NOTE: Don't call refreshState() here - it sets isDetecting=true which
+    // causes DeviceSyncSection to render loading skeleton, unmounting the
+    // pairing dialog and causing it to restart. Refresh happens when dialog closes.
   }, [state.pairingSession]);
 
   const cancelPairing = useCallback(async () => {
@@ -423,7 +383,6 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "PAIRING_CANCELED" });
   }, [state.pairingSession]);
 
-  // Claimer-side pairing actions
   const claimPairing = useCallback(async (code: string): Promise<ClaimerSession> => {
     const session = await syncService.claimPairingSession(code);
     dispatch({ type: "CLAIMER_SESSION_STARTED", session });
@@ -431,26 +390,40 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const pollForKeyBundle = useCallback(async () => {
-    if (!state.claimerSession) {
+    const session = claimerSessionRef.current;
+    if (!session) {
       throw new SyncError(SyncErrorCodes.NO_SESSION, "No active claimer session");
     }
-    const result = await syncService.pollForKeyBundle(state.claimerSession);
+    const result = await syncService.pollForKeyBundle(session);
     if (result.received && result.keyBundle) {
       dispatch({ type: "CLAIMER_KEY_RECEIVED", keyBundle: result.keyBundle });
     }
     return { received: result.received, keyBundle: result.keyBundle };
-  }, [state.claimerSession]);
+  }, []); // No dependencies - uses ref for latest session
 
   const confirmPairingAsClaimer = useCallback(
     async (keyBundle: KeyBundlePayload) => {
-      if (!state.claimerSession) {
+      const session = claimerSessionRef.current;
+      if (!session) {
         throw new SyncError(SyncErrorCodes.NO_SESSION, "No active claimer session");
       }
-      const result = await syncService.confirmPairingAsClaimer(state.claimerSession, keyBundle);
-      dispatch({ type: "CLAIMER_CONFIRMED", keyVersion: result.keyVersion });
+      await syncService.confirmPairingAsClaimer(session, keyBundle);
+      dispatch({ type: "CLEAR_PAIRING_STATE" });
+      // NOTE: Don't call refreshState() here - same issue as completePairing
     },
-    [state.claimerSession],
+    [], // No dependencies - uses ref for latest session
   );
+
+  const handleRecovery = useCallback(async () => {
+    dispatch({ type: "OPERATION_START" });
+    try {
+      await syncService.handleRecovery();
+      await refreshState();
+    } catch (err) {
+      dispatch({ type: "OPERATION_END" });
+      throw SyncError.from(err);
+    }
+  }, [refreshState]);
 
   const renameDevice = useCallback(async (deviceId: string, name: string) => {
     await syncService.renameDevice(deviceId, name);
@@ -461,35 +434,33 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const resetSync = useCallback(async () => {
-    // Reset keys on the server
-    await syncService.resetSync();
-    // Clear all local sync data (including device ID) so next init registers fresh
-    await syncService.clearSyncData();
-    dispatch({ type: "RESET" });
-  }, []);
-
-  const computeSAS = useCallback(async () => {
-    const sessionKey =
-      state.pairingSession?.sessionKey ||
-      state.claimResult?.sessionKey ||
-      state.claimerSession?.sessionKey;
-    if (!sessionKey) return null;
-    return crypto.computeSAS(sessionKey);
-  }, [state.pairingSession?.sessionKey, state.claimResult?.sessionKey, state.claimerSession?.sessionKey]);
-
-  const refreshDevice = useCallback(async () => {
+    dispatch({ type: "OPERATION_START" });
     try {
-      const device = await syncService.getCurrentDevice();
-      dispatch({
-        type: "INIT_SUCCESS",
-        deviceId: device.id,
-        device,
-        enrollmentMode: device.trustState === "trusted" ? "READY" : "PAIR",
-      });
-    } catch {
-      // Ignore refresh errors
+      await syncService.resetSync();
+      await syncService.clearSyncData();
+      dispatch({ type: "RESET" });
+    } catch (err) {
+      dispatch({ type: "OPERATION_END" });
+      throw SyncError.from(err);
     }
   }, []);
+
+  const reinitializeSync = useCallback(async () => {
+    dispatch({ type: "OPERATION_START" });
+    try {
+      await syncService.reinitializeSync();
+      await refreshState();
+    } catch (err) {
+      dispatch({ type: "OPERATION_END" });
+      throw SyncError.from(err);
+    }
+  }, [refreshState]);
+
+  const computeSAS = useCallback(async () => {
+    const sessionKey = state.pairingSession?.sessionKey || state.claimerSession?.sessionKey;
+    if (!sessionKey) return null;
+    return crypto.computeSAS(sessionKey);
+  }, [state.pairingSession?.sessionKey, state.claimerSession?.sessionKey]);
 
   const clearError = useCallback(() => {
     dispatch({ type: "CLEAR_ERROR" });
@@ -503,6 +474,8 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
   const value: SyncContextValue = {
     state,
     actions: {
+      refreshState,
+      enableSync,
       initializeKeys,
       startPairing,
       pollForClaimerConnection,
@@ -512,11 +485,12 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
       pollForKeyBundle,
       confirmPairingAsClaimer,
       cancelPairing,
+      handleRecovery,
       renameDevice,
       revokeDevice,
       resetSync,
+      reinitializeSync,
       computeSAS,
-      refreshDevice,
       clearError,
       clearSyncData,
     },

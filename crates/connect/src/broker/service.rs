@@ -446,6 +446,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                         pricing_mode: "MARKET".to_string(),
                         preferred_provider: Some(DataSource::Yahoo.as_str().to_string()),
                         metadata,
+                        is_active: 1,
                         created_at: now_rfc3339.clone(),
                         updated_at: now_rfc3339.clone(),
                         ..Default::default()

@@ -586,43 +586,46 @@ Check out the [addons/](addons/) directory for sample addons including:
 
 ```
 wealthfolio/
-├── src-front/                   # Main source code for the React application
+├── src-front/                   # React frontend application
 │   ├── adapters/                # Environment adapters (Tauri/Web)
 │   │   ├── tauri/               # Desktop/Tauri implementation
 │   │   ├── web/                 # Web/REST API implementation
 │   │   └── types.ts             # Shared adapter types
-│   ├── addons/                  # Addon system core functionality
+│   ├── addons/                  # Addon system runtime
 │   ├── commands/                # Backend command wrappers
 │   ├── components/              # React components
+│   ├── features/                # Feature modules (self-contained)
 │   ├── pages/                   # Application pages and routes
 │   ├── hooks/                   # Custom React hooks
 │   └── lib/                     # Utility libraries and helpers
-├── src-core/                    # Core backend functionality (Rust)
-├── src-tauri/                   # Tauri-specific code for desktop app functionality
-├── src-server/                  # Web server (Axum) for REST API mode
-├── addons/                      # Example and sample addons
-│   └── goal-progress-tracker/   # Goal Progress tracker addon example
-├── packages/                    # Shared packages and tools
+├── crates/                      # Rust crates (shared backend logic)
+│   ├── core/                    # Core business logic, services, models
+│   ├── storage-sqlite/          # SQLite storage layer (Diesel ORM)
+│   ├── market-data/             # Market data providers
+│   ├── connect/                 # External service integrations
+│   └── device-sync/             # Device sync functionality
+├── src-tauri/                   # Tauri desktop app (Rust IPC commands)
+├── src-server/                  # Axum HTTP server for web mode
+├── addons/                      # Example addons
+│   ├── goal-progress-tracker/   # Goal tracking addon
+│   ├── investment-fees-tracker/ # Fees tracking addon
+│   └── swingfolio-addon/        # Trading addon
+├── packages/                    # Shared TypeScript packages
 │   ├── addon-sdk/               # Addon SDK for developers
-│   ├── addon-dev-tools/         # Development tools and CLI
-│   └── ui/                      # Shared UI components library
+│   ├── addon-dev-tools/         # CLI and dev server for addons
+│   └── ui/                      # Shared UI components (@wealthfolio/ui)
 ├── docs/                        # Documentation
-│   ├── addons/                  # Addon development documentation
-│   ├── activities/              # Activity types documentation
-│   └── architecture/            # Architecture documentation
-├── public/                      # Public assets
-├── db/                          # Database files and migrations
-├── LICENSE                      # License file
-├── README.md                    # Project documentation
-├── ROADMAP.md                   # Future plans and roadmap
-│
-├── packages/ui/components.json  # Shadcn UI generator config (monorepo)
-├── package.json                 # Node.js dependencies and scripts
-├── pnpm-lock.yaml               # Lock file for pnpm
-├── postcss.config.js            # PostCSS configuration
-├── tailwind.config.js           # Tailwind CSS configuration
-├── tsconfig.json                # TypeScript configuration
-└── vite.config.ts               # Vite build tool configuration
+│   ├── addons/                  # Addon development docs
+│   ├── activities/              # Activity types docs
+│   └── architecture/            # Architecture docs
+├── db/                          # SQLite database and migrations
+├── public/                      # Static assets
+├── Cargo.toml                   # Rust workspace config
+├── package.json                 # Node.js dependencies
+├── pnpm-workspace.yaml          # pnpm workspace config
+├── tailwind.config.js           # Tailwind CSS config
+├── tsconfig.json                # TypeScript config
+└── vite.config.ts               # Vite build config
 ```
 
 ### Security & Data Storage

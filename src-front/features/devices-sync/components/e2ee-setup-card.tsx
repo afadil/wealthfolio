@@ -1,6 +1,7 @@
 // E2EESetupCard
-// Shows setup options for device sync (owner only, first device)
-// ==============================================================
+// Shows setup card for device sync (FRESH or REGISTERED+bootstrap state)
+// One button: "Enable Device Sync" - handles enrollment + key init automatically
+// ===============================================================================
 
 import { Icons } from "@wealthfolio/ui";
 import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
@@ -14,6 +15,7 @@ import {
 } from "@wealthfolio/ui/components/ui/card";
 import { useState } from "react";
 import { useDeviceSync } from "../providers/device-sync-provider";
+import { SyncStates } from "../types";
 
 export function E2EESetupCard() {
   const { state, actions } = useDeviceSync();
@@ -24,7 +26,11 @@ export function E2EESetupCard() {
     setIsEnabling(true);
     setError(null);
     try {
-      await actions.initializeKeys();
+      // enableSync() handles everything:
+      // - Enrolls device if needed
+      // - Initializes E2EE keys if first device (bootstrap mode)
+      // - Returns needsPairing=true if other devices exist (pair mode)
+      await actions.enableSync();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to enable device sync");
     } finally {
@@ -32,8 +38,8 @@ export function E2EESetupCard() {
     }
   };
 
-  // Already enabled
-  if (state.keysInitialized) {
+  // If in READY state, don't show this card
+  if (state.syncState === SyncStates.READY) {
     return null;
   }
 
@@ -41,9 +47,7 @@ export function E2EESetupCard() {
     <Card>
       <CardHeader>
         <CardTitle className="text-base font-medium">Device Sync</CardTitle>
-        <CardDescription>
-          Sync your data securely across all your devices.
-        </CardDescription>
+        <CardDescription>Sync your data securely across all your devices.</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col items-center justify-center py-6 text-center">
@@ -61,8 +65,13 @@ export function E2EESetupCard() {
             </Alert>
           )}
 
-          <Button onClick={handleEnable} disabled={isEnabling} size="sm" className="mt-4">
-            {isEnabling ? (
+          <Button
+            onClick={handleEnable}
+            disabled={isEnabling || state.isLoading}
+            size="sm"
+            className="mt-4"
+          >
+            {isEnabling || state.isLoading ? (
               <>
                 <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
                 Setting up...

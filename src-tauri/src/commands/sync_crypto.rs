@@ -191,7 +191,7 @@ pub fn generate_pairing_code() -> String {
 /// Returns hex-encoded hash (64 characters) to match server expectations
 /// Normalizes code to uppercase alphanumeric before hashing
 pub fn hash_pairing_code(code: &str) -> String {
-    // Normalize: uppercase and alphanumeric only (matches server behavior)
+    // Normalize: uppercase and alphanumeric only (matches server behavior for pairing codes)
     let normalized: String = code
         .to_uppercase()
         .chars()
@@ -203,6 +203,16 @@ pub fn hash_pairing_code(code: &str) -> String {
     let result = hasher.finalize();
 
     // Return hex-encoded (64 chars) instead of base64 (44 chars)
+    result.iter().map(|b| format!("{:02x}", b)).collect()
+}
+
+/// Hash arbitrary data using SHA-256 (without normalization)
+/// Returns hex-encoded hash (64 characters)
+/// Use this for challenge responses and other data that shouldn't be normalized
+pub fn hash_sha256(data: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(data.as_bytes());
+    let result = hasher.finalize();
     result.iter().map(|b| format!("{:02x}", b)).collect()
 }
 

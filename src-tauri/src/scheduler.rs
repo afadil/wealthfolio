@@ -62,7 +62,7 @@ pub async fn run_startup_sync(handle: &AppHandle, context: &Arc<ServiceContext>)
                             "Triggering portfolio update after startup sync ({} activities synced)",
                             activities.activities_upserted
                         );
-                        crate::events::emit_portfolio_trigger_update(
+                        crate::events::emit_portfolio_trigger_recalculate(
                             handle,
                             crate::events::PortfolioRequestPayload::builder()
                                 .refetch_all_market_data(false)

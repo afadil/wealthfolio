@@ -75,7 +75,7 @@ function ServiceUnavailableCard({ onRetry, isRetrying }: ServiceUnavailableCardP
             We're having trouble connecting to Wealthfolio Connect. This is usually temporary and
             should resolve shortly.
           </p>
-          <Button variant="outline" size="sm" onClick={onRetry} disabled={isRetrying}>
+          <Button variant="outline" onClick={onRetry} disabled={isRetrying}>
             {isRetrying ? (
               <>
                 <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
@@ -147,10 +147,10 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
     : "Never synced";
 
   return (
-    <div className="bg-muted/30 flex items-center justify-between gap-3 rounded-lg border p-3">
-      {/* Logo and info */}
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        <Avatar className="h-9 w-9 rounded-lg">
+    <div className="bg-muted/30 rounded-lg border p-3">
+      <div className="flex items-center gap-3">
+        {/* Logo */}
+        <Avatar className="h-9 w-9 shrink-0 rounded-lg">
           <AvatarImage
             src={logoUrl}
             alt={account.institution_name || "Broker"}
@@ -161,6 +161,7 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
           </AvatarFallback>
         </Avatar>
 
+        {/* Main info - takes remaining space */}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="truncate text-sm font-medium">{account.name || "Account"}</span>
@@ -169,43 +170,45 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
                 Paper
               </Badge>
             )}
-            {isShared && ownerName && (
-              <span className="text-muted-foreground flex items-center gap-1 text-xs">
-                <Icons.Users className="h-3 w-3" />
-                Shared by {ownerName}
-              </span>
-            )}
           </div>
-          <div className="text-muted-foreground flex items-center gap-2 text-xs">
-            <span>{account.institution_name}</span>
+          <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-xs">
+            <span className="truncate">{account.institution_name}</span>
             {account.number && <span>{maskAccountNumber(account.number)}</span>}
           </div>
         </div>
-      </div>
 
-      {/* Status indicators */}
-      <div className="flex items-center gap-2">
-        <span className="text-muted-foreground text-xs">{lastSyncedText}</span>
-        {/* Shared indicator */}
-        {account.shared_with_household && (
+        {/* Status icons - always visible */}
+        <div className="flex shrink-0 items-center gap-1.5">
+          {account.shared_with_household && (
+            <Tooltip>
+              <TooltipTrigger>
+                <Icons.Link className="text-muted-foreground h-4 w-4" />
+              </TooltipTrigger>
+              <TooltipContent>Shared with household</TooltipContent>
+            </Tooltip>
+          )}
           <Tooltip>
             <TooltipTrigger>
-              <Icons.Link className="text-muted-foreground h-4 w-4" />
+              {account.sync_enabled ? (
+                <Icons.Eye className="h-4 w-4 text-blue-500" />
+              ) : (
+                <Icons.EyeOff className="text-muted-foreground h-4 w-4" />
+              )}
             </TooltipTrigger>
-            <TooltipContent>Shared with household</TooltipContent>
+            <TooltipContent>{account.sync_enabled ? "Sync enabled" : "Sync disabled"}</TooltipContent>
           </Tooltip>
+        </div>
+      </div>
+
+      {/* Bottom row - sync time and shared info */}
+      <div className="text-muted-foreground mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <span>{lastSyncedText}</span>
+        {isShared && ownerName && (
+          <span className="flex items-center gap-1">
+            <Icons.Users className="h-3 w-3" />
+            Shared by {ownerName}
+          </span>
         )}
-        {/* Sync enabled indicator */}
-        <Tooltip>
-          <TooltipTrigger>
-            {account.sync_enabled ? (
-              <Icons.Eye className="h-4 w-4 text-blue-500" />
-            ) : (
-              <Icons.EyeOff className="text-muted-foreground h-4 w-4" />
-            )}
-          </TooltipTrigger>
-          <TooltipContent>{account.sync_enabled ? "Sync enabled" : "Sync disabled"}</TooltipContent>
-        </Tooltip>
       </div>
     </div>
   );
@@ -231,17 +234,27 @@ function BrokerConnectionsCard({
   return (
     <Card>
       <CardContent className="p-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="bg-muted flex h-8 w-8 items-center justify-center rounded-lg">
+            <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
               <Icons.Link className="text-muted-foreground h-4 w-4" />
             </div>
             <h3 className="text-base font-semibold">Broker connections</h3>
           </div>
+          {/* Mobile: icon only */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-foreground sm:hidden"
+            onClick={openConnectionsPortal}
+          >
+            <Icons.ExternalLink className="h-4 w-4" />
+          </Button>
+          {/* Desktop: full text */}
           <Button
             variant="ghost"
             size="sm"
-            className="text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground hidden sm:inline-flex"
             onClick={openConnectionsPortal}
           >
             Manage connections
@@ -258,7 +271,7 @@ function BrokerConnectionsCard({
           ) : connections.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-6 text-center">
               <p className="text-muted-foreground text-sm">No broker connections yet</p>
-              <Button className="mt-3" size="sm" onClick={openConnectionsPortal}>
+              <Button className="mt-3" onClick={openConnectionsPortal}>
                 <Icons.Plus className="mr-2 h-4 w-4" />
                 Connect Broker
               </Button>
@@ -275,27 +288,25 @@ function BrokerConnectionsCard({
               return (
                 <div
                   key={connection.id}
-                  className="bg-muted/30 flex items-center justify-between gap-3 rounded-lg border p-3"
+                  className="bg-muted/30 flex items-center gap-3 rounded-lg border p-3"
                 >
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10 rounded-lg">
-                      <AvatarImage
-                        src={logoUrl}
-                        alt={brokerageName}
-                        className="bg-white object-contain p-1"
-                      />
-                      <AvatarFallback className="rounded-lg text-sm font-semibold">
-                        {brokerageName.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="font-medium">{brokerageName}</span>
-                  </div>
+                  <Avatar className="h-9 w-9 shrink-0 rounded-lg">
+                    <AvatarImage
+                      src={logoUrl}
+                      alt={brokerageName}
+                      className="bg-white object-contain p-1"
+                    />
+                    <AvatarFallback className="rounded-lg text-sm font-semibold">
+                      {brokerageName.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{brokerageName}</span>
                   <Badge
-                    className={
+                    className={`shrink-0 ${
                       isConnected
                         ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                         : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                    }
+                    }`}
                   >
                     {isConnected ? "Connected" : "Disconnected"}
                   </Badge>
@@ -501,17 +512,27 @@ export function ConnectedView() {
       {hasSubscription && (
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <div className="bg-muted flex h-8 w-8 items-center justify-center rounded-lg">
+                <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
                   <Icons.Wallet className="text-muted-foreground h-4 w-4" />
                 </div>
                 <h3 className="text-base font-semibold">Accounts</h3>
               </div>
+              {/* Mobile: icon only */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-foreground sm:hidden"
+                onClick={() => openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/accounts`)}
+              >
+                <Icons.ExternalLink className="h-4 w-4" />
+              </Button>
+              {/* Desktop: full text */}
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-muted-foreground hover:text-foreground"
+                className="text-muted-foreground hover:text-foreground hidden sm:inline-flex"
                 onClick={() => openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/accounts`)}
               >
                 Manage accounts
@@ -561,10 +582,8 @@ export function ConnectedView() {
                   {/* Sync Action */}
                   <div className="mt-4">
                     <Button
-                      size="sm"
                       onClick={() => syncToLocalMutation.mutate()}
                       disabled={isSyncing}
-                      className="w-full sm:w-auto"
                     >
                       {isSyncing ? (
                         <>

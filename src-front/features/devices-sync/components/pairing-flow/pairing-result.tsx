@@ -43,13 +43,13 @@ export function PairingResult({ success, error, onRetry, onDone }: PairingResult
 
   if (success) {
     return (
-      <div className="flex flex-col items-center gap-5 py-6">
-        <div className="rounded-full bg-green-100 p-3 dark:bg-green-900/30">
+      <div className="flex flex-col items-center px-4 py-6">
+        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
           <Icons.CheckCircle className="h-10 w-10 text-green-600 dark:text-green-500" />
         </div>
-        <div className="text-center">
-          <p className="text-lg font-semibold">You're all set!</p>
-          <p className="text-muted-foreground mt-1 text-sm">Device connected successfully</p>
+        <div className="mb-6 text-center">
+          <p className="text-foreground text-lg font-semibold">You're all set!</p>
+          <p className="text-muted-foreground mt-2 text-sm">Device connected successfully</p>
         </div>
         <Button className="w-full max-w-[200px]" onClick={onDone}>
           Done
@@ -59,23 +59,23 @@ export function PairingResult({ success, error, onRetry, onDone }: PairingResult
   }
 
   return (
-    <div className="flex flex-col items-center gap-4 py-6">
-      <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/30">
+    <div className="flex flex-col items-center px-4 py-6">
+      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
         <Icons.XCircle className="h-10 w-10 text-red-600 dark:text-red-500" />
       </div>
-      <div className="text-center">
-        <p className="font-semibold">Connection failed</p>
-        <p className="text-muted-foreground mt-1 max-w-xs text-sm">{formatError(error)}</p>
+      <div className="mb-6 text-center">
+        <p className="text-foreground text-base font-semibold">Connection failed</p>
+        <p className="text-muted-foreground mt-2 max-w-[240px] text-sm">{formatError(error)}</p>
       </div>
-      <div className="flex gap-2 pt-2">
-        <Button variant="outline" size="sm" onClick={onDone}>
-          Close
-        </Button>
+      <div className="flex gap-3">
         {onRetry && (
-          <Button size="sm" onClick={onRetry}>
+          <Button variant="outline" onClick={onRetry}>
             Try Again
           </Button>
         )}
+        <Button variant={onRetry ? "ghost" : "default"} onClick={onDone}>
+          {onRetry ? "Cancel" : "Close"}
+        </Button>
       </div>
     </div>
   );

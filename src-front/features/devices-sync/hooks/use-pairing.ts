@@ -51,8 +51,19 @@ export function usePairing() {
     actions.computeSAS().then(setSas).catch(() => setSas(null));
   }, [sessionKey, actions]);
 
-  // Poll for claimer connection (issuer)
-  const startPollingForClaimerConnection = useCallback(() => {
+  // Start polling when session becomes available (avoids stale closure)
+  useEffect(() => {
+    // Only start polling when we have a session and step is display_code/waiting_claim
+    if (!state.pairingSession?.pairingId) return;
+    if (step !== "display_code" && step !== "waiting_claim") return;
+
+    // Clear any existing interval
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+    }
+
+    logger.info(`[usePairing] Starting poll for claimer, pairingId: ${state.pairingSession.pairingId}`);
+
     pollRef.current = setInterval(async () => {
       // Check if session has expired
       const expiresAt = state.pairingSession?.expiresAt;
@@ -66,49 +77,59 @@ export function usePairing() {
       try {
         const claimed = await actionsRef.current.pollForClaimerConnection();
         if (claimed) {
+          logger.info("[usePairing] Claimer detected! Moving to verify_sas");
           if (pollRef.current) clearInterval(pollRef.current);
           // Session is now claimed, move to SAS verification
           setStep("verify_sas");
         }
       } catch (err) {
+        logger.error(`[usePairing] Poll error: ${err}`);
         if (pollRef.current) clearInterval(pollRef.current);
         setError(err instanceof Error ? err.message : String(err));
         setStep("error");
       }
     }, 2000); // Poll every 2 seconds
-  }, [state.pairingSession?.expiresAt]);
+
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, [state.pairingSession?.pairingId, state.pairingSession?.expiresAt, step]);
 
   // Start pairing as issuer (trusted device)
   const startPairing = useCallback(async () => {
+    logger.info("[usePairing] startPairing called");
     try {
       setError(null);
       setStep("display_code");
-      await actions.startPairing();
-      // Start polling for when claimer connects
-      startPollingForClaimerConnection();
+      const session = await actions.startPairing();
+      logger.info(`[usePairing] Session created: ${session.pairingId}, code: ${session.code}`);
+      // Polling will start automatically via useEffect when state.pairingSession is set
     } catch (err) {
+      logger.error(`[usePairing] startPairing error: ${err}`);
       setError(err instanceof Error ? err.message : String(err));
       setStep("error");
     }
-  }, [actions, startPollingForClaimerConnection]);
+  }, [actions]);
 
   // Confirm SAS verification and complete pairing (issuer only)
   const confirmSAS = useCallback(async () => {
     try {
       setError(null);
       setIsSubmitting(true);
-      logger.info("[usePairing] confirmSAS called");
+      logger.info("[usePairing] confirmSAS: approving pairing...");
 
       // Approve pairing first
-      logger.info("[usePairing] Approving pairing...");
-      await actions.approvePairing();
+      await actionsRef.current.approvePairing();
+      logger.info("[usePairing] confirmSAS: pairing approved, completing...");
 
       // Then complete pairing (sends encrypted key bundle)
       setStep("transferring");
-      logger.info("[usePairing] Completing pairing...");
-      await actions.completePairing();
+      await actionsRef.current.completePairing();
+      logger.info("[usePairing] confirmSAS: pairing completed, setting success");
 
-      logger.info("[usePairing] Pairing completed successfully");
       setStep("success");
     } catch (err) {
       logger.error(`[usePairing] confirmSAS error: ${err}`);
@@ -117,22 +138,22 @@ export function usePairing() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [actions]);
+  }, []);
 
   // Reject SAS verification
   const rejectSAS = useCallback(async () => {
     if (pollRef.current) clearInterval(pollRef.current);
-    await actions.cancelPairing();
+    await actionsRef.current.cancelPairing();
     setStep("idle");
-  }, [actions]);
+  }, []);
 
   // Cancel pairing
   const cancel = useCallback(async () => {
     if (pollRef.current) clearInterval(pollRef.current);
-    await actions.cancelPairing();
+    await actionsRef.current.cancelPairing();
     setStep("idle");
     setError(null);
-  }, [actions]);
+  }, []);
 
   // Reset to initial state
   const reset = useCallback(() => {

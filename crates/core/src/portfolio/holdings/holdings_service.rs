@@ -121,7 +121,7 @@ impl HoldingsServiceTrait for HoldingsService {
         {
             Ok(Some(snap)) => snap,
             Ok(None) => {
-                warn!(
+                debug!(
                     "No calculated holdings found for account {}. Returning empty holdings list.",
                     account_id
                 );
@@ -386,7 +386,7 @@ impl HoldingsServiceTrait for HoldingsService {
         {
             Ok(Some(snap)) => snap,
             Ok(None) => {
-                warn!(
+                debug!(
                     "No snapshot found for account {}. Cannot get holding for asset {}.",
                     account_id, asset_id
                 );
