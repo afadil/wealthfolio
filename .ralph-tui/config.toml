@@ -1,9 +1,0 @@
-maxIterations = 0
-agent = "claude"
-tracker = "json"
-autoCommit = false
-
-[agentOptions]
-[trackerOptions]
-[notifications]
-sound = "system"
