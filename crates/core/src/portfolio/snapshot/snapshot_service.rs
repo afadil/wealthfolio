@@ -1,7 +1,7 @@
 use super::holdings_calculator::HoldingsCalculator;
 use super::SnapshotRepositoryTrait;
 use crate::accounts::{Account, AccountRepositoryTrait};
-use crate::activities::{Activity, ActivityRepositoryTrait};
+use crate::activities::{Activity, ActivityCompiler, ActivityRepositoryTrait, DefaultActivityCompiler};
 use crate::assets::AssetRepositoryTrait;
 use crate::constants::{DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
 use crate::errors::{CalculatorError, Error, Result};
@@ -317,7 +317,7 @@ impl SnapshotService {
     }
 
     // --- Step 5: Preprocess activities ---
-    // Adjusts for splits and groups activities.
+    // Compiles activities (expands DRIP, STAKING_REWARD, etc.), adjusts for splits, and groups.
     // If "TOTAL" account exists in `accounts_to_process`, adds ALL activities to its key.
     fn preprocess_data(
         &self,
@@ -326,10 +326,15 @@ impl SnapshotService {
         min_activity_date: NaiveDate,
         calculation_end_date: NaiveDate,
     ) -> Result<(ActivitiesByAccount, HashSet<String>)> {
-        // Perform split adjustments on the raw activity list
+        // First, compile activities to expand composite types (DRIP, STAKING_REWARD, DIVIDEND_IN_KIND)
+        // into their constituent legs (e.g., INTEREST + BUY for staking rewards)
+        let compiler = DefaultActivityCompiler::new();
+        let compiled_activities = compiler.compile_all(all_activities)?;
+
+        // Perform split adjustments on the compiled activity list
         let split_factors =
-            self.calculate_split_factors(all_activities, min_activity_date, calculation_end_date);
-        let adjusted_activities = self.adjust_activities_for_splits(all_activities, &split_factors);
+            self.calculate_split_factors(&compiled_activities, min_activity_date, calculation_end_date);
+        let adjusted_activities = self.adjust_activities_for_splits(&compiled_activities, &split_factors);
 
         // Group adjusted activities by original account ID and date
         let mut activities_by_account_date: ActivitiesByAccount = HashMap::new();

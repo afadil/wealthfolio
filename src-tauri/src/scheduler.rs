@@ -43,7 +43,7 @@ pub async fn run_startup_sync(handle: &AppHandle, context: &Arc<ServiceContext>)
     emit_broker_sync_start(handle);
 
     // Perform sync
-    match perform_broker_sync(context).await {
+    match perform_broker_sync(context, Some(handle)).await {
         Ok(result) => {
             info!(
                 "Startup sync completed: success={}, message={}",

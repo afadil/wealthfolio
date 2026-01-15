@@ -14,15 +14,18 @@ use super::traits::BrokerSyncServiceTrait;
 use crate::platform::{Platform, PlatformRepository};
 use crate::state::BrokerSyncState;
 use crate::state::BrokerSyncStateRepository;
+use chrono::{DateTime, Utc};
 use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 use std::collections::HashSet;
 use wealthfolio_core::accounts::{Account, AccountServiceTrait, NewAccount};
-use wealthfolio_core::activities::{self, NewActivity};
+use wealthfolio_core::activities::{self, compute_idempotency_key, NewActivity};
 use wealthfolio_core::assets::{canonical_asset_id, AssetKind, NewAsset};
 use wealthfolio_core::errors::Result;
 use wealthfolio_core::quotes::DataSource;
-use wealthfolio_core::sync::ImportRun;
+use wealthfolio_core::sync::{
+    ImportRun, ImportRunMode, ImportRunStatus, ImportRunSummary, ImportRunType, ReviewMode,
+};
 use wealthfolio_storage_sqlite::activities::ActivityDB;
 use wealthfolio_storage_sqlite::assets::AssetDB;
 use wealthfolio_storage_sqlite::db::{DbPool, WriteHandle};
@@ -239,12 +242,13 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
     async fn upsert_account_activities(
         &self,
         account_id: String,
+        import_run_id: Option<String>,
         activities_data: Vec<AccountUniversalActivity>,
-    ) -> Result<(usize, usize, Vec<String>)> {
+    ) -> Result<(usize, usize, Vec<String>, usize)> {
         use diesel::prelude::*;
 
         if activities_data.is_empty() {
-            return Ok((0, 0, Vec::new()));
+            return Ok((0, 0, Vec::new(), 0));
         }
 
         let now_rfc3339 = chrono::Utc::now().to_rfc3339();
@@ -254,6 +258,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
 
         let mut activity_rows: Vec<ActivityDB> = Vec::new();
         let mut seen_activity_ids: HashSet<String> = HashSet::new();
+        let mut needs_review_count: usize = 0;
 
         for activity in activities_data {
             let activity_id = match activity.id.clone().filter(|v| !v.trim().is_empty()) {
@@ -284,6 +289,9 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
 
             // Calculate needs_review flag using mapping module
             let needs_review = mapping::needs_review(&activity);
+            if needs_review {
+                needs_review_count += 1;
+            }
 
             // Build metadata JSON with flow info, confidence, reasons, and raw_type
             let metadata = mapping::build_activity_metadata(&activity);
@@ -479,12 +487,32 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             let amount = activity.amount.and_then(Decimal::from_f64).map(|d| d.abs());
             let fx_rate = activity.fx_rate.and_then(Decimal::from_f64);
 
-            // Determine status: needs_review -> Draft, otherwise Draft (synced activities start as Draft)
+            // Determine status: needs_review -> Draft (requires user review), otherwise Posted (ready for calculations)
             let status = if needs_review {
                 wealthfolio_core::activities::ActivityStatus::Draft
             } else {
-                wealthfolio_core::activities::ActivityStatus::Draft // All synced activities start as Draft
+                wealthfolio_core::activities::ActivityStatus::Posted
             };
+
+            // Parse activity date for idempotency key computation
+            let activity_datetime: DateTime<Utc> =
+                DateTime::parse_from_rfc3339(&activity_date)
+                    .map(|dt| dt.with_timezone(&Utc))
+                    .unwrap_or_else(|_| Utc::now());
+
+            // Compute idempotency key for content-based deduplication
+            let idempotency_key = compute_idempotency_key(
+                &account_id,
+                &activity_type,
+                &activity_datetime,
+                Some(&asset_id),
+                Some(quantity),
+                Some(unit_price),
+                amount,
+                &currency_code,
+                activity.source_record_id.as_deref(),
+                activity.description.as_deref(),
+            );
 
             let new_activity = NewActivity {
                 id: Some(activity_id),
@@ -521,7 +549,12 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 source_group_id: activity.source_group_id.clone(),
             };
 
-            activity_rows.push(new_activity.into());
+            // Convert to DB model and set idempotency key and import_run_id
+            let mut activity_db: ActivityDB = new_activity.into();
+            activity_db.idempotency_key = Some(idempotency_key);
+            activity_db.import_run_id = import_run_id.clone();
+
+            activity_rows.push(activity_db);
         }
 
         let writer = self.writer.clone();
@@ -573,11 +606,90 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                     "Starting activity inserts ({} activities)...",
                     activity_rows.len()
                 );
+
+                // Collect all activity IDs and idempotency keys for batch lookup
+                let activity_ids: Vec<String> =
+                    activity_rows.iter().map(|a| a.id.clone()).collect();
+                let idempotency_keys: Vec<String> = activity_rows
+                    .iter()
+                    .filter_map(|a| a.idempotency_key.clone())
+                    .collect();
+
+                // Fetch existing activities by ID or idempotency_key in one query
+                // This allows us to check is_user_modified and handle idempotency conflicts
+                let existing_activities: Vec<(String, Option<String>, i32)> =
+                    schema::activities::table
+                        .filter(
+                            schema::activities::id
+                                .eq_any(&activity_ids)
+                                .or(schema::activities::idempotency_key
+                                    .eq_any(&idempotency_keys)),
+                        )
+                        .select((
+                            schema::activities::id,
+                            schema::activities::idempotency_key,
+                            schema::activities::is_user_modified,
+                        ))
+                        .load::<(String, Option<String>, i32)>(conn)
+                        .map_err(StorageError::from)?;
+
+                // Build lookup maps for quick access
+                let mut existing_by_id: std::collections::HashMap<String, i32> =
+                    std::collections::HashMap::new();
+                let mut existing_by_idemp: std::collections::HashMap<String, (String, i32)> =
+                    std::collections::HashMap::new();
+
+                for (id, idemp_key, is_modified) in existing_activities {
+                    existing_by_id.insert(id.clone(), is_modified);
+                    if let Some(key) = idemp_key {
+                        existing_by_idemp.insert(key, (id, is_modified));
+                    }
+                }
+
                 let mut activities_upserted: usize = 0;
-                for (idx, activity_db) in activity_rows.into_iter().enumerate() {
+                let mut activities_skipped: usize = 0;
+
+                for (idx, mut activity_db) in activity_rows.into_iter().enumerate() {
                     let now_update = chrono::Utc::now().to_rfc3339();
                     let activity_id = activity_db.id.clone();
                     let activity_type = activity_db.activity_type.clone();
+                    let idempotency_key = activity_db.idempotency_key.clone();
+
+                    // Check if this activity exists and is user-modified
+                    // First check by ID
+                    if let Some(&is_modified) = existing_by_id.get(&activity_id) {
+                        if is_modified != 0 {
+                            debug!(
+                                "Skipping user-modified activity {} (type={})",
+                                activity_id, activity_type
+                            );
+                            activities_skipped += 1;
+                            continue;
+                        }
+                    }
+
+                    // If not found by ID, check by idempotency_key
+                    // This handles cases where provider IDs changed but content is the same
+                    if !existing_by_id.contains_key(&activity_id) {
+                        if let Some(ref key) = idempotency_key {
+                            if let Some((existing_id, is_modified)) = existing_by_idemp.get(key) {
+                                if *is_modified != 0 {
+                                    debug!(
+                                        "Skipping update for user-modified activity (matched by idempotency_key: {} -> {})",
+                                        activity_id, existing_id
+                                    );
+                                    activities_skipped += 1;
+                                    continue;
+                                }
+                                // Found by idempotency_key - update the existing record instead
+                                debug!(
+                                    "Activity {} matched existing {} by idempotency_key, updating existing",
+                                    activity_id, existing_id
+                                );
+                                activity_db.id = existing_id.clone();
+                            }
+                        }
+                    }
 
                     match diesel::insert_into(schema::activities::table)
                         .values(&activity_db)
@@ -610,6 +722,10 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                                 .eq(excluded(schema::activities::source_group_id)),
                             schema::activities::needs_review
                                 .eq(excluded(schema::activities::needs_review)),
+                            schema::activities::idempotency_key
+                                .eq(excluded(schema::activities::idempotency_key)),
+                            schema::activities::import_run_id
+                                .eq(excluded(schema::activities::import_run_id)),
                             schema::activities::updated_at.eq(now_update),
                         ))
                         .execute(conn)
@@ -625,29 +741,38 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                     }
                 }
 
+                if activities_skipped > 0 {
+                    info!(
+                        "Skipped {} user-modified activities during sync",
+                        activities_skipped
+                    );
+                }
+
                 debug!("Successfully upserted {} activities", activities_upserted);
                 Ok((activities_upserted, assets_inserted))
             })
             .await?;
 
         debug!(
-            "Upserted {} activities for account {} ({} assets inserted, {} new asset IDs)",
-            activities_count, account_id_for_log, assets_inserted, new_asset_ids.len()
+            "Upserted {} activities for account {} ({} assets inserted, {} new asset IDs, {} need review)",
+            activities_count, account_id_for_log, assets_inserted, new_asset_ids.len(), needs_review_count
         );
 
-        Ok((activities_upserted, assets_inserted, new_asset_ids))
+        Ok((activities_upserted, assets_inserted, new_asset_ids, needs_review_count))
     }
 
     async fn finalize_activity_sync_success(
         &self,
         account_id: String,
         last_synced_date: String,
+        import_run_id: Option<String>,
     ) -> Result<()> {
         self.brokers_sync_state_repository
             .upsert_success(
                 account_id,
                 DEFAULT_BROKERAGE_PROVIDER.to_string(),
                 last_synced_date,
+                import_run_id,
             )
             .await
     }
@@ -656,9 +781,15 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
         &self,
         account_id: String,
         error: String,
+        import_run_id: Option<String>,
     ) -> Result<()> {
         self.brokers_sync_state_repository
-            .upsert_failure(account_id, DEFAULT_BROKERAGE_PROVIDER.to_string(), error)
+            .upsert_failure(
+                account_id,
+                DEFAULT_BROKERAGE_PROVIDER.to_string(),
+                error,
+                import_run_id,
+            )
             .await
     }
 
@@ -671,6 +802,53 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             Some(rt) => self.import_run_repository.get_by_run_type(rt, limit),
             None => self.import_run_repository.get_all(limit),
         }
+    }
+
+    async fn create_import_run(
+        &self,
+        account_id: &str,
+        mode: ImportRunMode,
+    ) -> Result<ImportRun> {
+        let import_run = ImportRun::new(
+            account_id.to_string(),
+            DEFAULT_BROKERAGE_PROVIDER.to_string(),
+            ImportRunType::Sync,
+            mode,
+            ReviewMode::Never,
+        );
+
+        self.import_run_repository.create(import_run).await
+    }
+
+    async fn finalize_import_run(
+        &self,
+        run_id: &str,
+        summary: ImportRunSummary,
+        status: ImportRunStatus,
+        error: Option<String>,
+    ) -> Result<()> {
+        // Get the existing run
+        let run = self.import_run_repository.get_by_id(run_id)?;
+        if let Some(mut import_run) = run {
+            import_run.summary = Some(summary);
+            import_run.status = status.clone();
+            import_run.finished_at = Some(Utc::now());
+            import_run.updated_at = Utc::now();
+
+            if let Some(err) = error {
+                import_run.error = Some(err);
+            }
+
+            if status == ImportRunStatus::Applied {
+                import_run.applied_at = Some(Utc::now());
+            }
+
+            self.import_run_repository.update(import_run).await?;
+        } else {
+            warn!("Import run not found: {}", run_id);
+        }
+
+        Ok(())
     }
 }
 
