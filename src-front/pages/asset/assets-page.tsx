@@ -31,8 +31,8 @@ export default function AssetsPage() {
   const isMobileViewport = useIsMobileViewport();
 
   const parsedAssets = useMemo(() => assets.map(toParsedAsset), [assets]);
-  const symbols = useMemo(() => parsedAssets.map((asset) => asset.symbol), [parsedAssets]);
-  const { data: latestQuotes = {}, isLoading: isQuotesLoading } = useLatestQuotes(symbols);
+  const assetIds = useMemo(() => parsedAssets.map((asset) => asset.id), [parsedAssets]);
+  const { data: latestQuotes = {}, isLoading: isQuotesLoading } = useLatestQuotes(assetIds);
 
   const [editingAsset, setEditingAsset] = useState<ParsedAsset | null>(null);
   const [assetPendingDelete, setAssetPendingDelete] = useState<ParsedAsset | null>(null);
@@ -80,7 +80,7 @@ export default function AssetsPage() {
 
       <AssetEditSheet
         asset={editingAsset}
-        latestQuote={editingAsset ? latestQuotes[editingAsset.symbol] : null}
+        latestQuote={editingAsset ? latestQuotes[editingAsset.id] : null}
         open={!!editingAsset}
         onOpenChange={(open) => {
           if (!open) {

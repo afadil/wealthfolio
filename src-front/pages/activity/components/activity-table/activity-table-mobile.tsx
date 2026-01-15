@@ -88,7 +88,7 @@ export const ActivityTableMobile = ({
                   </div>
                 ) : (
                   <Link
-                    to={`/holdings/${encodeURIComponent(symbol)}`}
+                    to={`/holdings/${encodeURIComponent(activity.assetId)}`}
                     className="flex min-w-0 flex-1 items-center gap-3"
                   >
                     <TickerAvatar symbol={avatarSymbol} className="h-10 w-10 flex-shrink-0" />
@@ -146,7 +146,7 @@ export const ActivityTableMobile = ({
                   </div>
                 ) : (
                   <Link
-                    to={`/holdings/${encodeURIComponent(symbol)}`}
+                    to={`/holdings/${encodeURIComponent(activity.assetId)}`}
                     className="flex items-center gap-2"
                   >
                     <TickerAvatar symbol={avatarSymbol} className="h-10 w-10" />

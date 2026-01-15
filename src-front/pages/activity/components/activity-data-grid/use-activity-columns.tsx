@@ -276,17 +276,20 @@ export function useActivityColumns({
       // 16. Actions
       {
         id: "actions",
+        header: () => null,
         size: 64,
         enableSorting: false,
         enableResizing: false,
         enableHiding: false,
         cell: ({ row }) => (
-          <ActivityOperations
-            activity={row.original}
-            onEdit={onEditActivity}
-            onDuplicate={onDuplicate}
-            onDelete={onDelete}
-          />
+          <div className="flex size-full items-center justify-center">
+            <ActivityOperations
+              activity={row.original}
+              onEdit={onEditActivity}
+              onDuplicate={onDuplicate}
+              onDelete={onDelete}
+            />
+          </div>
         ),
       },
     ],

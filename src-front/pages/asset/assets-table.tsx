@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { TickerAvatar } from "@/components/ticker-avatar";
+import { Badge } from "@wealthfolio/ui";
 import { DataTable } from "@wealthfolio/ui/components/ui/data-table";
 import { DataTableColumnHeader } from "@wealthfolio/ui/components/ui/data-table/data-table-column-header";
 import { DataTableFacetedFilterProps } from "@wealthfolio/ui/components/ui/data-table/data-table-faceted-filter";
@@ -24,7 +25,6 @@ import {
   TableRow,
 } from "@wealthfolio/ui/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
-import { Badge } from "@wealthfolio/ui";
 
 import { Quote } from "@/lib/types";
 import { formatAmount, formatDate } from "@/lib/utils";
@@ -90,12 +90,12 @@ export function AssetsTable({
           return (
             <button
               type="button"
-              onClick={() => navigate(`/holdings/${encodeURIComponent(asset.symbol)}`)}
+              onClick={() => navigate(`/holdings/${encodeURIComponent(asset.id)}`)}
               className="hover:bg-muted/60 focus-visible:ring-ring group flex w-full items-center gap-2.5 rounded-md py-1 text-left transition"
             >
               <TickerAvatar symbol={asset.symbol} className="h-8 w-8 shrink-0" />
               <div className="min-w-0">
-                <div className="group-hover:text-primary font-semibold leading-tight transition-colors">
+                <div className="group-hover:text-primary leading-tight font-semibold transition-colors">
                   {displaySymbol}
                 </div>
                 <div className="text-muted-foreground truncate text-xs leading-tight">
@@ -171,14 +171,14 @@ export function AssetsTable({
         ),
         cell: ({ row }) => {
           const asset = row.original;
-          const quote = latestQuotes[asset.symbol];
+          const quote = latestQuotes[asset.id];
           const stale = isStaleQuote(quote, asset.isActive);
 
           if (!quote) {
             return (
               <div className="text-right">
                 <div className="flex items-center justify-end gap-1.5">
-                  <Icons.AlertTriangle className="text-amber-500 h-3.5 w-3.5" />
+                  <Icons.AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
                   <span className="text-muted-foreground text-sm">No quotes</span>
                 </div>
               </div>
@@ -192,7 +192,7 @@ export function AssetsTable({
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Icons.AlertTriangle
-                        className="text-amber-500 h-3.5 w-3.5"
+                        className="h-3.5 w-3.5 text-amber-500"
                         aria-label="Quote not updated today"
                       />
                     </TooltipTrigger>
@@ -203,11 +203,7 @@ export function AssetsTable({
                   {formatAmount(quote.close, quote.currency ?? asset.currency ?? "USD")}
                 </span>
               </div>
-              <div className="text-muted-foreground text-[11px]">
-                {formatDate(quote.timestamp)}
-                <span className="text-muted-foreground/50"> · </span>
-                <span className="uppercase">{quote.dataSource || "—"}</span>
-              </div>
+              <div className="text-muted-foreground text-[11px]">{formatDate(quote.timestamp)}</div>
             </div>
           );
         },
@@ -230,9 +226,7 @@ export function AssetsTable({
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => onEdit(asset)}>
-                    Edit
-                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onEdit(asset)}>Edit</DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => onUpdateQuotes(asset)}
@@ -274,9 +268,7 @@ export function AssetsTable({
 
   // Build filter options from assets (pricingMode)
   const pricingModeOptions = useMemo(() => {
-    const modes = new Set(
-      assets.map((asset) => asset.pricingMode).filter(Boolean),
-    );
+    const modes = new Set(assets.map((asset) => asset.pricingMode).filter(Boolean));
     return Array.from(modes).map((mode) => ({
       label: mode === "MARKET" ? "Auto" : mode,
       value: mode,
@@ -304,7 +296,7 @@ export function AssetsTable({
     () =>
       assets.map((asset) => ({
         ...asset,
-        isStale: isStaleQuote(latestQuotes[asset.symbol], asset.isActive) ? "true" : "false",
+        isStale: isStaleQuote(latestQuotes[asset.id], asset.isActive) ? "true" : "false",
       })),
     [assets, latestQuotes],
   );
@@ -369,7 +361,12 @@ export function AssetsTable({
       columns={columns}
       searchBy="symbol"
       filters={filters}
-      defaultColumnVisibility={{ currency: false, isStale: false, assetSubClass: false, pricingMode: false }}
+      defaultColumnVisibility={{
+        currency: false,
+        isStale: false,
+        assetSubClass: false,
+        pricingMode: false,
+      }}
       defaultSorting={[{ id: "symbol", desc: false }]}
       storageKey="securities-table-v2"
       scrollable

@@ -151,8 +151,9 @@ export const ActivityTable = ({
             return content;
           }
 
+          const assetId = row.original.assetId;
           return (
-            <Link to={`/holdings/${encodeURIComponent(symbol)}`} className="-m-1 block p-1">
+            <Link to={`/holdings/${encodeURIComponent(assetId)}`} className="-m-1 block p-1">
               {content}
             </Link>
           );

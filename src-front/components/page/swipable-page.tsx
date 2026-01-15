@@ -37,7 +37,7 @@ function NavigationPills({
   const layoutId = React.useId();
 
   return (
-    <nav className="bg-muted/60 inline-flex items-center rounded-lg p-1">
+    <nav className="bg-muted/60 inline-flex items-center rounded-full p-1">
       {views.map((view) => {
         const isActive = currentView === view.value;
         const IconComponent = view.icon;
@@ -48,7 +48,7 @@ function NavigationPills({
             type="button"
             onClick={() => onViewChange(view.value)}
             className={cn(
-              "relative flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-200",
+              "relative flex cursor-pointer items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-200",
               "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none",
               isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground/80",
             )}
@@ -57,7 +57,7 @@ function NavigationPills({
             {isActive && (
               <motion.div
                 layoutId={`nav-pill-${layoutId}`}
-                className="bg-background absolute inset-0 rounded-md shadow-sm"
+                className="bg-background absolute inset-0 rounded-full shadow-sm"
                 initial={false}
                 transition={{
                   type: "spring",
@@ -101,7 +101,7 @@ function MobileNavigation({
             type="button"
             onClick={() => onViewChange(item.value)}
             className={cn(
-              "relative flex items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-200",
+              "relative flex cursor-pointer items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-200",
               "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
               isActive ? "text-foreground" : "text-muted-foreground",
             )}
@@ -205,10 +205,7 @@ export function SwipablePage({
     <Page className={cn("flex h-full flex-col", className)}>
       <div
         data-ptr-content
-        className={cn(
-          "relative mx-auto flex w-full max-w-screen-2xl grow flex-col",
-          contentClassName,
-        )}
+        className={cn("relative mx-auto flex w-full grow flex-col", contentClassName)}
       >
         {isMobile ? (
           /* Mobile: SwipableView with navigation */

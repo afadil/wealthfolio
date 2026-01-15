@@ -36,7 +36,7 @@ export function PortfolioUpdateTrigger({
 
   return (
     <HoverCard>
-      <HoverCardTrigger className="flex cursor-pointer items-center">{children}</HoverCardTrigger>
+      <HoverCardTrigger className="inline-flex cursor-pointer items-center">{children}</HoverCardTrigger>
       <HoverCardContent align="start" className="w-80 shadow-none">
         <div className="flex flex-col space-y-4">
           <div className="space-y-2">

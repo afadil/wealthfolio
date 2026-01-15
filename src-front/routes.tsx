@@ -9,7 +9,7 @@ import ActivityManagerPage from "@/pages/activity/activity-manager-page";
 import ActivityPage from "@/pages/activity/activity-page";
 import ActivityImportPage from "@/pages/activity/import/activity-import-page";
 import AssetsPage from "@/pages/asset/assets-page";
-import DashboardPage from "@/pages/dashboard/dashboard-page";
+import PortfolioPage from "@/pages/dashboard/portfolio-page";
 import HoldingsPage from "@/pages/holdings/holdings-page";
 import IncomePage from "@/pages/income/income-page";
 import PortfolioInsightsPage from "@/pages/insights/portfolio-insights";
@@ -34,7 +34,6 @@ import NotFoundPage from "@/pages/not-found";
 import AuthCallbackPage from "./pages/auth/auth-callback-page";
 import ConnectPage from "./pages/connect/connect-page";
 import HoldingsInsightsPage from "./pages/holdings/holdings-insights-page";
-import NetWorthPage from "./pages/net-worth/net-worth-page";
 import AboutSettingsPage from "./pages/settings/about/about-page";
 
 export function AppRoutes() {
@@ -75,9 +74,9 @@ export function AppRoutes() {
 
         {/* Main app with sidebar */}
         <Route path="/" element={<AppLayout />}>
-          <Route index element={<DashboardPage />} />
-          <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="net-worth" element={<NetWorthPage />} />
+          <Route index element={<PortfolioPage />} />
+          <Route path="dashboard" element={<PortfolioPage />} />
+          <Route path="net-worth" element={<PortfolioPage />} />
           <Route path="activities" element={<ActivityPage />} />
           <Route path="activities/manage" element={<ActivityManagerPage />} />
           <Route path="holdings" element={<HoldingsPage />} />

@@ -424,18 +424,18 @@ export function AppLauncher() {
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [accounts]);
-  const handleSelectHolding = (symbol: string, name?: string | null) => {
-    if (!symbol) {
+  const handleSelectHolding = (id: string, symbol: string, name?: string | null) => {
+    if (!id) {
       return;
     }
     addRecentItem({
       type: "holding",
-      id: symbol,
+      id: id,
       label: name ? `${symbol} - ${name}` : symbol,
     });
     setSearch("");
     setOpen(false);
-    navigate(`/holdings/${encodeURIComponent(symbol)}`);
+    navigate(`/holdings/${encodeURIComponent(id)}`);
   };
   const handleSelectAccount = (accountId: string, accountName: string) => {
     if (!accountId) {
@@ -706,7 +706,7 @@ export function AppLauncher() {
                     "asset",
                     "stock",
                   ].filter((keyword): keyword is string => Boolean(keyword))}
-                  onSelect={() => handleSelectHolding(holding.symbol, holding.name)}
+                  onSelect={() => handleSelectHolding(holding.id, holding.symbol, holding.name)}
                   className={cn(isMobileViewport ? "gap-3 py-4 text-base" : undefined)}
                 >
                   <Icons.TrendingUp className={iconClassName} />
