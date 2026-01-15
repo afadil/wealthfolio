@@ -79,11 +79,15 @@ impl SnapshotRepository {
             .order(snapshot_date.asc())
             .load::<AccountStateSnapshotDB>(&mut conn)
             .map_err(StorageError::from)?;
-        debug!(
-            "Loaded {} snapshots for account {} from DB via SnapshotRepository",
-            result_db.len(),
-            input_account_id
-        );
+        if !result_db.is_empty() {
+            debug!(
+                "Loaded {} snapshots for account {} from DB via SnapshotRepository (range: {:?}..={:?})",
+                result_db.len(),
+                input_account_id,
+                start_date_opt,
+                end_date_opt
+            );
+        }
         Ok(result_db
             .into_iter()
             .map(AccountStateSnapshot::from)

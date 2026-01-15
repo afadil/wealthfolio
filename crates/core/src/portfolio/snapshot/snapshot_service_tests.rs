@@ -1202,6 +1202,53 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_calculate_holdings_snapshots_skips_when_latest_keyframe_is_up_to_date() {
+        let base_currency_arc = Arc::new(RwLock::new("CAD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "CAD", "Test ACC");
+        account_repo.add_account(acc.clone());
+        let account_repo = Arc::new(account_repo);
+
+        let today = Utc::now().date_naive();
+        let activity_date = today.pred_opt().unwrap_or(today);
+        let act = create_test_activity(
+            "act1",
+            &acc.id,
+            Some("$CASH-CAD"),
+            "DEPOSIT",
+            activity_date,
+            None,
+            None,
+            Some(dec!(5000)),
+            "CAD",
+        );
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![act]));
+
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        // Seed an existing keyframe for "today" to simulate a fully up-to-date snapshot store.
+        let today_str = today.format("%Y-%m-%d").to_string();
+        snapshot_repo.add_snapshots(vec![create_blank_snapshot(&acc.id, "CAD", &today_str)]);
+
+        let svc = SnapshotService::new(
+            base_currency_arc,
+            account_repo,
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        // No new dates remain to calculate (effective_start_date would be tomorrow), so no writes.
+        let saved = svc.calculate_holdings_snapshots(None).await.unwrap();
+        assert_eq!(saved, 0);
+        assert!(snapshot_repo.get_saved_snapshots().is_empty());
+    }
+
+    #[tokio::test]
     async fn test_calculate_holdings_snapshots_persists_keyframes() {
         let base = Arc::new(RwLock::new("CAD".to_string()));
 

@@ -426,17 +426,12 @@ impl SnapshotService {
                 .snapshot_repository
                 .get_latest_snapshot_before_date(acc_id, calculation_end_date)?
             {
-                // Re-evaluate the key-frame’s own date without duplicating its activities
                 let snapshot_day = latest_snapshot.snapshot_date;
-                let day_before = snapshot_day.pred_opt().unwrap_or(snapshot_day);
-
-                // fresh, empty state as of D-1
-                start_keyframes.insert(
-                    acc_id.clone(),
-                    Self::create_initial_snapshot(account, day_before),
-                );
-
-                effective_start_date = snapshot_day;
+                // Resume from the last known keyframe. The calculator expects the in-memory
+                // "previous" state to be the day before `effective_start_date`, so we start on
+                // the day *after* the stored keyframe to avoid re-processing that day’s activities.
+                initial_snapshot_for_acc = Some(latest_snapshot);
+                effective_start_date = snapshot_day.succ_opt().unwrap_or(snapshot_day);
             } else {
                 effective_start_date =
                     min_activity_date_for_account.unwrap_or(calculation_end_date);
