@@ -666,15 +666,33 @@ impl ActivityRepositoryTrait for ActivityRepository {
     fn get_income_activities_data(&self) -> Result<Vec<IncomeData>> {
         let mut conn = get_connection(&self.pool)?;
 
+        // For income reporting, we need to handle different subtypes:
+        // - Regular DIVIDEND/INTEREST: use the `amount` field directly
+        // - STAKING_REWARD/DRIP/DIVIDEND_IN_KIND subtypes: if amount is 0, calculate from:
+        //   1. quantity * unit_price (if unit_price is available)
+        //   2. quantity * market_price from quotes table (fallback)
         let query = "SELECT strftime('%Y-%m', a.activity_date) as date,
              a.activity_type as income_type,
              COALESCE(a.asset_id, 'CASH') as symbol,
              COALESCE(ast.name, 'Cash') as symbol_name,
              a.currency,
-             COALESCE(a.amount, '0') as amount
+             CASE
+                 WHEN a.subtype IN ('STAKING_REWARD', 'DRIP', 'DIVIDEND_IN_KIND')
+                      AND (a.amount IS NULL OR CAST(a.amount AS REAL) = 0)
+                 THEN CASE
+                     WHEN a.unit_price IS NOT NULL AND CAST(a.unit_price AS REAL) > 0
+                     THEN CAST(CAST(a.quantity AS REAL) * CAST(a.unit_price AS REAL) AS TEXT)
+                     WHEN q.close IS NOT NULL
+                     THEN CAST(CAST(a.quantity AS REAL) * CAST(q.close AS REAL) AS TEXT)
+                     ELSE '0'
+                 END
+                 ELSE COALESCE(a.amount, '0')
+             END as amount
              FROM activities a
              LEFT JOIN assets ast ON a.asset_id = ast.id
              INNER JOIN accounts acc ON a.account_id = acc.id
+             LEFT JOIN quotes q ON a.asset_id = q.asset_id
+                 AND date(a.activity_date) = q.day
              WHERE a.activity_type IN ('DIVIDEND', 'INTEREST', 'OTHER_INCOME')
              AND acc.is_active = 1
              ORDER BY a.activity_date";
