@@ -1,7 +1,7 @@
 import { getAssetProfile } from "@/commands/market-data";
 import { getHolding } from "@/commands/portfolio";
 import { AssetEditSheet } from "./asset-edit-sheet";
-import { MobileActionsMenu } from "@/components/mobile-actions-menu";
+import { ActionPalette, type ActionPaletteGroup } from "@/components/action-palette";
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { ValueHistoryDataGrid } from "@/features/alternative-assets";
 import { Button } from "@wealthfolio/ui/components/ui/button";
@@ -87,7 +87,7 @@ export const AssetProfilePage = () => {
   const queryParams = new URLSearchParams(location.search);
   const defaultTab = (queryParams.get("tab") as AssetTab) ?? "overview";
   const [activeTab, setActiveTab] = useState<AssetTab>(defaultTab);
-  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
+  const [actionPaletteOpen, setActionPaletteOpen] = useState(false);
   const [editSheetOpen, setEditSheetOpen] = useState(false);
   const [editSheetDefaultTab, setEditSheetDefaultTab] = useState<"general" | "classification" | "market-data">("general");
   const triggerHaptic = useHapticFeedback();
@@ -597,35 +597,8 @@ export const AssetProfilePage = () => {
       <PageHeader
         onBack={handleBack}
         actions={
-          <>
-            <div className="hidden items-center gap-2 sm:flex">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => navigate(`/activities/manage?symbol=${encodeURIComponent(symbol)}`)}
-                title="Record Transaction"
-              >
-                <Icons.Plus className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleRefreshQuotes}
-                disabled={syncMarketDataMutation.isPending}
-                title="Refresh Quote"
-              >
-                <Icons.Refresh
-                  className={`h-4 w-4 ${syncMarketDataMutation.isPending ? "animate-spin" : ""}`}
-                />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setEditSheetOpen(true)}
-                title="Edit Asset"
-              >
-                <Icons.Pencil className="h-4 w-4" />
-              </Button>
+          <div className="flex items-center gap-2">
+            <div className="hidden sm:flex">
               <AnimatedToggleGroup
                 items={toggleItems}
                 value={activeTab}
@@ -641,55 +614,87 @@ export const AssetProfilePage = () => {
                 className="md:text-base"
               />
             </div>
-
-            <div className="sm:hidden">
-              <MobileActionsMenu
-                open={mobileActionsOpen}
-                onOpenChange={setMobileActionsOpen}
-                title="Asset Actions"
-                description="Manage this asset"
-                actions={[
-                  {
-                    icon: "Plus",
-                    label: "Record Transaction",
-                    description: "Add a new activity manually",
-                    onClick: () =>
-                      navigate(`/activities/manage?symbol=${encodeURIComponent(symbol)}`),
-                  },
-                  {
-                    icon: "Refresh",
-                    label: "Refresh Quote",
-                    description: "Update market data",
-                    onClick: handleRefreshQuotes,
-                  },
-                  {
-                    icon: "Pencil",
-                    label: "Edit",
-                    description: "Edit asset details and settings",
-                    onClick: () => setEditSheetOpen(true),
-                  },
-                ]}
-              />
-            </div>
-          </>
+            <ActionPalette
+              open={actionPaletteOpen}
+              onOpenChange={setActionPaletteOpen}
+              title={(() => {
+                const parts = symbol.split(":");
+                return parts.length >= 2 ? parts[1] : symbol;
+              })()}
+              groups={[
+                {
+                  title: "Record Transaction",
+                  items: [
+                    {
+                      icon: "TrendingUp",
+                      label: "Buy",
+                      onClick: () =>
+                        navigate(`/activities/manage?symbol=${encodeURIComponent(symbol)}&type=BUY`),
+                    },
+                    {
+                      icon: "TrendingDown",
+                      label: "Sell",
+                      onClick: () =>
+                        navigate(`/activities/manage?symbol=${encodeURIComponent(symbol)}&type=SELL`),
+                    },
+                    {
+                      icon: "Coins",
+                      label: "Dividend",
+                      onClick: () =>
+                        navigate(`/activities/manage?symbol=${encodeURIComponent(symbol)}&type=DIVIDEND`),
+                    },
+                    {
+                      icon: "Ellipsis",
+                      label: "Other",
+                      onClick: () =>
+                        navigate(`/activities/manage?symbol=${encodeURIComponent(symbol)}`),
+                    },
+                  ],
+                },
+                {
+                  title: "Manage",
+                  items: [
+                    {
+                      icon: "Refresh",
+                      label: "Refresh Price",
+                      onClick: handleRefreshQuotes,
+                    },
+                    {
+                      icon: "Pencil",
+                      label: "Edit",
+                      onClick: () => setEditSheetOpen(true),
+                    },
+                  ],
+                },
+              ] satisfies ActionPaletteGroup[]}
+              trigger={
+                <Button variant="outline" size="icon" className="h-9 w-9">
+                  <Icons.DotsThreeVertical className="h-5 w-5" weight="fill" />
+                </Button>
+              }
+            />
+          </div>
         }
       >
-        <div className="flex items-center gap-1" data-tauri-drag-region="true">
+        <div className="flex items-center gap-2" data-tauri-drag-region="true">
           {(profile?.symbol ?? holding?.instrument?.symbol) && (
             <TickerAvatar
               symbol={profile?.symbol ?? holding?.instrument?.symbol ?? symbol}
-              className="size-8"
+              className="size-9"
             />
           )}
-          <div className="flex min-w-0 flex-col">
-            <h1 className="text-lg font-semibold md:text-xl">
+          <div className="flex min-w-0 flex-col justify-center">
+            <h1 className="truncate text-base font-semibold leading-tight md:text-lg">
               {assetProfile?.name ?? holding?.instrument?.name ?? symbol ?? "-"}
             </h1>
-            {(assetProfile?.name || holding?.instrument?.name) && (
-              <p className="text-muted-foreground text-sm md:text-base">
-                {holding?.instrument?.symbol ?? symbol}
-              </p>
-            )}
+            <p className="text-muted-foreground text-xs leading-tight md:text-sm">
+              {(() => {
+                const fullSymbol = assetProfile?.symbol ?? holding?.instrument?.symbol ?? symbol;
+                // Extract ticker from formats like "CRYPTO:GRT:USD" or "STOCK:AAPL:USD"
+                const parts = fullSymbol.split(":");
+                return parts.length >= 2 ? parts[1] : fullSymbol;
+              })()}
+            </p>
           </div>
         </div>
       </PageHeader>

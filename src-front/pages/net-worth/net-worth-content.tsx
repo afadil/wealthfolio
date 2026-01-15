@@ -11,7 +11,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@wealthfolio/ui/components/ui/collapsible";
-import { GainAmount, GainPercent, IntervalSelector, Page, PrivacyAmount } from "@wealthfolio/ui";
+import { GainAmount, GainPercent, IntervalSelector, PrivacyAmount } from "@wealthfolio/ui";
 import { useNetWorth, useNetWorthHistory } from "@/hooks/use-alternative-assets";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { formatDateISO } from "@/lib/utils";
@@ -19,8 +19,6 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { DateRange, TimePeriod } from "@/lib/types";
 import { NetWorthChart } from "./net-worth-chart";
-import { PrivacyToggle } from "@/components/privacy-toggle";
-import { PageSwitcher } from "@/components/page-switcher";
 
 // Muted tan/gold for net worth theme (matches chart)
 const THEME_COLOR = "hsl(35 45% 65%)";
@@ -296,10 +294,9 @@ function CompositionWidget({ data, isLoading }: CompositionWidgetProps) {
 }
 
 /**
- * Net Worth Page - Immersive analytics view for net worth
- * Design similar to dashboard with full-width chart and category breakdown
+ * Net Worth Content - Embeddable content for the combined portfolio page
  */
-export default function NetWorthPage() {
+export function NetWorthContent() {
   const { settings } = useSettingsContext();
   const { data: netWorthData, isLoading, isError, error } = useNetWorth();
 
@@ -409,229 +406,223 @@ export default function NetWorthPage() {
   // Error state
   if (isError && error) {
     return (
-      <Page className="flex flex-col">
-        <div className="flex min-h-[50vh] items-center justify-center p-8">
-          <div className="text-center">
-            <div className="bg-destructive/10 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full">
-              <Icons.AlertTriangle className="text-destructive h-6 w-6" />
-            </div>
-            <p className="text-destructive text-lg font-medium">Failed to load net worth</p>
-            <p className="text-muted-foreground mt-2 text-sm">{error?.message}</p>
+      <div className="flex min-h-[50vh] items-center justify-center p-8">
+        <div className="text-center">
+          <div className="bg-destructive/10 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full">
+            <Icons.AlertTriangle className="text-destructive h-6 w-6" />
           </div>
+          <p className="text-destructive text-lg font-medium">Failed to load net worth</p>
+          <p className="text-muted-foreground mt-2 text-sm">{error?.message}</p>
         </div>
-      </Page>
+      </div>
     );
   }
 
   return (
-    <Page className="flex flex-col">
-      <div data-ptr-content className="flex min-h-screen flex-col">
-        {/* Top section: Net Worth value */}
-        <div className="px-4 pt-22 pb-6 md:px-6 md:pt-10 md:pb-8 lg:px-8 lg:pt-12">
-          <div className="mb-1">
-            <PageSwitcher />
-          </div>
-          <div className="flex items-start gap-2">
-            <div className="min-h-[4.5rem]">
-              <div className="flex items-center gap-3">
-                {isLoading ? (
-                  <Skeleton className="h-9 w-48" />
-                ) : (
-                  <h1
-                    className="font-heading text-3xl font-bold tracking-tight"
-                    data-testid="net-worth-balance"
-                  >
-                    <PrivacyAmount value={parsedData?.netWorth ?? 0} currency={currency} />
-                  </h1>
-                )}
-                <PrivacyToggle />
-                {hasStaleValuations && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="bg-warning/10 flex h-8 w-8 items-center justify-center rounded-full">
-                          <Icons.AlertCircle className="text-warning h-4 w-4" />
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="max-w-[280px]">
-                        <p className="mb-2 text-xs font-medium">Stale valuations (90+ days):</p>
-                        <ul className="space-y-1 text-xs">
-                          {netWorthData?.staleAssets.map((asset) => (
-                            <li
-                              key={asset.assetId}
-                              className="flex items-center justify-between gap-2"
-                            >
-                              <span className="truncate">{asset.name ?? asset.assetId}</span>
-                              <span className="text-muted-foreground shrink-0">
-                                {asset.daysStale}d ago
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-              </div>
-              <div className="text-md flex space-x-3">
-                {isHistoryLoading ? (
-                  <div className="flex items-center gap-3 pt-1">
-                    <Skeleton className="h-4 w-24" />
-                    <div className="border-secondary my-1 border-r pr-2" />
-                    <Skeleton className="h-4 w-16" />
-                  </div>
-                ) : (
-                  <>
-                    <GainAmount
-                      className="lg:text-md text-sm font-light"
-                      value={gainLossAmount}
-                      currency={currency}
-                      displayCurrency={false}
-                    />
-                    <div className="border-secondary my-1 border-r pr-2" />
-                    <GainPercent
-                      className="lg:text-md text-sm font-light"
-                      value={gainLossPercent}
-                      animated={true}
-                    />
-                  </>
-                )}
-                {selectedIntervalDescription && (
-                  <span className="lg:text-md text-muted-foreground ml-1 text-sm font-light">
-                    {selectedIntervalDescription}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Chart section */}
-        <div className="h-[300px]">
-          {isHistoryLoading ? (
-            <div className="flex h-full items-center justify-center">
-              <Skeleton className="h-full w-full" />
-            </div>
-          ) : historyData && historyData.length > 0 ? (
-            <NetWorthChart data={historyData} isLoading={isHistoryLoading} />
-          ) : (
-            <div className="flex h-full flex-col items-center justify-center">
-              <Icons.TrendingUp className="text-muted-foreground/30 mb-3 h-12 w-12" />
-              <p className="text-muted-foreground text-sm">No history data available</p>
-            </div>
-          )}
-          {historyData && historyData.length > 0 && (
-            <div className="flex w-full justify-center">
-              <IntervalSelector
-                className="pointer-events-auto relative z-20 w-full max-w-screen-sm sm:max-w-screen-md md:max-w-2xl lg:max-w-3xl"
-                onIntervalSelect={handleIntervalSelect}
-                isLoading={isHistoryLoading}
-                initialSelection={INITIAL_INTERVAL_CODE}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Content section with gradient background */}
-        <div
-          className="grow bg-linear-to-t px-4 pt-12 md:px-6 md:pt-12 lg:px-10 lg:pt-20"
-          style={{
-            backgroundImage: `linear-gradient(to top, ${THEME_COLOR.replace(")", " / 0.30)")}, ${THEME_COLOR.replace(")", " / 0.15)")}, ${THEME_COLOR.replace(")", " / 0.10)")})`,
-          }}
-        >
-          <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:gap-20">
-            {/* Left column: Breakdown */}
-            <div className="lg:col-span-2">
-              <div className="mb-4 w-full">
-                <h2 className="text-md pb-2 font-semibold tracking-tight">Breakdown</h2>
-
-                {isLoading ? (
-                  <div className="border-border bg-card rounded-lg border p-4 shadow-xs md:p-5">
-                    <div className="space-y-4">
-                      {Array.from({ length: 3 }).map((_, i) => (
-                        <div key={i} className="flex items-center justify-between">
-                          <Skeleton className="h-4 w-32" />
-                          <Skeleton className="h-4 w-24" />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : parsedData ? (
-                  <BalanceSheet data={parsedData} currency={currency} />
-                ) : (
-                  <div
-                    className="rounded-lg border border-orange-200/50 p-6 text-center md:p-8 dark:border-orange-800/50"
-                    style={{ backgroundColor: THEME_COLOR_LIGHT }}
-                  >
-                    <p className="text-sm">No assets found.</p>
-                    <Link
-                      to="/holdings"
-                      className="text-muted-foreground hover:text-foreground mt-2 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
-                    >
-                      Add your first asset
-                      <Icons.ChevronRight className="h-3 w-3" />
-                    </Link>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Right column: Info cards */}
-            <div className="space-y-4 lg:col-span-1">
-              {/* Composition widget */}
-              <CompositionWidget data={parsedData} isLoading={isLoading} />
-
-              {/* Stale valuations warning */}
+    <div className="flex min-h-screen flex-col">
+      {/* Top section: Net Worth value */}
+      <div className="px-4 pb-6 md:px-6 md:pb-8 lg:px-8">
+        <div className="flex items-start gap-2">
+          <div className="min-h-[4.5rem]">
+            <div className="flex items-center gap-3">
+              {isLoading ? (
+                <Skeleton className="h-9 w-48" />
+              ) : (
+                <h1
+                  className="font-heading text-3xl font-bold tracking-tight"
+                  data-testid="net-worth-balance"
+                >
+                  <PrivacyAmount value={parsedData?.netWorth ?? 0} currency={currency} />
+                </h1>
+              )}
               {hasStaleValuations && (
-                <div className="border-warning/30 bg-warning/5 rounded-lg border p-4 md:p-5">
-                  <div className="flex items-start gap-3">
-                    <div className="bg-warning/10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
-                      <Icons.AlertCircle className="text-warning h-4 w-4" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium">Update your valuations</p>
-                      <p className="text-muted-foreground mt-1 text-xs">
-                        {netWorthData?.staleAssets.length} asset
-                        {netWorthData?.staleAssets.length !== 1 ? "s have" : " has"} not been updated
-                        in over 90 days.
-                      </p>
-                      {netWorthData?.oldestValuationDate && (
-                        <p className="text-muted-foreground mt-1 text-xs">
-                          Oldest: {formatDate(netWorthData.oldestValuationDate)}
-                        </p>
-                      )}
-                    </div>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="bg-warning/10 flex h-8 w-8 items-center justify-center rounded-full">
+                        <Icons.AlertCircle className="text-warning h-4 w-4" />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-[280px]">
+                      <p className="mb-2 text-xs font-medium">Stale valuations (90+ days):</p>
+                      <ul className="space-y-1 text-xs">
+                        {netWorthData?.staleAssets.map((asset) => (
+                          <li
+                            key={asset.assetId}
+                            className="flex items-center justify-between gap-2"
+                          >
+                            <span className="truncate">{asset.name ?? asset.assetId}</span>
+                            <span className="text-muted-foreground shrink-0">
+                              {asset.daysStale}d ago
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+            <div className="text-md flex space-x-3">
+              {isHistoryLoading ? (
+                <div className="flex items-center gap-3 pt-1">
+                  <Skeleton className="h-4 w-24" />
+                  <div className="border-secondary my-1 border-r pr-2" />
+                  <Skeleton className="h-4 w-16" />
+                </div>
+              ) : (
+                <>
+                  <GainAmount
+                    className="lg:text-md text-sm font-light"
+                    value={gainLossAmount}
+                    currency={currency}
+                    displayCurrency={false}
+                  />
+                  <div className="border-secondary my-1 border-r pr-2" />
+                  <GainPercent
+                    className="lg:text-md text-sm font-light"
+                    value={gainLossPercent}
+                    animated={true}
+                  />
+                </>
+              )}
+              {selectedIntervalDescription && (
+                <span className="lg:text-md text-muted-foreground ml-1 text-sm font-light">
+                  {selectedIntervalDescription}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Chart section */}
+      <div className="h-[300px]">
+        {isHistoryLoading ? (
+          <div className="flex h-full items-center justify-center">
+            <Skeleton className="h-full w-full" />
+          </div>
+        ) : historyData && historyData.length > 0 ? (
+          <NetWorthChart data={historyData} isLoading={isHistoryLoading} />
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center">
+            <Icons.TrendingUp className="text-muted-foreground/30 mb-3 h-12 w-12" />
+            <p className="text-muted-foreground text-sm">No history data available</p>
+          </div>
+        )}
+        {historyData && historyData.length > 0 && (
+          <div className="flex w-full justify-center">
+            <IntervalSelector
+              className="pointer-events-auto relative z-20 w-full max-w-screen-sm sm:max-w-screen-md md:max-w-2xl lg:max-w-3xl"
+              onIntervalSelect={handleIntervalSelect}
+              isLoading={isHistoryLoading}
+              initialSelection={INITIAL_INTERVAL_CODE}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Content section with gradient background */}
+      <div
+        className="grow bg-linear-to-t px-4 pt-12 md:px-6 md:pt-12 lg:px-10 lg:pt-20"
+        style={{
+          backgroundImage: `linear-gradient(to top, ${THEME_COLOR.replace(")", " / 0.30)")}, ${THEME_COLOR.replace(")", " / 0.15)")}, ${THEME_COLOR.replace(")", " / 0.10)")})`,
+        }}
+      >
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:gap-20">
+          {/* Left column: Breakdown */}
+          <div className="lg:col-span-2">
+            <div className="mb-4 w-full">
+              <h2 className="text-md pb-2 font-semibold tracking-tight">Breakdown</h2>
+
+              {isLoading ? (
+                <div className="border-border bg-card rounded-lg border p-4 shadow-xs md:p-5">
+                  <div className="space-y-4">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="flex items-center justify-between">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-4 w-24" />
+                      </div>
+                    ))}
                   </div>
                 </div>
-              )}
-
-              {/* Quick links */}
-              <div
-                className="rounded-lg border border-orange-200/50 p-4 md:p-5 dark:border-orange-800/50"
-                style={{ backgroundColor: THEME_COLOR_LIGHT }}
-              >
-                <p className="text-sm font-medium">Manage your assets</p>
-                <div className="mt-3 space-y-2">
+              ) : parsedData ? (
+                <BalanceSheet data={parsedData} currency={currency} />
+              ) : (
+                <div
+                  className="rounded-lg border border-orange-200/50 p-6 text-center md:p-8 dark:border-orange-800/50"
+                  style={{ backgroundColor: THEME_COLOR_LIGHT }}
+                >
+                  <p className="text-sm">No assets found.</p>
                   <Link
                     to="/holdings"
-                    className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-sm transition-colors"
+                    className="text-muted-foreground hover:text-foreground mt-2 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
                   >
-                    <Icons.ChevronRight className="h-4 w-4" />
-                    View all holdings
-                  </Link>
-                  <Link
-                    to="/settings/accounts"
-                    className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-sm transition-colors"
-                  >
-                    <Icons.ChevronRight className="h-4 w-4" />
-                    Manage accounts
+                    Add your first asset
+                    <Icons.ChevronRight className="h-3 w-3" />
                   </Link>
                 </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right column: Info cards */}
+          <div className="space-y-4 lg:col-span-1">
+            {/* Composition widget */}
+            <CompositionWidget data={parsedData} isLoading={isLoading} />
+
+            {/* Stale valuations warning */}
+            {hasStaleValuations && (
+              <div className="border-warning/30 bg-warning/5 rounded-lg border p-4 md:p-5">
+                <div className="flex items-start gap-3">
+                  <div className="bg-warning/10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
+                    <Icons.AlertCircle className="text-warning h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">Update your valuations</p>
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      {netWorthData?.staleAssets.length} asset
+                      {netWorthData?.staleAssets.length !== 1 ? "s have" : " has"} not been updated
+                      in over 90 days.
+                    </p>
+                    {netWorthData?.oldestValuationDate && (
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        Oldest: {formatDate(netWorthData.oldestValuationDate)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Quick links */}
+            <div
+              className="rounded-lg border border-orange-200/50 p-4 md:p-5 dark:border-orange-800/50"
+              style={{ backgroundColor: THEME_COLOR_LIGHT }}
+            >
+              <p className="text-sm font-medium">Manage your assets</p>
+              <div className="mt-3 space-y-2">
+                <Link
+                  to="/holdings"
+                  className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-sm transition-colors"
+                >
+                  <Icons.ChevronRight className="h-4 w-4" />
+                  View all holdings
+                </Link>
+                <Link
+                  to="/settings/accounts"
+                  className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-sm transition-colors"
+                >
+                  <Icons.ChevronRight className="h-4 w-4" />
+                  Manage accounts
+                </Link>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </Page>
+    </div>
   );
 }
+
+export default NetWorthContent;

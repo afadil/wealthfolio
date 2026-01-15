@@ -1,10 +1,9 @@
 import { SwipablePage, SwipablePageView } from "@/components/page";
-import { Card, CardContent, CardHeader } from "@wealthfolio/ui/components/ui/card";
-import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import IncomePage from "@/pages/income/income-page";
 import PerformancePage from "@/pages/performance/performance-page";
-import NetWorthPage from "@/pages/net-worth/net-worth-page";
 import { Icons } from "@wealthfolio/ui";
+import { Card, CardContent, CardHeader } from "@wealthfolio/ui/components/ui/card";
+import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Suspense, useMemo } from "react";
 import HoldingsInsightsPage from "../holdings/holdings-insights-page";
 
@@ -62,16 +61,6 @@ export default function PortfolioInsightsPage() {
         content: (
           <Suspense fallback={<DashboardLoader />}>
             <IncomePage />
-          </Suspense>
-        ),
-      },
-      {
-        value: "net-worth",
-        label: "Net Worth",
-        icon: Icons.Wallet,
-        content: (
-          <Suspense fallback={<DashboardLoader />}>
-            <NetWorthPage />
           </Suspense>
         ),
       },

@@ -46,10 +46,9 @@ import {
   DollarSign,
   Dot,
   Download,
+  Ellipsis,
   Eraser,
   ExternalLink,
-  Eye,
-  EyeOff,
   File,
   FileArchive,
   FileAudio,
@@ -81,6 +80,7 @@ import {
   Loader,
   Loader2,
   Mail,
+  Minus,
   MinusCircle,
   Monitor,
   Moon,
@@ -136,6 +136,10 @@ import type { ComponentType, CSSProperties } from "react";
 
 // Phosphor icons - deep imports for optimal tree shaking with Vite
 import { DevicesIcon } from "@phosphor-icons/react/dist/csr/Devices";
+import { DotsThreeOutlineIcon } from "@phosphor-icons/react/dist/csr/DotsThreeOutline";
+import { DotsThreeOutlineVerticalIcon } from "@phosphor-icons/react/dist/csr/DotsThreeOutlineVertical";
+import { EyeIcon } from "@phosphor-icons/react/dist/csr/Eye";
+import { EyeSlashIcon } from "@phosphor-icons/react/dist/csr/EyeSlash";
 import { TagIcon } from "@phosphor-icons/react/dist/csr/Tag";
 import { UserSwitchIcon } from "@phosphor-icons/react/dist/csr/UserSwitch";
 
@@ -148,6 +152,7 @@ export interface IconProps {
   strokeWidth?: number | string;
   className?: string;
   style?: CSSProperties;
+  weight?: "thin" | "light" | "regular" | "bold" | "fill" | "duotone";
 }
 
 export type Icon = ComponentType<IconProps>;
@@ -188,13 +193,18 @@ const IconsInternal = {
   Group: Group,
   Globe: Globe,
   Close: X,
-  Eye: Eye,
+  Eye: ({ size, className, style, color }: IconProps) => (
+    <EyeIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
   Info: Info,
-  EyeOff: EyeOff,
+  EyeOff: ({ size, className, style, color }: IconProps) => (
+    <EyeSlashIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
   Refresh: RefreshCcw,
   RefreshCw: RefreshCw,
   PanelLeftOpen: PanelLeftOpen,
   Download: Download,
+  Ellipsis: Ellipsis,
   Dot: Dot,
   Activity2: Activity,
   DollarSign: DollarSign,
@@ -212,6 +222,7 @@ const IconsInternal = {
   Pencil: Pencil,
   PlusCircle: PlusCircle,
   PanelLeft: PanelLeft,
+  Minus: Minus,
   MinusCircle: MinusCircle,
   PauseCircle: PauseCircle,
   Monitor: Monitor,
@@ -645,6 +656,13 @@ const IconsInternal = {
   Tag: ({ size, className, style, color }: IconProps) => (
     <TagIcon size={size} weight="duotone" className={className} style={style} color={color} />
   ),
+
+  DotsThreeVertical: ({ size, className, style, color }: IconProps) => (
+    <DotsThreeOutlineVerticalIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
+  DotsThree: ({ size, className, style, color }: IconProps) => (
+    <DotsThreeOutlineIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
 };
 
 /**
@@ -693,6 +711,7 @@ export type IconName =
   | "RefreshCw"
   | "PanelLeftOpen"
   | "Download"
+  | "Ellipsis"
   | "Dot"
   | "Activity2"
   | "DollarSign"
@@ -710,6 +729,7 @@ export type IconName =
   | "Pencil"
   | "PlusCircle"
   | "PanelLeft"
+  | "Minus"
   | "MinusCircle"
   | "PauseCircle"
   | "Monitor"
@@ -720,6 +740,7 @@ export type IconName =
   | "Spinner"
   | "Loader"
   | "MoreVertical"
+  | "DotsThreeVertical"
   | "Goal"
   | "Trash"
   | "Trash2"
@@ -808,7 +829,9 @@ export type IconName =
   | "Split"
   | "CircleGauge"
   | "X"
-  | "Upload";
+  | "Upload"
+  | "DotsThreeVertical"
+  | "DotsThree";
 
 /**
  * Icons object with unified typing - all icons have the same Icon type

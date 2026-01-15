@@ -226,14 +226,14 @@ export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsPr
         <Card className="w-full shadow-xs">
           <CardContent className="px-4 pt-4 pb-2">
             {topHoldings.map((holding) => {
-              const symbol = holding.instrument?.symbol ?? holding.id;
+              const assetId = holding.instrument?.id ?? holding.id;
               return (
                 <HoldingRow
                   key={holding.id}
                   holding={holding}
                   baseCurrency={baseCurrency}
                   isHidden={isBalanceHidden}
-                  onClick={() => navigate(`/holdings/${symbol}`)}
+                  onClick={() => navigate(`/holdings/${encodeURIComponent(assetId)}`)}
                 />
               );
             })}

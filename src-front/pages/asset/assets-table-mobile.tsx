@@ -120,7 +120,7 @@ export function AssetsTableMobile({
     // Filter by price status
     if (selectedPriceStatus.length > 0) {
       filtered = filtered.filter((asset) => {
-        const quote = latestQuotes[asset.symbol];
+        const quote = latestQuotes[asset.id];
         const isStale = isStaleQuote(quote);
         return selectedPriceStatus.includes(isStale ? "true" : "false");
       });
@@ -209,94 +209,92 @@ export function AssetsTableMobile({
       <div className="space-y-2">
         {filteredAssets.map((asset) => (
           <Card key={asset.id} className="p-4">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => navigate(`/holdings/${encodeURIComponent(asset.symbol)}`)}
-                className="hover:bg-muted/60 focus-visible:ring-ring flex flex-1 items-center gap-3 overflow-hidden rounded-md px-1 py-1 text-left transition"
+                onClick={() => navigate(`/holdings/${encodeURIComponent(asset.id)}`)}
+                className="hover:bg-muted/60 focus-visible:ring-ring flex flex-1 items-center gap-3 overflow-hidden rounded-md text-left transition"
               >
                 <TickerAvatar symbol={asset.symbol} className="h-10 w-10 flex-shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold">{asset.symbol}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="truncate font-semibold">{asset.symbol}</p>
+                    <Badge variant="secondary" className="text-[10px] uppercase">
+                      {asset.currency}
+                    </Badge>
+                  </div>
                   <p className="text-muted-foreground truncate text-sm">{asset.name ?? "-"}</p>
                 </div>
               </button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="hover:bg-muted text-muted-foreground inline-flex h-9 w-9 items-center justify-center rounded-md border transition"
-                    aria-label="Open actions"
-                  >
-                    <Icons.MoreVertical className="h-4 w-4" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onClick={() => onUpdateQuotes(asset)}
-                    disabled={isUpdatingQuotes}
-                  >
-                    Update quotes
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => onRefetchQuotes(asset)}
-                    disabled={isRefetchingQuotes}
-                  >
-                    Refetch quotes
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onClassify?.(asset)}>
-                    <Icons.Tag className="mr-2 h-4 w-4" />
-                    Classify
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onEdit(asset)}>Edit</DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="text-destructive focus:text-destructive"
-                    onSelect={() => onDelete(asset)}
-                  >
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
 
-            <div className="text-muted-foreground mt-3 flex flex-wrap items-center gap-2 text-sm">
-              <Badge variant="secondary" className="uppercase">
-                {asset.currency}
-              </Badge>
-              {asset.kind ? <Badge variant="outline">{asset.kind}</Badge> : null}
-              <Badge variant="secondary" className="uppercase">
-                {asset.pricingMode}
-              </Badge>
-            </div>
-
-            <div className="mt-3 text-sm">
-              {latestQuotes[asset.symbol] ? (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2 font-semibold">
-                    {formatAmount(
-                      latestQuotes[asset.symbol].close,
-                      latestQuotes[asset.symbol].currency ?? asset.currency ?? "USD",
-                    )}
-                    {isStaleQuote(latestQuotes[asset.symbol]) ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Icons.AlertTriangle
-                            className="text-destructive h-4 w-4"
-                            aria-label="Quote not updated today"
-                          />
-                        </TooltipTrigger>
-                        <TooltipContent>Latest close is not from today</TooltipContent>
-                      </Tooltip>
-                    ) : null}
-                  </span>
-                  <span className="text-muted-foreground text-xs">
-                    {formatDate(latestQuotes[asset.symbol].timestamp)}
-                  </span>
+              <div className="flex flex-shrink-0 items-center gap-2">
+                <div className="text-right text-sm">
+                  {latestQuotes[asset.id] ? (
+                    <>
+                      <div className="flex items-center justify-end gap-1 font-semibold">
+                        {formatAmount(
+                          latestQuotes[asset.id].close,
+                          latestQuotes[asset.id].currency ?? asset.currency ?? "USD",
+                        )}
+                        {isStaleQuote(latestQuotes[asset.id]) ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Icons.AlertTriangle
+                                className="text-destructive h-3.5 w-3.5"
+                                aria-label="Quote not updated today"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent>Latest close is not from today</TooltipContent>
+                          </Tooltip>
+                        ) : null}
+                      </div>
+                      <p className="text-muted-foreground text-xs">
+                        {formatDate(latestQuotes[asset.id].timestamp)}
+                      </p>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground text-xs">No quotes</span>
+                  )}
                 </div>
-              ) : (
-                <span className="text-muted-foreground">No quotes</span>
-              )}
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="hover:bg-muted text-muted-foreground inline-flex h-9 w-9 items-center justify-center rounded-md border transition"
+                      aria-label="Open actions"
+                    >
+                      <Icons.MoreVertical className="h-4 w-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => onUpdateQuotes(asset)}
+                      disabled={isUpdatingQuotes}
+                    >
+                      Update quotes
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => onRefetchQuotes(asset)}
+                      disabled={isRefetchingQuotes}
+                    >
+                      Refetch quotes
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => onClassify?.(asset)}>
+                      <Icons.Tag className="mr-2 h-4 w-4" />
+                      Classify
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onEdit(asset)}>Edit</DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onSelect={() => onDelete(asset)}
+                    >
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           </Card>
         ))}
@@ -456,7 +454,7 @@ export function AssetsTableMobile({
                   ].map((option) => {
                     const isSelected = selectedPriceStatus.includes(option.value);
                     const count = assets.filter((a) => {
-                      const quote = latestQuotes[a.symbol];
+                      const quote = latestQuotes[a.id];
                       const isStale = isStaleQuote(quote);
                       return (isStale ? "true" : "false") === option.value;
                     }).length;
