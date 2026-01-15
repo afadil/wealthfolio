@@ -156,11 +156,11 @@ async fn register_device(
     let client = create_client();
 
     let request = RegisterDeviceRequest {
+        device_nonce: body.instance_id, // Map instance_id to device_nonce
         display_name: body.display_name,
         platform: body.platform,
         os_version: body.os_version,
         app_version: body.app_version,
-        instance_id: body.instance_id,
     };
 
     let result = client

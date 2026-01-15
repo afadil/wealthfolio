@@ -163,6 +163,7 @@ impl BrokerSyncStateRepository {
         account_id: String,
         provider: String,
         _last_synced_date: String,
+        import_run_id: Option<String>,
     ) -> Result<()> {
         self.writer
             .exec(move |conn| {
@@ -184,6 +185,7 @@ impl BrokerSyncStateRepository {
                                 brokers_sync_state::last_successful_at.eq(&now_str),
                                 brokers_sync_state::sync_status.eq("IDLE"),
                                 brokers_sync_state::last_error.eq::<Option<String>>(None),
+                                brokers_sync_state::last_run_id.eq(&import_run_id),
                                 brokers_sync_state::updated_at.eq(&now_str),
                             ))
                             .execute(conn)
@@ -198,7 +200,7 @@ impl BrokerSyncStateRepository {
                             last_attempted_at: Some(now_str.clone()),
                             last_successful_at: Some(now_str.clone()),
                             last_error: None,
-                            last_run_id: None,
+                            last_run_id: import_run_id,
                             sync_status: "IDLE".to_string(),
                             created_at: now_str.clone(),
                             updated_at: now_str,
@@ -222,6 +224,7 @@ impl BrokerSyncStateRepository {
         account_id: String,
         provider: String,
         error: String,
+        import_run_id: Option<String>,
     ) -> Result<()> {
         self.writer
             .exec(move |conn| {
@@ -242,6 +245,7 @@ impl BrokerSyncStateRepository {
                             .set((
                                 brokers_sync_state::sync_status.eq("FAILED"),
                                 brokers_sync_state::last_error.eq(&error),
+                                brokers_sync_state::last_run_id.eq(&import_run_id),
                                 brokers_sync_state::updated_at.eq(&now_str),
                             ))
                             .execute(conn)
@@ -256,7 +260,7 @@ impl BrokerSyncStateRepository {
                             last_attempted_at: Some(now_str.clone()),
                             last_successful_at: None,
                             last_error: Some(error),
-                            last_run_id: None,
+                            last_run_id: import_run_id,
                             sync_status: "FAILED".to_string(),
                             created_at: now_str.clone(),
                             updated_at: now_str,

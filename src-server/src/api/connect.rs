@@ -335,10 +335,10 @@ async fn sync_broker_activities(
                 if count > 0 {
                     match state
                         .connect_sync_service
-                        .upsert_account_activities(account.id.clone(), activities)
+                        .upsert_account_activities(account.id.clone(), None, activities)
                         .await
                     {
-                        Ok((upserted, assets, new_asset_ids)) => {
+                        Ok((upserted, assets, new_asset_ids, needs_review)) => {
                             total_activities_upserted += upserted;
                             total_assets_inserted += assets;
                             total_new_asset_ids.extend(new_asset_ids);
@@ -347,13 +347,13 @@ async fn sync_broker_activities(
                             let now = chrono::Utc::now().to_rfc3339();
                             let _ = state
                                 .connect_sync_service
-                                .finalize_activity_sync_success(account.id.clone(), now)
+                                .finalize_activity_sync_success(account.id.clone(), now, None)
                                 .await;
 
                             accounts_synced += 1;
                             info!(
-                                "[Connect] Synced {} activities for account {}",
-                                upserted, account.name
+                                "[Connect] Synced {} activities for account {} ({} need review)",
+                                upserted, account.name, needs_review
                             );
                         }
                         Err(e) => {
@@ -363,7 +363,7 @@ async fn sync_broker_activities(
                             );
                             let _ = state
                                 .connect_sync_service
-                                .finalize_activity_sync_failure(account.id.clone(), e.to_string())
+                                .finalize_activity_sync_failure(account.id.clone(), e.to_string(), None)
                                 .await;
                             accounts_failed += 1;
                         }
@@ -380,7 +380,7 @@ async fn sync_broker_activities(
                 );
                 let _ = state
                     .connect_sync_service
-                    .finalize_activity_sync_failure(account.id.clone(), e.to_string())
+                    .finalize_activity_sync_failure(account.id.clone(), e.to_string(), None)
                     .await;
                 accounts_failed += 1;
             }

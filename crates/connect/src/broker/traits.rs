@@ -10,7 +10,7 @@ use crate::platform::Platform;
 use crate::state::BrokerSyncState;
 use wealthfolio_core::accounts::Account;
 use wealthfolio_core::errors::Result;
-use wealthfolio_core::sync::ImportRun;
+use wealthfolio_core::sync::{ImportRun, ImportRunMode, ImportRunStatus, ImportRunSummary};
 
 /// Trait for fetching data from the cloud broker API
 #[async_trait]
@@ -66,27 +66,49 @@ pub trait BrokerSyncServiceTrait: Send + Sync {
     async fn mark_activity_sync_attempt(&self, account_id: String) -> Result<()>;
 
     /// Upsert a batch/page of broker activities for a local account.
-    /// Returns (activities_upserted, assets_inserted, new_asset_ids).
+    /// Returns (activities_upserted, assets_inserted, new_asset_ids, needs_review_count).
     async fn upsert_account_activities(
         &self,
         account_id: String,
+        import_run_id: Option<String>,
         activities: Vec<AccountUniversalActivity>,
-    ) -> Result<(usize, usize, Vec<String>)>;
+    ) -> Result<(usize, usize, Vec<String>, usize)>;
 
     /// Finalize an activity sync as successful for an account.
     async fn finalize_activity_sync_success(
         &self,
         account_id: String,
         last_synced_date: String,
+        import_run_id: Option<String>,
     ) -> Result<()>;
 
     /// Finalize an activity sync as failed for an account.
-    async fn finalize_activity_sync_failure(&self, account_id: String, error: String)
-        -> Result<()>;
+    async fn finalize_activity_sync_failure(
+        &self,
+        account_id: String,
+        error: String,
+        import_run_id: Option<String>,
+    ) -> Result<()>;
 
     /// Get all broker sync states.
     fn get_all_sync_states(&self) -> Result<Vec<BrokerSyncState>>;
 
     /// Get import runs by type (SYNC or IMPORT) with a limit.
     fn get_import_runs(&self, run_type: Option<&str>, limit: i64) -> Result<Vec<ImportRun>>;
+
+    /// Create a new import run for broker sync.
+    async fn create_import_run(
+        &self,
+        account_id: &str,
+        mode: ImportRunMode,
+    ) -> Result<ImportRun>;
+
+    /// Finalize an import run with summary and status.
+    async fn finalize_import_run(
+        &self,
+        run_id: &str,
+        summary: ImportRunSummary,
+        status: ImportRunStatus,
+        error: Option<String>,
+    ) -> Result<()>;
 }
