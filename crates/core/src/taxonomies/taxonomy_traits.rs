@@ -52,6 +52,7 @@ pub trait TaxonomyServiceTrait: Send + Sync {
     // Taxonomy operations
     fn get_taxonomies(&self) -> Result<Vec<Taxonomy>>;
     fn get_taxonomy(&self, id: &str) -> Result<Option<TaxonomyWithCategories>>;
+    fn get_taxonomies_with_categories(&self) -> Result<Vec<TaxonomyWithCategories>>;
     async fn create_taxonomy(&self, taxonomy: NewTaxonomy) -> Result<Taxonomy>;
     async fn update_taxonomy(&self, taxonomy: Taxonomy) -> Result<Taxonomy>;
     async fn delete_taxonomy(&self, id: &str) -> Result<usize>;

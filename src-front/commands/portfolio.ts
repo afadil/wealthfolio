@@ -4,6 +4,7 @@ import {
   IncomeSummary,
   AccountValuation,
   PerformanceMetrics,
+  PortfolioAllocations,
   SimplePerformanceMetrics,
 } from "@/lib/types";
 
@@ -165,6 +166,15 @@ export const getHolding = async (accountId: string, assetId: string): Promise<Ho
     return await invoke<Holding | null>("get_holding", { accountId, assetId });
   } catch (error) {
     logger.error(`Error fetching holding for asset ${assetId} in account ${accountId}.`);
+    throw error;
+  }
+};
+
+export const getPortfolioAllocations = async (accountId: string): Promise<PortfolioAllocations> => {
+  try {
+    return await invoke<PortfolioAllocations>("get_portfolio_allocations", { accountId });
+  } catch (error) {
+    logger.error(`Error fetching portfolio allocations for account ${accountId}.`);
     throw error;
   }
 };

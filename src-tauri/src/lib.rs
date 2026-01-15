@@ -239,6 +239,7 @@ pub fn run() {
             // Portfolio commands
             commands::portfolio::get_holdings,
             commands::portfolio::get_holding,
+            commands::portfolio::get_portfolio_allocations,
             commands::portfolio::get_income_summary,
             commands::portfolio::get_historical_valuations,
             commands::portfolio::get_latest_valuations,

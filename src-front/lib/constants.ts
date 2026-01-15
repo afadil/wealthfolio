@@ -688,21 +688,59 @@ export const HOLDING_GROUP_ORDER: Record<string, number> = {
 // =============================================================================
 
 /**
- * Fallback display names for exchange codes not enriched by backend.
- *
- * The backend enriches search results with exchangeName via mic_to_exchange_name().
- * This mapping only handles special cases where the backend doesn't provide a name.
- *
- * NOTE: Most Yahoo codes (NMS, TOR, etc.) and MIC codes (XNAS, XTSE, etc.) are
- * handled by the backend. Only add entries here for truly special cases.
+ * Display names for exchange codes (MIC codes and special values).
+ * Used to show user-friendly exchange names in the UI.
  */
 export const EXCHANGE_DISPLAY_NAMES: Record<string, string> = {
-  // Special values not handled by backend
+  // Major US exchanges
+  XNAS: "NASDAQ",
+  XNYS: "NYSE",
+  XASE: "NYSE American",
+  ARCX: "NYSE Arca",
+  BATS: "CBOE BZX",
+
+  // Canadian exchanges
+  XTSE: "TSX",
+  XTSX: "TSX-V",
+  XCNQ: "CSE",
+  XNEO: "Aequitas NEO",
+
+  // European exchanges
+  XLON: "LSE",
+  XPAR: "Euronext Paris",
+  XAMS: "Euronext Amsterdam",
+  XBRU: "Euronext Brussels",
+  XLIS: "Euronext Lisbon",
+  XETR: "XETRA",
+  XFRA: "Frankfurt",
+  XSWX: "SIX Swiss",
+  XMIL: "Borsa Italiana",
+  XMAD: "BME",
+
+  // Asia-Pacific exchanges
+  XASX: "ASX",
+  XTKS: "Tokyo",
+  XHKG: "HKEX",
+  XSHG: "Shanghai",
+  XSHE: "Shenzhen",
+  XSES: "SGX",
+  XKRX: "Korea",
+  XBOM: "BSE India",
+  XNSE: "NSE India",
+
+  // Other major exchanges
+  XJSE: "JSE",
+  XSAU: "Tadawul",
+  XBSP: "B3",
+  XMEX: "BMV",
+
+  // Special values
   MANUAL: "Manual",
   CCC: "Crypto",
   CCY: "FX",
-  // OTC markets (may not have MIC mapping)
-  PNK: "OTC",
+
+  // OTC markets
+  PNK: "OTC Pink",
   OTC: "OTC",
   OTCQX: "OTCQX",
   OTCQB: "OTCQB",
@@ -710,12 +748,10 @@ export const EXCHANGE_DISPLAY_NAMES: Record<string, string> = {
 
 /**
  * Get a friendly display name for an exchange code.
- *
- * This is a fallback - the backend should provide exchangeName in most cases.
  * Falls back to the original code if no mapping exists.
  *
- * @param exchangeCode - Exchange code (typically from backend when exchangeName is missing)
- * @returns Friendly display name or original code if not mapped
+ * @param exchangeCode - Exchange MIC code (e.g., XNAS, XTSE, XASX)
+ * @returns Friendly display name (e.g., NASDAQ, TSX, ASX) or original code if not mapped
  */
 export function getExchangeDisplayName(exchangeCode: string | undefined | null): string {
   if (!exchangeCode) return "";

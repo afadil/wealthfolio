@@ -32,6 +32,10 @@ pub trait AssetServiceTrait: Send + Sync {
     /// Enriches an existing asset's profile with data from market data provider.
     /// Updates the profile JSON (sectors, countries, website) and notes fields.
     async fn enrich_asset_profile(&self, asset_id: &str) -> Result<Asset>;
+
+    /// Removes the $.legacy structure from asset metadata after migration.
+    /// Preserves $.identifiers if present.
+    async fn cleanup_legacy_metadata(&self, asset_id: &str) -> Result<()>;
 }
 
 /// Trait defining the contract for Asset repository operations.
@@ -49,4 +53,8 @@ pub trait AssetRepositoryTrait: Send + Sync {
     /// Search for assets by symbol (case-insensitive partial match).
     /// Used for merging existing assets into search results.
     fn search_by_symbol(&self, query: &str) -> Result<Vec<Asset>>;
+
+    /// Removes the $.legacy structure from asset metadata.
+    /// Preserves $.identifiers if present.
+    async fn cleanup_legacy_metadata(&self, asset_id: &str) -> Result<()>;
 }

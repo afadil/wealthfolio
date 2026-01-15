@@ -523,6 +523,18 @@ pub async fn migrate_legacy_classifications(
 
         if processed {
             result.assets_processed += 1;
+
+            // Cleanup legacy metadata after successful migration
+            if let Err(e) = state
+                .asset_service()
+                .cleanup_legacy_metadata(&asset.id)
+                .await
+            {
+                warn!(
+                    "Failed to cleanup legacy metadata for asset '{}': {}",
+                    asset.id, e
+                );
+            }
         }
     }
 

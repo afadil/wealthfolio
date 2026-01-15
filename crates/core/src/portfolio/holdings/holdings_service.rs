@@ -193,8 +193,6 @@ impl HoldingsServiceTrait for HoldingsService {
                             notes: asset.notes,
                             pricing_mode: asset.pricing_mode.as_db_str().to_string(),
                             preferred_provider: asset.preferred_provider.clone(),
-                            countries: None,
-                            sectors: None,
                             classifications: None,
                         };
 
@@ -457,8 +455,6 @@ impl HoldingsServiceTrait for HoldingsService {
             notes: asset_details.notes,
             pricing_mode: asset_details.pricing_mode.as_db_str().to_string(),
             preferred_provider: asset_details.preferred_provider.clone(),
-            countries: None,
-            sectors: None,
             classifications: None,
         };
 
@@ -556,8 +552,6 @@ mod tests {
                 notes: None,
                 pricing_mode: "MARKET".to_string(),
                 preferred_provider: None,
-                countries: None,
-                sectors: None,
                 classifications: None,
             }),
             asset_kind: None,

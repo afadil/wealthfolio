@@ -274,20 +274,15 @@ export const AssetProfilePage = () => {
       assetType: null,
       symbolMapping: null,
       notes: instrument?.notes ?? asset?.notes ?? null,
-      countries:
-        typeof instrument?.countries === "string"
-          ? instrument.countries
-          : JSON.stringify(instrument?.countries ?? parseJsonField(legacy?.countries) ?? []),
+      // Sectors and countries now come from taxonomy classifications (displayed via badges)
+      countries: JSON.stringify(parseJsonField(legacy?.countries) ?? []),
       categories: null,
       classes: null,
       attributes: null,
       createdAt: holding?.openDate ? new Date(holding.openDate) : new Date(),
       updatedAt: new Date(),
       currency: instrument?.currency ?? asset?.currency ?? "USD",
-      sectors:
-        typeof instrument?.sectors === "string"
-          ? instrument.sectors
-          : JSON.stringify(instrument?.sectors ?? parseJsonField(legacy?.sectors) ?? []),
+      sectors: JSON.stringify(parseJsonField(legacy?.sectors) ?? []),
       url: null,
       marketPrice: quote?.close ?? 0,
       totalGainAmount,

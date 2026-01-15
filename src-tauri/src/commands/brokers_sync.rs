@@ -312,7 +312,6 @@ pub async fn perform_broker_sync(
         let mut account_activities_inserted: u32 = 0;
         let account_activities_updated: u32 = 0; // Reserved for future use
         let mut account_needs_review: u32 = 0;
-        #[allow(unused_assignments)]
         let mut account_assets_created: u32 = 0;
 
         loop {
@@ -568,6 +567,7 @@ pub async fn perform_broker_sync(
                     warnings: account_needs_review,
                     errors: 0,
                     removed: 0,
+                    assets_created: account_assets_created,
                 };
 
                 // Use NeedsReview status if any activities need user attention

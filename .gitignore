@@ -81,6 +81,6 @@ Thumbs.db
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
-
+/AI-POC-COPY
 # AI tools
 .ralph-tui/

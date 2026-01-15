@@ -325,7 +325,9 @@ SELECT
                 'legacy', json_object(
                     'old_id', id,  -- Used for FK mapping (temp table) and quote mapping
                     'asset_class', asset_class,  -- Used for taxonomy classification, then removed
-                    'asset_sub_class', asset_sub_class  -- Used for taxonomy classification, then removed
+                    'asset_sub_class', asset_sub_class,  -- Used for taxonomy classification, then removed
+                    'sectors', sectors,  -- Used for manual migration to industries_gics taxonomy
+                    'countries', countries  -- Used for manual migration to regions taxonomy
                 ),
                 'identifiers', json_object('isin', isin)  -- Permanent: preserved after cleanup
             )
@@ -334,7 +336,9 @@ SELECT
                 'legacy', json_object(
                     'old_id', id,  -- Used for FK mapping (temp table) and quote mapping
                     'asset_class', asset_class,  -- Used for taxonomy classification, then removed
-                    'asset_sub_class', asset_sub_class  -- Used for taxonomy classification, then removed
+                    'asset_sub_class', asset_sub_class,  -- Used for taxonomy classification, then removed
+                    'sectors', sectors,  -- Used for manual migration to industries_gics taxonomy
+                    'countries', countries  -- Used for manual migration to regions taxonomy
                 )
             )
     END,

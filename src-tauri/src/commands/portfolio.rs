@@ -10,6 +10,7 @@ use crate::{
 use log::debug;
 use tauri::{AppHandle, State};
 use wealthfolio_core::{
+    allocation::PortfolioAllocations,
     holdings::Holding,
     income::IncomeSummary,
     performance::{PerformanceMetrics, SimplePerformanceMetrics},
@@ -68,6 +69,20 @@ pub async fn get_holding(
     state
         .holdings_service()
         .get_holding(&account_id, &asset_id, &base_currency)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_portfolio_allocations(
+    state: State<'_, Arc<ServiceContext>>,
+    account_id: String,
+) -> Result<PortfolioAllocations, String> {
+    debug!("Get portfolio allocations for account: {}", account_id);
+    let base_currency = state.get_base_currency();
+    state
+        .allocation_service()
+        .get_portfolio_allocations(&account_id, &base_currency)
         .await
         .map_err(|e| e.to_string())
 }

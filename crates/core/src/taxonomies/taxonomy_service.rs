@@ -114,6 +114,10 @@ impl TaxonomyServiceTrait for TaxonomyService {
         self.repository.get_taxonomy_with_categories(id)
     }
 
+    fn get_taxonomies_with_categories(&self) -> Result<Vec<TaxonomyWithCategories>> {
+        self.repository.get_all_taxonomies_with_categories()
+    }
+
     async fn create_taxonomy(&self, taxonomy: NewTaxonomy) -> Result<Taxonomy> {
         self.repository.create_taxonomy(taxonomy).await
     }

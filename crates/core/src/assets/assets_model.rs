@@ -87,6 +87,8 @@ pub struct Asset {
 
     // Market identity (for SECURITY)
     pub exchange_mic: Option<String>, // ISO 10383 MIC code
+    #[serde(skip_deserializing)]
+    pub exchange_name: Option<String>, // Friendly exchange name (derived from MIC)
 
     // Currency
     pub currency: String,
@@ -229,6 +231,17 @@ impl AssetKind {
 }
 
 impl Asset {
+    /// Enrich the asset with derived fields like exchange_name.
+    /// Call this when returning assets to the frontend.
+    pub fn enrich(mut self) -> Self {
+        self.exchange_name = self
+            .exchange_mic
+            .as_ref()
+            .and_then(|mic| wealthfolio_market_data::mic_to_exchange_name(mic))
+            .map(String::from);
+        self
+    }
+
     /// Check if this asset is holdable (can have positions)
     pub fn is_holdable(&self) -> bool {
         !matches!(self.kind, AssetKind::FxRate)

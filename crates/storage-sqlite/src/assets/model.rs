@@ -134,6 +134,7 @@ impl From<AssetDB> for Asset {
             name: db.name,
             symbol: db.symbol,
             exchange_mic: db.exchange_mic,
+            exchange_name: None, // Computed by Asset::enrich()
             currency: db.currency,
             pricing_mode,
             preferred_provider: db.preferred_provider,

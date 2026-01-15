@@ -12,6 +12,7 @@ use wealthfolio_core::{
     fx::{FxService, FxServiceTrait},
     goals::{GoalService, GoalServiceTrait},
     limits::{ContributionLimitService, ContributionLimitServiceTrait},
+    portfolio::allocation::{AllocationService, AllocationServiceTrait},
     portfolio::income::{IncomeService, IncomeServiceTrait},
     portfolio::{
         holdings::{
@@ -24,7 +25,7 @@ use wealthfolio_core::{
     quotes::{QuoteService, QuoteServiceTrait},
     secrets::SecretStore,
     settings::{SettingsService, SettingsServiceTrait},
-    taxonomies::TaxonomyService,
+    taxonomies::{TaxonomyService, TaxonomyServiceTrait},
 };
 use wealthfolio_storage_sqlite::{
     accounts::AccountRepository,
@@ -45,6 +46,7 @@ pub struct AppState {
     pub settings_service: Arc<SettingsService>,
     pub holdings_service: Arc<dyn HoldingsServiceTrait + Send + Sync>,
     pub valuation_service: Arc<dyn ValuationServiceTrait + Send + Sync>,
+    pub allocation_service: Arc<dyn AllocationServiceTrait + Send + Sync>,
     pub quote_service: Arc<dyn QuoteServiceTrait + Send + Sync>,
     pub base_currency: Arc<RwLock<String>>,
     pub snapshot_service: Arc<dyn SnapshotServiceTrait + Send + Sync>,
@@ -56,6 +58,7 @@ pub struct AppState {
     pub fx_service: Arc<dyn FxServiceTrait + Send + Sync>,
     pub activity_service: Arc<dyn ActivityServiceTrait + Send + Sync>,
     pub asset_service: Arc<dyn AssetServiceTrait + Send + Sync>,
+    pub taxonomy_service: Arc<dyn TaxonomyServiceTrait + Send + Sync>,
     pub connect_sync_service: Arc<dyn BrokerSyncServiceTrait + Send + Sync>,
     pub addons_root: String,
     pub data_root: String,
@@ -182,6 +185,12 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         holdings_valuation_service.clone(),
     ));
 
+    let allocation_service: Arc<dyn AllocationServiceTrait + Send + Sync> =
+        Arc::new(AllocationService::new(
+            holdings_service.clone(),
+            taxonomy_service.clone(),
+        ));
+
     let performance_service = Arc::new(
         wealthfolio_core::portfolio::performance::PerformanceService::new(
             valuation_service.clone(),
@@ -244,6 +253,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         settings_service,
         holdings_service,
         valuation_service,
+        allocation_service,
         quote_service,
         base_currency,
         snapshot_service,
@@ -254,6 +264,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         fx_service: fx_service.clone(),
         activity_service,
         asset_service,
+        taxonomy_service,
         connect_sync_service,
         addons_root: config.addons_root.clone(),
         data_root,

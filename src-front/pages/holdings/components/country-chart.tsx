@@ -1,55 +1,36 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
-import { Country, Holding } from "@/lib/types";
+import { TaxonomyAllocation } from "@/lib/types";
 import { DonutChart, EmptyPlaceholder, Skeleton } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
 
 interface CountryChartProps {
-  holdings?: Holding[];
+  allocation?: TaxonomyAllocation;
+  baseCurrency?: string;
   isLoading?: boolean;
   onCountrySectionClick?: (countryName: string) => void;
 }
 
-export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: CountryChartProps) => {
+export const CountryChart = ({
+  allocation,
+  baseCurrency = "USD",
+  isLoading,
+  onCountrySectionClick,
+}: CountryChartProps) => {
   const [activeIndex, setActiveIndex] = useState(0);
 
   const data = useMemo(() => {
-    if (!holdings || holdings.length === 0) return [];
+    if (!allocation?.categories?.length) return [];
 
-    // Assume baseCurrency is consistent across holdings or default to USD
-    const currency = holdings[0]?.baseCurrency || "USD";
-
-    const countryMap = new Map<string, number>();
-    holdings.forEach((holding) => {
-      const marketValue = Number(holding.marketValue?.base) || 0;
-
-      // Prefer taxonomy-based regions, fall back to legacy countries
-      const taxonomyRegions = holding.instrument?.classifications?.regions;
-      const regionsToProcess =
-        taxonomyRegions && taxonomyRegions.length > 0
-          ? taxonomyRegions.map((r) => ({
-              name: r.category.name,
-              weight: r.weight / 100, // taxonomy weight is 0-100, convert to decimal
-            }))
-          : holding.instrument?.countries && holding.instrument.countries.length > 0
-            ? holding.instrument.countries.map((c: Country) => ({
-                name: c.name,
-                weight: Number(c.weight) > 1 ? Number(c.weight) / 100 : Number(c.weight),
-              }))
-            : null;
-
-      if (regionsToProcess && !isNaN(marketValue)) {
-        regionsToProcess.forEach((region) => {
-          const currentValue = countryMap.get(region.name) || 0;
-          const weightedValue = marketValue * region.weight;
-          countryMap.set(region.name, currentValue + weightedValue);
-        });
-      }
-    });
-
-    return Array.from(countryMap, ([name, value]) => ({ name, value, currency }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 10); // Show top 10 countries
-  }, [holdings]);
+    return allocation.categories
+      .filter((cat) => cat.value > 0)
+      .slice(0, 10) // Show top 10 regions
+      .map((cat) => ({
+        name: cat.categoryName,
+        value: cat.value,
+        currency: baseCurrency,
+        color: cat.color,
+      }));
+  }, [allocation, baseCurrency]);
 
   if (isLoading) {
     return (
@@ -88,7 +69,7 @@ export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: Cou
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
-            Country Allocation
+            Region Allocation
           </CardTitle>
         </div>
       </CardHeader>
@@ -104,7 +85,7 @@ export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: Cou
           />
         ) : (
           <EmptyPlaceholder
-            description="There is no country data available for your holdings."
+            description="There is no region data available for your holdings."
             className="max-h-[160px]"
           />
         )}

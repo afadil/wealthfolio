@@ -15,6 +15,7 @@ import { useMemo, useState } from "react";
 
 import { AccountSelector } from "@/components/account-selector";
 import { useHoldings } from "@/hooks/use-holdings";
+import { usePortfolioAllocations } from "@/hooks/use-portfolio-allocations";
 import { PORTFOLIO_ACCOUNT_ID, isAlternativeAssetId } from "@/lib/constants";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { Account, Holding, HoldingType, Instrument } from "@/lib/types";
@@ -26,9 +27,18 @@ import { PortfolioComposition } from "./components/composition-chart";
 import { CountryChart } from "./components/country-chart";
 import { HoldingCurrencyChart } from "./components/currency-chart";
 import { SectorsChart } from "./components/sectors-chart";
+import { SegmentedAllocationBar } from "./components/segmented-allocation-bar";
 
 // Define a type for the filter criteria
-type SheetFilterType = "class" | "sector" | "country" | "currency" | "account" | "composition";
+type SheetFilterType =
+  | "class"
+  | "sector"
+  | "country"
+  | "currency"
+  | "account"
+  | "composition"
+  | "risk"
+  | "custom";
 
 export const HoldingsInsightsPage = () => {
   const navigate = useNavigate();
@@ -45,8 +55,13 @@ export const HoldingsInsightsPage = () => {
   } as Account);
 
   const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
 
-  const { holdings, isLoading } = useHoldings(selectedAccount?.id ?? PORTFOLIO_ACCOUNT_ID);
+  const accountId = selectedAccount?.id ?? PORTFOLIO_ACCOUNT_ID;
+  const { holdings, isLoading: holdingsLoading } = useHoldings(accountId);
+  const { allocations, isLoading: allocationsLoading } = usePortfolioAllocations(accountId);
+
+  const isLoading = holdingsLoading || allocationsLoading;
 
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [sheetTitle, setSheetTitle] = useState("");
@@ -85,31 +100,33 @@ export const HoldingsInsightsPage = () => {
       case "class":
         filteredHoldings = holdings.filter((h) => {
           const isCash = h.holdingType === HoldingType.CASH;
-          // Use taxonomy assetType classification
-          const assetType = isCash
-            ? "Cash"
-            : h.instrument?.classifications?.assetType?.name ?? "Other";
-          return assetType === sheetFilterName;
+          if (isCash) {
+            return sheetFilterName === "Cash";
+          }
+          // Use taxonomy assetClasses classification
+          const assetClasses = h.instrument?.classifications?.assetClasses;
+          if (assetClasses && assetClasses.length > 0) {
+            return assetClasses.some((c) => c.category.name === sheetFilterName);
+          }
+          return sheetFilterName === "Unknown";
         });
         break;
       case "sector":
         filteredHoldings = holdings.filter((h) => {
-          // Check taxonomy sectors first, fall back to legacy sectors
           const taxonomySectors = h.instrument?.classifications?.sectors;
           if (taxonomySectors && taxonomySectors.length > 0) {
             return taxonomySectors.some((s) => s.category.name === sheetFilterName);
           }
-          return h.instrument?.sectors?.some((s) => s.name === sheetFilterName);
+          return sheetFilterName === "Unknown";
         });
         break;
       case "country":
         filteredHoldings = holdings.filter((h) => {
-          // Check taxonomy regions first, fall back to legacy countries
           const taxonomyRegions = h.instrument?.classifications?.regions;
           if (taxonomyRegions && taxonomyRegions.length > 0) {
             return taxonomyRegions.some((r) => r.category.name === sheetFilterName);
           }
-          return h.instrument?.countries?.some((c) => c.name === sheetFilterName);
+          return sheetFilterName === "Unknown";
         });
         break;
       case "currency":
@@ -119,11 +136,28 @@ export const HoldingsInsightsPage = () => {
         if (sheetCompositionFilter) {
           filteredHoldings = holdings.filter((h) => h.instrument?.id === sheetCompositionFilter);
         } else if (sheetFilterName) {
-          // Use taxonomy classifications for filtering
           filteredHoldings = holdings.filter(
             (h) => h.instrument?.classifications?.assetType?.name === sheetFilterName,
           );
         }
+        break;
+      case "risk":
+        filteredHoldings = holdings.filter((h) => {
+          const riskCategory = h.instrument?.classifications?.riskCategory;
+          if (riskCategory) {
+            return riskCategory.name === sheetFilterName;
+          }
+          return sheetFilterName === "Unknown";
+        });
+        break;
+      case "custom":
+        filteredHoldings = holdings.filter((h) => {
+          const customGroups = h.instrument?.classifications?.customGroups;
+          if (customGroups && customGroups.length > 0) {
+            return customGroups.some((c) => c.category.name === sheetFilterName);
+          }
+          return sheetFilterName === "Unknown";
+        });
         break;
       default:
         break;
@@ -157,6 +191,13 @@ export const HoldingsInsightsPage = () => {
 
   // For insights tab, check if there are no holdings at all (including cash)
   const hasNoHoldingsAtAll = !isLoading && (!holdings || holdings.length === 0);
+
+  // Check if we have any custom taxonomy allocations to display
+  const hasCustomAllocations =
+    allocations?.customGroups && allocations.customGroups.some((g) => g.categories.length > 0);
+  const hasRiskAllocations =
+    allocations?.riskCategory && allocations.riskCategory.categories.length > 0;
+  const showTaxonomyRow = hasRiskAllocations || hasCustomAllocations;
 
   const renderEmptyState = () => (
     <div className="flex items-center justify-center py-16">
@@ -193,7 +234,7 @@ export const HoldingsInsightsPage = () => {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <HoldingCurrencyChart
             holdings={[...cashHoldings, ...nonCashHoldings]}
-            baseCurrency={settings?.baseCurrency ?? "USD"}
+            baseCurrency={baseCurrency}
             isLoading={isLoading}
             onCurrencySectionClick={(currencyName) =>
               handleChartSectionClick("currency", currencyName, `Holdings in ${currencyName}`)
@@ -203,7 +244,8 @@ export const HoldingsInsightsPage = () => {
           <AccountAllocationChart isLoading={isLoading} />
 
           <ClassesChart
-            holdings={[...cashHoldings, ...nonCashHoldings]}
+            allocation={allocations?.assetClasses}
+            baseCurrency={baseCurrency}
             isLoading={isLoading}
             onClassSectionClick={(className) =>
               handleChartSectionClick("class", className, `Asset Class: ${className}`)
@@ -211,7 +253,8 @@ export const HoldingsInsightsPage = () => {
           />
 
           <CountryChart
-            holdings={nonCashHoldings}
+            allocation={allocations?.regions}
+            baseCurrency={baseCurrency}
             isLoading={isLoading}
             onCountrySectionClick={(countryName) =>
               handleChartSectionClick("country", countryName, `Holdings in ${countryName}`)
@@ -225,10 +268,11 @@ export const HoldingsInsightsPage = () => {
             <PortfolioComposition holdings={nonCashHoldings ?? []} isLoading={isLoading} />
           </div>
 
-          {/* Sectors Chart - Now self-contained */}
+          {/* Sectors Chart */}
           <div className="col-span-1">
             <SectorsChart
-              holdings={nonCashHoldings}
+              allocation={allocations?.sectors}
+              baseCurrency={baseCurrency}
               isLoading={isLoading}
               onSectorSectionClick={(sectorName) =>
                 handleChartSectionClick("sector", sectorName, `Holdings in Sector: ${sectorName}`)
@@ -236,6 +280,42 @@ export const HoldingsInsightsPage = () => {
             />
           </div>
         </div>
+
+        {/* Third row: Risk & Custom Taxonomies */}
+        {showTaxonomyRow && (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {hasRiskAllocations && (
+              <SegmentedAllocationBar
+                title="Risk Profile"
+                allocation={allocations?.riskCategory}
+                baseCurrency={baseCurrency}
+                isLoading={isLoading}
+                onSegmentClick={(categoryName) =>
+                  handleChartSectionClick("risk", categoryName, `Risk Category: ${categoryName}`)
+                }
+              />
+            )}
+            {allocations?.customGroups?.map(
+              (taxonomy) =>
+                taxonomy.categories.length > 0 && (
+                  <SegmentedAllocationBar
+                    key={taxonomy.taxonomyId}
+                    title={taxonomy.taxonomyName}
+                    allocation={taxonomy}
+                    baseCurrency={baseCurrency}
+                    isLoading={isLoading}
+                    onSegmentClick={(categoryName) =>
+                      handleChartSectionClick(
+                        "custom",
+                        categoryName,
+                        `${taxonomy.taxonomyName}: ${categoryName}`,
+                      )
+                    }
+                  />
+                ),
+            )}
+          </div>
+        )}
       </div>
     );
   };
