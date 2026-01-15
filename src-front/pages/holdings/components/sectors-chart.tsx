@@ -2,59 +2,35 @@ import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/compon
 import { EmptyPlaceholder } from "@wealthfolio/ui/components/ui/empty-placeholder";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
-import { Holding, Sector } from "@/lib/types";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@wealthfolio/ui/components/ui/tooltip";
+import { TaxonomyAllocation } from "@/lib/types";
 import { formatPercent, PrivacyAmount } from "@wealthfolio/ui";
 import { useMemo } from "react";
 
-function getSectorsData(holdings: Holding[]) {
-  if (!holdings) return [];
-  const sectors = holdings?.reduce(
-    (acc, holding) => {
-      const marketValue = Number(holding.marketValue?.base) || 0;
-
-      // Prefer taxonomy-based classifications, fall back to legacy sectors
-      const taxonomySectors = holding.instrument?.classifications?.sectors;
-      const sectorsToProcess =
-        taxonomySectors && taxonomySectors.length > 0
-          ? taxonomySectors.map((s) => ({
-              name: s.category.name,
-              weight: s.weight / 100, // taxonomy weight is 0-100, convert to decimal
-            }))
-          : holding.instrument?.sectors && holding.instrument.sectors.length > 0
-            ? holding.instrument.sectors.map((s: Sector) => ({
-                name: s.name,
-                weight: Number(s.weight) > 1 ? Number(s.weight) / 100 : Number(s.weight),
-              }))
-            : [{ name: "Others", weight: 1 }];
-
-      if (isNaN(marketValue)) return acc;
-
-      sectorsToProcess.forEach((sector) => {
-        const current = acc[sector.name] || 0;
-        acc[sector.name] = current + marketValue * sector.weight;
-      });
-      return acc;
-    },
-    {} as Record<string, number>,
-  );
-
-  const sortedSectors = Object.entries(sectors)
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value);
-
-  return sortedSectors;
-}
-
 interface SectorsChartProps {
-  holdings: Holding[];
+  allocation?: TaxonomyAllocation;
+  baseCurrency?: string;
   isLoading?: boolean;
   onSectorSectionClick?: (sectorName: string) => void;
 }
 
-export function SectorsChart({ holdings, isLoading, onSectorSectionClick }: SectorsChartProps) {
-  const sectors = useMemo(() => getSectorsData(holdings), [holdings]);
-  const total = sectors.reduce((sum, s) => sum + s.value, 0);
+export function SectorsChart({
+  allocation,
+  baseCurrency = "USD",
+  isLoading,
+  onSectorSectionClick,
+}: SectorsChartProps) {
+  const sectors = useMemo(() => {
+    if (!allocation?.categories?.length) return [];
+    return allocation.categories.filter((cat) => cat.value > 0);
+  }, [allocation]);
+
+  const total = useMemo(() => sectors.reduce((sum, s) => sum + s.value, 0), [sectors]);
 
   return (
     <Card>
@@ -76,7 +52,7 @@ export function SectorsChart({ holdings, isLoading, onSectorSectionClick }: Sect
               <Skeleton className="h-8 w-[60%]" />
               <Skeleton className="h-8 w-[50%]" />
             </div>
-          ) : holdings.length === 0 ? (
+          ) : sectors.length === 0 ? (
             <div className="flex h-[330px] items-center justify-center">
               <EmptyPlaceholder
                 icon={<Icons.BarChart className="h-10 w-10" />}
@@ -89,16 +65,16 @@ export function SectorsChart({ holdings, isLoading, onSectorSectionClick }: Sect
               {sectors.map((sector) => {
                 const percent = total > 0 ? sector.value / total : 0;
                 return (
-                  <Tooltip key={sector.name} delayDuration={100}>
+                  <Tooltip key={sector.categoryId} delayDuration={100}>
                     <TooltipTrigger asChild>
                       <div
                         className="hover:bg-muted flex cursor-pointer items-center gap-0 rounded-md py-1"
-                        onClick={() => onSectorSectionClick?.(sector.name)}
+                        onClick={() => onSectorSectionClick?.(sector.categoryName)}
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
-                            onSectorSectionClick?.(sector.name);
+                            onSectorSectionClick?.(sector.categoryName);
                           }
                         }}
                       >
@@ -106,9 +82,10 @@ export function SectorsChart({ holdings, isLoading, onSectorSectionClick }: Sect
                         <div className="bg-secondary relative h-5 flex-1 overflow-hidden rounded">
                           {/* Actual Progress Fill */}
                           <div
-                            className="bg-chart-2 absolute top-0 left-0 h-full rounded"
+                            className="absolute top-0 left-0 h-full rounded"
                             style={{
                               width: `${percent * 100}%`,
+                              backgroundColor: sector.color || "var(--chart-2)",
                             }}
                           />
                           {/* Conditional Text Block */}
@@ -129,8 +106,8 @@ export function SectorsChart({ holdings, isLoading, onSectorSectionClick }: Sect
                                   right: "0",
                                 }}
                               >
-                                <span className="truncate" title={sector.name}>
-                                  {sector.name}
+                                <span className="truncate" title={sector.categoryName}>
+                                  {sector.categoryName}
                                 </span>
                               </div>
                             </>
@@ -143,11 +120,9 @@ export function SectorsChart({ holdings, isLoading, onSectorSectionClick }: Sect
                                 right: "0",
                               }}
                             >
-                              <span className="pl-1 whitespace-nowrap">
-                                {formatPercent(percent)}
-                              </span>
-                              <span className="truncate pr-1 pl-1" title={sector.name}>
-                                {sector.name}
+                              <span className="pl-1 whitespace-nowrap">{formatPercent(percent)}</span>
+                              <span className="truncate pr-1 pl-1" title={sector.categoryName}>
+                                {sector.categoryName}
                               </span>
                             </div>
                           )}
@@ -156,10 +131,10 @@ export function SectorsChart({ holdings, isLoading, onSectorSectionClick }: Sect
                     </TooltipTrigger>
                     <TooltipContent side="top" align="center">
                       <span className="text-muted-foreground text-[0.70rem] uppercase">
-                        {sector.name}
+                        {sector.categoryName}
                       </span>
                       <div>
-                        <PrivacyAmount value={sector.value} currency="USD" />
+                        <PrivacyAmount value={sector.value} currency={baseCurrency} />
                       </div>
                     </TooltipContent>
                   </Tooltip>

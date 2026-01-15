@@ -1,4 +1,4 @@
-import { Asset, Country, Sector } from "@/lib/types";
+import { Asset } from "@/lib/types";
 
 export interface WeightedBreakdown {
   name: string;
@@ -6,8 +6,8 @@ export interface WeightedBreakdown {
 }
 
 export interface ParsedAsset extends Asset {
-  sectorsList: Sector[];
-  countriesList: Country[];
+  sectorsList: WeightedBreakdown[];
+  countriesList: WeightedBreakdown[];
 }
 
 const normalizeWeight = (weight: unknown): number => {
@@ -28,17 +28,22 @@ const normalizeWeight = (weight: unknown): number => {
 };
 
 const parseJsonBreakdown = (value?: string | null): WeightedBreakdown[] => {
-  if (!value) {
+  // Handle null, undefined, empty string, or non-string values
+  if (!value || typeof value !== "string" || value.trim() === "" || value === "null") {
     return [];
   }
 
   try {
-    const parsed = JSON.parse(value) as WeightedBreakdown[];
+    const parsed = JSON.parse(value);
+    // Ensure parsed is an array
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
     return parsed
       .map((item) => ({ name: item.name?.trim() ?? "", weight: normalizeWeight(item.weight) }))
       .filter((item) => item.name);
-  } catch (error) {
-    console.warn("Failed to parse breakdown", error);
+  } catch {
+    // Silently return empty array for invalid JSON
     return [];
   }
 };

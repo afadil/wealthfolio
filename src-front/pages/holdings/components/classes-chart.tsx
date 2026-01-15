@@ -1,4 +1,4 @@
-import { Holding, HoldingType } from "@/lib/types";
+import { TaxonomyAllocation } from "@/lib/types";
 import {
   Card,
   CardContent,
@@ -10,43 +10,33 @@ import {
 } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
 
-function getClassData(holdings: Holding[]) {
-  if (!holdings?.length) return [];
-
-  const currency = holdings[0]?.baseCurrency || "USD";
-
-  const classes = holdings.reduce(
-    (acc, holding) => {
-      const isCash = holding.holdingType === HoldingType.CASH;
-      // Use taxonomy-based assetType classification
-      const assetType = isCash
-        ? "Cash"
-        : holding.instrument?.classifications?.assetType?.name || "Other";
-
-      const current = acc[assetType] || 0;
-      const value = Number(holding.marketValue?.base) || 0;
-      acc[assetType] = current + value;
-      return acc;
-    },
-    {} as Record<string, number>,
-  );
-
-  return Object.entries(classes)
-    .filter(([_, value]) => value > 0)
-    .sort(([, a], [, b]) => b - a)
-    .map(([name, value]) => ({ name, value, currency }));
-}
-
 interface ClassesChartProps {
-  holdings?: Holding[];
+  allocation?: TaxonomyAllocation;
+  baseCurrency?: string;
   isLoading?: boolean;
   onClassSectionClick?: (className: string) => void;
 }
 
-export function ClassesChart({ holdings, isLoading, onClassSectionClick }: ClassesChartProps) {
+export function ClassesChart({
+  allocation,
+  baseCurrency = "USD",
+  isLoading,
+  onClassSectionClick,
+}: ClassesChartProps) {
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const data = useMemo(() => getClassData(holdings ?? []), [holdings]);
+  const data = useMemo(() => {
+    if (!allocation?.categories?.length) return [];
+
+    return allocation.categories
+      .filter((cat) => cat.value > 0)
+      .map((cat) => ({
+        name: cat.categoryName,
+        value: cat.value,
+        currency: baseCurrency,
+        color: cat.color,
+      }));
+  }, [allocation, baseCurrency]);
 
   const handleInternalSectionClick = (sectionData: {
     name: string;
@@ -85,7 +75,7 @@ export function ClassesChart({ holdings, isLoading, onClassSectionClick }: Class
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
-            Asset Allocation
+            Asset Classes
           </CardTitle>
         </div>
       </CardHeader>
@@ -99,7 +89,7 @@ export function ClassesChart({ holdings, isLoading, onClassSectionClick }: Class
             endAngle={0}
           />
         ) : (
-          <EmptyPlaceholder description="There is no class data available for your holdings." />
+          <EmptyPlaceholder description="There is no asset class data available for your holdings." />
         )}
       </CardContent>
     </Card>

@@ -11,6 +11,7 @@ use wealthfolio_core::{
     goals::GoalService,
     limits::ContributionLimitService,
     portfolio::{
+        allocation::AllocationService,
         holdings::{HoldingsService, HoldingsValuationService},
         income::IncomeService,
         net_worth::NetWorthService,
@@ -161,6 +162,11 @@ pub async fn initialize_context(
         holdings_valuation_service.clone(),
     ));
 
+    let allocation_service = Arc::new(AllocationService::new(
+        holdings_service.clone(),
+        taxonomy_service.clone(),
+    ));
+
     let net_worth_service = Arc::new(NetWorthService::new(
         base_currency.clone(),
         account_repository.clone(),
@@ -198,6 +204,7 @@ pub async fn initialize_context(
         income_service,
         snapshot_service,
         holdings_service,
+        allocation_service,
         valuation_service,
         net_worth_service,
         sync_service,

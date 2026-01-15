@@ -353,17 +353,6 @@ export type ValidationResult = { status: "success" } | { status: "error"; errors
 
 // Holding types based on Rust HoldingView model
 
-// Types matching Rust structs from src-core/src/assets/assets_model.rs
-export interface Sector {
-  name: string;
-  weight: number;
-}
-
-export interface Country {
-  name: string;
-  weight: number;
-}
-
 export interface Instrument {
   id: string;
   symbol: string;
@@ -372,8 +361,6 @@ export interface Instrument {
   notes?: string | null;
   pricingMode: PricingMode;
   preferredProvider?: string | null;
-  countries?: Country[] | null;
-  sectors?: Sector[] | null;
 
   // Taxonomy-based classifications
   classifications?: AssetClassifications | null;
@@ -457,6 +444,7 @@ export interface Asset {
 
   // Market identity
   exchangeMic?: string | null; // ISO 10383 MIC code
+  exchangeName?: string | null; // Friendly exchange name (e.g., "NASDAQ")
   currency: string;
 
   // Pricing configuration
@@ -1222,6 +1210,31 @@ export interface MigrationStatus {
   needed: boolean;
   assetsWithLegacyData: number;
   assetsAlreadyMigrated: number;
+}
+
+// Portfolio allocation types for taxonomy-based breakdowns
+export interface CategoryAllocation {
+  categoryId: string;
+  categoryName: string;
+  color: string;
+  value: number; // Base currency value
+  percentage: number; // 0-100
+}
+
+export interface TaxonomyAllocation {
+  taxonomyId: string;
+  taxonomyName: string;
+  color: string;
+  categories: CategoryAllocation[];
+}
+
+export interface PortfolioAllocations {
+  assetClasses: TaxonomyAllocation;
+  sectors: TaxonomyAllocation;
+  regions: TaxonomyAllocation;
+  riskCategory: TaxonomyAllocation;
+  customGroups: TaxonomyAllocation[];
+  totalValue: number;
 }
 
 export interface MigrationResult {

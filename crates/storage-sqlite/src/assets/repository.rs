@@ -270,4 +270,40 @@ impl AssetRepositoryTrait for AssetRepository {
     fn search_by_symbol(&self, query: &str) -> Result<Vec<Asset>> {
         self.search_by_symbol_impl(query)
     }
+
+    async fn cleanup_legacy_metadata(&self, asset_id: &str) -> Result<()> {
+        let asset_id_owned = asset_id.to_string();
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                // Get current metadata
+                let existing: AssetDB = assets::table
+                    .filter(assets::id.eq(&asset_id_owned))
+                    .first(conn)
+                    .map_err(StorageError::from)?;
+
+                // Parse current metadata and remove $.legacy, keep $.identifiers
+                let new_metadata: Option<String> = existing.metadata.and_then(|meta_str| {
+                    serde_json::from_str::<serde_json::Value>(&meta_str)
+                        .ok()
+                        .and_then(|meta| {
+                            let identifiers = meta.get("identifiers").cloned();
+                            match identifiers {
+                                Some(ids) => Some(
+                                    serde_json::json!({ "identifiers": ids }).to_string(),
+                                ),
+                                None => None,
+                            }
+                        })
+                });
+
+                // Update the asset
+                diesel::update(assets::table.filter(assets::id.eq(&asset_id_owned)))
+                    .set(assets::metadata.eq(new_metadata))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+
+                Ok(())
+            })
+            .await
+    }
 }

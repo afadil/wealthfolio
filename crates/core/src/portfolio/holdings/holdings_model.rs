@@ -18,20 +18,6 @@ pub enum HoldingType {
     AlternativeAsset,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct Sector {
-    pub name: String,
-    pub weight: f64,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct Country {
-    pub name: String,
-    pub weight: f64,
-}
-
 /// Instrument data needed for display
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -43,10 +29,6 @@ pub struct Instrument {
     pub notes: Option<String>,
     pub pricing_mode: String,
     pub preferred_provider: Option<String>,
-
-    // Display categorization
-    pub countries: Option<Vec<Country>>,
-    pub sectors: Option<Vec<Sector>>,
 
     // Taxonomy-based classifications
     pub classifications: Option<AssetClassifications>,

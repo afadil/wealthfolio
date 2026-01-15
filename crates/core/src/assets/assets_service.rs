@@ -104,14 +104,15 @@ impl AssetService {
 // Implement the service trait
 #[async_trait::async_trait]
 impl AssetServiceTrait for AssetService {
-    /// Lists all assets
+    /// Lists all assets with enriched fields (e.g., exchange_name)
     fn get_assets(&self) -> Result<Vec<Asset>> {
-        self.asset_repository.list()
+        let assets = self.asset_repository.list()?;
+        Ok(assets.into_iter().map(|a| a.enrich()).collect())
     }
 
-    /// Retrieves an asset by its ID
+    /// Retrieves an asset by its ID with enriched fields
     fn get_asset_by_id(&self, asset_id: &str) -> Result<Asset> {
-        self.asset_repository.get_by_id(asset_id)
+        self.asset_repository.get_by_id(asset_id).map(|a| a.enrich())
     }
 
     async fn delete_asset(&self, asset_id: &str) -> Result<()> {
@@ -438,5 +439,9 @@ impl AssetServiceTrait for AssetService {
         }
 
         Ok(updated_asset)
+    }
+
+    async fn cleanup_legacy_metadata(&self, asset_id: &str) -> Result<()> {
+        self.asset_repository.cleanup_legacy_metadata(asset_id).await
     }
 }

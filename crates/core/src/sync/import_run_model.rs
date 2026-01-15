@@ -116,6 +116,8 @@ pub struct ImportRunSummary {
     pub errors: u32,
     /// Number of records removed
     pub removed: u32,
+    /// Number of assets created during import
+    pub assets_created: u32,
 }
 
 impl ImportRun {

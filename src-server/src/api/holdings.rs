@@ -6,7 +6,9 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use wealthfolio_core::portfolio::{holdings::Holding, valuation::DailyAccountValuation};
+use wealthfolio_core::portfolio::{
+    allocation::PortfolioAllocations, holdings::Holding, valuation::DailyAccountValuation,
+};
 
 #[derive(serde::Deserialize)]
 struct HoldingsQuery {
@@ -113,10 +115,23 @@ async fn get_latest_valuations(
     Ok(Json(vals))
 }
 
+async fn get_portfolio_allocations(
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<HoldingsQuery>,
+) -> ApiResult<Json<PortfolioAllocations>> {
+    let base = state.base_currency.read().unwrap().clone();
+    let allocations = state
+        .allocation_service
+        .get_portfolio_allocations(&q.account_id, &base)
+        .await?;
+    Ok(Json(allocations))
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/holdings", get(get_holdings))
         .route("/holdings/item", get(get_holding))
         .route("/valuations/history", get(get_historical_valuations))
         .route("/valuations/latest", get(get_latest_valuations))
+        .route("/allocations", get(get_portfolio_allocations))
 }

@@ -82,6 +82,8 @@ export function AssetsTable({
         id: "symbol",
         accessorKey: "symbol",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Security" />,
+        size: 220,
+        maxSize: 260,
         cell: ({ row }) => {
           const asset = row.original;
           const displaySymbol = asset.symbol.startsWith("$CASH")
@@ -94,11 +96,11 @@ export function AssetsTable({
               className="hover:bg-muted/60 focus-visible:ring-ring group flex w-full items-center gap-2.5 rounded-md py-1 text-left transition"
             >
               <TickerAvatar symbol={asset.symbol} className="h-8 w-8 shrink-0" />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="group-hover:text-primary leading-tight font-semibold transition-colors">
                   {displaySymbol}
                 </div>
-                <div className="text-muted-foreground truncate text-xs leading-tight">
+                <div className="text-muted-foreground line-clamp-2 text-xs leading-tight">
                   {asset.name ?? "—"}
                 </div>
               </div>
@@ -109,28 +111,28 @@ export function AssetsTable({
       {
         id: "market",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Market" />,
+        size: 120,
         cell: ({ row }) => {
           const asset = row.original;
           const isManual = asset.pricingMode === "MANUAL";
           return (
             <div className="space-y-0.5">
               <div className="flex items-center gap-1.5 text-sm">
-                <span className="font-medium">{asset.currency}</span>
-                {asset.exchangeMic ? (
+                {asset.exchangeName ? (
                   <>
+                    <span className="font-medium">{asset.exchangeName}</span>
                     <span className="text-muted-foreground/50">·</span>
-                    <span className="text-muted-foreground">{asset.exchangeMic}</span>
                   </>
                 ) : null}
+                <span className="text-muted-foreground">{asset.currency}</span>
               </div>
-              <div>
-                <Badge
-                  variant={isManual ? "outline" : "secondary"}
-                  className="px-1.5 py-0 text-[10px]"
-                >
-                  {isManual ? "Manual" : "Auto"}
-                </Badge>
-              </div>
+              {isManual ? (
+                <div>
+                  <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+                    Manual
+                  </Badge>
+                </div>
+              ) : null}
             </div>
           );
         },
@@ -169,6 +171,7 @@ export function AssetsTable({
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Quote" className="text-right" />
         ),
+        size: 130,
         cell: ({ row }) => {
           const asset = row.original;
           const quote = latestQuotes[asset.id];
@@ -211,6 +214,8 @@ export function AssetsTable({
       {
         id: "actions",
         header: "",
+        size: 56,
+        minSize: 56,
         cell: ({ row }) => {
           const asset = row.original;
           return (
