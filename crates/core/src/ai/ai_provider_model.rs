@@ -71,6 +71,9 @@ pub struct CatalogProvider {
     pub connection_fields: Vec<ConnectionField>,
     pub models: HashMap<String, CatalogModel>,
     pub default_model: String,
+    /// Fast model for title generation (falls back to default_model if not set).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title_model_id: Option<String>,
     pub documentation_url: String,
 }
 

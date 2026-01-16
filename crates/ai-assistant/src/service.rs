@@ -6,6 +6,7 @@
 //! - Tool registry and execution
 //! - Prompt template service
 //! - Environment abstraction for secrets/config
+//! - Title generation for new threads
 
 use async_trait::async_trait;
 use futures::stream::BoxStream;
@@ -19,6 +20,7 @@ use wealthfolio_core::ai::{
 
 use crate::env::AiEnvironment;
 use crate::providers::{CompletionConfig, ProviderRegistry};
+use crate::title_generator::{TitleGenerator, TitleGeneratorConfig, TitleGeneratorTrait};
 use crate::tools::{ToolContext, ToolRegistry};
 use crate::types::{
     AiAssistantError, AiStreamEvent, ChatMessage, ChatThread, SendMessageRequest,
@@ -92,6 +94,7 @@ pub struct AiAssistantService {
     provider_registry: Arc<ProviderRegistry>,
     tool_registry: Arc<ToolRegistry>,
     prompt_service: Arc<PromptTemplateService>,
+    title_generator: Arc<dyn TitleGeneratorTrait>,
     config: AiAssistantConfig,
     // In-memory thread storage (will be replaced with DB in future)
     threads: std::sync::RwLock<std::collections::HashMap<String, ChatThread>>,
@@ -107,11 +110,41 @@ impl AiAssistantService {
         prompt_service: Arc<PromptTemplateService>,
         config: AiAssistantConfig,
     ) -> Self {
+        // Create title generator using the provider registry
+        let title_generator = Arc::new(TitleGenerator::new(
+            env.clone(),
+            provider_registry.clone(),
+            TitleGeneratorConfig::default(),
+        ));
+
         Self {
             env,
             provider_registry,
             tool_registry,
             prompt_service,
+            title_generator,
+            config,
+            threads: std::sync::RwLock::new(std::collections::HashMap::new()),
+            messages: std::sync::RwLock::new(std::collections::HashMap::new()),
+        }
+    }
+
+    /// Create a new AI assistant service with a custom title generator.
+    /// This is useful for testing with a fake title generator.
+    pub fn with_title_generator(
+        env: Arc<dyn AiEnvironment>,
+        provider_registry: Arc<ProviderRegistry>,
+        tool_registry: Arc<ToolRegistry>,
+        prompt_service: Arc<PromptTemplateService>,
+        title_generator: Arc<dyn TitleGeneratorTrait>,
+        config: AiAssistantConfig,
+    ) -> Self {
+        Self {
+            env,
+            provider_registry,
+            tool_registry,
+            prompt_service,
+            title_generator,
             config,
             threads: std::sync::RwLock::new(std::collections::HashMap::new()),
             messages: std::sync::RwLock::new(std::collections::HashMap::new()),
@@ -178,6 +211,35 @@ impl AiAssistantService {
         let mut messages = self.messages.write().unwrap();
         messages.entry(thread_id).or_default().push(message);
     }
+
+    /// Update a thread's title.
+    fn update_thread_title(&self, thread_id: &str, title: String) {
+        let mut threads = self.threads.write().unwrap();
+        if let Some(thread) = threads.get_mut(thread_id) {
+            thread.title = Some(title);
+            thread.updated_at = chrono::Utc::now();
+        }
+    }
+
+    /// Check if this is the first message in a thread.
+    fn is_first_message(&self, thread_id: &str) -> bool {
+        let messages = self.messages.read().unwrap();
+        messages.get(thread_id).map(|m| m.is_empty()).unwrap_or(true)
+    }
+
+    /// Generate and set the title for a thread based on the first user message.
+    /// This runs asynchronously without blocking the chat response.
+    async fn generate_title_for_thread(&self, thread_id: &str, user_message: &str, provider_id: &str) {
+        debug!("Generating title for thread {} from message: {}", thread_id, user_message);
+
+        let title = self
+            .title_generator
+            .generate_title(user_message, provider_id)
+            .await;
+
+        info!("Generated title for thread {}: {}", thread_id, title);
+        self.update_thread_title(thread_id, title);
+    }
 }
 
 #[async_trait]
@@ -186,6 +248,9 @@ impl AiAssistantServiceTrait for AiAssistantService {
         &self,
         request: SendMessageRequest,
     ) -> Result<BoxStream<'static, AiStreamEvent>, AiAssistantError> {
+        // Check if this will be a new thread (for title generation)
+        let is_new_thread = request.thread_id.is_none();
+
         // Get or create thread
         let thread = match &request.thread_id {
             Some(id) => self.get_thread(id).await?,
@@ -199,19 +264,31 @@ impl AiAssistantServiceTrait for AiAssistantService {
 
         info!("Processing message for thread {}", thread.id);
 
+        // Check if this is the first message (for existing threads without title)
+        let needs_title = is_new_thread || (thread.title.is_none() && self.is_first_message(&thread.id));
+
         // Create and store user message
         let user_message = ChatMessage::user(&thread.id, &request.content);
         self.store_message(user_message.clone());
 
         // Get provider and model
         let provider = self.get_provider(request.provider_id.as_deref())?;
-        let model_id = self.get_model(provider.provider_id(), request.model_id.as_deref());
+        let provider_id = provider.provider_id().to_string();
+        let model_id = self.get_model(&provider_id, request.model_id.as_deref());
 
         debug!(
             "Using provider {} with model {}",
-            provider.provider_id(),
+            provider_id,
             model_id
         );
+
+        // Generate title for new threads
+        // This uses the title model configured for the provider
+        // Title generation runs before the chat response to ensure the title is available
+        // Note: In production with database persistence, this could run in background
+        if needs_title {
+            self.generate_title_for_thread(&thread.id, &request.content, &provider_id).await;
+        }
 
         // Build system prompt
         let system_prompt = self.build_system_prompt()?;
@@ -371,6 +448,7 @@ mod tests {
     use super::*;
     use crate::env::test_env::MockEnvironment;
     use crate::providers::StubProvider;
+    use crate::title_generator::FakeTitleGenerator;
     use crate::tools::create_placeholder_registry;
 
     fn create_test_service() -> AiAssistantService {
@@ -388,6 +466,28 @@ mod tests {
             Arc::new(provider_registry),
             Arc::new(tool_registry),
             Arc::new(prompt_service),
+            AiAssistantConfig::default(),
+        )
+    }
+
+    fn create_test_service_with_fake_title_gen(
+        title_generator: Arc<dyn TitleGeneratorTrait>,
+    ) -> AiAssistantService {
+        let env = Arc::new(MockEnvironment::new().with_ollama("http://localhost:11434"));
+        let mut provider_registry = ProviderRegistry::new(env.clone());
+        provider_registry.register(Arc::new(StubProvider::new("stub", "Hello!")));
+
+        let tool_registry = create_placeholder_registry();
+        let prompt_service =
+            PromptTemplateService::new(include_str!("../../../src-front/lib/ai-prompt-templates.json"))
+                .expect("Failed to load prompt templates");
+
+        AiAssistantService::with_title_generator(
+            env,
+            Arc::new(provider_registry),
+            Arc::new(tool_registry),
+            Arc::new(prompt_service),
+            title_generator,
             AiAssistantConfig::default(),
         )
     }
@@ -427,5 +527,122 @@ mod tests {
         let tools = service.list_tools();
         assert!(!tools.is_empty());
         assert!(tools.contains(&"get_holdings".to_string()));
+    }
+
+    // =========================================================================
+    // Title Generation Tests (deterministic, no network)
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_title_generation_with_fake_provider_fixed_title() {
+        // Use fake title generator that returns a fixed title
+        let fake_gen = Arc::new(FakeTitleGenerator::with_title("Portfolio Analysis"));
+        let service = create_test_service_with_fake_title_gen(fake_gen);
+
+        // Create a new thread and send first message
+        let request = SendMessageRequest {
+            thread_id: None,
+            content: "What is my portfolio value?".to_string(),
+            provider_id: Some("stub".to_string()),
+            model_id: None,
+            allowed_tools: None,
+        };
+
+        let _stream = service.send_message(request).await.unwrap();
+
+        // Get the thread and verify title was set
+        let threads = service.list_threads().await.unwrap();
+        assert_eq!(threads.len(), 1);
+        assert_eq!(threads[0].title, Some("Portfolio Analysis".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_title_generation_with_fallback_truncation() {
+        // Use fake title generator that uses fallback (truncation)
+        let fake_gen = Arc::new(FakeTitleGenerator::with_fallback());
+        let service = create_test_service_with_fake_title_gen(fake_gen);
+
+        // Create a new thread with a short message
+        let request = SendMessageRequest {
+            thread_id: None,
+            content: "Show my holdings".to_string(),
+            provider_id: Some("stub".to_string()),
+            model_id: None,
+            allowed_tools: None,
+        };
+
+        let _stream = service.send_message(request).await.unwrap();
+
+        // Title should be the message itself (short enough)
+        let threads = service.list_threads().await.unwrap();
+        assert_eq!(threads.len(), 1);
+        assert_eq!(threads[0].title, Some("Show my holdings".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_title_generation_fallback_truncates_long_message() {
+        // Use fake title generator that uses fallback (truncation)
+        let fake_gen = Arc::new(FakeTitleGenerator::with_fallback());
+        let service = create_test_service_with_fake_title_gen(fake_gen);
+
+        // Create a new thread with a long message
+        let request = SendMessageRequest {
+            thread_id: None,
+            content: "Can you provide a detailed analysis of all my investment holdings across multiple accounts including stocks, bonds, and ETFs with their current market values and historical performance?".to_string(),
+            provider_id: Some("stub".to_string()),
+            model_id: None,
+            allowed_tools: None,
+        };
+
+        let _stream = service.send_message(request).await.unwrap();
+
+        // Title should be truncated
+        let threads = service.list_threads().await.unwrap();
+        assert_eq!(threads.len(), 1);
+
+        let title = threads[0].title.as_ref().unwrap();
+        assert!(title.len() <= 53); // 50 chars + "..."
+        assert!(title.ends_with("..."));
+    }
+
+    #[tokio::test]
+    async fn test_no_title_regeneration_on_subsequent_messages() {
+        // Use fake title generator that returns a fixed title
+        let fake_gen = Arc::new(FakeTitleGenerator::with_title("First Title"));
+        let service = create_test_service_with_fake_title_gen(fake_gen);
+
+        // Create a new thread
+        let request1 = SendMessageRequest {
+            thread_id: None,
+            content: "First message".to_string(),
+            provider_id: Some("stub".to_string()),
+            model_id: None,
+            allowed_tools: None,
+        };
+
+        let _stream = service.send_message(request1).await.unwrap();
+
+        // Get thread ID
+        let threads = service.list_threads().await.unwrap();
+        let thread_id = threads[0].id.clone();
+        assert_eq!(threads[0].title, Some("First Title".to_string()));
+
+        // Manually change the title to verify it doesn't get regenerated
+        service.update_thread_title(&thread_id, "Modified Title".to_string());
+
+        // Send second message to existing thread
+        let request2 = SendMessageRequest {
+            thread_id: Some(thread_id.clone()),
+            content: "Second message".to_string(),
+            provider_id: Some("stub".to_string()),
+            model_id: None,
+            allowed_tools: None,
+        };
+
+        let _stream = service.send_message(request2).await.unwrap();
+
+        // Title should not change
+        let thread = service.get_thread(&thread_id).await.unwrap();
+        assert_eq!(thread.title, Some("Modified Title".to_string()));
     }
 }

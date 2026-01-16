@@ -31,6 +31,10 @@ pub trait AiProviderServiceTrait: Send + Sync {
     /// Returns AiError::MissingApiKey if API key is required but not configured.
     fn get_provider_config(&self, provider_id: &str) -> std::result::Result<ProviderConfig, AiError>;
 
+    /// Get the title model ID for a provider (fast model for generating thread titles).
+    /// Falls back to the default model if not configured.
+    fn get_title_model(&self, provider_id: &str) -> Option<String>;
+
     /// List available models from a provider.
     /// Fetches models from the provider's API using backend-stored secrets.
     /// For providers without model listing (e.g., Anthropic), returns catalog models.
@@ -381,6 +385,15 @@ impl AiProviderServiceTrait for AiProviderService {
             api_key,
             base_url,
             requires_api_key,
+        })
+    }
+
+    fn get_title_model(&self, provider_id: &str) -> Option<String> {
+        self.catalog.providers.get(provider_id).map(|p| {
+            // Use title_model_id if set, otherwise fall back to default_model
+            p.title_model_id
+                .clone()
+                .unwrap_or_else(|| p.default_model.clone())
         })
     }
 

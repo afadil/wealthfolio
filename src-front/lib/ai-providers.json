@@ -37,6 +37,7 @@
         }
       },
       "defaultModel": "gpt-4o-mini",
+      "titleModelId": "gpt-4o-mini",
       "documentationUrl": "https://platform.openai.com/docs/introduction"
     },
     "anthropic": {
@@ -70,6 +71,7 @@
         }
       },
       "defaultModel": "claude-3-5-sonnet-20241022",
+      "titleModelId": "claude-3-5-haiku-20241022",
       "documentationUrl": "https://docs.anthropic.com/en/api/getting-started"
     },
     "google": {
@@ -100,6 +102,7 @@
         }
       },
       "defaultModel": "gemini-2.5-flash",
+      "titleModelId": "gemini-2.5-flash",
       "documentationUrl": "https://ai.google.dev/docs"
     },
     "groq": {
@@ -133,6 +136,7 @@
         }
       },
       "defaultModel": "llama-3.3-70b-versatile",
+      "titleModelId": "llama-3.1-8b-instant",
       "documentationUrl": "https://console.groq.com/docs"
     },
     "ollama": {
@@ -169,6 +173,7 @@
         }
       },
       "defaultModel": "llama3.2",
+      "titleModelId": "llama3.2",
       "documentationUrl": "https://ollama.ai/docs"
     },
     "openrouter": {
@@ -205,6 +210,7 @@
         }
       },
       "defaultModel": "openai/gpt-4o",
+      "titleModelId": "openai/gpt-4o-mini",
       "documentationUrl": "https://openrouter.ai/docs"
     }
   },

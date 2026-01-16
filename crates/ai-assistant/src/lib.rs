@@ -11,10 +11,12 @@
 //! - `tools`: Tool registry, schemas, and result shaping
 //! - `types`: Shared DTOs/events used by Axum/Tauri + frontend
 //! - `env`: Environment abstraction for secrets/config/time
+//! - `title_generator`: Auto-generates thread titles from user messages
 
 pub mod env;
 pub mod providers;
 pub mod service;
+pub mod title_generator;
 pub mod tools;
 pub mod types;
 
@@ -22,5 +24,9 @@ pub mod types;
 pub use env::{AiEnvironment, RuntimeEnvironment};
 pub use providers::{ProviderAdapter, ProviderRegistry};
 pub use service::{AiAssistantService, AiAssistantServiceTrait};
+pub use title_generator::{
+    truncate_to_title, FakeTitleGenerator, TitleGenerator, TitleGeneratorConfig,
+    TitleGeneratorTrait,
+};
 pub use tools::{Tool, ToolRegistry, ToolResult};
 pub use types::{AiStreamEvent, ChatMessage, ChatThread, MessageRole, ToolCall};
