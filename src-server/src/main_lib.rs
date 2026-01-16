@@ -5,6 +5,7 @@ use crate::{auth::AuthManager, config::Config, events::EventBus, secrets::build_
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, EnvFilter};
 use wealthfolio_connect::{BrokerSyncService, BrokerSyncServiceTrait, PlatformRepository};
+use wealthfolio_ai_assistant::AiAssistantServiceTrait;
 use wealthfolio_core::{
     accounts::AccountService,
     activities::{ActivityService as CoreActivityService, ActivityServiceTrait},
@@ -67,6 +68,7 @@ pub struct AppState {
     pub alternative_asset_repository: Arc<dyn AlternativeAssetRepositoryTrait + Send + Sync>,
     pub connect_sync_service: Arc<dyn BrokerSyncServiceTrait + Send + Sync>,
     pub ai_provider_service: Arc<dyn AiProviderServiceTrait + Send + Sync>,
+    pub ai_assistant_service: Option<Arc<dyn AiAssistantServiceTrait + Send + Sync>>,
     pub addons_root: String,
     pub data_root: String,
     pub db_path: String,
@@ -302,6 +304,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         alternative_asset_repository,
         connect_sync_service,
         ai_provider_service,
+        ai_assistant_service: None, // Will be initialized when provider is configured
         addons_root: config.addons_root.clone(),
         data_root,
         db_path,

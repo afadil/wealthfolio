@@ -9,6 +9,7 @@ wealthfolio-core = { workspace = true }
 wealthfolio-connect = { workspace = true }
 wealthfolio-storage-sqlite = { workspace = true }
 wealthfolio-device-sync = { workspace = true }
+wealthfolio-ai-assistant = { workspace = true }
 
 # Web framework
 axum = { version = "0.8", features = ["json", "macros"] }
@@ -42,6 +43,7 @@ chacha20poly1305 = { version = "0.10", features = ["std"] }
 rand = "0.8"
 urlencoding = "2"
 tokio-stream = { version = "0.1", features = ["sync"] }
+futures = "0.3"
 futures-core = "0.3"
 semver = "1"
 hyper = { version = "0.14", features = ["full"] }

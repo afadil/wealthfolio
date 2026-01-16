@@ -1,4 +1,5 @@
 use std::sync::{Arc, RwLock};
+use wealthfolio_ai_assistant::AiAssistantServiceTrait;
 use wealthfolio_connect::BrokerSyncServiceTrait;
 use wealthfolio_core::{
     self, accounts, activities, ai, assets, fx, goals, limits, portfolio, quotes, settings,
@@ -33,6 +34,7 @@ pub struct ServiceContext {
     pub taxonomy_service: Arc<dyn taxonomies::TaxonomyServiceTrait>,
     pub connect_service: Arc<ConnectService>,
     pub ai_provider_service: Arc<dyn ai::AiProviderServiceTrait>,
+    pub ai_assistant_service: Option<Arc<dyn AiAssistantServiceTrait>>,
 }
 
 impl ServiceContext {
@@ -122,5 +124,9 @@ impl ServiceContext {
 
     pub fn ai_provider_service(&self) -> Arc<dyn ai::AiProviderServiceTrait> {
         Arc::clone(&self.ai_provider_service)
+    }
+
+    pub fn ai_assistant_service(&self) -> Option<Arc<dyn AiAssistantServiceTrait>> {
+        self.ai_assistant_service.as_ref().map(Arc::clone)
     }
 }

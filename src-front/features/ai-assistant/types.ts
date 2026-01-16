@@ -44,20 +44,126 @@ export interface ToolCall {
 
 export interface ToolResult {
   toolCallId: string;
-  result: unknown;
+  success: boolean;
+  data: unknown;
+  meta?: Record<string, unknown>;
+  error?: string;
 }
 
 // ============================================================================
 // Stream Event Types (from backend)
 // ============================================================================
 
+/**
+ * Base fields present in all stream events for correlation.
+ */
+interface AiStreamEventBase {
+  /** Thread ID for this conversation */
+  threadId: string;
+  /** Run ID for this streaming session (uuid7) */
+  runId: string;
+}
+
+/**
+ * System event - sent first in the stream with metadata.
+ */
+interface SystemEvent extends AiStreamEventBase {
+  type: "system";
+  /** The message ID being generated */
+  messageId: string;
+}
+
+/**
+ * Text delta event - partial text content.
+ */
+interface TextDeltaEvent extends AiStreamEventBase {
+  type: "textDelta";
+  /** The message ID this delta belongs to */
+  messageId: string;
+  /** The text content delta */
+  delta: string;
+}
+
+/**
+ * Reasoning delta event - partial reasoning/thinking content (optional).
+ */
+interface ReasoningDeltaEvent extends AiStreamEventBase {
+  type: "reasoningDelta";
+  /** The message ID this delta belongs to */
+  messageId: string;
+  /** The reasoning content delta */
+  delta: string;
+}
+
+/**
+ * Tool call event - model wants to call a tool.
+ */
+interface ToolCallEvent extends AiStreamEventBase {
+  type: "toolCall";
+  /** The message ID this tool call belongs to */
+  messageId: string;
+  /** The tool call details (structured JSON) */
+  toolCall: ToolCall;
+}
+
+/**
+ * Tool result event - tool execution completed.
+ */
+interface ToolResultEvent extends AiStreamEventBase {
+  type: "toolResult";
+  /** The message ID this result belongs to */
+  messageId: string;
+  /** The tool result (structured JSON) */
+  result: ToolResult;
+}
+
+/**
+ * Error event - something went wrong.
+ */
+interface ErrorEvent extends AiStreamEventBase {
+  type: "error";
+  /** The message ID (if available) */
+  messageId?: string;
+  /** Error code for programmatic handling */
+  code: string;
+  /** Human-readable error message */
+  message: string;
+}
+
+/**
+ * Done event - stream completed (terminal).
+ */
+interface DoneEvent extends AiStreamEventBase {
+  type: "done";
+  /** The message ID of the completed message */
+  messageId: string;
+  /** The final complete message */
+  message: ChatMessage;
+  /** Usage statistics (if available) */
+  usage?: UsageStats;
+}
+
+/**
+ * Token usage statistics.
+ */
+export interface UsageStats {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
+/**
+ * Union type for all stream events.
+ * All events include threadId, runId for correlation across reconnects.
+ */
 export type AiStreamEvent =
-  | { type: "textDelta"; delta: string }
-  | { type: "reasoningDelta"; delta: string }
-  | { type: "toolCall"; toolCall: ToolCall }
-  | { type: "toolResult"; toolResult: ToolResult }
-  | { type: "error"; error: string }
-  | { type: "done"; messageId: string };
+  | SystemEvent
+  | TextDeltaEvent
+  | ReasoningDeltaEvent
+  | ToolCallEvent
+  | ToolResultEvent
+  | ErrorEvent
+  | DoneEvent;
 
 // ============================================================================
 // UI State Types

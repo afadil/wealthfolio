@@ -223,5 +223,6 @@ pub async fn initialize_context(
         taxonomy_service,
         connect_service,
         ai_provider_service,
+        ai_assistant_service: None, // Will be initialized when provider is configured
     })
 }
