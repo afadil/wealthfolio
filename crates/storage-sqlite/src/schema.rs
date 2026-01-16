@@ -64,6 +64,34 @@ diesel::table! {
 }
 
 diesel::table! {
+    ai_messages (id) {
+        id -> Text,
+        thread_id -> Text,
+        role -> Text,
+        content_json -> Text,
+        created_at -> Text,
+    }
+}
+
+diesel::table! {
+    ai_thread_tags (id) {
+        id -> Text,
+        thread_id -> Text,
+        tag -> Text,
+        created_at -> Text,
+    }
+}
+
+diesel::table! {
+    ai_threads (id) {
+        id -> Text,
+        title -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
     app_settings (setting_key) {
         setting_key -> Text,
         setting_value -> Text,
@@ -145,6 +173,16 @@ diesel::table! {
         cost_basis -> Text,
         net_contribution -> Text,
         calculated_at -> Text,
+    }
+}
+
+diesel::table! {
+    exchanges (mic_code) {
+        mic_code -> Nullable<Text>,
+        name -> Text,
+        short_name -> Nullable<Text>,
+        country_code -> Nullable<Text>,
+        currency -> Nullable<Text>,
     }
 }
 
@@ -305,6 +343,8 @@ diesel::joinable!(accounts -> platforms (platform_id));
 diesel::joinable!(activities -> accounts (account_id));
 diesel::joinable!(activities -> assets (asset_id));
 diesel::joinable!(activities -> import_runs (import_run_id));
+diesel::joinable!(ai_messages -> ai_threads (thread_id));
+diesel::joinable!(ai_thread_tags -> ai_threads (thread_id));
 diesel::joinable!(asset_taxonomy_assignments -> assets (asset_id));
 diesel::joinable!(brokers_sync_state -> accounts (account_id));
 diesel::joinable!(brokers_sync_state -> import_runs (last_run_id));
@@ -318,12 +358,16 @@ diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     activities,
     activity_import_profiles,
+    ai_messages,
+    ai_thread_tags,
+    ai_threads,
     app_settings,
     asset_taxonomy_assignments,
     assets,
     brokers_sync_state,
     contribution_limits,
     daily_account_valuation,
+    exchanges,
     goals,
     goals_allocation,
     holdings_snapshots,
