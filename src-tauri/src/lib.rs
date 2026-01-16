@@ -313,6 +313,10 @@ pub fn run() {
             // Provider settings commands
             commands::providers_settings::get_market_data_providers_settings,
             commands::providers_settings::update_market_data_provider_settings,
+            // AI provider commands
+            commands::ai_providers::get_ai_providers,
+            commands::ai_providers::update_ai_provider_settings,
+            commands::ai_providers::set_default_ai_provider,
             // Addon commands
             commands::addon::extract_addon_zip,
             commands::addon::install_addon_zip,

@@ -8,6 +8,7 @@ use wealthfolio_connect::{BrokerSyncService, BrokerSyncServiceTrait, PlatformRep
 use wealthfolio_core::{
     accounts::AccountService,
     activities::{ActivityService as CoreActivityService, ActivityServiceTrait},
+    ai::{AiProviderService, AiProviderServiceTrait},
     assets::{
         AlternativeAssetRepositoryTrait, AssetClassificationService, AssetService, AssetServiceTrait,
     },
@@ -27,7 +28,7 @@ use wealthfolio_core::{
     },
     quotes::{QuoteService, QuoteServiceTrait},
     secrets::SecretStore,
-    settings::{SettingsService, SettingsServiceTrait},
+    settings::{SettingsService, SettingsServiceTrait, SettingsRepositoryTrait},
     taxonomies::{TaxonomyService, TaxonomyServiceTrait},
 };
 use wealthfolio_storage_sqlite::{
@@ -65,6 +66,7 @@ pub struct AppState {
     pub net_worth_service: Arc<dyn NetWorthServiceTrait + Send + Sync>,
     pub alternative_asset_repository: Arc<dyn AlternativeAssetRepositoryTrait + Send + Sync>,
     pub connect_sync_service: Arc<dyn BrokerSyncServiceTrait + Send + Sync>,
+    pub ai_provider_service: Arc<dyn AiProviderServiceTrait + Send + Sync>,
     pub addons_root: String,
     pub data_root: String,
     pub db_path: String,
@@ -124,7 +126,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     fx_service.initialize()?;
 
     let settings_repo = Arc::new(SettingsRepository::new(pool.clone(), writer.clone()));
-    let settings_service = Arc::new(SettingsService::new(settings_repo, fx_service.clone()));
+    let settings_service = Arc::new(SettingsService::new(settings_repo.clone(), fx_service.clone()));
     let settings = settings_service.get_settings()?;
     let base_currency = Arc::new(RwLock::new(settings.base_currency));
 
@@ -261,6 +263,15 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     // Determine data root directory (parent of DB path)
     let data_root = data_root_path.to_string_lossy().to_string();
 
+    // AI provider service - catalog is embedded at compile time
+    let ai_catalog_json = include_str!("../../src-front/lib/ai-providers.json");
+    let ai_provider_service: Arc<dyn AiProviderServiceTrait + Send + Sync> =
+        Arc::new(AiProviderService::new(
+            settings_repo.clone() as Arc<dyn SettingsRepositoryTrait>,
+            secret_store.clone(),
+            ai_catalog_json,
+        )?);
+
     let event_bus = EventBus::new(256);
 
     let auth_manager = config
@@ -290,6 +301,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         net_worth_service,
         alternative_asset_repository,
         connect_sync_service,
+        ai_provider_service,
         addons_root: config.addons_root.clone(),
         data_root,
         db_path,

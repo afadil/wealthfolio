@@ -1252,3 +1252,102 @@ export interface MigrationResult {
   assetsProcessed: number;
   errors: string[];
 }
+
+// ============================================================================
+// AI Provider Types
+// ============================================================================
+
+/**
+ * Model capabilities from the catalog.
+ */
+export interface ModelCapabilities {
+  tools: boolean;
+  thinking: boolean;
+  vision: boolean;
+}
+
+/**
+ * A model in the merged view returned to the UI.
+ */
+export interface MergedModel {
+  id: string;
+  capabilities: ModelCapabilities;
+}
+
+/**
+ * Connection field definition for provider configuration UI.
+ */
+export interface ConnectionField {
+  key: string;
+  label: string;
+  type: string;
+  placeholder: string;
+  required: boolean;
+  helpUrl?: string;
+}
+
+/**
+ * Capability metadata from the catalog.
+ */
+export interface CapabilityInfo {
+  name: string;
+  description: string;
+  icon: string;
+}
+
+/**
+ * A provider in the merged view returned to the UI.
+ * Combines catalog data with user settings and computed fields.
+ */
+export interface MergedProvider {
+  // From catalog (immutable)
+  id: string;
+  name: string;
+  type: string;
+  icon: string;
+  description: string;
+  envKey: string;
+  connectionFields: ConnectionField[];
+  models: MergedModel[];
+  defaultModel: string;
+  documentationUrl: string;
+
+  // From user settings (mutable)
+  enabled: boolean;
+  favorite: boolean;
+  selectedModel?: string;
+  customUrl?: string;
+  priority: number;
+
+  // Computed
+  hasApiKey: boolean;
+  isDefault: boolean;
+}
+
+/**
+ * The complete merged response returned to the UI.
+ */
+export interface AiProvidersResponse {
+  providers: MergedProvider[];
+  capabilities: Record<string, CapabilityInfo>;
+  defaultProvider?: string;
+}
+
+/**
+ * Request to update a single provider's settings.
+ */
+export interface UpdateProviderSettingsRequest {
+  providerId: string;
+  enabled?: boolean;
+  favorite?: boolean;
+  selectedModel?: string;
+  customUrl?: string;
+  priority?: number;
+}
+
+/**
+ * Request to set the default provider.
+ */
+export interface SetDefaultProviderRequest {
+  providerId?: string;
+}
