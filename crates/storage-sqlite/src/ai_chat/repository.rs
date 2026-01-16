@@ -82,8 +82,9 @@ impl AiChatRepositoryTrait for AiChatRepository {
     fn list_threads(&self, limit: i64, offset: i64) -> Result<Vec<AiThread>> {
         let mut conn = get_connection(&self.pool)?;
 
+        // Sort by pinned status first (pinned at top), then by updated_at
         let threads_db = ai_threads::table
-            .order(ai_threads::updated_at.desc())
+            .order((ai_threads::is_pinned.desc(), ai_threads::updated_at.desc()))
             .limit(limit)
             .offset(offset)
             .load::<AiThreadDB>(&mut conn)
@@ -107,6 +108,7 @@ impl AiChatRepositoryTrait for AiChatRepository {
     async fn update_thread(&self, thread: AiThread) -> Result<AiThread> {
         let thread_id = thread.id.clone();
         let title = thread.title.clone();
+        let is_pinned: i32 = if thread.is_pinned { 1 } else { 0 };
         let config_snapshot = thread
             .config
             .as_ref()
@@ -118,6 +120,7 @@ impl AiChatRepositoryTrait for AiChatRepository {
                 diesel::update(ai_threads::table.find(&thread_id))
                     .set((
                         ai_threads::title.eq(&title),
+                        ai_threads::is_pinned.eq(&is_pinned),
                         ai_threads::config_snapshot.eq(&config_snapshot),
                         ai_threads::updated_at.eq(&updated_at),
                     ))
@@ -301,6 +304,7 @@ fn thread_to_db(thread: &AiThread) -> AiThreadDB {
         created_at: thread.created_at.to_rfc3339(),
         updated_at: thread.updated_at.to_rfc3339(),
         config_snapshot,
+        is_pinned: if thread.is_pinned { 1 } else { 0 },
     }
 }
 
@@ -314,6 +318,7 @@ fn db_to_thread(db: &AiThreadDB) -> AiThread {
     AiThread {
         id: db.id.clone(),
         title: db.title.clone(),
+        is_pinned: db.is_pinned != 0,
         tags: Vec::new(), // Tags are loaded separately
         config,
         created_at: DateTime::parse_from_rfc3339(&db.created_at)

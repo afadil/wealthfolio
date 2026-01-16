@@ -45,6 +45,8 @@ export interface AiThreadConfig {
 export interface ChatThread {
   id: string;
   title: string;
+  /** Whether this thread is pinned to the top of the list */
+  isPinned: boolean;
   /** Per-thread agent configuration snapshot */
   config?: AiThreadConfig;
   createdAt: string;

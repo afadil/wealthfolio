@@ -27,6 +27,7 @@ use wealthfolio_core::{
 use wealthfolio_storage_sqlite::{
     accounts::AccountRepository,
     activities::ActivityRepository,
+    ai_chat::AiChatRepository,
     assets::{AlternativeAssetRepository, AssetRepository},
     db::{self, write_actor},
     fx::FxRepository,
@@ -200,6 +201,9 @@ pub async fn initialize_context(
         ai_catalog_json,
     )?);
 
+    // AI chat repository for thread/message persistence
+    let ai_chat_repository = Arc::new(AiChatRepository::new(pool.clone(), writer.clone()));
+
     Ok(ServiceContext {
         base_currency,
         instance_id,
@@ -224,5 +228,6 @@ pub async fn initialize_context(
         connect_service,
         ai_provider_service,
         ai_assistant_service: None, // Will be initialized when provider is configured
+        ai_chat_repository,
     })
 }

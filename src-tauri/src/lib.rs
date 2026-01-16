@@ -320,6 +320,10 @@ pub fn run() {
             commands::ai_providers::list_ai_models,
             // AI chat commands
             commands::ai_chat::stream_ai_chat,
+            commands::ai_chat::list_ai_threads,
+            commands::ai_chat::get_ai_thread,
+            commands::ai_chat::update_ai_thread,
+            commands::ai_chat::delete_ai_thread,
             // Addon commands
             commands::addon::extract_addon_zip,
             commands::addon::install_addon_zip,
