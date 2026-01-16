@@ -60,6 +60,7 @@ const COMMANDS: CommandMap = {
   get_holding: { method: "GET", path: "/holdings/item" },
   get_historical_valuations: { method: "GET", path: "/valuations/history" },
   get_latest_valuations: { method: "GET", path: "/valuations/latest" },
+  get_portfolio_allocations: { method: "GET", path: "/allocations" },
   update_portfolio: { method: "POST", path: "/portfolio/update" },
   recalculate_portfolio: { method: "POST", path: "/portfolio/recalculate" },
   // Performance
@@ -119,6 +120,23 @@ const COMMANDS: CommandMap = {
   set_secret: { method: "POST", path: "/secrets" },
   get_secret: { method: "GET", path: "/secrets" },
   delete_secret: { method: "DELETE", path: "/secrets" },
+  // Taxonomies
+  get_taxonomies: { method: "GET", path: "/taxonomies" },
+  get_taxonomy: { method: "GET", path: "/taxonomies" },
+  create_taxonomy: { method: "POST", path: "/taxonomies" },
+  update_taxonomy: { method: "PUT", path: "/taxonomies" },
+  delete_taxonomy: { method: "DELETE", path: "/taxonomies" },
+  create_category: { method: "POST", path: "/taxonomies/categories" },
+  update_category: { method: "PUT", path: "/taxonomies/categories" },
+  delete_category: { method: "DELETE", path: "/taxonomies" },
+  move_category: { method: "POST", path: "/taxonomies/categories/move" },
+  import_taxonomy_json: { method: "POST", path: "/taxonomies/import" },
+  export_taxonomy_json: { method: "GET", path: "/taxonomies" },
+  get_asset_taxonomy_assignments: { method: "GET", path: "/taxonomies/assignments/asset" },
+  assign_asset_to_category: { method: "POST", path: "/taxonomies/assignments" },
+  remove_asset_taxonomy_assignment: { method: "DELETE", path: "/taxonomies/assignments" },
+  get_migration_status: { method: "GET", path: "/taxonomies/migration/status" },
+  migrate_legacy_classifications: { method: "POST", path: "/taxonomies/migration/run" },
   // Addons
   list_installed_addons: { method: "GET", path: "/addons/installed" },
   install_addon_zip: { method: "POST", path: "/addons/install-zip" },
@@ -170,6 +188,17 @@ const COMMANDS: CommandMap = {
   get_connect_portal: { method: "POST", path: "/connect/portal" },
   get_subscription_plans: { method: "GET", path: "/connect/plans" },
   get_user_info: { method: "GET", path: "/connect/user" },
+  // Net Worth
+  get_net_worth: { method: "GET", path: "/net-worth" },
+  get_net_worth_history: { method: "GET", path: "/net-worth/history" },
+  // Alternative Assets
+  create_alternative_asset: { method: "POST", path: "/alternative-assets" },
+  update_alternative_asset_valuation: { method: "PUT", path: "/alternative-assets" },
+  delete_alternative_asset: { method: "DELETE", path: "/alternative-assets" },
+  link_liability: { method: "POST", path: "/alternative-assets" },
+  unlink_liability: { method: "DELETE", path: "/alternative-assets" },
+  update_alternative_asset_metadata: { method: "PUT", path: "/alternative-assets" },
+  get_alternative_holdings: { method: "GET", path: "/alternative-holdings" },
 };
 
 /**
@@ -247,6 +276,13 @@ export const invoke = async <T>(
       }
       const qs = params.toString();
       if (qs) url += `?${qs}`;
+      break;
+    }
+    case "get_portfolio_allocations": {
+      const { accountId } = payload as { accountId: string };
+      const params = new URLSearchParams();
+      params.set("accountId", accountId);
+      url += `?${params.toString()}`;
       break;
     }
     case "calculate_accounts_simple_performance": {
@@ -483,6 +519,83 @@ export const invoke = async <T>(
       url += `?${params.toString()}`;
       break;
     }
+    // Taxonomy commands
+    case "get_taxonomies":
+      break;
+    case "get_taxonomy": {
+      const { id } = payload as { id: string };
+      url += `/${encodeURIComponent(id)}`;
+      break;
+    }
+    case "create_taxonomy": {
+      const { taxonomy } = payload as { taxonomy: Record<string, unknown> };
+      body = JSON.stringify(taxonomy);
+      break;
+    }
+    case "update_taxonomy": {
+      const { taxonomy } = payload as { taxonomy: Record<string, unknown> };
+      body = JSON.stringify(taxonomy);
+      break;
+    }
+    case "delete_taxonomy": {
+      const { id } = payload as { id: string };
+      url += `/${encodeURIComponent(id)}`;
+      break;
+    }
+    case "create_category": {
+      const { category } = payload as { category: Record<string, unknown> };
+      body = JSON.stringify(category);
+      break;
+    }
+    case "update_category": {
+      const { category } = payload as { category: Record<string, unknown> };
+      body = JSON.stringify(category);
+      break;
+    }
+    case "delete_category": {
+      const { taxonomyId, categoryId } = payload as { taxonomyId: string; categoryId: string };
+      url += `/${encodeURIComponent(taxonomyId)}/categories/${encodeURIComponent(categoryId)}`;
+      break;
+    }
+    case "move_category": {
+      const { taxonomyId, categoryId, newParentId, position } = payload as {
+        taxonomyId: string;
+        categoryId: string;
+        newParentId: string | null;
+        position: number;
+      };
+      body = JSON.stringify({ taxonomyId, categoryId, newParentId, position });
+      break;
+    }
+    case "import_taxonomy_json": {
+      const { jsonStr } = payload as { jsonStr: string };
+      body = JSON.stringify({ jsonStr });
+      break;
+    }
+    case "export_taxonomy_json": {
+      const { id } = payload as { id: string };
+      url += `/${encodeURIComponent(id)}/export`;
+      break;
+    }
+    case "get_asset_taxonomy_assignments": {
+      const { assetId } = payload as { assetId: string };
+      url += `/${encodeURIComponent(assetId)}`;
+      break;
+    }
+    case "assign_asset_to_category": {
+      const { assignment } = payload as { assignment: Record<string, unknown> };
+      body = JSON.stringify(assignment);
+      break;
+    }
+    case "remove_asset_taxonomy_assignment": {
+      const { id } = payload as { id: string };
+      url += `/${encodeURIComponent(id)}`;
+      break;
+    }
+    case "get_migration_status":
+      break;
+    case "migrate_legacy_classifications":
+      break;
     // Addons
     case "install_addon_zip": {
       const { zipData, enableAfterInstall } = payload as {
@@ -711,6 +824,60 @@ export const invoke = async <T>(
     case "sync_broker_activities":
     case "get_subscription_plans":
     case "get_user_info":
+      break;
+    // Net Worth commands
+    case "get_net_worth": {
+      const { date } = (payload ?? {}) as { date?: string };
+      if (date) {
+        const params = new URLSearchParams();
+        params.set("date", date);
+        url += `?${params.toString()}`;
+      }
+      break;
+    }
+    case "get_net_worth_history": {
+      const { startDate, endDate } = payload as { startDate: string; endDate: string };
+      const params = new URLSearchParams();
+      params.set("startDate", startDate);
+      params.set("endDate", endDate);
+      url += `?${params.toString()}`;
+      break;
+    }
+    // Alternative Assets commands
+    case "create_alternative_asset": {
+      const { request } = payload as { request: Record<string, unknown> };
+      body = JSON.stringify(request);
+      break;
+    }
+    case "update_alternative_asset_valuation": {
+      const { assetId, request } = payload as { assetId: string; request: Record<string, unknown> };
+      url += `/${encodeURIComponent(assetId)}/valuation`;
+      body = JSON.stringify(request);
+      break;
+    }
+    case "delete_alternative_asset": {
+      const { assetId } = payload as { assetId: string };
+      url += `/${encodeURIComponent(assetId)}`;
+      break;
+    }
+    case "link_liability": {
+      const { liabilityId, request } = payload as { liabilityId: string; request: Record<string, unknown> };
+      url += `/${encodeURIComponent(liabilityId)}/link`;
+      body = JSON.stringify(request);
+      break;
+    }
+    case "unlink_liability": {
+      const { liabilityId } = payload as { liabilityId: string };
+      url += `/${encodeURIComponent(liabilityId)}/unlink`;
+      break;
+    }
+    case "update_alternative_asset_metadata": {
+      const { assetId, metadata } = payload as { assetId: string; metadata: Record<string, string> };
+      url += `/${encodeURIComponent(assetId)}/metadata`;
+      body = JSON.stringify(metadata);
+      break;
+    }
+    case "get_alternative_holdings":
       break;
   }
 

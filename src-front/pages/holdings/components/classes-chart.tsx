@@ -14,7 +14,7 @@ interface ClassesChartProps {
   allocation?: TaxonomyAllocation;
   baseCurrency?: string;
   isLoading?: boolean;
-  onClassSectionClick?: (className: string) => void;
+  onClassSectionClick?: (categoryId: string, categoryName: string) => void;
 }
 
 export function ClassesChart({
@@ -31,6 +31,7 @@ export function ClassesChart({
     return allocation.categories
       .filter((cat) => cat.value > 0)
       .map((cat) => ({
+        id: cat.categoryId,
         name: cat.categoryName,
         value: cat.value,
         currency: baseCurrency,
@@ -43,8 +44,9 @@ export function ClassesChart({
     value: number;
     currency: string;
   }) => {
-    if (onClassSectionClick) {
-      onClassSectionClick(sectionData.name);
+    const clickedItem = data.find((d) => d.name === sectionData.name);
+    if (clickedItem && onClassSectionClick) {
+      onClassSectionClick(clickedItem.id, clickedItem.name);
     }
     const clickedIndex = data.findIndex((d) => d.name === sectionData.name);
     if (clickedIndex !== -1) {

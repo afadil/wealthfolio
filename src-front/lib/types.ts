@@ -1200,8 +1200,17 @@ export interface AssetClassifications {
   customGroups: CategoryWithWeight[];
 }
 
+// Simple reference to a category with just id and name (for top-level lookups)
+export interface CategoryRef {
+  id: string;
+  name: string;
+}
+
 export interface CategoryWithWeight {
   category: TaxonomyCategory;
+  // The top-level ancestor category (for hierarchical taxonomies like GICS)
+  // Used for filtering when allocations are rolled up to top-level
+  topLevelCategory: CategoryRef;
   weight: number; // 0-100 percentage
 }
 

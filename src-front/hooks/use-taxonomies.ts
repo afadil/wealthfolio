@@ -15,12 +15,10 @@ import {
   getAssetTaxonomyAssignments,
   assignAssetToCategory,
   removeAssetTaxonomyAssignment,
-  getAssetClassifications,
   getMigrationStatus,
   migrateLegacyClassifications,
 } from "@/commands/taxonomy";
 import type {
-  AssetClassifications,
   AssetTaxonomyAssignment,
   MigrationResult,
   MigrationStatus,
@@ -190,6 +188,9 @@ export function useAssignAssetToCategory() {
       queryClient.invalidateQueries({
         queryKey: QueryKeys.assetTaxonomyAssignments(variables.assetId),
       });
+      // Invalidate portfolio allocations and holdings to reflect classification changes
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.PORTFOLIO_ALLOCATIONS] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS] });
     },
   });
 }
@@ -203,6 +204,9 @@ export function useRemoveAssetTaxonomyAssignment() {
       queryClient.invalidateQueries({
         queryKey: QueryKeys.assetTaxonomyAssignments(variables.assetId),
       });
+      // Invalidate portfolio allocations and holdings to reflect classification changes
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.PORTFOLIO_ALLOCATIONS] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS] });
     },
   });
 }
@@ -210,14 +214,6 @@ export function useRemoveAssetTaxonomyAssignment() {
 // ============================================================================
 // Classification Queries
 // ============================================================================
-
-export function useAssetClassifications(assetId: string) {
-  return useQuery<AssetClassifications, Error>({
-    queryKey: [QueryKeys.ASSET_CLASSIFICATIONS, assetId],
-    queryFn: () => getAssetClassifications(assetId),
-    enabled: !!assetId,
-  });
-}
 
 export function useMigrationStatus() {
   return useQuery<MigrationStatus, Error>({
@@ -233,6 +229,9 @@ export function useMigrateLegacyClassifications() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["migration-status"] });
       queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSET_TAXONOMY_ASSIGNMENTS] });
+      // Invalidate portfolio allocations and holdings to reflect classification changes
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.PORTFOLIO_ALLOCATIONS] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS] });
     },
   });
 }

@@ -1,4 +1,4 @@
-use crate::assets::{Asset, AssetKind, AssetServiceTrait};
+use crate::assets::{Asset, AssetClassificationService, AssetKind, AssetServiceTrait};
 use crate::errors::{CalculatorError, Error as CoreError, Result};
 use crate::fx::currency::{get_normalization_rule, normalize_currency_code};
 use crate::portfolio::holdings::holdings_model::{
@@ -29,11 +29,11 @@ pub trait HoldingsServiceTrait: Send + Sync {
     ) -> Result<Option<Holding>>;
 }
 
-#[derive(Clone)]
 pub struct HoldingsService {
     asset_service: Arc<dyn AssetServiceTrait>,
     snapshot_service: Arc<dyn SnapshotServiceTrait>,
     valuation_service: Arc<dyn HoldingsValuationServiceTrait>,
+    classification_service: Arc<AssetClassificationService>,
 }
 
 impl HoldingsService {
@@ -41,11 +41,13 @@ impl HoldingsService {
         asset_service: Arc<dyn AssetServiceTrait>,
         snapshot_service: Arc<dyn SnapshotServiceTrait>,
         valuation_service: Arc<dyn HoldingsValuationServiceTrait>,
+        classification_service: Arc<AssetClassificationService>,
     ) -> Self {
         Self {
             asset_service,
             snapshot_service,
             valuation_service,
+            classification_service,
         }
     }
 }
@@ -363,6 +365,23 @@ impl HoldingsServiceTrait for HoldingsService {
             normalize_holding_currency(holding_view);
         }
 
+        // Enrich holdings with taxonomy classifications (batch for efficiency)
+        let asset_ids: Vec<String> = holdings
+            .iter()
+            .filter_map(|h| h.instrument.as_ref().map(|i| i.id.clone()))
+            .collect();
+
+        if !asset_ids.is_empty() {
+            let classifications_map = self.classification_service.get_classifications_batch(&asset_ids);
+            for holding in &mut holdings {
+                if let Some(ref mut instrument) = holding.instrument {
+                    if let Some(classifications) = classifications_map.get(&instrument.id) {
+                        instrument.classifications = Some(classifications.clone());
+                    }
+                }
+            }
+        }
+
         Ok(holdings)
     }
 
@@ -508,6 +527,14 @@ impl HoldingsServiceTrait for HoldingsService {
                 if let Some(valued_holding) = single_holding_vec.into_iter().next() {
                     let mut valued_holding = valued_holding;
                     normalize_holding_currency(&mut valued_holding);
+                    // Enrich with classifications
+                    if let Some(ref mut instrument) = valued_holding.instrument {
+                        if let Ok(classifications) =
+                            self.classification_service.get_classifications(&instrument.id)
+                        {
+                            instrument.classifications = Some(classifications);
+                        }
+                    }
                     Ok(Some(valued_holding))
                 } else {
                     error!("Valuation service returned Ok but the holding vector was empty for asset {} in account {}.", asset_id, account_id);
