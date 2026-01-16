@@ -279,7 +279,7 @@ pub trait PortfolioDataProvider: Send + Sync {
 // ============================================================================
 
 /// Mock portfolio data provider for testing.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct MockPortfolioDataProvider {
     pub accounts: Vec<AccountDto>,
     pub holdings: Vec<HoldingDto>,
