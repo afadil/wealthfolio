@@ -19,6 +19,7 @@ use wealthfolio_core::ai::{
 };
 
 use crate::env::AiEnvironment;
+use crate::portfolio_data::{MockPortfolioDataProvider, PortfolioDataProvider};
 use crate::providers::{CompletionConfig, ProviderRegistry};
 use crate::title_generator::{TitleGenerator, TitleGeneratorConfig, TitleGeneratorTrait};
 use crate::tools::{ToolContext, ToolRegistry};
@@ -95,6 +96,7 @@ pub struct AiAssistantService {
     tool_registry: Arc<ToolRegistry>,
     prompt_service: Arc<PromptTemplateService>,
     title_generator: Arc<dyn TitleGeneratorTrait>,
+    data_provider: Arc<dyn PortfolioDataProvider>,
     config: AiAssistantConfig,
     // In-memory thread storage (will be replaced with DB in future)
     threads: std::sync::RwLock<std::collections::HashMap<String, ChatThread>>,
@@ -108,6 +110,7 @@ impl AiAssistantService {
         provider_registry: Arc<ProviderRegistry>,
         tool_registry: Arc<ToolRegistry>,
         prompt_service: Arc<PromptTemplateService>,
+        data_provider: Arc<dyn PortfolioDataProvider>,
         config: AiAssistantConfig,
     ) -> Self {
         // Create title generator using the provider registry
@@ -123,6 +126,7 @@ impl AiAssistantService {
             tool_registry,
             prompt_service,
             title_generator,
+            data_provider,
             config,
             threads: std::sync::RwLock::new(std::collections::HashMap::new()),
             messages: std::sync::RwLock::new(std::collections::HashMap::new()),
@@ -136,6 +140,7 @@ impl AiAssistantService {
         provider_registry: Arc<ProviderRegistry>,
         tool_registry: Arc<ToolRegistry>,
         prompt_service: Arc<PromptTemplateService>,
+        data_provider: Arc<dyn PortfolioDataProvider>,
         title_generator: Arc<dyn TitleGeneratorTrait>,
         config: AiAssistantConfig,
     ) -> Self {
@@ -145,6 +150,7 @@ impl AiAssistantService {
             tool_registry,
             prompt_service,
             title_generator,
+            data_provider,
             config,
             threads: std::sync::RwLock::new(std::collections::HashMap::new()),
             messages: std::sync::RwLock::new(std::collections::HashMap::new()),
@@ -202,6 +208,7 @@ impl AiAssistantService {
             base_currency: self.env.get_base_currency(),
             now: self.env.now(),
             locale: self.env.get_locale(),
+            data_provider: self.data_provider.clone(),
         }
     }
 
@@ -382,6 +389,7 @@ pub struct AiAssistantServiceBuilder {
     provider_registry: Option<Arc<ProviderRegistry>>,
     tool_registry: Option<Arc<ToolRegistry>>,
     prompt_service: Option<Arc<PromptTemplateService>>,
+    data_provider: Option<Arc<dyn PortfolioDataProvider>>,
     config: AiAssistantConfig,
 }
 
@@ -393,6 +401,7 @@ impl AiAssistantServiceBuilder {
             provider_registry: None,
             tool_registry: None,
             prompt_service: None,
+            data_provider: None,
             config: AiAssistantConfig::default(),
         }
     }
@@ -421,6 +430,12 @@ impl AiAssistantServiceBuilder {
         self
     }
 
+    /// Set the portfolio data provider.
+    pub fn with_data_provider(mut self, provider: Arc<dyn PortfolioDataProvider>) -> Self {
+        self.data_provider = Some(provider);
+        self
+    }
+
     /// Set the configuration.
     pub fn with_config(mut self, config: AiAssistantConfig) -> Self {
         self.config = config;
@@ -429,11 +444,17 @@ impl AiAssistantServiceBuilder {
 
     /// Build the service.
     pub fn build(self) -> Result<AiAssistantService, &'static str> {
+        // Use mock provider if none specified
+        let data_provider = self
+            .data_provider
+            .unwrap_or_else(|| Arc::new(MockPortfolioDataProvider::new()));
+
         Ok(AiAssistantService::new(
             self.env.ok_or("Environment required")?,
             self.provider_registry.ok_or("Provider registry required")?,
             self.tool_registry.ok_or("Tool registry required")?,
             self.prompt_service.ok_or("Prompt service required")?,
+            data_provider,
             self.config,
         ))
     }
@@ -462,12 +483,14 @@ mod tests {
         let prompt_service =
             PromptTemplateService::new(include_str!("../../../src-front/lib/ai-prompt-templates.json"))
                 .expect("Failed to load prompt templates");
+        let data_provider = Arc::new(MockPortfolioDataProvider::new());
 
         AiAssistantService::new(
             env,
             Arc::new(provider_registry),
             Arc::new(tool_registry),
             Arc::new(prompt_service),
+            data_provider,
             AiAssistantConfig::default(),
         )
     }
@@ -483,12 +506,14 @@ mod tests {
         let prompt_service =
             PromptTemplateService::new(include_str!("../../../src-front/lib/ai-prompt-templates.json"))
                 .expect("Failed to load prompt templates");
+        let data_provider = Arc::new(MockPortfolioDataProvider::new());
 
         AiAssistantService::with_title_generator(
             env,
             Arc::new(provider_registry),
             Arc::new(tool_registry),
             Arc::new(prompt_service),
+            data_provider,
             title_generator,
             AiAssistantConfig::default(),
         )

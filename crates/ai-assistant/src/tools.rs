@@ -5,15 +5,42 @@
 //! - Per-thread tool allowlist support
 //! - Input validation and output shaping
 //! - Result DTOs with `{ data, meta }` envelope
+//! - Real portfolio tools with strict schemas and bounded outputs
 
 use async_trait::async_trait;
+use chrono::{Duration, NaiveDate};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use std::time::Instant;
 
+use crate::portfolio_data::{
+    GetAllocationsParams, GetHoldingsParams, GetIncomeParams, GetPerformanceParams,
+    GetValuationsParams, PortfolioDataProvider, SearchActivitiesParams,
+};
 use crate::providers::ToolDefinition;
 use crate::types::{AiAssistantError, ToolResultData};
+
+// ============================================================================
+// Constants - Default Guardrails
+// ============================================================================
+
+/// Default lookback for search_activities: 90 days
+pub const DEFAULT_ACTIVITIES_DAYS: i64 = 90;
+/// Maximum rows for search_activities
+pub const MAX_ACTIVITIES_ROWS: usize = 200;
+
+/// Default lookback for get_valuations: 1 year (365 days)
+pub const DEFAULT_VALUATIONS_DAYS: i64 = 365;
+/// Maximum data points for get_valuations
+pub const MAX_VALUATIONS_POINTS: usize = 400;
+
+/// Maximum holdings to return
+pub const MAX_HOLDINGS: usize = 100;
+
+/// Maximum income records to return
+pub const MAX_INCOME_RECORDS: usize = 50;
 
 // ============================================================================
 // Tool Trait
@@ -53,6 +80,21 @@ impl ToolResult {
             .with_meta("truncated", original_count > returned_count)
     }
 
+    /// Add duration to metadata.
+    pub fn with_duration_ms(self, duration_ms: u128) -> Self {
+        self.with_meta("durationMs", duration_ms)
+    }
+
+    /// Add account scope to metadata.
+    pub fn with_account_scope(self, scope: &str) -> Self {
+        self.with_meta("accountScope", scope)
+    }
+
+    /// Add row/point count to metadata.
+    pub fn with_count(self, count: usize) -> Self {
+        self.with_meta("count", count)
+    }
+
     /// Convert to ToolResultData for streaming events.
     pub fn to_result_data(self, tool_call_id: &str, success: bool) -> ToolResultData {
         ToolResultData {
@@ -73,6 +115,8 @@ pub struct ToolContext {
     pub now: chrono::DateTime<chrono::Utc>,
     /// Locale for formatting.
     pub locale: Option<String>,
+    /// Portfolio data provider for accessing portfolio data.
+    pub data_provider: Arc<dyn PortfolioDataProvider>,
 }
 
 /// Trait for AI assistant tools.
@@ -210,8 +254,574 @@ pub fn parse_args<T: DeserializeOwned>(args: Value) -> Result<T, AiAssistantErro
     })
 }
 
+/// Parse a date string (YYYY-MM-DD) to NaiveDate.
+fn parse_date(date_str: &str) -> Result<NaiveDate, AiAssistantError> {
+    NaiveDate::parse_from_str(date_str, "%Y-%m-%d").map_err(|e| AiAssistantError::InvalidInput {
+        message: format!("Invalid date format '{}': {}. Expected YYYY-MM-DD.", date_str, e),
+    })
+}
+
 // ============================================================================
-// Placeholder Tools (to be replaced with real implementations)
+// Real Tool Implementations
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// GetAccountsTool
+// ----------------------------------------------------------------------------
+
+/// Tool to get list of investment accounts.
+pub struct GetAccountsTool;
+
+#[async_trait]
+impl Tool for GetAccountsTool {
+    fn name(&self) -> &str {
+        "get_accounts"
+    }
+
+    fn description(&self) -> &str {
+        "Get list of investment accounts with their names, types, currencies, and active status."
+    }
+
+    fn parameters_schema(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {},
+            "required": []
+        })
+    }
+
+    async fn execute(&self, _args: Value, ctx: &ToolContext) -> Result<ToolResult, AiAssistantError> {
+        let start = Instant::now();
+        let accounts = ctx.data_provider.get_accounts().await?;
+        let count = accounts.len();
+        let duration_ms = start.elapsed().as_millis();
+
+        Ok(ToolResult::ok(accounts)
+            .with_count(count)
+            .with_duration_ms(duration_ms)
+            .with_account_scope("all"))
+    }
+}
+
+// ----------------------------------------------------------------------------
+// GetHoldingsTool
+// ----------------------------------------------------------------------------
+
+/// Arguments for get_holdings tool.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GetHoldingsArgs {
+    /// Account ID to filter by. Use "TOTAL" or omit for all accounts.
+    #[serde(default = "default_account_id")]
+    account_id: String,
+}
+
+fn default_account_id() -> String {
+    "TOTAL".to_string()
+}
+
+/// Tool to get current portfolio holdings.
+pub struct GetHoldingsTool;
+
+#[async_trait]
+impl Tool for GetHoldingsTool {
+    fn name(&self) -> &str {
+        "get_holdings"
+    }
+
+    fn description(&self) -> &str {
+        "Get current portfolio holdings with quantities, market values, cost basis, and performance. Returns up to 100 holdings."
+    }
+
+    fn parameters_schema(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "accountId": {
+                    "type": "string",
+                    "description": "Account ID to filter holdings. Use 'TOTAL' for all accounts."
+                }
+            },
+            "required": []
+        })
+    }
+
+    async fn execute(&self, args: Value, ctx: &ToolContext) -> Result<ToolResult, AiAssistantError> {
+        let start = Instant::now();
+        let parsed: GetHoldingsArgs = parse_args(args)?;
+
+        let params = GetHoldingsParams {
+            account_id: parsed.account_id.clone(),
+            limit: MAX_HOLDINGS,
+        };
+
+        let result = ctx.data_provider.get_holdings(params).await?;
+        let duration_ms = start.elapsed().as_millis();
+
+        Ok(ToolResult::ok(&result.data)
+            .with_truncation(result.original_count, result.returned_count)
+            .with_duration_ms(duration_ms)
+            .with_account_scope(&result.account_scope))
+    }
+}
+
+// ----------------------------------------------------------------------------
+// SearchActivitiesTool
+// ----------------------------------------------------------------------------
+
+/// Arguments for search_activities tool.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SearchActivitiesArgs {
+    /// Account IDs to filter by.
+    #[serde(default)]
+    account_ids: Option<Vec<String>>,
+    /// Activity types to filter by (e.g., "BUY", "SELL", "DIVIDEND").
+    #[serde(default)]
+    activity_types: Option<Vec<String>>,
+    /// Symbol/asset keyword to search.
+    #[serde(default)]
+    symbol_keyword: Option<String>,
+    /// Start date (YYYY-MM-DD). Defaults to 90 days ago.
+    #[serde(default)]
+    start_date: Option<String>,
+    /// End date (YYYY-MM-DD). Defaults to today.
+    #[serde(default)]
+    end_date: Option<String>,
+}
+
+/// Tool to search activities/transactions.
+pub struct SearchActivitiesTool;
+
+#[async_trait]
+impl Tool for SearchActivitiesTool {
+    fn name(&self) -> &str {
+        "search_activities"
+    }
+
+    fn description(&self) -> &str {
+        "Search recent activities/transactions with filters. Default: last 90 days, max 200 rows. Supports filtering by account, activity type, symbol, and date range."
+    }
+
+    fn parameters_schema(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "accountIds": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Filter by account IDs. Omit for all accounts."
+                },
+                "activityTypes": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Filter by activity types (BUY, SELL, DIVIDEND, DEPOSIT, WITHDRAWAL, etc.)."
+                },
+                "symbolKeyword": {
+                    "type": "string",
+                    "description": "Filter by symbol/asset keyword."
+                },
+                "startDate": {
+                    "type": "string",
+                    "description": "Start date (YYYY-MM-DD). Default: 90 days ago."
+                },
+                "endDate": {
+                    "type": "string",
+                    "description": "End date (YYYY-MM-DD). Default: today."
+                }
+            },
+            "required": []
+        })
+    }
+
+    async fn execute(&self, args: Value, ctx: &ToolContext) -> Result<ToolResult, AiAssistantError> {
+        let start = Instant::now();
+        let parsed: SearchActivitiesArgs = parse_args(args)?;
+
+        // Apply default date range: last 90 days
+        let today = ctx.now.date_naive();
+        let default_start = today - Duration::days(DEFAULT_ACTIVITIES_DAYS);
+
+        let start_date = match &parsed.start_date {
+            Some(s) => Some(parse_date(s)?),
+            None => Some(default_start),
+        };
+        let end_date = match &parsed.end_date {
+            Some(s) => Some(parse_date(s)?),
+            None => Some(today),
+        };
+
+        let params = SearchActivitiesParams {
+            account_ids: parsed.account_ids.clone(),
+            activity_types: parsed.activity_types,
+            symbol_keyword: parsed.symbol_keyword,
+            start_date,
+            end_date,
+            limit: MAX_ACTIVITIES_ROWS,
+        };
+
+        let account_scope = parsed
+            .account_ids
+            .as_ref()
+            .map(|ids| ids.join(","))
+            .unwrap_or_else(|| "all".to_string());
+
+        let result = ctx.data_provider.search_activities(params).await?;
+        let duration_ms = start.elapsed().as_millis();
+
+        Ok(ToolResult::ok(&result.data)
+            .with_truncation(result.original_count, result.returned_count)
+            .with_duration_ms(duration_ms)
+            .with_account_scope(&account_scope))
+    }
+}
+
+// ----------------------------------------------------------------------------
+// GetValuationsTool
+// ----------------------------------------------------------------------------
+
+/// Arguments for get_valuations tool.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GetValuationsArgs {
+    /// Account ID. Use "TOTAL" for aggregate across all accounts.
+    #[serde(default = "default_account_id")]
+    account_id: String,
+    /// Start date (YYYY-MM-DD). Default: 1 year ago.
+    #[serde(default)]
+    start_date: Option<String>,
+    /// End date (YYYY-MM-DD). Default: today.
+    #[serde(default)]
+    end_date: Option<String>,
+}
+
+/// Tool to get historical valuations.
+pub struct GetValuationsTool;
+
+#[async_trait]
+impl Tool for GetValuationsTool {
+    fn name(&self) -> &str {
+        "get_valuations"
+    }
+
+    fn description(&self) -> &str {
+        "Get historical portfolio valuations over time. Default: last 1 year, max 400 data points. Returns daily total value, cash, investments, and net contributions."
+    }
+
+    fn parameters_schema(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "accountId": {
+                    "type": "string",
+                    "description": "Account ID. Use 'TOTAL' for aggregate across all accounts."
+                },
+                "startDate": {
+                    "type": "string",
+                    "description": "Start date (YYYY-MM-DD). Default: 1 year ago."
+                },
+                "endDate": {
+                    "type": "string",
+                    "description": "End date (YYYY-MM-DD). Default: today."
+                }
+            },
+            "required": []
+        })
+    }
+
+    async fn execute(&self, args: Value, ctx: &ToolContext) -> Result<ToolResult, AiAssistantError> {
+        let start = Instant::now();
+        let parsed: GetValuationsArgs = parse_args(args)?;
+
+        // Apply default date range: last 1 year
+        let today = ctx.now.date_naive();
+        let default_start = today - Duration::days(DEFAULT_VALUATIONS_DAYS);
+
+        let start_date = match &parsed.start_date {
+            Some(s) => Some(parse_date(s)?),
+            None => Some(default_start),
+        };
+        let end_date = match &parsed.end_date {
+            Some(s) => Some(parse_date(s)?),
+            None => Some(today),
+        };
+
+        let params = GetValuationsParams {
+            account_id: parsed.account_id.clone(),
+            start_date,
+            end_date,
+            limit: MAX_VALUATIONS_POINTS,
+        };
+
+        let result = ctx.data_provider.get_valuations(params).await?;
+        let duration_ms = start.elapsed().as_millis();
+
+        Ok(ToolResult::ok(&result.data)
+            .with_meta("pointCount", result.returned_count)
+            .with_truncation(result.original_count, result.returned_count)
+            .with_duration_ms(duration_ms)
+            .with_account_scope(&result.account_scope))
+    }
+}
+
+// ----------------------------------------------------------------------------
+// GetPerformanceTool
+// ----------------------------------------------------------------------------
+
+/// Arguments for get_performance tool.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GetPerformanceArgs {
+    /// Account ID. Use "TOTAL" for all accounts.
+    #[serde(default = "default_account_id")]
+    account_id: String,
+    /// Start date (YYYY-MM-DD).
+    #[serde(default)]
+    start_date: Option<String>,
+    /// End date (YYYY-MM-DD). Default: today.
+    #[serde(default)]
+    end_date: Option<String>,
+}
+
+/// Tool to get portfolio performance metrics.
+pub struct GetPerformanceTool;
+
+#[async_trait]
+impl Tool for GetPerformanceTool {
+    fn name(&self) -> &str {
+        "get_performance"
+    }
+
+    fn description(&self) -> &str {
+        "Get portfolio performance metrics including total return percentage, gains, and contributions/withdrawals over a time period."
+    }
+
+    fn parameters_schema(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "accountId": {
+                    "type": "string",
+                    "description": "Account ID. Use 'TOTAL' for all accounts."
+                },
+                "startDate": {
+                    "type": "string",
+                    "description": "Start date (YYYY-MM-DD). Default: inception."
+                },
+                "endDate": {
+                    "type": "string",
+                    "description": "End date (YYYY-MM-DD). Default: today."
+                }
+            },
+            "required": []
+        })
+    }
+
+    async fn execute(&self, args: Value, ctx: &ToolContext) -> Result<ToolResult, AiAssistantError> {
+        let start = Instant::now();
+        let parsed: GetPerformanceArgs = parse_args(args)?;
+
+        let start_date = match &parsed.start_date {
+            Some(s) => Some(parse_date(s)?),
+            None => None,
+        };
+        let end_date = match &parsed.end_date {
+            Some(s) => Some(parse_date(s)?),
+            None => Some(ctx.now.date_naive()),
+        };
+
+        let params = GetPerformanceParams {
+            account_id: parsed.account_id.clone(),
+            start_date,
+            end_date,
+        };
+
+        let result = ctx.data_provider.get_performance(params).await?;
+        let duration_ms = start.elapsed().as_millis();
+
+        Ok(ToolResult::ok(result)
+            .with_duration_ms(duration_ms)
+            .with_account_scope(&parsed.account_id))
+    }
+}
+
+// ----------------------------------------------------------------------------
+// GetDividendsTool (renamed from get_income for clarity)
+// ----------------------------------------------------------------------------
+
+/// Arguments for get_dividends tool.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GetDividendsArgs {
+    /// Account ID filter.
+    #[serde(default)]
+    account_id: Option<String>,
+    /// Start date (YYYY-MM-DD).
+    #[serde(default)]
+    start_date: Option<String>,
+    /// End date (YYYY-MM-DD).
+    #[serde(default)]
+    end_date: Option<String>,
+}
+
+/// Tool to get dividend/income history.
+pub struct GetDividendsTool;
+
+#[async_trait]
+impl Tool for GetDividendsTool {
+    fn name(&self) -> &str {
+        "get_dividends"
+    }
+
+    fn description(&self) -> &str {
+        "Get dividend/income history and summary by symbol. Shows total amounts, payment counts, and last payment dates. Max 50 records."
+    }
+
+    fn parameters_schema(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "accountId": {
+                    "type": "string",
+                    "description": "Filter by account ID. Omit for all accounts."
+                },
+                "startDate": {
+                    "type": "string",
+                    "description": "Start date (YYYY-MM-DD)."
+                },
+                "endDate": {
+                    "type": "string",
+                    "description": "End date (YYYY-MM-DD)."
+                }
+            },
+            "required": []
+        })
+    }
+
+    async fn execute(&self, args: Value, ctx: &ToolContext) -> Result<ToolResult, AiAssistantError> {
+        let start = Instant::now();
+        let parsed: GetDividendsArgs = parse_args(args)?;
+
+        let start_date = match &parsed.start_date {
+            Some(s) => Some(parse_date(s)?),
+            None => None,
+        };
+        let end_date = match &parsed.end_date {
+            Some(s) => Some(parse_date(s)?),
+            None => None,
+        };
+
+        let params = GetIncomeParams {
+            account_id: parsed.account_id.clone(),
+            start_date,
+            end_date,
+            limit: MAX_INCOME_RECORDS,
+        };
+
+        let account_scope = parsed.account_id.clone().unwrap_or_else(|| "all".to_string());
+        let result = ctx.data_provider.get_income(params).await?;
+        let duration_ms = start.elapsed().as_millis();
+
+        Ok(ToolResult::ok(&result.data)
+            .with_truncation(result.original_count, result.returned_count)
+            .with_duration_ms(duration_ms)
+            .with_account_scope(&account_scope))
+    }
+}
+
+// ----------------------------------------------------------------------------
+// GetAssetAllocationTool
+// ----------------------------------------------------------------------------
+
+/// Arguments for get_asset_allocation tool.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GetAssetAllocationArgs {
+    /// Account ID. Use "TOTAL" for all accounts.
+    #[serde(default = "default_account_id")]
+    account_id: String,
+    /// Allocation category: "asset_class", "sector", "geography", "currency".
+    #[serde(default = "default_allocation_category")]
+    category: String,
+}
+
+fn default_allocation_category() -> String {
+    "asset_class".to_string()
+}
+
+/// Tool to get asset allocation breakdown.
+pub struct GetAssetAllocationTool;
+
+#[async_trait]
+impl Tool for GetAssetAllocationTool {
+    fn name(&self) -> &str {
+        "get_asset_allocation"
+    }
+
+    fn description(&self) -> &str {
+        "Get asset allocation breakdown by category (asset_class, sector, geography, or currency). Shows values and percentages."
+    }
+
+    fn parameters_schema(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "accountId": {
+                    "type": "string",
+                    "description": "Account ID. Use 'TOTAL' for all accounts."
+                },
+                "category": {
+                    "type": "string",
+                    "enum": ["asset_class", "sector", "geography", "currency"],
+                    "description": "Allocation category to group by. Default: asset_class."
+                }
+            },
+            "required": []
+        })
+    }
+
+    async fn execute(&self, args: Value, ctx: &ToolContext) -> Result<ToolResult, AiAssistantError> {
+        let start = Instant::now();
+        let parsed: GetAssetAllocationArgs = parse_args(args)?;
+
+        let params = GetAllocationsParams {
+            account_id: parsed.account_id.clone(),
+            category: parsed.category.clone(),
+        };
+
+        let result = ctx.data_provider.get_allocations(params).await?;
+        let duration_ms = start.elapsed().as_millis();
+        let count = result.len();
+
+        Ok(ToolResult::ok(result)
+            .with_count(count)
+            .with_duration_ms(duration_ms)
+            .with_account_scope(&parsed.account_id)
+            .with_meta("category", &parsed.category))
+    }
+}
+
+// ============================================================================
+// Registry Factory
+// ============================================================================
+
+/// Create a registry with all portfolio read-only tools.
+pub fn create_portfolio_tools_registry() -> ToolRegistry {
+    let mut registry = ToolRegistry::new();
+
+    registry.register(Arc::new(GetAccountsTool));
+    registry.register(Arc::new(GetHoldingsTool));
+    registry.register(Arc::new(SearchActivitiesTool));
+    registry.register(Arc::new(GetValuationsTool));
+    registry.register(Arc::new(GetPerformanceTool));
+    registry.register(Arc::new(GetDividendsTool));
+    registry.register(Arc::new(GetAssetAllocationTool));
+
+    registry
+}
+
+// ============================================================================
+// Placeholder Tools (for backward compatibility during testing)
 // ============================================================================
 
 /// A placeholder tool that returns a static message.
@@ -256,9 +866,7 @@ impl Tool for PlaceholderTool {
 }
 
 /// Create a registry with placeholder tools for portfolio operations.
-///
-/// These will be replaced with real implementations that access
-/// the portfolio data layer.
+/// DEPRECATED: Use create_portfolio_tools_registry() instead.
 pub fn create_placeholder_registry() -> ToolRegistry {
     let mut registry = ToolRegistry::new();
 
@@ -294,6 +902,17 @@ pub fn create_placeholder_registry() -> ToolRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::{Datelike, Utc};
+    use crate::portfolio_data::MockPortfolioDataProvider;
+
+    fn create_test_context() -> ToolContext {
+        ToolContext {
+            base_currency: "USD".to_string(),
+            now: Utc::now(),
+            locale: None,
+            data_provider: Arc::new(MockPortfolioDataProvider::new()),
+        }
+    }
 
     #[test]
     fn test_tool_result_creation() {
@@ -304,6 +923,18 @@ mod tests {
         assert!(result.meta.contains_key("count"));
         assert!(result.meta.contains_key("truncated"));
         assert_eq!(result.meta["truncated"], true);
+    }
+
+    #[test]
+    fn test_tool_result_metadata() {
+        let result = ToolResult::ok(serde_json::json!({"test": true}))
+            .with_duration_ms(150)
+            .with_account_scope("acc-123")
+            .with_count(42);
+
+        assert_eq!(result.meta["durationMs"], 150);
+        assert_eq!(result.meta["accountScope"], "acc-123");
+        assert_eq!(result.meta["count"], 42);
     }
 
     #[tokio::test]
@@ -325,12 +956,7 @@ mod tests {
         registry.register(Arc::new(PlaceholderTool::new("allowed_tool", "Allowed")));
         registry.register(Arc::new(PlaceholderTool::new("blocked_tool", "Blocked")));
 
-        let ctx = ToolContext {
-            base_currency: "USD".to_string(),
-            now: chrono::Utc::now(),
-            locale: None,
-        };
-
+        let ctx = create_test_context();
         let allowlist = vec!["allowed_tool".to_string()];
 
         // Allowed tool should work
@@ -351,15 +977,118 @@ mod tests {
 
     #[tokio::test]
     async fn test_tool_definitions_with_allowlist() {
-        let registry = create_placeholder_registry();
+        let registry = create_portfolio_tools_registry();
 
         // Get all definitions
         let all_defs = registry.get_definitions(None);
-        assert!(all_defs.len() > 1);
+        assert!(all_defs.len() >= 6); // At least 6 tools
 
         // Get only specific tools
         let allowlist = vec!["get_holdings".to_string(), "get_accounts".to_string()];
         let filtered_defs = registry.get_definitions(Some(&allowlist));
         assert_eq!(filtered_defs.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_get_accounts_tool() {
+        use crate::portfolio_data::AccountDto;
+
+        let provider = MockPortfolioDataProvider::new().with_accounts(vec![
+            AccountDto {
+                id: "acc-1".to_string(),
+                name: "Main Account".to_string(),
+                account_type: "SECURITIES".to_string(),
+                currency: "USD".to_string(),
+                is_active: true,
+            },
+        ]);
+
+        let ctx = ToolContext {
+            base_currency: "USD".to_string(),
+            now: Utc::now(),
+            locale: None,
+            data_provider: Arc::new(provider),
+        };
+
+        let tool = GetAccountsTool;
+        let result = tool.execute(Value::Null, &ctx).await.unwrap();
+
+        // Check metadata
+        assert!(result.meta.contains_key("count"));
+        assert!(result.meta.contains_key("durationMs"));
+        assert!(result.meta.contains_key("accountScope"));
+    }
+
+    #[tokio::test]
+    async fn test_get_holdings_tool_with_account_id() {
+        use crate::portfolio_data::HoldingDto;
+
+        let provider = MockPortfolioDataProvider::new().with_holdings(vec![
+            HoldingDto {
+                account_id: "acc-1".to_string(),
+                symbol: "AAPL".to_string(),
+                name: Some("Apple Inc.".to_string()),
+                holding_type: "Security".to_string(),
+                quantity: 10.0,
+                market_value_base: 1500.0,
+                cost_basis_base: Some(1200.0),
+                unrealized_gain_pct: Some(25.0),
+                day_change_pct: Some(1.5),
+                weight: 0.15,
+                currency: "USD".to_string(),
+            },
+        ]);
+
+        let ctx = ToolContext {
+            base_currency: "USD".to_string(),
+            now: Utc::now(),
+            locale: None,
+            data_provider: Arc::new(provider),
+        };
+
+        let tool = GetHoldingsTool;
+        let args = serde_json::json!({ "accountId": "acc-1" });
+        let result = tool.execute(args, &ctx).await.unwrap();
+
+        assert!(result.meta.contains_key("accountScope"));
+        assert_eq!(result.meta["accountScope"], "acc-1");
+    }
+
+    #[tokio::test]
+    async fn test_search_activities_default_date_range() {
+        let ctx = create_test_context();
+
+        let tool = SearchActivitiesTool;
+        let result = tool.execute(serde_json::json!({}), &ctx).await.unwrap();
+
+        // Should succeed with empty args (uses defaults)
+        assert!(result.meta.contains_key("durationMs"));
+        assert!(result.meta.contains_key("accountScope"));
+        assert_eq!(result.meta["accountScope"], "all");
+    }
+
+    #[test]
+    fn test_parse_date_valid() {
+        let date = parse_date("2024-01-15").unwrap();
+        assert_eq!(date.year(), 2024);
+        assert_eq!(date.month(), 1);
+        assert_eq!(date.day(), 15);
+    }
+
+    #[test]
+    fn test_parse_date_invalid() {
+        let result = parse_date("invalid");
+        assert!(result.is_err());
+
+        let result = parse_date("01-15-2024"); // Wrong format
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_default_guardrails() {
+        assert_eq!(DEFAULT_ACTIVITIES_DAYS, 90);
+        assert_eq!(MAX_ACTIVITIES_ROWS, 200);
+        assert_eq!(DEFAULT_VALUATIONS_DAYS, 365);
+        assert_eq!(MAX_VALUATIONS_POINTS, 400);
     }
 }
