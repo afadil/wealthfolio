@@ -3,7 +3,16 @@
 import type { MergedProvider } from "@/lib/types";
 
 // Re-export API types for convenience
-export type { MergedProvider, MergedModel, AiProvidersResponse } from "@/lib/types";
+export type {
+  MergedProvider,
+  MergedModel,
+  AiProvidersResponse,
+  ModelCapabilities,
+  ModelCapabilityOverrides,
+  ModelCapabilityOverrideUpdate,
+  FetchedModel,
+  ListModelsResponse,
+} from "@/lib/types";
 
 // ============================================================================
 // Chat Thread Types

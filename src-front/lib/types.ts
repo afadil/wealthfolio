@@ -1264,6 +1264,18 @@ export interface ModelCapabilities {
   tools: boolean;
   thinking: boolean;
   vision: boolean;
+  /** Whether the model supports streaming responses. */
+  streaming: boolean;
+}
+
+/**
+ * Capability overrides for a specific model (tools/streaming/vision).
+ * User can set these for fetched/unknown models that aren't in the catalog.
+ */
+export interface ModelCapabilityOverrides {
+  tools?: boolean;
+  streaming?: boolean;
+  vision?: boolean;
 }
 
 /**
@@ -1271,7 +1283,15 @@ export interface ModelCapabilities {
  */
 export interface MergedModel {
   id: string;
+  /** Display name (may differ from id for fetched models). */
+  name?: string;
   capabilities: ModelCapabilities;
+  /** Whether this model is from the catalog (true) or dynamically fetched (false). */
+  isCatalog: boolean;
+  /** Whether this model is marked as a user favorite. */
+  isFavorite: boolean;
+  /** Whether capabilities have user overrides applied. */
+  hasCapabilityOverrides: boolean;
 }
 
 /**
@@ -1318,10 +1338,16 @@ export interface MergedProvider {
   selectedModel?: string;
   customUrl?: string;
   priority: number;
+  /** User's favorite model IDs (including fetched models not in catalog). */
+  favoriteModels: string[];
+  /** Capability overrides for specific models. */
+  modelCapabilityOverrides: Record<string, ModelCapabilityOverrides>;
 
   // Computed
   hasApiKey: boolean;
   isDefault: boolean;
+  /** Whether this provider supports dynamic model listing via API. */
+  supportsModelListing: boolean;
 }
 
 /**
@@ -1334,6 +1360,16 @@ export interface AiProvidersResponse {
 }
 
 /**
+ * Update for a single model's capability overrides.
+ */
+export interface ModelCapabilityOverrideUpdate {
+  /** The model ID to update. */
+  modelId: string;
+  /** The capability overrides to set. Use undefined to remove overrides for this model. */
+  overrides?: ModelCapabilityOverrides;
+}
+
+/**
  * Request to update a single provider's settings.
  */
 export interface UpdateProviderSettingsRequest {
@@ -1343,6 +1379,10 @@ export interface UpdateProviderSettingsRequest {
   selectedModel?: string;
   customUrl?: string;
   priority?: number;
+  /** Set capability overrides for a specific model. */
+  modelCapabilityOverride?: ModelCapabilityOverrideUpdate;
+  /** Update the list of favorite models (replaces the entire list). */
+  favoriteModels?: string[];
 }
 
 /**

@@ -20,6 +20,13 @@ pub struct ModelCapabilities {
     pub tools: bool,
     pub thinking: bool,
     pub vision: bool,
+    /// Whether the model supports streaming responses.
+    #[serde(default = "default_streaming")]
+    pub streaming: bool,
+}
+
+fn default_streaming() -> bool {
+    true // Most models support streaming by default
 }
 
 /// A single model definition from the catalog.
@@ -86,6 +93,22 @@ pub struct AiProviderCatalog {
 // User Settings Types (stored in app_settings)
 // ============================================================================
 
+/// Capability overrides for a specific model (tools/streaming/vision).
+/// User can set these for fetched/unknown models that aren't in the catalog.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelCapabilityOverrides {
+    /// Override for tools capability.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<bool>,
+    /// Override for streaming capability.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub streaming: Option<bool>,
+    /// Override for vision capability.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vision: Option<bool>,
+}
+
 /// Per-provider user settings (stored in app_settings).
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -105,6 +128,12 @@ pub struct ProviderUserSettings {
     /// Priority for sorting (lower = higher priority).
     #[serde(default)]
     pub priority: i32,
+    /// Capability overrides keyed by model ID. Only needed for fetched/unknown models.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub model_capability_overrides: HashMap<String, ModelCapabilityOverrides>,
+    /// List of fetched model IDs that user has marked as favorites.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub favorite_models: Vec<String>,
 }
 
 /// The complete AI provider settings blob stored in app_settings.
@@ -140,7 +169,16 @@ impl Default for AiProviderSettings {
 #[serde(rename_all = "camelCase")]
 pub struct MergedModel {
     pub id: String,
+    /// Display name (may differ from id for fetched models).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
     pub capabilities: ModelCapabilities,
+    /// Whether this model is from the catalog (true) or dynamically fetched (false).
+    pub is_catalog: bool,
+    /// Whether this model is marked as a user favorite.
+    pub is_favorite: bool,
+    /// Whether capabilities have user overrides applied.
+    pub has_capability_overrides: bool,
 }
 
 /// A provider in the merged view returned to the UI.
@@ -169,10 +207,18 @@ pub struct MergedProvider {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub custom_url: Option<String>,
     pub priority: i32,
+    /// User's favorite model IDs (including fetched models not in catalog).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub favorite_models: Vec<String>,
+    /// Capability overrides for specific models.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub model_capability_overrides: HashMap<String, ModelCapabilityOverrides>,
 
     // Computed
     pub has_api_key: bool,
     pub is_default: bool,
+    /// Whether this provider supports dynamic model listing via API.
+    pub supports_model_listing: bool,
 }
 
 /// The complete merged response returned to the UI.
@@ -204,6 +250,22 @@ pub struct UpdateProviderSettingsRequest {
     pub custom_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub priority: Option<i32>,
+    /// Set capability overrides for a specific model.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_capability_override: Option<ModelCapabilityOverrideUpdate>,
+    /// Update the list of favorite models (replaces the entire list).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub favorite_models: Option<Vec<String>>,
+}
+
+/// Update for a single model's capability overrides.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelCapabilityOverrideUpdate {
+    /// The model ID to update.
+    pub model_id: String,
+    /// The capability overrides to set. Use None to remove overrides for this model.
+    pub overrides: Option<ModelCapabilityOverrides>,
 }
 
 /// Request to set the default provider.
