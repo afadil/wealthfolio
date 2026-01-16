@@ -53,6 +53,11 @@ export const QueryKeys = {
   MARKET_DATA_PROVIDERS: "marketDataProviders",
   MARKET_DATA_PROVIDER_SETTINGS: "marketDataProviderSettings",
 
+  // AI Providers
+  AI_PROVIDERS: "aiProviders",
+  AI_PROVIDER_MODELS: "aiProviderModels",
+  aiProviderModels: (providerId: string) => [QueryKeys.AI_PROVIDER_MODELS, providerId],
+
   transactions: "transactions",
   latestValuations: "latest-valuations",
 

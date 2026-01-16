@@ -1351,3 +1351,19 @@ export interface UpdateProviderSettingsRequest {
 export interface SetDefaultProviderRequest {
   providerId?: string;
 }
+
+/**
+ * Model info returned from provider API.
+ */
+export interface FetchedModel {
+  id: string;
+  name?: string;
+}
+
+/**
+ * Response from model listing.
+ */
+export interface ListModelsResponse {
+  models: FetchedModel[];
+  supportsListing: boolean;
+}
