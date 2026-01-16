@@ -2,12 +2,13 @@ use std::sync::Arc;
 
 use crate::{error::ApiResult, main_lib::AppState};
 use axum::{
-    extract::State,
+    extract::{Path, State},
     routing::{get, post, put},
     Json, Router,
 };
 use wealthfolio_core::ai::{
-    AiProvidersResponse, SetDefaultProviderRequest, UpdateProviderSettingsRequest,
+    AiProvidersResponse, ListModelsResponse, SetDefaultProviderRequest,
+    UpdateProviderSettingsRequest,
 };
 
 async fn get_ai_providers(
@@ -39,9 +40,24 @@ async fn set_default_provider(
     Ok(Json(()))
 }
 
+/// List available models from a provider.
+/// Fetches models from the provider's API using backend-stored secrets.
+/// Frontend never needs to send API keys - they are retrieved internally.
+async fn list_models(
+    State(state): State<Arc<AppState>>,
+    Path(provider_id): Path<String>,
+) -> ApiResult<Json<ListModelsResponse>> {
+    let response = state
+        .ai_provider_service
+        .list_models(&provider_id)
+        .await?;
+    Ok(Json(response))
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/ai/providers", get(get_ai_providers))
         .route("/ai/providers/settings", put(update_provider_settings))
         .route("/ai/providers/default", post(set_default_provider))
+        .route("/ai/providers/{provider_id}/models", get(list_models))
 }
