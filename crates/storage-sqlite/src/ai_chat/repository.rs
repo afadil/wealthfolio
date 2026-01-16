@@ -469,6 +469,11 @@ fn convert_json_to_content(json: &str) -> Result<AiMessageContent> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
+
+    // ========================================================================
+    // Thread Conversion Tests
+    // ========================================================================
 
     #[test]
     fn test_thread_conversion() {
@@ -500,6 +505,36 @@ mod tests {
     }
 
     #[test]
+    fn test_thread_conversion_pinned() {
+        let mut thread = AiThread::new();
+        thread.is_pinned = true;
+        thread.title = Some("Pinned Thread".to_string());
+
+        let db = thread_to_db(&thread);
+        assert_eq!(db.is_pinned, 1);
+        assert_eq!(db.title, Some("Pinned Thread".to_string()));
+
+        let back = db_to_thread(&db);
+        assert!(back.is_pinned);
+        assert_eq!(back.title, Some("Pinned Thread".to_string()));
+    }
+
+    #[test]
+    fn test_thread_conversion_timestamps() {
+        let thread = AiThread::new();
+        let db = thread_to_db(&thread);
+        let back = db_to_thread(&db);
+
+        // Timestamps should round-trip (within tolerance for RFC3339 parsing)
+        assert!((thread.created_at - back.created_at).num_seconds().abs() < 1);
+        assert!((thread.updated_at - back.updated_at).num_seconds().abs() < 1);
+    }
+
+    // ========================================================================
+    // Message Conversion Tests
+    // ========================================================================
+
+    #[test]
     fn test_message_conversion() {
         let mut msg = AiMessage::user("thread-1", "Hello!");
         msg.content.parts.push(AiMessagePart::ToolCall {
@@ -518,11 +553,242 @@ mod tests {
     }
 
     #[test]
+    fn test_message_conversion_all_roles() {
+        let roles = [
+            (AiMessageRole::User, "user"),
+            (AiMessageRole::Assistant, "assistant"),
+            (AiMessageRole::System, "system"),
+            (AiMessageRole::Tool, "tool"),
+        ];
+
+        for (role, role_str) in roles {
+            let mut msg = AiMessage::user("thread-1", "test");
+            msg.role = role;
+
+            let db = message_to_db(&msg).unwrap();
+            assert_eq!(db.role, role_str);
+
+            let back = db_to_message(&db).unwrap();
+            assert_eq!(back.role, role);
+        }
+    }
+
+    #[test]
+    fn test_message_conversion_with_tool_result() {
+        let mut msg = AiMessage::assistant("thread-1");
+        msg.content.parts = vec![
+            AiMessagePart::Text {
+                content: "Here are your holdings:".to_string(),
+            },
+            AiMessagePart::ToolCall {
+                tool_call_id: "tc-123".to_string(),
+                name: "get_holdings".to_string(),
+                arguments: serde_json::json!({"account_id": "acc-1"}),
+            },
+            AiMessagePart::ToolResult {
+                tool_call_id: "tc-123".to_string(),
+                success: true,
+                data: serde_json::json!({
+                    "holdings": [
+                        {"symbol": "AAPL", "quantity": 10, "value": 1500.0},
+                        {"symbol": "GOOGL", "quantity": 5, "value": 2500.0}
+                    ]
+                }),
+                meta: {
+                    let mut m = HashMap::new();
+                    m.insert("row_count".to_string(), serde_json::json!(2));
+                    m.insert("truncated".to_string(), serde_json::json!(false));
+                    m
+                },
+                error: None,
+            },
+        ];
+
+        let db = message_to_db(&msg).unwrap();
+        let back = db_to_message(&db).unwrap();
+
+        assert_eq!(back.content.parts.len(), 3);
+
+        // Verify tool result preserved
+        if let AiMessagePart::ToolResult {
+            tool_call_id,
+            success,
+            meta,
+            ..
+        } = &back.content.parts[2]
+        {
+            assert_eq!(tool_call_id, "tc-123");
+            assert!(success);
+            assert_eq!(meta.get("row_count"), Some(&serde_json::json!(2)));
+        } else {
+            panic!("Expected ToolResult part");
+        }
+    }
+
+    #[test]
+    fn test_message_conversion_with_error() {
+        let mut msg = AiMessage::assistant("thread-1");
+        msg.content.parts = vec![AiMessagePart::Error {
+            code: "providerError".to_string(),
+            message: "API rate limit exceeded".to_string(),
+        }];
+
+        let db = message_to_db(&msg).unwrap();
+        let back = db_to_message(&db).unwrap();
+
+        if let AiMessagePart::Error { code, message } = &back.content.parts[0] {
+            assert_eq!(code, "providerError");
+            assert_eq!(message, "API rate limit exceeded");
+        } else {
+            panic!("Expected Error part");
+        }
+    }
+
+    #[test]
+    fn test_message_conversion_with_reasoning() {
+        let mut msg = AiMessage::assistant("thread-1");
+        msg.content.parts = vec![
+            AiMessagePart::Reasoning {
+                content: "Let me think about this...".to_string(),
+            },
+            AiMessagePart::Text {
+                content: "Based on my analysis...".to_string(),
+            },
+        ];
+
+        let db = message_to_db(&msg).unwrap();
+        let back = db_to_message(&db).unwrap();
+
+        assert_eq!(back.content.parts.len(), 2);
+
+        if let AiMessagePart::Reasoning { content } = &back.content.parts[0] {
+            assert_eq!(content, "Let me think about this...");
+        } else {
+            panic!("Expected Reasoning part");
+        }
+    }
+
+    // ========================================================================
+    // Content JSON Round-trip Tests
+    // ========================================================================
+
+    #[test]
     fn test_content_json_roundtrip() {
         let content = AiMessageContent::text("Test message");
         let json = convert_content_to_json(&content).unwrap();
         let back = convert_json_to_content(&json).unwrap();
 
         assert_eq!(content.get_text_content(), back.get_text_content());
+    }
+
+    #[test]
+    fn test_content_json_roundtrip_complex() {
+        let content = AiMessageContent::new(vec![
+            AiMessagePart::System {
+                content: "System prompt here".to_string(),
+            },
+            AiMessagePart::Text {
+                content: "User question".to_string(),
+            },
+            AiMessagePart::ToolCall {
+                tool_call_id: "tc-1".to_string(),
+                name: "get_accounts".to_string(),
+                arguments: serde_json::json!({}),
+            },
+            AiMessagePart::ToolResult {
+                tool_call_id: "tc-1".to_string(),
+                success: true,
+                data: serde_json::json!({"accounts": []}),
+                meta: HashMap::new(),
+                error: None,
+            },
+            AiMessagePart::Text {
+                content: "Response text".to_string(),
+            },
+        ]);
+
+        let json = convert_content_to_json(&content).unwrap();
+        let back = convert_json_to_content(&json).unwrap();
+
+        assert_eq!(content.parts.len(), back.parts.len());
+        assert_eq!(content.schema_version, back.schema_version);
+    }
+
+    #[test]
+    fn test_content_json_preserves_schema_version() {
+        let content = AiMessageContent {
+            schema_version: 1,
+            parts: vec![AiMessagePart::Text {
+                content: "test".to_string(),
+            }],
+            truncated: false,
+        };
+
+        let json = convert_content_to_json(&content).unwrap();
+        let back = convert_json_to_content(&json).unwrap();
+
+        assert_eq!(back.schema_version, 1);
+    }
+
+    #[test]
+    fn test_content_json_preserves_truncated_flag() {
+        let mut content = AiMessageContent::text("test");
+        content.truncated = true;
+
+        let json = convert_content_to_json(&content).unwrap();
+        let back = convert_json_to_content(&json).unwrap();
+
+        assert!(back.truncated);
+    }
+
+    // ========================================================================
+    // Thread Config Round-trip Tests
+    // ========================================================================
+
+    #[test]
+    fn test_thread_config_roundtrip_with_all_fields() {
+        let config = AiThreadConfig {
+            schema_version: 1,
+            provider_id: "anthropic".to_string(),
+            model_id: "claude-3-sonnet".to_string(),
+            prompt_template_id: "wealthfolio-assistant-v1".to_string(),
+            prompt_version: "2.0.0".to_string(),
+            locale: Some("en-US".to_string()),
+            detail_level: Some("detailed".to_string()),
+            tools_allowlist: Some(vec![
+                "get_holdings".to_string(),
+                "get_accounts".to_string(),
+            ]),
+        };
+
+        let thread = AiThread::with_config(config.clone());
+        let db = thread_to_db(&thread);
+        let back = db_to_thread(&db);
+
+        let back_config = back.config.expect("Config should be present");
+        assert_eq!(back_config.provider_id, "anthropic");
+        assert_eq!(back_config.model_id, "claude-3-sonnet");
+        assert_eq!(back_config.locale, Some("en-US".to_string()));
+        assert_eq!(back_config.detail_level, Some("detailed".to_string()));
+        assert_eq!(
+            back_config.tools_allowlist,
+            Some(vec![
+                "get_holdings".to_string(),
+                "get_accounts".to_string()
+            ])
+        );
+    }
+
+    #[test]
+    fn test_thread_config_roundtrip_minimal() {
+        let config = AiThreadConfig::new("openai", "gpt-4", "template", "1.0.0");
+        let thread = AiThread::with_config(config);
+        let db = thread_to_db(&thread);
+        let back = db_to_thread(&db);
+
+        let back_config = back.config.expect("Config should be present");
+        assert!(back_config.locale.is_none());
+        assert!(back_config.detail_level.is_none());
+        assert!(back_config.tools_allowlist.is_none());
     }
 }
