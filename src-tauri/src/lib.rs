@@ -206,13 +206,11 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             // Account commands
             commands::account::get_accounts,
-            commands::account::get_active_accounts,
             commands::account::create_account,
             commands::account::update_account,
             commands::account::delete_account,
             // Activity commands
             commands::activity::search_activities,
-            commands::activity::get_activities,
             commands::activity::create_activity,
             commands::activity::update_activity,
             commands::activity::save_activities,

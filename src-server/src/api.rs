@@ -19,6 +19,7 @@ use utoipa::OpenApi;
 mod accounts;
 mod activities;
 mod addons;
+mod alternative_assets;
 mod assets;
 mod connect;
 mod device_sync;
@@ -27,11 +28,13 @@ mod goals;
 mod holdings;
 mod limits;
 mod market_data;
+mod net_worth;
 mod performance;
 mod portfolio;
 mod secrets;
 mod settings;
 pub mod shared;
+mod taxonomies;
 
 #[utoipa::path(get, path = "/api/v1/healthz", responses((status = 200, description = "Health")))]
 pub async fn healthz() -> &'static str {
@@ -83,7 +86,10 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
         .merge(limits::router())
         .merge(addons::router())
         .merge(device_sync::router())
-        .merge(connect::router());
+        .merge(connect::router())
+        .merge(taxonomies::router())
+        .merge(net_worth::router())
+        .merge(alternative_assets::router());
 
     let protected_api = if requires_auth {
         protected_api.layer(middleware::from_fn_with_state(

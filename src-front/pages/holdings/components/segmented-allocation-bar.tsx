@@ -17,7 +17,8 @@ interface SegmentedAllocationBarProps {
   allocation?: TaxonomyAllocation;
   baseCurrency?: string;
   isLoading?: boolean;
-  onSegmentClick?: (categoryName: string) => void;
+  onSegmentClick?: (categoryId: string, categoryName: string) => void;
+  compact?: boolean;
 }
 
 export function SegmentedAllocationBar({
@@ -26,6 +27,7 @@ export function SegmentedAllocationBar({
   baseCurrency = "USD",
   isLoading,
   onSegmentClick,
+  compact = false,
 }: SegmentedAllocationBarProps) {
   const categories = useMemo(() => {
     if (!allocation?.categories?.length) return [];
@@ -38,18 +40,39 @@ export function SegmentedAllocationBar({
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader className="pb-2">
-          <Skeleton className="h-5 w-[140px]" />
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-8 w-full" />
-        </CardContent>
+      <Card className={compact ? "p-3 sm:p-3.5" : undefined}>
+        {compact ? (
+          <div className="flex items-center justify-between gap-3">
+            <Skeleton className="h-4 w-[100px]" />
+            <Skeleton className="h-6 w-full max-w-[300px]" />
+          </div>
+        ) : (
+          <>
+            <CardHeader className="pb-2">
+              <Skeleton className="h-5 w-[140px]" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-8 w-full" />
+            </CardContent>
+          </>
+        )}
       </Card>
     );
   }
 
   if (categories.length === 0) {
+    if (compact) {
+      return (
+        <Card className="p-3 sm:p-3.5">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+              {displayTitle}
+            </p>
+            <span className="text-muted-foreground text-xs">No data</span>
+          </div>
+        </Card>
+      );
+    }
     return (
       <Card>
         <CardHeader className="pb-2">
@@ -69,6 +92,77 @@ export function SegmentedAllocationBar({
     );
   }
 
+  // Compact mode - title on top, bar with labels inside segments
+  if (compact) {
+    return (
+      <Card className="p-3 sm:p-3.5">
+        <TooltipProvider>
+          <div className="space-y-2">
+            {/* Title */}
+            <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+              {displayTitle}
+            </p>
+
+            {/* Segmented bar with labels inside */}
+            <div className="flex h-6 w-full items-center gap-1">
+              {categories.map((category, index) => {
+                const percent = total > 0 ? category.value / total : 0;
+                const widthPercent = percent * 100;
+
+                if (widthPercent < 1) return null;
+
+                return (
+                  <Tooltip key={category.categoryId} delayDuration={100}>
+                    <TooltipTrigger asChild>
+                      <div
+                        className="flex h-full cursor-pointer items-center justify-center gap-1 overflow-hidden rounded-md px-1 transition-opacity hover:opacity-80"
+                        style={{
+                          width: `${widthPercent}%`,
+                          backgroundColor: category.color || `var(--chart-${(index % 5) + 1})`,
+                        }}
+                        onClick={() => onSegmentClick?.(category.categoryId, category.categoryName)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            onSegmentClick?.(category.categoryId, category.categoryName);
+                          }
+                        }}
+                      >
+                        {widthPercent > 8 && (
+                          <span className="text-background truncate text-[10px] font-medium">
+                            {category.categoryName}
+                          </span>
+                        )}
+                        {widthPercent > 15 && (
+                          <span className="text-background/80 text-[10px]">
+                            {formatPercent(percent)}
+                          </span>
+                        )}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" align="center">
+                      <div className="text-center">
+                        <span className="text-muted-foreground text-[0.70rem] uppercase">
+                          {category.categoryName}
+                        </span>
+                        <div className="font-medium">{formatPercent(percent)}</div>
+                        <div className="text-muted-foreground text-xs">
+                          <PrivacyAmount value={category.value} currency={baseCurrency} />
+                        </div>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          </div>
+        </TooltipProvider>
+      </Card>
+    );
+  }
+
+  // Default full-size mode with rounded segments and gaps
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -78,8 +172,8 @@ export function SegmentedAllocationBar({
       </CardHeader>
       <CardContent>
         <TooltipProvider>
-          {/* Segmented bar */}
-          <div className="flex h-8 w-full overflow-hidden rounded-md">
+          {/* Segmented bar with rounded segments and gaps */}
+          <div className="flex h-8 w-full items-center gap-1">
             {categories.map((category, index) => {
               const percent = total > 0 ? category.value / total : 0;
               const widthPercent = percent * 100;
@@ -91,17 +185,17 @@ export function SegmentedAllocationBar({
                 <Tooltip key={category.categoryId} delayDuration={100}>
                   <TooltipTrigger asChild>
                     <div
-                      className="flex h-full cursor-pointer items-center justify-center transition-opacity hover:opacity-80"
+                      className="flex h-full cursor-pointer items-center justify-center rounded-md transition-opacity hover:opacity-80"
                       style={{
                         width: `${widthPercent}%`,
                         backgroundColor: category.color || `var(--chart-${(index % 5) + 1})`,
                       }}
-                      onClick={() => onSegmentClick?.(category.categoryName)}
+                      onClick={() => onSegmentClick?.(category.categoryId, category.categoryName)}
                       role="button"
                       tabIndex={0}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
-                          onSegmentClick?.(category.categoryName);
+                          onSegmentClick?.(category.categoryId, category.categoryName);
                         }
                       }}
                     >
@@ -135,12 +229,12 @@ export function SegmentedAllocationBar({
               <div
                 key={category.categoryId}
                 className="flex cursor-pointer items-center gap-1.5 text-xs"
-                onClick={() => onSegmentClick?.(category.categoryName)}
+                onClick={() => onSegmentClick?.(category.categoryId, category.categoryName)}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
-                    onSegmentClick?.(category.categoryName);
+                    onSegmentClick?.(category.categoryId, category.categoryName);
                   }
                 }}
               >

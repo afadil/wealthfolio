@@ -16,7 +16,7 @@ interface SectorsChartProps {
   allocation?: TaxonomyAllocation;
   baseCurrency?: string;
   isLoading?: boolean;
-  onSectorSectionClick?: (sectorName: string) => void;
+  onSectorSectionClick?: (sectorId: string, sectorName: string) => void;
 }
 
 export function SectorsChart({
@@ -69,12 +69,12 @@ export function SectorsChart({
                     <TooltipTrigger asChild>
                       <div
                         className="hover:bg-muted flex cursor-pointer items-center gap-0 rounded-md py-1"
-                        onClick={() => onSectorSectionClick?.(sector.categoryName)}
+                        onClick={() => onSectorSectionClick?.(sector.categoryId, sector.categoryName)}
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
-                            onSectorSectionClick?.(sector.categoryName);
+                            onSectorSectionClick?.(sector.categoryId, sector.categoryName);
                           }
                         }}
                       >

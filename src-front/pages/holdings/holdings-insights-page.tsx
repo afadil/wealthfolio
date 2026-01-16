@@ -67,6 +67,7 @@ export const HoldingsInsightsPage = () => {
   const [sheetTitle, setSheetTitle] = useState("");
   const [sheetFilterType, setSheetFilterType] = useState<SheetFilterType | null>(null);
   const [sheetFilterName, setSheetFilterName] = useState<string | null>(null);
+  const [sheetFilterId, setSheetFilterId] = useState<string | null>(null);
   const [sheetCompositionFilter, setSheetCompositionFilter] = useState<Instrument["id"] | null>(
     null,
   );
@@ -75,11 +76,13 @@ export const HoldingsInsightsPage = () => {
     type: SheetFilterType,
     name: string,
     title?: string,
+    categoryId?: string,
     compositionId?: Instrument["id"],
     _accountIdsForFilter?: string[],
   ) => {
     setSheetFilterType(type);
     setSheetFilterName(name);
+    setSheetFilterId(categoryId ?? null);
     setSheetTitle(title ?? `Details for ${name}`);
     if (type === "composition" && compositionId) {
       setSheetCompositionFilter(compositionId);
@@ -103,28 +106,30 @@ export const HoldingsInsightsPage = () => {
           if (isCash) {
             return sheetFilterName === "Cash";
           }
-          // Use taxonomy assetClasses classification
+          // Use taxonomy assetClasses classification - filter by top-level category ID
           const assetClasses = h.instrument?.classifications?.assetClasses;
           if (assetClasses && assetClasses.length > 0) {
-            return assetClasses.some((c) => c.category.name === sheetFilterName);
+            return assetClasses.some((c) => c.topLevelCategory.id === sheetFilterId);
           }
           return sheetFilterName === "Unknown";
         });
         break;
       case "sector":
         filteredHoldings = holdings.filter((h) => {
+          // Filter by top-level category ID to match rolled-up allocation view
           const taxonomySectors = h.instrument?.classifications?.sectors;
           if (taxonomySectors && taxonomySectors.length > 0) {
-            return taxonomySectors.some((s) => s.category.name === sheetFilterName);
+            return taxonomySectors.some((s) => s.topLevelCategory.id === sheetFilterId);
           }
           return sheetFilterName === "Unknown";
         });
         break;
       case "country":
         filteredHoldings = holdings.filter((h) => {
+          // Filter by top-level category ID
           const taxonomyRegions = h.instrument?.classifications?.regions;
           if (taxonomyRegions && taxonomyRegions.length > 0) {
-            return taxonomyRegions.some((r) => r.category.name === sheetFilterName);
+            return taxonomyRegions.some((r) => r.topLevelCategory.id === sheetFilterId);
           }
           return sheetFilterName === "Unknown";
         });
@@ -145,16 +150,17 @@ export const HoldingsInsightsPage = () => {
         filteredHoldings = holdings.filter((h) => {
           const riskCategory = h.instrument?.classifications?.riskCategory;
           if (riskCategory) {
-            return riskCategory.name === sheetFilterName;
+            return riskCategory.id === sheetFilterId;
           }
           return sheetFilterName === "Unknown";
         });
         break;
       case "custom":
         filteredHoldings = holdings.filter((h) => {
+          // Filter by top-level category ID
           const customGroups = h.instrument?.classifications?.customGroups;
           if (customGroups && customGroups.length > 0) {
-            return customGroups.some((c) => c.category.name === sheetFilterName);
+            return customGroups.some((c) => c.topLevelCategory.id === sheetFilterId);
           }
           return sheetFilterName === "Unknown";
         });
@@ -168,7 +174,7 @@ export const HoldingsInsightsPage = () => {
       const aBase = a.marketValue?.base ?? 0;
       return Number(bBase) - Number(aBase);
     });
-  }, [holdings, sheetFilterType, sheetFilterName, sheetCompositionFilter]);
+  }, [holdings, sheetFilterType, sheetFilterName, sheetFilterId, sheetCompositionFilter]);
 
   const handleAccountSelect = (account: Account) => {
     setSelectedAccount(account);
@@ -197,7 +203,6 @@ export const HoldingsInsightsPage = () => {
     allocations?.customGroups && allocations.customGroups.some((g) => g.categories.length > 0);
   const hasRiskAllocations =
     allocations?.riskCategory && allocations.riskCategory.categories.length > 0;
-  const showTaxonomyRow = hasRiskAllocations || hasCustomAllocations;
 
   const renderEmptyState = () => (
     <div className="flex items-center justify-center py-16">
@@ -227,10 +232,24 @@ export const HoldingsInsightsPage = () => {
 
     return (
       <div className="space-y-4">
-        {/* Cash Holdings Widget */}
-        <CashHoldingsWidget cashHoldings={cashHoldings ?? []} isLoading={isLoading} />
+        {/* First row: Cash Balance and Risk Profile */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <CashHoldingsWidget cashHoldings={cashHoldings ?? []} isLoading={isLoading} />
+          {hasRiskAllocations && (
+            <SegmentedAllocationBar
+              title="Risk Profile"
+              allocation={allocations?.riskCategory}
+              baseCurrency={baseCurrency}
+              isLoading={isLoading}
+              compact={true}
+              onSegmentClick={(categoryId, categoryName) =>
+                handleChartSectionClick("risk", categoryName, `Risk Category: ${categoryName}`, categoryId)
+              }
+            />
+          )}
+        </div>
 
-        {/* Top row: Summary widgets */}
+        {/* Second row: Summary widgets */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <HoldingCurrencyChart
             holdings={[...cashHoldings, ...nonCashHoldings]}
@@ -247,8 +266,8 @@ export const HoldingsInsightsPage = () => {
             allocation={allocations?.assetClasses}
             baseCurrency={baseCurrency}
             isLoading={isLoading}
-            onClassSectionClick={(className) =>
-              handleChartSectionClick("class", className, `Asset Class: ${className}`)
+            onClassSectionClick={(categoryId, categoryName) =>
+              handleChartSectionClick("class", categoryName, `Asset Class: ${categoryName}`, categoryId)
             }
           />
 
@@ -256,8 +275,8 @@ export const HoldingsInsightsPage = () => {
             allocation={allocations?.regions}
             baseCurrency={baseCurrency}
             isLoading={isLoading}
-            onCountrySectionClick={(countryName) =>
-              handleChartSectionClick("country", countryName, `Holdings in ${countryName}`)
+            onCountrySectionClick={(categoryId, categoryName) =>
+              handleChartSectionClick("country", categoryName, `Holdings in ${categoryName}`, categoryId)
             }
           />
         </div>
@@ -274,27 +293,16 @@ export const HoldingsInsightsPage = () => {
               allocation={allocations?.sectors}
               baseCurrency={baseCurrency}
               isLoading={isLoading}
-              onSectorSectionClick={(sectorName) =>
-                handleChartSectionClick("sector", sectorName, `Holdings in Sector: ${sectorName}`)
+              onSectorSectionClick={(categoryId, categoryName) =>
+                handleChartSectionClick("sector", categoryName, `Holdings in Sector: ${categoryName}`, categoryId)
               }
             />
           </div>
         </div>
 
-        {/* Third row: Risk & Custom Taxonomies */}
-        {showTaxonomyRow && (
+        {/* Fourth row: Custom Taxonomies */}
+        {hasCustomAllocations && (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {hasRiskAllocations && (
-              <SegmentedAllocationBar
-                title="Risk Profile"
-                allocation={allocations?.riskCategory}
-                baseCurrency={baseCurrency}
-                isLoading={isLoading}
-                onSegmentClick={(categoryName) =>
-                  handleChartSectionClick("risk", categoryName, `Risk Category: ${categoryName}`)
-                }
-              />
-            )}
             {allocations?.customGroups?.map(
               (taxonomy) =>
                 taxonomy.categories.length > 0 && (
@@ -304,11 +312,12 @@ export const HoldingsInsightsPage = () => {
                     allocation={taxonomy}
                     baseCurrency={baseCurrency}
                     isLoading={isLoading}
-                    onSegmentClick={(categoryName) =>
+                    onSegmentClick={(categoryId, categoryName) =>
                       handleChartSectionClick(
                         "custom",
                         categoryName,
                         `${taxonomy.taxonomyName}: ${categoryName}`,
+                        categoryId,
                       )
                     }
                   />
@@ -362,22 +371,34 @@ export const HoldingsInsightsPage = () => {
                 {holdingsForSheet.map((holding) => {
                   let displayName = "N/A";
                   let symbol = "-";
+                  let assetId: string | null = null;
                   if (holding.holdingType === HoldingType.CASH) {
                     displayName = holding.localCurrency
                       ? `Cash (${holding.localCurrency})`
                       : "Cash";
                     symbol = `$CASH-${holding.localCurrency}`;
+                    assetId = symbol;
                   } else if (holding.instrument) {
                     displayName =
                       holding.instrument.name ?? holding.instrument.symbol ?? "Unnamed Security";
                     symbol = holding.instrument.symbol ?? "-";
+                    assetId = holding.instrument.id;
                   }
+
+                  const handleSymbolClick = () => {
+                    if (!assetId) return;
+                    setIsSheetOpen(false);
+                    navigate(`/holdings/${encodeURIComponent(assetId)}`);
+                  };
 
                   return (
                     <Card key={holding.id} className="flex items-center justify-between text-sm">
                       <CardHeader className="flex w-full flex-row items-center justify-between space-x-2 p-4">
                         <div className="flex items-center space-x-2">
-                          <Badge className="flex min-w-[50px] cursor-pointer items-center justify-center rounded-sm">
+                          <Badge
+                            className="flex min-w-[50px] cursor-pointer items-center justify-center rounded-sm hover:bg-primary/80"
+                            onClick={handleSymbolClick}
+                          >
                             {symbol}
                           </Badge>
                           <CardTitle className="line-clamp-1 text-sm font-normal">

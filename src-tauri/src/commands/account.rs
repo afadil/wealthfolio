@@ -20,17 +20,6 @@ pub async fn get_accounts(state: State<'_, Arc<ServiceContext>>) -> Result<Vec<A
 }
 
 #[tauri::command]
-pub async fn get_active_accounts(
-    state: State<'_, Arc<ServiceContext>>,
-) -> Result<Vec<Account>, String> {
-    debug!("Fetching active accounts...");
-    state
-        .account_service()
-        .get_active_accounts()
-        .map_err(|e| format!("Failed to load accounts: {}", e))
-}
-
-#[tauri::command]
 pub async fn create_account(
     account: NewAccount,
     state: State<'_, Arc<ServiceContext>>,

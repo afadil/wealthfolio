@@ -8,7 +8,9 @@ use wealthfolio_connect::{BrokerSyncService, BrokerSyncServiceTrait, PlatformRep
 use wealthfolio_core::{
     accounts::AccountService,
     activities::{ActivityService as CoreActivityService, ActivityServiceTrait},
-    assets::{AssetService, AssetServiceTrait},
+    assets::{
+        AlternativeAssetRepositoryTrait, AssetClassificationService, AssetService, AssetServiceTrait,
+    },
     fx::{FxService, FxServiceTrait},
     goals::{GoalService, GoalServiceTrait},
     limits::{ContributionLimitService, ContributionLimitServiceTrait},
@@ -19,6 +21,7 @@ use wealthfolio_core::{
             holdings_valuation_service::HoldingsValuationService, HoldingsService,
             HoldingsServiceTrait,
         },
+        net_worth::{NetWorthService, NetWorthServiceTrait},
         snapshot::{SnapshotService, SnapshotServiceTrait},
         valuation::{ValuationService, ValuationServiceTrait},
     },
@@ -30,7 +33,7 @@ use wealthfolio_core::{
 use wealthfolio_storage_sqlite::{
     accounts::AccountRepository,
     activities::ActivityRepository,
-    assets::AssetRepository,
+    assets::{AlternativeAssetRepository, AssetRepository},
     db::{self, write_actor},
     fx::FxRepository,
     goals::GoalRepository,
@@ -59,6 +62,8 @@ pub struct AppState {
     pub activity_service: Arc<dyn ActivityServiceTrait + Send + Sync>,
     pub asset_service: Arc<dyn AssetServiceTrait + Send + Sync>,
     pub taxonomy_service: Arc<dyn TaxonomyServiceTrait + Send + Sync>,
+    pub net_worth_service: Arc<dyn NetWorthServiceTrait + Send + Sync>,
+    pub alternative_asset_repository: Arc<dyn AlternativeAssetRepositoryTrait + Send + Sync>,
     pub connect_sync_service: Arc<dyn BrokerSyncServiceTrait + Send + Sync>,
     pub addons_root: String,
     pub data_root: String,
@@ -175,14 +180,27 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         fx_service.clone(),
     ));
 
+    let net_worth_service: Arc<dyn NetWorthServiceTrait + Send + Sync> =
+        Arc::new(NetWorthService::new(
+            base_currency.clone(),
+            account_repo.clone(),
+            asset_repository.clone(),
+            snapshot_repository.clone(),
+            quote_service.clone(),
+            valuation_repository.clone(),
+            fx_service.clone(),
+        ));
+
     let holdings_valuation_service = Arc::new(HoldingsValuationService::new(
         fx_service.clone(),
         quote_service.clone(),
     ));
+    let classification_service = Arc::new(AssetClassificationService::new(taxonomy_service.clone()));
     let holdings_service = Arc::new(HoldingsService::new(
         asset_service.clone(),
         snapshot_service.clone(),
         holdings_valuation_service.clone(),
+        classification_service.clone(),
     ));
 
     let allocation_service: Arc<dyn AllocationServiceTrait + Send + Sync> =
@@ -226,6 +244,10 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             fx_service.clone(),
         ));
 
+    // Alternative asset repository for alternative assets operations
+    let alternative_asset_repository: Arc<dyn AlternativeAssetRepositoryTrait + Send + Sync> =
+        Arc::new(AlternativeAssetRepository::new(pool.clone(), writer.clone()));
+
     // Connect sync service for broker data synchronization
     let platform_repository = Arc::new(PlatformRepository::new(pool.clone(), writer.clone()));
     let connect_sync_service: Arc<dyn BrokerSyncServiceTrait + Send + Sync> =
@@ -265,6 +287,8 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         activity_service,
         asset_service,
         taxonomy_service,
+        net_worth_service,
+        alternative_asset_repository,
         connect_sync_service,
         addons_root: config.addons_root.clone(),
         data_root,

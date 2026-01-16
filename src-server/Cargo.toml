@@ -19,6 +19,7 @@ tower-http = { version = "0.6", features = ["cors", "trace", "compression-full",
 tokio = { workspace = true, features = ["full"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
+rust_decimal = { workspace = true }
 
 uuid = { workspace = true }
 anyhow = { workspace = true }

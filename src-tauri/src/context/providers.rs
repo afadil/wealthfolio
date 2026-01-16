@@ -6,7 +6,7 @@ use wealthfolio_connect::{BrokerSyncService, PlatformRepository};
 use wealthfolio_core::{
     accounts::AccountService,
     activities::ActivityService,
-    assets::AssetService,
+    assets::{AssetClassificationService, AssetService},
     fx::{FxService, FxServiceTrait},
     goals::GoalService,
     limits::ContributionLimitService,
@@ -156,10 +156,12 @@ pub async fn initialize_context(
         quote_service.clone(),
     ));
 
+    let classification_service = Arc::new(AssetClassificationService::new(taxonomy_service.clone()));
     let holdings_service = Arc::new(HoldingsService::new(
         asset_service.clone(),
         snapshot_service.clone(),
         holdings_valuation_service.clone(),
+        classification_service.clone(),
     ));
 
     let allocation_service = Arc::new(AllocationService::new(

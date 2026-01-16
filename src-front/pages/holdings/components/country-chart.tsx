@@ -7,7 +7,7 @@ interface CountryChartProps {
   allocation?: TaxonomyAllocation;
   baseCurrency?: string;
   isLoading?: boolean;
-  onCountrySectionClick?: (countryName: string) => void;
+  onCountrySectionClick?: (categoryId: string, categoryName: string) => void;
 }
 
 export const CountryChart = ({
@@ -25,6 +25,7 @@ export const CountryChart = ({
       .filter((cat) => cat.value > 0)
       .slice(0, 10) // Show top 10 regions
       .map((cat) => ({
+        id: cat.categoryId,
         name: cat.categoryName,
         value: cat.value,
         currency: baseCurrency,
@@ -55,8 +56,9 @@ export const CountryChart = ({
     value: number;
     currency: string;
   }) => {
-    if (onCountrySectionClick) {
-      onCountrySectionClick(sectionData.name);
+    const clickedItem = data.find((d) => d.name === sectionData.name);
+    if (clickedItem && onCountrySectionClick) {
+      onCountrySectionClick(clickedItem.id, clickedItem.name);
     }
     const clickedIndex = data.findIndex((d) => d.name === sectionData.name);
     if (clickedIndex !== -1) {

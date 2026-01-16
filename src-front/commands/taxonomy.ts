@@ -1,6 +1,5 @@
 import { invoke, logger } from "@/adapters";
 import type {
-  AssetClassifications,
   AssetTaxonomyAssignment,
   MigrationResult,
   MigrationStatus,
@@ -166,15 +165,6 @@ export const removeAssetTaxonomyAssignment = async (id: string): Promise<number>
 // ============================================================================
 // Classification Commands
 // ============================================================================
-
-export const getAssetClassifications = async (assetId: string): Promise<AssetClassifications> => {
-  try {
-    return await invoke("get_asset_classifications", { assetId });
-  } catch (error) {
-    logger.error(`Error fetching classifications for asset ${assetId}.`);
-    throw error;
-  }
-};
 
 export const getMigrationStatus = async (): Promise<MigrationStatus> => {
   try {

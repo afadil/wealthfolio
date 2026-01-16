@@ -57,14 +57,6 @@ fn should_enrich_asset(asset_id: &str) -> bool {
 }
 
 #[tauri::command]
-pub async fn get_activities(
-    state: State<'_, Arc<ServiceContext>>,
-) -> Result<Vec<Activity>, String> {
-    debug!("Fetching all activities...");
-    Ok(state.activity_service().get_activities()?)
-}
-
-#[tauri::command]
 pub async fn search_activities(
     page: i64,                                 // Page number, 1-based
     page_size: i64,                            // Number of items per page
