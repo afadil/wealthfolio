@@ -15,21 +15,27 @@ import type { MergedProvider } from "../types";
 
 interface ProviderSettingsCardProps {
   provider: MergedProvider;
+  priorityValue: number;
   onToggleEnabled: (enabled: boolean) => void;
   onSetDefault: () => void;
   onSaveApiKey: (apiKey: string) => void;
   onDeleteApiKey: () => void;
   onRevealApiKey: () => Promise<string | null>;
+  onPriorityChange: (value: number) => void;
+  onCustomUrlChange?: (url: string) => void;
   isLast?: boolean;
 }
 
 export function ProviderSettingsCard({
   provider,
+  priorityValue,
   onToggleEnabled,
   onSetDefault,
   onSaveApiKey,
   onDeleteApiKey,
   onRevealApiKey,
+  onPriorityChange,
+  onCustomUrlChange,
   isLast = false,
 }: ProviderSettingsCardProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -37,6 +43,15 @@ export function ProviderSettingsCard({
   const [apiKeyValue, setApiKeyValue] = useState("");
   const [isLoadingKey, setIsLoadingKey] = useState(false);
   const [hasLoadedKey, setHasLoadedKey] = useState(false);
+  const [customUrlValue, setCustomUrlValue] = useState(provider.customUrl ?? "");
+
+  // Check if provider supports custom base URL
+  const supportsCustomUrl = provider.connectionFields?.some(
+    (field) => field.key === "baseUrl" || field.key === "customUrl"
+  );
+  const customUrlField = provider.connectionFields?.find(
+    (field) => field.key === "baseUrl" || field.key === "customUrl"
+  );
 
   const handleRevealApiKey = async () => {
     if (hasLoadedKey) {
@@ -181,35 +196,37 @@ export function ProviderSettingsCard({
                     <Label htmlFor={`apikey-${provider.id}`} className="text-xs font-medium">
                       API Key
                     </Label>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Input
                         id={`apikey-${provider.id}`}
                         type={showApiKey ? "text" : "password"}
                         value={apiKeyValue}
                         onChange={(e) => setApiKeyValue(e.target.value)}
                         placeholder={hasLoadedKey ? "Enter API Key" : "Click eye to reveal"}
-                        className="grow font-mono text-xs"
+                        className="min-w-0 flex-1 font-mono text-xs"
                         disabled={!hasLoadedKey && !showApiKey}
                       />
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={handleRevealApiKey}
-                        disabled={isLoadingKey}
-                        aria-label={showApiKey ? "Hide API key" : "Show API key"}
-                      >
-                        {isLoadingKey ? (
-                          <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
-                        ) : showApiKey ? (
-                          <Icons.EyeOff className="h-3.5 w-3.5" />
-                        ) : (
-                          <Icons.Eye className="h-3.5 w-3.5" />
-                        )}
-                      </Button>
-                      <Button onClick={handleSaveApiKey} size="sm" className="h-8" disabled={!hasLoadedKey}>
-                        Save
-                      </Button>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={handleRevealApiKey}
+                          disabled={isLoadingKey}
+                          aria-label={showApiKey ? "Hide API key" : "Show API key"}
+                        >
+                          {isLoadingKey ? (
+                            <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
+                          ) : showApiKey ? (
+                            <Icons.EyeOff className="h-3.5 w-3.5" />
+                          ) : (
+                            <Icons.Eye className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                        <Button onClick={handleSaveApiKey} size="sm" className="h-8" disabled={!hasLoadedKey}>
+                          Save
+                        </Button>
+                      </div>
                     </div>
                     {provider.documentationUrl && (
                       <a
@@ -224,9 +241,75 @@ export function ProviderSettingsCard({
                     )}
                   </div>
 
+                  {/* Base URL (for providers that support custom endpoints) */}
+                  {supportsCustomUrl && customUrlField && (
+                    <div className="space-y-2">
+                      <Label htmlFor={`baseurl-${provider.id}`} className="text-xs font-medium">
+                        {customUrlField.label}
+                      </Label>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Input
+                          id={`baseurl-${provider.id}`}
+                          type="url"
+                          value={customUrlValue}
+                          onChange={(e) => setCustomUrlValue(e.target.value)}
+                          placeholder={customUrlField.placeholder}
+                          className="min-w-0 flex-1 font-mono text-xs"
+                        />
+                        <Button
+                          onClick={() => onCustomUrlChange?.(customUrlValue)}
+                          size="sm"
+                          className="h-8 shrink-0"
+                        >
+                          Save
+                        </Button>
+                      </div>
+                      {customUrlField.helpUrl && (
+                        <a
+                          href={customUrlField.helpUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary inline-flex items-center gap-1 text-xs hover:underline"
+                        >
+                          Learn more
+                          <Icons.ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Priority */}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Label className="text-xs font-medium">Priority</Label>
+                    <div className="flex items-center">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-7 w-7 rounded-r-none"
+                        onClick={() => onPriorityChange(Math.max(1, priorityValue - 1))}
+                      >
+                        <Icons.MinusCircle className="h-3 w-3" />
+                      </Button>
+                      <div className="bg-muted flex h-7 w-10 items-center justify-center border-y text-xs font-medium">
+                        {priorityValue}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-7 w-7 rounded-l-none"
+                        onClick={() => onPriorityChange(priorityValue + 1)}
+                      >
+                        <Icons.PlusCircle className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <span className="text-muted-foreground text-[10px]">
+                      Lower = higher priority
+                    </span>
+                  </div>
+
                   {/* Set as Default */}
-                  <div className="flex items-center justify-between">
-                    <div>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
                       <Label className="text-xs font-medium">Default Provider</Label>
                       <p className="text-muted-foreground text-xs">
                         Use this provider for new conversations
@@ -237,6 +320,7 @@ export function ProviderSettingsCard({
                       size="sm"
                       onClick={onSetDefault}
                       disabled={provider.isDefault || !provider.enabled}
+                      className="shrink-0"
                     >
                       {provider.isDefault ? "Default" : "Set Default"}
                     </Button>
