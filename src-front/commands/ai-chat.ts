@@ -60,3 +60,43 @@ export const deleteAiThread = async (threadId: string): Promise<void> => {
     throw error;
   }
 };
+
+// ============================================================================
+// Tag Management Commands
+// ============================================================================
+
+/**
+ * Add a tag to a thread.
+ */
+export const addAiThreadTag = async (threadId: string, tag: string): Promise<void> => {
+  try {
+    await invoke("add_ai_thread_tag", { threadId, tag });
+  } catch (error) {
+    logger.error("Error adding tag to AI thread.");
+    throw error;
+  }
+};
+
+/**
+ * Remove a tag from a thread.
+ */
+export const removeAiThreadTag = async (threadId: string, tag: string): Promise<void> => {
+  try {
+    await invoke("remove_ai_thread_tag", { threadId, tag });
+  } catch (error) {
+    logger.error("Error removing tag from AI thread.");
+    throw error;
+  }
+};
+
+/**
+ * Get all tags for a thread.
+ */
+export const getAiThreadTags = async (threadId: string): Promise<string[]> => {
+  try {
+    return await invoke("get_ai_thread_tags", { threadId });
+  } catch (error) {
+    logger.error("Error getting AI thread tags.");
+    throw error;
+  }
+};

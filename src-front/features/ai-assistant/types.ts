@@ -47,6 +47,8 @@ export interface ChatThread {
   title: string;
   /** Whether this thread is pinned to the top of the list */
   isPinned: boolean;
+  /** Tags for organizing and filtering threads */
+  tags: string[];
   /** Per-thread agent configuration snapshot */
   config?: AiThreadConfig;
   createdAt: string;

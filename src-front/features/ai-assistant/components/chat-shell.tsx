@@ -16,6 +16,8 @@ import {
   useRenameThread,
   useDeleteThread,
   useToggleThreadPin,
+  useAddThreadTag,
+  useRemoveThreadTag,
 } from "../hooks/use-threads";
 import type { ChatMessage } from "../types";
 
@@ -39,6 +41,8 @@ export function ChatShell({ className }: ChatShellProps) {
   const renameThread = useRenameThread();
   const deleteThread = useDeleteThread();
   const togglePin = useToggleThreadPin();
+  const addTag = useAddThreadTag();
+  const removeTag = useRemoveThreadTag();
 
   // Auto-select first thread if none selected and threads exist
   useEffect(() => {
@@ -94,6 +98,20 @@ export function ChatShell({ className }: ChatShellProps) {
     [togglePin],
   );
 
+  const handleAddTag = useCallback(
+    (threadId: string, tag: string) => {
+      addTag.mutate({ threadId, tag });
+    },
+    [addTag],
+  );
+
+  const handleRemoveTag = useCallback(
+    (threadId: string, tag: string) => {
+      removeTag.mutate({ threadId, tag });
+    },
+    [removeTag],
+  );
+
   const handleSendMessage = useCallback(
     (content: string) => {
       // Add user message (placeholder - will be persisted in future)
@@ -135,6 +153,8 @@ export function ChatShell({ className }: ChatShellProps) {
       onRenameThread={handleRenameThread}
       onDeleteThread={handleDeleteThread}
       onTogglePin={handleTogglePin}
+      onAddTag={handleAddTag}
+      onRemoveTag={handleRemoveTag}
       className="h-full w-full border-r-0 lg:border-r"
     />
   );

@@ -1,7 +1,9 @@
-import { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { InputTags } from "@wealthfolio/ui/components/ui/tag-input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,10 +23,12 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@wealthfolio/ui/components/ui/dialog";
+import { Label } from "@wealthfolio/ui/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { ChatThread } from "../types";
 
@@ -37,6 +41,8 @@ interface ThreadSidebarProps {
   onRenameThread: (threadId: string, newTitle: string) => void;
   onDeleteThread: (threadId: string) => void;
   onTogglePin: (threadId: string, isPinned: boolean) => void;
+  onAddTag: (threadId: string, tag: string) => void;
+  onRemoveTag: (threadId: string, tag: string) => void;
   className?: string;
 }
 
@@ -49,22 +55,45 @@ export function ThreadSidebar({
   onRenameThread,
   onDeleteThread,
   onTogglePin,
+  onAddTag,
+  onRemoveTag,
   className,
 }: ThreadSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterTag, setFilterTag] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [tagsDialogOpen, setTagsDialogOpen] = useState(false);
   const [selectedThread, setSelectedThread] = useState<ChatThread | null>(null);
   const [newTitle, setNewTitle] = useState("");
+  const [editingTags, setEditingTags] = useState<string[]>([]);
 
-  // Filter threads by search query
+  // Get all unique tags across all threads
+  const allTags = useMemo(() => {
+    const tags = new Set<string>();
+    threads.forEach((thread) => thread.tags?.forEach((tag) => tags.add(tag)));
+    return Array.from(tags).sort();
+  }, [threads]);
+
+  // Filter threads by search query and tag filter
   const filteredThreads = useMemo(() => {
-    if (!searchQuery.trim()) return threads;
-    const query = searchQuery.toLowerCase();
-    return threads.filter((thread) =>
-      (thread.title || "New conversation").toLowerCase().includes(query),
-    );
-  }, [threads, searchQuery]);
+    let result = threads;
+
+    // Filter by tag if selected
+    if (filterTag) {
+      result = result.filter((thread) => thread.tags?.includes(filterTag));
+    }
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter((thread) =>
+        (thread.title || "New conversation").toLowerCase().includes(query),
+      );
+    }
+
+    return result;
+  }, [threads, searchQuery, filterTag]);
 
   // Separate pinned and unpinned threads
   const { pinnedThreads, unpinnedThreads } = useMemo(() => {
@@ -84,6 +113,12 @@ export function ThreadSidebar({
     setDeleteDialogOpen(true);
   }, []);
 
+  const handleOpenTagsDialog = useCallback((thread: ChatThread) => {
+    setSelectedThread(thread);
+    setEditingTags(thread.tags || []);
+    setTagsDialogOpen(true);
+  }, []);
+
   const handleConfirmRename = useCallback(() => {
     if (selectedThread && newTitle.trim()) {
       onRenameThread(selectedThread.id, newTitle.trim());
@@ -101,6 +136,37 @@ export function ThreadSidebar({
     setSelectedThread(null);
   }, [selectedThread, onDeleteThread]);
 
+  const handleTagsChange: React.Dispatch<React.SetStateAction<string[]>> = useCallback(
+    (action) => {
+      if (!selectedThread) return;
+
+      // Resolve the new tags value
+      setEditingTags((prevTags) => {
+        const newTags = typeof action === "function" ? action(prevTags) : action;
+
+        const currentTags = selectedThread.tags || [];
+        const tagsToAdd = newTags.filter((t) => !currentTags.includes(t));
+        const tagsToRemove = currentTags.filter((t) => !newTags.includes(t));
+
+        tagsToAdd.forEach((tag) => onAddTag(selectedThread.id, tag));
+        tagsToRemove.forEach((tag) => onRemoveTag(selectedThread.id, tag));
+
+        return newTags;
+      });
+    },
+    [selectedThread, onAddTag, onRemoveTag],
+  );
+
+  const handleCloseTagsDialog = useCallback(() => {
+    setTagsDialogOpen(false);
+    setSelectedThread(null);
+    setEditingTags([]);
+  }, []);
+
+  const handleTagFilterClick = useCallback((tag: string) => {
+    setFilterTag((prev) => (prev === tag ? null : tag));
+  }, []);
+
   const renderThread = (thread: ChatThread) => (
     <div
       key={thread.id}
@@ -112,15 +178,33 @@ export function ThreadSidebar({
     >
       <button
         onClick={() => onSelectThread(thread.id)}
-        className="flex min-w-0 flex-1 flex-col text-left"
+        className="flex min-w-0 flex-1 flex-col gap-0.5 text-left"
       >
         <div className="flex items-center gap-1.5">
           {thread.isPinned && <Icons.Pin className="text-muted-foreground h-3 w-3 shrink-0" />}
           <span className="truncate font-medium">{thread.title || "New conversation"}</span>
         </div>
-        <span className="text-muted-foreground text-xs">
-          {new Date(thread.updatedAt).toLocaleDateString()}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-muted-foreground text-xs">
+            {new Date(thread.updatedAt).toLocaleDateString()}
+          </span>
+          {thread.tags && thread.tags.length > 0 && (
+            <div className="flex flex-wrap gap-0.5">
+              {thread.tags.slice(0, 2).map((tag) => (
+                <Badge
+                  key={tag}
+                  variant="outline"
+                  className="h-4 px-1 py-0 text-[10px] leading-none"
+                >
+                  {tag}
+                </Badge>
+              ))}
+              {thread.tags.length > 2 && (
+                <span className="text-muted-foreground text-[10px]">+{thread.tags.length - 2}</span>
+              )}
+            </div>
+          )}
+        </div>
       </button>
 
       <DropdownMenu>
@@ -138,6 +222,10 @@ export function ThreadSidebar({
           <DropdownMenuItem onClick={() => handleOpenRenameDialog(thread)}>
             <Icons.Pencil className="mr-2 h-4 w-4" />
             Rename
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleOpenTagsDialog(thread)}>
+            <Icons.Tag className="mr-2 h-4 w-4" />
+            Edit tags
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => onTogglePin(thread.id, !thread.isPinned)}>
             {thread.isPinned ? (
@@ -190,6 +278,23 @@ export function ThreadSidebar({
         </div>
       </div>
 
+      {/* Tag Filter */}
+      {allTags.length > 0 && (
+        <div className="scrollbar-thin flex gap-1 overflow-x-auto border-b p-2">
+          {allTags.map((tag) => (
+            <Badge
+              key={tag}
+              variant={filterTag === tag ? "default" : "outline"}
+              className="shrink-0 cursor-pointer text-xs"
+              onClick={() => handleTagFilterClick(tag)}
+            >
+              {tag}
+              {filterTag === tag && <Icons.X className="ml-1 h-3 w-3" />}
+            </Badge>
+          ))}
+        </div>
+      )}
+
       {/* Thread List */}
       <div className="flex-1 overflow-y-auto p-2">
         {isLoading ? (
@@ -208,7 +313,9 @@ export function ThreadSidebar({
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <Icons.Search className="text-muted-foreground mb-2 h-6 w-6" />
             <p className="text-muted-foreground text-sm">No matches found</p>
-            <p className="text-muted-foreground mt-1 text-xs">Try a different search term</p>
+            <p className="text-muted-foreground mt-1 text-xs">
+              {filterTag ? "Try clearing the tag filter" : "Try a different search term"}
+            </p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -259,6 +366,31 @@ export function ThreadSidebar({
             <Button onClick={handleConfirmRename} disabled={!newTitle.trim()}>
               Save
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Tags Dialog */}
+      <Dialog open={tagsDialogOpen} onOpenChange={(open) => !open && handleCloseTagsDialog()}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit tags</DialogTitle>
+            <DialogDescription>Add or remove tags to organize this conversation.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="tags">Tags</Label>
+            <InputTags
+              id="tags"
+              value={editingTags}
+              onChange={handleTagsChange}
+              placeholder="Type a tag and press Enter..."
+            />
+            <p className="text-muted-foreground text-xs">
+              Press Enter or comma to add a tag. Backspace to remove the last tag.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleCloseTagsDialog}>Done</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

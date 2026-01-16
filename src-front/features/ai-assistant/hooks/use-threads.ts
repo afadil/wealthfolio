@@ -4,6 +4,8 @@ import {
   getAiThread,
   updateAiThread,
   deleteAiThread,
+  addAiThreadTag,
+  removeAiThreadTag,
   type UpdateThreadRequest,
 } from "@/commands/ai-chat";
 import { QueryKeys } from "@/lib/query-keys";
@@ -90,6 +92,42 @@ export function useDeleteThread() {
     onSuccess: (_, threadId) => {
       queryClient.invalidateQueries({ queryKey: AI_THREADS_KEY });
       queryClient.removeQueries({ queryKey: QueryKeys.aiThread(threadId) });
+    },
+  });
+}
+
+// ============================================================================
+// Tag Management Hooks
+// ============================================================================
+
+/**
+ * Hook to add a tag to a thread.
+ */
+export function useAddThreadTag() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ threadId, tag }: { threadId: string; tag: string }) =>
+      addAiThreadTag(threadId, tag),
+    onSuccess: (_, { threadId }) => {
+      queryClient.invalidateQueries({ queryKey: AI_THREADS_KEY });
+      queryClient.invalidateQueries({ queryKey: QueryKeys.aiThread(threadId) });
+    },
+  });
+}
+
+/**
+ * Hook to remove a tag from a thread.
+ */
+export function useRemoveThreadTag() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ threadId, tag }: { threadId: string; tag: string }) =>
+      removeAiThreadTag(threadId, tag),
+    onSuccess: (_, { threadId }) => {
+      queryClient.invalidateQueries({ queryKey: AI_THREADS_KEY });
+      queryClient.invalidateQueries({ queryKey: QueryKeys.aiThread(threadId) });
     },
   });
 }
