@@ -28,6 +28,8 @@ import MarketDataImportPage from "./pages/settings/market-data/market-data-impor
 import MarketDataSettingsPage from "./pages/settings/market-data/market-data-settings";
 import TaxonomiesPage from "./pages/settings/taxonomies/taxonomies-page";
 import ConnectSettingsPage from "./pages/settings/wealthfolio-connect/connect-settings-page";
+import AiProvidersPage from "./pages/settings/ai-providers/ai-providers-page";
+import AiAssistantPage from "./pages/ai-assistant/ai-assistant-page";
 // import QRScannerPage from './pages/qr-scanner/qr-scanner-page'; // File not found
 import { getDynamicRoutes, subscribeToNavigationUpdates } from "@/addons/addons-runtime-context";
 import NotFoundPage from "@/pages/not-found";
@@ -87,6 +89,7 @@ export function AppRoutes() {
           <Route path="income" element={<IncomePage />} />
           <Route path="performance" element={<PerformancePage />} />
           <Route path="insights" element={<PortfolioInsightsPage />} />
+          <Route path="assistant" element={<AiAssistantPage />} />
           <Route path="connect" element={<ConnectPage />} />
           {/* Dynamic addon routes */}
           {dynamicRoutes.map(({ path, component: Component }) => (
@@ -116,6 +119,7 @@ export function AppRoutes() {
             <Route path="securities" element={<AssetsPage />} />
             <Route path="taxonomies" element={<TaxonomiesPage />} />
             <Route path="connect" element={<ConnectSettingsPage />} />
+            <Route path="ai-providers" element={<AiProvidersPage />} />
             <Route path="addons" element={<AddonSettingsPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
