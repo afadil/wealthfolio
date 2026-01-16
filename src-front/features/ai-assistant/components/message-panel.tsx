@@ -2,20 +2,29 @@ import { useRef, useEffect, useState } from "react";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
+import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { cn } from "@/lib/utils";
-import type { ChatMessage } from "../types";
+import type { ChatMessage, ChatError } from "../types";
 
 interface MessagePanelProps {
   messages: ChatMessage[];
   isStreaming: boolean;
+  error: ChatError | null;
   onSendMessage: (content: string) => void;
+  onCancel?: () => void;
+  onRetry?: () => void;
+  onDismissError?: () => void;
   className?: string;
 }
 
 export function MessagePanel({
   messages,
   isStreaming,
+  error,
   onSendMessage,
+  onCancel,
+  onRetry,
+  onDismissError,
   className,
 }: MessagePanelProps) {
   const [input, setInput] = useState("");
@@ -64,6 +73,14 @@ export function MessagePanel({
             {messages.map((message) => (
               <MessageBubble key={message.id} message={message} />
             ))}
+            {/* Error display with retry action */}
+            {error && (
+              <ErrorMessage
+                error={error}
+                onRetry={onRetry}
+                onDismiss={onDismissError}
+              />
+            )}
             <div ref={messagesEndRef} />
           </div>
         )}
@@ -82,14 +99,26 @@ export function MessagePanel({
             disabled={isStreaming}
             rows={1}
           />
-          <Button type="submit" disabled={!input.trim() || isStreaming} className="shrink-0">
-            {isStreaming ? (
-              <Icons.Spinner className="h-4 w-4 animate-spin" />
-            ) : (
-              <Icons.ArrowUp className="h-4 w-4" />
-            )}
-            <span className="sr-only">Send message</span>
-          </Button>
+          {isStreaming && onCancel ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onCancel}
+              className="shrink-0"
+            >
+              <Icons.X className="h-4 w-4" />
+              <span className="sr-only">Cancel</span>
+            </Button>
+          ) : (
+            <Button type="submit" disabled={!input.trim() || isStreaming} className="shrink-0">
+              {isStreaming ? (
+                <Icons.Spinner className="h-4 w-4 animate-spin" />
+              ) : (
+                <Icons.ArrowUp className="h-4 w-4" />
+              )}
+              <span className="sr-only">Send message</span>
+            </Button>
+          )}
         </form>
       </div>
     </div>
@@ -119,5 +148,46 @@ function SuggestionChip({ children }: { children: string }) {
     <button className="text-muted-foreground hover:bg-accent hover:text-accent-foreground rounded-full border px-4 py-2 text-sm transition-colors">
       {children}
     </button>
+  );
+}
+
+interface ErrorMessageProps {
+  error: ChatError;
+  onRetry?: () => void;
+  onDismiss?: () => void;
+}
+
+function ErrorMessage({ error, onRetry, onDismiss }: ErrorMessageProps) {
+  return (
+    <Alert variant="destructive" className="max-w-[80%]">
+      <Icons.AlertCircle className="h-4 w-4" />
+      <AlertDescription className="flex items-center justify-between gap-4">
+        <span>{error.message}</span>
+        <div className="flex items-center gap-2 shrink-0">
+          {error.retryable && onRetry && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRetry}
+              className="h-7 px-2"
+            >
+              <Icons.Refresh className="h-3 w-3 mr-1" />
+              Retry
+            </Button>
+          )}
+          {onDismiss && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onDismiss}
+              className="h-7 w-7 p-0"
+            >
+              <Icons.X className="h-3 w-3" />
+              <span className="sr-only">Dismiss</span>
+            </Button>
+          )}
+        </div>
+      </AlertDescription>
+    </Alert>
   );
 }
