@@ -324,6 +324,9 @@ pub fn run() {
             commands::ai_chat::get_ai_thread,
             commands::ai_chat::update_ai_thread,
             commands::ai_chat::delete_ai_thread,
+            commands::ai_chat::add_ai_thread_tag,
+            commands::ai_chat::remove_ai_thread_tag,
+            commands::ai_chat::get_ai_thread_tags,
             // Addon commands
             commands::addon::extract_addon_zip,
             commands::addon::install_addon_zip,

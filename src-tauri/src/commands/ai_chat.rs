@@ -125,3 +125,42 @@ pub async fn delete_ai_thread(
     repo.delete_thread(&thread_id).await?;
     Ok(())
 }
+
+// ============================================================================
+// Tag Management Commands
+// ============================================================================
+
+/// Add a tag to a thread.
+#[tauri::command]
+pub async fn add_ai_thread_tag(
+    context: State<'_, Arc<ServiceContext>>,
+    thread_id: String,
+    tag: String,
+) -> CommandResult<()> {
+    let repo = context.ai_chat_repository();
+    repo.add_tag(&thread_id, &tag).await?;
+    Ok(())
+}
+
+/// Remove a tag from a thread.
+#[tauri::command]
+pub async fn remove_ai_thread_tag(
+    context: State<'_, Arc<ServiceContext>>,
+    thread_id: String,
+    tag: String,
+) -> CommandResult<()> {
+    let repo = context.ai_chat_repository();
+    repo.remove_tag(&thread_id, &tag).await?;
+    Ok(())
+}
+
+/// Get all tags for a thread.
+#[tauri::command]
+pub async fn get_ai_thread_tags(
+    context: State<'_, Arc<ServiceContext>>,
+    thread_id: String,
+) -> CommandResult<Vec<String>> {
+    let repo = context.ai_chat_repository();
+    let tags = repo.get_tags(&thread_id)?;
+    Ok(tags)
+}
