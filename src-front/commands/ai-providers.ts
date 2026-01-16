@@ -3,6 +3,7 @@ import type {
   AiProvidersResponse,
   UpdateProviderSettingsRequest,
   SetDefaultProviderRequest,
+  ListModelsResponse,
 } from "@/lib/types";
 
 /**
@@ -42,6 +43,19 @@ export const setDefaultAiProvider = async (
     await invoke("set_default_ai_provider", { request });
   } catch (error) {
     logger.error("Error setting default AI provider.");
+    throw error;
+  }
+};
+
+/**
+ * List available models from a provider.
+ * Fetches models from the provider's API using backend-stored secrets.
+ */
+export const listAiModels = async (providerId: string): Promise<ListModelsResponse> => {
+  try {
+    return await invoke("list_ai_models", { providerId });
+  } catch (error) {
+    logger.error("Error listing AI models.");
     throw error;
   }
 };

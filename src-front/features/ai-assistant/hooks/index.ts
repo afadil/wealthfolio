@@ -4,4 +4,5 @@ export {
   useUpdateAiProviderSettings,
   useSetDefaultAiProvider,
   useAiProviderApiKey,
+  useListAiModels,
 } from "./use-ai-providers";

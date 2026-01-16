@@ -3,11 +3,13 @@ import {
   getAiProviders,
   updateAiProviderSettings,
   setDefaultAiProvider,
+  listAiModels,
 } from "@/commands/ai-providers";
 import { setSecret, getSecret, deleteSecret } from "@/commands/secrets";
 import type { UpdateProviderSettingsRequest, SetDefaultProviderRequest } from "@/lib/types";
+import { QueryKeys } from "@/lib/query-keys";
 
-const AI_PROVIDERS_KEY = ["ai-providers"] as const;
+const AI_PROVIDERS_KEY = [QueryKeys.AI_PROVIDERS] as const;
 
 /**
  * Hook to fetch all AI providers with merged settings.
@@ -82,4 +84,16 @@ export function useAiProviderApiKey(providerId: string) {
     deleteApiKey,
     revealApiKey,
   };
+}
+
+/**
+ * Hook to list available models from a provider.
+ * Fetches models on demand; disabled by default until enabled explicitly.
+ */
+export function useListAiModels(providerId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: QueryKeys.aiProviderModels(providerId),
+    queryFn: () => listAiModels(providerId),
+    enabled: options?.enabled ?? false,
+  });
 }
