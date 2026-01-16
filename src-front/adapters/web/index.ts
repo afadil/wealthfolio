@@ -191,6 +191,11 @@ const COMMANDS: CommandMap = {
   // Net Worth
   get_net_worth: { method: "GET", path: "/net-worth" },
   get_net_worth_history: { method: "GET", path: "/net-worth/history" },
+  // AI Providers
+  get_ai_providers: { method: "GET", path: "/ai/providers" },
+  update_ai_provider_settings: { method: "PUT", path: "/ai/providers/settings" },
+  set_default_ai_provider: { method: "POST", path: "/ai/providers/default" },
+  list_ai_models: { method: "GET", path: "/ai/providers" },
   // Alternative Assets
   create_alternative_asset: { method: "POST", path: "/alternative-assets" },
   update_alternative_asset_valuation: { method: "PUT", path: "/alternative-assets" },
@@ -879,6 +884,24 @@ export const invoke = async <T>(
     }
     case "get_alternative_holdings":
       break;
+    // AI Providers
+    case "get_ai_providers":
+      break;
+    case "update_ai_provider_settings": {
+      const { request } = payload as { request: Record<string, unknown> };
+      body = JSON.stringify(request);
+      break;
+    }
+    case "set_default_ai_provider": {
+      const { request } = payload as { request: Record<string, unknown> };
+      body = JSON.stringify(request);
+      break;
+    }
+    case "list_ai_models": {
+      const { providerId } = payload as { providerId: string };
+      url += `/${encodeURIComponent(providerId)}/models`;
+      break;
+    }
   }
 
   const headers: HeadersInit = {};
