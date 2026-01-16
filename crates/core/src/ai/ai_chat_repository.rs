@@ -16,8 +16,115 @@ use crate::Result;
 /// Current schema version for message content.
 pub const AI_CONTENT_SCHEMA_VERSION: u32 = 1;
 
+/// Current schema version for thread config snapshot.
+pub const AI_CONFIG_SCHEMA_VERSION: u32 = 1;
+
+/// Default read-only tools allowed in v1.
+pub const DEFAULT_TOOLS_ALLOWLIST: &[&str] = &[
+    "get_holdings",
+    "get_accounts",
+    "get_performance",
+    "get_transactions",
+    "get_dividends",
+    "get_asset_allocation",
+];
+
 /// Maximum size in bytes for persisted message content (256KB).
 pub const AI_MAX_CONTENT_SIZE_BYTES: usize = 256 * 1024;
+
+// ============================================================================
+// Thread Configuration
+// ============================================================================
+
+/// Per-thread agent configuration snapshot.
+///
+/// Captures the model, prompt template, and tool allowlist at thread creation.
+/// This enables deterministic replay and debugging of conversations.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AiThreadConfig {
+    /// Schema version for backward compatibility.
+    pub schema_version: u32,
+
+    /// Provider ID (e.g., "openai", "anthropic").
+    pub provider_id: String,
+
+    /// Model ID (e.g., "gpt-4o", "claude-3-sonnet").
+    pub model_id: String,
+
+    /// Prompt template ID.
+    pub prompt_template_id: String,
+
+    /// Prompt template version.
+    pub prompt_version: String,
+
+    /// Locale for formatting and language.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub locale: Option<String>,
+
+    /// Detail level for responses.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail_level: Option<String>,
+
+    /// Allowlist of tool names that can be used in this thread.
+    /// If None, uses default read-only tools.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tools_allowlist: Option<Vec<String>>,
+}
+
+impl AiThreadConfig {
+    /// Create a new config with default settings.
+    pub fn new(provider_id: &str, model_id: &str, template_id: &str, template_version: &str) -> Self {
+        Self {
+            schema_version: AI_CONFIG_SCHEMA_VERSION,
+            provider_id: provider_id.to_string(),
+            model_id: model_id.to_string(),
+            prompt_template_id: template_id.to_string(),
+            prompt_version: template_version.to_string(),
+            locale: None,
+            detail_level: None,
+            tools_allowlist: None,
+        }
+    }
+
+    /// Create config with default read-only tools allowlist.
+    pub fn with_default_tools(mut self) -> Self {
+        self.tools_allowlist = Some(DEFAULT_TOOLS_ALLOWLIST.iter().map(|s| s.to_string()).collect());
+        self
+    }
+
+    /// Get the effective tools allowlist.
+    pub fn get_tools_allowlist(&self) -> Vec<String> {
+        self.tools_allowlist
+            .clone()
+            .unwrap_or_else(|| DEFAULT_TOOLS_ALLOWLIST.iter().map(|s| s.to_string()).collect())
+    }
+
+    /// Serialize to JSON.
+    pub fn to_json(&self) -> Result<String> {
+        serde_json::to_string(self).map_err(crate::Error::from)
+    }
+
+    /// Deserialize from JSON.
+    pub fn from_json(json: &str) -> Result<Self> {
+        serde_json::from_str(json).map_err(crate::Error::from)
+    }
+}
+
+impl Default for AiThreadConfig {
+    fn default() -> Self {
+        Self {
+            schema_version: AI_CONFIG_SCHEMA_VERSION,
+            provider_id: String::new(),
+            model_id: String::new(),
+            prompt_template_id: "wealthfolio-assistant-v1".to_string(),
+            prompt_version: "1.0.0".to_string(),
+            locale: None,
+            detail_level: None,
+            tools_allowlist: Some(DEFAULT_TOOLS_ALLOWLIST.iter().map(|s| s.to_string()).collect()),
+        }
+    }
+}
 
 // ============================================================================
 // Domain Types
@@ -30,6 +137,10 @@ pub struct AiThread {
     pub id: String,
     pub title: Option<String>,
     pub tags: Vec<String>,
+    /// Per-thread agent configuration snapshot.
+    /// Captures model, prompt template, and tool allowlist at creation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config: Option<AiThreadConfig>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -42,20 +153,49 @@ impl AiThread {
             id: uuid::Uuid::new_v4().to_string(),
             title: None,
             tags: Vec::new(),
+            config: None,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    /// Create a new thread with config snapshot.
+    pub fn with_config(config: AiThreadConfig) -> Self {
+        let now = Utc::now();
+        Self {
+            id: uuid::Uuid::new_v4().to_string(),
+            title: None,
+            tags: Vec::new(),
+            config: Some(config),
             created_at: now,
             updated_at: now,
         }
     }
 
     /// Create a thread with specific ID (for reconstruction from DB).
-    pub fn with_id(id: String, title: Option<String>, created_at: DateTime<Utc>, updated_at: DateTime<Utc>) -> Self {
+    pub fn with_id(
+        id: String,
+        title: Option<String>,
+        config: Option<AiThreadConfig>,
+        created_at: DateTime<Utc>,
+        updated_at: DateTime<Utc>,
+    ) -> Self {
         Self {
             id,
             title,
             tags: Vec::new(),
+            config,
             created_at,
             updated_at,
         }
+    }
+
+    /// Get the effective tools allowlist from config.
+    pub fn get_tools_allowlist(&self) -> Vec<String> {
+        self.config
+            .as_ref()
+            .map(|c| c.get_tools_allowlist())
+            .unwrap_or_else(|| DEFAULT_TOOLS_ALLOWLIST.iter().map(|s| s.to_string()).collect())
     }
 }
 
@@ -308,5 +448,66 @@ mod tests {
         assert_eq!("assistant".parse::<AiMessageRole>().unwrap(), AiMessageRole::Assistant);
         assert_eq!("system".parse::<AiMessageRole>().unwrap(), AiMessageRole::System);
         assert_eq!("tool".parse::<AiMessageRole>().unwrap(), AiMessageRole::Tool);
+    }
+
+    #[test]
+    fn test_thread_config_creation() {
+        let config = AiThreadConfig::new("openai", "gpt-4o", "wealthfolio-assistant-v1", "1.0.0");
+        assert_eq!(config.provider_id, "openai");
+        assert_eq!(config.model_id, "gpt-4o");
+        assert_eq!(config.prompt_template_id, "wealthfolio-assistant-v1");
+        assert_eq!(config.prompt_version, "1.0.0");
+        assert!(config.tools_allowlist.is_none());
+    }
+
+    #[test]
+    fn test_thread_config_with_default_tools() {
+        let config = AiThreadConfig::new("anthropic", "claude-3-sonnet", "test", "1.0.0").with_default_tools();
+        assert!(config.tools_allowlist.is_some());
+        let tools = config.get_tools_allowlist();
+        assert!(tools.contains(&"get_holdings".to_string()));
+        assert!(tools.contains(&"get_accounts".to_string()));
+    }
+
+    #[test]
+    fn test_thread_config_serialization() {
+        let config = AiThreadConfig::new("openai", "gpt-4o", "template-v1", "1.0.0")
+            .with_default_tools();
+
+        let json = config.to_json().unwrap();
+        assert!(json.contains("schemaVersion"));
+        assert!(json.contains("providerId"));
+        assert!(json.contains("modelId"));
+        assert!(json.contains("toolsAllowlist"));
+
+        let parsed = AiThreadConfig::from_json(&json).unwrap();
+        assert_eq!(parsed, config);
+    }
+
+    #[test]
+    fn test_thread_with_config() {
+        let config = AiThreadConfig::new("openai", "gpt-4o", "template", "1.0.0");
+        let thread = AiThread::with_config(config.clone());
+
+        assert!(thread.config.is_some());
+        assert_eq!(thread.config.as_ref().unwrap().provider_id, "openai");
+    }
+
+    #[test]
+    fn test_thread_tools_allowlist_fallback() {
+        // Thread without config uses default tools
+        let thread = AiThread::new();
+        let tools = thread.get_tools_allowlist();
+        assert!(!tools.is_empty());
+        assert!(tools.contains(&"get_holdings".to_string()));
+
+        // Thread with config uses config tools
+        let config = AiThreadConfig {
+            tools_allowlist: Some(vec!["custom_tool".to_string()]),
+            ..Default::default()
+        };
+        let thread_with_config = AiThread::with_config(config);
+        let tools = thread_with_config.get_tools_allowlist();
+        assert_eq!(tools, vec!["custom_tool".to_string()]);
     }
 }

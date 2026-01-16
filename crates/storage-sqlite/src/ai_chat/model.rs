@@ -34,6 +34,8 @@ pub struct AiThreadDB {
     pub title: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    /// JSON blob containing per-thread agent configuration snapshot.
+    pub config_snapshot: Option<String>,
 }
 
 /// Database model for AI chat messages.
@@ -270,6 +272,19 @@ impl AiThreadDB {
             title,
             created_at: now.clone(),
             updated_at: now,
+            config_snapshot: None,
+        }
+    }
+
+    /// Create a new thread DB model with config snapshot.
+    pub fn with_config(id: String, title: Option<String>, config_snapshot: Option<String>) -> Self {
+        let now = Utc::now().to_rfc3339();
+        Self {
+            id,
+            title,
+            created_at: now.clone(),
+            updated_at: now,
+            config_snapshot,
         }
     }
 }
