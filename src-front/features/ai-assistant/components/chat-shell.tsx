@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -19,7 +19,8 @@ import {
   useAddThreadTag,
   useRemoveThreadTag,
 } from "../hooks/use-threads";
-import type { ChatMessage } from "../types";
+import type { ChatMessage, ChatError } from "../types";
+import { parseErrorCode } from "../types";
 
 interface ChatShellProps {
   className?: string;
@@ -35,6 +36,11 @@ export function ChatShell({ className }: ChatShellProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const [error, setError] = useState<ChatError | null>(null);
+  const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
+
+  // AbortController for cancelling in-flight requests
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Thread management hooks
   const { data: threads = [], isLoading: isLoadingThreads } = useThreads();
@@ -114,6 +120,18 @@ export function ChatShell({ className }: ChatShellProps) {
 
   const handleSendMessage = useCallback(
     (content: string) => {
+      // Clear any previous error
+      setError(null);
+      // Store for retry
+      setLastUserMessage(content);
+
+      // Cancel any existing request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      // Create new AbortController for this request
+      abortControllerRef.current = new AbortController();
+
       // Add user message (placeholder - will be persisted in future)
       const userMessage: ChatMessage = {
         id: crypto.randomUUID(),
@@ -125,8 +143,17 @@ export function ChatShell({ className }: ChatShellProps) {
       setMessages((prev) => [...prev, userMessage]);
 
       // Simulate assistant response (placeholder)
+      // In real implementation, this would use the abortControllerRef.current.signal
       setIsStreaming(true);
-      setTimeout(() => {
+
+      const timeoutId = setTimeout(() => {
+        // Check if cancelled
+        if (abortControllerRef.current?.signal.aborted) {
+          setIsStreaming(false);
+          setError(parseErrorCode("cancelled"));
+          return;
+        }
+
         const assistantMessage: ChatMessage = {
           id: crypto.randomUUID(),
           threadId: activeThreadId ?? "",
@@ -137,10 +164,49 @@ export function ChatShell({ className }: ChatShellProps) {
         };
         setMessages((prev) => [...prev, assistantMessage]);
         setIsStreaming(false);
+        abortControllerRef.current = null;
       }, 1000);
+
+      // Store timeout for cleanup on abort
+      abortControllerRef.current.signal.addEventListener("abort", () => {
+        clearTimeout(timeoutId);
+        setIsStreaming(false);
+      });
     },
     [activeThreadId],
   );
+
+  // Cancel the current streaming response
+  const handleCancel = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setError(parseErrorCode("cancelled"));
+    }
+  }, []);
+
+  // Retry the last message
+  const handleRetry = useCallback(() => {
+    if (lastUserMessage) {
+      // Remove the last user message from the list (it will be re-added)
+      setMessages((prev) => {
+        // Find and remove the last user message
+        const lastUserIdx = [...prev].reverse().findIndex((m) => m.role === "user");
+        if (lastUserIdx >= 0) {
+          const idx = prev.length - 1 - lastUserIdx;
+          return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
+        }
+        return prev;
+      });
+      setError(null);
+      handleSendMessage(lastUserMessage);
+    }
+  }, [lastUserMessage, handleSendMessage]);
+
+  // Dismiss the error
+  const handleDismissError = useCallback(() => {
+    setError(null);
+  }, []);
 
   // Sidebar content - shared between desktop and mobile
   const sidebarContent = (
@@ -186,7 +252,11 @@ export function ChatShell({ className }: ChatShellProps) {
       <MessagePanel
         messages={messages}
         isStreaming={isStreaming}
+        error={error}
         onSendMessage={handleSendMessage}
+        onCancel={handleCancel}
+        onRetry={handleRetry}
+        onDismissError={handleDismissError}
         className="flex-1"
       />
     </div>

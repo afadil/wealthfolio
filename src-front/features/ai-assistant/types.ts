@@ -199,13 +199,97 @@ export type AiStreamEvent =
 // UI State Types
 // ============================================================================
 
+/**
+ * Error information for display in the UI.
+ * Contains both a user-friendly message and error code for programmatic handling.
+ */
+export interface ChatError {
+  /** Error code for programmatic handling (e.g., "missingApiKey", "providerError") */
+  code: string;
+  /** User-friendly error message */
+  message: string;
+  /** Whether the error is retryable */
+  retryable: boolean;
+}
+
+/**
+ * Maps error codes to user-friendly messages and retry eligibility.
+ * Error codes come from the backend AiAssistantError enum.
+ */
+export const ERROR_CODE_MAP: Record<string, { message: string; retryable: boolean }> = {
+  providerNotConfigured: {
+    message: "AI provider is not configured. Please set up a provider in Settings.",
+    retryable: false,
+  },
+  missingApiKey: {
+    message: "API key is missing. Please add your API key in Settings.",
+    retryable: false,
+  },
+  modelNotFound: {
+    message: "The selected model is not available. Please choose a different model.",
+    retryable: false,
+  },
+  toolNotFound: {
+    message: "A required tool is not available. Please try again.",
+    retryable: true,
+  },
+  toolNotAllowed: {
+    message: "A tool is not allowed for this conversation. Please try again.",
+    retryable: true,
+  },
+  toolExecutionError: {
+    message: "A tool failed to execute. Please try again.",
+    retryable: true,
+  },
+  providerError: {
+    message: "The AI provider returned an error. Please try again.",
+    retryable: true,
+  },
+  threadNotFound: {
+    message: "Conversation not found. Please start a new conversation.",
+    retryable: false,
+  },
+  invalidInput: {
+    message: "Invalid input. Please check your message and try again.",
+    retryable: false,
+  },
+  internal: {
+    message: "An unexpected error occurred. Please try again.",
+    retryable: true,
+  },
+  cancelled: {
+    message: "Response was cancelled.",
+    retryable: true,
+  },
+  network: {
+    message: "Network error. Please check your connection and try again.",
+    retryable: true,
+  },
+};
+
+/**
+ * Parse an error code and return a ChatError with user-friendly message.
+ */
+export function parseErrorCode(code: string, rawMessage?: string): ChatError {
+  const mapped = ERROR_CODE_MAP[code];
+  if (mapped) {
+    return { code, message: mapped.message, retryable: mapped.retryable };
+  }
+  // Fallback for unknown error codes
+  return {
+    code,
+    message: rawMessage ?? "An unexpected error occurred. Please try again.",
+    retryable: true,
+  };
+}
+
 export interface ChatState {
   threads: ChatThread[];
   activeThreadId: string | null;
   messages: ChatMessage[];
   isStreaming: boolean;
   streamingMessageId: string | null;
-  error: string | null;
+  error: ChatError | null;
 }
 
 export interface ProviderSettingsState {

@@ -230,7 +230,9 @@ impl AiAssistantService {
     /// Generate and set the title for a thread based on the first user message.
     /// This runs asynchronously without blocking the chat response.
     async fn generate_title_for_thread(&self, thread_id: &str, user_message: &str, provider_id: &str) {
-        debug!("Generating title for thread {} from message: {}", thread_id, user_message);
+        // Note: We intentionally do NOT log user_message content to avoid
+        // potentially exposing sensitive portfolio-related information in logs.
+        debug!("Generating title for thread {} (message_len={})", thread_id, user_message.len());
 
         let title = self
             .title_generator
