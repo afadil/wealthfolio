@@ -29,6 +29,9 @@ function loadDotenvFile(file) {
 // Load .env.web if present
 loadDotenvFile(".env.web");
 
+// Set build target for web mode
+process.env.BUILD_TARGET = "web";
+
 const children = new Map();
 let exiting = false;
 
