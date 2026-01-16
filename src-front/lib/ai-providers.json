@@ -1,0 +1,228 @@
+{
+  "providers": {
+    "openai": {
+      "name": "OpenAI",
+      "type": "api",
+      "icon": "LogoOpenAI",
+      "description": "ChatGPT and GPT models from OpenAI",
+      "envKey": "OPENAI_API_KEY",
+      "defaultConfig": {
+        "enabled": true
+      },
+      "connectionFields": [
+        {
+          "key": "apiKey",
+          "label": "API Key",
+          "type": "password",
+          "placeholder": "Enter your OpenAI API key",
+          "required": true,
+          "helpUrl": "https://platform.openai.com/api-keys"
+        }
+      ],
+      "models": {
+        "gpt-4o": {
+          "capabilities": { "tools": true, "thinking": false, "vision": true }
+        },
+        "gpt-4o-mini": {
+          "capabilities": { "tools": true, "thinking": false, "vision": true }
+        },
+        "o1": {
+          "capabilities": { "tools": false, "thinking": true, "vision": false }
+        },
+        "o1-mini": {
+          "capabilities": { "tools": false, "thinking": true, "vision": false }
+        },
+        "gpt-4-turbo": {
+          "capabilities": { "tools": true, "thinking": false, "vision": true }
+        }
+      },
+      "defaultModel": "gpt-4o-mini",
+      "documentationUrl": "https://platform.openai.com/docs/introduction"
+    },
+    "anthropic": {
+      "name": "Anthropic",
+      "type": "api",
+      "icon": "LogoAnthropic",
+      "description": "Claude AI models from Anthropic",
+      "envKey": "ANTHROPIC_API_KEY",
+      "defaultConfig": {
+        "enabled": false
+      },
+      "connectionFields": [
+        {
+          "key": "apiKey",
+          "label": "API Key",
+          "type": "password",
+          "placeholder": "Enter your Anthropic API key",
+          "required": true,
+          "helpUrl": "https://console.anthropic.com/account/keys"
+        }
+      ],
+      "models": {
+        "claude-3-5-sonnet-20241022": {
+          "capabilities": { "tools": true, "thinking": false, "vision": true }
+        },
+        "claude-3-5-haiku-20241022": {
+          "capabilities": { "tools": true, "thinking": false, "vision": true }
+        },
+        "claude-3-opus-20240229": {
+          "capabilities": { "tools": true, "thinking": false, "vision": true }
+        }
+      },
+      "defaultModel": "claude-3-5-sonnet-20241022",
+      "documentationUrl": "https://docs.anthropic.com/en/api/getting-started"
+    },
+    "google": {
+      "name": "Google AI",
+      "type": "api",
+      "icon": "LogoGoogle",
+      "description": "Google Generative AI models",
+      "envKey": "GEMINI_API_KEY",
+      "defaultConfig": {
+        "enabled": false
+      },
+      "connectionFields": [
+        {
+          "key": "apiKey",
+          "label": "API Key",
+          "type": "password",
+          "placeholder": "Enter your Google AI API key",
+          "required": true,
+          "helpUrl": "https://makersuite.google.com/app/apikey"
+        }
+      ],
+      "models": {
+        "gemini-2.5-flash": {
+          "capabilities": { "tools": true, "thinking": true, "vision": true }
+        },
+        "gemini-2.5-pro": {
+          "capabilities": { "tools": true, "thinking": true, "vision": true }
+        }
+      },
+      "defaultModel": "gemini-2.5-flash",
+      "documentationUrl": "https://ai.google.dev/docs"
+    },
+    "groq": {
+      "name": "Groq",
+      "type": "api",
+      "icon": "LogoGroq",
+      "description": "Fast inference cloud API",
+      "envKey": "GROQ_API_KEY",
+      "defaultConfig": {
+        "enabled": false
+      },
+      "connectionFields": [
+        {
+          "key": "apiKey",
+          "label": "API Key",
+          "type": "password",
+          "placeholder": "Enter your Groq API key",
+          "required": true,
+          "helpUrl": "https://console.groq.com/keys"
+        }
+      ],
+      "models": {
+        "llama-3.3-70b-versatile": {
+          "capabilities": { "tools": true, "thinking": false, "vision": false }
+        },
+        "llama-3.1-8b-instant": {
+          "capabilities": { "tools": true, "thinking": false, "vision": false }
+        },
+        "mixtral-8x7b-32768": {
+          "capabilities": { "tools": true, "thinking": false, "vision": false }
+        }
+      },
+      "defaultModel": "llama-3.3-70b-versatile",
+      "documentationUrl": "https://console.groq.com/docs"
+    },
+    "ollama": {
+      "name": "Ollama",
+      "type": "local",
+      "icon": "LogoOllama",
+      "description": "Local AI models on your machine",
+      "envKey": "OLLAMA_API_KEY",
+      "defaultConfig": {
+        "enabled": true,
+        "url": "http://localhost:11434"
+      },
+      "connectionFields": [
+        {
+          "key": "url",
+          "label": "Server URL",
+          "type": "text",
+          "placeholder": "http://localhost:11434",
+          "required": true
+        }
+      ],
+      "models": {
+        "llama3.2": {
+          "capabilities": { "tools": true, "thinking": false, "vision": false }
+        },
+        "mistral": {
+          "capabilities": { "tools": true, "thinking": false, "vision": false }
+        },
+        "deepseek-r1:8b": {
+          "capabilities": { "tools": true, "thinking": true, "vision": false }
+        },
+        "qwen2.5": {
+          "capabilities": { "tools": true, "thinking": false, "vision": false }
+        }
+      },
+      "defaultModel": "llama3.2",
+      "documentationUrl": "https://ollama.ai/docs"
+    },
+    "openrouter": {
+      "name": "OpenRouter",
+      "type": "api",
+      "icon": "LogoOpenRouter",
+      "description": "Access to multiple AI models via OpenRouter",
+      "envKey": "OPENROUTER_API_KEY",
+      "defaultConfig": {
+        "enabled": false
+      },
+      "connectionFields": [
+        {
+          "key": "apiKey",
+          "label": "API Key",
+          "type": "password",
+          "placeholder": "Enter your OpenRouter API key",
+          "required": true,
+          "helpUrl": "https://openrouter.ai/keys"
+        }
+      ],
+      "models": {
+        "anthropic/claude-3.5-sonnet": {
+          "capabilities": { "tools": true, "thinking": false, "vision": true }
+        },
+        "openai/gpt-4o": {
+          "capabilities": { "tools": true, "thinking": false, "vision": true }
+        },
+        "google/gemini-pro-1.5": {
+          "capabilities": { "tools": true, "thinking": false, "vision": true }
+        },
+        "meta-llama/llama-3.1-70b-instruct": {
+          "capabilities": { "tools": true, "thinking": false, "vision": false }
+        }
+      },
+      "defaultModel": "openai/gpt-4o",
+      "documentationUrl": "https://openrouter.ai/docs"
+    }
+  },
+  "capabilities": {
+    "tools": {
+      "name": "Tools",
+      "description": "Can use external tools and function calls",
+      "icon": "Wrench"
+    },
+    "thinking": {
+      "name": "Thinking",
+      "description": "Shows reasoning process and chain of thought",
+      "icon": "Brain"
+    },
+    "vision": {
+      "name": "Vision",
+      "description": "Can analyze and understand images",
+      "icon": "Eye"
+    }
+  }
+}
