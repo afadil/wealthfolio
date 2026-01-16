@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use tauri::State;
 use wealthfolio_core::ai::{
-    AiProvidersResponse, SetDefaultProviderRequest, UpdateProviderSettingsRequest,
+    AiError, AiProvidersResponse, ListModelsResponse, SetDefaultProviderRequest,
+    UpdateProviderSettingsRequest,
 };
 
 use crate::context::ServiceContext;
@@ -38,4 +39,18 @@ pub async fn set_default_ai_provider(
         .set_default_provider(request)
         .await?;
     Ok(())
+}
+
+/// List available models from a provider.
+/// Fetches models from the provider's API using backend-stored secrets.
+/// Frontend never needs to send API keys - they are retrieved internally.
+#[tauri::command]
+pub async fn list_ai_models(
+    context: State<'_, Arc<ServiceContext>>,
+    provider_id: String,
+) -> Result<ListModelsResponse, AiError> {
+    context
+        .ai_provider_service()
+        .list_models(&provider_id)
+        .await
 }

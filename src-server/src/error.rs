@@ -5,6 +5,7 @@ use axum::{
 };
 use serde::Serialize;
 use thiserror::Error;
+use wealthfolio_core::ai::AiError;
 use wealthfolio_core::errors::Error as CoreError;
 
 #[allow(dead_code)]
@@ -57,3 +58,9 @@ impl IntoResponse for ApiError {
 }
 
 pub type ApiResult<T> = Result<T, ApiError>;
+
+impl From<AiError> for ApiError {
+    fn from(err: AiError) -> Self {
+        ApiError::BadRequest(err.to_string())
+    }
+}

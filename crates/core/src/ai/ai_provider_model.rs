@@ -213,3 +213,86 @@ pub struct SetDefaultProviderRequest {
     /// Provider ID to set as default, or None to clear.
     pub provider_id: Option<String>,
 }
+
+// ============================================================================
+// AI Error Types
+// ============================================================================
+
+/// AI-specific errors.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum AiError {
+    /// API key is required but not configured for the provider.
+    #[serde(rename_all = "camelCase")]
+    MissingApiKey { provider_id: String },
+    /// Provider is not found in the catalog.
+    #[serde(rename_all = "camelCase")]
+    UnknownProvider { provider_id: String },
+    /// Provider API returned an error.
+    #[serde(rename_all = "camelCase")]
+    ProviderError { message: String },
+    /// Invalid input provided.
+    #[serde(rename_all = "camelCase")]
+    InvalidInput { message: String },
+}
+
+impl std::fmt::Display for AiError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AiError::MissingApiKey { provider_id } => {
+                write!(f, "API key required for provider '{}'", provider_id)
+            }
+            AiError::UnknownProvider { provider_id } => {
+                write!(f, "Unknown provider: {}", provider_id)
+            }
+            AiError::ProviderError { message } => {
+                write!(f, "Provider error: {}", message)
+            }
+            AiError::InvalidInput { message } => {
+                write!(f, "Invalid input: {}", message)
+            }
+        }
+    }
+}
+
+impl std::error::Error for AiError {}
+
+// ============================================================================
+// Provider Configuration Types (for chat/model listing)
+// ============================================================================
+
+/// Configuration needed to connect to a provider (retrieved internally by backend).
+/// This is returned only to internal callers, never exposed to frontend.
+#[derive(Debug, Clone)]
+pub struct ProviderConfig {
+    /// The provider ID.
+    pub provider_id: String,
+    /// The API key (if required and available).
+    pub api_key: Option<String>,
+    /// The base URL (for local providers like Ollama, or custom endpoints).
+    pub base_url: Option<String>,
+    /// Whether API key is required for this provider.
+    pub requires_api_key: bool,
+}
+
+/// Model info returned from provider API.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FetchedModel {
+    /// Model ID as returned by provider.
+    pub id: String,
+    /// Optional display name.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+/// Response from model listing.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListModelsResponse {
+    /// List of models from the provider.
+    pub models: Vec<FetchedModel>,
+    /// Whether the provider supports dynamic model listing.
+    /// If false, only catalog models are available.
+    pub supports_listing: bool,
+}

@@ -8,9 +8,10 @@ use crate::secrets::SecretStore;
 use crate::settings::SettingsRepositoryTrait;
 
 use super::{
-    AiProviderCatalog, AiProviderSettings, AiProvidersResponse, MergedModel, MergedProvider,
-    ProviderUserSettings, SetDefaultProviderRequest, UpdateProviderSettingsRequest,
-    AI_PROVIDER_SETTINGS_KEY, AI_PROVIDER_SETTINGS_SCHEMA_VERSION,
+    AiError, AiProviderCatalog, AiProviderSettings, AiProvidersResponse, FetchedModel,
+    ListModelsResponse, MergedModel, MergedProvider, ProviderConfig, ProviderUserSettings,
+    SetDefaultProviderRequest, UpdateProviderSettingsRequest, AI_PROVIDER_SETTINGS_KEY,
+    AI_PROVIDER_SETTINGS_SCHEMA_VERSION,
 };
 
 /// Service trait for AI provider operations.
@@ -24,6 +25,19 @@ pub trait AiProviderServiceTrait: Send + Sync {
 
     /// Set or clear the default provider.
     async fn set_default_provider(&self, request: SetDefaultProviderRequest) -> Result<()>;
+
+    /// Get provider configuration for backend-only use (chat, model listing).
+    /// This retrieves the API key from the secret store - never exposed to frontend.
+    /// Returns AiError::MissingApiKey if API key is required but not configured.
+    fn get_provider_config(&self, provider_id: &str) -> std::result::Result<ProviderConfig, AiError>;
+
+    /// List available models from a provider.
+    /// Fetches models from the provider's API using backend-stored secrets.
+    /// For providers without model listing (e.g., Anthropic), returns catalog models.
+    async fn list_models(
+        &self,
+        provider_id: &str,
+    ) -> std::result::Result<super::ListModelsResponse, AiError>;
 }
 
 /// AI provider service implementation.
@@ -111,6 +125,45 @@ impl AiProviderService {
             .flatten()
             .map(|s| !s.is_empty())
             .unwrap_or(false)
+    }
+
+    /// Get the API key for a provider (internal use only).
+    fn get_api_key(&self, provider_id: &str) -> Option<String> {
+        let secret_key = Self::secret_key_for_provider(provider_id);
+        self.secret_store
+            .get_secret(&secret_key)
+            .ok()
+            .flatten()
+            .filter(|s| !s.is_empty())
+    }
+
+    /// Check if provider requires an API key based on catalog.
+    fn provider_requires_api_key(&self, provider_id: &str) -> bool {
+        self.catalog
+            .providers
+            .get(provider_id)
+            .map(|p| {
+                // Local providers (like Ollama) don't require API keys
+                // API providers require keys
+                p.provider_type == "api"
+            })
+            .unwrap_or(true) // Default to requiring API key for unknown providers
+    }
+
+    /// Get the custom URL for a provider from user settings.
+    fn get_custom_url(&self, provider_id: &str) -> Option<String> {
+        let user_settings = self.load_user_settings();
+        user_settings
+            .providers
+            .get(provider_id)
+            .and_then(|s| s.custom_url.clone())
+            .or_else(|| {
+                // Fall back to catalog default URL
+                self.catalog
+                    .providers
+                    .get(provider_id)
+                    .and_then(|p| p.default_config.url.clone())
+            })
     }
 }
 
@@ -242,5 +295,197 @@ impl AiProviderServiceTrait for AiProviderService {
         settings.schema_version = AI_PROVIDER_SETTINGS_SCHEMA_VERSION;
 
         self.save_user_settings(&settings).await
+    }
+
+    fn get_provider_config(&self, provider_id: &str) -> std::result::Result<ProviderConfig, AiError> {
+        // Verify provider exists in catalog
+        if !self.catalog.providers.contains_key(provider_id) {
+            return Err(AiError::UnknownProvider {
+                provider_id: provider_id.to_string(),
+            });
+        }
+
+        let requires_api_key = self.provider_requires_api_key(provider_id);
+        let api_key = self.get_api_key(provider_id);
+        let base_url = self.get_custom_url(provider_id);
+
+        // Check if API key is required but missing
+        if requires_api_key && api_key.is_none() {
+            return Err(AiError::MissingApiKey {
+                provider_id: provider_id.to_string(),
+            });
+        }
+
+        Ok(ProviderConfig {
+            provider_id: provider_id.to_string(),
+            api_key,
+            base_url,
+            requires_api_key,
+        })
+    }
+
+    async fn list_models(
+        &self,
+        provider_id: &str,
+    ) -> std::result::Result<ListModelsResponse, AiError> {
+        // Get provider config (validates provider exists and has API key if needed)
+        let config = self.get_provider_config(provider_id)?;
+
+        // Get catalog provider for default base URL and to check if listing is supported
+        let catalog_provider = self.catalog.providers.get(provider_id).ok_or_else(|| {
+            AiError::UnknownProvider {
+                provider_id: provider_id.to_string(),
+            }
+        })?;
+
+        // Providers that don't support model listing return catalog models
+        // Anthropic doesn't have a model listing API
+        if provider_id == "anthropic" {
+            let models = catalog_provider
+                .models
+                .keys()
+                .map(|id| FetchedModel {
+                    id: id.clone(),
+                    name: None,
+                })
+                .collect();
+            return Ok(ListModelsResponse {
+                models,
+                supports_listing: false,
+            });
+        }
+
+        // Build the model list URL based on provider
+        let base_url = config.base_url.as_deref().unwrap_or_else(|| {
+            match provider_id {
+                "openai" => "https://api.openai.com",
+                "groq" => "https://api.groq.com/openai",
+                "openrouter" => "https://openrouter.ai/api",
+                "google" => "https://generativelanguage.googleapis.com",
+                "ollama" => "http://localhost:11434",
+                _ => "https://api.openai.com",
+            }
+        });
+
+        let models_url = match provider_id {
+            "ollama" => format!("{}/api/tags", base_url.trim_end_matches('/')),
+            "google" => format!("{}/v1beta/models", base_url.trim_end_matches('/')),
+            // OpenAI-compatible: OpenAI, Groq, OpenRouter
+            _ => format!("{}/v1/models", base_url.trim_end_matches('/')),
+        };
+
+        // Build HTTP client and request
+        let client = reqwest::Client::new();
+        let mut request = client.get(&models_url);
+
+        // Add authorization header based on provider
+        if let Some(ref api_key) = config.api_key {
+            request = match provider_id {
+                "google" => request.query(&[("key", api_key.as_str())]),
+                _ => request.header("Authorization", format!("Bearer {}", api_key)),
+            };
+        }
+
+        // Make the request
+        let response = request.send().await.map_err(|e| AiError::ProviderError {
+            message: format!("Failed to connect to provider: {}", e),
+        })?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(AiError::ProviderError {
+                message: format!("Provider returned error {}: {}", status, body),
+            });
+        }
+
+        // Parse response based on provider format
+        let models = match provider_id {
+            "ollama" => {
+                // Ollama format: { "models": [{ "name": "llama3.2", ... }] }
+                #[derive(serde::Deserialize)]
+                struct OllamaResponse {
+                    models: Vec<OllamaModel>,
+                }
+                #[derive(serde::Deserialize)]
+                struct OllamaModel {
+                    name: String,
+                }
+
+                let resp: OllamaResponse =
+                    response.json().await.map_err(|e| AiError::ProviderError {
+                        message: format!("Failed to parse Ollama response: {}", e),
+                    })?;
+
+                resp.models
+                    .into_iter()
+                    .map(|m| FetchedModel {
+                        id: m.name.clone(),
+                        name: Some(m.name),
+                    })
+                    .collect()
+            }
+            "google" => {
+                // Google format: { "models": [{ "name": "models/gemini-pro", ... }] }
+                #[derive(serde::Deserialize)]
+                struct GoogleResponse {
+                    models: Vec<GoogleModel>,
+                }
+                #[derive(serde::Deserialize)]
+                #[serde(rename_all = "camelCase")]
+                struct GoogleModel {
+                    name: String,
+                    display_name: Option<String>,
+                }
+
+                let resp: GoogleResponse =
+                    response.json().await.map_err(|e| AiError::ProviderError {
+                        message: format!("Failed to parse Google response: {}", e),
+                    })?;
+
+                resp.models
+                    .into_iter()
+                    .filter(|m| m.name.contains("gemini"))
+                    .map(|m| {
+                        // Google returns "models/gemini-pro", we want just "gemini-pro"
+                        let id = m.name.strip_prefix("models/").unwrap_or(&m.name).to_string();
+                        FetchedModel {
+                            id,
+                            name: m.display_name,
+                        }
+                    })
+                    .collect()
+            }
+            // OpenAI-compatible format: OpenAI, Groq, OpenRouter
+            _ => {
+                // OpenAI format: { "data": [{ "id": "gpt-4", ... }] }
+                #[derive(serde::Deserialize)]
+                struct OpenAIResponse {
+                    data: Vec<OpenAIModel>,
+                }
+                #[derive(serde::Deserialize)]
+                struct OpenAIModel {
+                    id: String,
+                }
+
+                let resp: OpenAIResponse =
+                    response.json().await.map_err(|e| AiError::ProviderError {
+                        message: format!("Failed to parse provider response: {}", e),
+                    })?;
+
+                resp.data
+                    .into_iter()
+                    .map(|m| FetchedModel {
+                        id: m.id.clone(),
+                        name: Some(m.id),
+                    })
+                    .collect()
+            }
+        };
+
+        Ok(ListModelsResponse {
+            models,
+            supports_listing: true,
+        })
     }
 }
