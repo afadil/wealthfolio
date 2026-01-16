@@ -732,18 +732,18 @@ number-flow-react.muted-fraction::part(fraction) {
   animation: subtle-pulse 1.2s ease-in-out infinite;
 }
 
-/* app.css */
-html,
-body {
+/* app.css - lockdown styles only apply when .app-lockdown class is present */
+html.app-lockdown,
+html.app-lockdown body {
   -webkit-user-select: none;
   user-select: none;
 }
 
 /* allow selection in editable controls (native behavior) */
-input,
-textarea,
-[contenteditable="true"],
-.allow-select {
+html.app-lockdown input,
+html.app-lockdown textarea,
+html.app-lockdown [contenteditable="true"],
+html.app-lockdown .allow-select {
   -webkit-user-select: text;
   user-select: text;
 }

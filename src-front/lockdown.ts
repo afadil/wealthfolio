@@ -6,6 +6,9 @@ const isEditable = (el: EventTarget | null) =>
   !!el.closest('input, textarea, [contenteditable="true"], .allow-select, .select-all');
 
 export function installLockdown() {
+  // Add lockdown class for CSS-based restrictions (user-select: none, etc.)
+  document.documentElement.classList.add("app-lockdown");
+
   // Disable context menu except in editables (capture early to beat other listeners)
   window.addEventListener(
     "contextmenu",
