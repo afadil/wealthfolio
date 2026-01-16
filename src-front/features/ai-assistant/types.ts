@@ -18,9 +18,35 @@ export type {
 // Chat Thread Types
 // ============================================================================
 
+/**
+ * Per-thread agent configuration snapshot.
+ * Captures the model, prompt template, and tool allowlist at thread creation.
+ * This enables deterministic replay and debugging of conversations.
+ */
+export interface AiThreadConfig {
+  /** Schema version for backward compatibility */
+  schemaVersion: number;
+  /** Provider ID (e.g., "openai", "anthropic") */
+  providerId: string;
+  /** Model ID (e.g., "gpt-4o", "claude-3-sonnet") */
+  modelId: string;
+  /** Prompt template ID */
+  promptTemplateId: string;
+  /** Prompt template version */
+  promptVersion: string;
+  /** Locale for formatting and language */
+  locale?: string;
+  /** Detail level for responses */
+  detailLevel?: string;
+  /** Allowlist of tool names that can be used in this thread */
+  toolsAllowlist?: string[];
+}
+
 export interface ChatThread {
   id: string;
   title: string;
+  /** Per-thread agent configuration snapshot */
+  config?: AiThreadConfig;
   createdAt: string;
   updatedAt: string;
 }

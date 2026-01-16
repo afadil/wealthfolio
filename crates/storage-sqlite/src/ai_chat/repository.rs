@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use wealthfolio_core::ai::{
     AiChatRepositoryTrait, AiMessage, AiMessageContent, AiMessagePart, AiMessageRole, AiThread,
-    AI_MAX_CONTENT_SIZE_BYTES,
+    AiThreadConfig, AI_MAX_CONTENT_SIZE_BYTES,
 };
 use wealthfolio_core::errors::{DatabaseError, ValidationError};
 use wealthfolio_core::{Error, Result};
@@ -107,6 +107,10 @@ impl AiChatRepositoryTrait for AiChatRepository {
     async fn update_thread(&self, thread: AiThread) -> Result<AiThread> {
         let thread_id = thread.id.clone();
         let title = thread.title.clone();
+        let config_snapshot = thread
+            .config
+            .as_ref()
+            .and_then(|c| serde_json::to_string(c).ok());
         let updated_at = Utc::now().to_rfc3339();
 
         self.writer
@@ -114,6 +118,7 @@ impl AiChatRepositoryTrait for AiChatRepository {
                 diesel::update(ai_threads::table.find(&thread_id))
                     .set((
                         ai_threads::title.eq(&title),
+                        ai_threads::config_snapshot.eq(&config_snapshot),
                         ai_threads::updated_at.eq(&updated_at),
                     ))
                     .execute(conn)
@@ -284,19 +289,33 @@ impl AiChatRepositoryTrait for AiChatRepository {
 // ============================================================================
 
 fn thread_to_db(thread: &AiThread) -> AiThreadDB {
+    // Serialize config snapshot to JSON if present
+    let config_snapshot = thread
+        .config
+        .as_ref()
+        .and_then(|c| serde_json::to_string(c).ok());
+
     AiThreadDB {
         id: thread.id.clone(),
         title: thread.title.clone(),
         created_at: thread.created_at.to_rfc3339(),
         updated_at: thread.updated_at.to_rfc3339(),
+        config_snapshot,
     }
 }
 
 fn db_to_thread(db: &AiThreadDB) -> AiThread {
+    // Parse config snapshot from JSON if present
+    let config = db
+        .config_snapshot
+        .as_ref()
+        .and_then(|json| serde_json::from_str::<AiThreadConfig>(json).ok());
+
     AiThread {
         id: db.id.clone(),
         title: db.title.clone(),
         tags: Vec::new(), // Tags are loaded separately
+        config,
         created_at: DateTime::parse_from_rfc3339(&db.created_at)
             .map(|dt| dt.with_timezone(&Utc))
             .unwrap_or_else(|_| Utc::now()),
@@ -454,6 +473,25 @@ mod tests {
 
         assert_eq!(thread.id, back.id);
         assert_eq!(thread.title, back.title);
+        assert!(back.config.is_none());
+    }
+
+    #[test]
+    fn test_thread_conversion_with_config() {
+        let config = AiThreadConfig::new("openai", "gpt-4o", "wealthfolio-assistant-v1", "1.0.0")
+            .with_default_tools();
+        let thread = AiThread::with_config(config.clone());
+
+        let db = thread_to_db(&thread);
+        assert!(db.config_snapshot.is_some());
+
+        let back = db_to_thread(&db);
+        assert!(back.config.is_some());
+        let back_config = back.config.unwrap();
+        assert_eq!(back_config.provider_id, "openai");
+        assert_eq!(back_config.model_id, "gpt-4o");
+        assert_eq!(back_config.prompt_template_id, "wealthfolio-assistant-v1");
+        assert!(back_config.tools_allowlist.is_some());
     }
 
     #[test]

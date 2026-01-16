@@ -88,6 +88,7 @@ diesel::table! {
         title -> Nullable<Text>,
         created_at -> Text,
         updated_at -> Text,
+        config_snapshot -> Nullable<Text>,
     }
 }
 
