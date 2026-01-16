@@ -4,7 +4,8 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
 import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { cn } from "@/lib/utils";
-import type { ChatMessage, ChatError } from "../types";
+import type { ChatMessage, ChatError, ToolCall } from "../types";
+import { ToolResultRenderer } from "./tool-renderers";
 
 interface MessagePanelProps {
   messages: ChatMessage[];
@@ -127,20 +128,86 @@ export function MessagePanel({
 
 function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
+  const hasToolResults = message.toolResults && message.toolResults.length > 0;
+  const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
+
+  // Build a map from toolCallId to tool name for rendering
+  const toolCallMap = new Map<string, ToolCall>();
+  if (message.toolCalls) {
+    for (const tc of message.toolCalls) {
+      toolCallMap.set(tc.id, tc);
+    }
+  }
 
   return (
-    <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
-      <div
-        className={cn(
-          "max-w-[80%] rounded-lg px-4 py-2",
-          isUser ? "bg-primary text-primary-foreground" : "bg-muted",
-        )}
-      >
-        <p className="whitespace-pre-wrap text-sm">{message.content}</p>
-        {/* TODO: Render tool calls/results when implemented */}
-      </div>
+    <div className={cn("flex flex-col gap-2", isUser ? "items-end" : "items-start")}>
+      {/* Text content */}
+      {message.content && (
+        <div
+          className={cn(
+            "max-w-[85%] rounded-lg px-4 py-2",
+            isUser ? "bg-primary text-primary-foreground" : "bg-muted",
+          )}
+        >
+          <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+        </div>
+      )}
+
+      {/* Tool calls in progress (no results yet) */}
+      {hasToolCalls && !hasToolResults && (
+        <div className="flex max-w-[85%] flex-wrap gap-2">
+          {message.toolCalls!.map((tc) => (
+            <ToolCallBadge key={tc.id} toolCall={tc} isPending />
+          ))}
+        </div>
+      )}
+
+      {/* Tool results with deterministic UI */}
+      {hasToolResults && (
+        <div className="flex w-full max-w-[85%] flex-col gap-2">
+          {message.toolResults!.map((result) => {
+            const toolCall = toolCallMap.get(result.toolCallId);
+            const toolName = toolCall?.name ?? "unknown";
+            return (
+              <ToolResultRenderer
+                key={result.toolCallId}
+                toolName={toolName}
+                result={result}
+              />
+            );
+          })}
+        </div>
+      )}
     </div>
   );
+}
+
+/**
+ * Badge showing a tool call in progress.
+ */
+function ToolCallBadge({ toolCall, isPending }: { toolCall: ToolCall; isPending?: boolean }) {
+  return (
+    <div className="bg-muted flex items-center gap-1.5 rounded-md px-2 py-1">
+      {isPending ? (
+        <Icons.Spinner className="h-3 w-3 animate-spin" />
+      ) : (
+        <Icons.CheckCircle className="text-success h-3 w-3" />
+      )}
+      <span className="text-muted-foreground text-xs">
+        {formatToolNameShort(toolCall.name)}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Format tool name for compact display.
+ */
+function formatToolNameShort(toolName: string): string {
+  // Remove get_ prefix and format
+  return toolName
+    .replace(/^get_/, "")
+    .replace(/_/g, " ");
 }
 
 function SuggestionChip({ children }: { children: string }) {
