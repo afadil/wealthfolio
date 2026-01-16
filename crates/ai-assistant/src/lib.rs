@@ -15,6 +15,8 @@
 //! - `title_generator`: Auto-generates thread titles from user messages
 
 pub mod env;
+#[cfg(test)]
+pub mod eval;
 pub mod portfolio_data;
 pub mod providers;
 pub mod service;
