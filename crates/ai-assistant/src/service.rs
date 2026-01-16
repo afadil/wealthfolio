@@ -238,11 +238,14 @@ impl AiAssistantServiceTrait for AiAssistantService {
             temperature: self.config.temperature,
         };
 
-        // Generate message ID for the assistant response
+        // Generate run ID and message ID for the assistant response
+        let run_id = Uuid::now_v7().to_string();
         let message_id = Uuid::now_v7().to_string();
 
         // Get streaming response from provider
-        let stream = provider.stream(config, &message_id).await?;
+        let stream = provider
+            .stream(config, &thread.id, &run_id, &message_id)
+            .await?;
 
         // TODO: Wrap stream to handle tool calls and store final message
         // Variables prepared for future tool execution loop:

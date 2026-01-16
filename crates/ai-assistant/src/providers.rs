@@ -83,9 +83,13 @@ pub trait ProviderAdapter: Send + Sync {
     /// Perform a streaming chat completion.
     ///
     /// Returns a stream of `AiStreamEvent` that ends with a `Done` event.
+    /// All events include the provided thread_id, run_id, and message_id
+    /// for correlation across reconnects.
     async fn stream(
         &self,
         config: CompletionConfig,
+        thread_id: &str,
+        run_id: &str,
         message_id: &str,
     ) -> Result<BoxStream<'static, AiStreamEvent>, AiAssistantError>;
 }
@@ -190,21 +194,25 @@ impl ProviderAdapter for StubProvider {
     async fn stream(
         &self,
         _config: CompletionConfig,
+        thread_id: &str,
+        run_id: &str,
         message_id: &str,
     ) -> Result<BoxStream<'static, AiStreamEvent>, AiAssistantError> {
         use futures::stream;
 
+        let thread_id = thread_id.to_string();
+        let run_id = run_id.to_string();
         let message_id = message_id.to_string();
         let response = self.response.clone();
 
-        // Emit the response as a single text delta followed by done
-        let msg = ChatMessage::assistant_with_id(&message_id, "stub-thread");
-        let mut final_msg = msg;
+        // Emit system event, response as a single text delta, then done
+        let mut final_msg = ChatMessage::assistant_with_id(&message_id, &thread_id);
         final_msg.content = response.clone();
 
         let events = vec![
-            AiStreamEvent::text_delta(&message_id, &response),
-            AiStreamEvent::done(final_msg, None),
+            AiStreamEvent::system(&thread_id, &run_id, &message_id),
+            AiStreamEvent::text_delta(&thread_id, &run_id, &message_id, &response),
+            AiStreamEvent::done(&thread_id, &run_id, final_msg, None),
         ];
 
         Ok(Box::pin(stream::iter(events)))

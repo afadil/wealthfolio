@@ -318,6 +318,8 @@ pub fn run() {
             commands::ai_providers::update_ai_provider_settings,
             commands::ai_providers::set_default_ai_provider,
             commands::ai_providers::list_ai_models,
+            // AI chat commands
+            commands::ai_chat::stream_ai_chat,
             // Addon commands
             commands::addon::extract_addon_zip,
             commands::addon::install_addon_zip,

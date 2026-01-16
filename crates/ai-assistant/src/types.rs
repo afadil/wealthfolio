@@ -203,41 +203,81 @@ pub struct ToolResultData {
 
 /// Events emitted during chat streaming.
 ///
-/// All events include `message_id` for correlation.
-/// The stream ends with a terminal `Done` event.
+/// All events include `thread_id`, `run_id`, and `message_id` for correlation
+/// across reconnects. The stream ends with a terminal `Done` event.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum AiStreamEvent {
+    /// System event - metadata about the stream (sent first).
+    #[serde(rename_all = "camelCase")]
+    System {
+        /// The thread ID for this conversation.
+        thread_id: String,
+        /// The run ID for this streaming session (uuid7).
+        run_id: String,
+        /// The message ID being generated.
+        message_id: String,
+    },
+
     /// Text delta - partial text content.
     #[serde(rename_all = "camelCase")]
     TextDelta {
+        /// The thread ID for this conversation.
+        thread_id: String,
+        /// The run ID for this streaming session.
+        run_id: String,
         /// The message ID this delta belongs to.
         message_id: String,
         /// The text content delta.
         delta: String,
     },
 
+    /// Reasoning delta - partial reasoning/thinking content (optional).
+    #[serde(rename_all = "camelCase")]
+    ReasoningDelta {
+        /// The thread ID for this conversation.
+        thread_id: String,
+        /// The run ID for this streaming session.
+        run_id: String,
+        /// The message ID this delta belongs to.
+        message_id: String,
+        /// The reasoning content delta.
+        delta: String,
+    },
+
     /// Tool call event - model wants to call a tool.
     #[serde(rename_all = "camelCase")]
     ToolCall {
+        /// The thread ID for this conversation.
+        thread_id: String,
+        /// The run ID for this streaming session.
+        run_id: String,
         /// The message ID this tool call belongs to.
         message_id: String,
-        /// The tool call details.
+        /// The tool call details (structured JSON).
         tool_call: ToolCall,
     },
 
     /// Tool result event - tool execution completed.
     #[serde(rename_all = "camelCase")]
     ToolResult {
+        /// The thread ID for this conversation.
+        thread_id: String,
+        /// The run ID for this streaming session.
+        run_id: String,
         /// The message ID this result belongs to.
         message_id: String,
-        /// The tool result.
+        /// The tool result (structured JSON).
         result: ToolResultData,
     },
 
     /// Error event - something went wrong.
     #[serde(rename_all = "camelCase")]
     Error {
+        /// The thread ID for this conversation.
+        thread_id: String,
+        /// The run ID for this streaming session.
+        run_id: String,
         /// The message ID (if available).
         message_id: Option<String>,
         /// Error code for programmatic handling.
@@ -249,6 +289,10 @@ pub enum AiStreamEvent {
     /// Done event - stream completed (terminal).
     #[serde(rename_all = "camelCase")]
     Done {
+        /// The thread ID for this conversation.
+        thread_id: String,
+        /// The run ID for this streaming session.
+        run_id: String,
         /// The message ID of the completed message.
         message_id: String,
         /// The final complete message.
@@ -260,33 +304,71 @@ pub enum AiStreamEvent {
 }
 
 impl AiStreamEvent {
+    /// Create a system event (sent first in the stream).
+    pub fn system(thread_id: &str, run_id: &str, message_id: &str) -> Self {
+        Self::System {
+            thread_id: thread_id.to_string(),
+            run_id: run_id.to_string(),
+            message_id: message_id.to_string(),
+        }
+    }
+
     /// Create a text delta event.
-    pub fn text_delta(message_id: &str, delta: &str) -> Self {
+    pub fn text_delta(thread_id: &str, run_id: &str, message_id: &str, delta: &str) -> Self {
         Self::TextDelta {
+            thread_id: thread_id.to_string(),
+            run_id: run_id.to_string(),
+            message_id: message_id.to_string(),
+            delta: delta.to_string(),
+        }
+    }
+
+    /// Create a reasoning delta event.
+    pub fn reasoning_delta(thread_id: &str, run_id: &str, message_id: &str, delta: &str) -> Self {
+        Self::ReasoningDelta {
+            thread_id: thread_id.to_string(),
+            run_id: run_id.to_string(),
             message_id: message_id.to_string(),
             delta: delta.to_string(),
         }
     }
 
     /// Create a tool call event.
-    pub fn tool_call(message_id: &str, tool_call: ToolCall) -> Self {
+    pub fn tool_call(thread_id: &str, run_id: &str, message_id: &str, tool_call: ToolCall) -> Self {
         Self::ToolCall {
+            thread_id: thread_id.to_string(),
+            run_id: run_id.to_string(),
             message_id: message_id.to_string(),
             tool_call,
         }
     }
 
     /// Create a tool result event.
-    pub fn tool_result(message_id: &str, result: ToolResultData) -> Self {
+    pub fn tool_result(
+        thread_id: &str,
+        run_id: &str,
+        message_id: &str,
+        result: ToolResultData,
+    ) -> Self {
         Self::ToolResult {
+            thread_id: thread_id.to_string(),
+            run_id: run_id.to_string(),
             message_id: message_id.to_string(),
             result,
         }
     }
 
     /// Create an error event.
-    pub fn error(message_id: Option<&str>, code: &str, message: &str) -> Self {
+    pub fn error(
+        thread_id: &str,
+        run_id: &str,
+        message_id: Option<&str>,
+        code: &str,
+        message: &str,
+    ) -> Self {
         Self::Error {
+            thread_id: thread_id.to_string(),
+            run_id: run_id.to_string(),
             message_id: message_id.map(|s| s.to_string()),
             code: code.to_string(),
             message: message.to_string(),
@@ -294,8 +376,10 @@ impl AiStreamEvent {
     }
 
     /// Create a done event.
-    pub fn done(message: ChatMessage, usage: Option<UsageStats>) -> Self {
+    pub fn done(thread_id: &str, run_id: &str, message: ChatMessage, usage: Option<UsageStats>) -> Self {
         Self::Done {
+            thread_id: thread_id.to_string(),
+            run_id: run_id.to_string(),
             message_id: message.id.clone(),
             message,
             usage,
@@ -436,10 +520,29 @@ mod tests {
 
     #[test]
     fn test_ai_stream_event_serialization() {
-        let event = AiStreamEvent::text_delta("msg-1", "Hello");
+        let event = AiStreamEvent::text_delta("thread-1", "run-1", "msg-1", "Hello");
         let json = serde_json::to_string(&event).unwrap();
         assert!(json.contains("textDelta"));
+        assert!(json.contains("threadId"));
+        assert!(json.contains("runId"));
         assert!(json.contains("msg-1"));
+    }
+
+    #[test]
+    fn test_system_event() {
+        let event = AiStreamEvent::system("thread-1", "run-1", "msg-1");
+        let json = serde_json::to_string(&event).unwrap();
+        assert!(json.contains("\"type\":\"system\""));
+        assert!(json.contains("\"threadId\":\"thread-1\""));
+        assert!(json.contains("\"runId\":\"run-1\""));
+    }
+
+    #[test]
+    fn test_reasoning_delta_event() {
+        let event = AiStreamEvent::reasoning_delta("thread-1", "run-1", "msg-1", "thinking...");
+        let json = serde_json::to_string(&event).unwrap();
+        assert!(json.contains("\"type\":\"reasoningDelta\""));
+        assert!(json.contains("thinking..."));
     }
 
     #[test]
