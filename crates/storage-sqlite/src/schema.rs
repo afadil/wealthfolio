@@ -89,6 +89,7 @@ diesel::table! {
         created_at -> Text,
         updated_at -> Text,
         config_snapshot -> Nullable<Text>,
+        is_pinned -> Integer,
     }
 }
 

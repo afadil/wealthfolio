@@ -136,6 +136,9 @@ impl Default for AiThreadConfig {
 pub struct AiThread {
     pub id: String,
     pub title: Option<String>,
+    /// Whether the thread is pinned to the top of the list.
+    #[serde(default)]
+    pub is_pinned: bool,
     pub tags: Vec<String>,
     /// Per-thread agent configuration snapshot.
     /// Captures model, prompt template, and tool allowlist at creation.
@@ -152,6 +155,7 @@ impl AiThread {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             title: None,
+            is_pinned: false,
             tags: Vec::new(),
             config: None,
             created_at: now,
@@ -165,6 +169,7 @@ impl AiThread {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             title: None,
+            is_pinned: false,
             tags: Vec::new(),
             config: Some(config),
             created_at: now,
@@ -176,6 +181,7 @@ impl AiThread {
     pub fn with_id(
         id: String,
         title: Option<String>,
+        is_pinned: bool,
         config: Option<AiThreadConfig>,
         created_at: DateTime<Utc>,
         updated_at: DateTime<Utc>,
@@ -183,6 +189,7 @@ impl AiThread {
         Self {
             id,
             title,
+            is_pinned,
             tags: Vec::new(),
             config,
             created_at,

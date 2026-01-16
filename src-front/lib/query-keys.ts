@@ -58,6 +58,11 @@ export const QueryKeys = {
   AI_PROVIDER_MODELS: "aiProviderModels",
   aiProviderModels: (providerId: string) => [QueryKeys.AI_PROVIDER_MODELS, providerId],
 
+  // AI Chat
+  AI_THREADS: "aiThreads",
+  AI_THREAD: "aiThread",
+  aiThread: (threadId: string) => [QueryKeys.AI_THREAD, threadId],
+
   transactions: "transactions",
   latestValuations: "latest-valuations",
 

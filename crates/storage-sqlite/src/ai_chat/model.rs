@@ -36,6 +36,8 @@ pub struct AiThreadDB {
     pub updated_at: String,
     /// JSON blob containing per-thread agent configuration snapshot.
     pub config_snapshot: Option<String>,
+    /// Whether the thread is pinned to the top of the list.
+    pub is_pinned: i32,
 }
 
 /// Database model for AI chat messages.
@@ -273,6 +275,7 @@ impl AiThreadDB {
             created_at: now.clone(),
             updated_at: now,
             config_snapshot: None,
+            is_pinned: 0,
         }
     }
 
@@ -285,6 +288,7 @@ impl AiThreadDB {
             created_at: now.clone(),
             updated_at: now,
             config_snapshot,
+            is_pinned: 0,
         }
     }
 }
