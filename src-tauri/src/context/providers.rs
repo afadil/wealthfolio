@@ -6,6 +6,7 @@ use wealthfolio_connect::{BrokerSyncService, PlatformRepository};
 use wealthfolio_core::{
     accounts::AccountService,
     activities::ActivityService,
+    ai::AiProviderService,
     assets::{AssetClassificationService, AssetService},
     fx::{FxService, FxServiceTrait},
     goals::GoalService,
@@ -20,7 +21,7 @@ use wealthfolio_core::{
         valuation::ValuationService,
     },
     quotes::{QuoteService, QuoteServiceTrait},
-    settings::{SettingsService, SettingsServiceTrait},
+    settings::{SettingsService, SettingsServiceTrait, SettingsRepositoryTrait},
     taxonomies::TaxonomyService,
 };
 use wealthfolio_storage_sqlite::{
@@ -191,6 +192,14 @@ pub async fn initialize_context(
 
     let connect_service = Arc::new(ConnectService::new());
 
+    // AI provider service - catalog is embedded at compile time
+    let ai_catalog_json = include_str!("../../../src-front/lib/ai-providers.json");
+    let ai_provider_service = Arc::new(AiProviderService::new(
+        settings_repository.clone() as Arc<dyn SettingsRepositoryTrait>,
+        secret_store.clone(),
+        ai_catalog_json,
+    )?);
+
     Ok(ServiceContext {
         base_currency,
         instance_id,
@@ -213,5 +222,6 @@ pub async fn initialize_context(
         alternative_asset_repository,
         taxonomy_service,
         connect_service,
+        ai_provider_service,
     })
 }
