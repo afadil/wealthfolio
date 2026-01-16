@@ -9,9 +9,9 @@ use crate::settings::SettingsRepositoryTrait;
 
 use super::{
     AiError, AiProviderCatalog, AiProviderSettings, AiProvidersResponse, FetchedModel,
-    ListModelsResponse, MergedModel, MergedProvider, ProviderConfig, ProviderUserSettings,
-    SetDefaultProviderRequest, UpdateProviderSettingsRequest, AI_PROVIDER_SETTINGS_KEY,
-    AI_PROVIDER_SETTINGS_SCHEMA_VERSION,
+    ListModelsResponse, MergedModel, MergedProvider, ModelCapabilities, ModelCapabilityOverrides,
+    ProviderConfig, ProviderUserSettings, SetDefaultProviderRequest, UpdateProviderSettingsRequest,
+    AI_PROVIDER_SETTINGS_KEY, AI_PROVIDER_SETTINGS_SCHEMA_VERSION,
 };
 
 /// Service trait for AI provider operations.
@@ -165,6 +165,25 @@ impl AiProviderService {
                     .and_then(|p| p.default_config.url.clone())
             })
     }
+
+    /// Check if a provider supports dynamic model listing via API.
+    fn provider_supports_model_listing(provider_id: &str) -> bool {
+        // Anthropic doesn't have a model listing API
+        provider_id != "anthropic"
+    }
+
+    /// Apply capability overrides to base capabilities.
+    fn apply_capability_overrides(
+        base: &ModelCapabilities,
+        overrides: &ModelCapabilityOverrides,
+    ) -> ModelCapabilities {
+        ModelCapabilities {
+            tools: overrides.tools.unwrap_or(base.tools),
+            thinking: base.thinking, // No override for thinking (yet)
+            vision: overrides.vision.unwrap_or(base.vision),
+            streaming: overrides.streaming.unwrap_or(base.streaming),
+        }
+    }
 }
 
 #[async_trait]
@@ -190,20 +209,38 @@ impl AiProviderServiceTrait for AiProviderService {
                             selected_model: None,
                             custom_url: catalog_provider.default_config.url.clone(),
                             priority: 100, // Default priority
+                            ..Default::default()
                         }
                     });
 
-                // Convert models map to sorted vec
+                // Convert models map to sorted vec, applying capability overrides
                 let mut models: Vec<MergedModel> = catalog_provider
                     .models
                     .iter()
-                    .map(|(model_id, model)| MergedModel {
-                        id: model_id.clone(),
-                        capabilities: model.capabilities.clone(),
+                    .map(|(model_id, model)| {
+                        let has_overrides = user.model_capability_overrides.contains_key(model_id);
+                        let capabilities = if let Some(overrides) =
+                            user.model_capability_overrides.get(model_id)
+                        {
+                            Self::apply_capability_overrides(&model.capabilities, overrides)
+                        } else {
+                            model.capabilities.clone()
+                        };
+                        MergedModel {
+                            id: model_id.clone(),
+                            name: None, // Catalog models don't have separate display names
+                            capabilities,
+                            is_catalog: true,
+                            is_favorite: user.favorite_models.contains(model_id),
+                            has_capability_overrides: has_overrides,
+                        }
                     })
                     .collect();
                 // Sort models alphabetically for consistent ordering
                 models.sort_by(|a, b| a.id.cmp(&b.id));
+
+                // Check if provider supports dynamic model listing
+                let supports_model_listing = Self::provider_supports_model_listing(id);
 
                 MergedProvider {
                     id: id.clone(),
@@ -221,8 +258,11 @@ impl AiProviderServiceTrait for AiProviderService {
                     selected_model: user.selected_model,
                     custom_url: user.custom_url,
                     priority: user.priority,
+                    favorite_models: user.favorite_models.clone(),
+                    model_capability_overrides: user.model_capability_overrides.clone(),
                     has_api_key: self.has_api_key(id),
                     is_default: user_settings.default_provider.as_ref() == Some(id),
+                    supports_model_listing,
                 }
             })
             .collect();
@@ -272,6 +312,26 @@ impl AiProviderServiceTrait for AiProviderService {
         }
         if let Some(priority) = request.priority {
             provider_settings.priority = priority;
+        }
+
+        // Handle capability override update for a specific model
+        if let Some(override_update) = request.model_capability_override {
+            if let Some(overrides) = override_update.overrides {
+                // Set or update overrides for this model
+                provider_settings
+                    .model_capability_overrides
+                    .insert(override_update.model_id, overrides);
+            } else {
+                // Remove overrides for this model (None means clear)
+                provider_settings
+                    .model_capability_overrides
+                    .remove(&override_update.model_id);
+            }
+        }
+
+        // Handle favorite models update (replaces entire list)
+        if let Some(favorite_models) = request.favorite_models {
+            provider_settings.favorite_models = favorite_models;
         }
 
         // Update schema version

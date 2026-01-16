@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -12,7 +12,8 @@ import {
   useSetDefaultAiProvider,
   useAiProviderApiKey,
 } from "@/features/ai-assistant";
-import type { MergedProvider } from "@/lib/types";
+import { listAiModels } from "@/commands/ai-providers";
+import type { MergedProvider, FetchedModel, ModelCapabilityOverrides } from "@/lib/types";
 
 /**
  * AI Providers settings page - configure AI provider API keys and preferences.
@@ -43,6 +44,28 @@ export default function AiProvidersPage() {
 
   const handleCustomUrlChange = (providerId: string, customUrl: string) => {
     updateSettings({ providerId, customUrl: customUrl || undefined });
+  };
+
+  const handleSelectModel = (providerId: string, modelId: string) => {
+    updateSettings({ providerId, selectedModel: modelId });
+  };
+
+  const handleSetFavoriteModels = (providerId: string, modelIds: string[]) => {
+    updateSettings({ providerId, favoriteModels: modelIds });
+  };
+
+  const handleSetCapabilityOverride = (
+    providerId: string,
+    modelId: string,
+    overrides: ModelCapabilityOverrides | null
+  ) => {
+    updateSettings({
+      providerId,
+      modelCapabilityOverride: {
+        modelId,
+        overrides: overrides ?? undefined,
+      },
+    });
   };
 
   if (isLoading) {
@@ -127,6 +150,11 @@ export default function AiProvidersPage() {
                 onSetDefault={() => setDefault({ providerId: provider.id })}
                 onPriorityChange={(priority) => handlePriorityChange(provider.id, priority)}
                 onCustomUrlChange={(url) => handleCustomUrlChange(provider.id, url)}
+                onSelectModel={(modelId) => handleSelectModel(provider.id, modelId)}
+                onSetFavoriteModels={(modelIds) => handleSetFavoriteModels(provider.id, modelIds)}
+                onSetCapabilityOverride={(modelId, overrides) =>
+                  handleSetCapabilityOverride(provider.id, modelId, overrides)
+                }
               />
             ))}
           </div>
@@ -137,7 +165,7 @@ export default function AiProvidersPage() {
 }
 
 /**
- * Wrapper component to provide API key hooks to each provider card.
+ * Wrapper component to provide API key hooks and model fetching to each provider card.
  */
 function ProviderSettingsCardWrapper({
   provider,
@@ -147,6 +175,9 @@ function ProviderSettingsCardWrapper({
   onSetDefault,
   onPriorityChange,
   onCustomUrlChange,
+  onSelectModel,
+  onSetFavoriteModels,
+  onSetCapabilityOverride,
 }: {
   provider: Parameters<typeof ProviderSettingsCard>[0]["provider"];
   priorityValue: number;
@@ -155,8 +186,17 @@ function ProviderSettingsCardWrapper({
   onSetDefault: () => void;
   onPriorityChange: (priority: number) => void;
   onCustomUrlChange: (url: string) => void;
+  onSelectModel: (modelId: string) => void;
+  onSetFavoriteModels: (modelIds: string[]) => void;
+  onSetCapabilityOverride: (modelId: string, overrides: ModelCapabilityOverrides | null) => void;
 }) {
   const { setApiKey, deleteApiKey, revealApiKey } = useAiProviderApiKey(provider.id);
+
+  // Fetch models from provider API
+  const handleFetchModels = useCallback(async (): Promise<FetchedModel[]> => {
+    const response = await listAiModels(provider.id);
+    return response.models;
+  }, [provider.id]);
 
   return (
     <ProviderSettingsCard
@@ -170,6 +210,10 @@ function ProviderSettingsCardWrapper({
       onRevealApiKey={revealApiKey}
       onPriorityChange={onPriorityChange}
       onCustomUrlChange={onCustomUrlChange}
+      onSelectModel={onSelectModel}
+      onFetchModels={handleFetchModels}
+      onSetFavoriteModels={onSetFavoriteModels}
+      onSetCapabilityOverride={onSetCapabilityOverride}
     />
   );
 }
