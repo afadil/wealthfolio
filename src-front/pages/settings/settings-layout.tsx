@@ -54,6 +54,12 @@ const sidebarNavItems = [
     icon: <Icons.BarChart className="size-5" />,
   },
   {
+    title: "AI Providers",
+    href: "ai-providers",
+    subtitle: "Configure AI for portfolio insights",
+    icon: <Icons.Sparkles className="size-5" />,
+  },
+  {
     title: "Add-ons",
     href: "addons",
     subtitle: "Extend Wealthfolio with features",

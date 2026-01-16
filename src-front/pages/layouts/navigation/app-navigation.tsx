@@ -46,6 +46,13 @@ const staticNavigation: NavigationProps = {
       keywords: ["transactions", "trades", "history"],
       label: "View Activities",
     },
+    {
+      icon: <Icons.Sparkles className="size-6" />,
+      title: "Assistant",
+      href: "/assistant",
+      keywords: ["ai", "assistant", "chat", "help", "ask"],
+      label: "AI Assistant",
+    },
   ],
   secondary: [
     {
