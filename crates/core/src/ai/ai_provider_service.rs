@@ -97,10 +97,16 @@ impl AiProviderService {
             .await
     }
 
+    /// Build the secret key for a provider (format: ai_<PROVIDER_ID>).
+    fn secret_key_for_provider(provider_id: &str) -> String {
+        format!("ai_{}", provider_id.to_uppercase())
+    }
+
     /// Check if a provider has an API key stored.
-    fn has_api_key(&self, env_key: &str) -> bool {
+    fn has_api_key(&self, provider_id: &str) -> bool {
+        let secret_key = Self::secret_key_for_provider(provider_id);
         self.secret_store
-            .get_secret(env_key)
+            .get_secret(&secret_key)
             .ok()
             .flatten()
             .map(|s| !s.is_empty())
@@ -162,7 +168,7 @@ impl AiProviderServiceTrait for AiProviderService {
                     selected_model: user.selected_model,
                     custom_url: user.custom_url,
                     priority: user.priority,
-                    has_api_key: self.has_api_key(&catalog_provider.env_key),
+                    has_api_key: self.has_api_key(id),
                     is_default: user_settings.default_provider.as_ref() == Some(id),
                 }
             })
