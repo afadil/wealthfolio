@@ -42,6 +42,12 @@ pub trait AiEnvironment: Send + Sync {
 
     /// Get the default model ID for a provider.
     fn get_default_model(&self, provider_id: &str) -> Option<String>;
+
+    /// Get the title generation model ID for a provider.
+    ///
+    /// This is a fast model used for auto-generating thread titles.
+    /// Falls back to the default model if not configured.
+    fn get_title_model(&self, provider_id: &str) -> Option<String>;
 }
 
 /// Environment errors.
@@ -138,6 +144,10 @@ impl AiEnvironment for RuntimeEnvironment {
                     })
             })
     }
+
+    fn get_title_model(&self, provider_id: &str) -> Option<String> {
+        self.provider_service.get_title_model(provider_id)
+    }
 }
 
 /// Test environment for unit testing without network access.
@@ -153,6 +163,7 @@ pub mod test_env {
         pub locale: Option<String>,
         pub default_provider: Option<String>,
         pub default_models: HashMap<String, String>,
+        pub title_models: HashMap<String, String>,
         pub fixed_time: Option<DateTime<Utc>>,
     }
 
@@ -164,6 +175,7 @@ pub mod test_env {
                 locale: Some("en-US".to_string()),
                 default_provider: None,
                 default_models: HashMap::new(),
+                title_models: HashMap::new(),
                 fixed_time: None,
             }
         }
@@ -228,6 +240,13 @@ pub mod test_env {
 
         fn get_default_model(&self, provider_id: &str) -> Option<String> {
             self.default_models.get(provider_id).cloned()
+        }
+
+        fn get_title_model(&self, provider_id: &str) -> Option<String> {
+            self.title_models
+                .get(provider_id)
+                .cloned()
+                .or_else(|| self.default_models.get(provider_id).cloned())
         }
     }
 }
