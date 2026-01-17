@@ -257,6 +257,10 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
             "get_accounts".to_string(),
             "search_activities".to_string(),
             "get_goals".to_string(),
+            "get_valuation_history".to_string(),
+            "get_dividends".to_string(),
+            "get_asset_allocation".to_string(),
+            "get_performance".to_string(),
         ]
     }
 
@@ -377,6 +381,10 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
                 .tool(tools.accounts)
                 .tool(tools.activities)
                 .tool(tools.goals)
+                .tool(tools.valuation)
+                .tool(tools.dividends)
+                .tool(tools.allocation)
+                .tool(tools.performance)
                 .tool_choice(ToolChoice::Auto)
                 .build();
 

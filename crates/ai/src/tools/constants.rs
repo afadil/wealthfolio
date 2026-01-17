@@ -21,6 +21,9 @@ pub const MAX_HOLDINGS: usize = 100;
 /// Maximum number of income/dividend records returned per tool call.
 pub const MAX_INCOME_RECORDS: usize = 50;
 
+/// Maximum number of dividend/interest payments returned per tool call.
+pub const MAX_DIVIDENDS: usize = 100;
+
 /// Maximum number of goals returned per tool call.
 pub const MAX_GOALS: usize = 50;
 
