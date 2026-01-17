@@ -16,7 +16,7 @@ wealthfolio-core = { workspace = true }
 wealthfolio-connect = { workspace = true }
 wealthfolio-storage-sqlite = { workspace = true }
 wealthfolio-device-sync = { workspace = true }
-wealthfolio-ai-assistant = { workspace = true }
+wealthfolio-ai = { workspace = true }
 
 # Tauri
 tauri = { version = "2.9.3", features = [] }

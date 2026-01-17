@@ -9,7 +9,7 @@ wealthfolio-core = { workspace = true }
 wealthfolio-connect = { workspace = true }
 wealthfolio-storage-sqlite = { workspace = true }
 wealthfolio-device-sync = { workspace = true }
-wealthfolio-ai-assistant = { workspace = true }
+wealthfolio-ai = { workspace = true }
 
 # Web framework
 axum = { version = "0.8", features = ["json", "macros"] }

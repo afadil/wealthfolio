@@ -17,6 +17,7 @@ import {
   Baseline,
   Bitcoin,
   Blocks,
+  Brain,
   Briefcase,
   Building2,
   Calendar,
@@ -187,6 +188,7 @@ const IconsInternal = {
   ArrowUpRight: ArrowUpRight,
   CreditCard: CreditCard,
   Bitcoin: Bitcoin,
+  Brain: Brain,
   Briefcase: Briefcase,
   Search: Search,
   Save: Save,
@@ -698,6 +700,7 @@ export type IconName =
   | "ArrowUpRight"
   | "CreditCard"
   | "Bitcoin"
+  | "Brain"
   | "Briefcase"
   | "Search"
   | "Save"

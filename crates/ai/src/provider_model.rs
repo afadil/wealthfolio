@@ -214,7 +214,8 @@ pub struct MergedProvider {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub favorite_models: Vec<String>,
     /// Capability overrides for specific models.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    /// Note: Always serialized (no skip_serializing_if) because frontend expects this field.
+    #[serde(default)]
     pub model_capability_overrides: HashMap<String, ModelCapabilityOverrides>,
 
     // Computed
@@ -280,13 +281,14 @@ pub struct SetDefaultProviderRequest {
 }
 
 // ============================================================================
-// AI Error Types
+// Provider API Error Types
 // ============================================================================
 
-/// AI-specific errors.
+/// Provider-specific API errors (for frontend consumption).
+/// Different from the main AiError which is used internally.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
-pub enum AiError {
+pub enum ProviderApiError {
     /// API key is required but not configured for the provider.
     #[serde(rename_all = "camelCase")]
     MissingApiKey { provider_id: String },
@@ -301,26 +303,26 @@ pub enum AiError {
     InvalidInput { message: String },
 }
 
-impl std::fmt::Display for AiError {
+impl std::fmt::Display for ProviderApiError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AiError::MissingApiKey { provider_id } => {
+            ProviderApiError::MissingApiKey { provider_id } => {
                 write!(f, "API key required for provider '{}'", provider_id)
             }
-            AiError::UnknownProvider { provider_id } => {
+            ProviderApiError::UnknownProvider { provider_id } => {
                 write!(f, "Unknown provider: {}", provider_id)
             }
-            AiError::ProviderError { message } => {
+            ProviderApiError::ProviderError { message } => {
                 write!(f, "Provider error: {}", message)
             }
-            AiError::InvalidInput { message } => {
+            ProviderApiError::InvalidInput { message } => {
                 write!(f, "Invalid input: {}", message)
             }
         }
     }
 }
 
-impl std::error::Error for AiError {}
+impl std::error::Error for ProviderApiError {}
 
 // ============================================================================
 // Provider Configuration Types (for chat/model listing)

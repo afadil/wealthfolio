@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use tauri::State;
-use wealthfolio_core::ai::{
-    AiError, AiProvidersResponse, ListModelsResponse, SetDefaultProviderRequest,
+use wealthfolio_ai::{
+    AiProvidersResponse, ListModelsResponse, ProviderApiError, SetDefaultProviderRequest,
     UpdateProviderSettingsRequest,
 };
 
@@ -48,7 +48,7 @@ pub async fn set_default_ai_provider(
 pub async fn list_ai_models(
     context: State<'_, Arc<ServiceContext>>,
     provider_id: String,
-) -> Result<ListModelsResponse, AiError> {
+) -> Result<ListModelsResponse, ProviderApiError> {
     context
         .ai_provider_service()
         .list_models(&provider_id)

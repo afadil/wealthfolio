@@ -3,11 +3,10 @@
 use async_trait::async_trait;
 use log::{info, warn};
 
-use crate::errors::Result;
+use wealthfolio_core::errors::Result;
 
-use super::{
-    ChatRunConfig, DetailLevel, PromptTemplate, PromptTemplateCatalog,
-    PROMPT_TEMPLATE_SCHEMA_VERSION,
+use crate::prompt_template::{
+    ChatRunConfig, DetailLevel, PromptTemplate, PromptTemplateCatalog, PROMPT_TEMPLATE_SCHEMA_VERSION,
 };
 
 /// Service trait for prompt template operations.
@@ -107,12 +106,12 @@ impl PromptTemplateServiceTrait for PromptTemplateService {
             .or_else(|| self.get_template(&config.template_id))
             .or_else(|| self.get_default_template())
             .ok_or_else(|| {
-                crate::errors::Error::Validation(crate::errors::ValidationError::InvalidInput(
-                    format!(
+                wealthfolio_core::errors::Error::Validation(
+                    wealthfolio_core::errors::ValidationError::InvalidInput(format!(
                         "Template not found: {}@{}",
                         config.template_id, config.template_version
-                    ),
-                ))
+                    )),
+                )
             })?;
 
         // Log if we fell back to a different version

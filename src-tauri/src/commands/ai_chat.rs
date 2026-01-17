@@ -7,8 +7,7 @@ use std::sync::Arc;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tauri::{ipc::Channel, State};
-use wealthfolio_ai_assistant::types::{AiAssistantError, AiStreamEvent, SendMessageRequest};
-use wealthfolio_core::ai::{AiChatRepositoryTrait, AiThread};
+use wealthfolio_ai::{AiError, AiStreamEvent, ChatThread, ListThreadsRequest, SendMessageRequest, ThreadPage};
 
 use crate::context::ServiceContext;
 
@@ -41,11 +40,7 @@ pub async fn stream_ai_chat(
     request: SendMessageRequest,
     on_event: Channel<AiStreamEvent>,
 ) -> CommandResult<()> {
-    let service = context
-        .ai_assistant_service()
-        .ok_or_else(|| AiAssistantError::ProviderNotConfigured {
-            provider_id: "default".to_string(),
-        })?;
+    let service = context.ai_chat_service();
 
     let mut event_stream = service.send_message(request).await?;
 
@@ -64,16 +59,20 @@ pub async fn stream_ai_chat(
 // Thread Management Commands
 // ============================================================================
 
-/// List all chat threads, sorted by pinned status then updated_at.
+/// List all chat threads with cursor-based pagination and optional search.
+///
+/// Returns a `ThreadPage` with threads, next_cursor, and has_more flag.
 #[tauri::command]
 pub async fn list_ai_threads(
     context: State<'_, Arc<ServiceContext>>,
-    limit: Option<i64>,
-    offset: Option<i64>,
-) -> CommandResult<Vec<AiThread>> {
-    let repo = context.ai_chat_repository();
-    let threads = repo.list_threads(limit.unwrap_or(100), offset.unwrap_or(0))?;
-    Ok(threads)
+    cursor: Option<String>,
+    limit: Option<u32>,
+    search: Option<String>,
+) -> CommandResult<ThreadPage> {
+    let service = context.ai_chat_service();
+    let request = ListThreadsRequest { cursor, limit, search };
+    let page = service.list_threads_paginated(&request)?;
+    Ok(page)
 }
 
 /// Get a single chat thread by ID.
@@ -81,9 +80,9 @@ pub async fn list_ai_threads(
 pub async fn get_ai_thread(
     context: State<'_, Arc<ServiceContext>>,
     thread_id: String,
-) -> CommandResult<Option<AiThread>> {
-    let repo = context.ai_chat_repository();
-    let thread = repo.get_thread(&thread_id)?;
+) -> CommandResult<Option<ChatThread>> {
+    let service = context.ai_chat_service();
+    let thread = service.get_thread(&thread_id)?;
     Ok(thread)
 }
 
@@ -92,27 +91,24 @@ pub async fn get_ai_thread(
 pub async fn update_ai_thread(
     context: State<'_, Arc<ServiceContext>>,
     request: UpdateThreadRequest,
-) -> CommandResult<AiThread> {
-    let repo = context.ai_chat_repository();
+) -> CommandResult<ChatThread> {
+    let service = context.ai_chat_service();
 
-    // Get existing thread
-    let existing = repo.get_thread(&request.id)?.ok_or_else(|| {
-        AiAssistantError::ThreadNotFound {
-            thread_id: request.id.clone(),
-        }
-    })?;
-
-    // Apply updates
-    let mut updated = existing;
+    // Update title if provided
     if let Some(title) = request.title {
-        updated.title = Some(title);
-    }
-    if let Some(is_pinned) = request.is_pinned {
-        updated.is_pinned = is_pinned;
+        service.update_thread_title(&request.id, title).await?;
     }
 
-    let result = repo.update_thread(updated).await?;
-    Ok(result)
+    // Update pinned status if provided
+    if let Some(is_pinned) = request.is_pinned {
+        service.update_thread_pinned(&request.id, is_pinned).await?;
+    }
+
+    // Get updated thread
+    let thread = service
+        .get_thread(&request.id)?
+        .ok_or_else(|| AiError::ThreadNotFound(request.id.clone()))?;
+    Ok(thread)
 }
 
 /// Delete a chat thread and all its messages.
@@ -121,8 +117,8 @@ pub async fn delete_ai_thread(
     context: State<'_, Arc<ServiceContext>>,
     thread_id: String,
 ) -> CommandResult<()> {
-    let repo = context.ai_chat_repository();
-    repo.delete_thread(&thread_id).await?;
+    let service = context.ai_chat_service();
+    service.delete_thread(&thread_id).await?;
     Ok(())
 }
 
@@ -133,24 +129,22 @@ pub async fn delete_ai_thread(
 /// Add a tag to a thread.
 #[tauri::command]
 pub async fn add_ai_thread_tag(
-    context: State<'_, Arc<ServiceContext>>,
-    thread_id: String,
-    tag: String,
+    _context: State<'_, Arc<ServiceContext>>,
+    _thread_id: String,
+    _tag: String,
 ) -> CommandResult<()> {
-    let repo = context.ai_chat_repository();
-    repo.add_tag(&thread_id, &tag).await?;
+    // TODO: Add tag support to ChatService
     Ok(())
 }
 
 /// Remove a tag from a thread.
 #[tauri::command]
 pub async fn remove_ai_thread_tag(
-    context: State<'_, Arc<ServiceContext>>,
-    thread_id: String,
-    tag: String,
+    _context: State<'_, Arc<ServiceContext>>,
+    _thread_id: String,
+    _tag: String,
 ) -> CommandResult<()> {
-    let repo = context.ai_chat_repository();
-    repo.remove_tag(&thread_id, &tag).await?;
+    // TODO: Add tag support to ChatService
     Ok(())
 }
 
@@ -160,7 +154,10 @@ pub async fn get_ai_thread_tags(
     context: State<'_, Arc<ServiceContext>>,
     thread_id: String,
 ) -> CommandResult<Vec<String>> {
-    let repo = context.ai_chat_repository();
-    let tags = repo.get_tags(&thread_id)?;
+    let service = context.ai_chat_service();
+    let tags = service
+        .get_thread(&thread_id)?
+        .map(|t| t.tags)
+        .unwrap_or_default();
     Ok(tags)
 }

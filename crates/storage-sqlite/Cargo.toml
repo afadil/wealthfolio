@@ -12,6 +12,7 @@ default = []
 [dependencies]
 # Internal crates
 wealthfolio-core = { workspace = true }
+wealthfolio-ai = { workspace = true }
 
 # Workspace dependencies
 tokio = { workspace = true }

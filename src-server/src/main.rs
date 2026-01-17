@@ -1,3 +1,4 @@
+mod ai_environment;
 mod api;
 mod auth;
 mod config;

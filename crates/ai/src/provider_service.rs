@@ -3,13 +3,13 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 
-use crate::errors::{Result, ValidationError};
-use crate::secrets::SecretStore;
-use crate::settings::SettingsRepositoryTrait;
+use wealthfolio_core::errors::{Result, ValidationError};
+use wealthfolio_core::secrets::SecretStore;
+use wealthfolio_core::settings::SettingsRepositoryTrait;
 
-use super::{
-    AiError, AiProviderCatalog, AiProviderSettings, AiProvidersResponse, FetchedModel,
-    ListModelsResponse, MergedModel, MergedProvider, ModelCapabilities, ModelCapabilityOverrides,
+use crate::provider_model::{
+    AiProviderCatalog, AiProviderSettings, AiProvidersResponse, FetchedModel, ListModelsResponse,
+    MergedModel, MergedProvider, ModelCapabilities, ModelCapabilityOverrides, ProviderApiError,
     ProviderConfig, ProviderUserSettings, SetDefaultProviderRequest, UpdateProviderSettingsRequest,
     AI_PROVIDER_SETTINGS_KEY, AI_PROVIDER_SETTINGS_SCHEMA_VERSION,
 };
@@ -28,8 +28,9 @@ pub trait AiProviderServiceTrait: Send + Sync {
 
     /// Get provider configuration for backend-only use (chat, model listing).
     /// This retrieves the API key from the secret store - never exposed to frontend.
-    /// Returns AiError::MissingApiKey if API key is required but not configured.
-    fn get_provider_config(&self, provider_id: &str) -> std::result::Result<ProviderConfig, AiError>;
+    /// Returns ProviderApiError::MissingApiKey if API key is required but not configured.
+    fn get_provider_config(&self, provider_id: &str)
+        -> std::result::Result<ProviderConfig, ProviderApiError>;
 
     /// Get the title model ID for a provider (fast model for generating thread titles).
     /// Falls back to the default model if not configured.
@@ -41,7 +42,7 @@ pub trait AiProviderServiceTrait: Send + Sync {
     async fn list_models(
         &self,
         provider_id: &str,
-    ) -> std::result::Result<super::ListModelsResponse, AiError>;
+    ) -> std::result::Result<ListModelsResponse, ProviderApiError>;
 }
 
 /// AI provider service implementation.
@@ -288,9 +289,9 @@ impl AiProviderServiceTrait for AiProviderService {
     async fn update_provider_settings(&self, request: UpdateProviderSettingsRequest) -> Result<()> {
         // Verify provider exists in catalog
         if !self.catalog.providers.contains_key(&request.provider_id) {
-            return Err(crate::errors::Error::Validation(ValidationError::InvalidInput(
-                format!("Unknown provider: {}", request.provider_id),
-            )));
+            return Err(wealthfolio_core::errors::Error::Validation(
+                ValidationError::InvalidInput(format!("Unknown provider: {}", request.provider_id)),
+            ));
         }
 
         let mut settings = self.load_user_settings();
@@ -348,9 +349,9 @@ impl AiProviderServiceTrait for AiProviderService {
         // Verify provider exists if setting a default
         if let Some(ref provider_id) = request.provider_id {
             if !self.catalog.providers.contains_key(provider_id) {
-                return Err(crate::errors::Error::Validation(ValidationError::InvalidInput(
-                    format!("Unknown provider: {}", provider_id),
-                )));
+                return Err(wealthfolio_core::errors::Error::Validation(
+                    ValidationError::InvalidInput(format!("Unknown provider: {}", provider_id)),
+                ));
             }
         }
 
@@ -361,10 +362,13 @@ impl AiProviderServiceTrait for AiProviderService {
         self.save_user_settings(&settings).await
     }
 
-    fn get_provider_config(&self, provider_id: &str) -> std::result::Result<ProviderConfig, AiError> {
+    fn get_provider_config(
+        &self,
+        provider_id: &str,
+    ) -> std::result::Result<ProviderConfig, ProviderApiError> {
         // Verify provider exists in catalog
         if !self.catalog.providers.contains_key(provider_id) {
-            return Err(AiError::UnknownProvider {
+            return Err(ProviderApiError::UnknownProvider {
                 provider_id: provider_id.to_string(),
             });
         }
@@ -375,7 +379,7 @@ impl AiProviderServiceTrait for AiProviderService {
 
         // Check if API key is required but missing
         if requires_api_key && api_key.is_none() {
-            return Err(AiError::MissingApiKey {
+            return Err(ProviderApiError::MissingApiKey {
                 provider_id: provider_id.to_string(),
             });
         }
@@ -400,13 +404,13 @@ impl AiProviderServiceTrait for AiProviderService {
     async fn list_models(
         &self,
         provider_id: &str,
-    ) -> std::result::Result<ListModelsResponse, AiError> {
+    ) -> std::result::Result<ListModelsResponse, ProviderApiError> {
         // Get provider config (validates provider exists and has API key if needed)
         let config = self.get_provider_config(provider_id)?;
 
         // Get catalog provider for default base URL and to check if listing is supported
         let catalog_provider = self.catalog.providers.get(provider_id).ok_or_else(|| {
-            AiError::UnknownProvider {
+            ProviderApiError::UnknownProvider {
                 provider_id: provider_id.to_string(),
             }
         })?;
@@ -460,14 +464,14 @@ impl AiProviderServiceTrait for AiProviderService {
         }
 
         // Make the request
-        let response = request.send().await.map_err(|e| AiError::ProviderError {
+        let response = request.send().await.map_err(|e| ProviderApiError::ProviderError {
             message: format!("Failed to connect to provider: {}", e),
         })?;
 
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            return Err(AiError::ProviderError {
+            return Err(ProviderApiError::ProviderError {
                 message: format!("Provider returned error {}: {}", status, body),
             });
         }
@@ -486,7 +490,7 @@ impl AiProviderServiceTrait for AiProviderService {
                 }
 
                 let resp: OllamaResponse =
-                    response.json().await.map_err(|e| AiError::ProviderError {
+                    response.json().await.map_err(|e| ProviderApiError::ProviderError {
                         message: format!("Failed to parse Ollama response: {}", e),
                     })?;
 
@@ -512,7 +516,7 @@ impl AiProviderServiceTrait for AiProviderService {
                 }
 
                 let resp: GoogleResponse =
-                    response.json().await.map_err(|e| AiError::ProviderError {
+                    response.json().await.map_err(|e| ProviderApiError::ProviderError {
                         message: format!("Failed to parse Google response: {}", e),
                     })?;
 
@@ -542,7 +546,7 @@ impl AiProviderServiceTrait for AiProviderService {
                 }
 
                 let resp: OpenAIResponse =
-                    response.json().await.map_err(|e| AiError::ProviderError {
+                    response.json().await.map_err(|e| ProviderApiError::ProviderError {
                         message: format!("Failed to parse provider response: {}", e),
                     })?;
 

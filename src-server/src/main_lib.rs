@@ -1,15 +1,17 @@
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
-use crate::{auth::AuthManager, config::Config, events::EventBus, secrets::build_secret_store};
+use crate::{
+    ai_environment::ServerAiEnvironment, auth::AuthManager, config::Config, events::EventBus,
+    secrets::build_secret_store,
+};
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, EnvFilter};
+use wealthfolio_ai::{AiProviderService, AiProviderServiceTrait, ChatConfig, ChatService};
 use wealthfolio_connect::{BrokerSyncService, BrokerSyncServiceTrait, PlatformRepository};
-use wealthfolio_ai_assistant::AiAssistantServiceTrait;
 use wealthfolio_core::{
     accounts::AccountService,
     activities::{ActivityService as CoreActivityService, ActivityServiceTrait},
-    ai::{AiProviderService, AiProviderServiceTrait},
     assets::{
         AlternativeAssetRepositoryTrait, AssetClassificationService, AssetService, AssetServiceTrait,
     },
@@ -35,6 +37,7 @@ use wealthfolio_core::{
 use wealthfolio_storage_sqlite::{
     accounts::AccountRepository,
     activities::ActivityRepository,
+    ai_chat::AiChatRepository,
     assets::{AlternativeAssetRepository, AssetRepository},
     db::{self, write_actor},
     fx::FxRepository,
@@ -68,7 +71,7 @@ pub struct AppState {
     pub alternative_asset_repository: Arc<dyn AlternativeAssetRepositoryTrait + Send + Sync>,
     pub connect_sync_service: Arc<dyn BrokerSyncServiceTrait + Send + Sync>,
     pub ai_provider_service: Arc<dyn AiProviderServiceTrait + Send + Sync>,
-    pub ai_assistant_service: Option<Arc<dyn AiAssistantServiceTrait + Send + Sync>>,
+    pub ai_chat_service: Arc<ChatService<ServerAiEnvironment>>,
     pub addons_root: String,
     pub data_root: String,
     pub db_path: String,
@@ -266,13 +269,30 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let data_root = data_root_path.to_string_lossy().to_string();
 
     // AI provider service - catalog is embedded at compile time
-    let ai_catalog_json = include_str!("../../src-front/lib/ai-providers.json");
+    let ai_catalog_json = include_str!("../../crates/ai/src/ai_providers.json");
     let ai_provider_service: Arc<dyn AiProviderServiceTrait + Send + Sync> =
         Arc::new(AiProviderService::new(
             settings_repo.clone() as Arc<dyn SettingsRepositoryTrait>,
             secret_store.clone(),
             ai_catalog_json,
         )?);
+
+    // AI chat repository for thread/message persistence
+    let ai_chat_repository = Arc::new(AiChatRepository::new(pool.clone(), writer.clone()));
+
+    // Create the AI environment and chat service using the new wealthfolio-ai crate
+    let ai_environment = Arc::new(ServerAiEnvironment::new(
+        base_currency.clone(),
+        account_service.clone(),
+        activity_service.clone(),
+        holdings_service.clone(),
+        valuation_service.clone(),
+        goal_service.clone(),
+        settings_service.clone(),
+        secret_store.clone(),
+        ai_chat_repository,
+    ));
+    let ai_chat_service = Arc::new(ChatService::new(ai_environment, ChatConfig::default()));
 
     let event_bus = EventBus::new(256);
 
@@ -304,7 +324,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         alternative_asset_repository,
         connect_sync_service,
         ai_provider_service,
-        ai_assistant_service: None, // Will be initialized when provider is configured
+        ai_chat_service,
         addons_root: config.addons_root.clone(),
         data_root,
         db_path,
