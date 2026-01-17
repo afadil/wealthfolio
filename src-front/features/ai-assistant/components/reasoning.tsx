@@ -1,7 +1,8 @@
 "use client";
 
-import { BrainIcon, ChevronDownIcon } from "lucide-react";
 import { memo, useCallback, useRef, useState, type FC, type PropsWithChildren } from "react";
+
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 
 import {
   useAssistantState,
@@ -90,7 +91,7 @@ const ReasoningTrigger: FC<{ active: boolean; className?: string }> = ({ active,
       className,
     )}
   >
-    <BrainIcon className="aui-reasoning-trigger-icon size-4 shrink-0" />
+    <Icons.Brain className="aui-reasoning-trigger-icon size-4 shrink-0" />
     <span className="aui-reasoning-trigger-label-wrapper relative inline-block leading-none">
       <span>Reasoning</span>
       {active ? (
@@ -102,7 +103,7 @@ const ReasoningTrigger: FC<{ active: boolean; className?: string }> = ({ active,
         </span>
       ) : null}
     </span>
-    <ChevronDownIcon
+    <Icons.ChevronDown
       className={cn(
         "aui-reasoning-trigger-chevron mt-0.5 size-4 shrink-0",
         "transition-transform duration-(--animation-duration) ease-out",

@@ -1,6 +1,7 @@
 import type { ToolCallMessagePartComponent } from "@assistant-ui/react";
-import { AlertTriangleIcon, CheckIcon, ChevronDownIcon, ChevronUpIcon, XCircleIcon } from "lucide-react";
 import { useState } from "react";
+
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { cn } from "@/lib/utils";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
@@ -43,9 +44,9 @@ export const ToolFallback: ToolCallMessagePartComponent = ({ toolName, argsText,
     >
       <div className="aui-tool-fallback-header flex items-center gap-2 px-4">
         {isCancelled ? (
-          <XCircleIcon className="aui-tool-fallback-icon text-muted-foreground size-4" />
+          <Icons.XCircle className="aui-tool-fallback-icon text-muted-foreground size-4" />
         ) : (
-          <CheckIcon className="aui-tool-fallback-icon size-4" />
+          <Icons.Check className="aui-tool-fallback-icon size-4" />
         )}
         <p className={cn("aui-tool-fallback-title grow", isCancelled && "text-muted-foreground line-through")}>
           {isCancelled ? "Cancelled tool: " : "Used tool: "}
@@ -53,12 +54,12 @@ export const ToolFallback: ToolCallMessagePartComponent = ({ toolName, argsText,
         </p>
         {isTruncated && (
           <Badge variant="secondary" className="text-muted-foreground gap-1 text-xs">
-            <AlertTriangleIcon className="size-3" />
+            <Icons.AlertTriangle className="size-3" />
             Result truncated
           </Badge>
         )}
         <Button onClick={() => setIsCollapsed(!isCollapsed)}>
-          {isCollapsed ? <ChevronUpIcon /> : <ChevronDownIcon />}
+          {isCollapsed ? <Icons.ChevronUp /> : <Icons.ChevronDown />}
         </Button>
       </div>
       {!isCollapsed && (

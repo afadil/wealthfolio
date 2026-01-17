@@ -1,16 +1,4 @@
 import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  CheckIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  CopyIcon,
-  PencilIcon,
-  RefreshCwIcon,
-  Square,
-} from "lucide-react";
-
-import {
   ActionBarPrimitive,
   BranchPickerPrimitive,
   ComposerPrimitive,
@@ -21,6 +9,7 @@ import {
 
 import type { FC, ReactNode } from "react";
 
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { ComposerAddAttachment, ComposerAttachments, UserMessageAttachments } from "./attachment";
 import { MarkdownText } from "./markdown-text";
@@ -77,7 +66,7 @@ const ThreadScrollToBottom: FC = () => {
         variant="outline"
         className="aui-thread-scroll-to-bottom dark:bg-background dark:hover:bg-accent absolute -top-12 z-10 self-center rounded-full p-4 disabled:invisible"
       >
-        <ArrowDownIcon />
+        <Icons.ArrowDown />
       </TooltipIconButton>
     </ThreadPrimitive.ScrollToBottom>
   );
@@ -194,7 +183,7 @@ const ComposerAction: FC<ComposerActionProps> = ({ composerActions }) => {
             className="aui-composer-send size-[34px] rounded-full p-1"
             aria-label="Send message"
           >
-            <ArrowUpIcon className="aui-composer-send-icon size-5" />
+            <Icons.ArrowUp className="aui-composer-send-icon size-5" />
           </TooltipIconButton>
         </ComposerPrimitive.Send>
       </ThreadPrimitive.If>
@@ -208,7 +197,7 @@ const ComposerAction: FC<ComposerActionProps> = ({ composerActions }) => {
             className="aui-composer-cancel border-muted-foreground/60 hover:bg-primary/75 dark:border-muted-foreground/90 size-[34px] rounded-full border"
             aria-label="Stop generating"
           >
-            <Square className="aui-composer-cancel-icon size-3.5 fill-white dark:fill-black" />
+            <Icons.Square className="aui-composer-cancel-icon size-3.5 fill-white dark:fill-black" />
           </Button>
         </ComposerPrimitive.Cancel>
       </ThreadPrimitive.If>
@@ -232,7 +221,7 @@ const AssistantMessage: FC = () => {
       className="aui-assistant-message-root fade-in slide-in-from-bottom-1 animate-in relative mx-auto w-full max-w-(--thread-max-width) py-4 duration-150 ease-out"
       data-role="assistant"
     >
-      <div className="aui-assistant-message-content text-foreground mx-2 leading-7 wrap-break-word">
+      <div className="aui-assistant-message-content text-foreground mx-2 text-sm leading-6 wrap-break-word">
         <MessagePrimitive.Parts
           components={{
             Text: MarkdownText,
@@ -265,16 +254,16 @@ const AssistantActionBar: FC = () => {
       <ActionBarPrimitive.Copy asChild>
         <TooltipIconButton tooltip="Copy">
           <MessagePrimitive.If copied>
-            <CheckIcon />
+            <Icons.Check />
           </MessagePrimitive.If>
           <MessagePrimitive.If copied={false}>
-            <CopyIcon />
+            <Icons.Copy />
           </MessagePrimitive.If>
         </TooltipIconButton>
       </ActionBarPrimitive.Copy>
       <ActionBarPrimitive.Reload asChild>
         <TooltipIconButton tooltip="Refresh">
-          <RefreshCwIcon />
+          <Icons.RefreshCw />
         </TooltipIconButton>
       </ActionBarPrimitive.Reload>
     </ActionBarPrimitive.Root>
@@ -290,7 +279,7 @@ const UserMessage: FC = () => {
       <UserMessageAttachments />
 
       <div className="aui-user-message-content-wrapper relative col-start-2 min-w-0">
-        <div className="aui-user-message-content bg-muted text-foreground rounded-3xl px-5 py-2.5 wrap-break-word">
+        <div className="aui-user-message-content bg-muted text-foreground rounded-3xl px-5 py-2.5 text-sm wrap-break-word">
           <MessagePrimitive.Parts
             components={{
               Reasoning: Reasoning,
@@ -317,7 +306,7 @@ const UserActionBar: FC = () => {
     >
       <ActionBarPrimitive.Edit asChild>
         <TooltipIconButton tooltip="Edit" className="aui-user-action-edit p-4">
-          <PencilIcon />
+          <Icons.Pencil />
         </TooltipIconButton>
       </ActionBarPrimitive.Edit>
     </ActionBarPrimitive.Root>
@@ -362,7 +351,7 @@ const BranchPicker: FC<BranchPickerPrimitive.Root.Props> = ({ className, ...rest
     >
       <BranchPickerPrimitive.Previous asChild>
         <TooltipIconButton tooltip="Previous">
-          <ChevronLeftIcon />
+          <Icons.ChevronLeft />
         </TooltipIconButton>
       </BranchPickerPrimitive.Previous>
       <span className="aui-branch-picker-state font-medium">
@@ -370,7 +359,7 @@ const BranchPicker: FC<BranchPickerPrimitive.Root.Props> = ({ className, ...rest
       </span>
       <BranchPickerPrimitive.Next asChild>
         <TooltipIconButton tooltip="Next">
-          <ChevronRightIcon />
+          <Icons.ChevronRight />
         </TooltipIconButton>
       </BranchPickerPrimitive.Next>
     </BranchPickerPrimitive.Root>

@@ -5,8 +5,9 @@ import { DateRange, TimePeriod } from "@/lib/types";
 import { makeAssistantToolUI } from "@assistant-ui/react";
 import { Badge, Card, CardContent, CardHeader, CardTitle, IntervalSelector } from "@wealthfolio/ui";
 import { isAfter, parseISO, subMonths } from "date-fns";
-import { Loader2Icon } from "lucide-react";
 import { useMemo, useState } from "react";
+
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 
 interface ValuationArgs {
   accountId?: string;
@@ -198,7 +199,7 @@ function ValuationContent({ args, result, status }: ValuationContentProps) {
             <div className="text-muted-foreground flex h-full flex-col items-center justify-center gap-2 rounded-md border border-dashed px-3 text-sm">
               {isRunning ? (
                 <>
-                  <Loader2Icon className="h-5 w-5 animate-spin" />
+                  <Icons.Spinner className="h-5 w-5 animate-spin" />
                   <span>Fetching valuation history...</span>
                 </>
               ) : isIncomplete ? (

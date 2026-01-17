@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { AlertCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui";
 
 export interface ToolCardProps {
@@ -46,7 +46,7 @@ export function ToolCard({
         >
           {error ? (
             <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              <AlertCircle className="size-4 shrink-0" />
+              <Icons.AlertCircle className="size-4 shrink-0" />
               <span>{error}</span>
             </div>
           ) : (
@@ -54,7 +54,7 @@ export function ToolCard({
               {children}
               {isLoading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-sm">
-                  <Loader2 className="text-muted-foreground size-6 animate-spin" />
+                  <Icons.Spinner className="text-muted-foreground size-6 animate-spin" />
                 </div>
               )}
             </>

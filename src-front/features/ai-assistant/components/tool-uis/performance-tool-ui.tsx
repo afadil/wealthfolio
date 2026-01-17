@@ -4,7 +4,7 @@ import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton } from "@weal
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
-import { TrendingUp, TrendingDown, Calendar } from "lucide-react";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 
 // ============================================================================
 // Types
@@ -294,7 +294,7 @@ function PerformanceToolUIContent({ args, result, status }: PerformanceToolUICon
   const typedArgs = args as GetPerformanceArgs | undefined;
   const accountLabel = parsed.id ?? typedArgs?.accountId ?? "Portfolio";
   const isPositiveReturn = parsed.cumulativeTwr >= 0;
-  const TrendIcon = isPositiveReturn ? TrendingUp : TrendingDown;
+  const TrendIcon = isPositiveReturn ? Icons.TrendingUp : Icons.TrendingDown;
 
   return (
     <Card className="bg-muted/40 border-primary/10">
@@ -310,7 +310,7 @@ function PerformanceToolUIContent({ args, result, status }: PerformanceToolUICon
           </div>
           {periodLabel && (
             <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
-              <Calendar className="size-3.5" />
+              <Icons.CalendarIcon className="size-3.5" />
               <span>{periodLabel}</span>
             </div>
           )}

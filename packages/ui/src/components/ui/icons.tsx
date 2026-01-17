@@ -117,9 +117,11 @@ import {
   Smartphone,
   Sparkles,
   Split,
+  Square,
   Star,
   Store,
   Sun,
+  Target,
   Trash,
   Trash2,
   TrendingDown,
@@ -296,6 +298,8 @@ const IconsInternal = {
   Presentation: Presentation,
   Scissors: Scissors,
   Split: Split,
+  Square: Square,
+  Target: Target,
   CircleGauge: CircleGauge,
   X: X,
   Upload: Upload,
@@ -830,6 +834,8 @@ export type IconName =
   | "Presentation"
   | "Scissors"
   | "Split"
+  | "Square"
+  | "Target"
   | "CircleGauge"
   | "X"
   | "Upload"
