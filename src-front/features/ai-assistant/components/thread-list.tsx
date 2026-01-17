@@ -8,61 +8,10 @@ import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { ActionConfirm } from "@wealthfolio/ui/components/common";
 import { useThreads, useDeleteThread, flattenThreadPages } from "../hooks/use-threads";
 import { useRuntimeContext } from "../hooks/use-runtime-context";
-import { getAiThreadMessages } from "@/commands/ai-chat";
-import type { ChatThread, ChatMessage, ToolCall, ToolResult } from "../types";
-import type { ExternalMessage } from "../hooks/use-chat-runtime";
+import type { ChatThread } from "../types";
 
 /** Debounce delay for search input (ms) */
 const SEARCH_DEBOUNCE_MS = 300;
-
-/**
- * Convert a ChatMessage from the database to ExternalMessage format for the runtime.
- * Extracts text, reasoning, tool calls, and tool results from the structured content.
- */
-function convertToExternalMessage(msg: ChatMessage): ExternalMessage {
-  let textContent = "";
-  let reasoning: string | undefined;
-  const toolCalls: ToolCall[] = [];
-  const toolResults: ToolResult[] = [];
-
-  // Extract parts from structured content
-  for (const part of msg.content.parts) {
-    switch (part.type) {
-      case "text":
-        textContent += part.content;
-        break;
-      case "reasoning":
-        reasoning = (reasoning ?? "") + part.content;
-        break;
-      case "toolCall":
-        toolCalls.push({
-          id: part.toolCallId,
-          name: part.name,
-          arguments: part.arguments,
-        });
-        break;
-      case "toolResult":
-        toolResults.push({
-          toolCallId: part.toolCallId,
-          success: part.success,
-          data: part.data,
-          meta: part.meta,
-          error: part.error,
-        });
-        break;
-    }
-  }
-
-  return {
-    id: msg.id,
-    role: msg.role,
-    content: textContent,
-    createdAt: new Date(msg.createdAt),
-    reasoning: reasoning?.trim() || undefined,
-    toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-    toolResults: toolResults.length > 0 ? toolResults : undefined,
-  };
-}
 
 /**
  * Custom hook for debounced value.
@@ -126,15 +75,9 @@ export const ThreadList: FC = () => {
   const [searchValue, setSearchValue] = useState("");
   const debouncedSearch = useDebouncedValue(searchValue, SEARCH_DEBOUNCE_MS);
 
-  // Lift active thread state to share between New button and list items
-  const [activeThreadId, setActiveThreadId] = useState<string | null>(
-    runtime.getCurrentThreadId(),
-  );
-
   // Handle new thread creation - clears selection
   const handleNewThread = useCallback(() => {
-    setActiveThreadId(null);
-    runtime.startNewThread();
+    runtime.threads.switchToNewThread();
   }, [runtime]);
 
   return (
@@ -143,8 +86,9 @@ export const ThreadList: FC = () => {
       <ThreadSearchInput value={searchValue} onChange={setSearchValue} />
       <ThreadListItems
         search={debouncedSearch}
-        activeThreadId={activeThreadId}
-        onActiveThreadChange={setActiveThreadId}
+        activeThreadId={runtime.currentThreadId}
+        switchingThreadId={runtime.switchingThreadId}
+        onThreadListStateChange={runtime.setThreadListState}
       />
     </ThreadListPrimitive.Root>
   );
@@ -200,19 +144,18 @@ const ThreadSearchInput: FC<ThreadSearchInputProps> = ({ value, onChange }) => {
 interface ThreadListItemsProps {
   search?: string;
   activeThreadId: string | null;
-  onActiveThreadChange: (threadId: string | null) => void;
+  switchingThreadId: string | null;
+  onThreadListStateChange: (threads: ChatThread[], isLoading: boolean) => void;
 }
 
 const ThreadListItems: FC<ThreadListItemsProps> = ({
   search,
   activeThreadId,
-  onActiveThreadChange,
+  switchingThreadId,
+  onThreadListStateChange,
 }) => {
   // Get the runtime for thread switching
   const runtime = useRuntimeContext();
-
-  // Track loading state for thread switching
-  const [isLoadingThread, setIsLoadingThread] = useState(false);
 
   // Fetch threads with infinite pagination from database
   const {
@@ -232,6 +175,10 @@ const ThreadListItems: FC<ThreadListItemsProps> = ({
     () => flattenThreadPages(data?.pages),
     [data?.pages],
   );
+
+  useEffect(() => {
+    onThreadListStateChange(threads, isLoading);
+  }, [threads, isLoading, onThreadListStateChange]);
 
   // Separate pinned and unpinned threads
   const { pinnedThreads, unpinnedThreads } = useMemo(() => {
@@ -253,36 +200,22 @@ const ThreadListItems: FC<ThreadListItemsProps> = ({
 
   // Handle thread selection - load messages from DB into runtime
   const handleSelectThread = useCallback(async (threadId: string) => {
-    if (threadId === activeThreadId || isLoadingThread) return;
-
-    setIsLoadingThread(true);
-    onActiveThreadChange(threadId);
-
     try {
-      // Fetch messages from database
-      const dbMessages = await getAiThreadMessages(threadId);
-      // Convert to external message format
-      const externalMessages = dbMessages.map(convertToExternalMessage);
-      // Load into runtime
-      await runtime.loadThread(threadId, externalMessages);
+      if (threadId === activeThreadId || switchingThreadId) return;
+      await runtime.threads.switchToThread(threadId);
     } catch (error) {
-      console.error("Failed to load thread:", error);
-      // Reset active thread on error
-      onActiveThreadChange(runtime.getCurrentThreadId());
-    } finally {
-      setIsLoadingThread(false);
+      console.error("Failed to switch thread:", error);
     }
-  }, [activeThreadId, isLoadingThread, runtime, onActiveThreadChange]);
+  }, [activeThreadId, switchingThreadId, runtime]);
 
   // Handle delete confirmation
   const handleDeleteThread = useCallback((threadId: string) => {
     deleteThread.mutate(threadId);
     // If deleting the active thread, clear selection
     if (threadId === activeThreadId) {
-      onActiveThreadChange(null);
-      runtime.startNewThread();
+      runtime.threads.switchToNewThread();
     }
-  }, [deleteThread, activeThreadId, onActiveThreadChange, runtime]);
+  }, [deleteThread, activeThreadId, runtime]);
 
   // Show skeleton on initial load
   if (isLoading) {
@@ -312,7 +245,7 @@ const ThreadListItems: FC<ThreadListItemsProps> = ({
               key={thread.id}
               thread={thread}
               isActive={activeThreadId === thread.id}
-              isLoading={isLoadingThread && activeThreadId === thread.id}
+              isLoading={switchingThreadId === thread.id}
               isDeleting={deleteThread.isPending && deleteThread.variables === thread.id}
               onSelect={handleSelectThread}
               onDelete={handleDeleteThread}
@@ -334,7 +267,7 @@ const ThreadListItems: FC<ThreadListItemsProps> = ({
               key={thread.id}
               thread={thread}
               isActive={activeThreadId === thread.id}
-              isLoading={isLoadingThread && activeThreadId === thread.id}
+              isLoading={switchingThreadId === thread.id}
               isDeleting={deleteThread.isPending && deleteThread.variables === thread.id}
               onSelect={handleSelectThread}
               onDelete={handleDeleteThread}
