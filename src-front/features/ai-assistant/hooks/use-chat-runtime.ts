@@ -15,9 +15,10 @@ import { useMemo, useCallback, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { streamChatResponse, type ChatModelConfig } from "../api";
-import type { ChatThread, ToolCall, ToolResult } from "../types";
+import type { ChatMessage, ChatThread, ToolCall, ToolResult } from "../types";
 import { QueryKeys } from "@/lib/query-keys";
 import { AI_THREADS_KEY } from "./use-threads";
+import { deleteAiThread, getAiThreadMessages, updateAiThread } from "@/commands/ai-chat";
 
 /**
  * Internal tool call state during streaming.
@@ -64,6 +65,87 @@ type ContentPart =
       argsText: string;
       result?: unknown;
     };
+
+/**
+ * Thread list data for assistant-ui thread list adapter.
+ */
+interface ThreadListItemData {
+  status: "regular";
+  id: string;
+  remoteId?: string;
+  externalId?: string;
+  title?: string;
+}
+
+/**
+ * Convert a ChatMessage from the database to ExternalMessage format.
+ */
+function convertToExternalMessage(msg: ChatMessage): ExternalMessage {
+  let textContent = "";
+  let reasoning: string | undefined;
+  const toolCalls: ToolCall[] = [];
+  const toolResults: ToolResult[] = [];
+
+  for (const part of msg.content.parts) {
+    switch (part.type) {
+      case "text":
+        textContent += part.content;
+        break;
+      case "reasoning":
+        reasoning = (reasoning ?? "") + part.content;
+        break;
+      case "toolCall":
+        toolCalls.push({
+          id: part.toolCallId,
+          name: part.name,
+          arguments: part.arguments,
+        });
+        break;
+      case "toolResult":
+        toolResults.push({
+          toolCallId: part.toolCallId,
+          success: part.success,
+          data: part.data,
+          meta: part.meta,
+          error: part.error,
+        });
+        break;
+    }
+  }
+
+  return {
+    id: msg.id,
+    role: msg.role,
+    content: textContent,
+    createdAt: new Date(msg.createdAt),
+    reasoning: reasoning?.trim() || undefined,
+    toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+    toolResults: toolResults.length > 0 ? toolResults : undefined,
+  };
+}
+
+function buildThreadListItems(threads: ChatThread[]): ThreadListItemData[] {
+  return threads.map((thread) => ({
+    status: "regular",
+    id: thread.id,
+    remoteId: thread.id,
+    title: thread.title || undefined,
+  }));
+}
+
+function areThreadListItemsEqual(
+  prevItems: ThreadListItemData[],
+  nextItems: ThreadListItemData[],
+): boolean {
+  if (prevItems.length !== nextItems.length) return false;
+  for (let i = 0; i < prevItems.length; i += 1) {
+    const prev = prevItems[i];
+    const next = nextItems[i];
+    if (!prev || !next) return false;
+    if (prev.id !== next.id || prev.title !== next.title) return false;
+  }
+  return true;
+}
 
 /**
  * Convert external message to assistant-ui ThreadMessageLike format.
@@ -126,6 +208,10 @@ export function useChatRuntime(config?: ChatModelConfig) {
   // External message state (from DB or streaming)
   const [messages, setMessages] = useState<ExternalMessage[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const [currentThreadId, setCurrentThreadIdState] = useState<string | null>(null);
+  const [switchingThreadId, setSwitchingThreadId] = useState<string | null>(null);
+  const [threadListItems, setThreadListItems] = useState<ThreadListItemData[]>([]);
+  const [isThreadListLoading, setIsThreadListLoading] = useState(false);
 
   // Thread ID ref - persists across streaming calls
   const threadIdRef = useRef<string | null>(null);
@@ -144,6 +230,19 @@ export function useChatRuntime(config?: ChatModelConfig) {
     },
     [queryClient],
   );
+
+  const setCurrentThreadId = useCallback((threadId: string | null) => {
+    threadIdRef.current = threadId;
+    setCurrentThreadIdState(threadId);
+  }, []);
+
+  const updateThreadListState = useCallback((threads: ChatThread[], isLoading: boolean) => {
+    const nextItems = buildThreadListItems(threads);
+    setThreadListItems((prevItems) =>
+      areThreadListItemsEqual(prevItems, nextItems) ? prevItems : nextItems,
+    );
+    setIsThreadListLoading((prev) => (prev === isLoading ? prev : isLoading));
+  }, []);
 
   // Handle new user message - streams response from AI backend
   const handleNew = useCallback(
@@ -239,7 +338,7 @@ export function useChatRuntime(config?: ChatModelConfig) {
             case "system":
               // Capture thread ID from system event
               if (event.threadId) {
-                threadIdRef.current = event.threadId;
+                setCurrentThreadId(event.threadId);
                 queryClient.invalidateQueries({ queryKey: AI_THREADS_KEY });
               }
               break;
@@ -308,13 +407,73 @@ export function useChatRuntime(config?: ChatModelConfig) {
         abortControllerRef.current = null;
       }
     },
-    [config, queryClient, handleThreadTitleUpdate],
+    [config, queryClient, handleThreadTitleUpdate, setCurrentThreadId],
   );
 
   // Handle cancel
   const handleCancel = useCallback(async () => {
     abortControllerRef.current?.abort();
   }, []);
+
+  const handleSwitchToNewThread = useCallback(async () => {
+    await handleCancel();
+    setCurrentThreadId(null);
+    setMessages([]);
+  }, [handleCancel, setCurrentThreadId]);
+
+  const handleSwitchToThread = useCallback(
+    async (threadId: string) => {
+      if (threadId === threadIdRef.current || switchingThreadId) return;
+
+      setSwitchingThreadId(threadId);
+      await handleCancel();
+
+      try {
+        const dbMessages = await getAiThreadMessages(threadId);
+        const externalMessages = dbMessages.map(convertToExternalMessage);
+        setMessages(externalMessages);
+        setCurrentThreadId(threadId);
+      } catch (error) {
+        console.error("Failed to load thread:", error);
+        throw error;
+      } finally {
+        setSwitchingThreadId(null);
+      }
+    },
+    [handleCancel, setCurrentThreadId, switchingThreadId],
+  );
+
+  const handleRenameThread = useCallback(
+    async (threadId: string, newTitle: string) => {
+      try {
+        const updatedThread = await updateAiThread({ id: threadId, title: newTitle });
+        queryClient.setQueryData(QueryKeys.aiThread(updatedThread.id), updatedThread);
+        queryClient.invalidateQueries({ queryKey: AI_THREADS_KEY });
+      } catch (error) {
+        console.error("Failed to rename thread:", error);
+        throw error;
+      }
+    },
+    [queryClient],
+  );
+
+  const handleDeleteThread = useCallback(
+    async (threadId: string) => {
+      try {
+        await deleteAiThread(threadId);
+        queryClient.invalidateQueries({ queryKey: AI_THREADS_KEY });
+        queryClient.removeQueries({ queryKey: QueryKeys.aiThread(threadId) });
+
+        if (threadIdRef.current === threadId) {
+          await handleSwitchToNewThread();
+        }
+      } catch (error) {
+        console.error("Failed to delete thread:", error);
+        throw error;
+      }
+    },
+    [handleSwitchToNewThread, queryClient],
+  );
 
   // Wrapper for setMessages that accepts readonly arrays
   const handleSetMessages = useCallback(
@@ -333,8 +492,32 @@ export function useChatRuntime(config?: ChatModelConfig) {
       convertMessage,
       onNew: handleNew,
       onCancel: handleCancel,
+      adapters: {
+        threadList: {
+          threadId: currentThreadId ?? undefined,
+          isLoading: isThreadListLoading,
+          threads: threadListItems,
+          onSwitchToThread: handleSwitchToThread,
+          onSwitchToNewThread: handleSwitchToNewThread,
+          onRename: handleRenameThread,
+          onDelete: handleDeleteThread,
+        },
+      },
     }),
-    [isRunning, messages, handleSetMessages, handleNew, handleCancel],
+    [
+      isRunning,
+      messages,
+      handleSetMessages,
+      handleNew,
+      handleCancel,
+      currentThreadId,
+      isThreadListLoading,
+      threadListItems,
+      handleSwitchToThread,
+      handleSwitchToNewThread,
+      handleRenameThread,
+      handleDeleteThread,
+    ],
   );
 
   const runtime = useExternalStoreRuntime(adapter);
@@ -343,20 +526,29 @@ export function useChatRuntime(config?: ChatModelConfig) {
   return useMemo(
     () => ({
       ...runtime,
+      currentThreadId,
+      switchingThreadId,
+      setThreadListState: updateThreadListState,
       /** Load messages for a thread from the database */
       loadThread: async (threadId: string, dbMessages: ExternalMessage[]) => {
-        threadIdRef.current = threadId;
+        setCurrentThreadId(threadId);
         setMessages(dbMessages);
       },
       /** Start a new thread (clears messages and thread ID) */
       startNewThread: () => {
-        threadIdRef.current = null;
-        setMessages([]);
+        handleSwitchToNewThread();
       },
       /** Get current thread ID */
       getCurrentThreadId: () => threadIdRef.current,
     }),
-    [runtime],
+    [
+      runtime,
+      currentThreadId,
+      switchingThreadId,
+      updateThreadListState,
+      setCurrentThreadId,
+      handleSwitchToNewThread,
+    ],
   );
 }
 
