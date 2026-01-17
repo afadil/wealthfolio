@@ -7,7 +7,7 @@ use std::sync::Arc;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tauri::{ipc::Channel, State};
-use wealthfolio_ai::{AiError, AiStreamEvent, ChatThread, ListThreadsRequest, SendMessageRequest, ThreadPage};
+use wealthfolio_ai::{AiError, AiStreamEvent, ChatMessage, ChatThread, ListThreadsRequest, SendMessageRequest, ThreadPage};
 
 use crate::context::ServiceContext;
 
@@ -84,6 +84,17 @@ pub async fn get_ai_thread(
     let service = context.ai_chat_service();
     let thread = service.get_thread(&thread_id)?;
     Ok(thread)
+}
+
+/// Get all messages for a chat thread.
+#[tauri::command]
+pub async fn get_ai_thread_messages(
+    context: State<'_, Arc<ServiceContext>>,
+    thread_id: String,
+) -> CommandResult<Vec<ChatMessage>> {
+    let service = context.ai_chat_service();
+    let messages = service.get_messages(&thread_id)?;
+    Ok(messages)
 }
 
 /// Update a chat thread's title and/or pinned status.

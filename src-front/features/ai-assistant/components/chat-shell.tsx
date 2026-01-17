@@ -21,6 +21,7 @@ import { ProviderPicker } from "./provider-picker";
 import { ModelPicker } from "./model-picker";
 import { useChatModel } from "../hooks/use-chat-model";
 import { useChatRuntime } from "../hooks/use-chat-runtime";
+import { RuntimeProvider } from "../hooks/use-runtime-context";
 
 interface ChatShellProps {
   className?: string;
@@ -145,26 +146,28 @@ export function ChatShell({ className }: ChatShellProps) {
   const runtime = useChatRuntime(chatConfig);
 
   return (
-    <AssistantRuntimeProvider runtime={runtime}>
-      <div className={cn("bg-background flex h-full w-full", className)}>
-        {/* Desktop Sidebar */}
-        <div className="hidden md:block">
-          <Sidebar collapsed={sidebarCollapsed} />
-        </div>
+    <RuntimeProvider runtime={runtime}>
+      <AssistantRuntimeProvider runtime={runtime}>
+        <div className={cn("bg-background flex h-full w-full", className)}>
+          {/* Desktop Sidebar */}
+          <div className="hidden md:block">
+            <Sidebar collapsed={sidebarCollapsed} />
+          </div>
 
-        {/* Main Content Area */}
-        <div className="flex flex-1 flex-col overflow-hidden">
-          <Header
-            sidebarCollapsed={sidebarCollapsed}
-            onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
-          />
+          {/* Main Content Area */}
+          <div className="flex flex-1 flex-col overflow-hidden">
+            <Header
+              sidebarCollapsed={sidebarCollapsed}
+              onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+            />
 
-          {/* Thread (Chat Messages) */}
-          <main className="flex-1 overflow-hidden">
-            <Thread composerActions={<ModelPicker />} />
-          </main>
+            {/* Thread (Chat Messages) */}
+            <main className="flex-1 overflow-hidden">
+              <Thread composerActions={<ModelPicker />} />
+            </main>
+          </div>
         </div>
-      </div>
-    </AssistantRuntimeProvider>
+      </AssistantRuntimeProvider>
+    </RuntimeProvider>
   );
 }

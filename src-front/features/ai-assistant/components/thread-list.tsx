@@ -1,15 +1,68 @@
-import { ThreadListItemPrimitive, ThreadListPrimitive, useAssistantState } from "@assistant-ui/react";
-import { ArchiveIcon, PlusIcon, SearchIcon, XIcon, LoaderIcon, PinIcon } from "lucide-react";
+import { ThreadListPrimitive } from "@assistant-ui/react";
+import { PlusIcon, SearchIcon, XIcon, LoaderIcon, PinIcon, Trash2Icon } from "lucide-react";
 import { type FC, useState, useEffect, useRef, useCallback, useMemo } from "react";
 
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { TooltipIconButton } from "./tooltip-icon-button";
-import { useThreads, flattenThreadPages } from "../hooks/use-threads";
+import { ActionConfirm } from "@wealthfolio/ui/components/common";
+import { useThreads, useDeleteThread, flattenThreadPages } from "../hooks/use-threads";
+import { useRuntimeContext } from "../hooks/use-runtime-context";
+import { getAiThreadMessages } from "@/commands/ai-chat";
+import type { ChatThread, ChatMessage, ToolCall, ToolResult } from "../types";
+import type { ExternalMessage } from "../hooks/use-chat-runtime";
 
 /** Debounce delay for search input (ms) */
 const SEARCH_DEBOUNCE_MS = 300;
+
+/**
+ * Convert a ChatMessage from the database to ExternalMessage format for the runtime.
+ * Extracts text, reasoning, tool calls, and tool results from the structured content.
+ */
+function convertToExternalMessage(msg: ChatMessage): ExternalMessage {
+  let textContent = "";
+  let reasoning: string | undefined;
+  const toolCalls: ToolCall[] = [];
+  const toolResults: ToolResult[] = [];
+
+  // Extract parts from structured content
+  for (const part of msg.content.parts) {
+    switch (part.type) {
+      case "text":
+        textContent += part.content;
+        break;
+      case "reasoning":
+        reasoning = (reasoning ?? "") + part.content;
+        break;
+      case "toolCall":
+        toolCalls.push({
+          id: part.toolCallId,
+          name: part.name,
+          arguments: part.arguments,
+        });
+        break;
+      case "toolResult":
+        toolResults.push({
+          toolCallId: part.toolCallId,
+          success: part.success,
+          data: part.data,
+          meta: part.meta,
+          error: part.error,
+        });
+        break;
+    }
+  }
+
+  return {
+    id: msg.id,
+    role: msg.role,
+    content: textContent,
+    createdAt: new Date(msg.createdAt),
+    reasoning: reasoning?.trim() || undefined,
+    toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+    toolResults: toolResults.length > 0 ? toolResults : undefined,
+  };
+}
 
 /**
  * Custom hook for debounced value.
@@ -69,29 +122,48 @@ function useIntersectionObserver(
 }
 
 export const ThreadList: FC = () => {
+  const runtime = useRuntimeContext();
   const [searchValue, setSearchValue] = useState("");
   const debouncedSearch = useDebouncedValue(searchValue, SEARCH_DEBOUNCE_MS);
 
+  // Lift active thread state to share between New button and list items
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(
+    runtime.getCurrentThreadId(),
+  );
+
+  // Handle new thread creation - clears selection
+  const handleNewThread = useCallback(() => {
+    setActiveThreadId(null);
+    runtime.startNewThread();
+  }, [runtime]);
+
   return (
     <ThreadListPrimitive.Root className="aui-root aui-thread-list-root flex flex-col items-stretch gap-1.5">
-      <ThreadListNew />
+      <ThreadListNew onNewThread={handleNewThread} />
       <ThreadSearchInput value={searchValue} onChange={setSearchValue} />
-      <ThreadListItems search={debouncedSearch} />
+      <ThreadListItems
+        search={debouncedSearch}
+        activeThreadId={activeThreadId}
+        onActiveThreadChange={setActiveThreadId}
+      />
     </ThreadListPrimitive.Root>
   );
 };
 
-const ThreadListNew: FC = () => {
+interface ThreadListNewProps {
+  onNewThread: () => void;
+}
+
+const ThreadListNew: FC<ThreadListNewProps> = ({ onNewThread }) => {
   return (
-    <ThreadListPrimitive.New asChild>
-      <Button
-        className="aui-thread-list-new hover:bg-muted data-active:bg-muted flex items-center justify-start gap-1 rounded-lg px-2.5 py-2 text-start"
-        variant="ghost"
-      >
-        <PlusIcon />
-        New Thread
-      </Button>
-    </ThreadListPrimitive.New>
+    <Button
+      className="aui-thread-list-new hover:bg-muted data-active:bg-muted flex items-center justify-start gap-1 rounded-lg px-2.5 py-2 text-start"
+      variant="ghost"
+      onClick={onNewThread}
+    >
+      <PlusIcon />
+      New Thread
+    </Button>
   );
 };
 
@@ -127,13 +199,22 @@ const ThreadSearchInput: FC<ThreadSearchInputProps> = ({ value, onChange }) => {
 
 interface ThreadListItemsProps {
   search?: string;
+  activeThreadId: string | null;
+  onActiveThreadChange: (threadId: string | null) => void;
 }
 
-const ThreadListItems: FC<ThreadListItemsProps> = ({ search }) => {
-  // Use assistant-ui loading state for initial load indicator
-  const isAssistantLoading = useAssistantState(({ threads }) => threads.isLoading);
+const ThreadListItems: FC<ThreadListItemsProps> = ({
+  search,
+  activeThreadId,
+  onActiveThreadChange,
+}) => {
+  // Get the runtime for thread switching
+  const runtime = useRuntimeContext();
 
-  // Fetch threads with infinite pagination
+  // Track loading state for thread switching
+  const [isLoadingThread, setIsLoadingThread] = useState(false);
+
+  // Fetch threads with infinite pagination from database
   const {
     data,
     fetchNextPage,
@@ -142,6 +223,9 @@ const ThreadListItems: FC<ThreadListItemsProps> = ({ search }) => {
     isFetchingNextPage,
     isLoading,
   } = useThreads(search);
+
+  // Delete thread mutation
+  const deleteThread = useDeleteThread();
 
   // Flatten pages into a single array
   const threads = useMemo(
@@ -167,8 +251,41 @@ const ThreadListItems: FC<ThreadListItemsProps> = ({ search }) => {
     enabled: hasNextPage && !isFetchingNextPage,
   });
 
+  // Handle thread selection - load messages from DB into runtime
+  const handleSelectThread = useCallback(async (threadId: string) => {
+    if (threadId === activeThreadId || isLoadingThread) return;
+
+    setIsLoadingThread(true);
+    onActiveThreadChange(threadId);
+
+    try {
+      // Fetch messages from database
+      const dbMessages = await getAiThreadMessages(threadId);
+      // Convert to external message format
+      const externalMessages = dbMessages.map(convertToExternalMessage);
+      // Load into runtime
+      await runtime.loadThread(threadId, externalMessages);
+    } catch (error) {
+      console.error("Failed to load thread:", error);
+      // Reset active thread on error
+      onActiveThreadChange(runtime.getCurrentThreadId());
+    } finally {
+      setIsLoadingThread(false);
+    }
+  }, [activeThreadId, isLoadingThread, runtime, onActiveThreadChange]);
+
+  // Handle delete confirmation
+  const handleDeleteThread = useCallback((threadId: string) => {
+    deleteThread.mutate(threadId);
+    // If deleting the active thread, clear selection
+    if (threadId === activeThreadId) {
+      onActiveThreadChange(null);
+      runtime.startNewThread();
+    }
+  }, [deleteThread, activeThreadId, onActiveThreadChange, runtime]);
+
   // Show skeleton on initial load
-  if (isLoading || isAssistantLoading) {
+  if (isLoading) {
     return <ThreadListSkeleton />;
   }
 
@@ -191,7 +308,15 @@ const ThreadListItems: FC<ThreadListItemsProps> = ({ search }) => {
             Pinned
           </div>
           {pinnedThreads.map((thread) => (
-            <ThreadListItem key={thread.id} />
+            <ThreadListItemCustom
+              key={thread.id}
+              thread={thread}
+              isActive={activeThreadId === thread.id}
+              isLoading={isLoadingThread && activeThreadId === thread.id}
+              isDeleting={deleteThread.isPending && deleteThread.variables === thread.id}
+              onSelect={handleSelectThread}
+              onDelete={handleDeleteThread}
+            />
           ))}
         </div>
       )}
@@ -204,7 +329,17 @@ const ThreadListItems: FC<ThreadListItemsProps> = ({ search }) => {
               Recent
             </div>
           )}
-          <ThreadListPrimitive.Items components={{ ThreadListItem }} />
+          {unpinnedThreads.map((thread) => (
+            <ThreadListItemCustom
+              key={thread.id}
+              thread={thread}
+              isActive={activeThreadId === thread.id}
+              isLoading={isLoadingThread && activeThreadId === thread.id}
+              isDeleting={deleteThread.isPending && deleteThread.variables === thread.id}
+              onSelect={handleSelectThread}
+              onDelete={handleDeleteThread}
+            />
+          ))}
         </div>
       )}
 
@@ -246,35 +381,67 @@ const ThreadListSkeleton: FC = () => {
   );
 };
 
-const ThreadListItem: FC = () => {
-  return (
-    <ThreadListItemPrimitive.Root className="aui-thread-list-item hover:bg-muted focus-visible:bg-muted focus-visible:ring-ring data-active:bg-muted flex items-center gap-2 rounded-lg transition-all focus-visible:ring-2 focus-visible:outline-none">
-      <ThreadListItemPrimitive.Trigger className="aui-thread-list-item-trigger grow px-3 py-2 text-start">
-        <ThreadListItemTitle />
-      </ThreadListItemPrimitive.Trigger>
-      <ThreadListItemArchive />
-    </ThreadListItemPrimitive.Root>
-  );
-};
+/**
+ * Custom thread list item that renders from database thread data.
+ * Uses inline ActionConfirm for delete confirmation.
+ */
+interface ThreadListItemCustomProps {
+  thread: ChatThread;
+  isActive?: boolean;
+  isLoading?: boolean;
+  isDeleting?: boolean;
+  onSelect: (threadId: string) => void;
+  onDelete: (threadId: string) => void;
+}
 
-const ThreadListItemTitle: FC = () => {
+const ThreadListItemCustom: FC<ThreadListItemCustomProps> = ({
+  thread,
+  isActive,
+  isLoading,
+  isDeleting,
+  onSelect,
+  onDelete,
+}) => {
   return (
-    <span className="aui-thread-list-item-title text-sm">
-      <ThreadListItemPrimitive.Title fallback="New Chat" />
-    </span>
-  );
-};
-
-const ThreadListItemArchive: FC = () => {
-  return (
-    <ThreadListItemPrimitive.Archive asChild>
-      <TooltipIconButton
-        className="aui-thread-list-item-archive text-foreground hover:text-primary mr-3 ml-auto size-4 p-0"
-        variant="ghost"
-        tooltip="Archive thread"
+    <div
+      className={`aui-thread-list-item hover:bg-muted focus-visible:bg-muted focus-visible:ring-ring group flex items-center gap-2 rounded-lg transition-all focus-visible:ring-2 focus-visible:outline-none ${
+        isActive ? "bg-muted" : ""
+      }`}
+      data-active={isActive || undefined}
+    >
+      <button
+        type="button"
+        className="aui-thread-list-item-trigger min-w-0 grow px-3 py-2 text-start"
+        onClick={() => onSelect(thread.id)}
+        disabled={isLoading || isDeleting}
       >
-        <ArchiveIcon />
-      </TooltipIconButton>
-    </ThreadListItemPrimitive.Archive>
+        <span className="aui-thread-list-item-title block truncate text-sm">
+          {thread.title || "New Chat"}
+        </span>
+      </button>
+      {isLoading ? (
+        <LoaderIcon className="text-muted-foreground mr-2 size-4 shrink-0 animate-spin" />
+      ) : (
+        <ActionConfirm
+          confirmTitle="Delete conversation?"
+          confirmMessage={`This will permanently delete "${thread.title || "this conversation"}" and all its messages.`}
+          confirmButtonText="Delete"
+          confirmButtonVariant="destructive"
+          isPending={isDeleting ?? false}
+          pendingText="Deleting..."
+          handleConfirm={() => onDelete(thread.id)}
+          button={
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-destructive mr-1 size-6 shrink-0 p-0 opacity-0 transition-opacity group-hover:opacity-100"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Trash2Icon className="size-4" />
+            </Button>
+          }
+        />
+      )}
+    </div>
   );
 };

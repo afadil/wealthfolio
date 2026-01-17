@@ -322,6 +322,7 @@ pub fn run() {
             commands::ai_chat::stream_ai_chat,
             commands::ai_chat::list_ai_threads,
             commands::ai_chat::get_ai_thread,
+            commands::ai_chat::get_ai_thread_messages,
             commands::ai_chat::update_ai_thread,
             commands::ai_chat::delete_ai_thread,
             commands::ai_chat::add_ai_thread_tag,

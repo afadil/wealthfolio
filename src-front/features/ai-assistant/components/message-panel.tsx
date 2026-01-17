@@ -9,8 +9,57 @@ import {
   CollapsibleTrigger,
 } from "@wealthfolio/ui/components/ui/collapsible";
 import { cn } from "@/lib/utils";
-import type { ChatMessage, ChatError, ToolCall } from "../types";
+import type { ChatMessage, ChatError, ToolCall, ToolResult, ChatMessagePart } from "../types";
 import { ToolResultRenderer } from "./tool-renderers";
+
+/**
+ * Extract text content from structured message parts.
+ */
+function getTextContent(parts: ChatMessagePart[]): string {
+  return parts
+    .filter((p): p is { type: "text"; content: string } => p.type === "text")
+    .map((p) => p.content)
+    .join("");
+}
+
+/**
+ * Extract reasoning content from structured message parts.
+ */
+function getReasoningContent(parts: ChatMessagePart[]): string | undefined {
+  const reasoning = parts
+    .filter((p): p is { type: "reasoning"; content: string } => p.type === "reasoning")
+    .map((p) => p.content)
+    .join("");
+  return reasoning.trim() || undefined;
+}
+
+/**
+ * Extract tool calls from structured message parts.
+ */
+function getToolCalls(parts: ChatMessagePart[]): ToolCall[] {
+  return parts
+    .filter((p): p is Extract<ChatMessagePart, { type: "toolCall" }> => p.type === "toolCall")
+    .map((p) => ({
+      id: p.toolCallId,
+      name: p.name,
+      arguments: p.arguments,
+    }));
+}
+
+/**
+ * Extract tool results from structured message parts.
+ */
+function getToolResults(parts: ChatMessagePart[]): ToolResult[] {
+  return parts
+    .filter((p): p is Extract<ChatMessagePart, { type: "toolResult" }> => p.type === "toolResult")
+    .map((p) => ({
+      toolCallId: p.toolCallId,
+      success: p.success,
+      data: p.data,
+      meta: p.meta,
+      error: p.error,
+    }));
+}
 
 interface MessagePanelProps {
   messages: ChatMessage[];
@@ -145,16 +194,22 @@ export function MessagePanel({
 function MessageBubble({ message }: { message: ChatMessage }) {
   const [reasoningOpen, setReasoningOpen] = useState(false);
   const isUser = message.role === "user";
-  const hasToolResults = message.toolResults && message.toolResults.length > 0;
-  const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
-  const hasReasoning = message.reasoning && message.reasoning.trim().length > 0;
+
+  // Extract structured content from message parts
+  const parts = message.content.parts;
+  const textContent = getTextContent(parts);
+  const reasoning = getReasoningContent(parts);
+  const toolCalls = getToolCalls(parts);
+  const toolResults = getToolResults(parts);
+
+  const hasToolResults = toolResults.length > 0;
+  const hasToolCalls = toolCalls.length > 0;
+  const hasReasoning = !!reasoning;
 
   // Build a map from toolCallId to tool name for rendering
   const toolCallMap = new Map<string, ToolCall>();
-  if (message.toolCalls) {
-    for (const tc of message.toolCalls) {
-      toolCallMap.set(tc.id, tc);
-    }
+  for (const tc of toolCalls) {
+    toolCallMap.set(tc.id, tc);
   }
 
   return (
@@ -181,7 +236,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
           <CollapsibleContent>
             <div className="bg-muted/50 mt-1 rounded-lg border border-dashed px-3 py-2">
               <p className="text-muted-foreground whitespace-pre-wrap text-xs italic">
-                {message.reasoning}
+                {reasoning}
               </p>
             </div>
           </CollapsibleContent>
@@ -189,21 +244,21 @@ function MessageBubble({ message }: { message: ChatMessage }) {
       )}
 
       {/* Text content */}
-      {message.content && (
+      {textContent && (
         <div
           className={cn(
             "max-w-[85%] rounded-lg px-4 py-2",
             isUser ? "bg-primary text-primary-foreground" : "bg-muted",
           )}
         >
-          <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+          <p className="whitespace-pre-wrap text-sm">{textContent}</p>
         </div>
       )}
 
       {/* Tool calls in progress (no results yet) */}
       {hasToolCalls && !hasToolResults && (
         <div className="flex max-w-[85%] flex-wrap gap-2">
-          {message.toolCalls!.map((tc) => (
+          {toolCalls.map((tc) => (
             <ToolCallBadge key={tc.id} toolCall={tc} isPending />
           ))}
         </div>
@@ -212,7 +267,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
       {/* Tool results with deterministic UI */}
       {hasToolResults && (
         <div className="flex w-full max-w-[85%] flex-col gap-2">
-          {message.toolResults!.map((result) => {
+          {toolResults.map((result) => {
             const toolCall = toolCallMap.get(result.toolCallId);
             const toolName = toolCall?.name ?? "unknown";
             return (
