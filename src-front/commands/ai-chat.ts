@@ -1,5 +1,5 @@
 import { invoke, logger, listAiThreads as adapterListAiThreads } from "@/adapters";
-import type { ChatThread, ListThreadsRequest, ThreadPage } from "@/features/ai-assistant/types";
+import type { ChatMessage, ChatThread, ListThreadsRequest, ThreadPage } from "@/features/ai-assistant/types";
 
 // Re-export types for convenience
 export type { ListThreadsRequest, ThreadPage };
@@ -37,6 +37,18 @@ export const getAiThread = async (threadId: string): Promise<ChatThread | null> 
     return await invoke("get_ai_thread", { threadId });
   } catch (error) {
     logger.error("Error getting AI thread.");
+    throw error;
+  }
+};
+
+/**
+ * Get all messages for a chat thread.
+ */
+export const getAiThreadMessages = async (threadId: string): Promise<ChatMessage[]> => {
+  try {
+    return await invoke("get_ai_thread_messages", { threadId });
+  } catch (error) {
+    logger.error("Error getting AI thread messages.");
     throw error;
   }
 };

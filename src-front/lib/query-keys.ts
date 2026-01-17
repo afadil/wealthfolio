@@ -61,7 +61,9 @@ export const QueryKeys = {
   // AI Chat
   AI_THREADS: "aiThreads",
   AI_THREAD: "aiThread",
+  AI_THREAD_MESSAGES: "aiThreadMessages",
   aiThread: (threadId: string) => [QueryKeys.AI_THREAD, threadId],
+  aiThreadMessages: (threadId: string) => [QueryKeys.AI_THREAD_MESSAGES, threadId],
 
   transactions: "transactions",
   latestValuations: "latest-valuations",

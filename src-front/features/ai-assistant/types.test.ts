@@ -8,11 +8,41 @@ import {
   type AiStreamEvent,
   type ChatThread,
   type ChatMessage,
+  type ChatMessageContent,
   type ToolCall,
   type ToolResult,
   type UsageStats,
   type ChatError,
 } from "./types";
+
+/**
+ * Helper to create a ChatMessageContent from simple text.
+ */
+function textContent(text: string): ChatMessageContent {
+  return {
+    schemaVersion: 1,
+    parts: [{ type: "text", content: text }],
+  };
+}
+
+/**
+ * Helper to create a ChatMessage with text content.
+ */
+function createTextMessage(
+  id: string,
+  threadId: string,
+  role: "user" | "assistant",
+  text: string,
+  createdAt: string,
+): ChatMessage {
+  return {
+    id,
+    threadId,
+    role,
+    content: textContent(text),
+    createdAt,
+  };
+}
 
 // ============================================================================
 // Error Code Parsing Tests
@@ -243,13 +273,13 @@ describe("AiStreamEvent type validation", () => {
   });
 
   it("should accept valid DoneEvent structure", () => {
-    const message: ChatMessage = {
-      id: "msg-789",
-      threadId: "thread-123",
-      role: "assistant",
-      content: "Here is your portfolio summary.",
-      createdAt: "2024-01-15T10:00:00Z",
-    };
+    const message = createTextMessage(
+      "msg-789",
+      "thread-123",
+      "assistant",
+      "Here is your portfolio summary.",
+      "2024-01-15T10:00:00Z",
+    );
 
     const usage: UsageStats = {
       promptTokens: 100,
@@ -268,19 +298,19 @@ describe("AiStreamEvent type validation", () => {
 
     expect(event.type).toBe("done");
     if (event.type === "done") {
-      expect(event.message.content).toBe("Here is your portfolio summary.");
+      expect(event.message.content.parts[0]).toEqual({ type: "text", content: "Here is your portfolio summary." });
       expect(event.usage?.totalTokens).toBe(150);
     }
   });
 
   it("should accept DoneEvent without usage stats", () => {
-    const message: ChatMessage = {
-      id: "msg-789",
-      threadId: "thread-123",
-      role: "assistant",
-      content: "Done.",
-      createdAt: "2024-01-15T10:00:00Z",
-    };
+    const message = createTextMessage(
+      "msg-789",
+      "thread-123",
+      "assistant",
+      "Done.",
+      "2024-01-15T10:00:00Z",
+    );
 
     const event: AiStreamEvent = {
       type: "done",
@@ -482,7 +512,7 @@ describe("Incremental transcript assembly", () => {
           id: "m1",
           threadId: "t1",
           role: "assistant",
-          content: "Hello, world!",
+          content: textContent("Hello, world!"),
           createdAt: "2024-01-15T10:00:00Z",
         },
       },
@@ -521,7 +551,7 @@ describe("Incremental transcript assembly", () => {
           id: "m1",
           threadId: "t1",
           role: "assistant",
-          content: "The answer is 42.",
+          content: textContent("The answer is 42."),
           createdAt: "2024-01-15T10:00:00Z",
         },
       },
@@ -571,7 +601,7 @@ describe("Incremental transcript assembly", () => {
           id: "m1",
           threadId: "t1",
           role: "assistant",
-          content: "Let me check your holdings.",
+          content: textContent("Let me check your holdings."),
           createdAt: "2024-01-15T10:00:00Z",
         },
       },
@@ -627,7 +657,7 @@ describe("Incremental transcript assembly", () => {
           id: "m1",
           threadId: "t1",
           role: "assistant",
-          content: "Summary",
+          content: textContent("Summary"),
           createdAt: "2024-01-15T10:00:00Z",
         },
       },
@@ -717,7 +747,7 @@ describe("Incremental transcript assembly", () => {
           id: "m1",
           threadId: "t1",
           role: "assistant",
-          content: "Sorry, I could not fetch your holdings.",
+          content: textContent("Sorry, I could not fetch your holdings."),
           createdAt: "2024-01-15T10:00:00Z",
         },
       },
@@ -746,7 +776,7 @@ describe("Incremental transcript assembly", () => {
           id: "m1",
           threadId: "t1",
           role: "assistant",
-          content: "ABCD",
+          content: textContent("ABCD"),
           createdAt: "2024-01-15T10:00:00Z",
         },
       },
@@ -814,13 +844,12 @@ describe("ChatMessage type", () => {
       id: "msg-1",
       threadId: "thread-1",
       role: "user",
-      content: "What are my holdings?",
+      content: textContent("What are my holdings?"),
       createdAt: "2024-01-15T10:00:00Z",
     };
 
     expect(message.role).toBe("user");
-    expect(message.content).toBe("What are my holdings?");
-    expect(message.toolCalls).toBeUndefined();
+    expect(message.content.parts[0]).toEqual({ type: "text", content: "What are my holdings?" });
   });
 
   it("should represent an assistant message with tool calls", () => {
@@ -828,28 +857,33 @@ describe("ChatMessage type", () => {
       id: "msg-2",
       threadId: "thread-1",
       role: "assistant",
-      content: "Here are your holdings:",
+      content: {
+        schemaVersion: 1,
+        parts: [
+          { type: "text", content: "Here are your holdings:" },
+          {
+            type: "toolCall",
+            toolCallId: "tc-1",
+            name: "get_holdings",
+            arguments: { accountId: "all" },
+          },
+          {
+            type: "toolResult",
+            toolCallId: "tc-1",
+            success: true,
+            data: { holdings: [{ symbol: "AAPL", quantity: 100 }] },
+            meta: { rowCount: 1 },
+          },
+        ],
+      },
       createdAt: "2024-01-15T10:01:00Z",
-      toolCalls: [
-        {
-          id: "tc-1",
-          name: "get_holdings",
-          arguments: { accountId: "all" },
-        },
-      ],
-      toolResults: [
-        {
-          toolCallId: "tc-1",
-          success: true,
-          data: { holdings: [{ symbol: "AAPL", quantity: 100 }] },
-          meta: { rowCount: 1 },
-        },
-      ],
     };
 
     expect(message.role).toBe("assistant");
-    expect(message.toolCalls).toHaveLength(1);
-    expect(message.toolResults).toHaveLength(1);
-    expect(message.toolResults![0].success).toBe(true);
+    const toolCalls = message.content.parts.filter((p) => p.type === "toolCall");
+    const toolResults = message.content.parts.filter((p) => p.type === "toolResult");
+    expect(toolCalls).toHaveLength(1);
+    expect(toolResults).toHaveLength(1);
+    expect((toolResults[0] as { success: boolean }).success).toBe(true);
   });
 });

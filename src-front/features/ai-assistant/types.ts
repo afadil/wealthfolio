@@ -55,17 +55,47 @@ export interface ChatThread {
   updatedAt: string;
 }
 
+/**
+ * A single part of a message's content.
+ * Maps to backend ChatMessagePart enum.
+ */
+export type ChatMessagePart =
+  | { type: "system"; content: string }
+  | { type: "text"; content: string }
+  | { type: "reasoning"; content: string }
+  | {
+      type: "toolCall";
+      toolCallId: string;
+      name: string;
+      arguments: Record<string, unknown>;
+    }
+  | {
+      type: "toolResult";
+      toolCallId: string;
+      success: boolean;
+      data: unknown;
+      meta?: Record<string, unknown>;
+      error?: string;
+    }
+  | { type: "error"; code: string; message: string };
+
+/**
+ * Structured message content from the backend.
+ * Contains versioned parts array for forward compatibility.
+ */
+export interface ChatMessageContent {
+  schemaVersion: number;
+  parts: ChatMessagePart[];
+  truncated?: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   threadId: string;
   role: "user" | "assistant";
-  content: string;
+  /** Structured content with parts array */
+  content: ChatMessageContent;
   createdAt: string;
-  /** Reasoning/thinking content from the model (optional) */
-  reasoning?: string;
-  // Tool calls/results stored inline
-  toolCalls?: ToolCall[];
-  toolResults?: ToolResult[];
 }
 
 export interface ToolCall {

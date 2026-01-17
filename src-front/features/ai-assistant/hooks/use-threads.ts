@@ -2,6 +2,7 @@ import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from "@tansta
 import {
   listAiThreads,
   getAiThread,
+  getAiThreadMessages,
   updateAiThread,
   deleteAiThread,
   addAiThreadTag,
@@ -10,7 +11,7 @@ import {
   type ThreadPage,
 } from "@/commands/ai-chat";
 import { QueryKeys } from "@/lib/query-keys";
-import type { ChatThread } from "../types";
+import type { ChatMessage, ChatThread } from "../types";
 
 /** Query key for AI threads list (infinite query) */
 export const AI_THREADS_KEY = [QueryKeys.AI_THREADS] as const;
@@ -47,6 +48,17 @@ export function useThread(threadId: string | null) {
   return useQuery({
     queryKey: QueryKeys.aiThread(threadId ?? ""),
     queryFn: () => getAiThread(threadId!),
+    enabled: !!threadId,
+  });
+}
+
+/**
+ * Hook to fetch messages for a thread.
+ */
+export function useThreadMessages(threadId: string | null) {
+  return useQuery<ChatMessage[]>({
+    queryKey: QueryKeys.aiThreadMessages(threadId ?? ""),
+    queryFn: () => getAiThreadMessages(threadId!),
     enabled: !!threadId,
   });
 }
