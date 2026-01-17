@@ -1,5 +1,5 @@
-import { AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@wealthfolio/ui";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 
 export interface ToolErrorProps {
   title?: string;
@@ -14,7 +14,7 @@ export function ToolError({
 }: ToolErrorProps) {
   return (
     <div className="flex flex-col items-center gap-3 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-6 text-center">
-      <AlertCircle className="size-8 text-destructive" />
+      <Icons.AlertCircle className="size-8 text-destructive" />
       <div className="flex flex-col gap-1">
         <p className="font-medium text-destructive">{title}</p>
         <p className="text-sm text-destructive/80">{message}</p>
@@ -26,7 +26,7 @@ export function ToolError({
           onClick={onRetry}
           className="mt-2 gap-1.5 border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive"
         >
-          <RefreshCw className="size-3.5" />
+          <Icons.RefreshCw className="size-3.5" />
           Retry
         </Button>
       )}

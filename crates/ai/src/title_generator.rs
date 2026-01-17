@@ -26,7 +26,7 @@ use std::sync::Arc;
 pub trait TitleGeneratorTrait: Send + Sync {
     /// Generate a title from the first user message.
     ///
-    /// Returns a short (3-8 word) descriptive title suitable for sidebar display.
+    /// Returns a short (4 words max) descriptive title suitable for sidebar display.
     /// Falls back to truncating the message if LLM generation fails.
     ///
     /// `chat_model_id` is used as fallback if no title model is configured for the provider.
@@ -96,7 +96,7 @@ impl<E: AiEnvironment> TitleGenerator<E> {
         );
 
         let prompt = format!(
-            "Generate a very short title (3-6 words, no quotes) for this chat message:\n\n\"{}\"\n\nTitle:",
+            "Generate a very short title (4 words max, no quotes) for this chat message:\n\n\"{}\"\n\nTitle:",
             truncate_to_title(user_message, 200)
         );
 

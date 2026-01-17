@@ -12,7 +12,7 @@ import {
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
-import { Target, CalendarDays, CheckCircle2 } from "lucide-react";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 
 // ============================================================================
 // Types
@@ -267,9 +267,9 @@ function GoalCard({
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           {goal.isAchieved ? (
-            <CheckCircle2 className="text-success h-4 w-4 flex-shrink-0" />
+            <Icons.CheckCircle className="text-success h-4 w-4 flex-shrink-0" />
           ) : (
-            <Target className="text-muted-foreground h-4 w-4 flex-shrink-0" />
+            <Icons.Target className="text-muted-foreground h-4 w-4 flex-shrink-0" />
           )}
           <span className="text-sm font-medium leading-tight">{goal.title}</span>
         </div>
@@ -304,7 +304,7 @@ function GoalCard({
         </span>
         {goal.deadline && (
           <span className="text-muted-foreground flex items-center gap-1">
-            <CalendarDays className="h-3 w-3" />
+            <Icons.Calendar className="h-3 w-3" />
             {formatDate(goal.deadline)}
           </span>
         )}
@@ -322,7 +322,7 @@ function EmptyState() {
   return (
     <Card className="bg-muted/40 border-primary/10">
       <CardContent className="flex flex-col items-center justify-center py-8 text-center">
-        <Target className="text-muted-foreground mb-2 h-8 w-8" />
+        <Icons.Target className="text-muted-foreground mb-2 h-8 w-8" />
         <p className="text-muted-foreground text-sm">No goals set up yet.</p>
         <p className="text-muted-foreground mt-1 text-xs">
           Create investment goals in Settings to track your progress.

@@ -1,13 +1,14 @@
 import { ThreadListPrimitive } from "@assistant-ui/react";
-import { PlusIcon, SearchIcon, XIcon, LoaderIcon, PinIcon, Trash2Icon } from "lucide-react";
-import { type FC, useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { type FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+
+import { ActionConfirm } from "@wealthfolio/ui/components/common";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { ActionConfirm } from "@wealthfolio/ui/components/common";
-import { useThreads, useDeleteThread, flattenThreadPages } from "../hooks/use-threads";
 import { useRuntimeContext } from "../hooks/use-runtime-context";
+import { flattenThreadPages, useDeleteThread, useThreads, useToggleThreadPin } from "../hooks/use-threads";
 import type { ChatThread } from "../types";
 
 /** Debounce delay for search input (ms) */
@@ -101,11 +102,11 @@ interface ThreadListNewProps {
 const ThreadListNew: FC<ThreadListNewProps> = ({ onNewThread }) => {
   return (
     <Button
-      className="aui-thread-list-new hover:bg-muted data-active:bg-muted flex items-center justify-start gap-1 rounded-lg px-2.5 py-2 text-start"
+      className="aui-thread-list-new hover:bg-muted data-active:bg-muted flex items-center justify-start gap-1 rounded-lg px-2.5 py-2 text-start text-xs"
       variant="ghost"
       onClick={onNewThread}
     >
-      <PlusIcon />
+      <Icons.Plus className="size-3.5" />
       New Thread
     </Button>
   );
@@ -119,22 +120,22 @@ interface ThreadSearchInputProps {
 const ThreadSearchInput: FC<ThreadSearchInputProps> = ({ value, onChange }) => {
   return (
     <div className="relative px-1">
-      <SearchIcon className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
+      <Icons.Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
       <Input
         type="text"
         placeholder="Search threads..."
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-8 pl-8 pr-8 text-sm"
+        className="h-8 pr-8 pl-8 text-sm"
       />
       {value && (
         <button
           type="button"
           onClick={() => onChange("")}
-          className="text-muted-foreground hover:text-foreground absolute right-3 top-1/2 -translate-y-1/2"
+          className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2"
           aria-label="Clear search"
         >
-          <XIcon className="size-4" />
+          <Icons.Close className="size-4" />
         </button>
       )}
     </div>
@@ -158,23 +159,17 @@ const ThreadListItems: FC<ThreadListItemsProps> = ({
   const runtime = useRuntimeContext();
 
   // Fetch threads with infinite pagination from database
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetching,
-    isFetchingNextPage,
-    isLoading,
-  } = useThreads(search);
+  const { data, fetchNextPage, hasNextPage, isFetching, isFetchingNextPage, isLoading } =
+    useThreads(search);
 
   // Delete thread mutation
   const deleteThread = useDeleteThread();
 
+  // Pin/unpin thread mutation
+  const togglePin = useToggleThreadPin();
+
   // Flatten pages into a single array
-  const threads = useMemo(
-    () => flattenThreadPages(data?.pages),
-    [data?.pages],
-  );
+  const threads = useMemo(() => flattenThreadPages(data?.pages), [data?.pages]);
 
   useEffect(() => {
     onThreadListStateChange(threads, isLoading);
@@ -199,23 +194,37 @@ const ThreadListItems: FC<ThreadListItemsProps> = ({
   });
 
   // Handle thread selection - load messages from DB into runtime
-  const handleSelectThread = useCallback(async (threadId: string) => {
-    try {
-      if (threadId === activeThreadId || switchingThreadId) return;
-      await runtime.threads.switchToThread(threadId);
-    } catch (error) {
-      console.error("Failed to switch thread:", error);
-    }
-  }, [activeThreadId, switchingThreadId, runtime]);
+  const handleSelectThread = useCallback(
+    async (threadId: string) => {
+      try {
+        if (threadId === activeThreadId || switchingThreadId) return;
+        await runtime.threads.switchToThread(threadId);
+      } catch (error) {
+        console.error("Failed to switch thread:", error);
+      }
+    },
+    [activeThreadId, switchingThreadId, runtime],
+  );
 
   // Handle delete confirmation
-  const handleDeleteThread = useCallback((threadId: string) => {
-    deleteThread.mutate(threadId);
-    // If deleting the active thread, clear selection
-    if (threadId === activeThreadId) {
-      runtime.threads.switchToNewThread();
-    }
-  }, [deleteThread, activeThreadId, runtime]);
+  const handleDeleteThread = useCallback(
+    (threadId: string) => {
+      deleteThread.mutate(threadId);
+      // If deleting the active thread, clear selection
+      if (threadId === activeThreadId) {
+        runtime.threads.switchToNewThread();
+      }
+    },
+    [deleteThread, activeThreadId, runtime],
+  );
+
+  // Handle pin/unpin toggle
+  const handleTogglePin = useCallback(
+    (threadId: string, currentlyPinned: boolean) => {
+      togglePin.mutate({ id: threadId, isPinned: !currentlyPinned });
+    },
+    [togglePin],
+  );
 
   // Show skeleton on initial load
   if (isLoading) {
@@ -237,7 +246,7 @@ const ThreadListItems: FC<ThreadListItemsProps> = ({
       {pinnedThreads.length > 0 && (
         <div className="flex flex-col gap-0.5">
           <div className="text-muted-foreground flex items-center gap-1.5 px-3 py-1 text-xs font-medium">
-            <PinIcon className="size-3" />
+            <Icons.Pin className="size-3" />
             Pinned
           </div>
           {pinnedThreads.map((thread) => (
@@ -249,6 +258,7 @@ const ThreadListItems: FC<ThreadListItemsProps> = ({
               isDeleting={deleteThread.isPending && deleteThread.variables === thread.id}
               onSelect={handleSelectThread}
               onDelete={handleDeleteThread}
+              onTogglePin={handleTogglePin}
             />
           ))}
         </div>
@@ -258,9 +268,7 @@ const ThreadListItems: FC<ThreadListItemsProps> = ({
       {unpinnedThreads.length > 0 && (
         <div className="flex flex-col gap-0.5">
           {pinnedThreads.length > 0 && (
-            <div className="text-muted-foreground px-3 py-1 text-xs font-medium">
-              Recent
-            </div>
+            <div className="text-muted-foreground px-3 py-1 text-xs font-medium">Recent</div>
           )}
           {unpinnedThreads.map((thread) => (
             <ThreadListItemCustom
@@ -271,6 +279,7 @@ const ThreadListItems: FC<ThreadListItemsProps> = ({
               isDeleting={deleteThread.isPending && deleteThread.variables === thread.id}
               onSelect={handleSelectThread}
               onDelete={handleDeleteThread}
+              onTogglePin={handleTogglePin}
             />
           ))}
         </div>
@@ -282,14 +291,14 @@ const ThreadListItems: FC<ThreadListItemsProps> = ({
       {/* Loading indicator for next page */}
       {isFetchingNextPage && (
         <div className="flex items-center justify-center py-2">
-          <LoaderIcon className="text-muted-foreground size-4 animate-spin" />
+          <Icons.Spinner className="text-muted-foreground size-4 animate-spin" />
         </div>
       )}
 
       {/* Show subtle loading indicator while refetching */}
       {isFetching && !isFetchingNextPage && !isLoading && (
         <div className="flex items-center justify-center py-1">
-          <LoaderIcon className="text-muted-foreground size-3 animate-spin" />
+          <Icons.Spinner className="text-muted-foreground size-3 animate-spin" />
         </div>
       )}
     </div>
@@ -325,6 +334,7 @@ interface ThreadListItemCustomProps {
   isDeleting?: boolean;
   onSelect: (threadId: string) => void;
   onDelete: (threadId: string) => void;
+  onTogglePin: (threadId: string, isPinned: boolean) => void;
 }
 
 const ThreadListItemCustom: FC<ThreadListItemCustomProps> = ({
@@ -334,46 +344,63 @@ const ThreadListItemCustom: FC<ThreadListItemCustomProps> = ({
   isDeleting,
   onSelect,
   onDelete,
+  onTogglePin,
 }) => {
   return (
     <div
-      className={`aui-thread-list-item hover:bg-muted focus-visible:bg-muted focus-visible:ring-ring group flex items-center gap-2 rounded-lg transition-all focus-visible:ring-2 focus-visible:outline-none ${
+      className={`aui-thread-list-item hover:bg-muted focus-visible:bg-muted focus-visible:ring-ring group relative rounded-lg transition-all focus-visible:ring-2 focus-visible:outline-none ${
         isActive ? "bg-muted" : ""
       }`}
       data-active={isActive || undefined}
     >
       <button
         type="button"
-        className="aui-thread-list-item-trigger min-w-0 grow px-3 py-2 text-start"
+        className="aui-thread-list-item-trigger w-full px-3 py-2 text-start"
         onClick={() => onSelect(thread.id)}
         disabled={isLoading || isDeleting}
       >
-        <span className="aui-thread-list-item-title block truncate text-sm">
+        <span className="aui-thread-list-item-title line-clamp-1 text-xs tracking-tighter [word-spacing:-0.2em]">
           {thread.title || "New Chat"}
         </span>
       </button>
       {isLoading ? (
-        <LoaderIcon className="text-muted-foreground mr-2 size-4 shrink-0 animate-spin" />
+        <div className="absolute inset-y-0 right-2 flex items-center">
+          <Icons.Spinner className="text-muted-foreground size-4 animate-spin" />
+        </div>
       ) : (
-        <ActionConfirm
-          confirmTitle="Delete conversation?"
-          confirmMessage={`This will permanently delete "${thread.title || "this conversation"}" and all its messages.`}
-          confirmButtonText="Delete"
-          confirmButtonVariant="destructive"
-          isPending={isDeleting ?? false}
-          pendingText="Deleting..."
-          handleConfirm={() => onDelete(thread.id)}
-          button={
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground hover:text-destructive mr-1 size-6 shrink-0 p-0 opacity-0 transition-opacity group-hover:opacity-100"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Trash2Icon className="size-4" />
-            </Button>
-          }
-        />
+        <div className="bg-muted/80 absolute inset-y-0 right-1 flex items-center gap-0.5 rounded-r-lg px-1 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-blue-500 hover:text-blue-600 size-6 p-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              onTogglePin(thread.id, thread.isPinned);
+            }}
+            title={thread.isPinned ? "Unpin" : "Pin"}
+          >
+            {thread.isPinned ? <Icons.PinOff className="size-3.5" /> : <Icons.Pin className="size-3.5" />}
+          </Button>
+          <ActionConfirm
+            confirmTitle="Delete conversation?"
+            confirmMessage={`This will permanently delete "${thread.title || "this conversation"}" and all its messages.`}
+            confirmButtonText="Delete"
+            confirmButtonVariant="destructive"
+            isPending={isDeleting ?? false}
+            pendingText="Deleting..."
+            handleConfirm={() => onDelete(thread.id)}
+            button={
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:text-destructive/80 size-6 p-0"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Icons.Trash2 className="size-3.5" />
+              </Button>
+            }
+          />
+        </div>
       )}
     </div>
   );

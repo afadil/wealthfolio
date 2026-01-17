@@ -8,15 +8,22 @@ import {
   unstable_memoizeMarkdownComponents as memoizeMarkdownComponents,
   useIsMarkdownCodeBlock,
 } from "@assistant-ui/react-markdown";
-import { CheckIcon, CopyIcon } from "lucide-react";
 import { type FC, memo, useState } from "react";
+
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import remarkGfm from "remark-gfm";
 
 import { cn } from "@/lib/utils";
 import { TooltipIconButton } from "./tooltip-icon-button";
 
 const MarkdownTextImpl = () => {
-  return <MarkdownTextPrimitive remarkPlugins={[remarkGfm]} className="aui-md" components={defaultComponents} />;
+  return (
+    <MarkdownTextPrimitive
+      remarkPlugins={[remarkGfm]}
+      className="aui-md prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent"
+      components={customComponents}
+    />
+  );
 };
 
 export const MarkdownText = memo(MarkdownTextImpl);
@@ -29,11 +36,11 @@ const CodeHeader: FC<CodeHeaderProps> = ({ language, code }) => {
   };
 
   return (
-    <div className="aui-code-header-root bg-muted-foreground/15 text-foreground dark:bg-muted-foreground/20 mt-4 flex items-center justify-between gap-4 rounded-t-lg px-4 py-2 text-sm font-semibold">
+    <div className="aui-code-header-root bg-muted-foreground/15 text-foreground dark:bg-muted-foreground/20 not-prose mt-4 flex items-center justify-between gap-4 rounded-t-lg px-4 py-2 text-sm font-semibold">
       <span className="aui-code-header-language lowercase [&>span]:text-xs">{language}</span>
       <TooltipIconButton tooltip="Copy" onClick={onCopy}>
-        {!isCopied && <CopyIcon />}
-        {isCopied && <CheckIcon />}
+        {!isCopied && <Icons.Copy />}
+        {isCopied && <Icons.Check />}
       </TooltipIconButton>
     </div>
   );
@@ -58,72 +65,50 @@ const useCopyToClipboard = ({
   return { isCopied, copyToClipboard };
 };
 
-const defaultComponents = memoizeMarkdownComponents({
-  h1: ({ className, ...props }) => (
-    <h1
-      className={cn("aui-md-h1 mb-8 scroll-m-20 text-4xl font-extrabold tracking-tight last:mb-0", className)}
-      {...props}
-    />
-  ),
-  h2: ({ className, ...props }) => (
-    <h2
+/**
+ * Custom components for elements that need special handling beyond prose defaults.
+ * Most elements use Tailwind Typography prose-sm defaults automatically.
+ */
+const customComponents = memoizeMarkdownComponents({
+  // Custom code block styling with dark background
+  pre: ({ className, ...props }) => (
+    <pre
       className={cn(
-        "aui-md-h2 mt-8 mb-4 scroll-m-20 text-3xl font-semibold tracking-tight first:mt-0 last:mb-0",
+        "aui-md-pre not-prose overflow-x-auto rounded-b-lg rounded-t-none bg-black p-4 text-sm text-white",
         className,
       )}
       {...props}
     />
   ),
-  h3: ({ className, ...props }) => (
-    <h3
-      className={cn(
-        "aui-md-h3 mt-6 mb-4 scroll-m-20 text-2xl font-semibold tracking-tight first:mt-0 last:mb-0",
-        className,
-      )}
-      {...props}
-    />
-  ),
-  h4: ({ className, ...props }) => (
-    <h4
-      className={cn(
-        "aui-md-h4 mt-6 mb-4 scroll-m-20 text-xl font-semibold tracking-tight first:mt-0 last:mb-0",
-        className,
-      )}
-      {...props}
-    />
-  ),
-  h5: ({ className, ...props }) => (
-    <h5 className={cn("aui-md-h5 my-4 text-lg font-semibold first:mt-0 last:mb-0", className)} {...props} />
-  ),
-  h6: ({ className, ...props }) => (
-    <h6 className={cn("aui-md-h6 my-4 font-semibold first:mt-0 last:mb-0", className)} {...props} />
-  ),
-  p: ({ className, ...props }) => (
-    <p className={cn("aui-md-p mt-5 mb-5 leading-7 first:mt-0 last:mb-0", className)} {...props} />
-  ),
-  a: ({ className, ...props }) => (
-    <a className={cn("aui-md-a text-primary font-medium underline underline-offset-4", className)} {...props} />
-  ),
-  blockquote: ({ className, ...props }) => (
-    <blockquote className={cn("aui-md-blockquote border-l-2 pl-6 italic", className)} {...props} />
-  ),
-  ul: ({ className, ...props }) => (
-    <ul className={cn("aui-md-ul my-5 ml-6 list-disc [&>li]:mt-2", className)} {...props} />
-  ),
-  ol: ({ className, ...props }) => (
-    <ol className={cn("aui-md-ol my-5 ml-6 list-decimal [&>li]:mt-2", className)} {...props} />
-  ),
-  hr: ({ className, ...props }) => <hr className={cn("aui-md-hr my-5 border-b", className)} {...props} />,
+  // Inline code styling
+  code: function Code({ className, ...props }) {
+    const isCodeBlock = useIsMarkdownCodeBlock();
+    return (
+      <code
+        className={cn(
+          !isCodeBlock && "aui-md-inline-code rounded border bg-muted px-1.5 py-0.5 font-mono text-sm font-medium before:content-none after:content-none",
+          className,
+        )}
+        {...props}
+      />
+    );
+  },
+  // Code header with copy button
+  CodeHeader,
+  // Tables with better styling for data display
   table: ({ className, ...props }) => (
     <table
-      className={cn("aui-md-table my-5 w-full border-separate border-spacing-0 overflow-y-auto", className)}
+      className={cn(
+        "aui-md-table not-prose my-3 w-full border-separate border-spacing-0 text-sm",
+        className,
+      )}
       {...props}
     />
   ),
   th: ({ className, ...props }) => (
     <th
       className={cn(
-        "aui-md-th bg-muted px-4 py-2 text-left font-bold first:rounded-tl-lg last:rounded-tr-lg [[align=center]]:text-center [[align=right]]:text-right",
+        "aui-md-th bg-muted px-3 py-2 text-left text-xs font-semibold first:rounded-tl-lg last:rounded-tr-lg",
         className,
       )}
       {...props}
@@ -132,7 +117,7 @@ const defaultComponents = memoizeMarkdownComponents({
   td: ({ className, ...props }) => (
     <td
       className={cn(
-        "aui-md-td border-b border-l px-4 py-2 text-left last:border-r [[align=center]]:text-center [[align=right]]:text-right",
+        "aui-md-td border-b border-l px-3 py-2 text-left text-sm last:border-r",
         className,
       )}
       {...props}
@@ -147,23 +132,4 @@ const defaultComponents = memoizeMarkdownComponents({
       {...props}
     />
   ),
-  sup: ({ className, ...props }) => (
-    <sup className={cn("aui-md-sup [&>a]:text-xs [&>a]:no-underline", className)} {...props} />
-  ),
-  pre: ({ className, ...props }) => (
-    <pre
-      className={cn("aui-md-pre overflow-x-auto rounded-t-none! rounded-b-lg bg-black p-4 text-white", className)}
-      {...props}
-    />
-  ),
-  code: function Code({ className, ...props }) {
-    const isCodeBlock = useIsMarkdownCodeBlock();
-    return (
-      <code
-        className={cn(!isCodeBlock && "aui-md-inline-code bg-muted rounded border font-semibold", className)}
-        {...props}
-      />
-    );
-  },
-  CodeHeader,
 });
