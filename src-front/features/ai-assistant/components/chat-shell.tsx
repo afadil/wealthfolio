@@ -19,6 +19,16 @@ import { Thread } from "./thread";
 import { ThreadList } from "./thread-list";
 import { ProviderPicker } from "./provider-picker";
 import { ModelPicker } from "./model-picker";
+import {
+  AccountsToolUI,
+  ActivitiesToolUI,
+  AllocationToolUI,
+  DividendsToolUI,
+  GoalsToolUI,
+  HoldingsToolUI,
+  PerformanceToolUI,
+  ValuationToolUI,
+} from "./tool-uis";
 import { useChatModel } from "../hooks/use-chat-model";
 import { useChatRuntime } from "../hooks/use-chat-runtime";
 import { RuntimeProvider } from "../hooks/use-runtime-context";
@@ -148,6 +158,16 @@ export function ChatShell({ className }: ChatShellProps) {
   return (
     <RuntimeProvider runtime={runtime}>
       <AssistantRuntimeProvider runtime={runtime}>
+        {/* Tool UIs - must be children of AssistantRuntimeProvider to register */}
+        <HoldingsToolUI />
+        <AccountsToolUI />
+        <ActivitiesToolUI />
+        <GoalsToolUI />
+        <ValuationToolUI />
+        <DividendsToolUI />
+        <AllocationToolUI />
+        <PerformanceToolUI />
+
         <div className={cn("bg-background flex h-full w-full", className)}>
           {/* Desktop Sidebar */}
           <div className="hidden md:block">
