@@ -58,6 +58,7 @@ const normalizeResult = (result: unknown): ValuationResult | null => {
   const baseCurrency =
     (candidate.baseCurrency as string | undefined) ??
     (candidate.base_currency as string | undefined) ??
+    (candidate.currency as string | undefined) ??
     "USD";
 
   const valuations: ValuationPoint[] = valuationsRaw
@@ -66,6 +67,7 @@ const normalizeResult = (result: unknown): ValuationResult | null => {
       valuationDate:
         (entry.valuationDate as string | undefined) ??
         (entry.valuation_date as string | undefined) ??
+        (entry.date as string | undefined) ??
         "",
       totalValue: Number(
         (entry.totalValue as number | string | undefined) ??
@@ -80,6 +82,7 @@ const normalizeResult = (result: unknown): ValuationResult | null => {
       baseCurrency:
         (entry.baseCurrency as string | undefined) ??
         (entry.base_currency as string | undefined) ??
+        (entry.currency as string | undefined) ??
         baseCurrency,
     }))
     .filter((entry) => Boolean(entry.valuationDate));
@@ -88,6 +91,8 @@ const normalizeResult = (result: unknown): ValuationResult | null => {
     accountId:
       (candidate.accountId as string | undefined) ??
       (candidate.account_id as string | undefined) ??
+      (candidate.accountScope as string | undefined) ??
+      (candidate.account_scope as string | undefined) ??
       PORTFOLIO_ACCOUNT_ID,
     accountName:
       (candidate.accountName as string | undefined) ??
