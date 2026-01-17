@@ -238,7 +238,9 @@ const AssistantMessage: FC = () => {
             Text: MarkdownText,
             Reasoning: Reasoning,
             ReasoningGroup: ReasoningGroup,
-            tools: { Fallback: ToolFallback },
+            tools: {
+              Fallback: ToolFallback,
+            },
           }}
         />
         <MessageError />
