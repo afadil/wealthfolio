@@ -7398,7 +7398,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "wealthfolio-ai-assistant"
+name = "wealthfolio-ai"
 version = "3.0.0-beta.1"
 dependencies = [
  "anyhow",
@@ -7406,7 +7406,10 @@ dependencies = [
  "chrono",
  "futures",
  "log",
+ "once_cell",
+ "reqwest",
  "rig-core",
+ "rust_decimal",
  "serde",
  "serde_json",
  "tempfile",
@@ -7454,7 +7457,7 @@ dependencies = [
  "tokio",
  "urlencoding",
  "uuid",
- "wealthfolio-ai-assistant",
+ "wealthfolio-ai",
  "wealthfolio-connect",
  "wealthfolio-core",
  "wealthfolio-device-sync",
@@ -7589,7 +7592,7 @@ dependencies = [
  "utoipa",
  "utoipa-swagger-ui",
  "uuid",
- "wealthfolio-ai-assistant",
+ "wealthfolio-ai",
  "wealthfolio-connect",
  "wealthfolio-core",
  "wealthfolio-device-sync",
@@ -7616,6 +7619,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "uuid",
+ "wealthfolio-ai",
  "wealthfolio-core",
 ]
 

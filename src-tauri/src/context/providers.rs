@@ -1,12 +1,13 @@
+use super::ai_environment::TauriAiEnvironment;
 use super::registry::ServiceContext;
 use crate::secret_store::shared_secret_store;
 use crate::services::ConnectService;
 use std::sync::{Arc, RwLock};
+use wealthfolio_ai::{AiProviderService, ChatConfig, ChatService};
 use wealthfolio_connect::{BrokerSyncService, PlatformRepository};
 use wealthfolio_core::{
     accounts::AccountService,
     activities::ActivityService,
-    ai::AiProviderService,
     assets::{AssetClassificationService, AssetService},
     fx::{FxService, FxServiceTrait},
     goals::GoalService,
@@ -194,7 +195,7 @@ pub async fn initialize_context(
     let connect_service = Arc::new(ConnectService::new());
 
     // AI provider service - catalog is embedded at compile time
-    let ai_catalog_json = include_str!("../../../src-front/lib/ai-providers.json");
+    let ai_catalog_json = include_str!("../../../crates/ai/src/ai_providers.json");
     let ai_provider_service = Arc::new(AiProviderService::new(
         settings_repository.clone() as Arc<dyn SettingsRepositoryTrait>,
         secret_store.clone(),
@@ -203,6 +204,20 @@ pub async fn initialize_context(
 
     // AI chat repository for thread/message persistence
     let ai_chat_repository = Arc::new(AiChatRepository::new(pool.clone(), writer.clone()));
+
+    // Create AI environment and chat service
+    let ai_environment = Arc::new(TauriAiEnvironment::new(
+        base_currency.clone(),
+        account_service.clone(),
+        activity_service.clone(),
+        holdings_service.clone(),
+        valuation_service.clone(),
+        goal_service.clone(),
+        settings_service.clone(),
+        secret_store.clone(),
+        ai_chat_repository,
+    ));
+    let ai_chat_service = Arc::new(ChatService::new(ai_environment, ChatConfig::default()));
 
     Ok(ServiceContext {
         base_currency,
@@ -227,7 +242,6 @@ pub async fn initialize_context(
         taxonomy_service,
         connect_service,
         ai_provider_service,
-        ai_assistant_service: None, // Will be initialized when provider is configured
-        ai_chat_repository,
+        ai_chat_service,
     })
 }

@@ -5,11 +5,17 @@
 
 use async_trait::async_trait;
 use log::{debug, warn};
-use std::sync::Arc;
+use reqwest::Client as HttpClient;
+use rig::{
+    client::{CompletionClient, Nothing},
+    completion::Prompt,
+    providers::{anthropic, gemini, groq, ollama, openai},
+};
 
+use crate::error::AiError;
+use crate::providers::ProviderService;
 use crate::env::AiEnvironment;
-use crate::providers::{CompletionConfig, ProviderAdapter, ProviderRegistry};
-use crate::types::AiAssistantError;
+use std::sync::Arc;
 
 // ============================================================================
 // Title Generator Trait
@@ -22,7 +28,9 @@ pub trait TitleGeneratorTrait: Send + Sync {
     ///
     /// Returns a short (3-8 word) descriptive title suitable for sidebar display.
     /// Falls back to truncating the message if LLM generation fails.
-    async fn generate_title(&self, user_message: &str, provider_id: &str) -> String;
+    ///
+    /// `chat_model_id` is used as fallback if no title model is configured for the provider.
+    async fn generate_title(&self, user_message: &str, provider_id: &str, chat_model_id: &str) -> String;
 }
 
 // ============================================================================
@@ -50,123 +58,117 @@ impl Default for TitleGeneratorConfig {
 }
 
 /// Title generator implementation using LLM providers.
-pub struct TitleGenerator {
-    env: Arc<dyn AiEnvironment>,
-    provider_registry: Arc<ProviderRegistry>,
+pub struct TitleGenerator<E: AiEnvironment> {
+    env: Arc<E>,
     config: TitleGeneratorConfig,
 }
 
-impl TitleGenerator {
+impl<E: AiEnvironment> TitleGenerator<E> {
     /// Create a new title generator.
-    pub fn new(
-        env: Arc<dyn AiEnvironment>,
-        provider_registry: Arc<ProviderRegistry>,
-        config: TitleGeneratorConfig,
-    ) -> Self {
-        Self {
-            env,
-            provider_registry,
-            config,
-        }
-    }
-
-    /// Get the title model for a provider.
-    ///
-    /// Uses titleModelId from provider config if available, otherwise falls back
-    /// to the default model for that provider.
-    fn get_title_model(&self, provider_id: &str) -> Option<String> {
-        self.env.get_title_model(provider_id).or_else(|| {
-            debug!(
-                "No titleModelId for provider {}, falling back to default model",
-                provider_id
-            );
-            self.env.get_default_model(provider_id)
-        })
-    }
-
-    /// Get a provider adapter that can be used for title generation.
-    fn get_provider(&self, provider_id: &str) -> Option<Arc<dyn ProviderAdapter>> {
-        self.provider_registry.get(provider_id)
-    }
-
-    /// Generate a title using the LLM.
-    async fn generate_with_llm(
-        &self,
-        user_message: &str,
-        provider: Arc<dyn ProviderAdapter>,
-        model_id: &str,
-    ) -> Result<String, AiAssistantError> {
-        let system_prompt = TITLE_GENERATION_PROMPT.to_string();
-
-        let config = CompletionConfig {
-            model_id: model_id.to_string(),
-            system_prompt,
-            messages: vec![crate::types::ChatMessage::user("temp", user_message)],
-            tools: vec![], // No tools for title generation
-            stream: false,
-            max_tokens: Some(self.config.max_tokens),
-            temperature: Some(self.config.temperature),
-        };
-
-        let result = provider.complete(config).await?;
-
-        // Clean up the title (remove quotes, trim whitespace)
-        let title = result
-            .content
-            .trim()
-            .trim_matches('"')
-            .trim_matches('\'')
-            .trim()
-            .to_string();
-
-        if title.is_empty() {
-            return Err(AiAssistantError::Internal {
-                message: "LLM returned empty title".to_string(),
-            });
-        }
-
-        Ok(title)
+    pub fn new(env: Arc<E>, config: TitleGeneratorConfig) -> Self {
+        Self { env, config }
     }
 
     /// Generate a fallback title by truncating the user message.
     fn generate_fallback(&self, user_message: &str) -> String {
         truncate_to_title(user_message, self.config.fallback_max_chars)
     }
-}
 
-#[async_trait]
-impl TitleGeneratorTrait for TitleGenerator {
-    async fn generate_title(&self, user_message: &str, provider_id: &str) -> String {
-        // Try to get provider and model
-        let provider = match self.get_provider(provider_id) {
-            Some(p) => p,
-            None => {
-                debug!(
-                    "Provider {} not available, using fallback title",
-                    provider_id
-                );
-                return self.generate_fallback(user_message);
-            }
-        };
+    /// Generate a title using the LLM.
+    async fn generate_with_llm(
+        &self,
+        user_message: &str,
+        provider_id: &str,
+        chat_model_id: &str,
+    ) -> Result<String, AiError> {
+        let provider_service = ProviderService::new(self.env.clone());
+        let api_key = provider_service.get_api_key(provider_id)?;
+        let provider_url = provider_service.get_provider_url(provider_id);
 
-        let model_id = match self.get_title_model(provider_id) {
-            Some(m) => m,
-            None => {
-                debug!(
-                    "No title model available for provider {}, using fallback",
-                    provider_id
-                );
-                return self.generate_fallback(user_message);
-            }
-        };
+        // Use title model from provider config, fallback to chat model
+        let model_id = provider_service
+            .get_title_model(provider_id)
+            .unwrap_or_else(|| chat_model_id.to_string());
 
         debug!(
             "Generating title with provider {} model {}",
             provider_id, model_id
         );
 
+        let prompt = format!(
+            "Generate a very short title (3-6 words, no quotes) for this chat message:\n\n\"{}\"\n\nTitle:",
+            truncate_to_title(user_message, 200)
+        );
+
+        let response = match provider_id {
+            "anthropic" => {
+                let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
+                let client: anthropic::Client<HttpClient> = anthropic::Client::new(&key)
+                    .map_err(|e| AiError::Provider(e.to_string()))?;
+                client.agent(&model_id).build().prompt(&prompt).await
+                    .map_err(|e| AiError::Provider(e.to_string()))?
+            }
+            "gemini" | "google" => {
+                let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
+                let client: gemini::Client<HttpClient> = gemini::Client::new(&key)
+                    .map_err(|e| AiError::Provider(e.to_string()))?;
+                client.agent(&model_id).build().prompt(&prompt).await
+                    .map_err(|e| AiError::Provider(e.to_string()))?
+            }
+            "groq" => {
+                let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
+                let client: groq::Client<HttpClient> = groq::Client::new(&key)
+                    .map_err(|e| AiError::Provider(e.to_string()))?;
+                client.agent(&model_id).build().prompt(&prompt).await
+                    .map_err(|e| AiError::Provider(e.to_string()))?
+            }
+            "ollama" => {
+                let mut builder = ollama::Client::<HttpClient>::builder().api_key(Nothing);
+                if let Some(url) = provider_url {
+                    builder = builder.base_url(&url);
+                }
+                let client = builder.build()
+                    .map_err(|e| AiError::Provider(e.to_string()))?;
+                client.agent(&model_id).build().prompt(&prompt).await
+                    .map_err(|e| AiError::Provider(e.to_string()))?
+            }
+            _ => {
+                // Default to OpenAI-compatible
+                let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
+                let client: openai::Client<HttpClient> = openai::Client::new(&key)
+                    .map_err(|e| AiError::Provider(e.to_string()))?;
+                client.agent(&model_id).build().prompt(&prompt).await
+                    .map_err(|e| AiError::Provider(e.to_string()))?
+            }
+        };
+
+        // Clean up the response
+        let title = response
+            .trim()
+            .trim_matches('"')
+            .trim_matches('\'')
+            .trim()
+            .to_string();
+
+        // Ensure reasonable length
+        if title.is_empty() || title.len() > 100 {
+            return Err(AiError::Internal("Generated title too long or empty".into()));
+        }
+
+        Ok(title)
+    }
+}
+
+#[async_trait]
+impl<E: AiEnvironment + 'static> TitleGeneratorTrait for TitleGenerator<E> {
+    async fn generate_title(&self, user_message: &str, provider_id: &str, chat_model_id: &str) -> String {
+        debug!(
+            "Generating title for message (len={})",
+            user_message.len()
+        );
+
         // Try LLM generation, fall back to truncation on failure
-        match self.generate_with_llm(user_message, provider, &model_id).await {
+        match self.generate_with_llm(user_message, provider_id, chat_model_id).await {
             Ok(title) => {
                 debug!("Generated title: {}", title);
                 title
@@ -179,17 +181,8 @@ impl TitleGeneratorTrait for TitleGenerator {
     }
 }
 
-// ============================================================================
-// Prompt Template
-// ============================================================================
-
-const TITLE_GENERATION_PROMPT: &str = r#"Generate a short, descriptive title (3-8 words) for a chat conversation based on the user's first message. The title should:
-- Be concise and capture the main topic
-- Not include quotes or punctuation at the end
-- Not start with "Title:" or similar prefixes
-- Be suitable for display in a sidebar
-
-Respond with only the title, nothing else."#;
+// Prompt template reserved for future LLM-based title generation:
+// "Generate a short, descriptive title (3-8 words) for a chat conversation..."
 
 // ============================================================================
 // Utility Functions
@@ -248,7 +241,7 @@ impl FakeTitleGenerator {
 
 #[async_trait]
 impl TitleGeneratorTrait for FakeTitleGenerator {
-    async fn generate_title(&self, user_message: &str, _provider_id: &str) -> String {
+    async fn generate_title(&self, user_message: &str, _provider_id: &str, _chat_model_id: &str) -> String {
         match &self.fixed_title {
             Some(title) => title.clone(),
             None => truncate_to_title(user_message, self.fallback_max_chars),
@@ -296,7 +289,7 @@ mod tests {
     #[tokio::test]
     async fn test_fake_title_generator_fixed() {
         let generator = FakeTitleGenerator::with_title("Test Title");
-        let title = generator.generate_title("Any message", "openai").await;
+        let title = generator.generate_title("Any message", "openai", "gpt-4o").await;
         assert_eq!(title, "Test Title");
     }
 
@@ -304,7 +297,7 @@ mod tests {
     async fn test_fake_title_generator_fallback() {
         let generator = FakeTitleGenerator::with_fallback();
         let title = generator
-            .generate_title("What is my portfolio value?", "openai")
+            .generate_title("What is my portfolio value?", "openai", "gpt-4o")
             .await;
         assert_eq!(title, "What is my portfolio value?");
     }
@@ -315,7 +308,8 @@ mod tests {
         let title = generator
             .generate_title(
                 "Can you show me a detailed breakdown of all my investment holdings across all accounts with their current market values?",
-                "openai"
+                "openai",
+                "gpt-4o"
             )
             .await;
         assert!(title.ends_with("..."));

@@ -61,6 +61,8 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   createdAt: string;
+  /** Reasoning/thinking content from the model (optional) */
+  reasoning?: string;
   // Tool calls/results stored inline
   toolCalls?: ToolCall[];
   toolResults?: ToolResult[];
@@ -78,6 +80,68 @@ export interface ToolResult {
   data: unknown;
   meta?: Record<string, unknown>;
   error?: string;
+}
+
+// ============================================================================
+// AI Chat API Types (for adapter layer)
+// ============================================================================
+
+/**
+ * Model configuration for AI chat requests.
+ */
+export interface AiChatModelConfig {
+  /** Provider ID (e.g., "openai", "anthropic"). */
+  provider?: string;
+  /** Model ID (e.g., "gpt-4o", "claude-3-sonnet"). */
+  model?: string;
+}
+
+/**
+ * Request payload for sending an AI chat message.
+ */
+export interface AiSendMessageRequest {
+  /** Thread ID (creates new thread if not provided). */
+  threadId?: string;
+  /** The message content. */
+  content: string;
+  /** Model configuration (provider and model selection). */
+  config?: AiChatModelConfig;
+  /** Override provider ID (uses default if not specified). @deprecated Use config.provider */
+  providerId?: string;
+  /** Override model ID (uses provider default if not specified). @deprecated Use config.model */
+  modelId?: string;
+  /** Tool allowlist for this request (uses all if not specified). */
+  allowedTools?: string[];
+}
+
+/**
+ * AI thread structure from the backend API.
+ */
+export interface AiThread {
+  id: string;
+  title: string;
+  isPinned: boolean;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Paginated response for AI threads.
+ */
+export interface ThreadPage {
+  threads: AiThread[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+/**
+ * Request parameters for listing AI threads.
+ */
+export interface ListThreadsRequest {
+  cursor?: string;
+  limit?: number;
+  search?: string;
 }
 
 // ============================================================================
@@ -174,6 +238,15 @@ interface DoneEvent extends AiStreamEventBase {
 }
 
 /**
+ * Thread title updated event - emitted when the thread title is generated/updated.
+ */
+interface ThreadTitleUpdatedEvent extends AiStreamEventBase {
+  type: "threadTitleUpdated";
+  /** The new thread title */
+  title: string;
+}
+
+/**
  * Token usage statistics.
  */
 export interface UsageStats {
@@ -193,7 +266,8 @@ export type AiStreamEvent =
   | ToolCallEvent
   | ToolResultEvent
   | ErrorEvent
-  | DoneEvent;
+  | DoneEvent
+  | ThreadTitleUpdatedEvent;
 
 // ============================================================================
 // UI State Types
@@ -297,3 +371,19 @@ export interface ProviderSettingsState {
   isLoading: boolean;
   error: string | null;
 }
+
+// ============================================================================
+// Type Aliases (for backward compatibility with adapter layer)
+// ============================================================================
+
+/** @alias ToolCall - for adapter layer compatibility */
+export type AiToolCall = ToolCall;
+
+/** @alias ToolResult - for adapter layer compatibility */
+export type AiToolResult = ToolResult;
+
+/** @alias ChatMessage - for adapter layer compatibility */
+export type AiChatMessage = ChatMessage;
+
+/** @alias UsageStats - for adapter layer compatibility */
+export type AiUsageStats = UsageStats;

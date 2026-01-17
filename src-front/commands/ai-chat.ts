@@ -1,5 +1,8 @@
-import { invoke, logger } from "@/adapters";
-import type { ChatThread } from "@/features/ai-assistant/types";
+import { invoke, logger, listAiThreads as adapterListAiThreads } from "@/adapters";
+import type { ChatThread, ListThreadsRequest, ThreadPage } from "@/features/ai-assistant/types";
+
+// Re-export types for convenience
+export type { ListThreadsRequest, ThreadPage };
 
 /**
  * Request for updating thread title or pinned status.
@@ -11,14 +14,15 @@ export interface UpdateThreadRequest {
 }
 
 /**
- * List all chat threads, sorted by pinned status then updated_at.
+ * List chat threads with cursor-based pagination and optional search.
+ * Threads are sorted by pinned status (pinned first), then by updated_at.
+ *
+ * @param req - Request parameters (cursor, limit, search)
+ * @returns Paginated thread page with threads, nextCursor, and hasMore
  */
-export const listAiThreads = async (
-  limit?: number,
-  offset?: number,
-): Promise<ChatThread[]> => {
+export const listAiThreads = async (req?: ListThreadsRequest): Promise<ThreadPage> => {
   try {
-    return await invoke("list_ai_threads", { limit, offset });
+    return await adapterListAiThreads(req);
   } catch (error) {
     logger.error("Error listing AI threads.");
     throw error;

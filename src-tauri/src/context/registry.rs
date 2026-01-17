@@ -1,13 +1,13 @@
 use std::sync::{Arc, RwLock};
-use wealthfolio_ai_assistant::AiAssistantServiceTrait;
+use wealthfolio_ai::{AiProviderServiceTrait, ChatService};
 use wealthfolio_connect::BrokerSyncServiceTrait;
 use wealthfolio_core::{
-    self, accounts, activities, ai, assets, fx, goals, limits, portfolio, quotes, settings,
+    self, accounts, activities, assets, fx, goals, limits, portfolio, quotes, settings,
     taxonomies,
 };
-use wealthfolio_storage_sqlite::ai_chat::AiChatRepository;
 use wealthfolio_storage_sqlite::assets::AlternativeAssetRepository;
 
+use super::TauriAiEnvironment;
 use crate::services::ConnectService;
 
 pub struct ServiceContext {
@@ -34,9 +34,8 @@ pub struct ServiceContext {
     pub alternative_asset_repository: Arc<AlternativeAssetRepository>,
     pub taxonomy_service: Arc<dyn taxonomies::TaxonomyServiceTrait>,
     pub connect_service: Arc<ConnectService>,
-    pub ai_provider_service: Arc<dyn ai::AiProviderServiceTrait>,
-    pub ai_assistant_service: Option<Arc<dyn AiAssistantServiceTrait>>,
-    pub ai_chat_repository: Arc<AiChatRepository>,
+    pub ai_provider_service: Arc<dyn AiProviderServiceTrait>,
+    pub ai_chat_service: Arc<ChatService<TauriAiEnvironment>>,
 }
 
 impl ServiceContext {
@@ -124,15 +123,11 @@ impl ServiceContext {
         Arc::clone(&self.connect_service)
     }
 
-    pub fn ai_provider_service(&self) -> Arc<dyn ai::AiProviderServiceTrait> {
+    pub fn ai_provider_service(&self) -> Arc<dyn AiProviderServiceTrait> {
         Arc::clone(&self.ai_provider_service)
     }
 
-    pub fn ai_assistant_service(&self) -> Option<Arc<dyn AiAssistantServiceTrait>> {
-        self.ai_assistant_service.as_ref().map(Arc::clone)
-    }
-
-    pub fn ai_chat_repository(&self) -> Arc<AiChatRepository> {
-        Arc::clone(&self.ai_chat_repository)
+    pub fn ai_chat_service(&self) -> Arc<ChatService<TauriAiEnvironment>> {
+        Arc::clone(&self.ai_chat_service)
     }
 }

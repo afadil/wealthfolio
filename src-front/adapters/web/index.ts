@@ -11,6 +11,13 @@ import type {
 } from "../types";
 import { RunEnvs } from "../types";
 
+import type {
+  AiSendMessageRequest,
+  AiStreamEvent,
+  ListThreadsRequest,
+  ThreadPage,
+} from "@/features/ai-assistant/types";
+
 // Re-export types and constants
 export type { EventCallback, UnlistenFn, RunEnv } from "../types";
 export { RunEnvs } from "../types";
@@ -26,6 +33,19 @@ export type {
   InstalledAddon,
   Permission,
 } from "../types";
+// Re-export AI types from features/ai-assistant
+export type {
+  AiChatModelConfig,
+  AiSendMessageRequest,
+  AiStreamEvent,
+  AiToolCall,
+  AiToolResult,
+  AiChatMessage,
+  AiUsageStats,
+  AiThread,
+  ThreadPage,
+  ListThreadsRequest,
+} from "@/features/ai-assistant/types";
 
 /**
  * Runtime environment identifier - always "web" for web builds
@@ -196,6 +216,14 @@ const COMMANDS: CommandMap = {
   update_ai_provider_settings: { method: "PUT", path: "/ai/providers/settings" },
   set_default_ai_provider: { method: "POST", path: "/ai/providers/default" },
   list_ai_models: { method: "GET", path: "/ai/providers" },
+  // AI Threads
+  list_ai_threads: { method: "GET", path: "/ai/threads" },
+  get_ai_thread: { method: "GET", path: "/ai/threads" },
+  update_ai_thread: { method: "PUT", path: "/ai/threads" },
+  delete_ai_thread: { method: "DELETE", path: "/ai/threads" },
+  add_ai_thread_tag: { method: "POST", path: "/ai/threads" },
+  remove_ai_thread_tag: { method: "DELETE", path: "/ai/threads" },
+  get_ai_thread_tags: { method: "GET", path: "/ai/threads" },
   // Alternative Assets
   create_alternative_asset: { method: "POST", path: "/alternative-assets" },
   update_alternative_asset_valuation: { method: "PUT", path: "/alternative-assets" },
@@ -902,6 +930,53 @@ export const invoke = async <T>(
       url += `/${encodeURIComponent(providerId)}/models`;
       break;
     }
+    // AI Threads
+    case "list_ai_threads": {
+      const { cursor, limit, search } = (payload ?? {}) as {
+        cursor?: string;
+        limit?: number;
+        search?: string;
+      };
+      const params = new URLSearchParams();
+      if (cursor) params.set("cursor", cursor);
+      if (limit !== undefined) params.set("limit", String(limit));
+      if (search) params.set("search", search);
+      const qs = params.toString();
+      if (qs) url += `?${qs}`;
+      break;
+    }
+    case "get_ai_thread": {
+      const { threadId } = payload as { threadId: string };
+      url += `/${encodeURIComponent(threadId)}`;
+      break;
+    }
+    case "update_ai_thread": {
+      const { request } = payload as { request: { id: string; title?: string; isPinned?: boolean } };
+      url += `/${encodeURIComponent(request.id)}`;
+      body = JSON.stringify({ title: request.title, isPinned: request.isPinned });
+      break;
+    }
+    case "delete_ai_thread": {
+      const { threadId } = payload as { threadId: string };
+      url += `/${encodeURIComponent(threadId)}`;
+      break;
+    }
+    case "add_ai_thread_tag": {
+      const { threadId, tag } = payload as { threadId: string; tag: string };
+      url += `/${encodeURIComponent(threadId)}/tags`;
+      body = JSON.stringify({ tag });
+      break;
+    }
+    case "remove_ai_thread_tag": {
+      const { threadId, tag } = payload as { threadId: string; tag: string };
+      url += `/${encodeURIComponent(threadId)}/tags/${encodeURIComponent(tag)}`;
+      break;
+    }
+    case "get_ai_thread_tags": {
+      const { threadId } = payload as { threadId: string };
+      url += `/${encodeURIComponent(threadId)}/tags`;
+      break;
+    }
   }
 
   const headers: HeadersInit = {};
@@ -1247,6 +1322,147 @@ export const loadAddonForRuntime = async (addonId: string): Promise<ExtractedAdd
 export const getEnabledAddonsOnStartup = async (): Promise<ExtractedAddon[]> => {
   return await invoke<ExtractedAddon[]>("get_enabled_addons_on_startup");
 };
+
+// ============================================================================
+// AI Thread Listing
+// ============================================================================
+
+/**
+ * List AI chat threads with cursor-based pagination and optional search.
+ *
+ * @param req - Request parameters (cursor, limit, search)
+ * @returns Paginated thread page
+ */
+export async function listAiThreads(req?: ListThreadsRequest): Promise<ThreadPage> {
+  return invoke<ThreadPage>("list_ai_threads", {
+    cursor: req?.cursor,
+    limit: req?.limit ?? 20,
+    search: req?.search,
+  });
+}
+
+// ============================================================================
+// AI Chat Streaming
+// ============================================================================
+
+const AI_CHAT_STREAM_ENDPOINT = `${API_PREFIX}/ai/chat/stream`;
+
+/**
+ * Stream AI chat responses via HTTP fetch.
+ *
+ * Uses NDJSON streaming for efficient event delivery.
+ *
+ * @param request - The chat message request
+ * @param signal - Optional AbortSignal for cancellation
+ * @yields AiStreamEvent objects from the stream
+ */
+export async function* streamAiChat(
+  request: AiSendMessageRequest,
+  signal?: AbortSignal,
+): AsyncGenerator<AiStreamEvent, void, undefined> {
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+  };
+
+  const token = getAuthToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(AI_CHAT_STREAM_ENDPOINT, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(request),
+    signal,
+  });
+
+  if (!response.ok) {
+    let errorMessage = response.statusText;
+    let errorCode = "network";
+
+    try {
+      const errorBody = (await response.json()) as { code?: string; error?: string };
+      errorCode = errorBody.code ?? "network";
+      errorMessage = errorBody.error ?? errorMessage;
+    } catch {
+      // Ignore JSON parse error
+    }
+
+    yield {
+      type: "error",
+      threadId: "",
+      runId: "",
+      messageId: undefined,
+      code: errorCode,
+      message: errorMessage,
+    } as AiStreamEvent;
+    return;
+  }
+
+  if (!response.body) {
+    yield {
+      type: "error",
+      threadId: "",
+      runId: "",
+      messageId: undefined,
+      code: "network",
+      message: "Response body is null",
+    } as AiStreamEvent;
+    return;
+  }
+
+  // Parse NDJSON stream
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        // Process any remaining buffer content
+        if (buffer.trim()) {
+          try {
+            const event = JSON.parse(buffer.trim()) as AiStreamEvent;
+            yield event;
+          } catch (parseError) {
+            console.error("Failed to parse final buffer:", parseError);
+          }
+        }
+        break;
+      }
+
+      // Decode chunk and add to buffer
+      buffer += decoder.decode(value, { stream: true });
+
+      // Split by newlines and process complete lines
+      const lines = buffer.split("\n");
+
+      // Keep the last incomplete line in the buffer
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        try {
+          const event = JSON.parse(trimmed) as AiStreamEvent;
+          yield event;
+
+          // Stop if we receive a terminal event
+          if (event.type === "done" || event.type === "error") {
+            return;
+          }
+        } catch (parseError) {
+          console.error("Failed to parse NDJSON line:", trimmed, parseError);
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
 
 // ============================================================================
 // Helpers

@@ -1,8 +1,13 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, type ReactNode } from "react";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
 import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@wealthfolio/ui/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import type { ChatMessage, ChatError, ToolCall } from "../types";
 import { ToolResultRenderer } from "./tool-renderers";
@@ -15,6 +20,8 @@ interface MessagePanelProps {
   onCancel?: () => void;
   onRetry?: () => void;
   onDismissError?: () => void;
+  /** Optional actions to render in the composer area (e.g., ModelPicker) */
+  composerActions?: ReactNode;
   className?: string;
 }
 
@@ -26,6 +33,7 @@ export function MessagePanel({
   onCancel,
   onRetry,
   onDismissError,
+  composerActions,
   className,
 }: MessagePanelProps) {
   const [input, setInput] = useState("");
@@ -89,36 +97,44 @@ export function MessagePanel({
 
       {/* Input Area */}
       <div className="border-t p-4">
-        <form onSubmit={handleSubmit} className="flex gap-2">
-          <Textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask about your portfolio..."
-            className="min-h-[44px] max-h-32 resize-none"
-            disabled={isStreaming}
-            rows={1}
-          />
-          {isStreaming && onCancel ? (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onCancel}
-              className="shrink-0"
-            >
-              <Icons.X className="h-4 w-4" />
-              <span className="sr-only">Cancel</span>
-            </Button>
-          ) : (
-            <Button type="submit" disabled={!input.trim() || isStreaming} className="shrink-0">
-              {isStreaming ? (
-                <Icons.Spinner className="h-4 w-4 animate-spin" />
-              ) : (
-                <Icons.ArrowUp className="h-4 w-4" />
-              )}
-              <span className="sr-only">Send message</span>
-            </Button>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <Textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask about your portfolio..."
+              className="min-h-[44px] max-h-32 flex-1 resize-none"
+              disabled={isStreaming}
+              rows={1}
+            />
+            {isStreaming && onCancel ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCancel}
+                className="shrink-0"
+              >
+                <Icons.X className="h-4 w-4" />
+                <span className="sr-only">Cancel</span>
+              </Button>
+            ) : (
+              <Button type="submit" disabled={!input.trim() || isStreaming} className="shrink-0">
+                {isStreaming ? (
+                  <Icons.Spinner className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Icons.ArrowUp className="h-4 w-4" />
+                )}
+                <span className="sr-only">Send message</span>
+              </Button>
+            )}
+          </div>
+          {/* Composer actions (e.g., Model Picker) */}
+          {composerActions && (
+            <div className="flex items-center">
+              {composerActions}
+            </div>
           )}
         </form>
       </div>
@@ -127,9 +143,11 @@ export function MessagePanel({
 }
 
 function MessageBubble({ message }: { message: ChatMessage }) {
+  const [reasoningOpen, setReasoningOpen] = useState(false);
   const isUser = message.role === "user";
   const hasToolResults = message.toolResults && message.toolResults.length > 0;
   const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
+  const hasReasoning = message.reasoning && message.reasoning.trim().length > 0;
 
   // Build a map from toolCallId to tool name for rendering
   const toolCallMap = new Map<string, ToolCall>();
@@ -141,6 +159,35 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
   return (
     <div className={cn("flex flex-col gap-2", isUser ? "items-end" : "items-start")}>
+      {/* Reasoning/thinking content (collapsible) */}
+      {hasReasoning && (
+        <Collapsible open={reasoningOpen} onOpenChange={setReasoningOpen} className="max-w-[85%]">
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground gap-1.5 px-2 text-xs"
+            >
+              <Icons.Brain className="h-3 w-3" />
+              <span>Thinking</span>
+              <Icons.ChevronDown
+                className={cn(
+                  "h-3 w-3 transition-transform",
+                  reasoningOpen && "rotate-180",
+                )}
+              />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="bg-muted/50 mt-1 rounded-lg border border-dashed px-3 py-2">
+              <p className="text-muted-foreground whitespace-pre-wrap text-xs italic">
+                {message.reasoning}
+              </p>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+
       {/* Text content */}
       {message.content && (
         <div

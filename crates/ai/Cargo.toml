@@ -1,8 +1,8 @@
 [package]
-name = "wealthfolio-ai-assistant"
+name = "wealthfolio-ai"
 version.workspace = true
 edition.workspace = true
-description = "AI assistant orchestration using rig-core for Wealthfolio"
+description = "AI assistant with LLM orchestration using rig-core for Wealthfolio"
 authors = ["Aziz Fadil"]
 license = "AGPL-3.0"
 repository = "https://github.com/afadil/wealthfolio"
@@ -22,12 +22,19 @@ uuid = { workspace = true, features = ["v7"] }
 async-trait = { workspace = true }
 futures = { workspace = true }
 log = { workspace = true }
+reqwest = { workspace = true }
 
-# LLM orchestration
-rig-core = "0.28"
+# LLM orchestration (rig-core crate exports as "rig")
+rig = { package = "rig-core", version = "0.28" }
+
+# Lazy static initialization
+once_cell = "1"
 
 # Streaming
 tokio-stream = "0.1"
+
+# Numbers (for Decimal to f64 conversion)
+rust_decimal = { workspace = true }
 
 # Sibling crates
 wealthfolio-core = { path = "../core" }

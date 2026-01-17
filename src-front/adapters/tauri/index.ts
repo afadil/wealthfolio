@@ -1,5 +1,5 @@
 // Tauri adapter - Desktop implementation
-import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { invoke as tauriInvoke, Channel } from "@tauri-apps/api/core";
 import type { EventCallback as TauriEventCallback, UnlistenFn as TauriUnlistenFn } from "@tauri-apps/api/event";
 import { listen } from "@tauri-apps/api/event";
 import { open, save } from "@tauri-apps/plugin-dialog";
@@ -17,6 +17,13 @@ import type {
 } from "../types";
 import { RunEnvs } from "../types";
 
+import type {
+  AiSendMessageRequest,
+  AiStreamEvent,
+  ListThreadsRequest,
+  ThreadPage,
+} from "@/features/ai-assistant/types";
+
 // Re-export types and constants
 export type { EventCallback, UnlistenFn, RunEnv } from "../types";
 export { RunEnvs } from "../types";
@@ -32,6 +39,19 @@ export type {
   InstalledAddon,
   Permission,
 } from "../types";
+// Re-export AI types from features/ai-assistant
+export type {
+  AiChatModelConfig,
+  AiSendMessageRequest,
+  AiStreamEvent,
+  AiToolCall,
+  AiToolResult,
+  AiChatMessage,
+  AiUsageStats,
+  AiThread,
+  ThreadPage,
+  ListThreadsRequest,
+} from "@/features/ai-assistant/types";
 
 /**
  * Runtime environment identifier - always "desktop" for Tauri builds
@@ -260,3 +280,107 @@ export const openUrlInBrowser = async (url: string): Promise<void> => {
   const { open: openShell } = await import("@tauri-apps/plugin-shell");
   await openShell(url);
 };
+
+// ============================================================================
+// AI Thread Listing
+// ============================================================================
+
+/**
+ * List AI chat threads with cursor-based pagination and optional search.
+ *
+ * @param req - Request parameters (cursor, limit, search)
+ * @returns Paginated thread page
+ */
+export async function listAiThreads(req?: ListThreadsRequest): Promise<ThreadPage> {
+  return tauriInvoke<ThreadPage>("list_ai_threads", {
+    cursor: req?.cursor,
+    limit: req?.limit ?? 20,
+    search: req?.search,
+  });
+}
+
+// ============================================================================
+// AI Chat Streaming
+// ============================================================================
+
+/**
+ * Stream AI chat responses via Tauri IPC.
+ *
+ * Uses Tauri's Channel for efficient streaming of events from the backend.
+ *
+ * @param request - The chat message request
+ * @param signal - Optional AbortSignal for cancellation
+ * @yields AiStreamEvent objects from the stream
+ */
+export async function* streamAiChat(
+  request: AiSendMessageRequest,
+  signal?: AbortSignal,
+): AsyncGenerator<AiStreamEvent, void, undefined> {
+  const channel = new Channel<AiStreamEvent>();
+  const queue: AiStreamEvent[] = [];
+  let done = false;
+  let pendingResolve: (() => void) | null = null;
+
+  const notifyPending = () => {
+    if (pendingResolve) {
+      pendingResolve();
+      pendingResolve = null;
+    }
+  };
+
+  channel.onmessage = (event: AiStreamEvent) => {
+    queue.push(event);
+    notifyPending();
+  };
+
+  const invokePromise = tauriInvoke("stream_ai_chat", {
+    request,
+    onEvent: channel,
+  })
+    .catch((err) => {
+      queue.push({
+        type: "error",
+        threadId: "",
+        runId: "",
+        messageId: undefined,
+        code: "network",
+        message: err instanceof Error ? err.message : String(err),
+      } as AiStreamEvent);
+      notifyPending();
+    })
+    .finally(() => {
+      done = true;
+      notifyPending();
+    });
+
+  try {
+    while (!done || queue.length > 0) {
+      if (signal?.aborted) {
+        break;
+      }
+
+      if (queue.length === 0) {
+        await new Promise<void>((resolve) => {
+          pendingResolve = resolve;
+        });
+        continue;
+      }
+
+      const next = queue.shift();
+      if (next) {
+        yield next;
+
+        // Stop on terminal events
+        if (next.type === "done" || next.type === "error") {
+          return;
+        }
+      }
+    }
+  } finally {
+    // @ts-expect-error - Tauri Channel doesn't have a proper cleanup method
+    channel.onmessage = null;
+    if (!signal?.aborted) {
+      await invokePromise;
+    }
+  }
+}
