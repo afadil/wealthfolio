@@ -51,12 +51,25 @@ pub async fn store_sync_session(
 pub async fn clear_sync_session(
     _state: State<'_, Arc<ServiceContext>>, // keep signature consistent
 ) -> Result<(), String> {
-    KeyringSecretStore
-        .delete_secret(SYNC_ACCESS_TOKEN_KEY)
-        .map_err(|e| e.to_string())?;
-    KeyringSecretStore
-        .delete_secret(SYNC_REFRESH_TOKEN_KEY)
-        .map_err(|e| e.to_string())?;
+    // Try to delete both tokens, collecting errors instead of failing fast
+    let access_result = KeyringSecretStore.delete_secret(SYNC_ACCESS_TOKEN_KEY);
+    let refresh_result = KeyringSecretStore.delete_secret(SYNC_REFRESH_TOKEN_KEY);
 
-    Ok(())
+    // Report errors but don't fail if keys didn't exist
+    let mut errors = Vec::new();
+    if let Err(e) = access_result {
+        error!("Failed to delete access token from keyring: {}", e);
+        errors.push(format!("access_token: {}", e));
+    }
+    if let Err(e) = refresh_result {
+        error!("Failed to delete refresh token from keyring: {}", e);
+        errors.push(format!("refresh_token: {}", e));
+    }
+
+    if errors.is_empty() {
+        info!("Sync session cleared from keyring");
+        Ok(())
+    } else {
+        Err(format!("Failed to clear some tokens: {}", errors.join(", ")))
+    }
 }

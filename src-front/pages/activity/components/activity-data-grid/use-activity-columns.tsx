@@ -70,6 +70,7 @@ export function useActivityColumns({
       longName: result.longName,
       exchange: result.exchange,
       exchangeMic: result.exchangeMic,
+      currency: result.currency,
       score: result.score,
       dataSource: result.dataSource,
     }));

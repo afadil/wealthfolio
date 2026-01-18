@@ -143,6 +143,7 @@ import { DotsThreeOutlineIcon } from "@phosphor-icons/react/dist/csr/DotsThreeOu
 import { DotsThreeOutlineVerticalIcon } from "@phosphor-icons/react/dist/csr/DotsThreeOutlineVertical";
 import { EyeIcon } from "@phosphor-icons/react/dist/csr/Eye";
 import { EyeSlashIcon } from "@phosphor-icons/react/dist/csr/EyeSlash";
+import { SparkleIcon } from "@phosphor-icons/react/dist/csr/Sparkle";
 import { TagIcon } from "@phosphor-icons/react/dist/csr/Tag";
 import { UserSwitchIcon } from "@phosphor-icons/react/dist/csr/UserSwitch";
 
@@ -268,7 +269,6 @@ const IconsInternal = {
   Gem: Gem,
   Coins: Coins,
   Eraser: Eraser,
-  Sparkles: Sparkles,
   Palette: Palette,
   Moon: Moon,
   Sun: Sun,
@@ -300,6 +300,7 @@ const IconsInternal = {
   Split: Split,
   Square: Square,
   Target: Target,
+  SparklesOutline: Sparkles,
   CircleGauge: CircleGauge,
   X: X,
   Upload: Upload,
@@ -669,6 +670,9 @@ const IconsInternal = {
   DotsThree: ({ size, className, style, color }: IconProps) => (
     <DotsThreeOutlineIcon size={size} weight="duotone" className={className} style={style} color={color} />
   ),
+  Sparkles: ({ size, className, style, color }: IconProps) => (
+    <SparkleIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
 };
 
 /**
@@ -836,6 +840,7 @@ export type IconName =
   | "Split"
   | "Square"
   | "Target"
+  | "SparklesOutline"
   | "CircleGauge"
   | "X"
   | "Upload"

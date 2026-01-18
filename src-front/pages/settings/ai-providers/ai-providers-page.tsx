@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from "react";
+import { useMemo, useState } from "react";
 import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -11,9 +11,9 @@ import {
   useUpdateAiProviderSettings,
   useSetDefaultAiProvider,
   useAiProviderApiKey,
+  useListAiModels,
 } from "@/features/ai-assistant";
-import { listAiModels } from "@/commands/ai-providers";
-import type { FetchedModel, ModelCapabilityOverrides } from "@/lib/types";
+import type { ModelCapabilityOverrides } from "@/lib/types";
 
 /**
  * AI Providers settings page - configure AI provider API keys and preferences.
@@ -177,12 +177,22 @@ function ProviderSettingsCardWrapper({
   onToolsAllowlistChange: (tools: string[] | null) => void;
 }) {
   const { setApiKey, deleteApiKey, revealApiKey } = useAiProviderApiKey(provider.id);
+  const [modelComboboxOpen, setModelComboboxOpen] = useState(false);
 
-  // Fetch models from provider API
-  const handleFetchModels = useCallback(async (): Promise<FetchedModel[]> => {
-    const response = await listAiModels(provider.id);
-    return response.models;
-  }, [provider.id]);
+  // Enable query when combobox opens (if provider supports it and has API key)
+  const canFetchModels =
+    provider.supportsModelListing && (provider.hasApiKey || provider.type !== "api");
+
+  const {
+    data: modelsResponse,
+    isLoading: isFetchingModels,
+    error: fetchModelsError,
+    refetch: refetchModels,
+  } = useListAiModels(provider.id, {
+    enabled: modelComboboxOpen && canFetchModels,
+  });
+
+  const fetchedModels = modelsResponse?.models ?? [];
 
   return (
     <ProviderSettingsCard
@@ -195,10 +205,15 @@ function ProviderSettingsCardWrapper({
       onRevealApiKey={revealApiKey}
       onCustomUrlChange={onCustomUrlChange}
       onSelectModel={onSelectModel}
-      onFetchModels={handleFetchModels}
       onSetFavoriteModels={onSetFavoriteModels}
       onSetCapabilityOverride={onSetCapabilityOverride}
       onToolsAllowlistChange={onToolsAllowlistChange}
+      modelComboboxOpen={modelComboboxOpen}
+      onModelComboboxOpenChange={setModelComboboxOpen}
+      fetchedModels={fetchedModels}
+      isFetchingModels={isFetchingModels}
+      fetchModelsError={fetchModelsError?.message ?? null}
+      onRefreshModels={() => refetchModels()}
     />
   );
 }

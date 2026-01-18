@@ -328,6 +328,7 @@ pub fn run() {
             commands::ai_chat::add_ai_thread_tag,
             commands::ai_chat::remove_ai_thread_tag,
             commands::ai_chat::get_ai_thread_tags,
+            commands::ai_chat::update_tool_result,
             // Addon commands
             commands::addon::extract_addon_zip,
             commands::addon::install_addon_zip,

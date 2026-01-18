@@ -304,6 +304,8 @@ export interface QuoteSummary {
   exchangeMic?: string;
   /** Friendly exchange name (e.g., "NASDAQ" instead of "NMS" or "XNAS") */
   exchangeName?: string;
+  /** Currency derived from exchange (e.g., "USD", "CAD") */
+  currency?: string;
   shortName: string;
   quoteType: string;
   symbol: string;

@@ -230,10 +230,8 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
     logger.debug(`storeTokens called, isDesktop=${isDesktop}, hasSession=${!!session}`);
 
     if (!session) {
-      // Clear from backend
-      await clearSyncSession().catch((err) => {
-        logger.warn(`Failed to clear sync session from backend: ${err}`);
-      });
+      // Clear from backend - throw on failure so signOut properly reports errors
+      await clearSyncSession();
 
       // Clear local storage for session restoration
       if (isDesktop) {

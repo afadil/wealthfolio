@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -43,11 +43,17 @@ interface ProviderSettingsCardProps {
   onCustomUrlChange?: (url: string) => void;
   /** @deprecated Use onSetFavoriteModels instead for multi-select */
   onSelectModel?: (modelId: string) => void;
-  onFetchModels?: () => Promise<FetchedModel[]>;
   onSetFavoriteModels?: (modelIds: string[]) => void;
   onSetCapabilityOverride?: (modelId: string, overrides: ModelCapabilityOverrides | null) => void;
   onToolsAllowlistChange?: (tools: string[] | null) => void;
   isLast?: boolean;
+  // Model fetching props (controlled by parent via React Query)
+  modelComboboxOpen?: boolean;
+  onModelComboboxOpenChange?: (open: boolean) => void;
+  fetchedModels?: FetchedModel[];
+  isFetchingModels?: boolean;
+  fetchModelsError?: string | null;
+  onRefreshModels?: () => void;
 }
 
 // Novice-friendly tool mapping for data access settings
@@ -71,11 +77,17 @@ export function ProviderSettingsCard({
   onRevealApiKey,
   onCustomUrlChange,
   onSelectModel: _onSelectModel,
-  onFetchModels,
   onSetFavoriteModels,
   onSetCapabilityOverride,
   onToolsAllowlistChange,
   isLast = false,
+  // Model fetching props
+  modelComboboxOpen: controlledComboboxOpen,
+  onModelComboboxOpenChange,
+  fetchedModels: externalFetchedModels,
+  isFetchingModels: externalIsFetchingModels,
+  fetchModelsError: externalFetchModelsError,
+  onRefreshModels,
 }: ProviderSettingsCardProps) {
   // Suppress unused variable warnings for deprecated/unused props
   void _onSelectModel;
@@ -86,13 +98,18 @@ export function ProviderSettingsCard({
   const [isLoadingKey, setIsLoadingKey] = useState(false);
   const [hasLoadedKey, setHasLoadedKey] = useState(false);
   const [customUrlValue, setCustomUrlValue] = useState(provider.customUrl ?? "");
-  const [isFetchingModels, setIsFetchingModels] = useState(false);
-  const [fetchedModels, setFetchedModels] = useState<FetchedModel[]>([]);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  const [modelComboboxOpen, setModelComboboxOpen] = useState(false);
-  const [hasFetchedModels, setHasFetchedModels] = useState(false);
   const [selectedModelForConfig, setSelectedModelForConfig] = useState<string | null>(null);
   const hasAutoSelectedRef = useRef(false);
+
+  // Support both controlled and uncontrolled combobox state
+  const [internalComboboxOpen, setInternalComboboxOpen] = useState(false);
+  const modelComboboxOpen = controlledComboboxOpen ?? internalComboboxOpen;
+  const setModelComboboxOpen = onModelComboboxOpenChange ?? setInternalComboboxOpen;
+
+  // Use external fetched models if provided
+  const fetchedModels = externalFetchedModels ?? [];
+  const isFetchingModels = externalIsFetchingModels ?? false;
+  const fetchError = externalFetchModelsError ?? null;
 
   // Check if provider supports custom base URL
   const supportsCustomUrl = provider.connectionFields?.some(
@@ -172,35 +189,6 @@ export function ProviderSettingsCard({
       onDeleteApiKey();
     }
   };
-
-  const handleFetchModels = useCallback(async () => {
-    if (!onFetchModels || isFetchingModels) return;
-
-    setIsFetchingModels(true);
-    setFetchError(null);
-    try {
-      const models = await onFetchModels();
-      setFetchedModels(models);
-      setHasFetchedModels(true);
-    } catch (err) {
-      setFetchError(err instanceof Error ? err.message : "Failed to fetch models");
-    } finally {
-      setIsFetchingModels(false);
-    }
-  }, [onFetchModels, isFetchingModels]);
-
-  // Auto-fetch models when combobox opens (if provider supports it and has API key)
-  useEffect(() => {
-    if (
-      modelComboboxOpen &&
-      !hasFetchedModels &&
-      provider.supportsModelListing &&
-      provider.hasApiKey &&
-      onFetchModels
-    ) {
-      handleFetchModels();
-    }
-  }, [modelComboboxOpen, hasFetchedModels, provider.supportsModelListing, provider.hasApiKey, onFetchModels, handleFetchModels]);
 
   // Auto-select recommended models on initial mount if no models are selected
   // This only runs once when the card first expands, not on subsequent updates
@@ -405,12 +393,12 @@ export function ProviderSettingsCard({
                     <div className="flex items-center justify-between">
                       <Label className="text-sm font-medium">Models</Label>
                       <div className="flex items-center gap-2">
-                        {provider.supportsModelListing && (
+                        {provider.supportsModelListing && onRefreshModels && (
                           <Button
                             variant="ghost"
                             size="sm"
                             className="text-muted-foreground hover:text-foreground h-7 px-2 text-xs"
-                            onClick={handleFetchModels}
+                            onClick={onRefreshModels}
                             disabled={isFetchingModels || (!provider.hasApiKey && provider.type === "api")}
                           >
                             {isFetchingModels ? (
@@ -471,9 +459,9 @@ export function ProviderSettingsCard({
                                       );
                                     })}
                                 </CommandGroup>
-                                {/* Fetched models */}
+                                {/* Other available models */}
                                 {allModels.filter((m) => !("isCatalog" in m && m.isCatalog)).length > 0 && (
-                                  <CommandGroup heading="From Provider">
+                                  <CommandGroup heading="Other Available">
                                     {allModels
                                       .filter((m) => !("isCatalog" in m && m.isCatalog))
                                       .map((model) => {

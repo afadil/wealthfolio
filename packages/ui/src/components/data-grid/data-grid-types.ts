@@ -18,6 +18,8 @@ export interface SymbolSearchResult {
   exchange?: string;
   /** Canonical exchange MIC code (e.g., "XNAS", "XTSE") */
   exchangeMic?: string;
+  /** Currency derived from exchange (e.g., "USD", "CAD") */
+  currency?: string;
   score: number;
   dataSource?: string;
 }

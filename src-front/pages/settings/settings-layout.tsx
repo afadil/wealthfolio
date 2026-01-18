@@ -57,7 +57,7 @@ const sidebarNavItems = [
     title: "AI Providers",
     href: "ai-providers",
     subtitle: "Configure AI for portfolio insights",
-    icon: <Icons.Sparkles className="size-5" />,
+    icon: <Icons.SparklesOutline className="size-5" />,
   },
   {
     title: "Add-ons",

@@ -291,6 +291,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         settings_service.clone(),
         secret_store.clone(),
         ai_chat_repository,
+        quote_service.clone(),
     ));
     let ai_chat_service = Arc::new(ChatService::new(ai_environment, ChatConfig::default()));
 

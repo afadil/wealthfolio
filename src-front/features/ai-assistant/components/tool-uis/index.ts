@@ -12,6 +12,7 @@ import { DividendsToolUI } from "./dividends-tool-ui";
 import { GoalsToolUI } from "./goals-tool-ui";
 import { HoldingsToolUI } from "./holdings-tool-ui";
 import { PerformanceToolUI } from "./performance-tool-ui";
+import { RecordActivityToolUI } from "./record-activity-tool-ui";
 import { ValuationToolUI } from "./valuation-tool-ui";
 
 /**
@@ -26,6 +27,7 @@ export const toolUIs = {
   get_holdings: HoldingsToolUI,
   get_performance: PerformanceToolUI,
   get_valuation_history: ValuationToolUI,
+  record_activity: RecordActivityToolUI,
   search_activities: ActivitiesToolUI,
 } as const;
 
@@ -40,6 +42,7 @@ export {
   GoalsToolUI,
   HoldingsToolUI,
   PerformanceToolUI,
+  RecordActivityToolUI,
   ValuationToolUI,
 };
 

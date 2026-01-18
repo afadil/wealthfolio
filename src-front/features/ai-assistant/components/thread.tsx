@@ -5,6 +5,7 @@ import {
   ErrorPrimitive,
   MessagePrimitive,
   ThreadPrimitive,
+  useAssistantState,
 } from "@assistant-ui/react";
 
 import type { FC, ReactNode } from "react";
@@ -218,6 +219,25 @@ const MessageError: FC = () => {
   );
 };
 
+const TypingIndicator: FC = () => {
+  const showIndicator = useAssistantState(({ message }) => {
+    // Show indicator when message is running and has no text/tool content yet
+    if (message.status?.type !== "running") return false;
+    // Hide if there are any parts (text started streaming or tools are being called)
+    return message.parts.length === 0;
+  });
+
+  if (!showIndicator) return null;
+
+  return (
+    <div className="bg-muted mb-2 inline-flex items-end gap-1 rounded-2xl px-3.5 pb-2.5 pt-3">
+      <span className="bg-foreground/50 size-2 animate-bounce rounded-full [animation-delay:-0.3s]" />
+      <span className="bg-foreground/50 size-2 animate-bounce rounded-full [animation-delay:-0.15s]" />
+      <span className="bg-foreground/50 size-2 animate-bounce rounded-full" />
+    </div>
+  );
+};
+
 const AssistantMessage: FC = () => {
   return (
     <MessagePrimitive.Root
@@ -225,6 +245,7 @@ const AssistantMessage: FC = () => {
       data-role="assistant"
     >
       <div className="aui-assistant-message-content text-foreground mx-2 text-sm leading-6 wrap-break-word">
+        <TypingIndicator />
         <MessagePrimitive.Parts
           components={{
             Text: MarkdownText,
