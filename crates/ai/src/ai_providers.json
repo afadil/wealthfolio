@@ -30,7 +30,7 @@
           "capabilities": { "tools": false, "thinking": false, "vision": false }
         },
         "qwen3-vl:8b": {
-          "capabilities": { "tools": true, "thinking": false, "vision": true }
+          "capabilities": { "tools": true, "thinking": true, "vision": true }
         },
         "deepseek-r1:8b": {
           "capabilities": { "tools": false, "thinking": true, "vision": false }
@@ -94,6 +94,9 @@
         }
       ],
       "models": {
+        "gemini-3-flash-preview": {
+          "capabilities": { "tools": false, "thinking": true, "vision": true }
+        },
         "gemini-2.5-flash": {
           "capabilities": { "tools": true, "thinking": true, "vision": true }
         },
