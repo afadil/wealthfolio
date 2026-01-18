@@ -84,3 +84,5 @@ Thumbs.db
 /AI-POC-COPY
 # AI tools
 .ralph-tui/
+.kiro/
+tasks
