@@ -153,7 +153,7 @@ export function ImportHelpPopover() {
         </Button>
       </PopoverTrigger>
       <PopoverContent className="m-4 w-[900px] max-w-[calc(100vw-2rem)] p-6 text-sm">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">{helpContent}</div>
+        <ScrollArea className="h-[calc(85vh-4rem)] pr-4">{helpContent}</ScrollArea>
       </PopoverContent>
     </Popover>
   );
