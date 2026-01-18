@@ -96,7 +96,7 @@ pub struct AiProviderCatalog {
 // User Settings Types (stored in app_settings)
 // ============================================================================
 
-/// Capability overrides for a specific model (tools/streaming/vision).
+/// Capability overrides for a specific model (tools/thinking/vision).
 /// User can set these for fetched/unknown models that aren't in the catalog.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -104,12 +104,15 @@ pub struct ModelCapabilityOverrides {
     /// Override for tools capability.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<bool>,
-    /// Override for streaming capability.
+    /// Override for thinking capability.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub streaming: Option<bool>,
+    pub thinking: Option<bool>,
     /// Override for vision capability.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub vision: Option<bool>,
+    /// Override for streaming capability.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub streaming: Option<bool>,
 }
 
 /// Per-provider user settings (stored in app_settings).
@@ -137,6 +140,10 @@ pub struct ProviderUserSettings {
     /// List of fetched model IDs that user has marked as favorites.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub favorite_models: Vec<String>,
+    /// Allowlist of tool IDs that this provider can use.
+    /// None = all tools enabled (default), Some([]) = no tools, Some([...]) = only specified tools.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tools_allowlist: Option<Vec<String>>,
 }
 
 /// The complete AI provider settings blob stored in app_settings.
@@ -217,6 +224,10 @@ pub struct MergedProvider {
     /// Note: Always serialized (no skip_serializing_if) because frontend expects this field.
     #[serde(default)]
     pub model_capability_overrides: HashMap<String, ModelCapabilityOverrides>,
+    /// Allowlist of tool IDs that this provider can use.
+    /// None = all tools enabled (default), Some([]) = no tools, Some([...]) = only specified tools.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tools_allowlist: Option<Vec<String>>,
 
     // Computed
     pub has_api_key: bool,
@@ -260,6 +271,10 @@ pub struct UpdateProviderSettingsRequest {
     /// Update the list of favorite models (replaces the entire list).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub favorite_models: Option<Vec<String>>,
+    /// Update tools allowlist.
+    /// Use Some(None) to clear (all tools enabled), Some(Some([])) to set specific tools.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tools_allowlist: Option<Option<Vec<String>>>,
 }
 
 /// Update for a single model's capability overrides.

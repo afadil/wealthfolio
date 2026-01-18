@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useMemo, useCallback } from "react";
 import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -13,7 +13,7 @@ import {
   useAiProviderApiKey,
 } from "@/features/ai-assistant";
 import { listAiModels } from "@/commands/ai-providers";
-import type { MergedProvider, FetchedModel, ModelCapabilityOverrides } from "@/lib/types";
+import type { FetchedModel, ModelCapabilityOverrides } from "@/lib/types";
 
 /**
  * AI Providers settings page - configure AI provider API keys and preferences.
@@ -22,25 +22,8 @@ export default function AiProvidersPage() {
   const { data, isLoading, error, refetch } = useAiProviders();
   const { mutate: updateSettings } = useUpdateAiProviderSettings();
   const { mutate: setDefault } = useSetDefaultAiProvider();
-  const [priorityInputs, setPriorityInputs] = useState<Record<string, number>>({});
 
   const providers = useMemo(() => data?.providers ?? [], [data?.providers]);
-
-  // Initialize priority inputs when providers load
-  useEffect(() => {
-    if (providers.length > 0) {
-      const initialPriorityInputs: Record<string, number> = {};
-      providers.forEach((p: MergedProvider) => {
-        initialPriorityInputs[p.id] = p.priority;
-      });
-      setPriorityInputs(initialPriorityInputs);
-    }
-  }, [providers]);
-
-  const handlePriorityChange = (providerId: string, newPriority: number) => {
-    setPriorityInputs((prev) => ({ ...prev, [providerId]: newPriority }));
-    updateSettings({ providerId, priority: newPriority });
-  };
 
   const handleCustomUrlChange = (providerId: string, customUrl: string) => {
     updateSettings({ providerId, customUrl: customUrl || undefined });
@@ -66,6 +49,10 @@ export default function AiProvidersPage() {
         overrides: overrides ?? undefined,
       },
     });
+  };
+
+  const handleToolsAllowlistChange = (providerId: string, tools: string[] | null) => {
+    updateSettings({ providerId, toolsAllowlist: tools });
   };
 
   if (isLoading) {
@@ -142,18 +129,19 @@ export default function AiProvidersPage() {
               <ProviderSettingsCardWrapper
                 key={provider.id}
                 provider={provider}
-                priorityValue={priorityInputs[provider.id] ?? provider.priority}
                 isLast={index === arr.length - 1}
                 onToggleEnabled={(enabled) =>
                   updateSettings({ providerId: provider.id, enabled })
                 }
                 onSetDefault={() => setDefault({ providerId: provider.id })}
-                onPriorityChange={(priority) => handlePriorityChange(provider.id, priority)}
                 onCustomUrlChange={(url) => handleCustomUrlChange(provider.id, url)}
                 onSelectModel={(modelId) => handleSelectModel(provider.id, modelId)}
                 onSetFavoriteModels={(modelIds) => handleSetFavoriteModels(provider.id, modelIds)}
                 onSetCapabilityOverride={(modelId, overrides) =>
                   handleSetCapabilityOverride(provider.id, modelId, overrides)
+                }
+                onToolsAllowlistChange={(tools) =>
+                  handleToolsAllowlistChange(provider.id, tools)
                 }
               />
             ))}
@@ -169,26 +157,24 @@ export default function AiProvidersPage() {
  */
 function ProviderSettingsCardWrapper({
   provider,
-  priorityValue,
   isLast,
   onToggleEnabled,
   onSetDefault,
-  onPriorityChange,
   onCustomUrlChange,
   onSelectModel,
   onSetFavoriteModels,
   onSetCapabilityOverride,
+  onToolsAllowlistChange,
 }: {
   provider: Parameters<typeof ProviderSettingsCard>[0]["provider"];
-  priorityValue: number;
   isLast: boolean;
   onToggleEnabled: (enabled: boolean) => void;
   onSetDefault: () => void;
-  onPriorityChange: (priority: number) => void;
   onCustomUrlChange: (url: string) => void;
   onSelectModel: (modelId: string) => void;
   onSetFavoriteModels: (modelIds: string[]) => void;
   onSetCapabilityOverride: (modelId: string, overrides: ModelCapabilityOverrides | null) => void;
+  onToolsAllowlistChange: (tools: string[] | null) => void;
 }) {
   const { setApiKey, deleteApiKey, revealApiKey } = useAiProviderApiKey(provider.id);
 
@@ -201,19 +187,18 @@ function ProviderSettingsCardWrapper({
   return (
     <ProviderSettingsCard
       provider={provider}
-      priorityValue={priorityValue}
       isLast={isLast}
       onToggleEnabled={onToggleEnabled}
       onSetDefault={onSetDefault}
       onSaveApiKey={(apiKey) => setApiKey.mutate(apiKey)}
       onDeleteApiKey={() => deleteApiKey.mutate()}
       onRevealApiKey={revealApiKey}
-      onPriorityChange={onPriorityChange}
       onCustomUrlChange={onCustomUrlChange}
       onSelectModel={onSelectModel}
       onFetchModels={handleFetchModels}
       onSetFavoriteModels={onSetFavoriteModels}
       onSetCapabilityOverride={onSetCapabilityOverride}
+      onToolsAllowlistChange={onToolsAllowlistChange}
     />
   );
 }

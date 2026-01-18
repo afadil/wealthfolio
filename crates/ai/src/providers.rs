@@ -13,7 +13,8 @@ use std::sync::Arc;
 use crate::env::AiEnvironment;
 use crate::error::AiError;
 use crate::provider_model::{
-    CapabilityInfo, ConnectionField, ModelCapabilities, ProviderDefaultConfig,
+    AiProviderSettings, CapabilityInfo, ConnectionField, ModelCapabilities, ProviderDefaultConfig,
+    AI_PROVIDER_SETTINGS_KEY,
 };
 
 // ============================================================================
@@ -255,21 +256,19 @@ impl<E: AiEnvironment> ProviderService<E> {
         })
     }
 
+    /// Build the secret key for a provider (format: ai_<provider_id>).
+    /// Matches the frontend convention in use-ai-providers.ts.
+    fn secret_key_for_provider(provider_id: &str) -> String {
+        format!("ai_{}", provider_id)
+    }
+
     /// Get API key for a provider from the secret store.
     pub fn get_api_key(&self, provider_id: &str) -> Result<Option<String>, AiError> {
-        let env_key = PROVIDER_CATALOG
-            .providers
-            .get(provider_id)
-            .and_then(|p| p.env_key.clone());
-
-        match env_key {
-            Some(key) => self
-                .env
-                .secret_store()
-                .get_secret(&key)
-                .map_err(|e| AiError::Internal(e.to_string())),
-            None => Ok(None),
-        }
+        let secret_key = Self::secret_key_for_provider(provider_id);
+        self.env
+            .secret_store()
+            .get_secret(&secret_key)
+            .map_err(|e| AiError::Internal(e.to_string()))
     }
 
     /// Check if a provider has an API key stored.
@@ -283,49 +282,64 @@ impl<E: AiEnvironment> ProviderService<E> {
 
     /// Set API key for a provider.
     pub async fn set_api_key(&self, provider_id: &str, api_key: &str) -> Result<(), AiError> {
-        let env_key = PROVIDER_CATALOG
-            .providers
-            .get(provider_id)
-            .and_then(|p| p.env_key.clone())
-            .ok_or_else(|| AiError::Internal(format!("No env_key for provider {}", provider_id)))?;
-
+        let secret_key = Self::secret_key_for_provider(provider_id);
         self.env
             .secret_store()
-            .set_secret(&env_key, api_key)
+            .set_secret(&secret_key, api_key)
             .map_err(|e| AiError::Internal(e.to_string()))
     }
 
     /// Delete API key for a provider.
     pub async fn delete_api_key(&self, provider_id: &str) -> Result<(), AiError> {
-        let env_key = PROVIDER_CATALOG
-            .providers
-            .get(provider_id)
-            .and_then(|p| p.env_key.clone())
-            .ok_or_else(|| AiError::Internal(format!("No env_key for provider {}", provider_id)))?;
-
+        let secret_key = Self::secret_key_for_provider(provider_id);
         self.env
             .secret_store()
-            .delete_secret(&env_key)
+            .delete_secret(&secret_key)
             .map_err(|e| AiError::Internal(e.to_string()))
     }
 
     /// Get model capabilities for a specific provider/model combination.
-    /// Returns default capabilities (no tools) if model is not found in catalog.
+    /// Checks user capability overrides first, then falls back to catalog, then defaults.
     pub fn get_model_capabilities(&self, provider_id: &str, model_id: &str) -> ModelCapabilities {
-        PROVIDER_CATALOG
+        // First, get base capabilities from catalog
+        let catalog_capabilities = PROVIDER_CATALOG
             .providers
             .get(provider_id)
             .and_then(|p| p.models.get(model_id))
-            .map(|m| m.capabilities.clone())
-            .unwrap_or_else(|| {
-                // Default: no tools for unknown models to be safe
-                ModelCapabilities {
-                    tools: false,
-                    thinking: false,
-                    vision: false,
-                    streaming: true,
-                }
-            })
+            .map(|m| m.capabilities.clone());
+
+        // Check for user capability overrides in the new settings system
+        let user_overrides = self
+            .env
+            .settings_service()
+            .get_setting_value(AI_PROVIDER_SETTINGS_KEY)
+            .ok()
+            .flatten()
+            .and_then(|s| serde_json::from_str::<AiProviderSettings>(&s).ok())
+            .and_then(|settings| settings.providers.get(provider_id).cloned())
+            .and_then(|provider_settings| {
+                provider_settings.model_capability_overrides.get(model_id).cloned()
+            });
+
+        // Build final capabilities: start with catalog or defaults, then apply overrides
+        let base = catalog_capabilities.unwrap_or(ModelCapabilities {
+            tools: false,
+            thinking: false,
+            vision: false,
+            streaming: true,
+        });
+
+        // Apply user overrides if present
+        if let Some(overrides) = user_overrides {
+            ModelCapabilities {
+                tools: overrides.tools.unwrap_or(base.tools),
+                thinking: overrides.thinking.unwrap_or(base.thinking),
+                vision: overrides.vision.unwrap_or(base.vision),
+                streaming: overrides.streaming.unwrap_or(base.streaming),
+            }
+        } else {
+            base
+        }
     }
 
     /// Get the title model ID for a provider.

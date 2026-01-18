@@ -38,7 +38,7 @@ export const ToolFallback: ToolCallMessagePartComponent = ({ toolName, argsText,
   return (
     <div
       className={cn(
-        "aui-tool-fallback-root mb-4 flex w-full flex-col gap-3 rounded-lg border py-3",
+        "aui-tool-fallback-root flex w-full flex-col gap-3 rounded-lg border py-3",
         isCancelled && "border-muted-foreground/30 bg-muted/30",
       )}
     >

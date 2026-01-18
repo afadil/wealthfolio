@@ -1274,8 +1274,9 @@ export interface ModelCapabilities {
  */
 export interface ModelCapabilityOverrides {
   tools?: boolean;
-  streaming?: boolean;
+  thinking?: boolean;
   vision?: boolean;
+  streaming?: boolean;
 }
 
 /**
@@ -1342,6 +1343,8 @@ export interface MergedProvider {
   favoriteModels: string[];
   /** Capability overrides for specific models. */
   modelCapabilityOverrides: Record<string, ModelCapabilityOverrides>;
+  /** Allowlist of tool IDs that this provider can use. null = all tools enabled. */
+  toolsAllowlist?: string[] | null;
 
   // Computed
   hasApiKey: boolean;
@@ -1383,6 +1386,8 @@ export interface UpdateProviderSettingsRequest {
   modelCapabilityOverride?: ModelCapabilityOverrideUpdate;
   /** Update the list of favorite models (replaces the entire list). */
   favoriteModels?: string[];
+  /** Update tools allowlist. null = all tools enabled, [] = no tools, [...] = only specified tools. */
+  toolsAllowlist?: string[] | null;
 }
 
 /**

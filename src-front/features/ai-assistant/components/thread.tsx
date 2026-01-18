@@ -32,7 +32,10 @@ export const Thread: FC<ThreadProps> = ({ composerActions }) => {
       }}
     >
       <ThreadPrimitive.Viewport
-        turnAnchor="top"
+        autoScroll
+        scrollToBottomOnRunStart
+        scrollToBottomOnInitialize
+        scrollToBottomOnThreadSwitch
         className="aui-thread-viewport relative flex min-h-0 flex-1 flex-col overflow-x-auto overflow-y-scroll scroll-smooth px-4 pt-4"
       >
         <div className="flex min-h-full flex-col">
@@ -60,7 +63,7 @@ export const Thread: FC<ThreadProps> = ({ composerActions }) => {
 
 const ThreadScrollToBottom: FC = () => {
   return (
-    <ThreadPrimitive.ScrollToBottom asChild>
+    <ThreadPrimitive.ScrollToBottom behavior="smooth" asChild>
       <TooltipIconButton
         tooltip="Scroll to bottom"
         variant="outline"
@@ -227,6 +230,7 @@ const AssistantMessage: FC = () => {
             Text: MarkdownText,
             Reasoning: Reasoning,
             ReasoningGroup: ReasoningGroup,
+            ToolGroup: ({ children }) => <div className="mb-6">{children}</div>,
             tools: {
               Fallback: ToolFallback,
             },

@@ -53,9 +53,11 @@ export function useChatModel(): ChatModelState {
     if (storedSelection) {
       const provider = enabledProviders.find((p) => p.id === storedSelection.providerId);
       if (provider) {
-        const model = provider.models.find((m) => m.id === storedSelection.modelId);
-        if (model) {
-          return { currentProviderId: provider.id, currentModelId: model.id };
+        // Check if model is in catalog models or user's favorite models
+        const isInCatalog = provider.models.some((m) => m.id === storedSelection.modelId);
+        const isInFavorites = provider.favoriteModels?.includes(storedSelection.modelId);
+        if (isInCatalog || isInFavorites) {
+          return { currentProviderId: provider.id, currentModelId: storedSelection.modelId };
         }
         // Provider exists but model doesn't - use provider's default model
         return { currentProviderId: provider.id, currentModelId: provider.defaultModel };
@@ -98,8 +100,11 @@ export function useChatModel(): ChatModelState {
       const provider = enabledProviders.find((p) => p.id === providerId);
       if (!provider) return;
 
-      const selectedModel = provider.models.find((m) => m.id === modelId)?.id;
-      setStoredSelection({ providerId, modelId: selectedModel ?? provider.defaultModel });
+      // Check if model is in catalog models or user's favorite models
+      const isInCatalog = provider.models.some((m) => m.id === modelId);
+      const isInFavorites = provider.favoriteModels?.includes(modelId);
+      const selectedModel = isInCatalog || isInFavorites ? modelId : provider.defaultModel;
+      setStoredSelection({ providerId, modelId: selectedModel });
     },
     [enabledProviders, setStoredSelection],
   );
