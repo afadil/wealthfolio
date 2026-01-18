@@ -116,9 +116,9 @@ impl AiProviderService {
             .await
     }
 
-    /// Build the secret key for a provider (format: ai_<PROVIDER_ID>).
+    /// Build the secret key for a provider (format: ai_<provider_id>).
     fn secret_key_for_provider(provider_id: &str) -> String {
-        format!("ai_{}", provider_id.to_uppercase())
+        format!("ai_{}", provider_id)
     }
 
     /// Check if a provider has an API key stored.
@@ -184,7 +184,7 @@ impl AiProviderService {
     ) -> ModelCapabilities {
         ModelCapabilities {
             tools: overrides.tools.unwrap_or(base.tools),
-            thinking: base.thinking, // No override for thinking (yet)
+            thinking: overrides.thinking.unwrap_or(base.thinking),
             vision: overrides.vision.unwrap_or(base.vision),
             streaming: overrides.streaming.unwrap_or(base.streaming),
         }
@@ -265,6 +265,7 @@ impl AiProviderServiceTrait for AiProviderService {
                     priority: user.priority,
                     favorite_models: user.favorite_models.clone(),
                     model_capability_overrides: user.model_capability_overrides.clone(),
+                    tools_allowlist: user.tools_allowlist.clone(),
                     has_api_key: self.has_api_key(id),
                     is_default: user_settings.default_provider.as_ref() == Some(id),
                     supports_model_listing,
@@ -337,6 +338,12 @@ impl AiProviderServiceTrait for AiProviderService {
         // Handle favorite models update (replaces entire list)
         if let Some(favorite_models) = request.favorite_models {
             provider_settings.favorite_models = favorite_models;
+        }
+
+        // Handle tools allowlist update
+        // Some(Some([...])) = set specific tools, Some(None) = all tools enabled
+        if let Some(tools_allowlist) = request.tools_allowlist {
+            provider_settings.tools_allowlist = tools_allowlist;
         }
 
         // Update schema version

@@ -27,7 +27,7 @@ export function ToolCard({
   className,
 }: ToolCardProps) {
   return (
-    <Card className={cn("bg-muted/40 border-primary/10", className)}>
+    <Card className={className}>
       <CardHeader className="flex flex-row items-center justify-between gap-3 pb-3">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
