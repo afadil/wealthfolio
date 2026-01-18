@@ -55,5 +55,6 @@
   "files.trimFinalNewlines": true,
   "[rust]": {
     "editor.defaultFormatter": "rust-lang.rust-analyzer"
-  }
+  },
+  "kiroAgent.configureMCP": "Disabled"
 }
