@@ -98,7 +98,7 @@ export function ImportHelpPopover() {
           <br />
           2024-01-01,MSFT,1,DIVIDEND,57.5,USD,0,57.5
           <br />
-          2023-12-15,MSFT,30,BUY,368.60,USD,0
+          2023-12-15,MSFT,30,BUY,368.60,USD,0,
           <br />
           2023-08-11,$CASH-USD,1,DEPOSIT,1,USD,0,600.03
           <br />
