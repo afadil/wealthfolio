@@ -4,6 +4,7 @@ import {
   CommandEmpty,
   CommandGroup,
   CommandItem,
+  CommandSeparator,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -11,12 +12,14 @@ import {
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import type { FC } from "react";
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import type { MergedModel } from "../types";
 import { useChatModel } from "../hooks/use-chat-model";
 
 export const ModelPicker: FC = () => {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   const { isLoading, currentProvider, currentModelId, selectModel } = useChatModel();
 
   // Get selected/favorite models from provider settings
@@ -78,6 +81,11 @@ export const ModelPicker: FC = () => {
     setOpen(false);
   };
 
+  const handleAddModels = () => {
+    setOpen(false);
+    navigate("/settings/ai-providers");
+  };
+
   // If only one model, just show the name without dropdown
   if (selectedModels.length <= 1) {
     return (
@@ -121,6 +129,16 @@ export const ModelPicker: FC = () => {
                 </CommandItem>
               );
             })}
+          </CommandGroup>
+          <CommandSeparator />
+          <CommandGroup>
+            <CommandItem
+              onSelect={handleAddModels}
+              className="text-muted-foreground flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs"
+            >
+              <Icons.Plus className="h-3 w-3 shrink-0" />
+              <span className="whitespace-nowrap">Add models...</span>
+            </CommandItem>
           </CommandGroup>
         </Command>
       </PopoverContent>

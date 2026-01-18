@@ -300,34 +300,32 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
             <CardTitle className="text-sm font-medium">Holdings</CardTitle>
             <p className="text-muted-foreground mt-1 text-xs">
               {holdingsCount} position{holdingsCount !== 1 ? "s" : ""}
+              {accountLabel !== "TOTAL" && (
+                <Badge variant="outline" className="ml-2 text-xs uppercase">
+                  {accountLabel}
+                </Badge>
+              )}
+              {parsed?.truncated && parsed.originalCount && (
+                <Badge variant="secondary" className="ml-1 text-xs">
+                  {holdingsCount} / {parsed.originalCount}
+                </Badge>
+              )}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {accountLabel !== "TOTAL" && (
-              <Badge variant="outline" className="text-xs uppercase">
-                {accountLabel}
-              </Badge>
-            )}
-            {parsed?.truncated && parsed.originalCount && (
-              <Badge variant="secondary" className="text-xs">
-                {holdingsCount} / {parsed.originalCount}
-              </Badge>
+          <div className="text-right">
+            <span className="text-xl font-bold">{formatValue(totalValue)}</span>
+            {!isBalanceHidden && (
+              <p
+                className={cn(
+                  "text-sm font-medium",
+                  totalGain >= 0 ? "text-success" : "text-destructive"
+                )}
+              >
+                {totalGain >= 0 ? "+" : ""}
+                {formatter.format(totalGain)} ({percentFormatter.format(totalGainPct)})
+              </p>
             )}
           </div>
-        </div>
-        <div className="mt-2 flex flex-wrap items-baseline gap-2">
-          <span className="text-xl font-bold">{formatValue(totalValue)}</span>
-          {!isBalanceHidden && (
-            <span
-              className={cn(
-                "text-sm font-medium",
-                totalGain >= 0 ? "text-success" : "text-destructive"
-              )}
-            >
-              {totalGain >= 0 ? "+" : ""}
-              {formatter.format(totalGain)} ({percentFormatter.format(totalGainPct)})
-            </span>
-          )}
         </div>
       </CardHeader>
       <CardContent className="px-0 pb-0">

@@ -7,13 +7,13 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import {
   useAssistantState,
   useScrollLock,
+  useMessagePartReasoning,
   type ReasoningGroupComponent,
   type ReasoningMessagePartComponent,
 } from "@assistant-ui/react";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@wealthfolio/ui/components/ui/collapsible";
 import { cn } from "@/lib/utils";
-import { MarkdownText } from "./markdown-text";
 
 const ANIMATION_DURATION = 200;
 
@@ -194,7 +194,10 @@ ReasoningText.displayName = "ReasoningText";
  * />
  * ```
  */
-const ReasoningImpl: ReasoningMessagePartComponent = () => <MarkdownText />;
+const ReasoningImpl: ReasoningMessagePartComponent = () => {
+  const { text } = useMessagePartReasoning();
+  return <p className="whitespace-pre-wrap">{text}</p>;
+};
 
 /**
  * Collapsible wrapper that groups consecutive reasoning parts together.

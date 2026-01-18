@@ -23,7 +23,8 @@ pub const CHAT_CONTENT_SCHEMA_VERSION: u32 = 1;
 /// Current schema version for thread config snapshot.
 pub const CHAT_CONFIG_SCHEMA_VERSION: u32 = 1;
 
-/// Default read-only tools allowed in v1.
+/// Default tools allowed. Includes read-only tools and safe mutation tools
+/// (record_activity requires explicit user confirmation before creating).
 pub const DEFAULT_TOOLS_ALLOWLIST: &[&str] = &[
     "get_holdings",
     "get_accounts",
@@ -32,6 +33,7 @@ pub const DEFAULT_TOOLS_ALLOWLIST: &[&str] = &[
     "get_valuations",
     "get_dividends",
     "get_asset_allocation",
+    "record_activity",
 ];
 
 /// Maximum size in bytes for persisted message content (256KB).

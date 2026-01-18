@@ -11,6 +11,7 @@ use wealthfolio_core::{
     activities::ActivityServiceTrait,
     goals::GoalServiceTrait,
     portfolio::{holdings::HoldingsServiceTrait, valuation::ValuationServiceTrait},
+    quotes::QuoteServiceTrait,
     secrets::SecretStore,
     settings::SettingsServiceTrait,
 };
@@ -24,6 +25,7 @@ use crate::types::ChatRepositoryTrait;
 /// - Secret store for API keys
 /// - Configuration (base currency, etc.)
 /// - Chat repository for thread/message persistence
+/// - Quote service for symbol search
 #[async_trait]
 pub trait AiEnvironment: Send + Sync {
     /// Get the user's base currency (e.g., "USD", "EUR").
@@ -52,13 +54,16 @@ pub trait AiEnvironment: Send + Sync {
 
     /// Get the chat repository for thread/message persistence.
     fn chat_repository(&self) -> Arc<dyn ChatRepositoryTrait>;
+
+    /// Get the quote service for symbol search.
+    fn quote_service(&self) -> Arc<dyn QuoteServiceTrait>;
 }
 
 #[cfg(test)]
 pub mod test_env {
     use super::*;
     use chrono::{DateTime, NaiveDate, Utc};
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
     use std::sync::RwLock;
     use wealthfolio_core::{
         accounts::{Account, AccountServiceTrait, AccountUpdate, NewAccount},
@@ -67,9 +72,14 @@ pub mod test_env {
             ActivityDetails, ActivityImport, ActivitySearchResponse, ActivitySearchResponseMeta,
             ActivityServiceTrait, ActivityUpdate, ImportMappingData, NewActivity, Sort,
         },
+        assets::{Asset, ProviderProfile},
         errors::DatabaseError,
         goals::{Goal, GoalServiceTrait, GoalsAllocation, NewGoal},
         holdings::{Holding, HoldingsServiceTrait},
+        quotes::{
+            LatestQuotePair, Quote, QuoteServiceTrait, QuoteSummary, QuoteSyncState, SyncResult,
+            SymbolSyncPlan, ProviderInfo, QuoteImport,
+        },
         secrets::SecretStore,
         settings::{Settings, SettingsServiceTrait, SettingsUpdate},
         valuation::{DailyAccountValuation, ValuationServiceTrait},
@@ -575,6 +585,176 @@ pub mod test_env {
         }
     }
 
+    /// Mock quote service for testing.
+    #[derive(Default)]
+    pub struct MockQuoteService {
+        pub search_results: RwLock<Vec<QuoteSummary>>,
+    }
+
+    #[async_trait]
+    impl QuoteServiceTrait for MockQuoteService {
+        fn get_latest_quote(&self, _symbol: &str) -> CoreResult<Quote> {
+            unimplemented!("MockQuoteService::get_latest_quote")
+        }
+
+        fn get_latest_quotes(&self, _symbols: &[String]) -> CoreResult<HashMap<String, Quote>> {
+            Ok(HashMap::new())
+        }
+
+        fn get_latest_quotes_pair(
+            &self,
+            _symbols: &[String],
+        ) -> CoreResult<HashMap<String, LatestQuotePair>> {
+            Ok(HashMap::new())
+        }
+
+        fn get_historical_quotes(&self, _symbol: &str) -> CoreResult<Vec<Quote>> {
+            Ok(Vec::new())
+        }
+
+        fn get_all_historical_quotes(&self) -> CoreResult<HashMap<String, Vec<(NaiveDate, Quote)>>> {
+            Ok(HashMap::new())
+        }
+
+        fn get_quotes_in_range(
+            &self,
+            _symbols: &HashSet<String>,
+            _start: NaiveDate,
+            _end: NaiveDate,
+        ) -> CoreResult<Vec<Quote>> {
+            Ok(Vec::new())
+        }
+
+        fn get_quotes_in_range_filled(
+            &self,
+            _symbols: &HashSet<String>,
+            _start: NaiveDate,
+            _end: NaiveDate,
+            _first_appearance: &HashMap<String, NaiveDate>,
+        ) -> CoreResult<Vec<Quote>> {
+            Ok(Vec::new())
+        }
+
+        async fn get_daily_quotes(
+            &self,
+            _asset_ids: &HashSet<String>,
+            _start: NaiveDate,
+            _end: NaiveDate,
+        ) -> CoreResult<HashMap<NaiveDate, HashMap<String, Quote>>> {
+            Ok(HashMap::new())
+        }
+
+        async fn add_quote(&self, quote: &Quote) -> CoreResult<Quote> {
+            Ok(quote.clone())
+        }
+
+        async fn update_quote(&self, quote: Quote) -> CoreResult<Quote> {
+            Ok(quote)
+        }
+
+        async fn delete_quote(&self, _quote_id: &str) -> CoreResult<()> {
+            Ok(())
+        }
+
+        async fn bulk_upsert_quotes(&self, quotes: Vec<Quote>) -> CoreResult<usize> {
+            Ok(quotes.len())
+        }
+
+        async fn search_symbol(&self, query: &str) -> CoreResult<Vec<QuoteSummary>> {
+            self.search_symbol_with_currency(query, None).await
+        }
+
+        async fn search_symbol_with_currency(
+            &self,
+            _query: &str,
+            _account_currency: Option<&str>,
+        ) -> CoreResult<Vec<QuoteSummary>> {
+            Ok(self.search_results.read().unwrap().clone())
+        }
+
+        async fn get_asset_profile(&self, _asset: &Asset) -> CoreResult<ProviderProfile> {
+            unimplemented!("MockQuoteService::get_asset_profile")
+        }
+
+        async fn fetch_quotes_from_provider(
+            &self,
+            _symbol: &str,
+            _start: NaiveDate,
+            _end: NaiveDate,
+        ) -> CoreResult<Vec<Quote>> {
+            Ok(Vec::new())
+        }
+
+        async fn sync(&self) -> CoreResult<SyncResult> {
+            Ok(SyncResult::default())
+        }
+
+        async fn resync(&self, _symbols: Option<Vec<String>>) -> CoreResult<SyncResult> {
+            Ok(SyncResult::default())
+        }
+
+        async fn refresh_sync_state(&self) -> CoreResult<()> {
+            Ok(())
+        }
+
+        fn get_sync_plan(&self) -> CoreResult<Vec<SymbolSyncPlan>> {
+            Ok(Vec::new())
+        }
+
+        async fn handle_activity_created(
+            &self,
+            _symbol: &str,
+            _activity_date: NaiveDate,
+        ) -> CoreResult<()> {
+            Ok(())
+        }
+
+        async fn handle_activity_deleted(&self, _symbol: &str) -> CoreResult<()> {
+            Ok(())
+        }
+
+        async fn delete_sync_state(&self, _symbol: &str) -> CoreResult<()> {
+            Ok(())
+        }
+
+        fn get_symbols_needing_sync(&self) -> CoreResult<Vec<QuoteSyncState>> {
+            Ok(Vec::new())
+        }
+
+        fn get_sync_state(&self, _symbol: &str) -> CoreResult<Option<QuoteSyncState>> {
+            Ok(None)
+        }
+
+        async fn mark_profile_enriched(&self, _symbol: &str) -> CoreResult<()> {
+            Ok(())
+        }
+
+        fn get_assets_needing_profile_enrichment(&self) -> CoreResult<Vec<QuoteSyncState>> {
+            Ok(Vec::new())
+        }
+
+        async fn get_providers_info(&self) -> CoreResult<Vec<ProviderInfo>> {
+            Ok(Vec::new())
+        }
+
+        async fn update_provider_settings(
+            &self,
+            _provider_id: &str,
+            _priority: i32,
+            _enabled: bool,
+        ) -> CoreResult<()> {
+            Ok(())
+        }
+
+        async fn import_quotes(
+            &self,
+            quotes: Vec<QuoteImport>,
+            _overwrite: bool,
+        ) -> CoreResult<Vec<QuoteImport>> {
+            Ok(quotes)
+        }
+    }
+
     /// Mock environment for testing.
     pub struct MockEnvironment {
         pub base_currency: String,
@@ -586,6 +766,7 @@ pub mod test_env {
         pub settings_service: Arc<dyn SettingsServiceTrait>,
         pub secret_store: Arc<dyn SecretStore>,
         pub chat_repository: Arc<dyn ChatRepositoryTrait>,
+        pub quote_service: Arc<dyn QuoteServiceTrait>,
     }
 
     impl Default for MockEnvironment {
@@ -606,6 +787,7 @@ pub mod test_env {
                 settings_service: Arc::new(MockSettingsService::default()),
                 secret_store: Arc::new(MockSecretStore::default()),
                 chat_repository: Arc::new(MockChatRepository::default()),
+                quote_service: Arc::new(MockQuoteService::default()),
             }
         }
 
@@ -651,6 +833,10 @@ pub mod test_env {
 
         fn chat_repository(&self) -> Arc<dyn ChatRepositoryTrait> {
             self.chat_repository.clone()
+        }
+
+        fn quote_service(&self) -> Arc<dyn QuoteServiceTrait> {
+            self.quote_service.clone()
         }
     }
 }

@@ -27,6 +27,7 @@ import {
   GoalsToolUI,
   HoldingsToolUI,
   PerformanceToolUI,
+  RecordActivityToolUI,
   ValuationToolUI,
 } from "./tool-uis";
 import { useChatModel } from "../hooks/use-chat-model";
@@ -167,6 +168,7 @@ export function ChatShell({ className }: ChatShellProps) {
         <DividendsToolUI />
         <AllocationToolUI />
         <PerformanceToolUI />
+        <RecordActivityToolUI />
 
         <div className={cn("bg-background flex h-full w-full", className)}>
           {/* Desktop Sidebar */}

@@ -144,22 +144,26 @@ export function ActivityDataGrid({
     [markForDeletion],
   );
 
-  // Handle symbol selection to capture exchangeMic from search result
+  // Handle symbol selection to capture exchangeMic and currency from search result
   const handleSymbolSelect = useCallback(
     (rowIndex: number, result: SymbolSearchResult) => {
       setLocalTransactions((prev) => {
         const updated = [...prev];
         if (updated[rowIndex]) {
+          const row = updated[rowIndex];
+          // Currency fallback: search result (from exchange) → account → base
+          const currency = result.currency ?? row.accountCurrency ?? fallbackCurrency;
           updated[rowIndex] = {
-            ...updated[rowIndex],
+            ...row,
             exchangeMic: result.exchangeMic,
             assetPricingMode: result.dataSource === "MANUAL" ? "MANUAL" : "MARKET",
+            currency,
           };
         }
         return updated;
       });
     },
-    [setLocalTransactions],
+    [setLocalTransactions, fallbackCurrency],
   );
 
   // Column definitions

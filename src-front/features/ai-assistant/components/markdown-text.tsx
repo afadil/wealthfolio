@@ -1,7 +1,5 @@
 "use client";
 
-import "@assistant-ui/react-markdown/styles/dot.css";
-
 import {
   type CodeHeaderProps,
   MarkdownTextPrimitive,
@@ -9,6 +7,7 @@ import {
   useIsMarkdownCodeBlock,
 } from "@assistant-ui/react-markdown";
 import { type FC, memo, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import remarkGfm from "remark-gfm";
@@ -66,10 +65,50 @@ const useCopyToClipboard = ({
 };
 
 /**
+ * Custom link component that uses React Router for internal links.
+ */
+const MarkdownLink: FC<React.AnchorHTMLAttributes<HTMLAnchorElement>> = ({
+  href,
+  children,
+  className,
+  ...props
+}) => {
+  // Check if it's an internal link (starts with /)
+  const isInternalLink = href?.startsWith("/");
+
+  if (isInternalLink && href) {
+    return (
+      <Link
+        to={href}
+        className={cn("text-primary underline underline-offset-2 hover:text-primary/80", className)}
+        {...props}
+      >
+        {children}
+      </Link>
+    );
+  }
+
+  // External link - open in new tab
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn("text-primary underline underline-offset-2 hover:text-primary/80", className)}
+      {...props}
+    >
+      {children}
+    </a>
+  );
+};
+
+/**
  * Custom components for elements that need special handling beyond prose defaults.
  * Most elements use Tailwind Typography prose-sm defaults automatically.
  */
 const customComponents = memoizeMarkdownComponents({
+  // Custom link handling for React Router
+  a: MarkdownLink,
   // Custom code block styling with dark background
   pre: ({ className, ...props }) => (
     <pre

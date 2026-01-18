@@ -261,12 +261,89 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
             "get_dividends".to_string(),
             "get_asset_allocation".to_string(),
             "get_performance".to_string(),
+            "record_activity".to_string(),
         ]
     }
 
     /// Get environment reference.
     pub fn env(&self) -> &Arc<E> {
         &self.env
+    }
+
+    /// Update a tool result in a message by merging a patch into the result data.
+    ///
+    /// This is used by the frontend to persist submission state for mutation tools
+    /// (e.g., record_activity). After the user confirms and the activity is created,
+    /// the frontend calls this to store the created_activity_id in the tool result.
+    ///
+    /// The thread_id is used to search for the message containing the tool_call_id.
+    pub async fn update_tool_result(
+        &self,
+        thread_id: &str,
+        tool_call_id: &str,
+        result_patch: serde_json::Value,
+    ) -> Result<ChatMessage, AiError> {
+        let repo = self.env.chat_repository();
+
+        // Get all messages in the thread to find the one with this tool call
+        let messages = repo.get_messages_by_thread(thread_id)?;
+
+        // Find the message containing this tool_call_id
+        let mut target_message: Option<ChatMessage> = None;
+        for msg in messages {
+            for part in &msg.content.parts {
+                if let ChatMessagePart::ToolResult {
+                    tool_call_id: ref id,
+                    ..
+                } = part
+                {
+                    if id == tool_call_id {
+                        target_message = Some(msg);
+                        break;
+                    }
+                }
+            }
+            if target_message.is_some() {
+                break;
+            }
+        }
+
+        let mut message = target_message.ok_or_else(|| {
+            AiError::InvalidInput(format!(
+                "Tool result not found for tool_call_id: {}",
+                tool_call_id
+            ))
+        })?;
+
+        // Find and update the tool result part
+        for part in &mut message.content.parts {
+            if let ChatMessagePart::ToolResult {
+                tool_call_id: ref id,
+                ref mut data,
+                ref mut meta,
+                ..
+            } = part
+            {
+                if id == tool_call_id {
+                    // Merge the patch into data
+                    if let serde_json::Value::Object(patch_obj) = &result_patch {
+                        if let serde_json::Value::Object(data_obj) = data {
+                            for (key, value) in patch_obj {
+                                data_obj.insert(key.clone(), value.clone());
+                            }
+                        }
+                        // Also store in meta for easier access
+                        for (key, value) in patch_obj {
+                            meta.insert(key.clone(), value.clone());
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        // Save the updated message
+        repo.update_message(message).await
     }
 }
 
@@ -319,17 +396,49 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
 
     // Build preamble - include tool limitation notice if model doesn't support tools
     let base_preamble = include_str!("system_prompt.txt").trim();
+
+    // Build dynamic context
+    let base_currency = env.base_currency();
+    let current_date = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let current_datetime = chrono::Local::now().format("%Y-%m-%d %H:%M").to_string();
+
+    // Get accounts for context
+    let accounts = env
+        .account_service()
+        .get_active_accounts()
+        .unwrap_or_default();
+    let account_count = accounts.len();
+    let account_list: String = if accounts.is_empty() {
+        "No accounts configured.".to_string()
+    } else {
+        accounts
+            .iter()
+            .map(|a| format!("- {} ({}): {}", a.name, a.account_type, a.currency))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+
+    let dynamic_context = format!(
+        "\n\n## Current Context\n\
+        - Current date: {}\n\
+        - Current datetime: {}\n\
+        - Base currency: {}\n\
+        - Number of accounts: {}\n\
+        - Accounts:\n{}",
+        current_date, current_datetime, base_currency, account_count, account_list
+    );
+
     let preamble = if capabilities.tools {
-        base_preamble.to_string()
+        format!("{}{}", base_preamble, dynamic_context)
     } else {
         format!(
-            "{}\n\n## Important Limitation\n\
+            "{}{}\n\n## Important Limitation\n\
             You do not have access to tools or function calling. You cannot retrieve real-time \
             portfolio data, account information, or transaction history. When users ask about \
             their specific holdings, accounts, or financial data, politely explain that you \
             cannot access this information with the current model and suggest they switch to \
             a model that supports tools (look for the wrench icon in the model picker).",
-            base_preamble
+            base_preamble, dynamic_context
         )
     };
 
@@ -372,9 +481,9 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
 
     // Helper macro to build agent WITH tools and stream
     macro_rules! build_with_tools_and_stream {
-        ($client:expr) => {{
+        ($client:expr, $thinking_params:expr) => {{
             let tools = ToolSet::new(env.clone(), env.base_currency());
-            let agent = $client
+            let mut builder = $client
                 .agent(&model_id)
                 .preamble(&preamble)
                 .tool(tools.holdings)
@@ -385,67 +494,95 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
                 .tool(tools.dividends)
                 .tool(tools.allocation)
                 .tool(tools.performance)
-                .tool_choice(ToolChoice::Auto)
-                .build();
+                .tool(tools.record_activity)
+                .tool_choice(ToolChoice::Auto);
 
+            if let Some(params) = $thinking_params {
+                builder = builder.additional_params(params);
+            }
+
+            let agent = builder.build();
             stream_agent_response(agent, prompt, history, tx, repo, thread_id, run_id, message_id, title_ctx).await
         }};
     }
 
     // Helper macro to build agent WITHOUT tools and stream
     macro_rules! build_without_tools_and_stream {
-        ($client:expr) => {{
-            let agent = $client.agent(&model_id).preamble(&preamble).build();
+        ($client:expr, $thinking_params:expr) => {{
+            let mut builder = $client.agent(&model_id).preamble(&preamble);
 
+            if let Some(params) = $thinking_params {
+                builder = builder.additional_params(params);
+            }
+
+            let agent = builder.build();
             stream_agent_response(agent, prompt, history, tx, repo, thread_id, run_id, message_id, title_ctx).await
         }};
     }
+
+    // Provider-specific reasoning params:
+    // - Gemini: Enable thinking with thinkingBudget (-1 = dynamic)
+    // - Groq: Use reasoning_format "parsed" (required when using tools, "raw" not allowed with tools)
+    // - Ollama: we don't pass think:true because not all models support Ollama's think API
+    //   (e.g., deepseek-r1:14b). Models output <think> tags which ThinkTagParser handles.
+    let groq_reasoning_params: Option<serde_json::Value> = if capabilities.thinking {
+        Some(serde_json::json!({
+            "reasoning_format": "parsed",
+            "reasoning_effort": "default"
+        }))
+    } else {
+        None
+    };
+
+    // Gemini: thinkingConfig not supported via additional_params in rig-core.
+    // Gemini 2.5 has thinking enabled by default, rig-core should handle thought parts.
+    let gemini_thinking_params: Option<serde_json::Value> = None;
 
     // Route to provider with tool support check
     if capabilities.tools {
         match provider_id.as_str() {
             "anthropic" => {
                 let client = create_anthropic_client(api_key, &provider_id)?;
-                build_with_tools_and_stream!(client)
+                build_with_tools_and_stream!(client, None::<serde_json::Value>)
             }
             "gemini" | "google" => {
                 let client = create_gemini_client(api_key, &provider_id)?;
-                build_with_tools_and_stream!(client)
+                build_with_tools_and_stream!(client, gemini_thinking_params.clone())
             }
             "groq" => {
                 let client = create_groq_client(api_key, &provider_id)?;
-                build_with_tools_and_stream!(client)
+                build_with_tools_and_stream!(client, groq_reasoning_params.clone())
             }
             "ollama" => {
                 let client = create_ollama_client(provider_url)?;
-                build_with_tools_and_stream!(client)
+                build_with_tools_and_stream!(client, None::<serde_json::Value>)
             }
             _ => {
                 let client = create_openai_client(api_key, &provider_id)?;
-                build_with_tools_and_stream!(client)
+                build_with_tools_and_stream!(client, None::<serde_json::Value>)
             }
         }
     } else {
         match provider_id.as_str() {
             "anthropic" => {
                 let client = create_anthropic_client(api_key, &provider_id)?;
-                build_without_tools_and_stream!(client)
+                build_without_tools_and_stream!(client, None::<serde_json::Value>)
             }
             "gemini" | "google" => {
                 let client = create_gemini_client(api_key, &provider_id)?;
-                build_without_tools_and_stream!(client)
+                build_without_tools_and_stream!(client, gemini_thinking_params.clone())
             }
             "groq" => {
                 let client = create_groq_client(api_key, &provider_id)?;
-                build_without_tools_and_stream!(client)
+                build_without_tools_and_stream!(client, groq_reasoning_params.clone())
             }
             "ollama" => {
                 let client = create_ollama_client(provider_url)?;
-                build_without_tools_and_stream!(client)
+                build_without_tools_and_stream!(client, None::<serde_json::Value>)
             }
             _ => {
                 let client = create_openai_client(api_key, &provider_id)?;
-                build_without_tools_and_stream!(client)
+                build_without_tools_and_stream!(client, None::<serde_json::Value>)
             }
         }
     }
@@ -496,6 +633,84 @@ fn create_ollama_client(provider_url: Option<String>) -> Result<ollama::Client<H
 }
 
 // ============================================================================
+// Think Tag Parser (fallback for models that output <think> tags in text)
+// ============================================================================
+
+/// Lightweight parser for `<think>` tags in streamed text.
+/// Only performs string operations when potential tags are detected.
+#[derive(Default)]
+struct ThinkTagParser {
+    buffer: String,
+    in_think_block: bool,
+    accumulated_reasoning: String,
+}
+
+impl ThinkTagParser {
+    /// Process text delta, returns (text_to_emit, reasoning_to_emit).
+    fn process(&mut self, delta: &str) -> (String, String) {
+        // Fast path: no potential tags and not in a think block
+        if !self.in_think_block && !delta.contains('<') && self.buffer.is_empty() {
+            return (delta.to_string(), String::new());
+        }
+
+        self.buffer.push_str(delta);
+        let mut text_out = String::new();
+        let mut reasoning_out = String::new();
+
+        loop {
+            if self.in_think_block {
+                if let Some(end_idx) = self.buffer.find("</think>") {
+                    reasoning_out.push_str(&self.buffer[..end_idx]);
+                    self.accumulated_reasoning.push_str(&self.buffer[..end_idx]);
+                    self.buffer = self.buffer[end_idx + 8..].to_string();
+                    self.in_think_block = false;
+                } else if self.buffer.len() > 8 && !self.buffer.ends_with('<') && !self.buffer.ends_with("</") {
+                    // Safe to emit most of the buffer as reasoning
+                    let safe_len = self.buffer.len().saturating_sub(8);
+                    reasoning_out.push_str(&self.buffer[..safe_len]);
+                    self.accumulated_reasoning.push_str(&self.buffer[..safe_len]);
+                    self.buffer = self.buffer[safe_len..].to_string();
+                    break;
+                } else {
+                    break;
+                }
+            } else {
+                if let Some(start_idx) = self.buffer.find("<think>") {
+                    text_out.push_str(&self.buffer[..start_idx]);
+                    self.buffer = self.buffer[start_idx + 7..].to_string();
+                    self.in_think_block = true;
+                } else if self.buffer.len() > 7 && !self.buffer.ends_with('<') {
+                    // Safe to emit most of the buffer as text
+                    let safe_len = self.buffer.len().saturating_sub(7);
+                    text_out.push_str(&self.buffer[..safe_len]);
+                    self.buffer = self.buffer[safe_len..].to_string();
+                    break;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        (text_out, reasoning_out)
+    }
+
+    /// Flush remaining buffer at end of stream.
+    fn flush(&mut self) -> (String, String) {
+        if self.in_think_block {
+            self.accumulated_reasoning.push_str(&self.buffer);
+            (String::new(), std::mem::take(&mut self.buffer))
+        } else {
+            (std::mem::take(&mut self.buffer), String::new())
+        }
+    }
+
+    /// Get total accumulated reasoning.
+    fn reasoning(&self) -> &str {
+        &self.accumulated_reasoning
+    }
+}
+
+// ============================================================================
 // Stream Agent Response
 // ============================================================================
 
@@ -517,20 +732,39 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
     // Track content parts for final message
     let mut content_parts: Vec<ChatMessagePart> = vec![];
     let mut accumulated_text = String::new();
-    let mut has_streamed_text = false;
+
+    // Parser for <think> tags (fallback for models that don't use native thinking API)
+    let mut think_parser = ThinkTagParser::default();
 
     while let Some(chunk) = stream.next().await {
         match chunk {
-            // Text streaming
+            // Text streaming - parse for <think> tags as fallback
             Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Text(
                 Text { text },
             ))) => {
                 if !text.is_empty() {
-                    has_streamed_text = true;
-                    accumulated_text.push_str(&text);
-                    tx.send(AiStreamEvent::text_delta(&thread_id, &run_id, &message_id, &text))
+                    debug!("Text delta received: {} chars", text.len());
+                    let (text_out, reasoning_out) = think_parser.process(&text);
+
+                    // Emit reasoning if extracted from <think> tags
+                    if !reasoning_out.is_empty() {
+                        tx.send(AiStreamEvent::reasoning_delta(
+                            &thread_id,
+                            &run_id,
+                            &message_id,
+                            &reasoning_out,
+                        ))
                         .await
                         .map_err(|e| AiError::Internal(e.to_string()))?;
+                    }
+
+                    // Emit text content
+                    if !text_out.is_empty() {
+                        accumulated_text.push_str(&text_out);
+                        tx.send(AiStreamEvent::text_delta(&thread_id, &run_id, &message_id, &text_out))
+                            .await
+                            .map_err(|e| AiError::Internal(e.to_string()))?;
+                    }
                 }
             }
 
@@ -538,6 +772,7 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
             Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Reasoning(
                 Reasoning { reasoning, .. },
             ))) => {
+                debug!("Received reasoning from provider: {:?}", reasoning);
                 if !reasoning.is_empty() {
                     let reasoning_text = reasoning.join(" ");
                     content_parts.push(ChatMessagePart::Reasoning {
@@ -627,10 +862,19 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
                 .map_err(|e| AiError::Internal(e.to_string()))?;
             }
 
-            // Final response
+            // Final response - use if no meaningful text was accumulated (some providers like Gemini
+            // may not stream text deltas for tool-calling responses, and Ollama/DeepSeek may
+            // send reasoning natively without streaming text deltas)
             Ok(MultiTurnStreamItem::FinalResponse(final_response)) => {
                 let response_text = final_response.response().to_string();
-                if !has_streamed_text && !response_text.is_empty() {
+                debug!(
+                    "FinalResponse received: accumulated_text_len={}, response_text_len={}",
+                    accumulated_text.len(),
+                    response_text.len()
+                );
+                // Use trim() to handle cases where only whitespace was accumulated
+                if accumulated_text.trim().is_empty() && !response_text.trim().is_empty() {
+                    debug!("Using FinalResponse text as accumulated_text was empty/whitespace");
                     accumulated_text = response_text.clone();
                     tx.send(AiStreamEvent::text_delta(
                         &thread_id,
@@ -643,8 +887,10 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
                 }
             }
 
-            // Other items (ignore)
-            Ok(_) => {}
+            // Other stream items - log for debugging
+            Ok(other) => {
+                debug!("Unhandled stream item: {:?}", std::any::type_name_of_val(&other));
+            }
 
             // Errors
             Err(error) => {
@@ -663,10 +909,41 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
         }
     }
 
-    // Add accumulated text to content parts
-    if !accumulated_text.is_empty() {
+    // Flush any remaining buffered content from the think parser
+    let (remaining_text, remaining_reasoning) = think_parser.flush();
+    if !remaining_reasoning.is_empty() {
+        tx.send(AiStreamEvent::reasoning_delta(
+            &thread_id,
+            &run_id,
+            &message_id,
+            &remaining_reasoning,
+        ))
+        .await
+        .map_err(|e| AiError::Internal(e.to_string()))?;
+    }
+    if !remaining_text.is_empty() {
+        accumulated_text.push_str(&remaining_text);
+        tx.send(AiStreamEvent::text_delta(&thread_id, &run_id, &message_id, &remaining_text))
+            .await
+            .map_err(|e| AiError::Internal(e.to_string()))?;
+    }
+
+    // Add reasoning parsed from <think> tags to content parts
+    let parsed_reasoning = think_parser.reasoning();
+    if !parsed_reasoning.is_empty() {
         content_parts.insert(
             0,
+            ChatMessagePart::Reasoning {
+                content: parsed_reasoning.to_string(),
+            },
+        );
+    }
+
+    // Add accumulated text to content parts
+    if !accumulated_text.is_empty() {
+        let text_idx = if parsed_reasoning.is_empty() { 0 } else { 1 };
+        content_parts.insert(
+            text_idx,
             ChatMessagePart::Text {
                 content: accumulated_text,
             },

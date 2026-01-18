@@ -116,3 +116,29 @@ export const getAiThreadTags = async (threadId: string): Promise<string[]> => {
     throw error;
   }
 };
+
+// ============================================================================
+// Tool Result Management Commands
+// ============================================================================
+
+/**
+ * Request to update a tool result with additional data.
+ */
+export interface UpdateToolResultRequest {
+  threadId: string;
+  toolCallId: string;
+  resultPatch: Record<string, unknown>;
+}
+
+/**
+ * Update a tool result in the database.
+ * Used to persist state like submission status after user actions.
+ */
+export const updateToolResult = async (request: UpdateToolResultRequest): Promise<void> => {
+  try {
+    await invoke("update_tool_result", { request });
+  } catch (error) {
+    logger.error("Error updating tool result.");
+    throw error;
+  }
+};

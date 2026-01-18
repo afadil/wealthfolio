@@ -172,3 +172,36 @@ pub async fn get_ai_thread_tags(
         .unwrap_or_default();
     Ok(tags)
 }
+
+// ============================================================================
+// Tool Result Update Command
+// ============================================================================
+
+/// Request for updating a tool result in a message.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateToolResultRequest {
+    /// The thread ID containing the message with the tool result.
+    pub thread_id: String,
+    /// The tool call ID to update.
+    pub tool_call_id: String,
+    /// JSON patch to merge into the tool result data.
+    pub result_patch: serde_json::Value,
+}
+
+/// Update a tool result in a message by merging a patch into the result data.
+///
+/// This is used by mutation tool UIs (e.g., record_activity) to persist
+/// submission state. After the user confirms and the backend operation succeeds,
+/// the frontend calls this to store metadata like created_activity_id.
+#[tauri::command]
+pub async fn update_tool_result(
+    context: State<'_, Arc<ServiceContext>>,
+    request: UpdateToolResultRequest,
+) -> CommandResult<ChatMessage> {
+    let service = context.ai_chat_service();
+    let message = service
+        .update_tool_result(&request.thread_id, &request.tool_call_id, request.result_patch)
+        .await?;
+    Ok(message)
+}

@@ -11,6 +11,7 @@ use wealthfolio_core::{
     activities::ActivityServiceTrait,
     goals::GoalServiceTrait,
     holdings::HoldingsServiceTrait,
+    quotes::QuoteServiceTrait,
     secrets::SecretStore,
     settings::SettingsServiceTrait,
     valuation::ValuationServiceTrait,
@@ -30,6 +31,7 @@ pub struct ServerAiEnvironment {
     settings_service: Arc<dyn SettingsServiceTrait + Send + Sync>,
     secret_store: Arc<dyn SecretStore>,
     chat_repository: Arc<dyn ChatRepositoryTrait + Send + Sync>,
+    quote_service: Arc<dyn QuoteServiceTrait + Send + Sync>,
 }
 
 impl ServerAiEnvironment {
@@ -44,6 +46,7 @@ impl ServerAiEnvironment {
         settings_service: Arc<dyn SettingsServiceTrait + Send + Sync>,
         secret_store: Arc<dyn SecretStore>,
         chat_repository: Arc<dyn ChatRepositoryTrait + Send + Sync>,
+        quote_service: Arc<dyn QuoteServiceTrait + Send + Sync>,
     ) -> Self {
         Self {
             base_currency,
@@ -55,6 +58,7 @@ impl ServerAiEnvironment {
             settings_service,
             secret_store,
             chat_repository,
+            quote_service,
         }
     }
 }
@@ -94,5 +98,9 @@ impl AiEnvironment for ServerAiEnvironment {
 
     fn chat_repository(&self) -> Arc<dyn ChatRepositoryTrait> {
         self.chat_repository.clone()
+    }
+
+    fn quote_service(&self) -> Arc<dyn QuoteServiceTrait> {
+        self.quote_service.clone()
     }
 }

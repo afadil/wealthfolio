@@ -21,6 +21,107 @@ import { AI_THREADS_KEY } from "./use-threads";
 import { deleteAiThread, getAiThreadMessages, updateAiThread } from "@/commands/ai-chat";
 
 /**
+ * Extract error message from provider response.
+ * Handles JSON error responses like:
+ * - {"error":"message here"}
+ * - {"error":{"message":"message here","type":"error_type"}}
+ */
+function extractErrorMessage(error: string): string {
+  // Try to extract from "with message:" format first
+  const messageMatch = error.match(/with message:\s*(.+)$/i);
+  const jsonStr = messageMatch?.[1] || error;
+
+  // Try to parse as JSON
+  try {
+    // Find JSON object in the string
+    const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      // Handle {"error":{"message":"..."}} format
+      if (parsed.error?.message) {
+        return parsed.error.message;
+      }
+      // Handle {"error":"..."} format
+      if (typeof parsed.error === "string") {
+        return parsed.error;
+      }
+      // Handle {"message":"..."} format
+      if (parsed.message) {
+        return parsed.message;
+      }
+    }
+  } catch {
+    // Not valid JSON, continue with string extraction
+  }
+
+  // Fallback: try simple regex for {"error":"..."}
+  const simpleMatch = error.match(/"error":\s*"([^"]+)"/);
+  if (simpleMatch?.[1]) {
+    return simpleMatch[1];
+  }
+
+  // Fallback: try regex for "message":"..."
+  const msgMatch = error.match(/"message":\s*"([^"]+)"/);
+  if (msgMatch?.[1]) {
+    return msgMatch[1];
+  }
+
+  return error;
+}
+
+/**
+ * Format error messages with user-friendly copy and actionable guidance.
+ */
+function formatErrorMessage(error: string): string {
+  const settingsLink = "[AI Providers settings](/settings/ai-providers)";
+
+  // First, extract the actual error message from nested formats
+  const extractedError = extractErrorMessage(error);
+
+  // Model doesn't support thinking (Ollama)
+  if (extractedError.includes("does not support thinking")) {
+    const modelMatch = extractedError.match(/"([^"]+)"/);
+    const modelName = modelMatch?.[1] || "This model";
+    return `**Thinking not supported**\n\n${modelName} doesn't support the thinking/reasoning feature.\n\nTry a different model that supports thinking, or check your ${settingsLink}.`;
+  }
+
+  // Model not found errors
+  if (extractedError.includes("not found") && extractedError.includes("model")) {
+    const modelMatch = extractedError.match(/model ['"]([^'"]+)['"]/i);
+    const modelName = modelMatch?.[1] || "selected model";
+    return `**Model not available**\n\nThe model "${modelName}" could not be found. This usually means:\n- The model hasn't been downloaded yet\n- The model name is incorrect\n- The AI provider service isn't running\n\nPlease check your ${settingsLink} to select a different model or verify your provider configuration.`;
+  }
+
+  // Connection refused / provider not running
+  if (extractedError.includes("Connection refused") || extractedError.includes("ECONNREFUSED")) {
+    return `**Cannot connect to AI provider**\n\nThe AI provider service doesn't appear to be running. Please:\n1. Start your local AI provider (e.g., Ollama)\n2. Verify the provider URL in ${settingsLink}\n3. Try again`;
+  }
+
+  // API key errors
+  if (extractedError.includes("401") || extractedError.includes("unauthorized") || extractedError.includes("API key")) {
+    return `**Authentication failed**\n\nYour API key appears to be invalid or missing. Please check your ${settingsLink} and ensure your API key is correctly configured.`;
+  }
+
+  // Rate limit errors
+  if (extractedError.includes("429") || extractedError.includes("rate limit")) {
+    return `**Rate limit exceeded**\n\nYou've made too many requests. Please wait a moment and try again.`;
+  }
+
+  // Timeout errors
+  if (extractedError.includes("timeout") || extractedError.includes("ETIMEDOUT")) {
+    return `**Request timed out**\n\nThe AI provider took too long to respond. This could be due to:\n- A slow network connection\n- The provider being overloaded\n- A very complex request\n\nPlease try again or select a faster model in ${settingsLink}.`;
+  }
+
+  // Generic provider error - use extracted message
+  if (error.includes("Provider error") || error.includes("CompletionError") || error.includes("HttpError")) {
+    return `**Provider error**\n\n${extractedError}\n\nCheck your ${settingsLink} if this persists.`;
+  }
+
+  // Fallback for unknown errors
+  return `**Something went wrong**\n\n${extractedError}\n\nIf this persists, please check your ${settingsLink}.`;
+}
+
+/**
  * Internal tool call state during streaming.
  */
 interface ToolCallState {
@@ -395,12 +496,19 @@ export function useChatRuntime(config?: ChatModelConfig) {
 
             case "error":
               console.error("Stream error:", event.message);
+              // Show formatted error to user in the assistant message
+              text = formatErrorMessage(event.message);
+              updateAssistantMessage();
               break;
           }
         }
       } catch (error) {
         if (!signal.aborted) {
           console.error("Streaming error:", error);
+          // Show formatted error to user in the assistant message
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          text = formatErrorMessage(errorMessage);
+          updateAssistantMessage();
         }
       } finally {
         setIsRunning(false);
