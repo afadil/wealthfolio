@@ -233,14 +233,10 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
       // Clear from backend - throw on failure so signOut properly reports errors
       await clearSyncSession();
 
-      // Clear local storage for session restoration
-      if (isDesktop) {
-        await deleteSecret("sync_refresh_token").catch((err) => {
-          logger.warn(`Failed to delete refresh token: ${err}`);
-        });
-      } else {
-        localStorage.removeItem(REFRESH_TOKEN_KEY);
-      }
+      // Clear session restoration token from secret store (keyring on desktop, FileSecretStore on web)
+      await deleteSecret(REFRESH_TOKEN_KEY).catch((err) => {
+        logger.warn(`Failed to delete refresh token: ${err}`);
+      });
       return;
     }
 
@@ -254,34 +250,35 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
       }
     }
 
-    // Also store refresh token locally for session restoration on app restart
-    if (isDesktop) {
+    // Also store refresh token in secret store for session restoration on app restart
+    // Desktop: OS keyring, Web: backend FileSecretStore (both via setSecret command)
+    if (session.refresh_token) {
       try {
-        if (session.refresh_token) {
-          await setSecret("sync_refresh_token", session.refresh_token);
-          logger.info("Refresh token stored in keyring");
-        }
+        await setSecret(REFRESH_TOKEN_KEY, session.refresh_token);
+        logger.info(isDesktop ? "Refresh token stored in keyring" : "Refresh token stored in backend");
       } catch (err) {
         logger.error(`setSecret failed: ${err}`);
-        // Fallback to localStorage
-        if (session.refresh_token) {
+        // Fallback to localStorage only on desktop where keyring might fail
+        if (isDesktop) {
           localStorage.setItem(REFRESH_TOKEN_KEY, session.refresh_token);
         }
-      }
-    } else {
-      // Web mode: store refresh token in localStorage for session restoration
-      if (session.refresh_token) {
-        localStorage.setItem(REFRESH_TOKEN_KEY, session.refresh_token);
       }
     }
   }, []);
 
-  // Retrieve tokens from keyring (desktop) or localStorage (web fallback)
+  // Retrieve refresh token from secret store (keyring on desktop, FileSecretStore on web)
   const retrieveRefreshToken = useCallback(async (): Promise<string | null> => {
-    if (isDesktop) {
-      return getSecret(REFRESH_TOKEN_KEY).catch(() => null);
+    try {
+      const token = await getSecret(REFRESH_TOKEN_KEY);
+      if (token) return token;
+    } catch (err) {
+      logger.debug(`getSecret failed: ${err}`);
     }
-    return localStorage.getItem(REFRESH_TOKEN_KEY);
+    // Fallback to localStorage for desktop (legacy tokens or keyring failures)
+    if (isDesktop) {
+      return localStorage.getItem(REFRESH_TOKEN_KEY);
+    }
+    return null;
   }, []);
 
   // Handle auth callback from URL (deep link or web redirect)
@@ -710,7 +707,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
 
   // Fetch user info from the cloud API
   const refetchUserInfo = useCallback(async () => {
-    if (!session || !isDesktop) {
+    if (!session) {
       setUserInfo(null);
       setIsLoadingUserInfo(false);
       return;

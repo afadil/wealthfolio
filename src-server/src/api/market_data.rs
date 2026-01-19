@@ -20,6 +20,13 @@ async fn get_market_data_providers(
     Ok(Json(infos))
 }
 
+async fn get_market_data_provider_settings(
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<Vec<ProviderInfo>>> {
+    let infos = state.quote_service.get_providers_info().await?;
+    Ok(Json(infos))
+}
+
 #[derive(serde::Deserialize)]
 struct ProviderUpdateBody {
     #[serde(rename = "providerId")]
@@ -181,7 +188,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/providers", get(get_market_data_providers))
         .route(
             "/providers/settings",
-            put(update_market_data_provider_settings),
+            get(get_market_data_provider_settings).put(update_market_data_provider_settings),
         )
         .route("/market-data/search", get(search_symbol))
         .route("/market-data/quotes/history", get(get_quote_history))

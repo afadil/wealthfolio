@@ -257,8 +257,18 @@ export async function listenMarketSyncStart<T>(handler: EventCallback<T>): Promi
   return adaptUnlisten(unlisten);
 }
 
+export async function listenBrokerSyncStart<T>(handler: EventCallback<T>): Promise<UnlistenFn> {
+  const unlisten = await listen<T>("broker:sync-start", adaptCallback(handler));
+  return adaptUnlisten(unlisten);
+}
+
 export async function listenBrokerSyncComplete<T>(handler: EventCallback<T>): Promise<UnlistenFn> {
   const unlisten = await listen<T>("broker:sync-complete", adaptCallback(handler));
+  return adaptUnlisten(unlisten);
+}
+
+export async function listenBrokerSyncError<T>(handler: EventCallback<T>): Promise<UnlistenFn> {
+  const unlisten = await listen<T>("broker:sync-error", adaptCallback(handler));
   return adaptUnlisten(unlisten);
 }
 
@@ -296,6 +306,60 @@ export async function listAiThreads(req?: ListThreadsRequest): Promise<ThreadPag
     cursor: req?.cursor,
     limit: req?.limit ?? 20,
     search: req?.search,
+  });
+}
+
+// ============================================================================
+// Broker / Connect Commands
+// ============================================================================
+
+export async function syncBrokerData(): Promise<void> {
+  return tauriInvoke<void>("sync_broker_data");
+}
+
+export async function getSyncedAccounts<T>(): Promise<T[]> {
+  return tauriInvoke<T[]>("get_synced_accounts");
+}
+
+export async function getPlatforms<T>(): Promise<T[]> {
+  return tauriInvoke<T[]>("get_platforms");
+}
+
+export async function listBrokerConnections<T>(): Promise<T[]> {
+  return tauriInvoke<T[]>("list_broker_connections");
+}
+
+export async function listBrokerAccounts<T>(): Promise<T[]> {
+  return tauriInvoke<T[]>("list_broker_accounts");
+}
+
+export async function getSubscriptionPlans<T>(): Promise<T> {
+  return tauriInvoke<T>("get_subscription_plans");
+}
+
+export async function getSubscriptionPlansPublic<T>(): Promise<T> {
+  return tauriInvoke<T>("get_subscription_plans_public");
+}
+
+export async function getUserInfo<T>(): Promise<T> {
+  return tauriInvoke<T>("get_user_info");
+}
+
+export async function getBrokerSyncStates<T>(): Promise<T[]> {
+  return tauriInvoke<T[]>("get_broker_sync_states");
+}
+
+export interface ImportRunsRequest {
+  runType?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export async function getImportRuns<T>(request?: ImportRunsRequest): Promise<T[]> {
+  return tauriInvoke<T[]>("get_import_runs", {
+    runType: request?.runType,
+    limit: request?.limit,
+    offset: request?.offset,
   });
 }
 

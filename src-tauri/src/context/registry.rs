@@ -5,6 +5,7 @@ use wealthfolio_core::{
     self, accounts, activities, assets, fx, goals, limits, portfolio, quotes, settings,
     taxonomies,
 };
+use wealthfolio_device_sync::DeviceEnrollService;
 use wealthfolio_storage_sqlite::assets::AlternativeAssetRepository;
 
 use super::TauriAiEnvironment;
@@ -36,6 +37,7 @@ pub struct ServiceContext {
     pub connect_service: Arc<ConnectService>,
     pub ai_provider_service: Arc<dyn AiProviderServiceTrait>,
     pub ai_chat_service: Arc<ChatService<TauriAiEnvironment>>,
+    pub device_enroll_service: Arc<DeviceEnrollService>,
 }
 
 impl ServiceContext {
@@ -129,5 +131,9 @@ impl ServiceContext {
 
     pub fn ai_chat_service(&self) -> Arc<ChatService<TauriAiEnvironment>> {
         Arc::clone(&self.ai_chat_service)
+    }
+
+    pub fn device_enroll_service(&self) -> Arc<DeviceEnrollService> {
+        Arc::clone(&self.device_enroll_service)
     }
 }

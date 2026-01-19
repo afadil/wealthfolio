@@ -348,9 +348,6 @@ pub fn run() {
             // Sync commands
             commands::wealthfolio_connect::store_sync_session,
             commands::wealthfolio_connect::clear_sync_session,
-            commands::brokers_sync::set_sync_credentials,
-            commands::brokers_sync::get_sync_credentials,
-            commands::brokers_sync::clear_sync_credentials,
             commands::brokers_sync::sync_broker_data,
             commands::brokers_sync::get_synced_accounts,
             commands::brokers_sync::get_platforms,

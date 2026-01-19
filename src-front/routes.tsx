@@ -33,8 +33,8 @@ import AiAssistantPage from "./pages/ai-assistant/ai-assistant-page";
 // import QRScannerPage from './pages/qr-scanner/qr-scanner-page'; // File not found
 import { getDynamicRoutes, subscribeToNavigationUpdates } from "@/addons/addons-runtime-context";
 import NotFoundPage from "@/pages/not-found";
-import AuthCallbackPage from "./pages/auth/auth-callback-page";
-import ConnectPage from "./pages/connect/connect-page";
+import AuthCallbackPage from "@/features/wealthfolio-connect/pages/auth-callback-page";
+import ConnectPage from "@/features/wealthfolio-connect/pages/connect-page";
 import HoldingsInsightsPage from "./pages/holdings/holdings-insights-page";
 import AboutSettingsPage from "./pages/settings/about/about-page";
 

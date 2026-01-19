@@ -1,13 +1,13 @@
 // Web adapter - Browser implementation
 import { getAuthToken, notifyUnauthorized } from "@/lib/auth-token";
 import type {
+  AddonManifest,
   EventCallback,
-  UnlistenFn,
-  Logger,
   ExtractedAddon,
   InstalledAddon,
-  AddonManifest,
+  Logger,
   RunEnv,
+  UnlistenFn,
 } from "../types";
 import { RunEnvs } from "../types";
 
@@ -19,7 +19,6 @@ import type {
 } from "@/features/ai-assistant/types";
 
 // Re-export types and constants
-export type { EventCallback, UnlistenFn, RunEnv } from "../types";
 export { RunEnvs } from "../types";
 export type {
   AddonFile,
@@ -27,24 +26,17 @@ export type {
   AddonManifest,
   AddonUpdateCheckResult,
   AddonUpdateInfo,
-  AddonValidationResult,
-  ExtractedAddon,
+  AddonValidationResult, EventCallback, ExtractedAddon,
   FunctionPermission,
   InstalledAddon,
-  Permission,
+  Permission, RunEnv, UnlistenFn
 } from "../types";
 // Re-export AI types from features/ai-assistant
 export type {
-  AiChatModelConfig,
+  AiChatMessage, AiChatModelConfig,
   AiSendMessageRequest,
-  AiStreamEvent,
-  AiToolCall,
-  AiToolResult,
-  AiChatMessage,
-  AiUsageStats,
-  AiThread,
-  ThreadPage,
-  ListThreadsRequest,
+  AiStreamEvent, AiThread, AiToolCall,
+  AiToolResult, AiUsageStats, ListThreadsRequest, ThreadPage
 } from "@/features/ai-assistant/types";
 
 /**
@@ -176,17 +168,17 @@ const COMMANDS: CommandMap = {
   install_addon_from_staging: { method: "POST", path: "/addons/store/install-from-staging" },
   clear_addon_staging: { method: "DELETE", path: "/addons/store/staging" },
   // Device Sync - Device management
-  register_device: { method: "POST", path: "/sync/team/devices" },
-  get_device: { method: "GET", path: "/sync/team/devices" },
-  list_devices: { method: "GET", path: "/sync/team/devices" },
-  update_device: { method: "PATCH", path: "/sync/team/devices" },
-  delete_device: { method: "DELETE", path: "/sync/team/devices" },
-  revoke_device: { method: "POST", path: "/sync/team/devices" },
+  register_device: { method: "POST", path: "/sync/device/register" },
+  get_device: { method: "GET", path: "/sync/device" },
+  list_devices: { method: "GET", path: "/sync/devices" },
+  update_device: { method: "PATCH", path: "/sync/device" },
+  delete_device: { method: "DELETE", path: "/sync/device" },
+  revoke_device: { method: "POST", path: "/sync/device" },
   // Device Sync - Team keys (E2EE)
-  initialize_team_keys: { method: "POST", path: "/sync/team/keys/initialize" },
-  commit_initialize_team_keys: { method: "POST", path: "/sync/team/keys/initialize/commit" },
-  rotate_team_keys: { method: "POST", path: "/sync/team/keys/rotate" },
-  commit_rotate_team_keys: { method: "POST", path: "/sync/team/keys/rotate/commit" },
+  initialize_team_keys: { method: "POST", path: "/sync/keys/initialize" },
+  commit_initialize_team_keys: { method: "POST", path: "/sync/keys/initialize/commit" },
+  rotate_team_keys: { method: "POST", path: "/sync/keys/rotate" },
+  commit_rotate_team_keys: { method: "POST", path: "/sync/keys/rotate/commit" },
   reset_team_sync: { method: "POST", path: "/sync/team/reset" },
   // Device Sync - Pairing (Issuer - Trusted Device)
   create_pairing: { method: "POST", path: "/sync/pairing" },
@@ -202,12 +194,25 @@ const COMMANDS: CommandMap = {
   store_sync_session: { method: "POST", path: "/connect/session" },
   clear_sync_session: { method: "DELETE", path: "/connect/session" },
   get_sync_session_status: { method: "GET", path: "/connect/session/status" },
+  list_broker_connections: { method: "GET", path: "/connect/connections" },
+  list_broker_accounts: { method: "GET", path: "/connect/accounts" },
+  sync_broker_data: { method: "POST", path: "/connect/sync" },
   sync_broker_connections: { method: "POST", path: "/connect/sync/connections" },
   sync_broker_accounts: { method: "POST", path: "/connect/sync/accounts" },
   sync_broker_activities: { method: "POST", path: "/connect/sync/activities" },
-  get_connect_portal: { method: "POST", path: "/connect/portal" },
   get_subscription_plans: { method: "GET", path: "/connect/plans" },
+  get_subscription_plans_public: { method: "GET", path: "/connect/plans/public" },
   get_user_info: { method: "GET", path: "/connect/user" },
+  // Local data queries (from local database)
+  get_synced_accounts: { method: "GET", path: "/connect/synced-accounts" },
+  get_platforms: { method: "GET", path: "/connect/platforms" },
+  get_broker_sync_states: { method: "GET", path: "/connect/sync-states" },
+  get_import_runs: { method: "GET", path: "/connect/import-runs" },
+  // Device Sync / Enrollment
+  get_device_sync_state: { method: "GET", path: "/connect/device/sync-state" },
+  enable_device_sync: { method: "POST", path: "/connect/device/enable" },
+  clear_device_sync_data: { method: "DELETE", path: "/connect/device/sync-data" },
+  reinitialize_device_sync: { method: "POST", path: "/connect/device/reinitialize" },
   // Net Worth
   get_net_worth: { method: "GET", path: "/net-worth" },
   get_net_worth_history: { method: "GET", path: "/net-worth/history" },
@@ -219,11 +224,13 @@ const COMMANDS: CommandMap = {
   // AI Threads
   list_ai_threads: { method: "GET", path: "/ai/threads" },
   get_ai_thread: { method: "GET", path: "/ai/threads" },
+  get_ai_thread_messages: { method: "GET", path: "/ai/threads" },
   update_ai_thread: { method: "PUT", path: "/ai/threads" },
   delete_ai_thread: { method: "DELETE", path: "/ai/threads" },
   add_ai_thread_tag: { method: "POST", path: "/ai/threads" },
   remove_ai_thread_tag: { method: "DELETE", path: "/ai/threads" },
   get_ai_thread_tags: { method: "GET", path: "/ai/threads" },
+  update_tool_result: { method: "PATCH", path: "/ai/tool-result" },
   // Alternative Assets
   create_alternative_asset: { method: "POST", path: "/alternative-assets" },
   update_alternative_asset_valuation: { method: "PUT", path: "/alternative-assets" },
@@ -534,21 +541,21 @@ export const invoke = async <T>(
       break;
     }
     case "set_secret": {
-      const { providerId, secret } = payload as { providerId: string; secret: string };
-      body = JSON.stringify({ providerId, secret });
+      const { secretKey, secret } = payload as { secretKey: string; secret: string };
+      body = JSON.stringify({ secretKey, secret });
       break;
     }
     case "get_secret": {
-      const { providerId } = payload as { providerId: string };
+      const { secretKey } = payload as { secretKey: string };
       const params = new URLSearchParams();
-      params.set("providerId", providerId);
+      params.set("secretKey", secretKey);
       url += `?${params.toString()}`;
       break;
     }
     case "delete_secret": {
-      const { providerId } = payload as { providerId: string };
+      const { secretKey } = payload as { secretKey: string };
       const params = new URLSearchParams();
-      params.set("providerId", providerId);
+      params.set("secretKey", secretKey);
       url += `?${params.toString()}`;
       break;
     }
@@ -765,7 +772,7 @@ export const invoke = async <T>(
     case "commit_rotate_team_keys": {
       const { newKeyVersion, envelopes, signature, challengeResponse } = payload as {
         newKeyVersion: number;
-        envelopes: Array<{ deviceId: string; deviceKeyEnvelope: string }>;
+        envelopes: { deviceId: string; deviceKeyEnvelope: string }[];
         signature: string;
         challengeResponse?: string;
       };
@@ -843,21 +850,39 @@ export const invoke = async <T>(
       body = JSON.stringify({ accessToken, refreshToken });
       break;
     }
-    case "get_connect_portal": {
-      body = JSON.stringify(payload);
-      break;
-    }
     case "list_devices":
     case "initialize_team_keys":
     case "rotate_team_keys":
     case "clear_sync_session":
     case "get_sync_session_status":
+    case "list_broker_connections":
+    case "list_broker_accounts":
+    case "sync_broker_data":
     case "sync_broker_connections":
     case "sync_broker_accounts":
     case "sync_broker_activities":
     case "get_subscription_plans":
+    case "get_subscription_plans_public":
     case "get_user_info":
+    case "get_synced_accounts":
+    case "get_platforms":
+    case "get_broker_sync_states":
+    // Device Sync / Enrollment
+    case "get_device_sync_state":
+    case "enable_device_sync":
+    case "clear_device_sync_data":
+    case "reinitialize_device_sync":
       break;
+    case "get_import_runs": {
+      const { runType, limit, offset } = (payload ?? {}) as { runType?: string; limit?: number; offset?: number };
+      const params = new URLSearchParams();
+      if (runType) params.set("runType", runType);
+      if (limit !== undefined) params.set("limit", String(limit));
+      if (offset !== undefined) params.set("offset", String(offset));
+      const qs = params.toString();
+      if (qs) url += `?${qs}`;
+      break;
+    }
     // Net Worth commands
     case "get_net_worth": {
       const { date } = (payload ?? {}) as { date?: string };
@@ -950,6 +975,22 @@ export const invoke = async <T>(
       url += `/${encodeURIComponent(threadId)}`;
       break;
     }
+    case "get_ai_thread_messages": {
+      const { threadId } = payload as { threadId: string };
+      url += `/${encodeURIComponent(threadId)}/messages`;
+      break;
+    }
+    case "update_tool_result": {
+      const { request } = payload as {
+        request: { threadId: string; toolCallId: string; resultPatch: unknown };
+      };
+      body = JSON.stringify({
+        threadId: request.threadId,
+        toolCallId: request.toolCallId,
+        resultPatch: request.resultPatch,
+      });
+      break;
+    }
     case "update_ai_thread": {
       const { request } = payload as { request: { id: string; title?: string; isPinned?: boolean } };
       url += `/${encodeURIComponent(request.id)}`;
@@ -1029,7 +1070,8 @@ export const invoke = async <T>(
     const parsed = (await res.json()) as { path: string };
     return parsed.path as T;
   }
-  if (res.status === 204) {
+  // Handle responses with no body (204 No Content, 202 Accepted)
+  if (res.status === 204 || res.status === 202) {
     return undefined as T;
   }
   return (await res.json()) as T;
@@ -1215,9 +1257,17 @@ export const listenDeepLink = async <T>(_handler: EventCallback<T>): Promise<Unl
   return async () => {};
 };
 
-// Broker sync is desktop-only (requires keyring access)
-export const listenBrokerSyncComplete = async <T>(_handler: EventCallback<T>): Promise<UnlistenFn> => {
-  return async () => {};
+// Broker sync events
+export const listenBrokerSyncStart = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
+  return portfolioEventBridge.listen("broker:sync-start", handler);
+};
+
+export const listenBrokerSyncComplete = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
+  return portfolioEventBridge.listen("broker:sync-complete", handler);
+};
+
+export const listenBrokerSyncError = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
+  return portfolioEventBridge.listen("broker:sync-error", handler);
 };
 
 // ============================================================================
@@ -1338,6 +1388,60 @@ export async function listAiThreads(req?: ListThreadsRequest): Promise<ThreadPag
     cursor: req?.cursor,
     limit: req?.limit ?? 20,
     search: req?.search,
+  });
+}
+
+// ============================================================================
+// Broker / Connect Commands
+// ============================================================================
+
+export async function syncBrokerData(): Promise<void> {
+  return invoke<void>("sync_broker_data");
+}
+
+export async function getSyncedAccounts<T>(): Promise<T[]> {
+  return invoke<T[]>("get_synced_accounts");
+}
+
+export async function getPlatforms<T>(): Promise<T[]> {
+  return invoke<T[]>("get_platforms");
+}
+
+export async function listBrokerConnections<T>(): Promise<T[]> {
+  return invoke<T[]>("list_broker_connections");
+}
+
+export async function listBrokerAccounts<T>(): Promise<T[]> {
+  return invoke<T[]>("list_broker_accounts");
+}
+
+export async function getSubscriptionPlans<T>(): Promise<T> {
+  return invoke<T>("get_subscription_plans");
+}
+
+export async function getSubscriptionPlansPublic<T>(): Promise<T> {
+  return invoke<T>("get_subscription_plans_public");
+}
+
+export async function getUserInfo<T>(): Promise<T> {
+  return invoke<T>("get_user_info");
+}
+
+export async function getBrokerSyncStates<T>(): Promise<T[]> {
+  return invoke<T[]>("get_broker_sync_states");
+}
+
+export interface ImportRunsRequest {
+  runType?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export async function getImportRuns<T>(request?: ImportRunsRequest): Promise<T[]> {
+  return invoke<T[]>("get_import_runs", {
+    runType: request?.runType,
+    limit: request?.limit,
+    offset: request?.offset,
   });
 }
 

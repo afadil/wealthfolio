@@ -2,10 +2,21 @@
 // API commands for broker connections, sync, subscriptions, and user info
 // ========================================================================
 
-import { invoke, isDesktop, logger } from "@/adapters";
+import {
+  logger,
+  syncBrokerData as syncBrokerDataAdapter,
+  getSyncedAccounts as getSyncedAccountsAdapter,
+  getPlatforms as getPlatformsAdapter,
+  listBrokerConnections as listBrokerConnectionsAdapter,
+  listBrokerAccounts as listBrokerAccountsAdapter,
+  getSubscriptionPlans as getSubscriptionPlansAdapter,
+  getSubscriptionPlansPublic as getSubscriptionPlansPublicAdapter,
+  getUserInfo as getUserInfoAdapter,
+  getBrokerSyncStates as getBrokerSyncStatesAdapter,
+  getImportRuns as getImportRunsAdapter,
+} from "@/adapters";
 import type { Account, Platform } from "@/lib/types";
 import type {
-  SyncResult,
   BrokerConnection,
   BrokerAccount,
   PlansResponse,
@@ -15,39 +26,22 @@ import type {
 } from "../types";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-const DESKTOP_ONLY_ERROR_MESSAGE =
-  "Broker sync is not supported in web mode. Please use the desktop app.";
-
-const assertDesktop = () => {
-  if (!isDesktop) {
-    throw new Error(DESKTOP_ONLY_ERROR_MESSAGE);
-  }
-};
-
-const invokeDesktop = async <T>(command: string, payload?: Record<string, unknown>): Promise<T> => {
-  assertDesktop();
-  return invoke<T>(command, payload);
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Broker Sync
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const syncBrokerData = async (): Promise<SyncResult> => {
-  try {
-    return await invokeDesktop("sync_broker_data");
-  } catch (error) {
-    logger.error("Error syncing broker data.");
-    throw error;
-  }
+/**
+ * Sync broker data from the cloud to the local database.
+ * Works on both desktop (Tauri) and web platforms:
+ * - Triggers sync via command (returns immediately)
+ * - Global event listener handles toast notifications via SSE events
+ */
+export const syncBrokerData = async (): Promise<void> => {
+  await syncBrokerDataAdapter();
 };
 
 export const getSyncedAccounts = async (): Promise<Account[]> => {
   try {
-    return await invokeDesktop("get_synced_accounts");
+    return await getSyncedAccountsAdapter<Account>();
   } catch (error) {
     logger.error("Error getting synced accounts.");
     throw error;
@@ -56,7 +50,7 @@ export const getSyncedAccounts = async (): Promise<Account[]> => {
 
 export const getPlatforms = async (): Promise<Platform[]> => {
   try {
-    return await invokeDesktop("get_platforms");
+    return await getPlatformsAdapter<Platform>();
   } catch (error) {
     logger.error("Error getting platforms.");
     throw error;
@@ -69,7 +63,7 @@ export const getPlatforms = async (): Promise<Platform[]> => {
 
 export const listBrokerConnections = async (): Promise<BrokerConnection[]> => {
   try {
-    return await invokeDesktop("list_broker_connections");
+    return await listBrokerConnectionsAdapter<BrokerConnection>();
   } catch (error) {
     logger.error("Error listing broker connections.");
     throw error;
@@ -78,7 +72,7 @@ export const listBrokerConnections = async (): Promise<BrokerConnection[]> => {
 
 export const listBrokerAccounts = async (): Promise<BrokerAccount[]> => {
   try {
-    return await invokeDesktop("list_broker_accounts");
+    return await listBrokerAccountsAdapter<BrokerAccount>();
   } catch (error) {
     logger.error("Error listing broker accounts.");
     throw error;
@@ -91,7 +85,7 @@ export const listBrokerAccounts = async (): Promise<BrokerAccount[]> => {
 
 export const getSubscriptionPlans = async (): Promise<PlansResponse> => {
   try {
-    return await invoke("get_subscription_plans");
+    return await getSubscriptionPlansAdapter<PlansResponse>();
   } catch (error) {
     logger.error(`Error getting subscription plans: ${error}`);
     throw error;
@@ -100,7 +94,7 @@ export const getSubscriptionPlans = async (): Promise<PlansResponse> => {
 
 export const getSubscriptionPlansPublic = async (): Promise<PlansResponse> => {
   try {
-    return await invoke("get_subscription_plans_public");
+    return await getSubscriptionPlansPublicAdapter<PlansResponse>();
   } catch (error) {
     logger.error(`Error getting subscription plans (public): ${error}`);
     throw error;
@@ -113,7 +107,7 @@ export const getSubscriptionPlansPublic = async (): Promise<PlansResponse> => {
 
 export const getUserInfo = async (): Promise<UserInfo> => {
   try {
-    return await invoke("get_user_info");
+    return await getUserInfoAdapter<UserInfo>();
   } catch (error) {
     logger.error(`Error getting user info: ${error}`);
     throw error;
@@ -126,7 +120,7 @@ export const getUserInfo = async (): Promise<UserInfo> => {
 
 export const getBrokerSyncStates = async (): Promise<BrokerSyncState[]> => {
   try {
-    return await invokeDesktop("get_broker_sync_states");
+    return await getBrokerSyncStatesAdapter<BrokerSyncState>();
   } catch (error) {
     logger.error("Error getting broker sync states.");
     throw error;
@@ -136,9 +130,10 @@ export const getBrokerSyncStates = async (): Promise<BrokerSyncState[]> => {
 export const getImportRuns = async (
   runType?: string,
   limit?: number,
+  offset?: number,
 ): Promise<ImportRun[]> => {
   try {
-    return await invokeDesktop("get_import_runs", { runType, limit });
+    return await getImportRunsAdapter<ImportRun>({ runType, limit, offset });
   } catch (error) {
     logger.error("Error getting import runs.");
     throw error;

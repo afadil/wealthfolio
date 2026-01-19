@@ -4,7 +4,8 @@ use crate::secret_store::shared_secret_store;
 use crate::services::ConnectService;
 use std::sync::{Arc, RwLock};
 use wealthfolio_ai::{AiProviderService, ChatConfig, ChatService};
-use wealthfolio_connect::{BrokerSyncService, PlatformRepository};
+use wealthfolio_connect::{BrokerSyncService, PlatformRepository, DEFAULT_CLOUD_API_URL};
+use wealthfolio_device_sync::DeviceEnrollService;
 use wealthfolio_core::{
     accounts::AccountService,
     activities::ActivityService,
@@ -220,6 +221,21 @@ pub async fn initialize_context(
     ));
     let ai_chat_service = Arc::new(ChatService::new(ai_environment, ChatConfig::default()));
 
+    // Device enroll service for E2EE sync
+    let cloud_api_url = std::env::var("CONNECT_API_URL")
+        .ok()
+        .map(|v| v.trim().trim_end_matches('/').to_string())
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| DEFAULT_CLOUD_API_URL.to_string());
+    let device_display_name = get_device_display_name();
+    let app_version = Some(env!("CARGO_PKG_VERSION").to_string());
+    let device_enroll_service = Arc::new(DeviceEnrollService::new(
+        secret_store.clone(),
+        &cloud_api_url,
+        device_display_name,
+        app_version,
+    ));
+
     Ok(ServiceContext {
         base_currency,
         instance_id,
@@ -244,5 +260,18 @@ pub async fn initialize_context(
         connect_service,
         ai_provider_service,
         ai_chat_service,
+        device_enroll_service,
     })
+}
+
+/// Get a friendly display name for this device based on platform.
+fn get_device_display_name() -> String {
+    #[cfg(target_os = "macos")]
+    return "My Mac".to_string();
+    #[cfg(target_os = "windows")]
+    return "My Windows PC".to_string();
+    #[cfg(target_os = "linux")]
+    return "My Linux".to_string();
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+    return "My Device".to_string();
 }

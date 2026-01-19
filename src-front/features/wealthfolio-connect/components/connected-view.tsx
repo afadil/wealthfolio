@@ -2,7 +2,7 @@ import { openUrlInBrowser } from "@/adapters";
 import { DeviceSyncSection } from "@/features/devices-sync";
 import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { ActionConfirm } from "@wealthfolio/ui";
 import { Avatar, AvatarFallback, AvatarImage } from "@wealthfolio/ui/components/ui/avatar";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
@@ -20,7 +20,7 @@ import {
   listBrokerAccounts,
   syncBrokerData,
 } from "../services/broker-service";
-import type { BrokerConnection, BrokerAccount, SyncResult } from "../types";
+import type { BrokerConnection, BrokerAccount } from "../types";
 import { SubscriptionPlans } from "./subscription-plans";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -336,9 +336,7 @@ export function ConnectedView() {
     clearError,
     refetchUserInfo,
   } = useWealthfolioConnect();
-  const queryClient = useQueryClient();
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
 
   // Check if user is connected (has a valid session)
@@ -366,23 +364,14 @@ export function ConnectedView() {
   }, [clearError, refetchUserInfo]);
 
   // Sync accounts to local database
+  // Sync runs in background, global event listener handles toasts and query invalidation
   const syncToLocalMutation = useMutation({
     mutationFn: syncBrokerData,
-    onSuccess: (result) => {
-      setSyncResult(result);
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNTS] });
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.PLATFORMS] });
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.ACTIVITIES] });
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSETS] });
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS] });
-      if (result.success) {
-        toast.success(result.message);
-      } else {
-        toast.error(result.message);
-      }
+    onSuccess: () => {
+      toast.loading("Syncing broker data...", { id: "broker-sync-start" });
     },
     onError: (error) => {
-      toast.error(`Sync failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      toast.error(`Failed to start sync: ${error instanceof Error ? error.message : "Unknown error"}`);
     },
   });
 
@@ -565,19 +554,6 @@ export function ConnectedView() {
                       />
                     ))}
                   </div>
-
-                  {/* Sync Result */}
-                  {syncResult && (
-                    <div className="bg-muted/50 mt-3 rounded-lg p-3 text-sm">
-                      <p className="font-medium">{syncResult.message}</p>
-                      {syncResult.accountsSynced && (
-                        <p className="text-muted-foreground mt-1">
-                          {syncResult.accountsSynced.created} accounts created,{" "}
-                          {syncResult.accountsSynced.skipped} skipped
-                        </p>
-                      )}
-                    </div>
-                  )}
 
                   {/* Sync Action */}
                   <div className="mt-4">

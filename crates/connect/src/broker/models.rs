@@ -182,6 +182,7 @@ pub struct BrokerConnectionBrokerage {
 
 /// Response from syncing accounts
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SyncAccountsResponse {
     pub synced: usize,
     pub created: usize,
@@ -195,6 +196,7 @@ pub struct SyncAccountsResponse {
 
 /// Response from syncing connections/platforms
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SyncConnectionsResponse {
     pub synced: usize,
     pub platforms_created: usize,
@@ -399,6 +401,7 @@ pub struct AccountUniversalActivity {
 
 /// Response from syncing activities.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct SyncActivitiesResponse {
     pub accounts_synced: usize,
     pub activities_upserted: usize,
@@ -407,6 +410,22 @@ pub struct SyncActivitiesResponse {
     /// IDs of newly created assets (for background enrichment)
     #[serde(default)]
     pub new_asset_ids: Vec<String>,
+}
+
+/// Combined result from a full broker sync operation.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncResult {
+    /// Whether the sync completed successfully (no errors)
+    pub success: bool,
+    /// Human-readable summary message
+    pub message: String,
+    /// Result of syncing connections/platforms
+    pub connections_synced: Option<SyncConnectionsResponse>,
+    /// Result of syncing accounts
+    pub accounts_synced: Option<SyncAccountsResponse>,
+    /// Result of syncing activities
+    pub activities_synced: Option<SyncActivitiesResponse>,
 }
 
 impl BrokerAccount {

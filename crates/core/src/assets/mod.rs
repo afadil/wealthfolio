@@ -30,7 +30,7 @@ pub use asset_id::{
     generate_asset_id, get_asset_id_prefix, get_kind_from_asset_id, is_valid_alternative_asset_id,
     try_generate_asset_id,
     // Helper functions for checking asset ID types
-    is_cash_asset_id, is_fx_asset_id,
+    is_cash_asset_id, is_fx_asset_id, should_enrich_asset,
 };
 pub use alternative_assets_model::{
     AlternativeHolding, CreateAlternativeAssetRequest, CreateAlternativeAssetResponse,

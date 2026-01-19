@@ -1,9 +1,10 @@
+import { useSettings } from "@/hooks/use-settings";
 import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { OnboardingConnect } from "./onboarding-connect";
 import { OnboardingStep1 } from "./onboarding-step1";
 import { OnboardingStep2, OnboardingStep2Handle } from "./onboarding-step2";
@@ -12,9 +13,16 @@ const MAX_STEPS = 3;
 
 const OnboardingPage = () => {
   const navigate = useNavigate();
+  const { data: settings, isLoading: isSettingsLoading } = useSettings();
   const [currentStep, setCurrentStep] = useState(1);
   const [isStepValid, setIsStepValid] = useState(true);
   const settingsStepRef = useRef<OnboardingStep2Handle>(null);
+
+  // Redirect to home if onboarding is already completed
+  if (isSettingsLoading) return null;
+  if (settings?.onboardingCompleted) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleNext = () => {
     setCurrentStep((prev) => Math.min(prev + 1, MAX_STEPS));

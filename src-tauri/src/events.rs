@@ -37,8 +37,11 @@ pub const RESOURCE_CHANGED: &str = "resource:changed";
 /// Event emitted when the broker sync process starts.
 pub const BROKER_SYNC_START: &str = "broker:sync-start";
 
-/// Event emitted when the broker sync process completes (success or failure).
+/// Event emitted when the broker sync process completes successfully.
 pub const BROKER_SYNC_COMPLETE: &str = "broker:sync-complete";
+
+/// Event emitted when the broker sync process fails.
+pub const BROKER_SYNC_ERROR: &str = "broker:sync-error";
 
 /// Event emitted to trigger asset profile enrichment for newly synced assets.
 pub const ASSETS_ENRICH_REQUESTED: &str = "assets:enrich-requested";

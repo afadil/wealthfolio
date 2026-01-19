@@ -503,6 +503,19 @@ impl BrokerApiClient for ConnectApiClient {
         // Brokerages are embedded in connections
         Ok(vec![])
     }
+
+    /// Fetch account activities with pagination.
+    async fn get_account_activities(
+        &self,
+        account_id: &str,
+        start_date: Option<&str>,
+        end_date: Option<&str>,
+        offset: Option<i64>,
+        limit: Option<i64>,
+    ) -> Result<PaginatedUniversalActivity> {
+        // Delegate to the inherent method
+        ConnectApiClient::get_account_activities(self, account_id, start_date, end_date, offset, limit).await
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -7526,13 +7526,21 @@ name = "wealthfolio-device-sync"
 version = "3.0.0-beta.1"
 dependencies = [
  "async-trait",
+ "base64 0.22.1",
+ "chacha20poly1305",
+ "hkdf",
  "log",
+ "rand 0.8.5",
  "reqwest",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror 1.0.69",
  "tokio",
  "urlencoding",
+ "uuid",
+ "wealthfolio-core",
+ "x25519-dalek",
 ]
 
 [[package]]

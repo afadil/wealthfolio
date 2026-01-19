@@ -33,6 +33,11 @@ pub trait AssetServiceTrait: Send + Sync {
     /// Updates the profile JSON (sectors, countries, website) and notes fields.
     async fn enrich_asset_profile(&self, asset_id: &str) -> Result<Asset>;
 
+    /// Enriches multiple assets in batch, with deduplication and sync state tracking.
+    /// Checks if each asset needs enrichment before fetching profile data.
+    /// Returns (enriched_count, skipped_count, failed_count).
+    async fn enrich_assets(&self, asset_ids: Vec<String>) -> Result<(usize, usize, usize)>;
+
     /// Removes the $.legacy structure from asset metadata after migration.
     /// Preserves $.identifiers if present.
     async fn cleanup_legacy_metadata(&self, asset_id: &str) -> Result<()>;

@@ -17,7 +17,7 @@ use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 
 use crate::main_lib::AppState;
-use wealthfolio_ai::{AiError, AiStreamEvent, ChatThread, ListThreadsRequest, SendMessageRequest, ThreadPage};
+use wealthfolio_ai::{AiError, AiStreamEvent, ChatMessage, ChatThread, ListThreadsRequest, SendMessageRequest, ThreadPage};
 
 // ============================================================================
 // Request/Response Types
@@ -47,6 +47,18 @@ pub struct UpdateThreadRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TagRequest {
     pub tag: String,
+}
+
+/// Request for updating a tool result.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateToolResultRequest {
+    /// The thread ID containing the message with the tool result.
+    pub thread_id: String,
+    /// The tool call ID to update.
+    pub tool_call_id: String,
+    /// JSON patch to merge into the tool result data.
+    pub result_patch: serde_json::Value,
 }
 
 // ============================================================================
@@ -133,6 +145,17 @@ async fn get_thread(
     Ok(Json(thread))
 }
 
+/// GET /api/v1/ai/threads/:id/messages
+///
+/// Get all messages for a chat thread.
+async fn get_thread_messages(
+    State(state): State<Arc<AppState>>,
+    Path(thread_id): Path<String>,
+) -> Result<Json<Vec<ChatMessage>>, AiChatError> {
+    let messages = state.ai_chat_service.get_messages(&thread_id).map_err(AiChatError::Ai)?;
+    Ok(Json(messages))
+}
+
 /// PUT /api/v1/ai/threads/:id
 ///
 /// Update a chat thread's title and/or pinned status.
@@ -216,6 +239,27 @@ async fn get_tags(
 }
 
 // ============================================================================
+// Tool Result Management
+// ============================================================================
+
+/// PATCH /api/v1/ai/tool-result
+///
+/// Update a tool result in a message by merging a patch into the result data.
+/// This is used by mutation tool UIs (e.g., record_activity) to persist
+/// submission state after the backend operation succeeds.
+async fn update_tool_result(
+    State(state): State<Arc<AppState>>,
+    Json(request): Json<UpdateToolResultRequest>,
+) -> Result<Json<ChatMessage>, AiChatError> {
+    let message = state
+        .ai_chat_service
+        .update_tool_result(&request.thread_id, &request.tool_call_id, request.result_patch)
+        .await
+        .map_err(AiChatError::Ai)?;
+    Ok(Json(message))
+}
+
+// ============================================================================
 // Error Handling
 // ============================================================================
 
@@ -263,6 +307,8 @@ impl IntoResponse for AiChatError {
 // ============================================================================
 
 pub fn router() -> Router<Arc<AppState>> {
+    use axum::routing::patch;
+
     Router::new()
         // Streaming endpoint
         .route("/ai/chat/stream", post(stream_chat))
@@ -272,6 +318,10 @@ pub fn router() -> Router<Arc<AppState>> {
             "/ai/threads/{id}",
             get(get_thread).put(update_thread).delete(delete_thread),
         )
+        // Thread messages
+        .route("/ai/threads/{id}/messages", get(get_thread_messages))
+        // Tool result update
+        .route("/ai/tool-result", patch(update_tool_result))
         // Tag management
         .route(
             "/ai/threads/{id}/tags",
