@@ -209,6 +209,7 @@ export interface ImportRunSummary {
   warnings: number;
   errors: number;
   removed: number;
+  assetsCreated?: number;
 }
 
 export interface ImportRun {
