@@ -21,6 +21,7 @@ import { QueryKeys } from "@/lib/query-keys";
 import { listBrokerConnections } from "../services/broker-service";
 import type { AggregatedSyncStatus, BrokerConnection, BrokerAccount, ImportRun } from "../types";
 import { Link } from "react-router-dom";
+import { useAccounts } from "@/hooks/use-accounts";
 
 // Status dot component
 function StatusDot({ status }: { status: "healthy" | "warning" | "error" }) {
@@ -48,6 +49,7 @@ export default function ConnectPage() {
   const { data: brokerAccounts = [], isLoading: isLoadingAccounts } = useBrokerAccounts();
   const { mutate: syncBrokerData, isPending: isSyncing } = useSyncBrokerData();
   const { data: importRunsData } = useImportRunsInfinite({ pageSize: 10 });
+  const { accounts: localAccounts } = useAccounts(false); // Get all accounts including inactive
 
   // Fetch broker connections for stats
   const { data: brokerConnections = [] } = useQuery({
@@ -62,6 +64,15 @@ export default function ConnectPage() {
     if (!importRunsData?.pages) return [];
     return importRunsData.pages.flat().slice(0, 10);
   }, [importRunsData]);
+
+  // Create account name lookup map from local accounts
+  const accountNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    localAccounts.forEach((account) => {
+      map.set(account.id, account.name);
+    });
+    return map;
+  }, [localAccounts]);
 
   // Count items needing attention (needs review status OR has warnings/errors)
   const needsAttentionCount = useMemo(() => {
@@ -101,19 +112,64 @@ export default function ConnectPage() {
   if (isInitializing) {
     return (
       <Page>
-        <PageHeader heading="Connect" />
+        <PageHeader heading="Connect" text="Sync broker accounts into your local database" />
         <PageContent>
-          <div className="space-y-6">
-            <div className="grid grid-cols-3 gap-4">
-              <Skeleton className="h-20 w-full rounded-lg" />
-              <Skeleton className="h-20 w-full rounded-lg" />
-              <Skeleton className="h-20 w-full rounded-lg" />
+          <div className="mx-auto max-w-5xl space-y-6">
+            {/* Stats Card Skeleton */}
+            <Card>
+              <CardContent className="p-0">
+                <div className="grid grid-cols-3 divide-x divide-border">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="flex items-center gap-4 p-5">
+                      <Skeleton className="h-12 w-12 rounded-lg" />
+                      <div className="space-y-2">
+                        <Skeleton className="h-6 w-16" />
+                        <Skeleton className="h-4 w-24" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Brokers & Accounts Skeleton */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {[...Array(2)].map((_, i) => (
+                <Card key={i} className="border">
+                  <CardHeader className="pb-3">
+                    <Skeleton className="h-5 w-24" />
+                  </CardHeader>
+                  <CardContent className="space-y-3 pt-0">
+                    {[...Array(3)].map((_, j) => (
+                      <div key={j} className="flex items-center gap-3 py-2">
+                        <Skeleton className="h-10 w-10 rounded-full" />
+                        <div className="space-y-1.5">
+                          <Skeleton className="h-4 w-32" />
+                          <Skeleton className="h-3 w-20" />
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              ))}
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <Skeleton className="h-64 w-full rounded-lg" />
-              <Skeleton className="h-64 w-full rounded-lg" />
-            </div>
-            <Skeleton className="h-48 w-full rounded-lg" />
+
+            {/* Recent Activity Skeleton */}
+            <Card className="border">
+              <CardHeader className="pb-3">
+                <Skeleton className="h-5 w-36" />
+              </CardHeader>
+              <CardContent className="space-y-2 pt-0">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="flex items-center gap-4 py-3">
+                    <Skeleton className="h-2 w-2 rounded-full" />
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-4 w-24" />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
           </div>
         </PageContent>
       </Page>
@@ -174,7 +230,7 @@ export default function ConnectPage() {
         }
       />
       <PageContent>
-        <div className="space-y-6">
+        <div className="mx-auto max-w-5xl space-y-6">
           {/* Stats Cards Row */}
           <Card>
             <CardContent className="p-0">
@@ -310,7 +366,11 @@ export default function ConnectPage() {
               ) : (
                 <div className="-mx-3 divide-y divide-border">
                   {recentActivity.map((run) => (
-                    <ActivityItem key={run.id} run={run} />
+                    <ActivityItem
+                      key={run.id}
+                      run={run}
+                      accountName={accountNameMap.get(run.accountId)}
+                    />
                   ))}
                 </div>
               )}
@@ -401,7 +461,7 @@ function AccountItem({ account }: { account: BrokerAccount }) {
 }
 
 // Activity Item
-function ActivityItem({ run }: { run: ImportRun }) {
+function ActivityItem({ run, accountName }: { run: ImportRun; accountName?: string }) {
   const timeAgo = formatDistanceToNow(new Date(run.startedAt), { addSuffix: false });
   const isNeedsReview = run.status === "NEEDS_REVIEW";
   const isFailed = run.status === "FAILED";
@@ -433,9 +493,14 @@ function ActivityItem({ run }: { run: ImportRun }) {
       <span className="text-muted-foreground min-w-[100px] shrink-0 whitespace-nowrap text-sm">
         {timeAgo} ago
       </span>
+      {accountName && (
+        <span className="min-w-[120px] shrink-0 truncate text-sm font-medium">{accountName}</span>
+      )}
       <div className="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
         {inserted > 0 && (
-          <span className="font-medium text-green-600 dark:text-green-500">+{inserted} new</span>
+          <span className="font-medium text-green-600 dark:text-green-500">
+            +{inserted} new {inserted === 1 ? "activity" : "activities"}
+          </span>
         )}
         {updated > 0 && <span className="text-muted-foreground">{updated} updated</span>}
         {removed > 0 && <span className="text-muted-foreground">{removed} removed</span>}
