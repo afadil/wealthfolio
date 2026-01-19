@@ -176,58 +176,49 @@ export default function ConnectPage() {
       <PageContent>
         <div className="space-y-6">
           {/* Stats Cards Row */}
-          <Card className="border-border/50">
+          <Card>
             <CardContent className="p-0">
-              <div className="grid grid-cols-3 divide-x divide-border/50">
+              <div className="grid grid-cols-3 divide-x divide-border">
                 {/* Broker Connections */}
                 <button
-                  className="hover:bg-muted/30 flex items-center gap-4 p-4 text-left transition-colors"
+                  className="hover:bg-muted/50 flex items-center gap-4 p-5 text-left transition-colors"
                   onClick={() => openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/connections`)}
                 >
-                  <div className="bg-muted flex h-12 w-12 items-center justify-center rounded-lg">
-                    <Icons.Link className="text-muted-foreground h-5 w-5" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500/10 dark:bg-blue-500/20">
+                    <Icons.Link className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-semibold">{brokerConnections.length}</span>
-                      <span className="text-muted-foreground text-sm">Broker connections</span>
-                    </div>
-                    <p className="text-muted-foreground/70 text-xs">via SnapTrade</p>
+                  <div className="flex flex-1 items-baseline gap-2">
+                    <span className="text-2xl font-semibold">{brokerConnections.length}</span>
+                    <span className="text-muted-foreground text-sm">Broker connections</span>
                   </div>
                   <Icons.Plus className="text-muted-foreground h-4 w-4" />
                 </button>
 
                 {/* Synced Accounts */}
                 <button
-                  className="hover:bg-muted/30 flex items-center gap-4 p-4 text-left transition-colors"
+                  className="hover:bg-muted/50 flex items-center gap-4 p-5 text-left transition-colors"
                   onClick={() => openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/accounts`)}
                 >
-                  <div className="bg-muted flex h-12 w-12 items-center justify-center rounded-lg">
-                    <Icons.Wallet className="text-muted-foreground h-5 w-5" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-500/10 dark:bg-green-500/20">
+                    <Icons.Wallet className="h-5 w-5 text-green-600 dark:text-green-400" />
                   </div>
-                  <div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-semibold">{enabledAccountsCount}</span>
-                      <span className="text-muted-foreground text-sm">Synced accounts</span>
-                    </div>
-                    <p className="text-muted-foreground/70 text-xs">Auto-syncing daily</p>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-semibold">{enabledAccountsCount}</span>
+                    <span className="text-muted-foreground text-sm">Synced accounts</span>
                   </div>
                 </button>
 
                 {/* Devices */}
                 <button
-                  className="hover:bg-muted/30 flex items-center gap-4 p-4 text-left transition-colors"
+                  className="hover:bg-muted/50 flex items-center gap-4 p-5 text-left transition-colors"
                   onClick={() => openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/devices`)}
                 >
-                  <div className="bg-muted flex h-12 w-12 items-center justify-center rounded-lg">
-                    <Icons.Monitor className="text-muted-foreground h-5 w-5" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-500/10 dark:bg-purple-500/20">
+                    <Icons.Monitor className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                   </div>
-                  <div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-semibold">1</span>
-                      <span className="text-muted-foreground text-sm">Devices</span>
-                    </div>
-                    <p className="text-muted-foreground/70 text-xs">End-to-end encrypted</p>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-semibold">1</span>
+                    <span className="text-muted-foreground text-sm">Devices</span>
                   </div>
                 </button>
               </div>
@@ -237,10 +228,10 @@ export default function ConnectPage() {
           {/* Two Column Layout: Brokers & Accounts */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {/* Brokers Card */}
-            <Card className="flex flex-col">
+            <Card className="flex flex-col border">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base font-medium">
-                  <Icons.Link className="h-4 w-4" />
+                  <Icons.Link className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                   Brokers
                 </CardTitle>
               </CardHeader>
@@ -250,7 +241,7 @@ export default function ConnectPage() {
                     No broker connections yet
                   </p>
                 ) : (
-                  <div className="space-y-1">
+                  <div className="divide-y divide-border">
                     {brokerConnections.map((connection) => (
                       <BrokerConnectionItem
                         key={connection.id}
@@ -268,10 +259,10 @@ export default function ConnectPage() {
             </Card>
 
             {/* Accounts Card */}
-            <Card className="flex flex-col">
+            <Card className="flex flex-col border">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base font-medium">
-                  <Icons.Wallet className="h-4 w-4" />
+                  <Icons.Wallet className="h-4 w-4 text-green-600 dark:text-green-400" />
                   Accounts
                 </CardTitle>
               </CardHeader>
@@ -286,7 +277,7 @@ export default function ConnectPage() {
                     No synced accounts yet
                   </p>
                 ) : (
-                  <div className="space-y-1">
+                  <div className="divide-y divide-border">
                     {brokerAccounts
                       .filter((a) => a.sync_enabled)
                       .map((account) => (
@@ -299,11 +290,11 @@ export default function ConnectPage() {
           </div>
 
           {/* Recent Activity */}
-          <Card>
+          <Card className="border">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base font-medium">
-                <Icons.History className="h-4 w-4" />
-                Recent Activity
+                <Icons.History className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                Recent Sync Activity
                 {needsAttentionCount > 0 && (
                   <Badge variant="default" className="ml-1 h-5 min-w-5 px-1.5 text-xs">
                     {needsAttentionCount}
@@ -317,7 +308,7 @@ export default function ConnectPage() {
                   No sync activity yet
                 </p>
               ) : (
-                <div className="-mx-3 space-y-1">
+                <div className="-mx-3 divide-y divide-border">
                   {recentActivity.map((run) => (
                     <ActivityItem key={run.id} run={run} />
                   ))}
@@ -345,7 +336,7 @@ function BrokerConnectionItem({
   const status = isDisabled ? "warning" : "healthy";
 
   return (
-    <div className="hover:bg-muted/30 flex items-center gap-3 rounded-lg px-2 py-3 transition-colors">
+    <div className="hover:bg-muted/30 flex items-center gap-3 px-2 py-3 transition-colors">
       <div className="bg-muted text-muted-foreground flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-medium">
         {connection.brokerage?.aws_s3_square_logo_url ? (
           <img
@@ -394,7 +385,7 @@ function AccountItem({ account }: { account: BrokerAccount }) {
   const status = hasRecentSync ? "healthy" : "warning";
 
   return (
-    <div className="hover:bg-muted/30 flex items-center gap-3 rounded-lg px-2 py-3 transition-colors">
+    <div className="hover:bg-muted/30 flex items-center gap-3 px-2 py-3 transition-colors">
       <div className="bg-muted text-muted-foreground flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-medium">
         {getInitials(institution)}
       </div>
@@ -434,7 +425,7 @@ function ActivityItem({ run }: { run: ImportRun }) {
 
   return (
     <div
-      className={`flex items-center gap-4 rounded-md px-3 py-2.5 ${
+      className={`flex items-center gap-4 px-3 py-3 ${
         needsAttention ? "bg-yellow-500/10 dark:bg-yellow-500/5" : "hover:bg-muted/30"
       }`}
     >
