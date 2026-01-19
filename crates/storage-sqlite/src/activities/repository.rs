@@ -673,7 +673,9 @@ impl ActivityRepositoryTrait for ActivityRepository {
         //   2. quantity * market_price from quotes table (fallback)
         let query = "SELECT strftime('%Y-%m', a.activity_date) as date,
              a.activity_type as income_type,
-             COALESCE(a.asset_id, 'CASH') as symbol,
+             COALESCE(a.asset_id, 'CASH') as asset_id,
+             COALESCE(ast.kind, 'CASH') as asset_kind,
+             COALESCE(ast.symbol, 'CASH') as symbol,
              COALESCE(ast.name, 'Cash') as symbol_name,
              a.currency,
              CASE
@@ -705,6 +707,10 @@ impl ActivityRepositoryTrait for ActivityRepository {
             #[diesel(sql_type = diesel::sql_types::Text)]
             pub income_type: String,
             #[diesel(sql_type = diesel::sql_types::Text)]
+            pub asset_id: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub asset_kind: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
             pub symbol: String,
             #[diesel(sql_type = diesel::sql_types::Text)]
             pub symbol_name: String,
@@ -726,6 +732,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 Ok(IncomeData {
                     date: raw.date,
                     income_type: raw.income_type,
+                    asset_id: raw.asset_id,
+                    asset_kind: raw.asset_kind,
                     symbol: raw.symbol,
                     symbol_name: raw.symbol_name,
                     currency: raw.currency,

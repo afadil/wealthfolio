@@ -688,6 +688,8 @@ mod optional_decimal_format {
 pub struct IncomeData {
     pub date: String,
     pub income_type: String,
+    pub asset_id: String,
+    pub asset_kind: String,
     pub symbol: String,
     pub symbol_name: String,
     pub currency: String,

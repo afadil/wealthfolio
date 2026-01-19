@@ -3,13 +3,23 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IncomeByAsset {
+    pub asset_id: String,
+    pub kind: String,
+    pub symbol: String,
+    pub name: String,
+    pub income: Decimal,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IncomeSummary {
     pub period: String,
     pub by_month: HashMap<String, Decimal>,
     pub by_type: HashMap<String, Decimal>,
-    pub by_symbol: HashMap<String, Decimal>,
+    pub by_asset: HashMap<String, IncomeByAsset>,
     pub by_currency: HashMap<String, Decimal>,
     pub total_income: Decimal,
     pub currency: String,
@@ -23,7 +33,7 @@ impl IncomeSummary {
             period: period.to_string(),
             by_month: HashMap::new(),
             by_type: HashMap::new(),
-            by_symbol: HashMap::new(),
+            by_asset: HashMap::new(),
             by_currency: HashMap::new(),
             total_income: Decimal::ZERO,
             currency,
@@ -41,10 +51,16 @@ impl IncomeSummary {
             .by_type
             .entry(data.income_type.clone())
             .or_insert_with(|| Decimal::ZERO) += &converted_amount;
-        *self
-            .by_symbol
-            .entry(format!("[{}]-{}", data.symbol, data.symbol_name))
-            .or_insert_with(|| Decimal::ZERO) += &converted_amount;
+        self.by_asset
+            .entry(data.asset_id.clone())
+            .and_modify(|entry| entry.income += converted_amount)
+            .or_insert_with(|| IncomeByAsset {
+                asset_id: data.asset_id.clone(),
+                kind: data.asset_kind.clone(),
+                symbol: data.symbol.clone(),
+                name: data.symbol_name.clone(),
+                income: converted_amount,
+            });
         *self
             .by_currency
             .entry(data.currency.clone())
