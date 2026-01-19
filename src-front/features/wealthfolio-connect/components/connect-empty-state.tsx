@@ -90,7 +90,7 @@ export function ConnectEmptyState() {
               </a>
             </Button>
             <Button variant="outline" asChild className="w-full sm:w-auto">
-              <Link to="/settings/wealthfolio-connect">
+              <Link to="/settings/connect">
                 <Icons.User className="mr-1.5 h-4 w-4" />
                 Login to your account
               </Link>

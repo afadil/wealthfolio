@@ -519,7 +519,7 @@ export function LoginForm() {
                     provider="google"
                     onClick={() => handleOAuthSignIn("google")}
                     isLoading={loadingProvider === "google"}
-                    isLastUsed={preferredProvider === "google"}
+                    isLastUsed={topProviders.length > 1 && preferredProvider === "google"}
                   />
                 )}
                 {topProviders.includes("email") && (
@@ -541,7 +541,8 @@ export function LoginForm() {
                       type="submit"
                       onClick={() => {}}
                       isLoading={loadingProvider === "email"}
-                      isLastUsed={preferredProvider === "email"}
+                      isLastUsed={topProviders.length > 1 && preferredProvider === "email"}
+                      variant="default"
                     />
                   </form>
                 )}
@@ -641,9 +642,6 @@ export function LoginForm() {
           )}
         </CardContent>
       </Card>
-
-      {/* Plans Preview */}
-      <PlansPreviewSection />
 
       {/* Privacy Footnote */}
       <p className="text-muted-foreground text-center text-xs">

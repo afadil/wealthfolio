@@ -473,8 +473,8 @@ export function ConnectedView() {
         </CardContent>
       </Card>
 
-      {/* Show loading skeleton while user info is being fetched */}
-      {isLoadingUserInfo && (
+      {/* Show loading skeleton only during initial load (not refreshes) */}
+      {!isServiceUnavailable && !userInfo && (
         <Card>
           <CardHeader>
             <Skeleton className="h-5 w-48" />
@@ -494,8 +494,8 @@ export function ConnectedView() {
         <ServiceUnavailableCard onRetry={handleRetry} isRetrying={isRetrying} />
       )}
 
-      {/* Show Subscription Plans if user has no active subscription (only after userInfo is loaded) */}
-      {!isLoadingUserInfo && !isServiceUnavailable && !hasSubscription && (
+      {/* Show Subscription Plans if user has no active subscription (keep mounted during refresh) */}
+      {!isServiceUnavailable && !hasSubscription && !!userInfo && (
         <SubscriptionPlans
           enabled={isConnected && !hasSubscription}
           onRefresh={refetchUserInfo}
