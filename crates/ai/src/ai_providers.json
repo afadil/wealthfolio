@@ -7,7 +7,7 @@
       "description": "Local AI models on your machine",
       "envKey": "OLLAMA_API_KEY",
       "defaultConfig": {
-        "enabled": true,
+        "enabled": false,
         "url": "http://localhost:11434"
       },
       "connectionFields": [
@@ -149,7 +149,7 @@
       "description": "ChatGPT and GPT models from OpenAI",
       "envKey": "OPENAI_API_KEY",
       "defaultConfig": {
-        "enabled": true
+        "enabled": false
       },
       "connectionFields": [
         {

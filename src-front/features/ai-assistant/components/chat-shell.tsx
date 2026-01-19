@@ -1,8 +1,10 @@
 import { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { EmptyPlaceholder } from "@wealthfolio/ui";
 import {
   Sheet,
   SheetContent,
@@ -138,12 +140,34 @@ function Header({
 }
 
 /**
+ * Empty state when no AI providers are enabled.
+ */
+function NoProvidersEmptyState({ className }: { className?: string }) {
+  return (
+    <div className={cn("flex h-full w-full items-center justify-center", className)}>
+      <EmptyPlaceholder
+        icon={<Icons.Sparkles className="text-muted-foreground h-10 w-10" />}
+        title="No AI provider configured"
+        description="Connect an AI provider to start chatting with your personal finance assistant. Your data stays private and secure."
+      >
+        <Button asChild>
+          <Link to="/settings/ai-providers">
+            <Icons.Settings className="mr-2 h-4 w-4" />
+            Configure AI Providers
+          </Link>
+        </Button>
+      </EmptyPlaceholder>
+    </div>
+  );
+}
+
+/**
  * Main chat shell component with thread sidebar and message panel.
  * Uses @assistant-ui/react for the chat interface.
  */
 export function ChatShell({ className }: ChatShellProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const { currentProviderId, currentModelId } = useChatModel();
+  const { currentProviderId, currentModelId, enabledProviders, isLoading } = useChatModel();
 
   // Build chat config from current selection
   const chatConfig = useMemo(() => {
@@ -155,6 +179,11 @@ export function ChatShell({ className }: ChatShellProps) {
 
   // Create the chat runtime
   const runtime = useChatRuntime(chatConfig);
+
+  // Show empty state if no providers are enabled
+  if (!isLoading && enabledProviders.length === 0) {
+    return <NoProvidersEmptyState className={className} />;
+  }
 
   return (
     <RuntimeProvider runtime={runtime}>
