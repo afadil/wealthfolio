@@ -524,23 +524,23 @@ export const SUBTYPES_BY_ACTIVITY_TYPE: Record<string, string[]> = {
 };
 
 // Asset kinds for behavior classification
-export const ASSET_KINDS = [
-  "SECURITY",
-  "CRYPTO",
-  "CASH",
-  "FX_RATE",
-  "OPTION",
-  "COMMODITY",
-  "PRIVATE_EQUITY",
-  "PROPERTY",
-  "VEHICLE",
-  "COLLECTIBLE",
-  "PHYSICAL_PRECIOUS",
-  "LIABILITY",
-  "OTHER",
-] as const;
+export const AssetKind = {
+  SECURITY: "SECURITY",
+  CRYPTO: "CRYPTO",
+  CASH: "CASH",
+  FX_RATE: "FX_RATE",
+  OPTION: "OPTION",
+  COMMODITY: "COMMODITY",
+  PRIVATE_EQUITY: "PRIVATE_EQUITY",
+  PROPERTY: "PROPERTY",
+  VEHICLE: "VEHICLE",
+  COLLECTIBLE: "COLLECTIBLE",
+  PHYSICAL_PRECIOUS: "PHYSICAL_PRECIOUS",
+  LIABILITY: "LIABILITY",
+  OTHER: "OTHER",
+} as const;
 
-export type AssetKind = (typeof ASSET_KINDS)[number];
+export type AssetKind = (typeof AssetKind)[keyof typeof AssetKind];
 
 // Display names for all asset kinds
 export const ASSET_KIND_DISPLAY_NAMES: Record<AssetKind, string> = {

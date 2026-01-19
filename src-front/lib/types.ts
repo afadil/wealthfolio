@@ -21,7 +21,7 @@ export {
   AlternativeAssetKind,
   ALTERNATIVE_ASSET_DEFAULT_GROUPS,
   ALTERNATIVE_ASSET_KIND_DISPLAY_NAMES,
-  ASSET_KINDS,
+  AssetKind,
   DataSource,
   defaultGroupForAccountType,
   ExportDataType,
@@ -39,7 +39,7 @@ export {
 
 export type { HoldingCategoryFilterId } from "./constants";
 
-export type { ActivitySubtype, AssetKind, ImportRequiredField } from "./constants";
+export type { ActivitySubtype, ImportRequiredField } from "./constants";
 
 export interface Account {
   id: string;
@@ -539,11 +539,19 @@ export interface GoalProgress {
   currency: string;
 }
 
+export interface IncomeByAsset {
+  assetId: string;
+  kind: AssetKind;
+  symbol: string;
+  name: string;
+  income: number;
+}
+
 export interface IncomeSummary {
   period: string;
   byMonth: Record<string, number>;
   byType: Record<string, number>;
-  bySymbol: Record<string, number>;
+  byAsset: Record<string, IncomeByAsset>;
   byCurrency: Record<string, number>;
   totalIncome: number;
   currency: string;

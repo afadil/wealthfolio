@@ -124,6 +124,8 @@ impl IncomeServiceTrait for IncomeService {
             let activity_copy = IncomeData {
                 date: activity.date.clone(),
                 income_type: activity.income_type.clone(),
+                asset_id: activity.asset_id.clone(),
+                asset_kind: activity.asset_kind.clone(),
                 symbol: activity.symbol.clone(),
                 symbol_name: activity.symbol_name.clone(),
                 currency: activity.currency.clone(),
@@ -186,8 +188,8 @@ impl IncomeServiceTrait for IncomeService {
                 for val in summary.by_type.values_mut() {
                     *val = val.round_dp(DISPLAY_DECIMAL_PRECISION);
                 }
-                for val in summary.by_symbol.values_mut() {
-                    *val = val.round_dp(DISPLAY_DECIMAL_PRECISION);
+                for entry in summary.by_asset.values_mut() {
+                    entry.income = entry.income.round_dp(DISPLAY_DECIMAL_PRECISION);
                 }
                 for val in summary.by_currency.values_mut() {
                     *val = val.round_dp(DISPLAY_DECIMAL_PRECISION);
