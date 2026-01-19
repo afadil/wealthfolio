@@ -6,6 +6,7 @@ import { EmptyPlaceholder } from "@wealthfolio/ui/components/ui/empty-placeholde
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { AssetKind } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import type { IncomeSummary } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
@@ -101,9 +102,9 @@ export default function IncomePage() {
   const dividendPercentage = totalIncome > 0 ? (dividendIncome / totalIncome) * 100 : 0;
   const interestPercentage = totalIncome > 0 ? (interestIncome / totalIncome) * 100 : 0;
 
-  const topDividendStocks = Object.entries(periodSummary.bySymbol)
-    .filter(([symbol, income]) => income > 0 && !symbol.startsWith("[$CASH-"))
-    .sort(([, a], [, b]) => b - a)
+  const topDividendStocks = Object.values(periodSummary.byAsset)
+    .filter((asset) => asset.income > 0 && asset.kind !== AssetKind.CASH)
+    .sort((a, b) => b.income - a.income)
     .slice(0, 10);
 
   const monthlyIncomeData: [string, number][] = Object.entries(periodSummary.byMonth)
@@ -347,13 +348,13 @@ export default function IncomePage() {
                     {(() => {
                       const top5Stocks = topDividendStocks.slice(0, 5);
                       const otherStocks = topDividendStocks.slice(5);
-                      const otherTotal = otherStocks.reduce((sum, [, income]) => sum + income, 0);
+                      const otherTotal = otherStocks.reduce((sum, asset) => sum + asset.income, 0);
 
                       const chartItems = [
-                        ...top5Stocks.map(([symbol, income]) => ({
-                          symbol: /\[(.*?)\]/.exec(symbol)?.[1] || symbol,
-                          companyName: symbol.replace(/\[.*?\]-/, "").trim(),
-                          income,
+                        ...top5Stocks.map((asset) => ({
+                          symbol: asset.symbol,
+                          companyName: asset.name,
+                          income: asset.income,
                           isOther: false,
                         })),
                         ...(otherTotal > 0
@@ -413,18 +414,16 @@ export default function IncomePage() {
                     })()}
                   </div>
 
-                  {topDividendStocks.map(([symbol, income], index) => (
-                    <div key={index} className="flex items-center justify-between">
+                  {topDividendStocks.map((asset) => (
+                    <div key={asset.assetId} className="flex items-center justify-between">
                       <div className="flex items-center">
                         <Badge className="bg-primary mr-2 flex min-w-[55px] items-center justify-center rounded-sm text-xs">
-                          {/\[(.*?)\]/.exec(symbol)?.[1] || symbol}
+                          {asset.symbol}
                         </Badge>
-                        <span className="text-muted-foreground mr-16 text-xs">
-                          {symbol.replace(/\[.*?\]-/, "").trim()}
-                        </span>
+                        <span className="text-muted-foreground mr-16 text-xs">{asset.name}</span>
                       </div>
                       <div className="text-success text-sm">
-                        <PrivacyAmount value={income} currency={currency} />
+                        <PrivacyAmount value={asset.income} currency={currency} />
                       </div>
                     </div>
                   ))}
