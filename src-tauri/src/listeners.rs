@@ -168,7 +168,8 @@ fn handle_resource_change(handle: AppHandle, payload_str: &str) {
 
 /// Handles asset enrichment requests for newly synced assets.
 /// Fetches additional profile data (sectors, countries, etc.) from market data providers.
-/// Uses quote_sync_state.profile_enriched_at to track which assets have been enriched.
+/// Uses the shared enrich_assets method from AssetService for consistent behavior
+/// between Tauri and web server.
 fn handle_assets_enrichment(handle: AppHandle, payload_str: &str) {
     match serde_json::from_str::<AssetsEnrichPayload>(payload_str) {
         Ok(payload) => {
@@ -184,36 +185,22 @@ fn handle_assets_enrichment(handle: AppHandle, payload_str: &str) {
                 }
             };
 
-            // Deduplicate asset IDs
-            let unique_ids: Vec<String> = payload
-                .asset_ids
-                .into_iter()
-                .collect::<std::collections::HashSet<_>>()
-                .into_iter()
-                .collect();
+            let asset_ids = payload.asset_ids;
+            info!("Starting asset enrichment for {} assets", asset_ids.len());
 
             spawn(async move {
                 let asset_service = context.asset_service();
-                let quote_service = context.quote_service();
 
-                for asset_id in unique_ids {
-                    // Check sync state to see if enrichment is needed
-                    let needs_enrichment = match quote_service.get_sync_state(&asset_id) {
-                        Ok(Some(state)) => state.needs_profile_enrichment(),
-                        Ok(None) => true, // No sync state yet, try enrichment
-                        Err(_) => true,   // Error checking state, try enrichment
-                    };
-
-                    if !needs_enrichment {
-                        continue;
+                // Use shared enrich_assets method for consistent behavior
+                match asset_service.enrich_assets(asset_ids).await {
+                    Ok((enriched, skipped, failed)) => {
+                        info!(
+                            "Asset enrichment complete: {} enriched, {} skipped, {} failed",
+                            enriched, skipped, failed
+                        );
                     }
-
-                    // Try to enrich the asset profile
-                    if asset_service.enrich_asset_profile(&asset_id).await.is_ok() {
-                        // Mark as enriched in sync state
-                        if let Err(e) = quote_service.mark_profile_enriched(&asset_id).await {
-                            warn!("Failed to mark profile enriched for {}: {}", asset_id, e);
-                        }
+                    Err(e) => {
+                        warn!("Asset enrichment failed: {}", e);
                     }
                 }
             });

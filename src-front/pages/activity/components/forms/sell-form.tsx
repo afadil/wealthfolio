@@ -37,12 +37,6 @@ export const sellFormSchema = z.object({
       invalid_type_error: "Price must be a number.",
     })
     .positive({ message: "Price must be greater than 0." }),
-  amount: z.coerce
-    .number({
-      invalid_type_error: "Amount must be a number.",
-    })
-    .nonnegative({ message: "Amount must be non-negative." })
-    .optional(),
   fee: z.coerce
     .number({
       invalid_type_error: "Fee must be a number.",
@@ -52,7 +46,12 @@ export const sellFormSchema = z.object({
   comment: z.string().optional().nullable(),
   // Advanced options
   currency: z.string().optional(),
-  subtype: z.string().optional().nullable(),
+  fxRate: z.coerce
+    .number({
+      invalid_type_error: "FX Rate must be a number.",
+    })
+    .positive({ message: "FX Rate must be positive." })
+    .optional(),
   // Internal fields
   pricingMode: z.enum([PricingMode.MARKET, PricingMode.MANUAL]).default(PricingMode.MARKET),
   exchangeMic: z.string().optional(),
@@ -82,22 +81,6 @@ function calculateAmount(quantity: number | undefined, unitPrice: number | undef
   return Math.max(0, qty * price - feeVal);
 }
 
-/**
- * Checks if the manual amount differs from calculated by more than threshold percentage.
- */
-function isAmountDifferenceSignificant(
-  manualAmount: number | undefined,
-  calculatedAmount: number,
-  thresholdPercent = 1,
-): boolean {
-  if (manualAmount === undefined || manualAmount === 0 || calculatedAmount === 0) {
-    return false;
-  }
-  const difference = Math.abs(manualAmount - calculatedAmount);
-  const percentDiff = (difference / calculatedAmount) * 100;
-  return percentDiff > thresholdPercent;
-}
-
 export function SellForm({ accounts, defaultValues, onSubmit, onCancel, isLoading = false, isEditing = false, assetCurrency }: SellFormProps) {
   const { data: settings } = useSettings();
   const baseCurrency = settings?.baseCurrency;
@@ -115,24 +98,23 @@ export function SellForm({ accounts, defaultValues, onSubmit, onCancel, isLoadin
       })(),
       quantity: undefined,
       unitPrice: undefined,
-      amount: undefined,
       fee: 0,
       comment: null,
       currency: undefined,
-      subtype: null,
+      fxRate: undefined,
       pricingMode: PricingMode.MARKET,
       exchangeMic: undefined,
       ...defaultValues,
     },
   });
 
-  const { watch, setValue } = form;
+  const { watch, setValue, getValues } = form;
   const accountId = watch("accountId");
   const assetId = watch("assetId");
   const quantity = watch("quantity");
   const unitPrice = watch("unitPrice");
   const fee = watch("fee");
-  const amount = watch("amount");
+  const currency = watch("currency");
   const pricingMode = watch("pricingMode");
   const isManualAsset = pricingMode === PricingMode.MANUAL;
 
@@ -165,21 +147,17 @@ export function SellForm({ accounts, defaultValues, onSubmit, onCancel, isLoadin
     [quantity, unitPrice, fee],
   );
 
-  // Auto-update amount when quantity, price, or fee changes
+  // Auto-initialize currency from resolved priority: assetCurrency > accountCurrency > baseCurrency
   useEffect(() => {
-    if (quantity && unitPrice) {
-      // Only auto-set if amount hasn't been manually modified or is undefined
-      if (amount === undefined || amount === 0) {
-        setValue("amount", calculatedAmount, { shouldValidate: false });
+    const currentCurrency = getValues("currency");
+    // Only auto-set if currency is empty/undefined
+    if (!currentCurrency) {
+      const resolvedCurrency = assetCurrency || accountCurrency || baseCurrency;
+      if (resolvedCurrency) {
+        setValue("currency", resolvedCurrency, { shouldValidate: false });
       }
     }
-  }, [calculatedAmount, quantity, unitPrice, setValue, amount]);
-
-  // Check if manual amount differs significantly from calculated
-  const showAmountWarning = useMemo(
-    () => isAmountDifferenceSignificant(amount, calculatedAmount, 1),
-    [amount, calculatedAmount],
-  );
+  }, [assetCurrency, accountCurrency, baseCurrency, setValue, getValues]);
 
   const handleSubmit = form.handleSubmit(async (data) => {
     await onSubmit(data);
@@ -218,6 +196,12 @@ export function SellForm({ accounts, defaultValues, onSubmit, onCancel, isLoadin
               <AmountInput name="fee" label="Fee" />
             </div>
 
+            {calculatedAmount > 0 && (
+              <p className="text-muted-foreground text-sm">
+                Amount: {calculatedAmount.toFixed(2)}{currency && ` ${currency}`}
+              </p>
+            )}
+
             {/* Warning for selling more than holdings */}
             {isSellingMoreThanHoldings && (
               <Alert variant="default" className="border-warning bg-warning/10">
@@ -229,33 +213,15 @@ export function SellForm({ accounts, defaultValues, onSubmit, onCancel, isLoadin
               </Alert>
             )}
 
-            {/* Amount (Calculated) */}
-            <div className="space-y-2">
-              <AmountInput name="amount" label="Amount" />
-              {calculatedAmount > 0 && (
-                <p className="text-muted-foreground text-xs">
-                  Calculated: {calculatedAmount.toFixed(2)} (quantity × price - fee)
-                </p>
-              )}
-              {showAmountWarning && (
-                <Alert variant="default" className="border-warning bg-warning/10">
-                  <Icons.AlertTriangle className="text-warning h-4 w-4" />
-                  <AlertDescription className="text-warning text-xs">
-                    The entered amount differs from the calculated value by more than 1%. Expected:{" "}
-                    {calculatedAmount.toFixed(2)}
-                  </AlertDescription>
-                </Alert>
-              )}
-            </div>
-
             {/* Advanced Options */}
             <AdvancedOptionsSection
               currencyName="currency"
-              subtypeName="subtype"
+              fxRateName="fxRate"
               activityType={ActivityType.SELL}
               assetCurrency={assetCurrency}
               accountCurrency={accountCurrency}
               baseCurrency={baseCurrency}
+              showSubtype={false}
             />
 
             {/* Notes */}

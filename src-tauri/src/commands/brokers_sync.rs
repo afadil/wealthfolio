@@ -1,138 +1,111 @@
 //! Commands for syncing broker data from the cloud API.
 
 use log::{debug, error, info};
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
-use wealthfolio_core::accounts::Account;
-use wealthfolio_core::sync::{ImportRunMode, ImportRunStatus, ImportRunSummary};
 
 use crate::context::ServiceContext;
-use crate::secret_store::KeyringSecretStore;
+use crate::events::{BROKER_SYNC_COMPLETE, BROKER_SYNC_ERROR, BROKER_SYNC_START};
 use wealthfolio_connect::{
     broker::BrokerApiClient, fetch_subscription_plans_public, BrokerAccount, BrokerConnection,
-    PlansResponse, Platform, SyncAccountsResponse, SyncActivitiesResponse, SyncConnectionsResponse,
-    UserInfo, DEFAULT_CLOUD_API_URL,
+    PlansResponse, Platform, SyncConfig, SyncOrchestrator, SyncProgressPayload,
+    SyncProgressReporter, SyncResult, UserInfo, DEFAULT_CLOUD_API_URL,
 };
-use wealthfolio_core::secrets::SecretStore;
 
-/// Sync progress event payload
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SyncProgressPayload {
-    pub account_id: String,
-    pub account_name: String,
-    pub status: String,
-    pub current_page: usize,
-    pub activities_fetched: usize,
-    pub message: Option<String>,
+// ─────────────────────────────────────────────────────────────────────────────
+// Tauri Progress Reporter
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Progress reporter that emits Tauri events.
+struct TauriProgressReporter {
+    app_handle: AppHandle,
 }
 
-/// Emit sync progress event
-fn emit_sync_progress(app: Option<&AppHandle>, payload: SyncProgressPayload) {
-    if let Some(app_handle) = app {
-        if let Err(e) = app_handle.emit("sync-progress", payload) {
+impl TauriProgressReporter {
+    fn new(app_handle: AppHandle) -> Self {
+        Self { app_handle }
+    }
+}
+
+impl SyncProgressReporter for TauriProgressReporter {
+    fn report_progress(&self, payload: SyncProgressPayload) {
+        if let Err(e) = self.app_handle.emit("sync-progress", &payload) {
             debug!("Failed to emit sync-progress event: {}", e);
         }
     }
-}
 
-/// Secret key for storing the cloud API access token (same as frontend)
-/// Note: SecretStore adds "wealthfolio_" prefix automatically
-const CLOUD_ACCESS_TOKEN_KEY: &str = "sync_access_token";
-
-/// Sync configuration status
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SyncConfig {
-    /// Whether access token is configured (masked for security)
-    pub access_token: Option<String>,
-}
-
-/// Result from a sync operation
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SyncResult {
-    pub success: bool,
-    pub message: String,
-    pub connections_synced: Option<SyncConnectionsResponse>,
-    pub accounts_synced: Option<SyncAccountsResponse>,
-    pub activities_synced: Option<SyncActivitiesResponse>,
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Credential Management Commands
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Set the cloud API credentials
-#[tauri::command]
-pub async fn set_sync_credentials(
-    access_token: String,
-    _state: State<'_, Arc<ServiceContext>>,
-) -> Result<(), String> {
-    debug!("Setting cloud sync credentials");
-
-    // Validate token is not empty
-    if access_token.trim().is_empty() {
-        return Err("Access token cannot be empty".to_string());
+    fn report_sync_start(&self) {
+        self.app_handle.emit(BROKER_SYNC_START, ()).unwrap_or_else(|e| {
+            error!("Failed to emit broker:sync-start event: {}", e);
+        });
     }
 
-    // Store access token securely in keyring
-    KeyringSecretStore
-        .set_secret(CLOUD_ACCESS_TOKEN_KEY, &access_token)
-        .map_err(|e| format!("Failed to store access token: {}", e))?;
-
-    info!("Cloud sync credentials saved successfully");
-    Ok(())
-}
-
-/// Get the current cloud API credentials (only returns whether they're set)
-#[tauri::command]
-pub async fn get_sync_credentials(
-    _state: State<'_, Arc<ServiceContext>>,
-) -> Result<SyncConfig, String> {
-    let has_token = KeyringSecretStore
-        .get_secret(CLOUD_ACCESS_TOKEN_KEY)
-        .map_err(|e| e.to_string())?
-        .is_some();
-
-    Ok(SyncConfig {
-        access_token: if has_token {
-            Some("********".to_string())
+    fn report_sync_complete(&self, result: &SyncResult) {
+        if result.success {
+            self.app_handle
+                .emit(BROKER_SYNC_COMPLETE, result)
+                .unwrap_or_else(|e| {
+                    error!("Failed to emit broker:sync-complete event: {}", e);
+                });
         } else {
-            None
-        },
-    })
-}
-
-/// Clear the cloud API credentials
-#[tauri::command]
-pub async fn clear_sync_credentials(_state: State<'_, Arc<ServiceContext>>) -> Result<(), String> {
-    KeyringSecretStore
-        .delete_secret(CLOUD_ACCESS_TOKEN_KEY)
-        .map_err(|e| format!("Failed to delete access token: {}", e))?;
-
-    info!("Cloud sync credentials cleared");
-    Ok(())
+            self.app_handle
+                .emit(
+                    BROKER_SYNC_ERROR,
+                    serde_json::json!({ "error": result.message }),
+                )
+                .unwrap_or_else(|e| {
+                    error!("Failed to emit broker:sync-error event: {}", e);
+                });
+        }
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Broker Sync Commands
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Sync broker data from the cloud API (Tauri command wrapper)
+/// Sync broker data from the cloud API (non-blocking with SSE events).
+/// Returns immediately after triggering the sync. Results are delivered via events:
+/// - `broker:sync-start` - emitted when sync begins
+/// - `broker:sync-complete` - emitted with SyncResult payload on success
+/// - `broker:sync-error` - emitted with error message on failure
 #[tauri::command]
 pub async fn sync_broker_data(
     app: AppHandle,
     state: State<'_, Arc<ServiceContext>>,
-) -> Result<SyncResult, String> {
-    perform_broker_sync(&state, Some(&app)).await
+) -> Result<(), String> {
+    info!("[Connect] Starting broker data sync (non-blocking)...");
+
+    // Clone what we need for the spawned task
+    let context = state.inner().clone();
+    let app_handle = app.clone();
+
+    // Spawn background task
+    tauri::async_runtime::spawn(async move {
+        match perform_broker_sync(&context, Some(&app_handle)).await {
+            Ok(_result) => {
+                info!("[Connect] Broker sync completed successfully");
+                // Events are emitted by the orchestrator via TauriProgressReporter
+            }
+            Err(err) => {
+                error!("[Connect] Broker sync failed: {}", err);
+                // Error event also emitted by orchestrator
+            }
+        }
+    });
+
+    Ok(())
 }
 
 /// Core broker sync logic that can be called from Tauri command or scheduler.
 ///
 /// This function is public so the scheduler can call it directly.
 /// FX rate registration is handled automatically by AccountService during account creation.
+///
+/// # Arguments
+///
+/// * `context` - Service context
+/// * `app` - Optional AppHandle for progress reporting. If None, progress events are not emitted.
 pub async fn perform_broker_sync(
     context: &Arc<ServiceContext>,
     app: Option<&AppHandle>,
@@ -141,499 +114,25 @@ pub async fn perform_broker_sync(
 
     let client = context.connect_service().get_api_client()?;
 
-    // Step 1: Fetch and sync connections (platforms)
-    info!("Fetching broker connections...");
-    let connections = client.list_connections().await.map_err(|e| e.to_string())?;
-    info!("Found {} broker connections", connections.len());
-
-    let connections_result = context
-        .sync_service()
-        .sync_connections(connections.clone())
-        .await
-        .map_err(|e| format!("Failed to sync connections: {}", e))?;
-
-    info!(
-        "Connections synced: {} created, {} updated",
-        connections_result.platforms_created, connections_result.platforms_updated
-    );
-
-    // Step 2: Fetch and sync accounts (FX rates are registered via AccountService)
-    info!("Fetching broker accounts...");
-    let authorization_ids: Vec<String> = connections.iter().map(|c| c.id.clone()).collect();
-    let all_accounts = client
-        .list_accounts(if authorization_ids.is_empty() {
-            None
-        } else {
-            Some(authorization_ids)
-        })
-        .await
-        .map_err(|e| e.to_string())?;
-
-    // Log all accounts with their sync_enabled status for debugging
-    info!(
-        "Fetched {} total broker accounts from API",
-        all_accounts.len()
-    );
-    for acc in &all_accounts {
-        debug!(
-            "  Account '{}' (id={:?}): sync_enabled={}, shared_with_household={}",
-            acc.name.as_deref().unwrap_or("unnamed"),
-            acc.id,
-            acc.sync_enabled,
-            acc.shared_with_household
+    // Create progress reporter and orchestrator
+    // Use TauriProgressReporter if we have an AppHandle, otherwise use NoOp
+    if let Some(app_handle) = app {
+        let reporter = Arc::new(TauriProgressReporter::new(app_handle.clone()));
+        let orchestrator = SyncOrchestrator::new(
+            context.sync_service(),
+            reporter,
+            SyncConfig::default(),
         );
-    }
-
-    // Filter accounts to only sync those with sync_enabled = true
-    let accounts: Vec<_> = all_accounts
-        .into_iter()
-        .filter(|a| a.sync_enabled)
-        .collect();
-
-    // Create a set of sync-enabled broker account IDs to filter activity sync (before moving accounts)
-    let sync_enabled_broker_ids: std::collections::HashSet<String> = accounts
-        .iter()
-        .filter_map(|a| a.id.clone())
-        .collect();
-
-    let total_accounts = accounts.len();
-    info!(
-        "Filtered to {} broker accounts with sync_enabled=true",
-        total_accounts
-    );
-
-    let accounts_result = context
-        .sync_service()
-        .sync_accounts(accounts)
-        .await
-        .map_err(|e| format!("Failed to sync accounts: {}", e))?;
-
-    info!(
-        "Accounts synced: {} created, {} updated, {} skipped",
-        accounts_result.created, accounts_result.updated, accounts_result.skipped
-    );
-
-    // Step 3: Fetch and sync activities for all synced accounts (incremental per account)
-    let end_date = chrono::Utc::now().date_naive();
-
-    let synced_accounts = context
-        .sync_service()
-        .get_synced_accounts()
-        .map_err(|e| format!("Failed to get synced accounts: {}", e))?;
-
-    let mut activities_summary = SyncActivitiesResponse::default();
-    let mut activity_errors: Vec<String> = Vec::new();
-
-    for account in synced_accounts {
-        let Some(broker_account_id) = account.provider_account_id.clone() else {
-            continue;
-        };
-
-        // Skip accounts that are not sync-enabled
-        if !sync_enabled_broker_ids.contains(&broker_account_id) {
-            info!(
-                "Skipping activity sync for account '{}' (sync disabled)",
-                account.name
-            );
-            continue;
-        }
-
-        let account_id = account.id.clone();
-        let account_name = account.name.clone();
-        if let Err(err) = context
-            .sync_service()
-            .mark_activity_sync_attempt(account_id.clone())
-            .await
-            .map_err(|e| format!("Failed to mark activity sync attempt: {}", e))
-        {
-            activity_errors.push(format!("{}: {}", account_name, err));
-            continue;
-        }
-
-        let (start_date, end_date_filter) =
-            compute_activity_query_window(context, &account, end_date)
-                .map_err(|e| format!("Failed to compute activity sync window: {}", e))?;
-
-        // Determine import run mode based on whether this is first sync
-        let import_mode = if start_date.is_none() {
-            ImportRunMode::Initial
-        } else {
-            ImportRunMode::Incremental
-        };
-
-        // Create import run for this account sync
-        let import_run = match context
-            .sync_service()
-            .create_import_run(&account_id, import_mode)
-            .await
-        {
-            Ok(run) => {
-                debug!("Created import run {} for account '{}'", run.id, account_name);
-                Some(run)
-            }
-            Err(e) => {
-                error!("Failed to create import run for '{}': {}", account_name, e);
-                None
-            }
-        };
-        let import_run_id = import_run.as_ref().map(|r| r.id.clone());
-
-        let window_label = match (&start_date, &end_date_filter) {
-            (Some(s), Some(e)) => format!("{} -> {}", s, e),
-            _ => "ALL".to_string(),
-        };
-        info!(
-            "Syncing activities for account '{}' ({}): {}",
-            account_name, broker_account_id, window_label
+        orchestrator.sync_all(&client).await
+    } else {
+        let reporter = Arc::new(wealthfolio_connect::NoOpProgressReporter);
+        let orchestrator = SyncOrchestrator::new(
+            context.sync_service(),
+            reporter,
+            SyncConfig::default(),
         );
-
-        // Emit sync start event for this account
-        emit_sync_progress(
-            app,
-            SyncProgressPayload {
-                account_id: account_id.clone(),
-                account_name: account_name.clone(),
-                status: "syncing".to_string(),
-                current_page: 0,
-                activities_fetched: 0,
-                message: Some(format!("Starting sync: {}", window_label)),
-            },
-        );
-
-        let mut offset: i64 = 0;
-        let limit: i64 = 1000;
-        let mut pages_fetched: usize = 0;
-        let mut last_page_first_id: Option<String> = None;
-        let max_pages: usize = 10000;
-        let mut account_failed = false;
-
-        // Track per-account summary for import run
-        let mut account_activities_fetched: u32 = 0;
-        let mut account_activities_inserted: u32 = 0;
-        let account_activities_updated: u32 = 0; // Reserved for future use
-        let mut account_needs_review: u32 = 0;
-        let mut account_assets_created: u32 = 0;
-
-        loop {
-            if pages_fetched >= max_pages {
-                let msg = format!("Pagination exceeded max pages ({}). Aborting.", max_pages);
-                let _ = context
-                    .sync_service()
-                    .finalize_activity_sync_failure(account_id.clone(), msg.clone(), import_run_id.clone())
-                    .await;
-                // Finalize import run as failed
-                if let Some(ref run_id) = import_run_id {
-                    let summary = ImportRunSummary {
-                        fetched: account_activities_fetched,
-                        inserted: account_activities_inserted,
-                        updated: account_activities_updated,
-                        errors: 1,
-                        ..Default::default()
-                    };
-                    let _ = context
-                        .sync_service()
-                        .finalize_import_run(run_id, summary, ImportRunStatus::Failed, Some(msg.clone()))
-                        .await;
-                }
-                activity_errors.push(format!("{}: {}", account_name, msg));
-                account_failed = true;
-                break;
-            }
-
-            let page = match client
-                .get_account_activities(
-                    &broker_account_id,
-                    start_date.as_deref(),
-                    end_date_filter.as_deref(),
-                    Some(offset),
-                    Some(limit),
-                )
-                .await
-            {
-                Ok(p) => p,
-                Err(e) => {
-                    let err_msg = e.to_string();
-                    let _ = context
-                        .sync_service()
-                        .finalize_activity_sync_failure(account_id.clone(), err_msg.clone(), import_run_id.clone())
-                        .await;
-                    // Finalize import run as failed
-                    if let Some(ref run_id) = import_run_id {
-                        let summary = ImportRunSummary {
-                            fetched: account_activities_fetched,
-                            inserted: account_activities_inserted,
-                            updated: account_activities_updated,
-                            errors: 1,
-                            ..Default::default()
-                        };
-                        let _ = context
-                            .sync_service()
-                            .finalize_import_run(run_id, summary, ImportRunStatus::Failed, Some(err_msg.clone()))
-                            .await;
-                    }
-                    activity_errors.push(format!("{}: {}", account_name, err_msg));
-                    account_failed = true;
-                    break;
-                }
-            };
-
-            let data = page.data.clone();
-            pages_fetched += 1;
-            account_activities_fetched += data.len() as u32;
-
-            // Emit progress event after fetching page
-            let page_total = page.pagination.as_ref().and_then(|p| p.total);
-            emit_sync_progress(
-                app,
-                SyncProgressPayload {
-                    account_id: account_id.clone(),
-                    account_name: account_name.clone(),
-                    status: "syncing".to_string(),
-                    current_page: pages_fetched,
-                    activities_fetched: account_activities_fetched as usize,
-                    message: Some(format!(
-                        "Fetched {} activities (total: {:?})",
-                        account_activities_fetched, page_total
-                    )),
-                },
-            );
-
-            info!(
-                "Fetched {} activities for '{}' (offset {}, total {:?})",
-                data.len(),
-                account_name,
-                offset,
-                page_total
-            );
-
-            if !data.is_empty() {
-                if let Some(first_id) = data.first().and_then(|a| a.id.clone()) {
-                    if offset > 0 {
-                        if let Some(prev) = &last_page_first_id {
-                            if prev == &first_id {
-                                let msg = "Pagination appears stuck (same first activity id returned for multiple pages).".to_string();
-                                let _ = context
-                                    .sync_service()
-                                    .finalize_activity_sync_failure(account_id.clone(), msg.clone(), import_run_id.clone())
-                                    .await;
-                                // Finalize import run as failed
-                                if let Some(ref run_id) = import_run_id {
-                                    let summary = ImportRunSummary {
-                                        fetched: account_activities_fetched,
-                                        inserted: account_activities_inserted,
-                                        updated: account_activities_updated,
-                                        errors: 1,
-                                        ..Default::default()
-                                    };
-                                    let _ = context
-                                        .sync_service()
-                                        .finalize_import_run(run_id, summary, ImportRunStatus::Failed, Some(msg.clone()))
-                                        .await;
-                                }
-                                activity_errors.push(format!("{}: {}", account_name, msg));
-                                account_failed = true;
-                                break;
-                            }
-                        }
-                    }
-                    last_page_first_id = Some(first_id);
-                }
-
-                debug!(
-                    "Upserting {} activities for account '{}'...",
-                    data.len(),
-                    account_name
-                );
-
-                match context
-                    .sync_service()
-                    .upsert_account_activities(account_id.clone(), import_run_id.clone(), data.clone())
-                    .await
-                {
-                    Ok((activities_upserted, assets_inserted, new_asset_ids, needs_review_count)) => {
-                        info!(
-                            "Upserted {} activities, {} assets for '{}' ({} need review)",
-                            activities_upserted, assets_inserted, account_name, needs_review_count
-                        );
-                        // Track for import run summary
-                        account_activities_inserted += activities_upserted as u32;
-                        account_assets_created += assets_inserted as u32;
-                        account_needs_review += needs_review_count as u32;
-
-                        activities_summary.activities_upserted += activities_upserted;
-                        activities_summary.assets_inserted += assets_inserted;
-                        activities_summary.new_asset_ids.extend(new_asset_ids);
-                    }
-                    Err(e) => {
-                        let e = format!("Failed to upsert activities: {}", e);
-                        error!("{}: {}", account_name, e);
-                        let _ = context
-                            .sync_service()
-                            .finalize_activity_sync_failure(account_id.clone(), e.clone(), import_run_id.clone())
-                            .await;
-                        // Finalize import run as failed
-                        if let Some(ref run_id) = import_run_id {
-                            let summary = ImportRunSummary {
-                                fetched: account_activities_fetched,
-                                inserted: account_activities_inserted,
-                                updated: account_activities_updated,
-                                errors: 1,
-                                ..Default::default()
-                            };
-                            let _ = context
-                                .sync_service()
-                                .finalize_import_run(run_id, summary, ImportRunStatus::Failed, Some(e.clone()))
-                                .await;
-                        }
-                        activity_errors.push(format!("{}: {}", account_name, e));
-                        account_failed = true;
-                        break;
-                    }
-                }
-            }
-
-            // Use has_more flag for pagination
-            let has_more = page
-                .pagination
-                .as_ref()
-                .map(|p| p.has_more)
-                .unwrap_or(false);
-
-            // Advance offset by number of items received
-            offset += data.len() as i64;
-
-            // Stop if no more pages
-            if !has_more {
-                break;
-            }
-        }
-
-        if !account_failed {
-            let last_synced_date = end_date;
-            if let Err(e) = context
-                .sync_service()
-                .finalize_activity_sync_success(
-                    account_id.clone(),
-                    last_synced_date.format("%Y-%m-%d").to_string(),
-                    import_run_id.clone(),
-                )
-                .await
-                .map_err(|e| format!("Failed to persist sync state: {}", e))
-            {
-                activity_errors.push(format!("{}: {}", account_name, e));
-                activities_summary.accounts_failed += 1;
-                // Emit failure event
-                emit_sync_progress(
-                    app,
-                    SyncProgressPayload {
-                        account_id: account_id.clone(),
-                        account_name: account_name.clone(),
-                        status: "failed".to_string(),
-                        current_page: pages_fetched,
-                        activities_fetched: account_activities_fetched as usize,
-                        message: Some(e),
-                    },
-                );
-                continue;
-            }
-
-            // Emit completion event
-            emit_sync_progress(
-                app,
-                SyncProgressPayload {
-                    account_id: account_id.clone(),
-                    account_name: account_name.clone(),
-                    status: if account_needs_review > 0 {
-                        "needs_review".to_string()
-                    } else {
-                        "complete".to_string()
-                    },
-                    current_page: pages_fetched,
-                    activities_fetched: account_activities_fetched as usize,
-                    message: Some(format!(
-                        "Synced {} activities ({} need review)",
-                        account_activities_inserted, account_needs_review
-                    )),
-                },
-            );
-
-            // Finalize import run - use NeedsReview status if there are activities needing review
-            if let Some(ref run_id) = import_run_id {
-                let summary = ImportRunSummary {
-                    fetched: account_activities_fetched,
-                    inserted: account_activities_inserted,
-                    updated: account_activities_updated,
-                    skipped: 0,
-                    warnings: account_needs_review,
-                    errors: 0,
-                    removed: 0,
-                    assets_created: account_assets_created,
-                };
-
-                // Use NeedsReview status if any activities need user attention
-                let status = if account_needs_review > 0 {
-                    info!(
-                        "Import run {} has {} activities needing review",
-                        run_id, account_needs_review
-                    );
-                    ImportRunStatus::NeedsReview
-                } else {
-                    ImportRunStatus::Applied
-                };
-
-                let _ = context
-                    .sync_service()
-                    .finalize_import_run(run_id, summary, status, None)
-                    .await;
-            }
-
-            activities_summary.accounts_synced += 1;
-        } else {
-            activities_summary.accounts_failed += 1;
-        }
+        orchestrator.sync_all(&client).await
     }
-
-    Ok(SyncResult {
-        success: activity_errors.is_empty(),
-        message: format!(
-            "Sync completed. {} accounts created, {} activities synced{}",
-            accounts_result.created,
-            activities_summary.activities_upserted,
-            if activity_errors.is_empty() {
-                ".".to_string()
-            } else {
-                format!(" ({} failed).", activity_errors.len())
-            }
-        ),
-        connections_synced: Some(connections_result),
-        accounts_synced: Some(accounts_result),
-        activities_synced: Some(activities_summary),
-    })
-}
-
-fn compute_activity_query_window(
-    context: &Arc<ServiceContext>,
-    account: &Account,
-    end_date: chrono::NaiveDate,
-) -> Result<(Option<String>, Option<String>), String> {
-    let sync_state = context
-        .sync_service()
-        .get_activity_sync_state(&account.id)
-        .map_err(|e| format!("Failed to read activity sync state: {}", e))?;
-
-    let from_state = sync_state
-        .and_then(|s| s.last_successful_at)
-        .map(|dt| dt.date_naive())
-        .map(|d| (d - chrono::Days::new(1)).min(end_date));
-
-    if let Some(d) = from_state {
-        return Ok((
-            Some(d.format("%Y-%m-%d").to_string()),
-            Some(end_date.format("%Y-%m-%d").to_string()),
-        ));
-    }
-
-    Ok((None, None))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -771,21 +270,23 @@ pub async fn get_broker_sync_states(
         .map_err(|e| format!("Failed to get broker sync states: {}", e))
 }
 
-/// Get import runs with optional type filter
+/// Get import runs with optional type filter and pagination
 #[tauri::command]
 pub async fn get_import_runs(
     run_type: Option<String>,
     limit: Option<i64>,
+    offset: Option<i64>,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<Vec<wealthfolio_core::sync::ImportRun>, String> {
     let limit = limit.unwrap_or(50);
+    let offset = offset.unwrap_or(0);
     debug!(
-        "Fetching import runs (type={:?}, limit={})...",
-        run_type, limit
+        "Fetching import runs (type={:?}, limit={}, offset={})...",
+        run_type, limit, offset
     );
     state
         .sync_service()
-        .get_import_runs(run_type.as_deref(), limit)
+        .get_import_runs(run_type.as_deref(), limit, offset)
         .map_err(|e| format!("Failed to get import runs: {}", e))
 }
 

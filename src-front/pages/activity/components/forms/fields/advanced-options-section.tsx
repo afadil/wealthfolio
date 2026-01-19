@@ -16,6 +16,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Input,
 } from "@wealthfolio/ui";
 import { CurrencyInput } from "@wealthfolio/ui/components/financial";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -29,6 +30,8 @@ import {
 interface AdvancedOptionsSectionProps<TFieldValues extends FieldValues = FieldValues> {
   /** Field name for the currency value */
   currencyName?: FieldPath<TFieldValues>;
+  /** Field name for the FX rate value */
+  fxRateName?: FieldPath<TFieldValues>;
   /** Field name for the subtype value */
   subtypeName?: FieldPath<TFieldValues>;
   /** Activity type to determine available subtypes */
@@ -41,6 +44,8 @@ interface AdvancedOptionsSectionProps<TFieldValues extends FieldValues = FieldVa
   baseCurrency?: string;
   /** Whether to show the currency field */
   showCurrency?: boolean;
+  /** Whether to show the FX rate field */
+  showFxRate?: boolean;
   /** Whether to show the subtype field */
   showSubtype?: boolean;
   /** Default open state */
@@ -53,12 +58,14 @@ interface AdvancedOptionsSectionProps<TFieldValues extends FieldValues = FieldVa
  */
 export function AdvancedOptionsSection<TFieldValues extends FieldValues = FieldValues>({
   currencyName,
+  fxRateName,
   subtypeName,
   activityType,
   assetCurrency,
   accountCurrency,
   baseCurrency,
   showCurrency = true,
+  showFxRate = true,
   showSubtype = true,
   defaultOpen = false,
 }: AdvancedOptionsSectionProps<TFieldValues>) {
@@ -88,7 +95,7 @@ export function AdvancedOptionsSection<TFieldValues extends FieldValues = FieldV
   }, [assetCurrency, accountCurrency, baseCurrency]);
 
   // Don't render if nothing to show
-  const hasContent = (showCurrency && currencyName) || (showSubtype && subtypeName && availableSubtypes.length > 0);
+  const hasContent = (showCurrency && currencyName) || (showFxRate && fxRateName) || (showSubtype && subtypeName && availableSubtypes.length > 0);
   if (!hasContent) {
     return null;
   }
@@ -110,7 +117,7 @@ export function AdvancedOptionsSection<TFieldValues extends FieldValues = FieldV
       </CollapsibleTrigger>
       <CollapsibleContent className="space-y-4 pt-2">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {/* Currency (FX Rate) Field */}
+          {/* Currency Field */}
           {showCurrency && currencyName && (
             <FormField
               control={control}
@@ -126,7 +133,7 @@ export function AdvancedOptionsSection<TFieldValues extends FieldValues = FieldV
                       className="w-full"
                     />
                   </FormControl>
-                  {prioritizedCurrencies.length > 0 && (
+                  {prioritizedCurrencies.length > 1 && (
                     <div className="flex flex-wrap gap-1 pt-1">
                       {prioritizedCurrencies.map((currency, index) => (
                         <button
@@ -151,6 +158,33 @@ export function AdvancedOptionsSection<TFieldValues extends FieldValues = FieldV
                       ))}
                     </div>
                   )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+
+          {/* FX Rate Field */}
+          {showFxRate && fxRateName && (
+            <FormField
+              control={control}
+              name={fxRateName}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>FX Rate</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="any"
+                      placeholder="1.0000"
+                      value={field.value ?? ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        field.onChange(value === "" ? undefined : parseFloat(value));
+                      }}
+                      className="w-full"
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

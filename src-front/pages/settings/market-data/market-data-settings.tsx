@@ -335,11 +335,11 @@ function ProviderSettings({
                         <Input
                           id={`apikey-${provider.id}`}
                           type={showApiKey ? "text" : "password"}
-                          value={apiKeyValue}
+                          value={hasLoadedKey ? apiKeyValue : (provider.hasApiKey ? "••••••••••••••••••••••••" : "")}
                           onChange={(e) => setApiKeyValue(e.target.value)}
-                          placeholder={hasLoadedKey ? "Enter API Key" : "Click eye to reveal"}
+                          placeholder={provider.hasApiKey ? "" : "Enter API key"}
                           className="grow font-mono text-xs"
-                          disabled={!hasLoadedKey && !showApiKey}
+                          readOnly={!hasLoadedKey && provider.hasApiKey}
                         />
                         <Button
                           variant="outline"
@@ -361,7 +361,7 @@ function ProviderSettings({
                           onClick={handleSaveApiKey}
                           size="sm"
                           className="h-8"
-                          disabled={!hasLoadedKey}
+                          disabled={provider.hasApiKey && !hasLoadedKey}
                         >
                           Save
                         </Button>

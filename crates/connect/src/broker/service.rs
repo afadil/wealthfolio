@@ -797,10 +797,10 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
         self.brokers_sync_state_repository.get_all()
     }
 
-    fn get_import_runs(&self, run_type: Option<&str>, limit: i64) -> Result<Vec<ImportRun>> {
+    fn get_import_runs(&self, run_type: Option<&str>, limit: i64, offset: i64) -> Result<Vec<ImportRun>> {
         match run_type {
-            Some(rt) => self.import_run_repository.get_by_run_type(rt, limit),
-            None => self.import_run_repository.get_all(limit),
+            Some(rt) => self.import_run_repository.get_by_run_type(rt, limit, offset),
+            None => self.import_run_repository.get_all(limit, offset),
         }
     }
 

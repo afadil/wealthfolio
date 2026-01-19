@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use crate::{
@@ -10,6 +11,7 @@ use axum::{
     routing::{delete, get, post},
     Json, Router,
 };
+use tracing::info;
 use wealthfolio_core::activities::{
     Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityImport,
     ActivitySearchResponse, ActivityUpdate, ImportMappingData, NewActivity,
@@ -83,6 +85,16 @@ async fn create_activity(
     Json(activity): Json<NewActivity>,
 ) -> ApiResult<Json<Activity>> {
     let created = state.activity_service.create_activity(activity).await?;
+
+    // Trigger asset enrichment (service handles filtering)
+    if let Some(ref asset_id) = created.asset_id {
+        let asset_service = state.asset_service.clone();
+        let asset_id = asset_id.clone();
+        tokio::spawn(async move {
+            let _ = asset_service.enrich_assets(vec![asset_id]).await;
+        });
+    }
+
     trigger_activity_portfolio_job(state, vec![ActivityImpact::from_activity(&created)]);
     Ok(Json(created))
 }
@@ -93,6 +105,18 @@ async fn update_activity(
 ) -> ApiResult<Json<Activity>> {
     let previous = state.activity_service.get_activity(&activity.id)?;
     let updated = state.activity_service.update_activity(activity).await?;
+
+    // Trigger asset enrichment if asset changed (service handles filtering)
+    if updated.asset_id != previous.asset_id {
+        if let Some(ref asset_id) = updated.asset_id {
+            let asset_service = state.asset_service.clone();
+            let asset_id = asset_id.clone();
+            tokio::spawn(async move {
+                let _ = asset_service.enrich_assets(vec![asset_id]).await;
+            });
+        }
+    }
+
     trigger_activity_portfolio_job(
         state,
         vec![
@@ -111,6 +135,24 @@ async fn save_activities(
         .activity_service
         .bulk_mutate_activities(request)
         .await?;
+
+    // Trigger asset enrichment for all assets from created activities (service handles filtering)
+    let new_asset_ids: Vec<String> = result
+        .created
+        .iter()
+        .filter_map(|a| a.asset_id.clone())
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+
+    if !new_asset_ids.is_empty() {
+        info!("Triggering enrichment for {} assets from bulk mutation", new_asset_ids.len());
+        let asset_service = state.asset_service.clone();
+        tokio::spawn(async move {
+            let _ = asset_service.enrich_assets(new_asset_ids).await;
+        });
+    }
+
     let mut impacts: Vec<ActivityImpact> = Vec::new();
     impacts.extend(result.created.iter().map(ActivityImpact::from_activity));
     impacts.extend(result.updated.iter().map(ActivityImpact::from_activity));
@@ -161,6 +203,24 @@ async fn import_activities(
         .activity_service
         .import_activities(body.account_id, body.activities)
         .await?;
+
+    // Trigger asset enrichment for all assets from imported activities (service handles filtering)
+    let imported_asset_ids: Vec<String> = res
+        .iter()
+        .filter(|a| a.is_valid)
+        .map(|a| a.symbol.clone())
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+
+    if !imported_asset_ids.is_empty() {
+        info!("Triggering enrichment for {} assets from import", imported_asset_ids.len());
+        let asset_service = state.asset_service.clone();
+        tokio::spawn(async move {
+            let _ = asset_service.enrich_assets(imported_asset_ids).await;
+        });
+    }
+
     trigger_activity_portfolio_job(
         state,
         res.iter()

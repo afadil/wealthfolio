@@ -157,6 +157,14 @@ mod tests {
         async fn enrich_asset_profile(&self, _asset_id: &str) -> Result<Asset> {
             unimplemented!()
         }
+
+        async fn enrich_assets(&self, _asset_ids: Vec<String>) -> Result<(usize, usize, usize)> {
+            Ok((0, 0, 0))
+        }
+
+        async fn cleanup_legacy_metadata(&self, _asset_id: &str) -> Result<()> {
+            Ok(())
+        }
     }
 
     // --- Mock FxService ---

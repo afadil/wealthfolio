@@ -13,12 +13,19 @@ import {
   listenPortfolioUpdateError,
   listenPortfolioUpdateStart,
 } from "@/commands/portfolio-listener";
-import { isDesktop, listenBrokerSyncComplete, listenDatabaseRestored, logger } from "@/adapters";
+import {
+  isDesktop,
+  listenBrokerSyncComplete,
+  listenBrokerSyncError,
+  listenDatabaseRestored,
+  logger,
+} from "@/adapters";
 
 const TOAST_IDS = {
   marketSyncStart: "market-sync-start",
   portfolioUpdateStart: "portfolio-update-start",
   portfolioUpdateError: "portfolio-update-error",
+  brokerSyncStart: "broker-sync-start",
 } as const;
 
 const useGlobalEventListener = () => {
@@ -126,31 +133,65 @@ const useGlobalEventListener = () => {
     };
 
     const handleBrokerSyncComplete = (event: {
-      payload: { success: boolean; message: string; is_scheduled: boolean };
+      payload: {
+        success: boolean;
+        message: string;
+        accountsSynced?: { created: number; updated: number; skipped: number };
+        activitiesSynced?: { activitiesUpserted: number; assetsInserted: number };
+      };
     }) => {
-      const { success, message, is_scheduled } = event.payload || {
+      const { success, message, accountsSynced, activitiesSynced } = event.payload || {
         success: false,
         message: "Unknown error",
-        is_scheduled: false,
       };
 
-      // Only show toast for scheduled (background) syncs
-      // Manual syncs show their own toast via the mutation handler
-      if (!is_scheduled) {
-        return;
-      }
+      // Dismiss the loading toast
+      toast.dismiss(TOAST_IDS.brokerSyncStart);
+
+      // Invalidate queries that could be affected by sync
+      queryClientRef.current.invalidateQueries();
 
       if (success) {
-        toast.success("Background Sync Complete", {
-          description: message,
+        // Build description with key numbers
+        const accountsCreated = accountsSynced?.created ?? 0;
+        const accountsUpdated = accountsSynced?.updated ?? 0;
+        const activities = activitiesSynced?.activitiesUpserted ?? 0;
+        const newAssets = activitiesSynced?.assetsInserted ?? 0;
+
+        const hasChanges = accountsCreated > 0 || accountsUpdated > 0 || activities > 0 || newAssets > 0;
+
+        let description: string;
+        if (hasChanges) {
+          const parts: string[] = [];
+          if (accountsCreated > 0) parts.push(`${accountsCreated} new accounts`);
+          if (accountsUpdated > 0) parts.push(`${accountsUpdated} accounts updated`);
+          if (activities > 0) parts.push(`${activities} activities`);
+          if (newAssets > 0) parts.push(`${newAssets} new assets`);
+          description = parts.join(" · ");
+        } else {
+          description = "Everything is up to date";
+        }
+
+        toast.success("Broker Sync Complete", {
+          description,
           duration: 5000,
         });
       } else {
-        toast.error("Background Sync Failed", {
+        toast.error("Broker Sync Failed", {
           description: message,
           duration: 10000,
         });
       }
+    };
+
+    const handleBrokerSyncError = (event: { payload: { error: string } }) => {
+      const { error } = event.payload || { error: "Unknown error" };
+      // Dismiss the loading toast
+      toast.dismiss(TOAST_IDS.brokerSyncStart);
+      toast.error("Broker Sync Failed", {
+        description: error,
+        duration: 10000,
+      });
     };
 
     const setupListeners = async () => {
@@ -166,6 +207,7 @@ const useGlobalEventListener = () => {
       const unlistenMarketComplete = await listenMarketSyncComplete(handleMarketSyncComplete);
       const unlistenDatabaseRestored = await listenDatabaseRestored(handleDatabaseRestored);
       const unlistenBrokerSyncComplete = await listenBrokerSyncComplete(handleBrokerSyncComplete);
+      const unlistenBrokerSyncError = await listenBrokerSyncError(handleBrokerSyncError);
 
       const cleanup = () => {
         unlistenPortfolioSyncStart();
@@ -175,6 +217,7 @@ const useGlobalEventListener = () => {
         unlistenMarketComplete();
         unlistenDatabaseRestored();
         unlistenBrokerSyncComplete();
+        unlistenBrokerSyncError();
       };
 
       // If unmounted while setting up, clean up immediately

@@ -1,4 +1,4 @@
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use std::sync::Arc;
 
 use crate::quotes::QuoteServiceTrait;
@@ -439,6 +439,75 @@ impl AssetServiceTrait for AssetService {
         }
 
         Ok(updated_asset)
+    }
+
+    /// Enriches multiple assets in batch, with deduplication and sync state tracking.
+    /// This is the shared implementation used by both Tauri and web server.
+    ///
+    /// Automatically filters out assets that shouldn't be enriched (cash, FX, alternative assets)
+    /// and checks sync state to avoid re-enriching already enriched assets.
+    async fn enrich_assets(&self, asset_ids: Vec<String>) -> Result<(usize, usize, usize)> {
+        use super::should_enrich_asset;
+        use std::collections::HashSet;
+
+        if asset_ids.is_empty() {
+            return Ok((0, 0, 0));
+        }
+
+        // Deduplicate and filter to only enrichable assets
+        let unique_ids: Vec<String> = asset_ids
+            .into_iter()
+            .filter(|id| should_enrich_asset(id))
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+
+        if unique_ids.is_empty() {
+            debug!("No enrichable assets in batch");
+            return Ok((0, 0, 0));
+        }
+
+        let mut enriched_count = 0;
+        let mut skipped_count = 0;
+        let mut failed_count = 0;
+
+        for asset_id in unique_ids {
+            // Check sync state to see if enrichment is needed
+            let needs_enrichment = match self.quote_service.get_sync_state(&asset_id) {
+                Ok(Some(state)) => state.needs_profile_enrichment(),
+                Ok(None) => true, // No sync state yet, try enrichment
+                Err(_) => true,   // Error checking state, try enrichment
+            };
+
+            if !needs_enrichment {
+                debug!("Skipping enrichment for {} - already enriched", asset_id);
+                skipped_count += 1;
+                continue;
+            }
+
+            // Try to enrich the asset profile
+            match self.enrich_asset_profile(&asset_id).await {
+                Ok(_) => {
+                    // Mark as enriched in sync state
+                    if let Err(e) = self.quote_service.mark_profile_enriched(&asset_id).await {
+                        warn!("Failed to mark profile enriched for {}: {}", asset_id, e);
+                    }
+                    enriched_count += 1;
+                    info!("Successfully enriched asset profile: {}", asset_id);
+                }
+                Err(e) => {
+                    debug!("Failed to enrich asset {}: {}", asset_id, e);
+                    failed_count += 1;
+                }
+            }
+        }
+
+        info!(
+            "Asset enrichment complete: {} enriched, {} skipped, {} failed",
+            enriched_count, skipped_count, failed_count
+        );
+
+        Ok((enriched_count, skipped_count, failed_count))
     }
 
     async fn cleanup_legacy_metadata(&self, asset_id: &str) -> Result<()> {

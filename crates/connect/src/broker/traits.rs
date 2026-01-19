@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use super::models::{
     AccountUniversalActivity, BrokerAccount, BrokerBrokerage, BrokerConnection,
-    SyncAccountsResponse, SyncConnectionsResponse,
+    PaginatedUniversalActivity, SyncAccountsResponse, SyncConnectionsResponse,
 };
 use crate::platform::Platform;
 use crate::state::BrokerSyncState;
@@ -26,6 +26,24 @@ pub trait BrokerApiClient: Send + Sync {
 
     /// Fetch all available brokerages
     async fn list_brokerages(&self) -> Result<Vec<BrokerBrokerage>>;
+
+    /// Fetch account activities with pagination.
+    ///
+    /// # Arguments
+    ///
+    /// * `account_id` - The broker account ID (provider's ID)
+    /// * `start_date` - Optional start date filter (YYYY-MM-DD)
+    /// * `end_date` - Optional end date filter (YYYY-MM-DD)
+    /// * `offset` - Pagination offset
+    /// * `limit` - Maximum number of results per page
+    async fn get_account_activities(
+        &self,
+        account_id: &str,
+        start_date: Option<&str>,
+        end_date: Option<&str>,
+        offset: Option<i64>,
+        limit: Option<i64>,
+    ) -> Result<PaginatedUniversalActivity>;
 }
 
 /// Trait for platform repository operations
@@ -93,8 +111,8 @@ pub trait BrokerSyncServiceTrait: Send + Sync {
     /// Get all broker sync states.
     fn get_all_sync_states(&self) -> Result<Vec<BrokerSyncState>>;
 
-    /// Get import runs by type (SYNC or IMPORT) with a limit.
-    fn get_import_runs(&self, run_type: Option<&str>, limit: i64) -> Result<Vec<ImportRun>>;
+    /// Get import runs by type (SYNC or IMPORT) with pagination.
+    fn get_import_runs(&self, run_type: Option<&str>, limit: i64, offset: i64) -> Result<Vec<ImportRun>>;
 
     /// Create a new import run for broker sync.
     async fn create_import_run(

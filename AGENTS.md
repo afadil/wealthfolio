@@ -80,10 +80,13 @@ References:
 ## Architecture Notes
 
 - Runtime detection is centralized and selects between Tauri and Web adapters.
-  - `src-front/adapters/index.ts`:1 — `getRunEnv`, `invokeTauri`, `invokeWeb`.
-- Frontend command wrappers must support both desktop and web:
-  - See `src-front/commands/portfolio.ts`:1 for a complete pattern (switch on
-    `RUN_ENV`, unified signatures, logging, error handling).
+  - `src-front/adapters/index.ts`:1 — Re-exports from runtime-specific adapter.
+  - `src-front/adapters/tauri/index.ts`:1 — Desktop (Tauri IPC) implementation.
+  - `src-front/adapters/web/index.ts`:1 — Web (REST API) implementation.
+- Adapters export typed functions for each backend command (e.g., `getAccounts`,
+  `syncBrokerData`). Services import these directly instead of using generic
+  `invoke`.
+- Frontend services wrap adapter calls with error handling and logging.
 - Web mode server routes (Axum) live in `src-server/src/api/` and wire to
   services in `crates/core`.
 - Tauri commands live under `src-tauri/src/commands/*` and call into

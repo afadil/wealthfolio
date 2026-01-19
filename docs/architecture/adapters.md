@@ -87,8 +87,15 @@ All adapters export the same interface:
 ```typescript
 // Core exports
 export const RUN_ENV: RunEnv; // "desktop" | "web"
-export const invoke: <T>(command: string, payload?: Record<string, unknown>) => Promise<T>;
+export const isDesktop: boolean;
+export const isWeb: boolean;
 export const logger: Logger;
+
+// Typed command functions (preferred pattern)
+export const getAccounts: <T>() => Promise<T[]>;
+export const syncBrokerData: () => Promise<void>;
+export const getImportRuns: <T>(request?: ImportRunsRequest) => Promise<T[]>;
+// ... more typed functions for each backend command
 
 // Event listeners
 export const listenDeepLink: (callback: EventCallback<string>) => Promise<UnlistenFn>;
@@ -106,16 +113,29 @@ export type { ExtractedAddon, InstalledAddon, AddonManifest, ... };
 
 ## Usage in Code
 
-Import from `@/adapters` and use the unified interface:
+Import typed functions from `@/adapters` and use them in services:
 
 ```typescript
-import { invoke, logger, RUN_ENV } from "@/adapters";
+import {
+  logger,
+  getAccounts as getAccountsAdapter,
+  syncBrokerData as syncBrokerDataAdapter
+} from "@/adapters";
 
-// Works in both desktop and web
-const accounts = await invoke<Account[]>("get_accounts");
+// Service wraps adapter with error handling
+export const getAccounts = async (): Promise<Account[]> => {
+  try {
+    return await getAccountsAdapter<Account>();
+  } catch (error) {
+    logger.error("Error getting accounts.");
+    throw error;
+  }
+};
 
 // Check environment when needed
-if (RUN_ENV === "desktop") {
+import { isDesktop } from "@/adapters";
+
+if (isDesktop) {
   // Desktop-specific code (e.g., file dialogs)
   const { open } = await import("@tauri-apps/plugin-dialog");
   // ...
@@ -132,29 +152,43 @@ if (RUN_ENV === "desktop") {
 
 ## Adding New Commands
 
-When adding a new command:
+When adding a new backend command:
 
-1. Add the Tauri command in `adapters/tauri/index.ts`
-2. Add the REST API mapping in `adapters/web/index.ts`
-3. Use the same function signature in both
+1. Add a typed function in `adapters/tauri/index.ts` using `tauriInvoke`
+2. Add the REST API mapping in `adapters/web/index.ts` COMMANDS map
+3. Add a matching typed function in `adapters/web/index.ts` using `invoke`
+4. Create a service function that wraps the adapter with error handling
 
 Example:
 
 ```typescript
-// tauri/index.ts
-export const myNewCommand = async (data: MyData): Promise<Result> => {
-  return await invoke<Result>("my_new_command", { data });
-};
+// adapters/tauri/index.ts
+export async function myNewCommand<T>(data: MyData): Promise<T> {
+  return tauriInvoke<T>("my_new_command", { data });
+}
 
-// web/index.ts
-// Add to COMMANDS map
+// adapters/web/index.ts
+// 1. Add to COMMANDS map
 const COMMANDS = {
   // ...existing commands
   my_new_command: { method: "POST", path: "/my-endpoint" },
 };
 
+// 2. Add typed function
+export async function myNewCommand<T>(data: MyData): Promise<T> {
+  return invoke<T>("my_new_command", { data });
+}
+
+// services/my-service.ts
+import { logger, myNewCommand as myNewCommandAdapter } from "@/adapters";
+
 export const myNewCommand = async (data: MyData): Promise<Result> => {
-  return await invoke<Result>("my_new_command", { data });
+  try {
+    return await myNewCommandAdapter<Result>(data);
+  } catch (error) {
+    logger.error("Error in myNewCommand.");
+    throw error;
+  }
 };
 ```
 
@@ -162,14 +196,14 @@ export const myNewCommand = async (data: MyData): Promise<Result> => {
 
 Some features only work on desktop (e.g., file system dialogs). These should:
 
-1. Check `RUN_ENV` before calling
+1. Check `isDesktop` before calling
 2. Use dynamic imports for Tauri plugins
 3. Provide graceful fallbacks for web
 
 ```typescript
-import { RUN_ENV } from "@/adapters";
+import { isDesktop } from "@/adapters";
 
-if (RUN_ENV === "desktop") {
+if (isDesktop) {
   const { open } = await import("@tauri-apps/plugin-dialog");
   const filePath = await open({ filters: [{ name: "CSV", extensions: ["csv"] }] });
   // ...

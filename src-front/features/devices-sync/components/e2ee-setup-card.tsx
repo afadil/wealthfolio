@@ -68,7 +68,6 @@ export function E2EESetupCard() {
           <Button
             onClick={handleEnable}
             disabled={isEnabling || state.isLoading}
-            size="sm"
             className="mt-4"
           >
             {isEnabling || state.isLoading ? (

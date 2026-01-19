@@ -8,7 +8,8 @@ use crate::{
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, EnvFilter};
 use wealthfolio_ai::{AiProviderService, AiProviderServiceTrait, ChatConfig, ChatService};
-use wealthfolio_connect::{BrokerSyncService, BrokerSyncServiceTrait, PlatformRepository};
+use wealthfolio_connect::{BrokerSyncService, BrokerSyncServiceTrait, PlatformRepository, DEFAULT_CLOUD_API_URL};
+use wealthfolio_device_sync::DeviceEnrollService;
 use wealthfolio_core::{
     accounts::AccountService,
     activities::{ActivityService as CoreActivityService, ActivityServiceTrait},
@@ -79,6 +80,7 @@ pub struct AppState {
     pub secret_store: Arc<dyn SecretStore>,
     pub event_bus: EventBus,
     pub auth: Option<Arc<AuthManager>>,
+    pub device_enroll_service: Arc<DeviceEnrollService>,
 }
 
 pub fn init_tracing() {
@@ -295,6 +297,21 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     ));
     let ai_chat_service = Arc::new(ChatService::new(ai_environment, ChatConfig::default()));
 
+    // Device enroll service for E2EE sync
+    let cloud_api_url = std::env::var("CONNECT_API_URL")
+        .ok()
+        .map(|v| v.trim().trim_end_matches('/').to_string())
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| DEFAULT_CLOUD_API_URL.to_string());
+    let device_display_name = "Wealthfolio Server".to_string();
+    let app_version = Some(env!("CARGO_PKG_VERSION").to_string());
+    let device_enroll_service = Arc::new(DeviceEnrollService::new(
+        secret_store.clone(),
+        &cloud_api_url,
+        device_display_name,
+        app_version,
+    ));
+
     let event_bus = EventBus::new(256);
 
     let auth_manager = config
@@ -333,5 +350,6 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         secret_store,
         event_bus,
         auth: auth_manager,
+        device_enroll_service,
     }))
 }

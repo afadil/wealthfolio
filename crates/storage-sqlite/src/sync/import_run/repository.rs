@@ -99,27 +99,29 @@ impl ImportRunRepository {
         Ok(results.into_iter().map(Into::into).collect())
     }
 
-    /// Get all import runs with optional limit
-    pub fn get_all(&self, limit: i64) -> Result<Vec<ImportRun>> {
+    /// Get all import runs with optional limit and offset for pagination
+    pub fn get_all(&self, limit: i64, offset: i64) -> Result<Vec<ImportRun>> {
         let mut conn = get_connection(&self.pool)?;
 
         let results = import_runs::table
             .order(import_runs::started_at.desc())
             .limit(limit)
+            .offset(offset)
             .load::<ImportRunDB>(&mut conn)
             .map_err(StorageError::from)?;
 
         Ok(results.into_iter().map(Into::into).collect())
     }
 
-    /// Get import runs by run type (SYNC or IMPORT)
-    pub fn get_by_run_type(&self, run_type: &str, limit: i64) -> Result<Vec<ImportRun>> {
+    /// Get import runs by run type (SYNC or IMPORT) with pagination
+    pub fn get_by_run_type(&self, run_type: &str, limit: i64, offset: i64) -> Result<Vec<ImportRun>> {
         let mut conn = get_connection(&self.pool)?;
 
         let results = import_runs::table
             .filter(import_runs::run_type.eq(run_type))
             .order(import_runs::started_at.desc())
             .limit(limit)
+            .offset(offset)
             .load::<ImportRunDB>(&mut conn)
             .map_err(StorageError::from)?;
 

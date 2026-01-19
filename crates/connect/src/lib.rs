@@ -13,9 +13,11 @@ pub mod state;
 #[cfg(feature = "broker")]
 pub use broker::{
     AccountUniversalActivity, BrokerAccount, BrokerApiClient, BrokerBrokerage, BrokerConnection,
-    BrokerSyncService, BrokerSyncServiceTrait, PaginatedUniversalActivity, PlanLimitValue,
-    PlanLimits, PlanPricing, PlansResponse, PlatformRepositoryTrait, SubscriptionPlan,
-    SyncAccountsResponse, SyncActivitiesResponse, SyncConnectionsResponse, UserInfo, UserTeam,
+    BrokerSyncService, BrokerSyncServiceTrait, NoOpProgressReporter, PaginatedUniversalActivity,
+    PlanLimitValue, PlanLimits, PlanPricing, PlansResponse, PlatformRepositoryTrait,
+    SubscriptionPlan, SyncAccountsResponse, SyncActivitiesResponse, SyncConfig,
+    SyncConnectionsResponse, SyncOrchestrator, SyncProgressPayload, SyncProgressReporter,
+    SyncResult, SyncStatus, UserInfo, UserTeam,
 };
 
 // Re-export the HTTP client and public functions

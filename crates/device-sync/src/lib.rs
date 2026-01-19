@@ -35,9 +35,15 @@
 //! ```
 
 mod client;
+pub mod crypto;
+mod enroll_service;
 mod error;
 mod types;
 
 pub use client::DeviceSyncClient;
+pub use enroll_service::{
+    DeviceEnrollService, EnableSyncResult, EnrollServiceError, SyncIdentity, SyncState,
+    SyncStateResult,
+};
 pub use error::{DeviceSyncError, Result};
 pub use types::*;
