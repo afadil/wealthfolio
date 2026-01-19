@@ -25,6 +25,7 @@ import {
   Skeleton,
   Textarea,
 } from "@wealthfolio/ui";
+import { CurrencyInput } from "@wealthfolio/ui/components/financial";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useMemo, useState, useCallback } from "react";
 import { useForm, FormProvider } from "react-hook-form";
@@ -40,6 +41,7 @@ import {
 } from "@/lib/constants";
 import type { ActivityCreate } from "@/lib/types";
 import { today, getLocalTimeZone } from "@internationalized/date";
+import { parse as dateFnsParse } from "date-fns";
 import TickerSearchInput from "@/components/ticker-search";
 import type { QuoteSummary } from "@/lib/types";
 import { useRuntimeContext } from "../../hooks/use-runtime-context";
@@ -135,8 +137,27 @@ interface DraftFormValues {
   unitPrice?: number;
   amount?: number;
   fee?: number;
+  currency: string;
   subtype?: string;
   notes?: string;
+}
+
+// ============================================================================
+// Date Helper
+// ============================================================================
+
+/**
+ * Parse an ISO date string preserving the date/time as-is (no timezone conversion).
+ * Uses date-fns parse() which interprets the string as local time.
+ */
+function parseActivityDateToLocal(dateString: string): Date {
+  // Check if string has time component
+  if (dateString.includes("T")) {
+    // Parse datetime without timezone conversion (take first 19 chars: "yyyy-MM-ddTHH:mm:ss")
+    return dateFnsParse(dateString.substring(0, 19), "yyyy-MM-dd'T'HH:mm:ss", new Date());
+  }
+  // Date only
+  return dateFnsParse(dateString.substring(0, 10), "yyyy-MM-dd", new Date());
 }
 
 // ============================================================================
@@ -480,17 +501,51 @@ function DraftForm({
     resolvedAsset?.exchangeMic
   );
 
+  // Auto-select account: use draft value, or auto-select if only one account
+  const defaultAccountId = useMemo(() => {
+    if (draft.accountId) return draft.accountId;
+    if (availableAccounts.length === 1) return availableAccounts[0].id;
+    return "";
+  }, [draft.accountId, availableAccounts]);
+
+  // Determine default currency based on activity type
+  // - Asset activities (BUY, SELL, DIVIDEND, SPLIT): use resolved asset currency
+  // - Cash activities (DEPOSIT, WITHDRAWAL, etc.): use account currency
+  const defaultCurrency = useMemo(() => {
+    const assetActivityTypes: string[] = [
+      ActivityType.BUY,
+      ActivityType.SELL,
+      ActivityType.DIVIDEND,
+      ActivityType.SPLIT,
+    ];
+    const isAssetActivity = assetActivityTypes.includes(draft.activityType);
+
+    if (isAssetActivity && resolvedAsset?.currency) {
+      return resolvedAsset.currency;
+    }
+
+    // For cash activities or when no asset currency, use account currency
+    const accountCurrency = draft.accountId
+      ? availableAccounts.find((a) => a.id === draft.accountId)?.currency
+      : availableAccounts.length === 1
+        ? availableAccounts[0].currency
+        : undefined;
+
+    return accountCurrency ?? draft.currency ?? "USD";
+  }, [draft.activityType, draft.accountId, draft.currency, resolvedAsset, availableAccounts]);
+
   // Initialize form with draft values, preferring resolved values
   const form = useForm<DraftFormValues>({
     defaultValues: {
       activityType: draft.activityType,
-      activityDate: new Date(draft.activityDate),
+      activityDate: parseActivityDateToLocal(draft.activityDate),
       symbol: initialSymbol,
-      accountId: draft.accountId ?? "",
+      accountId: defaultAccountId,
       quantity: draft.quantity,
       unitPrice: draft.unitPrice,
       amount: draft.amount,
       fee: draft.fee ?? 0,
+      currency: defaultCurrency,
       subtype: draft.subtype ?? "",
       notes: draft.notes ?? "",
     },
@@ -502,6 +557,9 @@ function DraftForm({
   const unitPrice = watch("unitPrice");
   const fee = watch("fee");
   const accountId = watch("accountId");
+  const amount = watch("amount");
+  const activityDate = watch("activityDate");
+  const formCurrency = watch("currency");
 
   // Get subtypes for the current activity type
   const subtypesForType = useMemo(() => {
@@ -525,12 +583,14 @@ function DraftForm({
     return undefined;
   }, [quantity, unitPrice, fee]);
 
-  // Get selected account currency
+  // Get selected account (for reference)
   const selectedAccount = useMemo(
     () => availableAccounts.find((a) => a.id === accountId),
     [availableAccounts, accountId]
   );
-  const currency = selectedAccount?.currency ?? draft.currency ?? "USD";
+
+  // Use watched form currency (user can override in Advanced Options)
+  const currency = formCurrency;
 
   // Format currency value with privacy
   const formatAmount = useCallback(
@@ -545,31 +605,61 @@ function DraftForm({
     [currency, isBalanceHidden]
   );
 
-  // Check if field has validation error
+  // Get current form values for error checking
+  const currentFormValues = useMemo(
+    () => ({
+      accountId,
+      activityType,
+      activityDate,
+      amount,
+      quantity,
+      unitPrice,
+      symbol: selectedSymbol,
+    }),
+    [accountId, activityType, activityDate, amount, quantity, unitPrice, selectedSymbol]
+  );
+
+  // Check if field has validation error (only show if field is still empty)
   const hasFieldError = useCallback(
     (fieldName: string) => {
       const snakeCaseField = fieldName.replace(/([A-Z])/g, "_$1").toLowerCase();
-      return (
+      const fieldHasBackendError =
         validation.missingFields.includes(fieldName) ||
         validation.missingFields.includes(snakeCaseField) ||
         validation.errors.some(
           (e) => e.field === fieldName || e.field === snakeCaseField
-        )
-      );
+        );
+
+      // If no backend error, no error to show
+      if (!fieldHasBackendError) return false;
+
+      // Check if field now has a value (user filled it in)
+      const currentValue = currentFormValues[fieldName as keyof typeof currentFormValues];
+      if (currentValue !== undefined && currentValue !== "" && currentValue !== null) {
+        return false;
+      }
+
+      return true;
     },
-    [validation]
+    [validation, currentFormValues]
   );
 
-  // Get error message for field
+  // Get error message for field (only if field is still empty)
   const getFieldError = useCallback(
     (fieldName: string) => {
+      // Check if field now has a value (user filled it in)
+      const currentValue = currentFormValues[fieldName as keyof typeof currentFormValues];
+      if (currentValue !== undefined && currentValue !== "" && currentValue !== null) {
+        return undefined;
+      }
+
       const snakeCaseField = fieldName.replace(/([A-Z])/g, "_$1").toLowerCase();
       const error = validation.errors.find(
         (e) => e.field === fieldName || e.field === snakeCaseField
       );
       return error?.message;
     },
-    [validation]
+    [validation, currentFormValues]
   );
 
   // Check if asset requires symbol
@@ -585,17 +675,15 @@ function DraftForm({
 
   // Check if form is valid for submission
   const canSubmit = useMemo(() => {
-    const formValues = form.getValues();
-
     // Required for all: account, date
-    if (!formValues.accountId || !formValues.activityDate) return false;
+    if (!accountId || !activityDate) return false;
 
     // Asset-based activities need symbol
     if (requiresAsset && !selectedSymbol) return false;
 
     // BUY/SELL need quantity and price
     if (activityType === ActivityType.BUY || activityType === ActivityType.SELL) {
-      if (!formValues.quantity || !formValues.unitPrice) return false;
+      if (!quantity || !unitPrice) return false;
     }
 
     // DEPOSIT/WITHDRAWAL need amount
@@ -603,11 +691,11 @@ function DraftForm({
       activityType === ActivityType.DEPOSIT ||
       activityType === ActivityType.WITHDRAWAL
     ) {
-      if (!formValues.amount) return false;
+      if (!amount) return false;
     }
 
     return true;
-  }, [form, activityType, requiresAsset, selectedSymbol]);
+  }, [accountId, activityDate, activityType, requiresAsset, selectedSymbol, quantity, unitPrice, amount]);
 
   // Handle symbol selection from ticker search
   const handleSymbolSelect = useCallback(
@@ -630,9 +718,6 @@ function DraftForm({
       const formValues = form.getValues();
 
       // Build ActivityCreate payload
-      // Use resolved asset currency if available, otherwise account currency
-      const activityCurrency = resolvedAsset?.currency ?? currency;
-
       const payload: ActivityCreate = {
         accountId: formValues.accountId,
         activityType: formValues.activityType,
@@ -642,7 +727,7 @@ function DraftForm({
         quantity: formValues.quantity,
         unitPrice: formValues.unitPrice,
         amount: formValues.amount ?? calculatedAmount,
-        currency: activityCurrency,
+        currency: formValues.currency,
         fee: formValues.fee,
         comment: formValues.notes || undefined,
       };
@@ -687,8 +772,6 @@ function DraftForm({
     selectedSymbol,
     selectedExchangeMic,
     calculatedAmount,
-    currency,
-    resolvedAsset,
     threadId,
     toolCallId,
     onSuccess,
@@ -1052,6 +1135,46 @@ function DraftForm({
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-4 pt-2">
                 <div className="grid grid-cols-2 gap-4">
+                  {/* Currency Select */}
+                  <FormField
+                    control={form.control}
+                    name="currency"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Currency</FormLabel>
+                        <FormControl>
+                          <CurrencyInput
+                            value={field.value}
+                            onChange={field.onChange}
+                            placeholder="Select currency"
+                            className="w-full"
+                          />
+                        </FormControl>
+                        {/* Quick-select buttons for relevant currencies */}
+                        {(resolvedAsset?.currency || selectedAccount?.currency) && (
+                          <div className="flex flex-wrap gap-1 pt-1">
+                            {[
+                              resolvedAsset?.currency,
+                              selectedAccount?.currency,
+                            ]
+                              .filter((c): c is string => !!c && c !== field.value)
+                              .filter((c, i, arr) => arr.indexOf(c) === i) // dedupe
+                              .map((curr) => (
+                                <button
+                                  key={curr}
+                                  type="button"
+                                  onClick={() => field.onChange(curr)}
+                                  className="bg-muted hover:bg-muted/80 text-muted-foreground rounded px-2 py-0.5 text-xs transition-colors"
+                                >
+                                  {curr}
+                                </button>
+                              ))}
+                          </div>
+                        )}
+                      </FormItem>
+                    )}
+                  />
+
                   {/* Subtype Select */}
                   {subtypesForType.length > 0 && (
                     <FormField

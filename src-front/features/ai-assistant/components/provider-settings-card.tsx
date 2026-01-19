@@ -355,10 +355,11 @@ export function ProviderSettingsCard({
                       <Input
                         id={`apikey-${provider.id}`}
                         type={showApiKey ? "text" : "password"}
-                        value={apiKeyValue}
+                        value={hasLoadedKey ? apiKeyValue : (provider.hasApiKey ? "••••••••••••••••••••••••" : "")}
                         onChange={(e) => setApiKeyValue(e.target.value)}
-                        placeholder="Enter API key"
+                        placeholder={provider.hasApiKey ? "" : "Enter API key"}
                         className="bg-background pr-9 font-mono text-sm"
+                        readOnly={!hasLoadedKey && provider.hasApiKey}
                       />
                       <Button
                         type="button"
