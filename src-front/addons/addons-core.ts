@@ -1,11 +1,10 @@
-import { logger } from "@/adapters";
+import { logger, getInstalledAddons, loadAddon as loadAddonRuntime } from "@/adapters";
 import {
   createAddonContext,
   getDynamicNavItems,
   getDynamicRoutes,
   triggerAllDisableCallbacks,
 } from "@/addons/addons-runtime-context";
-import { getInstalledAddons, loadAddon as loadAddonRuntime } from "@/commands/addon";
 import type { AddonContext, AddonManifest } from "@wealthfolio/addon-sdk";
 import { ReactVersion, SDK_VERSION } from "@wealthfolio/addon-sdk";
 

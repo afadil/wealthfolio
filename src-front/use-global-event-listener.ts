@@ -1,18 +1,17 @@
 // useGlobalEventListener.ts
-import { updatePortfolio } from "@/commands/portfolio";
-import { listenMarketSyncComplete } from "@/commands/portfolio-listener";
+import {
+  updatePortfolio,
+  listenMarketSyncComplete,
+  listenMarketSyncStart,
+  listenPortfolioUpdateComplete,
+  listenPortfolioUpdateError,
+  listenPortfolioUpdateStart,
+} from "@/adapters";
 import { usePortfolioSyncOptional } from "@/context/portfolio-sync-context";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
-
-import {
-  listenMarketSyncStart,
-  listenPortfolioUpdateComplete,
-  listenPortfolioUpdateError,
-  listenPortfolioUpdateStart,
-} from "@/commands/portfolio-listener";
 import {
   isDesktop,
   listenBrokerSyncComplete,

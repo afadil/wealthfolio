@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { PortfolioAllocations } from "@/lib/types";
-import { getPortfolioAllocations } from "@/commands/portfolio";
+import { getPortfolioAllocations } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 
 export function usePortfolioAllocations(accountId: string) {

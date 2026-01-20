@@ -1,4 +1,4 @@
-import { getGoals, getGoalsAllocation } from "@/commands/goal";
+import { getGoals, getGoalsAllocation } from "@/adapters";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Progress } from "@wealthfolio/ui/components/ui/progress";

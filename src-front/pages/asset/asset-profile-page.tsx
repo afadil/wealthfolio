@@ -1,5 +1,4 @@
-import { getAssetProfile } from "@/commands/market-data";
-import { getHolding } from "@/commands/portfolio";
+import { getAssetProfile, getHolding } from "@/adapters";
 import { AssetEditSheet } from "./asset-edit-sheet";
 import { ActionPalette, type ActionPaletteGroup } from "@/components/action-palette";
 import { TickerAvatar } from "@/components/ticker-avatar";

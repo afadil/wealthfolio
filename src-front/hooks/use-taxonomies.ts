@@ -17,7 +17,7 @@ import {
   removeAssetTaxonomyAssignment,
   getMigrationStatus,
   migrateLegacyClassifications,
-} from "@/commands/taxonomy";
+} from "@/adapters";
 import type {
   AssetTaxonomyAssignment,
   MigrationResult,

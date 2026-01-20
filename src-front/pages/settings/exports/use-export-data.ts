@@ -1,10 +1,15 @@
-import { isDesktop, logger } from "@/adapters";
-import { getAccounts } from "@/commands/account";
-import { getActivities } from "@/commands/activity";
-import { openFileSaveDialog, openFolderDialog } from "@/commands/file";
-import { getGoals } from "@/commands/goal";
-import { getHistoricalValuations } from "@/commands/portfolio";
-import { backupDatabase, backupDatabaseToPath } from "@/commands/settings";
+import {
+  isDesktop,
+  logger,
+  getGoals,
+  getHistoricalValuations,
+  getActivities,
+  getAccounts,
+  openFileSaveDialog,
+  openFolderDialog,
+  backupDatabase,
+  backupDatabaseToPath,
+} from "@/adapters";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { formatData } from "@/lib/export-utils";
 import { QueryKeys } from "@/lib/query-keys";

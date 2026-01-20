@@ -1,31 +1,19 @@
 // Tauri adapter - Desktop implementation
-import { invoke as tauriInvoke, Channel } from "@tauri-apps/api/core";
-import type { EventCallback as TauriEventCallback, UnlistenFn as TauriUnlistenFn } from "@tauri-apps/api/event";
-import { listen } from "@tauri-apps/api/event";
-import { open, save } from "@tauri-apps/plugin-dialog";
-import { BaseDirectory, writeFile } from "@tauri-apps/plugin-fs";
-import { debug, error, info, trace, warn } from "@tauri-apps/plugin-log";
+// This file re-exports all domain-specific modules
 
-import type {
-  EventCallback,
-  UnlistenFn,
-  Logger,
-  ExtractedAddon,
-  InstalledAddon,
-  AddonManifest,
-  RunEnv,
-} from "../types";
+import type { RunEnv } from "../types";
 import { RunEnvs } from "../types";
 
-import type {
-  AiSendMessageRequest,
-  AiStreamEvent,
-  ListThreadsRequest,
-  ThreadPage,
-} from "@/features/ai-assistant/types";
+// Platform constants from core
+export { isDesktop, isWeb, logger } from "./core";
 
-// Re-export types and constants
-export type { EventCallback, UnlistenFn, RunEnv } from "../types";
+/**
+ * Runtime environment identifier - always "desktop" for Tauri builds
+ */
+export const RUN_ENV: RunEnv = RunEnvs.DESKTOP;
+
+// Re-export types and constants from ../types
+export type { EventCallback, UnlistenFn, RunEnv, Logger } from "../types";
 export { RunEnvs } from "../types";
 export type {
   AddonFile,
@@ -38,7 +26,20 @@ export type {
   FunctionPermission,
   InstalledAddon,
   Permission,
+  MarketDataProviderSetting,
+  ProviderCapabilities,
+  ImportRunsRequest,
+  UpdateThreadRequest,
+  UpdateToolResultRequest,
+  AppInfo,
+  UpdateCheckResult,
+  UpdateCheckPayload,
+  PlatformInfo,
+  BackendSyncStateResult,
+  BackendEnableSyncResult,
+  EphemeralKeyPair,
 } from "../types";
+
 // Re-export AI types from features/ai-assistant
 export type {
   AiChatModelConfig,
@@ -53,398 +54,134 @@ export type {
   ListThreadsRequest,
 } from "@/features/ai-assistant/types";
 
-/**
- * Runtime environment identifier - always "desktop" for Tauri builds
- */
-export const RUN_ENV: RunEnv = RunEnvs.DESKTOP;
-
-/** True when running in the desktop (Tauri) environment */
-export const isDesktop = true;
-
-/** True when running in the web environment */
-export const isWeb = false;
-
-/**
- * Invoke a Tauri command
- */
-export const invoke = async <T>(command: string, payload?: Record<string, unknown>): Promise<T> => {
-  try {
-    return await tauriInvoke<T>(command, payload);
-  } catch (err) {
-    error(`[Invoke] Command "${command}" failed: ${err}`);
-    throw err;
-  }
-};
-
-/**
- * Logger implementation using Tauri's log plugin
- * Wraps the Tauri log functions to match the Logger interface
- */
-export const logger: Logger = {
-  error: (...args: unknown[]) => {
-    error(args.map(String).join(" "));
-  },
-  warn: (...args: unknown[]) => {
-    warn(args.map(String).join(" "));
-  },
-  info: (...args: unknown[]) => {
-    info(args.map(String).join(" "));
-  },
-  debug: (...args: unknown[]) => {
-    debug(args.map(String).join(" "));
-  },
-  trace: (...args: unknown[]) => {
-    trace(args.map(String).join(" "));
-  },
-};
-
 // ============================================================================
-// Addon Commands
+// Shared domain modules (identical logic for both platforms)
 // ============================================================================
 
-export const extractAddonZip = async (zipData: Uint8Array): Promise<ExtractedAddon> => {
-  return await tauriInvoke<ExtractedAddon>("extract_addon_zip", { zipData: Array.from(zipData) });
-};
+// Account Commands
+export * from "../shared/accounts";
 
-export const installAddonZip = async (
-  zipData: Uint8Array,
-  enableAfterInstall?: boolean,
-): Promise<AddonManifest> => {
-  return await tauriInvoke<AddonManifest>("install_addon_zip", {
-    zipData: Array.from(zipData),
-    enableAfterInstall,
-  });
-};
+// Activity Commands
+export * from "../shared/activities";
 
-export const installAddonFile = async (
-  fileName: string,
-  fileContent: string,
-  enableAfterInstall?: boolean,
-): Promise<AddonManifest> => {
-  return await tauriInvoke<AddonManifest>("install_addon_file", {
-    fileName,
-    fileContent,
-    enableAfterInstall,
-  });
-};
+// Portfolio Commands
+export * from "../shared/portfolio";
 
-export const listInstalledAddons = async (): Promise<InstalledAddon[]> => {
-  return await tauriInvoke<InstalledAddon[]>("list_installed_addons");
-};
+// Market Data Commands
+export * from "../shared/market-data";
 
-export const toggleAddon = async (addonId: string, enabled: boolean): Promise<void> => {
-  return await tauriInvoke<void>("toggle_addon", { addonId, enabled });
-};
+// Goal Commands
+export * from "../shared/goals";
 
-export const uninstallAddon = async (addonId: string): Promise<void> => {
-  return await tauriInvoke<void>("uninstall_addon", { addonId });
-};
+// Taxonomy Commands
+export * from "../shared/taxonomies";
 
-export const loadAddonForRuntime = async (addonId: string): Promise<ExtractedAddon> => {
-  return await tauriInvoke<ExtractedAddon>("load_addon_for_runtime", { addonId });
-};
+// Alternative Assets Commands
+export * from "../shared/alternative-assets";
 
-export const getEnabledAddonsOnStartup = async (): Promise<ExtractedAddon[]> => {
-  return await tauriInvoke<ExtractedAddon[]>("get_enabled_addons_on_startup");
-};
+// Contribution Limits Commands
+export * from "../shared/contribution-limits";
+
+// Exchange Rates Commands
+export * from "../shared/exchange-rates";
+
+// Secrets Commands
+export * from "../shared/secrets";
+
+// Connect Commands (Broker + Device Sync + Auth)
+export * from "../shared/connect";
+
+// AI Providers Commands
+export * from "../shared/ai-providers";
+
+// AI Thread Commands
+export * from "../shared/ai-threads";
 
 // ============================================================================
-// File Dialogs
+// Platform-specific modules (different implementations)
 // ============================================================================
 
-export const openCsvFileDialog = async (): Promise<null | string | string[]> => {
-  return open({ filters: [{ name: "CSV", extensions: ["csv"] }] });
-};
+// Settings Commands (contains platform-specific backupDatabase, etc.)
+export {
+  getSettings,
+  updateSettings,
+  isAutoUpdateCheckEnabled,
+  backupDatabase,
+  backupDatabaseToPath,
+  restoreDatabase,
+  getAppInfo,
+  checkForUpdates,
+  installUpdate,
+  getPlatform,
+} from "./settings";
 
-export const openFolderDialog = async (): Promise<string | null> => {
-  return open({ directory: true });
-};
+// Addon Commands (platform-specific)
+export {
+  extractAddonZip,
+  installAddonZip,
+  installAddonFile,
+  listInstalledAddons,
+  toggleAddon,
+  uninstallAddon,
+  loadAddonForRuntime,
+  getEnabledAddonsOnStartup,
+  getInstalledAddons,
+  loadAddon,
+  extractAddon,
+  installAddon,
+  getEnabledAddons,
+  checkAddonUpdate,
+  checkAllAddonUpdates,
+  updateAddon,
+  downloadAddonForReview,
+  installFromStaging,
+  clearAddonStaging,
+  getAddonRatings,
+  submitAddonRating,
+  fetchAddonStoreListings,
+} from "./addons";
 
-export const openDatabaseFileDialog = async (): Promise<string | null> => {
-  const result = await open();
-  return Array.isArray(result) ? (result[0] ?? null) : result;
-};
+// AI Streaming (Tauri Channel-based implementation)
+export { streamAiChat } from "./ai-streaming";
 
-export const openFileSaveDialog = async (
-  fileContent: string | Blob | Uint8Array,
-  fileName: string,
-): Promise<boolean> => {
-  const filePath = await save({
-    defaultPath: fileName,
-    filters: [
-      {
-        name: fileName,
-        extensions: [fileName.split(".").pop() ?? ""],
-      },
-    ],
-  });
+// Event Listeners (Tauri listen() implementation)
+export {
+  listenFileDropHover,
+  listenFileDrop,
+  listenFileDropCancelled,
+  listenPortfolioUpdateStart,
+  listenPortfolioUpdateComplete,
+  listenDatabaseRestored,
+  listenPortfolioUpdateError,
+  listenMarketSyncComplete,
+  listenMarketSyncStart,
+  listenBrokerSyncStart,
+  listenBrokerSyncComplete,
+  listenBrokerSyncError,
+  listenNavigateToRoute,
+  listenDeepLink,
+} from "./events";
 
-  if (filePath === null) {
-    return false;
-  }
+// File Dialogs (Tauri file dialogs)
+export {
+  openCsvFileDialog,
+  openFolderDialog,
+  openDatabaseFileDialog,
+  openFileSaveDialog,
+  openUrlInBrowser,
+} from "./files";
 
-  let contentToSave: Uint8Array;
-  if (typeof fileContent === "string") {
-    contentToSave = new TextEncoder().encode(fileContent);
-  } else if (fileContent instanceof Blob) {
-    const arrayBuffer = await fileContent.arrayBuffer();
-    contentToSave = new Uint8Array(arrayBuffer);
-  } else {
-    contentToSave = fileContent;
-  }
-
-  await writeFile(filePath, contentToSave, { baseDir: BaseDirectory.Document });
-
-  return true;
-};
-
-// ============================================================================
-// Event Listeners
-// ============================================================================
-
-// Helper to adapt Tauri's event callback to our unified type
-const adaptCallback = <T>(handler: EventCallback<T>): TauriEventCallback<T> => {
-  return (event) => handler({ event: event.event, payload: event.payload, id: event.id });
-};
-
-// Helper to adapt Tauri's unlisten function to our unified type
-const adaptUnlisten = (unlisten: TauriUnlistenFn): UnlistenFn => {
-  return async () => unlisten();
-};
-
-export const listenFileDropHover = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
-  const unlisten = await listen<T>("tauri://file-drop-hover", adaptCallback(handler));
-  return adaptUnlisten(unlisten);
-};
-
-export const listenFileDrop = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
-  const unlisten = await listen<T>("tauri://file-drop", adaptCallback(handler));
-  return adaptUnlisten(unlisten);
-};
-
-export const listenFileDropCancelled = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
-  const unlisten = await listen<T>("tauri://file-drop-cancelled", adaptCallback(handler));
-  return adaptUnlisten(unlisten);
-};
-
-export const listenPortfolioUpdateStart = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
-  const unlisten = await listen<T>("portfolio:update-start", adaptCallback(handler));
-  return adaptUnlisten(unlisten);
-};
-
-export const listenPortfolioUpdateComplete = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
-  const unlisten = await listen<T>("portfolio:update-complete", adaptCallback(handler));
-  return adaptUnlisten(unlisten);
-};
-
-export const listenDatabaseRestored = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
-  const unlisten = await listen<T>("database-restored", adaptCallback(handler));
-  return adaptUnlisten(unlisten);
-};
-
-export const listenPortfolioUpdateError = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
-  const unlisten = await listen<T>("portfolio:update-error", adaptCallback(handler));
-  return adaptUnlisten(unlisten);
-};
-
-export async function listenMarketSyncComplete<T>(handler: EventCallback<T>): Promise<UnlistenFn> {
-  const unlisten = await listen<T>("market:sync-complete", adaptCallback(handler));
-  return adaptUnlisten(unlisten);
-}
-
-export async function listenMarketSyncStart<T>(handler: EventCallback<T>): Promise<UnlistenFn> {
-  const unlisten = await listen<T>("market:sync-start", adaptCallback(handler));
-  return adaptUnlisten(unlisten);
-}
-
-export async function listenBrokerSyncStart<T>(handler: EventCallback<T>): Promise<UnlistenFn> {
-  const unlisten = await listen<T>("broker:sync-start", adaptCallback(handler));
-  return adaptUnlisten(unlisten);
-}
-
-export async function listenBrokerSyncComplete<T>(handler: EventCallback<T>): Promise<UnlistenFn> {
-  const unlisten = await listen<T>("broker:sync-complete", adaptCallback(handler));
-  return adaptUnlisten(unlisten);
-}
-
-export async function listenBrokerSyncError<T>(handler: EventCallback<T>): Promise<UnlistenFn> {
-  const unlisten = await listen<T>("broker:sync-error", adaptCallback(handler));
-  return adaptUnlisten(unlisten);
-}
-
-export async function listenNavigateToRoute<T>(handler: EventCallback<T>): Promise<UnlistenFn> {
-  const unlisten = await listen<T>("navigate-to-route", adaptCallback(handler));
-  return adaptUnlisten(unlisten);
-}
-
-export const listenDeepLink = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
-  const unlisten = await listen<T>("deep-link-received", adaptCallback(handler));
-  return adaptUnlisten(unlisten);
-};
-
-// ============================================================================
-// Shell & Browser
-// ============================================================================
-
-export const openUrlInBrowser = async (url: string): Promise<void> => {
-  const { open: openShell } = await import("@tauri-apps/plugin-shell");
-  await openShell(url);
-};
-
-// ============================================================================
-// AI Thread Listing
-// ============================================================================
-
-/**
- * List AI chat threads with cursor-based pagination and optional search.
- *
- * @param req - Request parameters (cursor, limit, search)
- * @returns Paginated thread page
- */
-export async function listAiThreads(req?: ListThreadsRequest): Promise<ThreadPage> {
-  return tauriInvoke<ThreadPage>("list_ai_threads", {
-    cursor: req?.cursor,
-    limit: req?.limit ?? 20,
-    search: req?.search,
-  });
-}
-
-// ============================================================================
-// Broker / Connect Commands
-// ============================================================================
-
-export async function syncBrokerData(): Promise<void> {
-  return tauriInvoke<void>("sync_broker_data");
-}
-
-export async function getSyncedAccounts<T>(): Promise<T[]> {
-  return tauriInvoke<T[]>("get_synced_accounts");
-}
-
-export async function getPlatforms<T>(): Promise<T[]> {
-  return tauriInvoke<T[]>("get_platforms");
-}
-
-export async function listBrokerConnections<T>(): Promise<T[]> {
-  return tauriInvoke<T[]>("list_broker_connections");
-}
-
-export async function listBrokerAccounts<T>(): Promise<T[]> {
-  return tauriInvoke<T[]>("list_broker_accounts");
-}
-
-export async function getSubscriptionPlans<T>(): Promise<T> {
-  return tauriInvoke<T>("get_subscription_plans");
-}
-
-export async function getSubscriptionPlansPublic<T>(): Promise<T> {
-  return tauriInvoke<T>("get_subscription_plans_public");
-}
-
-export async function getUserInfo<T>(): Promise<T> {
-  return tauriInvoke<T>("get_user_info");
-}
-
-export async function getBrokerSyncStates<T>(): Promise<T[]> {
-  return tauriInvoke<T[]>("get_broker_sync_states");
-}
-
-export interface ImportRunsRequest {
-  runType?: string;
-  limit?: number;
-  offset?: number;
-}
-
-export async function getImportRuns<T>(request?: ImportRunsRequest): Promise<T[]> {
-  return tauriInvoke<T[]>("get_import_runs", {
-    runType: request?.runType,
-    limit: request?.limit,
-    offset: request?.offset,
-  });
-}
-
-// ============================================================================
-// AI Chat Streaming
-// ============================================================================
-
-/**
- * Stream AI chat responses via Tauri IPC.
- *
- * Uses Tauri's Channel for efficient streaming of events from the backend.
- *
- * @param request - The chat message request
- * @param signal - Optional AbortSignal for cancellation
- * @yields AiStreamEvent objects from the stream
- */
-export async function* streamAiChat(
-  request: AiSendMessageRequest,
-  signal?: AbortSignal,
-): AsyncGenerator<AiStreamEvent, void, undefined> {
-  const channel = new Channel<AiStreamEvent>();
-  const queue: AiStreamEvent[] = [];
-  let done = false;
-  let pendingResolve: (() => void) | null = null;
-
-  const notifyPending = () => {
-    if (pendingResolve) {
-      pendingResolve();
-      pendingResolve = null;
-    }
-  };
-
-  channel.onmessage = (event: AiStreamEvent) => {
-    queue.push(event);
-    notifyPending();
-  };
-
-  const invokePromise = tauriInvoke("stream_ai_chat", {
-    request,
-    onEvent: channel,
-  })
-    .catch((err) => {
-      queue.push({
-        type: "error",
-        threadId: "",
-        runId: "",
-        messageId: undefined,
-        code: "network",
-        message: err instanceof Error ? err.message : String(err),
-      } as AiStreamEvent);
-      notifyPending();
-    })
-    .finally(() => {
-      done = true;
-      notifyPending();
-    });
-
-  try {
-    while (!done || queue.length > 0) {
-      if (signal?.aborted) {
-        break;
-      }
-
-      if (queue.length === 0) {
-        await new Promise<void>((resolve) => {
-          pendingResolve = resolve;
-        });
-        continue;
-      }
-
-      const next = queue.shift();
-      if (next) {
-        yield next;
-
-        // Stop on terminal events
-        if (next.type === "done" || next.type === "error") {
-          return;
-        }
-      }
-    }
-  } finally {
-    // @ts-expect-error - Tauri Channel doesn't have a proper cleanup method
-    channel.onmessage = null;
-    if (!signal?.aborted) {
-      await invokePromise;
-    }
-  }
-}
+// Crypto Commands (sync crypto operations)
+export {
+  syncGenerateRootKey,
+  syncDeriveDek,
+  syncGenerateKeypair,
+  syncComputeSharedSecret,
+  syncDeriveSessionKey,
+  syncEncrypt,
+  syncDecrypt,
+  syncGeneratePairingCode,
+  syncHashPairingCode,
+  syncComputeSas,
+  syncGenerateDeviceId,
+} from "./crypto";

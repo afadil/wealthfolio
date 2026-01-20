@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { syncMarketData } from "@/commands/market-data";
+import { syncMarketData } from "@/adapters";
 import { useToast } from "@wealthfolio/ui/components/ui/use-toast";
 
 export function useSyncMarketDataMutation(refetchAll = true) {

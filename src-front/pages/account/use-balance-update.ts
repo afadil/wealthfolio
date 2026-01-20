@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { createActivity } from "@/commands/activity";
+import { createActivity } from "@/adapters";
 import { ActivityCreate, AccountValuation } from "@/lib/types";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 

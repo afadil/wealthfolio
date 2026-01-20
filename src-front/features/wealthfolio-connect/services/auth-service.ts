@@ -1,4 +1,8 @@
-import { invoke, logger } from "@/adapters";
+import {
+  logger,
+  storeSyncSession as storeSyncSessionApi,
+  clearSyncSession as clearSyncSessionApi,
+} from "@/adapters";
 
 /**
  * Store Wealthfolio Connect tokens in the backend's encrypted secret store.
@@ -10,7 +14,7 @@ export const storeSyncSession = async (
   accessToken?: string,
 ): Promise<void> => {
   try {
-    await invoke("store_sync_session", { refreshToken, accessToken });
+    await storeSyncSessionApi(refreshToken, accessToken);
     logger.debug("Sync session stored in backend");
   } catch (error) {
     logger.error("Error storing sync session in backend");
@@ -24,7 +28,7 @@ export const storeSyncSession = async (
  */
 export const clearSyncSession = async (): Promise<void> => {
   try {
-    await invoke("clear_sync_session");
+    await clearSyncSessionApi();
     logger.debug("Sync session cleared from backend");
   } catch (error) {
     logger.error("Error clearing sync session from backend");

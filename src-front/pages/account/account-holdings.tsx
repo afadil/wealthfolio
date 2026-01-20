@@ -1,4 +1,4 @@
-import { getHoldings } from "@/commands/portfolio";
+import { getHoldings } from "@/adapters";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { QueryKeys } from "@/lib/query-keys";

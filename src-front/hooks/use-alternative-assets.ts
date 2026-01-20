@@ -11,7 +11,7 @@ import {
   getNetWorth,
   getNetWorthHistory,
   getAlternativeHoldings,
-} from "@/commands/alternative-assets";
+} from "@/adapters";
 import type {
   AlternativeAssetHolding,
   CreateAlternativeAssetRequest,

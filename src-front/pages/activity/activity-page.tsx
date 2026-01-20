@@ -1,4 +1,4 @@
-import { getAccounts } from "@/commands/account";
+import { getAccounts } from "@/adapters";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { ActivityType } from "@/lib/constants";

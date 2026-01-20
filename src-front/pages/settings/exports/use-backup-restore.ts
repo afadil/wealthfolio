@@ -1,6 +1,12 @@
-import { isDesktop, logger } from "@/adapters";
-import { openDatabaseFileDialog, openFolderDialog } from "@/commands/file";
-import { backupDatabase, backupDatabaseToPath, restoreDatabase } from "@/commands/settings";
+import {
+  isDesktop,
+  logger,
+  backupDatabase,
+  backupDatabaseToPath,
+  restoreDatabase,
+  openDatabaseFileDialog,
+  openFolderDialog,
+} from "@/adapters";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useMutation } from "@tanstack/react-query";
 

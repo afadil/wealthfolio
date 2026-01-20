@@ -1,4 +1,4 @@
-import { searchActivities } from "@/commands/activity";
+import { searchActivities } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 import { ActivityType } from "@/lib/constants";
 import { ActivityDetails, ActivitySearchResponse } from "@/lib/types";

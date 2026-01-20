@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Holding } from "@/lib/types";
-import { getHoldings } from "@/commands/portfolio";
+import { getHoldings } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 
 export function useHoldings(accountId: string) {

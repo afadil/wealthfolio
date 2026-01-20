@@ -1,4 +1,4 @@
-import { calculateDepositsForLimit, getContributionLimit } from "@/commands/contribution-limits";
+import { calculateDepositsForLimit, getContributionLimit } from "@/adapters";
 import { Card, CardContent, CardHeader } from "@wealthfolio/ui/components/ui/card";
 import { Progress } from "@wealthfolio/ui/components/ui/progress";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";

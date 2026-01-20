@@ -1,11 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { QueryKeys } from "@/lib/query-keys";
 import {
+  setSecret,
+  deleteSecret,
   getMarketDataProviderSettings,
   updateMarketDataProviderSettings,
-  MarketDataProviderSetting,
-} from "@/commands/market-data";
-import { setSecret, deleteSecret } from "@/commands/secrets";
+  type MarketDataProviderSetting,
+} from "@/adapters";
+import { QueryKeys } from "@/lib/query-keys";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 
 export function useMarketDataProviderSettings() {

@@ -3,41 +3,43 @@ import React from "react";
 import { createSDKHostAPIBridge } from "./type-bridge";
 
 // Import all command functions
-import { logger } from "@/adapters";
-import { createAccount, getAccounts, updateAccount } from "@/commands/account";
 import {
+  logger,
+  checkActivitiesImport,
+  getAccountImportMapping,
+  importActivities,
+  saveAccountImportMapping,
   createActivity,
   getActivities,
   saveActivities,
   searchActivities,
   updateActivity,
-} from "@/commands/activity";
+  createAccount,
+  getAccounts,
+  updateAccount,
+} from "@/adapters";
 import {
-  checkActivitiesImport,
-  getAccountImportMapping,
-  importActivities,
-  saveAccountImportMapping,
-} from "@/commands/activity-import";
-import {
+  addExchangeRate,
+  getExchangeRates,
+  updateExchangeRate,
   calculateDepositsForLimit,
   createContributionLimit,
   getContributionLimit,
   updateContributionLimit,
-} from "@/commands/contribution-limits";
-import { addExchangeRate, getExchangeRates, updateExchangeRate } from "@/commands/exchange-rates";
-import { openCsvFileDialog, openFileSaveDialog } from "@/commands/file";
+} from "@/adapters";
+import { openCsvFileDialog, openFileSaveDialog } from "@/adapters";
 import {
   createGoal,
   getGoals,
   getGoalsAllocation,
   updateGoal,
   updateGoalsAllocations,
-} from "@/commands/goal";
+} from "@/adapters";
 import {
-  listenImportFileDrop,
-  listenImportFileDropCancelled,
-  listenImportFileDropHover,
-} from "@/commands/import-listener";
+  listenFileDrop as listenImportFileDrop,
+  listenFileDropCancelled as listenImportFileDropCancelled,
+  listenFileDropHover as listenImportFileDropHover,
+} from "@/adapters";
 import {
   getAssetProfile,
   getMarketDataProviders,
@@ -48,7 +50,7 @@ import {
   updatePricingMode,
   updateAssetProfile,
   updateQuote,
-} from "@/commands/market-data";
+} from "@/adapters";
 import {
   calculateAccountsSimplePerformance,
   calculatePerformanceHistory,
@@ -60,16 +62,15 @@ import {
   getLatestValuations,
   recalculatePortfolio,
   updatePortfolio,
-} from "@/commands/portfolio";
+} from "@/adapters";
 import {
   listenMarketSyncComplete,
   listenMarketSyncStart,
   listenPortfolioUpdateComplete,
   listenPortfolioUpdateError,
   listenPortfolioUpdateStart,
-} from "@/commands/portfolio-listener";
-import { deleteSecret, getSecret, setSecret } from "@/commands/secrets";
-import { backupDatabase, getSettings, updateSettings } from "@/commands/settings";
+} from "@/adapters";
+import { deleteSecret, getSecret, setSecret, backupDatabase, getSettings, updateSettings } from "@/adapters";
 
 // Store for dynamically added navigation items
 interface NavItem {

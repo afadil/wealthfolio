@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Settings } from "@/lib/types";
-import { getSettings } from "@/commands/settings";
+import { getSettings } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 import { useAuth } from "@/context/auth-context";
 

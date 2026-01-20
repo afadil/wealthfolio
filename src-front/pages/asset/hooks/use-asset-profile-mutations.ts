@@ -1,8 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { updateAssetProfile, updatePricingMode } from "@/commands/market-data";
+import { updateAssetProfile, updatePricingMode, logger } from "@/adapters";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { QueryKeys } from "@/lib/query-keys";
-import { logger } from "@/adapters";
 
 export const useAssetProfileMutations = () => {
   const queryClient = useQueryClient();

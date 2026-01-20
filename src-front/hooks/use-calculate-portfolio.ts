@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
-import { updatePortfolio, recalculatePortfolio } from "@/commands/portfolio";
+import { updatePortfolio, recalculatePortfolio } from "@/adapters";
 import { logger } from "@/adapters";
 
 export function useUpdatePortfolioMutation() {

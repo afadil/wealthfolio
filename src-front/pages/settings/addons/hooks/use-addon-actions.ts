@@ -1,18 +1,19 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@wealthfolio/ui/components/ui/use-toast";
-import { isDesktop, logger as envLogger } from "@/adapters";
-import type { InstalledAddon, Permission, ExtractedAddon } from "@/adapters";
-
-import { reloadAllAddons } from "@/addons/addons-core";
 import {
+  isDesktop,
+  logger as envLogger,
   installAddon,
   getInstalledAddons,
   toggleAddon,
   uninstallAddon,
   extractAddon,
   clearAddonStaging,
-} from "@/commands/addon";
+} from "@/adapters";
+import type { InstalledAddon, Permission, ExtractedAddon } from "@/adapters";
+
+import { reloadAllAddons } from "@/addons/addons-core";
 import type { RiskLevel, AddonManifest } from "@wealthfolio/addon-sdk";
 import { QueryKeys } from "@/lib/query-keys";
 

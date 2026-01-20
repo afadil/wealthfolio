@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { getMarketDataProviders } from "@/commands/market-data";
+import { getMarketDataProviders, logger } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 import { MarketDataProviderInfo } from "@/lib/types";
-import { logger } from "@/adapters";
 
 export function useMarketDataProviders() {
   return useQuery<MarketDataProviderInfo[], Error>({

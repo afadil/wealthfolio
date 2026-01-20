@@ -1,4 +1,4 @@
-import { searchTicker } from "@/commands/market-data";
+import { searchTicker } from "@/adapters";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Command,

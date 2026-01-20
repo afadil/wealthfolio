@@ -1,6 +1,5 @@
-import { isDesktop, listenDeepLink, logger, openUrlInBrowser } from "@/adapters";
+import { isDesktop, listenDeepLink, logger, openUrlInBrowser, getSecret, setSecret, deleteSecret } from "@/adapters";
 import { authenticate as authenticateWithASWebAuth } from "tauri-plugin-web-auth-api";
-import { getSecret, setSecret, deleteSecret } from "@/commands/secrets";
 import { getUserInfo } from "../services/broker-service";
 import { storeSyncSession, clearSyncSession } from "../services/auth-service";
 import type { UserInfo } from "../types";

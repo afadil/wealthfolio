@@ -31,8 +31,7 @@ import { useMemo, useState, useCallback } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
-import { createActivity } from "@/commands/activity";
-import { updateToolResult } from "@/commands/ai-chat";
+import { createActivity, updateToolResult } from "@/adapters";
 import {
   ActivityType,
   ACTIVITY_TYPE_DISPLAY_NAMES,

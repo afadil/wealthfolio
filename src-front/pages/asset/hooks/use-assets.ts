@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { getAssets } from "@/commands/market-data";
+import { getAssets } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 import { Asset } from "@/lib/types";
 

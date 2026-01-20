@@ -7,7 +7,27 @@
 // pairing operations which require real-time UI interaction.
 // ===========================================================================
 
-import { invoke, logger } from "@/adapters";
+import {
+  logger,
+  getDeviceSyncState as getDeviceSyncStateApi,
+  enableDeviceSync as enableDeviceSyncApi,
+  clearDeviceSyncData as clearDeviceSyncDataApi,
+  reinitializeDeviceSync as reinitializeDeviceSyncApi,
+  getDevice as getDeviceApi,
+  listDevices as listDevicesApi,
+  updateDevice as updateDeviceApi,
+  deleteDevice as deleteDeviceApi,
+  revokeDevice as revokeDeviceApi,
+  resetTeamSync as resetTeamSyncApi,
+  createPairing as createPairingApi,
+  getPairing as getPairingApi,
+  approvePairing as approvePairingApi,
+  completePairing as completePairingApi,
+  cancelPairing as cancelPairingApi,
+  claimPairing as claimPairingApi,
+  getPairingMessages as getPairingMessagesApi,
+  confirmPairing as confirmPairingApi,
+} from "@/adapters";
 import { syncStorage } from "../storage/keyring";
 import * as crypto from "../crypto";
 import type {
@@ -15,145 +35,12 @@ import type {
   DeviceSyncState,
   PairingSession,
   ClaimerSession,
-  CreatePairingResponse,
-  GetPairingResponse,
-  ClaimPairingResponse,
-  PairingMessagesResponse,
-  ConfirmPairingResponse,
-  SuccessResponse,
-  ResetTeamSyncResponse,
   KeyBundlePayload,
   TrustedDeviceSummary,
   SyncIdentity,
   StateDetectionResult,
 } from "../types";
 import { SyncError, SyncErrorCodes, SyncStates } from "../types";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Backend Types (from DeviceEnrollService)
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Result from get_device_sync_state Tauri command */
-interface BackendSyncStateResult {
-  state: DeviceSyncState;
-  deviceId: string | null;
-  deviceName: string | null;
-  keyVersion: number | null;
-  serverKeyVersion: number | null;
-  isTrusted: boolean;
-  trustedDevices: TrustedDeviceSummary[];
-}
-
-/** Result from enable_device_sync Tauri command */
-interface BackendEnableSyncResult {
-  deviceId: string;
-  state: DeviceSyncState;
-  keyVersion: number | null;
-  serverKeyVersion: number | null;
-  needsPairing: boolean;
-  trustedDevices: TrustedDeviceSummary[];
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// High-Level Backend Commands (DeviceEnrollService)
-// ─────────────────────────────────────────────────────────────────────────────
-
-async function getDeviceSyncStateApi(): Promise<BackendSyncStateResult> {
-  return invoke("get_device_sync_state");
-}
-
-async function enableDeviceSyncApi(): Promise<BackendEnableSyncResult> {
-  return invoke("enable_device_sync");
-}
-
-async function clearDeviceSyncDataApi(): Promise<void> {
-  return invoke("clear_device_sync_data");
-}
-
-async function reinitializeDeviceSyncApi(): Promise<BackendEnableSyncResult> {
-  return invoke("reinitialize_device_sync");
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Device Management Commands
-// ─────────────────────────────────────────────────────────────────────────────
-
-async function getDeviceApi(deviceId?: string): Promise<Device> {
-  return invoke("get_device", { deviceId });
-}
-
-async function listDevicesApi(scope?: string): Promise<Device[]> {
-  return invoke("list_devices", { scope });
-}
-
-async function updateDeviceApi(deviceId: string, displayName: string): Promise<SuccessResponse> {
-  return invoke("update_device", { deviceId, displayName });
-}
-
-async function deleteDeviceApi(deviceId: string): Promise<SuccessResponse> {
-  return invoke("delete_device", { deviceId });
-}
-
-async function revokeDeviceApi(deviceId: string): Promise<SuccessResponse> {
-  return invoke("revoke_device", { deviceId });
-}
-
-async function resetTeamSyncApi(reason?: string): Promise<ResetTeamSyncResponse> {
-  return invoke("reset_team_sync", { reason });
-}
-
-// Pairing
-async function createPairingApi(
-  codeHash: string,
-  ephemeralPublicKey: string,
-): Promise<CreatePairingResponse> {
-  return invoke("create_pairing", { codeHash, ephemeralPublicKey });
-}
-
-async function getPairingApi(pairingId: string): Promise<GetPairingResponse> {
-  return invoke("get_pairing", { pairingId });
-}
-
-async function approvePairingApi(pairingId: string): Promise<SuccessResponse> {
-  return invoke("approve_pairing", { pairingId });
-}
-
-async function completePairingApi(
-  pairingId: string,
-  encryptedKeyBundle: string,
-  sasProof: string | Record<string, unknown>,
-  signature: string,
-): Promise<SuccessResponse> {
-  return invoke("complete_pairing", {
-    pairingId,
-    encryptedKeyBundle,
-    sasProof,
-    signature,
-  });
-}
-
-async function cancelPairingApi(pairingId: string): Promise<SuccessResponse> {
-  return invoke("cancel_pairing", { pairingId });
-}
-
-// Claimer-side pairing
-async function claimPairingApi(
-  code: string,
-  ephemeralPublicKey: string,
-): Promise<ClaimPairingResponse> {
-  return invoke("claim_pairing", { code, ephemeralPublicKey });
-}
-
-async function getPairingMessagesApi(pairingId: string): Promise<PairingMessagesResponse> {
-  return invoke("get_pairing_messages", { pairingId });
-}
-
-async function confirmPairingApi(
-  pairingId: string,
-  proof?: string,
-): Promise<ConfirmPairingResponse> {
-  return invoke("confirm_pairing", { pairingId, proof });
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Exported Types

@@ -2,10 +2,9 @@ import { useState, useCallback, useEffect } from "react";
 import { ImportFormat, ActivityType, ImportMappingData } from "@/lib/types";
 import { ACTIVITY_TYPE_PREFIX_LENGTH } from "@/lib/types";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getAccountImportMapping, saveAccountImportMapping } from "@/commands/activity-import";
+import { getAccountImportMapping, saveAccountImportMapping, logger } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
-import { logger } from "@/adapters";
 
 export function initializeColumnMapping(
   headerRow: string[],

@@ -1,6 +1,6 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { AccountValuation, DateRange } from "@/lib/types";
-import { getHistoricalValuations } from "@/commands/portfolio";
+import { getHistoricalValuations } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 import { format } from "date-fns";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
