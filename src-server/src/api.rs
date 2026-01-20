@@ -36,6 +36,7 @@ mod portfolio;
 mod secrets;
 mod settings;
 pub mod shared;
+mod sync_crypto;
 mod taxonomies;
 
 #[utoipa::path(get, path = "/api/v1/healthz", responses((status = 200, description = "Health")))]
@@ -93,7 +94,8 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
         .merge(net_worth::router())
         .merge(alternative_assets::router())
         .merge(ai_providers::router())
-        .merge(ai_chat::router());
+        .merge(ai_chat::router())
+        .merge(sync_crypto::router());
 
     let protected_api = if requires_auth {
         protected_api.layer(middleware::from_fn_with_state(
