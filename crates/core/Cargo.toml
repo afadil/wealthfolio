@@ -37,7 +37,7 @@ wealthfolio-market-data = { path = "../market-data" }
 # Additional dependencies not in workspace
 yahoo_finance_api = "4.1"
 regex = "1.10"
-lazy_static = "1.5"
+rand = { workspace = true }
 dashmap = "6.1"
 serde_with = "3"
 urlencoding = "2"

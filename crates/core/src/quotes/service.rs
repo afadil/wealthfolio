@@ -23,7 +23,7 @@ use super::store::{ProviderSettingsStore, QuoteStore};
 use super::sync::{QuoteSyncService, QuoteSyncServiceTrait, SyncResult};
 use super::sync_state::{QuoteSyncState, SyncStateStore, SymbolSyncPlan};
 use super::types::{AssetId, Day};
-use crate::assets::{Asset, AssetKind, AssetRepositoryTrait, ProviderProfile, CASH_PREFIX};
+use crate::assets::{needs_market_quotes, Asset, AssetKind, AssetRepositoryTrait, ProviderProfile};
 use crate::errors::Result;
 use crate::secrets::SecretStore;
 
@@ -894,10 +894,11 @@ fn fill_missing_quotes(
         return Vec::new();
     }
 
-    // Filter out cash symbols - they don't need quotes (valued at 1:1)
+    // Filter to only symbols that need market quotes
+    // Excludes: cash, FX, alternative assets (PROP, VEH, COLL, PREC, LIAB, ALT), private equity
     let required_symbols: HashSet<String> = required_symbols
         .iter()
-        .filter(|s| !s.starts_with(CASH_PREFIX))
+        .filter(|s| needs_market_quotes(s))
         .cloned()
         .collect();
 
