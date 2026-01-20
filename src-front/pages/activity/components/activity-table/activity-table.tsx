@@ -141,7 +141,7 @@ export const ActivityTable = ({
               <div className="flex min-w-0 flex-col">
                 <span className="truncate font-medium">{displaySymbol}</span>
                 <span className="text-muted-foreground truncate text-xs font-light">
-                  {isCash ? String(currency) : String(assetName)}
+                  {isCash ? String(currency) : String(assetName ?? currency)}
                 </span>
               </div>
             </div>
