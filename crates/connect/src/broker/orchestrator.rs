@@ -295,7 +295,7 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
                 )
                 .await
             {
-                Ok((fetched, inserted, assets_created, needs_review)) => {
+                Ok((fetched, inserted, assets_created, needs_review, new_asset_ids)) => {
                     // Build import run summary first (needed for both success and failure paths)
                     let summary = ImportRunSummary {
                         fetched,
@@ -360,6 +360,7 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
                     activities_summary.accounts_synced += 1;
                     activities_summary.activities_upserted += inserted as usize;
                     activities_summary.assets_inserted += assets_created as usize;
+                    activities_summary.new_asset_ids.extend(new_asset_ids);
                 }
                 Err(err) => {
                     error!("Failed to sync activities for '{}': {}", account_name, err);
@@ -400,7 +401,7 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
 
     /// Sync activities for a single account with full pagination.
     ///
-    /// Returns (fetched, inserted, assets_created, needs_review).
+    /// Returns (fetched, inserted, assets_created, needs_review, new_asset_ids).
     async fn sync_account_activities(
         &self,
         api_client: &dyn BrokerApiClient,
@@ -410,7 +411,7 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
         start_date: Option<&str>,
         end_date: Option<&str>,
         import_run_id: Option<String>,
-    ) -> Result<(u32, u32, u32, u32), String> {
+    ) -> Result<(u32, u32, u32, u32, Vec<String>), String> {
         let mut offset: i64 = 0;
         let limit = self.config.page_limit;
         let mut pages_fetched: usize = 0;
@@ -420,6 +421,7 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
         let mut total_inserted: u32 = 0;
         let mut total_assets_created: u32 = 0;
         let mut total_needs_review: u32 = 0;
+        let mut all_new_asset_ids: Vec<String> = Vec::new();
 
         loop {
             // Check max pages limit
@@ -484,7 +486,7 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
                     account_name
                 );
 
-                let (upserted, assets, _new_asset_ids, needs_review) = self
+                let (upserted, assets, new_asset_ids, needs_review) = self
                     .sync_service
                     .upsert_account_activities(account_id.to_string(), import_run_id.clone(), data.clone())
                     .await
@@ -498,9 +500,7 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
                 total_inserted += upserted as u32;
                 total_assets_created += assets as u32;
                 total_needs_review += needs_review as u32;
-
-                // Update activities_summary with new asset IDs if needed
-                // (handled by caller)
+                all_new_asset_ids.extend(new_asset_ids);
             }
 
             // Check if there are more pages
@@ -518,7 +518,7 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
             }
         }
 
-        Ok((total_fetched, total_inserted, total_assets_created, total_needs_review))
+        Ok((total_fetched, total_inserted, total_assets_created, total_needs_review, all_new_asset_ids))
     }
 
     /// Compute the activity query window for incremental sync.
