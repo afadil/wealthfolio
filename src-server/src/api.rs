@@ -27,6 +27,7 @@ mod connect;
 mod device_sync;
 mod exchange_rates;
 mod goals;
+mod health;
 mod holdings;
 mod limits;
 mod market_data;
@@ -95,7 +96,8 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
         .merge(alternative_assets::router())
         .merge(ai_providers::router())
         .merge(ai_chat::router())
-        .merge(sync_crypto::router());
+        .merge(sync_crypto::router())
+        .merge(health::router());
 
     let protected_api = if requires_auth {
         protected_api.layer(middleware::from_fn_with_state(

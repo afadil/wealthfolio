@@ -37,6 +37,7 @@ import AuthCallbackPage from "@/features/wealthfolio-connect/pages/auth-callback
 import ConnectPage from "@/features/wealthfolio-connect/pages/connect-page";
 import HoldingsInsightsPage from "./pages/holdings/holdings-insights-page";
 import AboutSettingsPage from "./pages/settings/about/about-page";
+import HealthPage from "./pages/health/health-page";
 
 export function AppRoutes() {
   const [dynamicRoutes, setDynamicRoutes] = useState<
@@ -89,6 +90,7 @@ export function AppRoutes() {
           <Route path="income" element={<IncomePage />} />
           <Route path="performance" element={<PerformancePage />} />
           <Route path="insights" element={<PortfolioInsightsPage />} />
+          <Route path="health" element={<HealthPage />} />
           <Route path="assistant" element={<AiAssistantPage />} />
           <Route path="connect" element={<ConnectPage />} />
           {/* Dynamic addon routes */}

@@ -128,10 +128,11 @@ export const ActivityTable = ({
         header: ({ column }) => <DataTableColumnHeader column={column} title="Symbol" />,
         cell: ({ row }) => {
           const symbol = String(row.getValue("assetSymbol"));
-          const displaySymbol = symbol.startsWith("$CASH") ? symbol.split("-")[0] : symbol;
-          const avatarSymbol = symbol.startsWith("$CASH") ? "$CASH" : symbol;
+          const assetId = row.original.assetId;
+          const isCash = assetId.startsWith("CASH:");
+          const displaySymbol = isCash ? "Cash" : symbol;
+          const avatarSymbol = isCash ? "$CASH" : symbol;
 
-          const isCash = symbol.startsWith("$CASH");
           const assetName = row.getValue("assetName");
           const currency = row.getValue("currency");
 
@@ -150,8 +151,6 @@ export const ActivityTable = ({
           if (isCash) {
             return content;
           }
-
-          const assetId = row.original.assetId;
           return (
             <Link to={`/holdings/${encodeURIComponent(assetId)}`} className="-m-1 block p-1">
               {content}

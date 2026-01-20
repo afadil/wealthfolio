@@ -6,6 +6,7 @@ import { AmountDisplay, GainPercent, QuantityDisplay } from "@wealthfolio/ui";
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { Holding, HOLDING_GROUP_ORDER, AccountType } from "@/lib/types";
+import { AssetKind } from "@/lib/constants";
 import { cn, safeDivide } from "@/lib/utils";
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
@@ -176,10 +177,10 @@ function HoldingRow({
   navigate,
   isIndented = false,
 }: HoldingRowProps) {
+  const isCash = holding.assetKind === AssetKind.CASH;
   const symbol = holding.instrument?.symbol ?? holding.id;
-  const displaySymbol = symbol.startsWith("$CASH") ? symbol.split("-")[0] : symbol;
-  const avatarSymbol = symbol.startsWith("$CASH") ? "$CASH" : symbol;
-  const isCash = symbol.startsWith("$CASH");
+  const displaySymbol = isCash ? "Cash" : symbol;
+  const avatarSymbol = isCash ? "$CASH" : symbol;
 
   const handleNavigate = () => {
     // Use instrument.id (asset ID) for navigation, not symbol (which may be stripped)
@@ -227,7 +228,7 @@ function HoldingRow({
               )}
             </div>
             <span className="text-muted-foreground truncate text-sm">
-              {holding.instrument?.name ?? holding.id}
+              {isCash ? holding.localCurrency : (holding.instrument?.name ?? holding.id)}
             </span>
           </div>
         </div>

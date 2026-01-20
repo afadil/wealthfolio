@@ -179,22 +179,20 @@ diesel::table! {
 }
 
 diesel::table! {
-    exchanges (mic_code) {
-        mic_code -> Nullable<Text>,
-        name -> Text,
-        short_name -> Nullable<Text>,
-        country_code -> Nullable<Text>,
-        currency -> Nullable<Text>,
-    }
-}
-
-diesel::table! {
     goals (id) {
         id -> Text,
         title -> Text,
         description -> Nullable<Text>,
         target_amount -> Double,
         is_achieved -> Bool,
+    }
+}
+
+diesel::table! {
+    health_issue_dismissals (issue_id) {
+        issue_id -> Text,
+        dismissed_at -> Text,
+        data_hash -> Text,
     }
 }
 
@@ -369,9 +367,9 @@ diesel::allow_tables_to_appear_in_same_query!(
     brokers_sync_state,
     contribution_limits,
     daily_account_valuation,
-    exchanges,
     goals,
     goals_allocation,
+    health_issue_dismissals,
     holdings_snapshots,
     import_runs,
     market_data_providers,

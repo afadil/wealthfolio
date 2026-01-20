@@ -1422,3 +1422,79 @@ export interface ListModelsResponse {
   models: FetchedModel[];
   supportsListing: boolean;
 }
+
+// ============================================================================
+// Health Center Types
+// ============================================================================
+
+/**
+ * Severity level for health issues.
+ */
+export type HealthSeverity = "INFO" | "WARNING" | "ERROR" | "CRITICAL";
+
+/**
+ * Category of health issue.
+ */
+export type HealthCategory =
+  | "PRICE_STALENESS"
+  | "FX_INTEGRITY"
+  | "CLASSIFICATION"
+  | "DATA_CONSISTENCY";
+
+/**
+ * Navigation action for health issue resolution.
+ */
+export interface NavigateAction {
+  route: string;
+  query?: Record<string, unknown>;
+  label: string;
+}
+
+/**
+ * Fix action for health issue resolution.
+ */
+export interface FixAction {
+  id: string;
+  label: string;
+  payload: Record<string, unknown>;
+}
+
+/**
+ * A single health issue detected by the health center.
+ */
+export interface HealthIssue {
+  id: string;
+  severity: HealthSeverity;
+  category: HealthCategory;
+  title: string;
+  message: string;
+  affectedCount: number;
+  affectedMvPct?: number;
+  fixAction?: FixAction;
+  navigateAction?: NavigateAction;
+  details?: string;
+  dataHash: string;
+  timestamp: string;
+}
+
+/**
+ * Aggregated health status.
+ * Note: issueCounts is a partial map - missing keys mean 0 count.
+ */
+export interface HealthStatus {
+  overallSeverity: HealthSeverity;
+  issueCounts: Partial<Record<HealthSeverity, number>>;
+  issues: HealthIssue[];
+  checkedAt: string;
+  isStale: boolean;
+}
+
+/**
+ * Health center configuration.
+ */
+export interface HealthConfig {
+  stalePriceWarningDays: number;
+  stalePriceErrorDays: number;
+  criticalMvThresholdPercent: number;
+  enabled: boolean;
+}

@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/compone
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { Holding } from "@/lib/types";
+import { AssetKind } from "@/lib/constants";
 import { AmountDisplay, QuantityDisplay } from "@wealthfolio/ui";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -184,10 +185,10 @@ const getColumns = (
     cell: ({ row }) => {
       const navigate = useNavigate();
       const holding = row.original;
+      const isCash = holding.assetKind === AssetKind.CASH;
       const symbol = holding.instrument?.symbol ?? holding.id;
-      const displaySymbol = symbol.startsWith("$CASH") ? symbol.split("-")[0] : symbol;
-      // For TickerAvatar, use the full symbol for cash (including $CASH) to get the proper icon
-      const avatarSymbol = symbol.startsWith("$CASH") ? "$CASH" : symbol;
+      const displaySymbol = isCash ? "Cash" : symbol;
+      const avatarSymbol = isCash ? "$CASH" : symbol;
 
       const handleNavigate = () => {
         // Use instrument.id (asset ID) for navigation, not symbol (which may be stripped)
@@ -195,7 +196,6 @@ const getColumns = (
         navigate(`/holdings/${encodeURIComponent(navSymbol)}`, { state: { holding } });
       };
 
-      const isCash = symbol.startsWith("$CASH");
       const isManual = holding.instrument?.pricingMode === "MANUAL";
       const content = (
         <div className="flex items-center">
@@ -209,11 +209,15 @@ const getColumns = (
                 </Badge>
               )}
             </div>
-            {holding.instrument?.name && (
+            {isCash ? (
+              <span className="text-muted-foreground line-clamp-1 text-xs">
+                {holding.localCurrency}
+              </span>
+            ) : holding.instrument?.name ? (
               <span className="text-muted-foreground line-clamp-1 text-xs">
                 {holding.instrument.name}
               </span>
-            )}
+            ) : null}
           </div>
         </div>
       );

@@ -398,6 +398,15 @@ pub fn run() {
             commands::sync_crypto::sync_hash_pairing_code,
             commands::sync_crypto::sync_compute_sas,
             commands::sync_crypto::sync_generate_device_id,
+            // Health commands
+            commands::health::get_health_status,
+            commands::health::run_health_checks,
+            commands::health::dismiss_health_issue,
+            commands::health::restore_health_issue,
+            commands::health::get_dismissed_health_issues,
+            commands::health::execute_health_fix,
+            commands::health::get_health_config,
+            commands::health::update_health_config,
         ])
         .build(tauri::generate_context!())
         .expect("Failed to build Wealthfolio application")

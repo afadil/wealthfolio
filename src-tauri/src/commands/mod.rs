@@ -10,6 +10,7 @@ pub mod device_enroll_service;
 pub mod device_sync;
 pub mod error;
 pub mod goal;
+pub mod health;
 pub mod limits;
 pub mod market_data;
 pub mod platform;

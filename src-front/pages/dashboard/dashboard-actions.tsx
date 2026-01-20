@@ -5,6 +5,7 @@ import {
   useUpdatePortfolioMutation,
   useRecalculatePortfolioMutation,
 } from "@/hooks/use-calculate-portfolio";
+import { useRunHealthChecks } from "@/hooks/use-health";
 import { useSyncBrokerData } from "@/features/wealthfolio-connect/hooks";
 import { useWealthfolioConnect } from "@/features/wealthfolio-connect/providers/wealthfolio-connect-provider";
 import { useMemo, useState } from "react";
@@ -17,6 +18,7 @@ export function DashboardActions() {
   // Portfolio update mutations
   const updatePortfolioMutation = useUpdatePortfolioMutation();
   const recalculatePortfolioMutation = useRecalculatePortfolioMutation();
+  const runHealthChecksMutation = useRunHealthChecks();
 
   // Wealthfolio Connect sync
   const { isEnabled, isConnected, userInfo } = useWealthfolioConnect();
@@ -54,10 +56,15 @@ export function DashboardActions() {
             label: "Recalculate Portfolio",
             onClick: () => recalculatePortfolioMutation.mutate(),
           },
+          {
+            icon: "ShieldCheck",
+            label: "Run Health Check",
+            onClick: () => runHealthChecksMutation.mutate(),
+          },
         ],
       },
     ];
-  }, [navigate, showSyncAction, syncBrokerData, updatePortfolioMutation, recalculatePortfolioMutation]);
+  }, [navigate, showSyncAction, syncBrokerData, updatePortfolioMutation, recalculatePortfolioMutation, runHealthChecksMutation]);
 
   return (
     <ActionPalette
