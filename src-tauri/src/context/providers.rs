@@ -12,6 +12,7 @@ use wealthfolio_core::{
     assets::{AssetClassificationService, AssetService},
     fx::{FxService, FxServiceTrait},
     goals::GoalService,
+    health::HealthService,
     limits::ContributionLimitService,
     portfolio::{
         allocation::AllocationService,
@@ -34,6 +35,7 @@ use wealthfolio_storage_sqlite::{
     db::{self, write_actor},
     fx::FxRepository,
     goals::GoalRepository,
+    health::HealthDismissalRepository,
     limits::ContributionLimitRepository,
     market_data::{MarketDataRepository, QuoteSyncStateRepository},
     portfolio::{snapshot::SnapshotRepository, valuation::ValuationRepository},
@@ -236,6 +238,11 @@ pub async fn initialize_context(
         app_version,
     ));
 
+    // Health service for portfolio health diagnostics
+    let health_dismissal_repository =
+        Arc::new(HealthDismissalRepository::new(pool.clone(), writer.clone()));
+    let health_service = Arc::new(HealthService::new(health_dismissal_repository));
+
     Ok(ServiceContext {
         base_currency,
         instance_id,
@@ -261,6 +268,7 @@ pub async fn initialize_context(
         ai_provider_service,
         ai_chat_service,
         device_enroll_service,
+        health_service,
     })
 }
 

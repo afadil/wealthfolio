@@ -97,6 +97,9 @@ export * from "../shared/ai-providers";
 // AI Thread Commands
 export * from "../shared/ai-threads";
 
+// Health Center Commands
+export * from "../shared/health";
+
 // ============================================================================
 // Platform-specific modules (different implementations)
 // ============================================================================

@@ -1,4 +1,5 @@
 import { SwipablePage, SwipablePageView } from "@/components/page";
+import { HealthStatusIndicator } from "@/components/health-status-icon";
 import { PrivacyToggle } from "@/components/privacy-toggle";
 import { useNavigationMode } from "@/pages/layouts/navigation/navigation-mode-context";
 import { Icons, Button } from "@wealthfolio/ui";
@@ -61,6 +62,7 @@ export default function PortfolioPage() {
         </Button>
       )}
       <PrivacyToggle />
+      <HealthStatusIndicator />
       <DashboardActions />
     </>
   );

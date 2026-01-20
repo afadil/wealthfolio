@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock};
 use wealthfolio_ai::{AiProviderServiceTrait, ChatService};
 use wealthfolio_connect::BrokerSyncServiceTrait;
 use wealthfolio_core::{
-    self, accounts, activities, assets, fx, goals, limits, portfolio, quotes, settings,
+    self, accounts, activities, assets, fx, goals, health, limits, portfolio, quotes, settings,
     taxonomies,
 };
 use wealthfolio_device_sync::DeviceEnrollService;
@@ -38,6 +38,7 @@ pub struct ServiceContext {
     pub ai_provider_service: Arc<dyn AiProviderServiceTrait>,
     pub ai_chat_service: Arc<ChatService<TauriAiEnvironment>>,
     pub device_enroll_service: Arc<DeviceEnrollService>,
+    pub health_service: Arc<health::HealthService>,
 }
 
 impl ServiceContext {
@@ -135,5 +136,9 @@ impl ServiceContext {
 
     pub fn device_enroll_service(&self) -> Arc<DeviceEnrollService> {
         Arc::clone(&self.device_enroll_service)
+    }
+
+    pub fn health_service(&self) -> Arc<health::HealthService> {
+        Arc::clone(&self.health_service)
     }
 }

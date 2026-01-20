@@ -236,6 +236,18 @@ export {
   updateToolResult,
 } from "../shared/ai-threads";
 
+// Health Center Commands
+export {
+  getHealthStatus,
+  runHealthChecks,
+  dismissHealthIssue,
+  restoreHealthIssue,
+  getDismissedHealthIssues,
+  executeHealthFix,
+  getHealthConfig,
+  updateHealthConfig,
+} from "../shared/health";
+
 // ============================================================================
 // Platform-specific modules (different implementations for web vs desktop)
 // ============================================================================

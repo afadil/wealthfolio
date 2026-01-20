@@ -18,6 +18,7 @@ use wealthfolio_core::{
     },
     fx::{FxService, FxServiceTrait},
     goals::{GoalService, GoalServiceTrait},
+    health::{HealthService, HealthServiceTrait},
     limits::{ContributionLimitService, ContributionLimitServiceTrait},
     portfolio::allocation::{AllocationService, AllocationServiceTrait},
     portfolio::income::{IncomeService, IncomeServiceTrait},
@@ -43,6 +44,7 @@ use wealthfolio_storage_sqlite::{
     db::{self, write_actor},
     fx::FxRepository,
     goals::GoalRepository,
+    health::HealthDismissalRepository,
     limits::ContributionLimitRepository,
     market_data::{MarketDataRepository, QuoteSyncStateRepository},
     portfolio::{snapshot::SnapshotRepository, valuation::ValuationRepository},
@@ -81,6 +83,7 @@ pub struct AppState {
     pub event_bus: EventBus,
     pub auth: Option<Arc<AuthManager>>,
     pub device_enroll_service: Arc<DeviceEnrollService>,
+    pub health_service: Arc<dyn HealthServiceTrait + Send + Sync>,
 }
 
 pub fn init_tracing() {
@@ -312,6 +315,12 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         app_version,
     ));
 
+    // Health service for portfolio health diagnostics
+    let health_dismissal_repository =
+        Arc::new(HealthDismissalRepository::new(pool.clone(), writer.clone()));
+    let health_service: Arc<dyn HealthServiceTrait + Send + Sync> =
+        Arc::new(HealthService::new(health_dismissal_repository));
+
     let event_bus = EventBus::new(256);
 
     let auth_manager = config
@@ -351,5 +360,6 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         event_bus,
         auth: auth_manager,
         device_enroll_service,
+        health_service,
     }))
 }

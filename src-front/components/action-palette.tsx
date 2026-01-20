@@ -6,7 +6,7 @@ import { cn } from "@wealthfolio/ui/lib/utils";
 import { useHapticFeedback } from "@/hooks";
 
 export interface ActionPaletteItem {
-  icon: "Plus" | "Minus" | "Pencil" | "Refresh" | "Trash" | "Eye" | "EyeOff" | "Settings2" | "Download" | "Upload" | "Copy" | "ExternalLink" | "HandCoins" | "MoreVertical" | "TrendingUp" | "TrendingDown" | "Coins" | "Ellipsis" | "History" | "Fullscreen";
+  icon: "Plus" | "Minus" | "Pencil" | "Refresh" | "Trash" | "Eye" | "EyeOff" | "Settings2" | "Download" | "Upload" | "Copy" | "ExternalLink" | "HandCoins" | "MoreVertical" | "TrendingUp" | "TrendingDown" | "Coins" | "Ellipsis" | "History" | "Fullscreen" | "ShieldCheck";
   label: string;
   onClick: () => void;
   variant?: "default" | "destructive";
@@ -48,6 +48,7 @@ const iconMap: Record<ActionPaletteItem["icon"], React.ComponentType<{ className
   Ellipsis: Icons.Ellipsis,
   History: Icons.History,
   Fullscreen: Icons.Fullscreen,
+  ShieldCheck: Icons.ShieldCheck,
 };
 
 export function ActionPalette({

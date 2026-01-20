@@ -12,6 +12,7 @@ pub mod constants;
 pub mod errors;
 pub mod fx;
 pub mod goals;
+pub mod health;
 pub mod limits;
 pub mod portfolio;
 pub mod quotes;

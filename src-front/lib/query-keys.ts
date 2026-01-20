@@ -111,4 +111,9 @@ export const QueryKeys = {
   ASSET_TAXONOMY_ASSIGNMENTS: "assetTaxonomyAssignments",
   assetTaxonomyAssignments: (assetId: string) => [QueryKeys.ASSET_TAXONOMY_ASSIGNMENTS, assetId],
   ASSET_CLASSIFICATIONS: "asset-classifications",
+
+  // Health Center
+  HEALTH_STATUS: "healthStatus",
+  HEALTH_CONFIG: "healthConfig",
+  DISMISSED_HEALTH_ISSUES: "dismissedHealthIssues",
 } as const;
