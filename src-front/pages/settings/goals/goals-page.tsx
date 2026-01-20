@@ -1,4 +1,4 @@
-import { getGoals, getGoalsAllocation } from "@/commands/goal";
+import { getGoals, getGoalsAllocation } from "@/adapters";
 import { useAccounts } from "@/hooks/use-accounts";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Goal, GoalAllocation } from "@/lib/types";

@@ -1,4 +1,4 @@
-import { invoke, logger } from "@/adapters";
+// Alternative Assets Commands
 import type {
   AlternativeAssetHolding,
   CreateAlternativeAssetRequest,
@@ -10,6 +10,8 @@ import type {
   NetWorthHistoryPoint,
 } from "@/lib/types";
 
+import { invoke } from "./platform";
+
 /**
  * Create a new alternative asset (property, vehicle, collectible, precious metal, liability, or other)
  * This creates an asset record and initial valuation quote.
@@ -18,12 +20,7 @@ import type {
 export const createAlternativeAsset = async (
   request: CreateAlternativeAssetRequest,
 ): Promise<CreateAlternativeAssetResponse> => {
-  try {
-    return await invoke<CreateAlternativeAssetResponse>("create_alternative_asset", { request });
-  } catch (error) {
-    logger.error("Error creating alternative asset.");
-    throw error;
-  }
+  return invoke<CreateAlternativeAssetResponse>("create_alternative_asset", { request });
 };
 
 /**
@@ -34,15 +31,10 @@ export const updateAlternativeAssetValuation = async (
   assetId: string,
   request: UpdateValuationRequest,
 ): Promise<UpdateValuationResponse> => {
-  try {
-    return await invoke<UpdateValuationResponse>("update_alternative_asset_valuation", {
-      assetId,
-      request,
-    });
-  } catch (error) {
-    logger.error("Error updating alternative asset valuation.");
-    throw error;
-  }
+  return invoke<UpdateValuationResponse>("update_alternative_asset_valuation", {
+    assetId,
+    request,
+  });
 };
 
 /**
@@ -51,12 +43,7 @@ export const updateAlternativeAssetValuation = async (
  * Any linked liabilities will be unlinked but not deleted.
  */
 export const deleteAlternativeAsset = async (assetId: string): Promise<void> => {
-  try {
-    await invoke<void>("delete_alternative_asset", { assetId });
-  } catch (error) {
-    logger.error("Error deleting alternative asset.");
-    throw error;
-  }
+  return invoke<void>("delete_alternative_asset", { assetId });
 };
 
 /**
@@ -67,12 +54,7 @@ export const linkLiability = async (
   liabilityId: string,
   request: LinkLiabilityRequest,
 ): Promise<void> => {
-  try {
-    await invoke<void>("link_liability", { liabilityId, request });
-  } catch (error) {
-    logger.error("Error linking liability.");
-    throw error;
-  }
+  return invoke<void>("link_liability", { liabilityId, request });
 };
 
 /**
@@ -80,12 +62,7 @@ export const linkLiability = async (
  * Removes the linked_asset_id from the liability's metadata.
  */
 export const unlinkLiability = async (liabilityId: string): Promise<void> => {
-  try {
-    await invoke<void>("unlink_liability", { liabilityId });
-  } catch (error) {
-    logger.error("Error unlinking liability.");
-    throw error;
-  }
+  return invoke<void>("unlink_liability", { liabilityId });
 };
 
 /**
@@ -93,12 +70,7 @@ export const unlinkLiability = async (liabilityId: string): Promise<void> => {
  * @param date Optional date for as-of calculation (ISO format: YYYY-MM-DD). Defaults to today.
  */
 export const getNetWorth = async (date?: string): Promise<NetWorthResponse> => {
-  try {
-    return await invoke<NetWorthResponse>("get_net_worth", { date });
-  } catch (error) {
-    logger.error("Error fetching net worth.");
-    throw error;
-  }
+  return invoke<NetWorthResponse>("get_net_worth", { date });
 };
 
 /**
@@ -110,15 +82,10 @@ export const updateAlternativeAssetMetadata = async (
   assetId: string,
   metadata: Record<string, string>,
 ): Promise<void> => {
-  try {
-    await invoke<void>("update_alternative_asset_metadata", {
-      assetId,
-      metadata,
-    });
-  } catch (error) {
-    logger.error("Error updating alternative asset metadata.");
-    throw error;
-  }
+  return invoke<void>("update_alternative_asset_metadata", {
+    assetId,
+    metadata,
+  });
 };
 
 /**
@@ -127,12 +94,7 @@ export const updateAlternativeAssetMetadata = async (
  * PhysicalPrecious, Liability, Other) formatted for display in the Holdings page.
  */
 export const getAlternativeHoldings = async (): Promise<AlternativeAssetHolding[]> => {
-  try {
-    return await invoke<AlternativeAssetHolding[]>("get_alternative_holdings", {});
-  } catch (error) {
-    logger.error("Error fetching alternative holdings.");
-    throw error;
-  }
+  return invoke<AlternativeAssetHolding[]>("get_alternative_holdings", {});
 };
 
 /**
@@ -144,13 +106,8 @@ export const getNetWorthHistory = async (
   startDate: string,
   endDate: string,
 ): Promise<NetWorthHistoryPoint[]> => {
-  try {
-    return await invoke<NetWorthHistoryPoint[]>("get_net_worth_history", {
-      startDate,
-      endDate,
-    });
-  } catch (error) {
-    logger.error("Error fetching net worth history.");
-    throw error;
-  }
+  return invoke<NetWorthHistoryPoint[]>("get_net_worth_history", {
+    startDate,
+    endDate,
+  });
 };

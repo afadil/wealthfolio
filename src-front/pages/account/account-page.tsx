@@ -1,4 +1,4 @@
-import { getHoldings } from "@/commands/portfolio";
+import { getHoldings } from "@/adapters";
 import { HistoryChart } from "@/components/history-chart";
 import {
   Card,

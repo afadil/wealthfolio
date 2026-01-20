@@ -1,4 +1,4 @@
-import { getIncomeSummary } from "@/commands/portfolio";
+import { getIncomeSummary } from "@/adapters";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@wealthfolio/ui/components/ui/chart";

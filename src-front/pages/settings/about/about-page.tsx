@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { getAppInfo } from "@/commands/app";
+import { getAppInfo } from "@/adapters";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";

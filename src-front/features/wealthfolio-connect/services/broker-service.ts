@@ -41,7 +41,7 @@ export const syncBrokerData = async (): Promise<void> => {
 
 export const getSyncedAccounts = async (): Promise<Account[]> => {
   try {
-    return await getSyncedAccountsAdapter<Account>();
+    return await getSyncedAccountsAdapter();
   } catch (error) {
     logger.error("Error getting synced accounts.");
     throw error;
@@ -50,7 +50,7 @@ export const getSyncedAccounts = async (): Promise<Account[]> => {
 
 export const getPlatforms = async (): Promise<Platform[]> => {
   try {
-    return await getPlatformsAdapter<Platform>();
+    return await getPlatformsAdapter();
   } catch (error) {
     logger.error("Error getting platforms.");
     throw error;
@@ -63,7 +63,7 @@ export const getPlatforms = async (): Promise<Platform[]> => {
 
 export const listBrokerConnections = async (): Promise<BrokerConnection[]> => {
   try {
-    return await listBrokerConnectionsAdapter<BrokerConnection>();
+    return await listBrokerConnectionsAdapter();
   } catch (error) {
     logger.error("Error listing broker connections.");
     throw error;
@@ -72,7 +72,7 @@ export const listBrokerConnections = async (): Promise<BrokerConnection[]> => {
 
 export const listBrokerAccounts = async (): Promise<BrokerAccount[]> => {
   try {
-    return await listBrokerAccountsAdapter<BrokerAccount>();
+    return await listBrokerAccountsAdapter();
   } catch (error) {
     logger.error("Error listing broker accounts.");
     throw error;
@@ -85,7 +85,7 @@ export const listBrokerAccounts = async (): Promise<BrokerAccount[]> => {
 
 export const getSubscriptionPlans = async (): Promise<PlansResponse> => {
   try {
-    return await getSubscriptionPlansAdapter<PlansResponse>();
+    return await getSubscriptionPlansAdapter();
   } catch (error) {
     logger.error(`Error getting subscription plans: ${error}`);
     throw error;
@@ -94,7 +94,7 @@ export const getSubscriptionPlans = async (): Promise<PlansResponse> => {
 
 export const getSubscriptionPlansPublic = async (): Promise<PlansResponse> => {
   try {
-    return await getSubscriptionPlansPublicAdapter<PlansResponse>();
+    return await getSubscriptionPlansPublicAdapter();
   } catch (error) {
     logger.error(`Error getting subscription plans (public): ${error}`);
     throw error;
@@ -107,7 +107,7 @@ export const getSubscriptionPlansPublic = async (): Promise<PlansResponse> => {
 
 export const getUserInfo = async (): Promise<UserInfo> => {
   try {
-    return await getUserInfoAdapter<UserInfo>();
+    return await getUserInfoAdapter();
   } catch (error) {
     logger.error(`Error getting user info: ${error}`);
     throw error;
@@ -120,7 +120,7 @@ export const getUserInfo = async (): Promise<UserInfo> => {
 
 export const getBrokerSyncStates = async (): Promise<BrokerSyncState[]> => {
   try {
-    return await getBrokerSyncStatesAdapter<BrokerSyncState>();
+    return await getBrokerSyncStatesAdapter();
   } catch (error) {
     logger.error("Error getting broker sync states.");
     throw error;
@@ -133,7 +133,7 @@ export const getImportRuns = async (
   offset?: number,
 ): Promise<ImportRun[]> => {
   try {
-    return await getImportRunsAdapter<ImportRun>({ runType, limit, offset });
+    return await getImportRunsAdapter({ runType, limit, offset });
   } catch (error) {
     logger.error("Error getting import runs.");
     throw error;

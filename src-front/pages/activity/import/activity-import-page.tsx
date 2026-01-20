@@ -1,5 +1,4 @@
-import { logger } from "@/adapters";
-import { getAccounts } from "@/commands/account";
+import { logger, getAccounts } from "@/adapters";
 import { Card, CardContent, CardHeader } from "@wealthfolio/ui/components/ui/card";
 import { usePlatform } from "@/hooks/use-platform";
 import { QueryKeys } from "@/lib/query-keys";

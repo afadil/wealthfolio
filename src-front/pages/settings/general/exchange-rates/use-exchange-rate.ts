@@ -1,10 +1,10 @@
-import { logger } from "@/adapters";
 import {
+  logger,
   addExchangeRate as addExchangeRateApi,
   deleteExchangeRate as deleteExchangeRateApi,
   getExchangeRates,
   updateExchangeRate as updateExchangeRateApi,
-} from "@/commands/exchange-rates";
+} from "@/adapters";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { QueryKeys } from "@/lib/query-keys";
 import { ExchangeRate } from "@/lib/types";

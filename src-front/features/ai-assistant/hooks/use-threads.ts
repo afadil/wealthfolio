@@ -9,7 +9,7 @@ import {
   removeAiThreadTag,
   type UpdateThreadRequest,
   type ThreadPage,
-} from "@/commands/ai-chat";
+} from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 import type { ChatMessage, ChatThread } from "../types";
 

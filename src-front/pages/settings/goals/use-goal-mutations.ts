@@ -1,5 +1,4 @@
-import { logger } from "@/adapters";
-import { createGoal, deleteGoal, updateGoal, updateGoalsAllocations } from "@/commands/goal";
+import { logger, createGoal, deleteGoal, updateGoal, updateGoalsAllocations } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";

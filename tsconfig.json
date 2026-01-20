@@ -11,7 +11,8 @@
       "@/*": ["./src-front/*"],
       "@wealthfolio/addon-sdk": ["packages/addon-sdk/src"],
       "@wealthfolio/ui": ["packages/ui/src"],
-      "@wealthfolio/ui/*": ["packages/ui/src/*"]
+      "@wealthfolio/ui/*": ["packages/ui/src/*"],
+      "#platform": ["./src-front/adapters/tauri/core"]
     }
   },
   "include": ["src-front"],

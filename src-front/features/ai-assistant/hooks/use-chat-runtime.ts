@@ -18,7 +18,7 @@ import { streamChatResponse, type ChatModelConfig } from "../api";
 import type { ChatMessage, ChatThread, ToolCall, ToolResult } from "../types";
 import { QueryKeys } from "@/lib/query-keys";
 import { AI_THREADS_KEY } from "./use-threads";
-import { deleteAiThread, getAiThreadMessages, updateAiThread } from "@/commands/ai-chat";
+import { deleteAiThread, getAiThreadMessages, updateAiThread } from "@/adapters";
 
 /**
  * Extract error message from provider response.

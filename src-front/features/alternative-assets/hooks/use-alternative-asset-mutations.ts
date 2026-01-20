@@ -7,7 +7,7 @@ import {
   deleteAlternativeAsset,
   linkLiability,
   unlinkLiability,
-} from "@/commands/alternative-assets";
+} from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 import { logger } from "@/adapters";
 import type {

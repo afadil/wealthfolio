@@ -14,8 +14,7 @@ import { Link } from "react-router-dom";
 
 import { SettingsHeader } from "../settings-header";
 
-import { MarketDataProviderSetting } from "@/commands/market-data";
-import { getSecret } from "@/commands/secrets";
+import { getSecret, type MarketDataProviderSetting } from "@/adapters";
 import {
   useRecalculatePortfolioMutation,
   useUpdatePortfolioMutation,

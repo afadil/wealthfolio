@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getQuoteHistory } from "@/commands/market-data";
+import { getQuoteHistory } from "@/adapters";
 import { Quote } from "@/lib/types";
 import { DataSource } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";

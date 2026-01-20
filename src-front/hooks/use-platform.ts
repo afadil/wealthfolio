@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { invoke, isDesktop as isDesktopEnv, isWeb as isWebEnv } from "@/adapters";
+import {
+  getPlatform as getPlatformApi,
+  isDesktop as isDesktopEnv,
+  isWeb as isWebEnv,
+  type PlatformInfo,
+} from "@/adapters";
 
-export interface PlatformInfo {
-  os: string;
-  is_mobile: boolean;
-  is_desktop: boolean;
-}
+export type { PlatformInfo };
 
 export interface UsePlatformResult {
   platform: PlatformInfo | null;
@@ -38,7 +39,7 @@ export function usePlatform(): UsePlatformResult {
 
     if (isDesktopEnv) {
       // We're in Tauri, get actual platform info
-      invoke<PlatformInfo>("get_platform")
+      getPlatformApi()
         .then((info) => {
           cachedPlatform = info;
           setPlatform(info);
@@ -129,7 +130,7 @@ export async function getPlatform(): Promise<PlatformInfo> {
 
   if (isDesktopEnv) {
     try {
-      const info = await invoke<PlatformInfo>("get_platform");
+      const info = await getPlatformApi();
       cachedPlatform = info;
       return info;
     } catch (error) {

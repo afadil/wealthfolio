@@ -1,4 +1,4 @@
-import { importManualQuotes } from "@/commands/market-data";
+import { importManualQuotes } from "@/adapters";
 import { useCallback, useState } from "react";
 import { parseCsvContent, validateCsvFile } from "../lib/quote-import-utils";
 import {

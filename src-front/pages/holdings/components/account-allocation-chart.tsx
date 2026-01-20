@@ -1,4 +1,4 @@
-import { getAccounts } from "@/commands/account";
+import { getAccounts } from "@/adapters";
 import { useAccountsSimplePerformance } from "@/hooks/use-accounts-simple-performance";
 import { QueryKeys } from "@/lib/query-keys";
 import { Account } from "@/lib/types";

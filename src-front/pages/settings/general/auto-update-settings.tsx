@@ -1,4 +1,4 @@
-import { updateSettings } from "@/commands/settings";
+import { updateSettings } from "@/adapters";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { Switch } from "@wealthfolio/ui/components/ui/switch";

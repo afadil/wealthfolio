@@ -1,5 +1,5 @@
 import { keepPreviousData, useQueries } from "@tanstack/react-query";
-import { calculatePerformanceHistory } from "@/commands/portfolio";
+import { calculatePerformanceHistory } from "@/adapters";
 import { useRef } from "react";
 import { format } from "date-fns";
 import { DateRange } from "react-day-picker";

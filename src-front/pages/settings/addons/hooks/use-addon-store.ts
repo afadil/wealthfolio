@@ -1,12 +1,13 @@
-import { logger, type ExtractedAddon } from "@/adapters";
 import {
+  logger,
   clearAddonStaging,
   downloadAddonForReview,
   fetchAddonStoreListings,
   getAddonRatings,
   installFromStaging,
   submitAddonRating,
-} from "@/commands/addon";
+} from "@/adapters";
+import type { ExtractedAddon } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 import type { AddonStoreListing } from "@/lib/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";

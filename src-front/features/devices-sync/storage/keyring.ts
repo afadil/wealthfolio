@@ -2,7 +2,7 @@
 // Uses the existing Tauri keyring integration via secrets commands
 // =================================================================
 
-import { getSecret, setSecret, deleteSecret } from "@/commands/secrets";
+import { getSecret, setSecret, deleteSecret } from "@/adapters";
 
 // Storage key for sync identity in keychain
 const SYNC_IDENTITY_KEY = "sync_identity";

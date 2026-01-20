@@ -2,15 +2,22 @@
 // Delegates to Rust backend for all crypto operations
 // ====================================================
 
-import { invoke } from "@/adapters";
+import {
+  syncGenerateRootKey,
+  syncDeriveDek,
+  syncGenerateKeypair,
+  syncComputeSharedSecret,
+  syncDeriveSessionKey,
+  syncEncrypt,
+  syncDecrypt,
+  syncGeneratePairingCode,
+  syncHashPairingCode,
+  syncComputeSas,
+  syncGenerateDeviceId,
+  type EphemeralKeyPair,
+} from "@/adapters";
 
-// Types
-// -----
-
-export interface EphemeralKeyPair {
-  publicKey: string; // Base64
-  secretKey: string; // Base64
-}
+export type { EphemeralKeyPair };
 
 // Base64 utilities (kept for convenience)
 // ----------------------------------------
@@ -37,7 +44,7 @@ export function base64Decode(str: string): Uint8Array {
  * Returns base64-encoded key
  */
 export async function generateRootKey(): Promise<string> {
-  return invoke<string>("sync_generate_root_key");
+  return syncGenerateRootKey();
 }
 
 /**
@@ -46,10 +53,7 @@ export async function generateRootKey(): Promise<string> {
  * Returns base64-encoded DEK
  */
 export async function deriveDEK(rootKeyB64: string, version: number = 1): Promise<string> {
-  return invoke<string>("sync_derive_dek", {
-    rootKey: rootKeyB64,
-    version,
-  });
+  return syncDeriveDek(rootKeyB64, version);
 }
 
 // Ephemeral key operations for pairing
@@ -60,7 +64,7 @@ export async function deriveDEK(rootKeyB64: string, version: number = 1): Promis
  * Returns base64-encoded keys
  */
 export async function generateEphemeralKeypair(): Promise<EphemeralKeyPair> {
-  return invoke<EphemeralKeyPair>("sync_generate_keypair");
+  return syncGenerateKeypair();
 }
 
 /**
@@ -71,10 +75,7 @@ export async function computeSharedSecret(
   ourSecretB64: string,
   theirPublicB64: string,
 ): Promise<string> {
-  return invoke<string>("sync_compute_shared_secret", {
-    ourSecret: ourSecretB64,
-    theirPublic: theirPublicB64,
-  });
+  return syncComputeSharedSecret(ourSecretB64, theirPublicB64);
 }
 
 /**
@@ -86,10 +87,7 @@ export async function deriveSessionKey(
   sharedSecretB64: string,
   context: string = "pairing",
 ): Promise<string> {
-  return invoke<string>("sync_derive_session_key", {
-    sharedSecret: sharedSecretB64,
-    context,
-  });
+  return syncDeriveSessionKey(sharedSecretB64, context);
 }
 
 // Encryption/Decryption
@@ -100,10 +98,7 @@ export async function deriveSessionKey(
  * Returns base64-encoded ciphertext (includes nonce)
  */
 export async function encrypt(keyB64: string, plaintext: string): Promise<string> {
-  return invoke<string>("sync_encrypt", {
-    key: keyB64,
-    plaintext,
-  });
+  return syncEncrypt(keyB64, plaintext);
 }
 
 /**
@@ -112,10 +107,7 @@ export async function encrypt(keyB64: string, plaintext: string): Promise<string
  * @throws if authentication fails
  */
 export async function decrypt(keyB64: string, ciphertextB64: string): Promise<string> {
-  return invoke<string>("sync_decrypt", {
-    key: keyB64,
-    ciphertext: ciphertextB64,
-  });
+  return syncDecrypt(keyB64, ciphertextB64);
 }
 
 // Pairing code utilities
@@ -126,7 +118,7 @@ export async function decrypt(keyB64: string, ciphertextB64: string): Promise<st
  * Uses alphanumeric characters excluding ambiguous ones
  */
 export async function generatePairingCode(): Promise<string> {
-  return invoke<string>("sync_generate_pairing_code");
+  return syncGeneratePairingCode();
 }
 
 /**
@@ -134,7 +126,7 @@ export async function generatePairingCode(): Promise<string> {
  * Returns base64-encoded SHA-256 hash
  */
 export async function hashPairingCode(code: string): Promise<string> {
-  return invoke<string>("sync_hash_pairing_code", { code });
+  return syncHashPairingCode(code);
 }
 
 // Short Authentication String (SAS)
@@ -145,9 +137,7 @@ export async function hashPairingCode(code: string): Promise<string> {
  * Used for out-of-band verification during pairing
  */
 export async function computeSAS(sharedSecretB64: string): Promise<string> {
-  return invoke<string>("sync_compute_sas", {
-    sharedSecret: sharedSecretB64,
-  });
+  return syncComputeSas(sharedSecretB64);
 }
 
 // Device ID generation
@@ -157,6 +147,6 @@ export async function computeSAS(sharedSecretB64: string): Promise<string> {
  * Generate a new device ID (UUIDv4)
  */
 export async function generateDeviceId(): Promise<string> {
-  return invoke<string>("sync_generate_device_id");
+  return syncGenerateDeviceId();
 }
 

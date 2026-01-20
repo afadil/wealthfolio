@@ -1,4 +1,4 @@
-import { getContributionLimit } from "@/commands/contribution-limits";
+import { getContributionLimit } from "@/adapters";
 import { useAccounts } from "@/hooks/use-accounts";
 import { QueryKeys } from "@/lib/query-keys";
 import type { ContributionLimit } from "@/lib/types";

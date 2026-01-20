@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { listenNavigateToRoute } from "@/commands/navigation-listener";
+import { listenNavigateToRoute } from "@/adapters";
 
 const useNavigationEventListener = () => {
   const navigate = useNavigate();

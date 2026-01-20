@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 
-import { getAiProviders } from "@/commands/ai-providers";
+import { getAiProviders } from "@/adapters";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { QueryKeys } from "@/lib/query-keys";
 import type { AiProvidersResponse, MergedProvider } from "@/lib/types";

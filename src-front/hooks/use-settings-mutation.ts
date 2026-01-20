@@ -1,5 +1,4 @@
-import { logger } from "@/adapters";
-import { updateSettings } from "@/commands/settings";
+import { logger, updateSettings } from "@/adapters";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { QueryKeys } from "@/lib/query-keys";
 import { Settings } from "@/lib/types";

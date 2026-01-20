@@ -4,7 +4,7 @@ import {
   createContributionLimit,
   updateContributionLimit,
   calculateDepositsForLimit,
-} from "@/commands/contribution-limits";
+} from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { ContributionLimit, NewContributionLimit, DepositsCalculation } from "@/lib/types";

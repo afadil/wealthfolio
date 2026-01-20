@@ -30,7 +30,7 @@ import {
   UpdateValuationModal,
   type AssetDetailsSheetAsset,
 } from "@/features/alternative-assets";
-import { updateAlternativeAssetMetadata } from "@/commands/alternative-assets";
+import { updateAlternativeAssetMetadata } from "@/adapters";
 import { ClassificationSheet } from "@/components/classification/classification-sheet";
 
 export const HoldingsPage = () => {

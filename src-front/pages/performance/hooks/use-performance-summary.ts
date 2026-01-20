@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { PerformanceMetrics } from "@/lib/types";
-import { calculatePerformanceSummary } from "@/commands/portfolio";
+import { calculatePerformanceSummary } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 
 // Define the parameters the hook accepts

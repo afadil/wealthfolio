@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { calculateAccountsSimplePerformance } from "@/commands/portfolio";
+import { calculateAccountsSimplePerformance } from "@/adapters";
 import { Account, SimplePerformanceMetrics } from "@/lib/types";
 import { QueryKeys } from "@/lib/query-keys";
 

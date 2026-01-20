@@ -1,5 +1,5 @@
 import { reloadAllAddons } from "@/addons/addons-core";
-import { updateAddon } from "@/commands/addon";
+import { updateAddon } from "@/adapters";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {

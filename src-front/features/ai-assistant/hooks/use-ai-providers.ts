@@ -4,8 +4,10 @@ import {
   updateAiProviderSettings,
   setDefaultAiProvider,
   listAiModels,
-} from "@/commands/ai-providers";
-import { setSecret, getSecret, deleteSecret } from "@/commands/secrets";
+  setSecret,
+  getSecret,
+  deleteSecret,
+} from "@/adapters";
 import type { UpdateProviderSettingsRequest, SetDefaultProviderRequest } from "@/lib/types";
 import { QueryKeys } from "@/lib/query-keys";
 

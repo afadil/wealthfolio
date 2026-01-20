@@ -1,7 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { logger } from "@/adapters";
-import { deleteAsset, updateAssetProfile } from "@/commands/market-data";
+import { logger, deleteAsset, updateAssetProfile } from "@/adapters";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { QueryKeys } from "@/lib/query-keys";
 import { UpdateAssetProfile } from "@/lib/types";

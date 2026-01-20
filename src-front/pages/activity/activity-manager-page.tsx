@@ -1,4 +1,4 @@
-import { getAccounts } from "@/commands/account";
+import { getAccounts } from "@/adapters";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { ActivityType } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";

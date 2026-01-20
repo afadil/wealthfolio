@@ -142,7 +142,7 @@ export interface InternalHostAPI {
   // Activity import
   importActivities(params: { activities: ActivityImport[] }): Promise<ActivityImport[]>;
   checkActivitiesImport(params: {
-    account_id: string;
+    accountId: string;
     activities: ActivityImport[];
   }): Promise<ActivityImport[]>;
   getAccountImportMapping(accountId: string): Promise<ImportMappingData>;
@@ -204,7 +204,7 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: s
           : internalAPI.saveActivities(input),
       import: (activities: ActivityImport[]) => internalAPI.importActivities({ activities }),
       checkImport: (accountId: string, activities: ActivityImport[]) =>
-        internalAPI.checkActivitiesImport({ account_id: accountId, activities }),
+        internalAPI.checkActivitiesImport({ accountId, activities }),
       getImportMapping: internalAPI.getAccountImportMapping,
       saveImportMapping: internalAPI.saveAccountImportMapping,
     },
