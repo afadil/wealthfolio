@@ -5,6 +5,7 @@ use crate::events::{emit_portfolio_trigger_recalculate, PortfolioRequestPayload}
 use log::debug;
 use tauri::{AppHandle, State};
 use wealthfolio_core::fx::{ExchangeRate, NewExchangeRate};
+use wealthfolio_core::quotes::MarketSyncMode;
 use wealthfolio_core::settings::{Settings, SettingsUpdate};
 
 #[tauri::command]
@@ -101,10 +102,14 @@ pub async fn update_settings(
             let handle = handle.clone();
             tauri::async_runtime::spawn(async move {
                 // Emit event to trigger portfolio update using the builder
+                // Base currency change needs BackfillHistory mode to ensure FX pairs
+                // have sufficient quote coverage from earliest activity date (US-006)
                 let payload = PortfolioRequestPayload::builder()
                     .account_ids(None) // Base currency change affects all accounts
-                    .refetch_all_market_data(true)
-                    .symbols(None) // Sync all relevant symbols
+                    .market_sync_mode(MarketSyncMode::BackfillHistory {
+                        asset_ids: None,
+                        days: wealthfolio_core::quotes::DEFAULT_HISTORY_DAYS,
+                    })
                     .build();
                 emit_portfolio_trigger_recalculate(&handle, payload);
             });
@@ -132,8 +137,12 @@ pub async fn update_exchange_rate(
 
     let handle = handle.clone();
     tauri::async_runtime::spawn(async move {
-        // Emit event to trigger portfolio update
-        emit_portfolio_trigger_recalculate(&handle, PortfolioRequestPayload::builder().build());
+        // Emit event to trigger portfolio recalculation only - no market sync needed
+        // for manual exchange rate updates
+        let payload = PortfolioRequestPayload::builder()
+            .market_sync_mode(MarketSyncMode::None)
+            .build();
+        emit_portfolio_trigger_recalculate(&handle, payload);
     });
     Ok(result)
 }
@@ -164,8 +173,12 @@ pub async fn add_exchange_rate(
 
     let handle = handle.clone();
     tauri::async_runtime::spawn(async move {
-        // Emit event to trigger portfolio update
-        emit_portfolio_trigger_recalculate(&handle, PortfolioRequestPayload::builder().build());
+        // Emit event to trigger portfolio recalculation only - no market sync needed
+        // for manual exchange rate additions
+        let payload = PortfolioRequestPayload::builder()
+            .market_sync_mode(MarketSyncMode::None)
+            .build();
+        emit_portfolio_trigger_recalculate(&handle, payload);
     });
     Ok(result)
 }
@@ -185,8 +198,12 @@ pub async fn delete_exchange_rate(
 
     let handle = handle.clone();
     tauri::async_runtime::spawn(async move {
-        // Emit event to trigger portfolio update
-        emit_portfolio_trigger_recalculate(&handle, PortfolioRequestPayload::builder().build());
+        // Emit event to trigger portfolio recalculation only - no market sync needed
+        // for manual exchange rate deletions
+        let payload = PortfolioRequestPayload::builder()
+            .market_sync_mode(MarketSyncMode::None)
+            .build();
+        emit_portfolio_trigger_recalculate(&handle, payload);
     });
     Ok(())
 }

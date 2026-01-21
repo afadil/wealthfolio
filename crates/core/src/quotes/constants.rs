@@ -41,3 +41,8 @@ pub const QUOTE_LOOKBACK_DAYS: i64 = 14;
 /// Minimum number of days of historical data required before first activity.
 /// If we have fewer trading days than this before first activity, trigger backfill.
 pub const MIN_HISTORICAL_TRADING_DAYS: i64 = 20;
+
+/// Days of overlap when doing incremental sync to heal provider corrections.
+/// This ensures that if a provider corrects historical data (e.g., stock splits,
+/// dividend adjustments), we'll pick up those corrections on subsequent syncs.
+pub const OVERLAP_DAYS: i64 = 5;

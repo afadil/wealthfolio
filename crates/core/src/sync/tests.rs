@@ -179,6 +179,7 @@ mod import_run_tests {
             warnings: 3,
             errors: 2,
             removed: 0,
+            assets_created: 0,
         };
 
         let json = serde_json::to_string(&summary).unwrap();
@@ -546,6 +547,7 @@ mod integration_tests {
             warnings: 2,
             errors: 0,
             removed: 0,
+            assets_created: 0,
         });
 
         run.mark_needs_review();

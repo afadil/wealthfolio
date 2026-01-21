@@ -329,6 +329,7 @@ mod tests {
             name: Some("Test Asset".to_string()),
             symbol: "TEST".to_string(),
             exchange_mic: None,
+            exchange_name: None,
             currency: "USD".to_string(),
             pricing_mode,
             preferred_provider: None,

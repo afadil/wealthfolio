@@ -158,6 +158,7 @@ mod tests {
                     name: Some("Apple Inc.".to_string()),
                     symbol: "AAPL".to_string(),
                     exchange_mic: None,
+                    exchange_name: None,
                     currency: "USD".to_string(), // USD listing
                     pricing_mode: PricingMode::Market,
                     preferred_provider: None,
@@ -178,6 +179,7 @@ mod tests {
                     name: Some("Shopify Inc.".to_string()),
                     symbol: "SHOP".to_string(),
                     exchange_mic: None,
+                    exchange_name: None,
                     currency: "CAD".to_string(), // CAD listing
                     pricing_mode: PricingMode::Market,
                     preferred_provider: None,
@@ -235,17 +237,21 @@ mod tests {
             Ok(vec![])
         }
 
-        fn list_by_symbols(&self, symbols: &[String]) -> AppResult<Vec<Asset>> {
+        fn list_by_asset_ids(&self, asset_ids: &[String]) -> AppResult<Vec<Asset>> {
             Ok(self
                 .assets
                 .values()
-                .filter(|asset| symbols.contains(&asset.symbol))
+                .filter(|asset| asset_ids.contains(&asset.id))
                 .cloned()
                 .collect())
         }
 
         fn search_by_symbol(&self, _query: &str) -> AppResult<Vec<Asset>> {
             Ok(Vec::new())
+        }
+
+        async fn cleanup_legacy_metadata(&self, _asset_id: &str) -> AppResult<()> {
+            Ok(())
         }
     }
 
@@ -401,6 +407,15 @@ mod tests {
         fn get_first_activity_date_overall(&self) -> AppResult<DateTime<Utc>> {
             unimplemented!()
         }
+
+        fn get_activity_bounds_for_assets(
+            &self,
+            _asset_ids: &[String],
+        ) -> AppResult<
+            std::collections::HashMap<String, (Option<chrono::NaiveDate>, Option<chrono::NaiveDate>)>,
+        > {
+            Ok(std::collections::HashMap::new())
+        }
     }
 
     #[derive(Clone, Debug)]
@@ -509,6 +524,15 @@ mod tests {
         }
         fn get_first_activity_date_overall(&self) -> AppResult<DateTime<Utc>> {
             unimplemented!()
+        }
+
+        fn get_activity_bounds_for_assets(
+            &self,
+            _asset_ids: &[String],
+        ) -> AppResult<
+            std::collections::HashMap<String, (Option<chrono::NaiveDate>, Option<chrono::NaiveDate>)>,
+        > {
+            Ok(std::collections::HashMap::new())
         }
     }
 

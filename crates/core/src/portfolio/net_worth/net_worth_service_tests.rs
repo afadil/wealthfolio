@@ -114,11 +114,11 @@ impl AssetRepositoryTrait for MockAssetRepository {
             .collect())
     }
 
-    fn list_by_symbols(&self, symbols: &[String]) -> Result<Vec<Asset>> {
+    fn list_by_asset_ids(&self, asset_ids: &[String]) -> Result<Vec<Asset>> {
         Ok(self
             .assets
             .iter()
-            .filter(|a| symbols.contains(&a.symbol))
+            .filter(|a| asset_ids.contains(&a.id))
             .cloned()
             .collect())
     }
@@ -129,6 +129,10 @@ impl AssetRepositoryTrait for MockAssetRepository {
 
     fn search_by_symbol(&self, _query: &str) -> Result<Vec<Asset>> {
         Ok(Vec::new())
+    }
+
+    async fn cleanup_legacy_metadata(&self, _asset_id: &str) -> Result<()> {
+        Ok(())
     }
 }
 
@@ -414,7 +418,11 @@ impl QuoteServiceTrait for MockMarketDataRepository {
     // Sync Operations
     // =========================================================================
 
-    async fn sync(&self) -> Result<SyncResult> {
+    async fn sync(
+        &self,
+        _mode: crate::quotes::SyncMode,
+        _asset_ids: Option<Vec<String>>,
+    ) -> Result<SyncResult> {
         unimplemented!()
     }
 
@@ -460,6 +468,13 @@ impl QuoteServiceTrait for MockMarketDataRepository {
 
     fn get_assets_needing_profile_enrichment(&self) -> Result<Vec<QuoteSyncState>> {
         Ok(Vec::new())
+    }
+
+    async fn update_position_status_from_holdings(
+        &self,
+        _current_holdings: &std::collections::HashMap<String, rust_decimal::Decimal>,
+    ) -> Result<()> {
+        Ok(())
     }
 
     // =========================================================================
@@ -713,6 +728,7 @@ fn create_test_asset(id: &str, kind: AssetKind, currency: &str) -> Asset {
         currency: currency.to_string(),
         kind,
         exchange_mic: None,
+        exchange_name: None,
         pricing_mode: PricingMode::default(),
         preferred_provider: None,
         provider_overrides: None,

@@ -26,7 +26,7 @@ interface AssetHistoryProps {
   totalGainPercent: number;
   currency: string;
   quoteHistory: Quote[];
-  symbol: string;
+  assetId: string;
   className?: string;
 }
 
@@ -36,7 +36,7 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
   totalGainPercent,
   currency,
   quoteHistory,
-  symbol,
+  assetId,
   className,
 }) => {
   const syncMarketDataMutation = useSyncMarketDataMutation();
@@ -149,7 +149,7 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
                   </h4>
                 </div>
                 <Button
-                  onClick={() => syncMarketDataMutation.mutate([symbol])}
+                  onClick={() => syncMarketDataMutation.mutate([assetId])}
                   variant="outline"
                   size="sm"
                   className="rounded-full"

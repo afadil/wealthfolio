@@ -11,7 +11,7 @@ use serde_json::Value;
 use crate::errors::Result;
 use crate::errors::ValidationError;
 use crate::Error;
-use super::{cash_id, fx_id};
+use super::canonical_asset_id;
 
 // Re-export InstrumentId from market-data crate for convenience
 pub use wealthfolio_market_data::InstrumentId;
@@ -450,7 +450,7 @@ impl NewAsset {
     /// Uses canonical ID format: `CASH:{currency}` (e.g., "CASH:USD")
     pub fn new_cash_asset(currency: &str) -> Self {
         let currency_upper = currency.to_uppercase();
-        let asset_id = cash_id(&currency_upper);
+        let asset_id = canonical_asset_id(&AssetKind::Cash, &currency_upper, None, &currency_upper);
         Self {
             id: Some(asset_id),
             kind: AssetKind::Cash,
@@ -463,7 +463,7 @@ impl NewAsset {
     }
 
     /// Creates a new FX asset following the canonical format:
-    /// - `id`: "EUR:USD" format (base:quote)
+    /// - `id`: "FX:EUR:USD" format (FX:base:quote)
     /// - `symbol`: Base currency only (e.g., "EUR")
     /// - `currency`: Quote currency (e.g., "USD")
     /// - `provider_overrides`: Contains provider-specific symbol formats (e.g., "EURUSD=X" for Yahoo)
@@ -471,8 +471,8 @@ impl NewAsset {
         let base_upper = base_currency.to_uppercase();
         let quote_upper = quote_currency.to_uppercase();
 
-        // Canonical ID format: EUR:USD
-        let asset_id = fx_id(&base_upper, &quote_upper);
+        // Canonical ID format: FX:EUR:USD
+        let asset_id = canonical_asset_id(&AssetKind::FxRate, &base_upper, None, &quote_upper);
         let readable_name = format!("{}/{} Exchange Rate", base_upper, quote_upper);
         let notes = format!(
             "Currency pair for converting from {} to {}",

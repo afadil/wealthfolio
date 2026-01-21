@@ -14,10 +14,10 @@ use crate::db::{get_connection, WriteHandle};
 use crate::errors::{IntoCore, StorageError};
 use crate::schema::market_data_providers::dsl as market_data_providers_dsl;
 use crate::schema::quotes::dsl as quotes_dsl;
-use wealthfolio_core::quotes::{MarketDataProviderSetting, UpdateMarketDataProviderSetting};
+use crate::utils::chunk_for_sqlite;
 use wealthfolio_core::quotes::store::{ProviderSettingsStore, QuoteStore};
 use wealthfolio_core::quotes::types::{AssetId, Day, QuoteSource};
-use wealthfolio_core::quotes::{LatestQuotePair, Quote};
+use wealthfolio_core::quotes::{LatestQuotePair, MarketDataProviderSetting, Quote, UpdateMarketDataProviderSetting};
 use wealthfolio_core::Result;
 
 pub struct MarketDataRepository {
@@ -169,52 +169,56 @@ impl QuoteStore for MarketDataRepository {
         }
 
         let mut conn = get_connection(&self.pool)?;
-        let symbols: Vec<&str> = asset_ids.iter().map(|id| id.as_str()).collect();
+        let mut result: HashMap<AssetId, Quote> = HashMap::new();
 
-        let placeholders = symbols.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+        // Chunk the asset_ids to avoid SQLite parameter limits
+        for chunk in chunk_for_sqlite(asset_ids) {
+            let symbols: Vec<&str> = chunk.iter().map(|id| id.as_str()).collect();
+            let placeholders = symbols.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
 
-        let sql = if source.is_some() {
-            format!(
-                "WITH RankedQuotes AS ( \
-                    SELECT \
-                        q.*, \
-                        ROW_NUMBER() OVER (PARTITION BY q.asset_id ORDER BY q.day DESC) as rn \
-                    FROM quotes q WHERE q.asset_id IN ({}) AND q.source = ? \
-                ) \
-                SELECT * FROM RankedQuotes WHERE rn = 1 \
-                ORDER BY asset_id",
-                placeholders
-            )
-        } else {
-            format!(
-                "WITH RankedQuotes AS ( \
-                    SELECT \
-                        q.*, \
-                        ROW_NUMBER() OVER (PARTITION BY q.asset_id ORDER BY q.day DESC) as rn \
-                    FROM quotes q WHERE q.asset_id IN ({}) \
-                ) \
-                SELECT * FROM RankedQuotes WHERE rn = 1 \
-                ORDER BY asset_id",
-                placeholders
-            )
-        };
+            let sql = if source.is_some() {
+                format!(
+                    "WITH RankedQuotes AS ( \
+                        SELECT \
+                            q.*, \
+                            ROW_NUMBER() OVER (PARTITION BY q.asset_id ORDER BY q.day DESC) as rn \
+                        FROM quotes q WHERE q.asset_id IN ({}) AND q.source = ? \
+                    ) \
+                    SELECT * FROM RankedQuotes WHERE rn = 1 \
+                    ORDER BY asset_id",
+                    placeholders
+                )
+            } else {
+                format!(
+                    "WITH RankedQuotes AS ( \
+                        SELECT \
+                            q.*, \
+                            ROW_NUMBER() OVER (PARTITION BY q.asset_id ORDER BY q.day DESC) as rn \
+                        FROM quotes q WHERE q.asset_id IN ({}) \
+                    ) \
+                    SELECT * FROM RankedQuotes WHERE rn = 1 \
+                    ORDER BY asset_id",
+                    placeholders
+                )
+            };
 
-        let mut query_builder = Box::new(sql_query(sql)).into_boxed::<Sqlite>();
+            let mut query_builder = Box::new(sql_query(sql)).into_boxed::<Sqlite>();
 
-        for sym in &symbols {
-            query_builder = query_builder.bind::<Text, _>(*sym);
+            for sym in &symbols {
+                query_builder = query_builder.bind::<Text, _>(*sym);
+            }
+
+            if let Some(src) = source {
+                query_builder = query_builder.bind::<Text, _>(src.to_storage_string());
+            }
+
+            let ranked_quotes_db: Vec<QuoteDB> =
+                query_builder.load::<QuoteDB>(&mut conn).into_core()?;
+
+            for quote_db in ranked_quotes_db {
+                result.insert(AssetId::new(quote_db.asset_id.clone()), quote_db.into());
+            }
         }
-
-        if let Some(src) = source {
-            query_builder = query_builder.bind::<Text, _>(src.to_storage_string());
-        }
-
-        let ranked_quotes_db: Vec<QuoteDB> = query_builder.load::<QuoteDB>(&mut conn).into_core()?;
-
-        let result: HashMap<AssetId, Quote> = ranked_quotes_db
-            .into_iter()
-            .map(|quote_db| (AssetId::new(quote_db.asset_id.clone()), quote_db.into()))
-            .collect();
 
         Ok(result)
     }
@@ -228,76 +232,81 @@ impl QuoteStore for MarketDataRepository {
         }
 
         let mut conn = get_connection(&self.pool)?;
-        let symbols: Vec<&str> = asset_ids.iter().map(|id| id.as_str()).collect();
-
-        let placeholders = symbols.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
-        let sql = format!(
-            "WITH RankedQuotes AS ( \
-                SELECT \
-                    q.*, \
-                    ROW_NUMBER() OVER (PARTITION BY q.asset_id ORDER BY q.day DESC) as rn \
-                FROM quotes q WHERE q.asset_id IN ({}) \
-            ) \
-            SELECT * \
-            FROM RankedQuotes \
-            WHERE rn <= 2 \
-            ORDER BY asset_id, rn",
-            placeholders
-        );
-
-        let mut query_builder = Box::new(sql_query(sql)).into_boxed::<Sqlite>();
-
-        for sym in &symbols {
-            query_builder = query_builder.bind::<Text, _>(*sym);
-        }
-
-        let ranked_quotes_db: Vec<QuoteDB> = query_builder.load::<QuoteDB>(&mut conn).into_core()?;
-
         let mut result_map: HashMap<AssetId, LatestQuotePair> = HashMap::new();
-        let mut current_asset_quotes: Vec<Quote> = Vec::new();
 
-        for quote_db in ranked_quotes_db {
-            let quote = Quote::from(quote_db);
-
-            if current_asset_quotes.is_empty()
-                || quote.asset_id == current_asset_quotes[0].asset_id
-            {
-                current_asset_quotes.push(quote);
-            } else {
-                if !current_asset_quotes.is_empty() {
-                    let latest_quote = current_asset_quotes.remove(0);
-                    let previous_quote = if !current_asset_quotes.is_empty() {
-                        Some(current_asset_quotes.remove(0))
-                    } else {
-                        None
-                    };
-                    result_map.insert(
-                        AssetId::new(latest_quote.asset_id.clone()),
-                        LatestQuotePair {
-                            latest: latest_quote,
-                            previous: previous_quote,
-                        },
-                    );
-                }
-                current_asset_quotes.clear();
-                current_asset_quotes.push(quote);
-            }
-        }
-
-        if !current_asset_quotes.is_empty() {
-            let latest_quote = current_asset_quotes.remove(0);
-            let previous_quote = if !current_asset_quotes.is_empty() {
-                Some(current_asset_quotes.remove(0))
-            } else {
-                None
-            };
-            result_map.insert(
-                AssetId::new(latest_quote.asset_id.clone()),
-                LatestQuotePair {
-                    latest: latest_quote,
-                    previous: previous_quote,
-                },
+        // Chunk the asset_ids to avoid SQLite parameter limits
+        for chunk in chunk_for_sqlite(asset_ids) {
+            let symbols: Vec<&str> = chunk.iter().map(|id| id.as_str()).collect();
+            let placeholders = symbols.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+            let sql = format!(
+                "WITH RankedQuotes AS ( \
+                    SELECT \
+                        q.*, \
+                        ROW_NUMBER() OVER (PARTITION BY q.asset_id ORDER BY q.day DESC) as rn \
+                    FROM quotes q WHERE q.asset_id IN ({}) \
+                ) \
+                SELECT * \
+                FROM RankedQuotes \
+                WHERE rn <= 2 \
+                ORDER BY asset_id, rn",
+                placeholders
             );
+
+            let mut query_builder = Box::new(sql_query(sql)).into_boxed::<Sqlite>();
+
+            for sym in &symbols {
+                query_builder = query_builder.bind::<Text, _>(*sym);
+            }
+
+            let ranked_quotes_db: Vec<QuoteDB> =
+                query_builder.load::<QuoteDB>(&mut conn).into_core()?;
+
+            let mut current_asset_quotes: Vec<Quote> = Vec::new();
+
+            for quote_db in ranked_quotes_db {
+                let quote = Quote::from(quote_db);
+
+                if current_asset_quotes.is_empty()
+                    || quote.asset_id == current_asset_quotes[0].asset_id
+                {
+                    current_asset_quotes.push(quote);
+                } else {
+                    if !current_asset_quotes.is_empty() {
+                        let latest_quote = current_asset_quotes.remove(0);
+                        let previous_quote = if !current_asset_quotes.is_empty() {
+                            Some(current_asset_quotes.remove(0))
+                        } else {
+                            None
+                        };
+                        result_map.insert(
+                            AssetId::new(latest_quote.asset_id.clone()),
+                            LatestQuotePair {
+                                latest: latest_quote,
+                                previous: previous_quote,
+                            },
+                        );
+                    }
+                    current_asset_quotes.clear();
+                    current_asset_quotes.push(quote);
+                }
+            }
+
+            // Process final asset from this chunk
+            if !current_asset_quotes.is_empty() {
+                let latest_quote = current_asset_quotes.remove(0);
+                let previous_quote = if !current_asset_quotes.is_empty() {
+                    Some(current_asset_quotes.remove(0))
+                } else {
+                    None
+                };
+                result_map.insert(
+                    AssetId::new(latest_quote.asset_id.clone()),
+                    LatestQuotePair {
+                        latest: latest_quote,
+                        previous: previous_quote,
+                    },
+                );
+            }
         }
 
         Ok(result_map)
@@ -334,33 +343,37 @@ impl QuoteStore for MarketDataRepository {
         }
 
         let mut conn = get_connection(&self.pool)?;
+        let mut result: HashMap<String, Quote> = HashMap::new();
 
-        let placeholders = symbols.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+        // Chunk the symbols to avoid SQLite parameter limits
+        for chunk in chunk_for_sqlite(symbols) {
+            let placeholders = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
 
-        let sql = format!(
-            "WITH RankedQuotes AS ( \
-                SELECT \
-                    q.*, \
-                    ROW_NUMBER() OVER (PARTITION BY q.asset_id ORDER BY q.day DESC) as rn \
-                FROM quotes q WHERE q.asset_id IN ({}) \
-            ) \
-            SELECT * FROM RankedQuotes WHERE rn = 1 \
-            ORDER BY asset_id",
-            placeholders
-        );
+            let sql = format!(
+                "WITH RankedQuotes AS ( \
+                    SELECT \
+                        q.*, \
+                        ROW_NUMBER() OVER (PARTITION BY q.asset_id ORDER BY q.day DESC) as rn \
+                    FROM quotes q WHERE q.asset_id IN ({}) \
+                ) \
+                SELECT * FROM RankedQuotes WHERE rn = 1 \
+                ORDER BY asset_id",
+                placeholders
+            );
 
-        let mut query_builder = Box::new(sql_query(sql)).into_boxed::<Sqlite>();
+            let mut query_builder = Box::new(sql_query(sql)).into_boxed::<Sqlite>();
 
-        for symbol_val in symbols {
-            query_builder = query_builder.bind::<Text, _>(symbol_val);
+            for symbol_val in chunk {
+                query_builder = query_builder.bind::<Text, _>(symbol_val);
+            }
+
+            let ranked_quotes_db: Vec<QuoteDB> =
+                query_builder.load::<QuoteDB>(&mut conn).into_core()?;
+
+            for quote_db in ranked_quotes_db {
+                result.insert(quote_db.asset_id.clone(), quote_db.into());
+            }
         }
-
-        let ranked_quotes_db: Vec<QuoteDB> = query_builder.load::<QuoteDB>(&mut conn).into_core()?;
-
-        let result: HashMap<String, Quote> = ranked_quotes_db
-            .into_iter()
-            .map(|quote_db| (quote_db.asset_id.clone(), quote_db.into()))
-            .collect();
 
         Ok(result)
     }
@@ -374,73 +387,80 @@ impl QuoteStore for MarketDataRepository {
         }
 
         let mut conn = get_connection(&self.pool)?;
-
-        let placeholders = symbols.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
-        let sql = format!(
-            "WITH RankedQuotes AS ( \
-                SELECT \
-                    q.*, \
-                    ROW_NUMBER() OVER (PARTITION BY q.asset_id ORDER BY q.day DESC) as rn \
-                FROM quotes q WHERE q.asset_id IN ({}) \
-            ) \
-            SELECT * \
-            FROM RankedQuotes \
-            WHERE rn <= 2 \
-            ORDER BY asset_id, rn",
-            placeholders
-        );
-
-        let mut query_builder = Box::new(sql_query(sql)).into_boxed::<Sqlite>();
-
-        for symbol_val in symbols {
-            query_builder = query_builder.bind::<Text, _>(symbol_val);
-        }
-
-        let ranked_quotes_db: Vec<QuoteDB> = query_builder.load::<QuoteDB>(&mut conn).into_core()?;
-
         let mut result_map: HashMap<String, LatestQuotePair> = HashMap::new();
-        let mut current_asset_quotes: Vec<Quote> = Vec::new();
 
-        for quote_db in ranked_quotes_db {
-            let quote = Quote::from(quote_db);
-
-            if current_asset_quotes.is_empty() || quote.asset_id == current_asset_quotes[0].asset_id {
-                current_asset_quotes.push(quote);
-            } else {
-                if !current_asset_quotes.is_empty() {
-                    let latest_quote = current_asset_quotes.remove(0);
-                    let previous_quote = if !current_asset_quotes.is_empty() {
-                        Some(current_asset_quotes.remove(0))
-                    } else {
-                        None
-                    };
-                    result_map.insert(
-                        latest_quote.asset_id.clone(),
-                        LatestQuotePair {
-                            latest: latest_quote,
-                            previous: previous_quote,
-                        },
-                    );
-                }
-                current_asset_quotes.clear();
-                current_asset_quotes.push(quote);
-            }
-        }
-
-        if !current_asset_quotes.is_empty() {
-            let latest_quote = current_asset_quotes.remove(0);
-            let previous_quote = if !current_asset_quotes.is_empty() {
-                Some(current_asset_quotes.remove(0))
-            } else {
-                None
-            };
-            result_map.insert(
-                latest_quote.asset_id.clone(),
-                LatestQuotePair {
-                    latest: latest_quote,
-                    previous: previous_quote,
-                },
+        // Chunk the symbols to avoid SQLite parameter limits
+        for chunk in chunk_for_sqlite(symbols) {
+            let placeholders = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+            let sql = format!(
+                "WITH RankedQuotes AS ( \
+                    SELECT \
+                        q.*, \
+                        ROW_NUMBER() OVER (PARTITION BY q.asset_id ORDER BY q.day DESC) as rn \
+                    FROM quotes q WHERE q.asset_id IN ({}) \
+                ) \
+                SELECT * \
+                FROM RankedQuotes \
+                WHERE rn <= 2 \
+                ORDER BY asset_id, rn",
+                placeholders
             );
+
+            let mut query_builder = Box::new(sql_query(sql)).into_boxed::<Sqlite>();
+
+            for symbol_val in chunk {
+                query_builder = query_builder.bind::<Text, _>(symbol_val);
+            }
+
+            let ranked_quotes_db: Vec<QuoteDB> =
+                query_builder.load::<QuoteDB>(&mut conn).into_core()?;
+
+            let mut current_asset_quotes: Vec<Quote> = Vec::new();
+
+            for quote_db in ranked_quotes_db {
+                let quote = Quote::from(quote_db);
+
+                if current_asset_quotes.is_empty()
+                    || quote.asset_id == current_asset_quotes[0].asset_id
+                {
+                    current_asset_quotes.push(quote);
+                } else {
+                    if !current_asset_quotes.is_empty() {
+                        let latest_quote = current_asset_quotes.remove(0);
+                        let previous_quote = if !current_asset_quotes.is_empty() {
+                            Some(current_asset_quotes.remove(0))
+                        } else {
+                            None
+                        };
+                        result_map.insert(
+                            latest_quote.asset_id.clone(),
+                            LatestQuotePair {
+                                latest: latest_quote,
+                                previous: previous_quote,
+                            },
+                        );
+                    }
+                    current_asset_quotes.clear();
+                    current_asset_quotes.push(quote);
+                }
+            }
+
+            // Process final asset from this chunk
+            if !current_asset_quotes.is_empty() {
+                let latest_quote = current_asset_quotes.remove(0);
+                let previous_quote = if !current_asset_quotes.is_empty() {
+                    Some(current_asset_quotes.remove(0))
+                } else {
+                    None
+                };
+                result_map.insert(
+                    latest_quote.asset_id.clone(),
+                    LatestQuotePair {
+                        latest: latest_quote,
+                        previous: previous_quote,
+                    },
+                );
+            }
         }
 
         Ok(result_map)

@@ -137,7 +137,7 @@ mod tests {
             Ok(Asset::default())
         }
 
-        async fn get_assets_by_symbols(&self, _symbols: &[String]) -> Result<Vec<Asset>> {
+        async fn get_assets_by_asset_ids(&self, _asset_ids: &[String]) -> Result<Vec<Asset>> {
             unimplemented!()
         }
 
@@ -430,6 +430,14 @@ mod tests {
 
         fn get_first_activity_date_overall(&self) -> Result<DateTime<Utc>> {
             unimplemented!()
+        }
+
+        fn get_activity_bounds_for_assets(
+            &self,
+            _asset_ids: &[String],
+        ) -> Result<std::collections::HashMap<String, (Option<chrono::NaiveDate>, Option<chrono::NaiveDate>)>>
+        {
+            Ok(std::collections::HashMap::new())
         }
     }
 

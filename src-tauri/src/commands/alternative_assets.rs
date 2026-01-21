@@ -28,7 +28,7 @@ use crate::{
 
 use wealthfolio_core::{
     assets::{generate_asset_id, AlternativeAssetRepositoryTrait, AssetKind, NewAsset, PricingMode},
-    quotes::{DataSource, Quote},
+    quotes::{DataSource, MarketSyncMode, Quote},
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -326,14 +326,12 @@ pub async fn create_alternative_asset(
         ),
     );
 
-    // Trigger portfolio recalculation
+    // Trigger portfolio recalculation - no market sync needed for manual alternative assets
     let handle_clone = handle.clone();
-    let asset_id_clone = asset_id.clone();
     tauri::async_runtime::spawn(async move {
         let payload = PortfolioRequestPayload::builder()
             .account_ids(None)
-            .refetch_all_market_data(false)
-            .symbols(Some(vec![asset_id_clone]))
+            .market_sync_mode(MarketSyncMode::None)
             .build();
         emit_portfolio_trigger_recalculate(&handle_clone, payload);
     });
@@ -410,14 +408,12 @@ pub async fn update_alternative_asset_valuation(
         ),
     );
 
-    // Trigger portfolio recalculation
+    // Trigger portfolio recalculation - no market sync needed for manual valuation updates
     let handle_clone = handle.clone();
-    let asset_id_clone = asset_id.clone();
     tauri::async_runtime::spawn(async move {
         let payload = PortfolioRequestPayload::builder()
             .account_ids(None)
-            .refetch_all_market_data(false)
-            .symbols(Some(vec![asset_id_clone]))
+            .market_sync_mode(MarketSyncMode::None)
             .build();
         emit_portfolio_trigger_recalculate(&handle_clone, payload);
     });
@@ -529,13 +525,12 @@ pub async fn delete_alternative_asset(
         ),
     );
 
-    // Trigger portfolio recalculation
+    // Trigger portfolio recalculation - no market sync needed for asset deletion
     let handle_clone = handle.clone();
     tauri::async_runtime::spawn(async move {
         let payload = PortfolioRequestPayload::builder()
             .account_ids(None)
-            .refetch_all_market_data(false)
-            .symbols(None)
+            .market_sync_mode(MarketSyncMode::None)
             .build();
         emit_portfolio_trigger_recalculate(&handle_clone, payload);
     });
@@ -729,13 +724,13 @@ pub async fn get_alternative_holdings(
         return Ok(vec![]);
     }
 
-    // Get symbols for quote lookup
-    let symbols: Vec<String> = alternative_assets.iter().map(|a| a.symbol.clone()).collect();
+    // Use canonical asset IDs for quote lookup
+    let asset_ids: Vec<String> = alternative_assets.iter().map(|a| a.id.clone()).collect();
 
     // Fetch latest quotes for all alternative assets
     let quotes = state
         .quote_service()
-        .get_latest_quotes(&symbols)
+        .get_latest_quotes(&asset_ids)
         .map_err(|e| format!("Failed to get quotes: {}", e))?;
 
     // Build response for each asset
@@ -743,7 +738,7 @@ pub async fn get_alternative_holdings(
         .into_iter()
         .filter_map(|asset| {
             // Get the latest quote for this asset
-            let quote = quotes.get(&asset.symbol)?;
+            let quote = quotes.get(&asset.id)?;
 
             // Extract purchase_price from metadata
             let purchase_price = asset

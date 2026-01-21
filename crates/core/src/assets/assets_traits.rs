@@ -28,7 +28,7 @@ pub trait AssetServiceTrait: Send + Sync {
         metadata: Option<AssetMetadata>,
     ) -> Result<Asset>;
     async fn update_pricing_mode(&self, asset_id: &str, pricing_mode: &str) -> Result<Asset>;
-    async fn get_assets_by_symbols(&self, symbols: &[String]) -> Result<Vec<Asset>>;
+    async fn get_assets_by_asset_ids(&self, asset_ids: &[String]) -> Result<Vec<Asset>>;
     /// Enriches an existing asset's profile with data from market data provider.
     /// Updates the profile JSON (sectors, countries, website) and notes fields.
     async fn enrich_asset_profile(&self, asset_id: &str) -> Result<Asset>;
@@ -52,7 +52,7 @@ pub trait AssetRepositoryTrait: Send + Sync {
     fn get_by_id(&self, asset_id: &str) -> Result<Asset>;
     fn list(&self) -> Result<Vec<Asset>>;
     fn list_cash_assets(&self, base_currency: &str) -> Result<Vec<Asset>>;
-    fn list_by_symbols(&self, symbols: &[String]) -> Result<Vec<Asset>>;
+    fn list_by_asset_ids(&self, asset_ids: &[String]) -> Result<Vec<Asset>>;
     async fn delete(&self, asset_id: &str) -> Result<()>;
 
     /// Search for assets by symbol (case-insensitive partial match).

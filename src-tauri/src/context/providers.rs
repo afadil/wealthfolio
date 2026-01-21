@@ -96,6 +96,7 @@ pub async fn initialize_context(
             quote_sync_state_repository.clone(), // SyncStateStore
             market_data_repo.clone(),           // ProviderSettingsStore
             asset_repository.clone(),           // AssetRepositoryTrait
+            activity_repository.clone(),        // ActivityRepositoryTrait
             secret_store.clone(),
         )
         .await?,

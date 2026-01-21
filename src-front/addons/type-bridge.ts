@@ -73,7 +73,11 @@ export interface InternalHostAPI {
   updateAssetProfile(payload: UpdateAssetProfile): Promise<Asset>;
   updatePricingMode(assetId: string, pricingMode: string): Promise<Asset>;
   updateQuote(symbol: string, quote: Quote): Promise<void>;
-  syncMarketData(symbols: string[], refetchAll: boolean): Promise<void>;
+  syncMarketData(
+    assetIds: string[],
+    refetchAll: boolean,
+    refetchRecentDays?: number,
+  ): Promise<void>;
   getQuoteHistory(symbol: string): Promise<Quote[]>;
   getMarketDataProviders(): Promise<MarketDataProviderInfo[]>;
 

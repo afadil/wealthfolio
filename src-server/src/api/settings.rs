@@ -17,7 +17,10 @@ use reqwest::StatusCode as HttpStatusCode;
 use semver::Version;
 use serde::Deserialize;
 use tokio::{fs, task};
-use wealthfolio_core::settings::{Settings, SettingsServiceTrait, SettingsUpdate};
+use wealthfolio_core::{
+    quotes::MarketSyncMode,
+    settings::{Settings, SettingsServiceTrait, SettingsUpdate},
+};
 use wealthfolio_storage_sqlite::db;
 
 async fn get_settings(State(state): State<Arc<AppState>>) -> ApiResult<Json<Settings>> {
@@ -38,10 +41,14 @@ async fn update_settings(
 
         let state_for_job = state.clone();
         tokio::spawn(async move {
+            // Base currency change needs BackfillHistory mode to ensure FX pairs
+            // have sufficient quote coverage from earliest activity date (US-006)
             let job_config = PortfolioJobConfig {
                 account_ids: None,
-                symbols: None,
-                refetch_all_market_data: true,
+                market_sync_mode: MarketSyncMode::BackfillHistory {
+                    asset_ids: None,
+                    days: wealthfolio_core::quotes::DEFAULT_HISTORY_DAYS,
+                },
                 force_full_recalculation: true,
             };
 

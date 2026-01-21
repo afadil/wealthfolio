@@ -14,16 +14,23 @@ use wealthfolio_core::{
     holdings::Holding,
     income::IncomeSummary,
     performance::{PerformanceMetrics, SimplePerformanceMetrics},
+    quotes::MarketSyncMode,
     valuation::DailyAccountValuation,
 };
 
 #[tauri::command]
 pub async fn recalculate_portfolio(handle: AppHandle) -> Result<(), String> {
     debug!("Emitting PORTFOLIO_TRIGGER_RECALCULATE event...");
+    // Full recalculation uses BackfillHistory to rebuild quote history from activity start.
+    // This ensures all historical valuations have proper quote coverage.
+    // - Fetches quotes from first_activity_date (or 5 years fallback) to today
+    // - Then performs a full portfolio recalculation
     let payload = PortfolioRequestPayload::builder()
         .account_ids(None) // None signifies all accounts
-        .symbols(None) // None signifies all relevant symbols
-        .refetch_all_market_data(false)
+        .market_sync_mode(MarketSyncMode::BackfillHistory {
+            asset_ids: None,
+            days: 365 * 5, // 5 years fallback if no activity dates
+        })
         .build();
     emit_portfolio_trigger_recalculate(&handle, payload);
     Ok(())
@@ -32,10 +39,10 @@ pub async fn recalculate_portfolio(handle: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub async fn update_portfolio(handle: AppHandle) -> Result<(), String> {
     debug!("Emitting PORTFOLIO_TRIGGER_UPDATE event...");
+    // Manual update uses Incremental sync for all assets
     let payload = PortfolioRequestPayload::builder()
         .account_ids(None) // None signifies all accounts
-        .symbols(None) // None signifies all relevant symbols
-        .refetch_all_market_data(false)
+        .market_sync_mode(MarketSyncMode::Incremental { asset_ids: None })
         .build();
     emit_portfolio_trigger_update(&handle, payload);
     Ok(())

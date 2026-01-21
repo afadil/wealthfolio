@@ -11,6 +11,7 @@ use wealthfolio_connect::DEFAULT_CLOUD_API_URL;
 use crate::api::shared::{process_portfolio_job, PortfolioJobConfig};
 use crate::events::{ServerEvent, BROKER_SYNC_COMPLETE, BROKER_SYNC_START};
 use crate::main_lib::AppState;
+use wealthfolio_core::quotes::MarketSyncMode;
 
 /// Sync interval: 4 hours (not user-configurable to prevent API abuse)
 const SYNC_INTERVAL_SECS: u64 = 4 * 60 * 60;
@@ -221,10 +222,10 @@ async fn run_scheduled_sync(state: &Arc<AppState>) {
             // Trigger portfolio update if activities were synced
             if result.activities_synced > 0 {
                 info!("Triggering portfolio update after sync");
+                // Scheduled broker sync uses incremental sync for all assets
                 let job_config = PortfolioJobConfig {
                     account_ids: None,
-                    symbols: None,
-                    refetch_all_market_data: false,
+                    market_sync_mode: MarketSyncMode::Incremental { asset_ids: None },
                     force_full_recalculation: false,
                 };
                 if let Err(e) = process_portfolio_job(state.clone(), job_config).await {

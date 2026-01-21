@@ -1,13 +1,13 @@
 import { ActionPalette, type ActionPaletteGroup } from "@/components/action-palette";
-import { Button } from "@wealthfolio/ui/components/ui/button";
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import {
-  useUpdatePortfolioMutation,
-  useRecalculatePortfolioMutation,
-} from "@/hooks/use-calculate-portfolio";
-import { useRunHealthChecks } from "@/hooks/use-health";
 import { useSyncBrokerData } from "@/features/wealthfolio-connect/hooks";
 import { useWealthfolioConnect } from "@/features/wealthfolio-connect/providers/wealthfolio-connect-provider";
+import {
+  useRecalculatePortfolioMutation,
+  useUpdatePortfolioMutation,
+} from "@/hooks/use-calculate-portfolio";
+import { useRunHealthChecks } from "@/hooks/use-health";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -48,12 +48,12 @@ export function DashboardActions() {
             : []),
           {
             icon: "Refresh",
-            label: "Update Market Data",
+            label: "Update Prices",
             onClick: () => updatePortfolioMutation.mutate(),
           },
           {
             icon: "History",
-            label: "Recalculate Portfolio",
+            label: "Rebuild Full History",
             onClick: () => recalculatePortfolioMutation.mutate(),
           },
           {

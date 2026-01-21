@@ -63,7 +63,7 @@ export function PortfolioUpdateTrigger({
             ) : (
               <Icons.Refresh className="mr-2 h-4 w-4" />
             )}
-            {updatePortfolioMutation.isPending ? "Updating market data..." : "Update market data"}
+            {updatePortfolioMutation.isPending ? "Updating quotes..." : "Update quotes"}
           </Button>
           <Button
             onClick={handleRecalculate}
@@ -75,9 +75,9 @@ export function PortfolioUpdateTrigger({
             {recalculatePortfolioMutation.isPending ? (
               <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
             ) : (
-              <Icons.Refresh className="mr-2 h-4 w-4" />
+              <Icons.Clock className="mr-2 h-4 w-4" />
             )}
-            {recalculatePortfolioMutation.isPending ? "Recalculating..." : "Recalculate portfolio"}
+            {recalculatePortfolioMutation.isPending ? "Rebuilding history..." : "Rebuild full history"}
           </Button>
         </div>
       </HoverCardContent>

@@ -1,4 +1,4 @@
-use wealthfolio_core::assets::{AssetKind, PricingMode};
+use wealthfolio_core::assets::{canonical_asset_id, AssetKind, PricingMode};
 use wealthfolio_core::errors::{DatabaseError, ValidationError};
 use wealthfolio_core::fx::{ExchangeRate, FxRepositoryTrait};
 use wealthfolio_core::quotes::{DataSource, Quote};
@@ -445,8 +445,8 @@ impl FxRepository {
 
         self.writer
             .exec(move |conn| {
-                // Canonical ID format: EUR:USD (base:quote)
-                let asset_id = format!("{}:{}", &from_owned, &to_owned);
+                // Canonical ID format: FX:{base}:{quote} (e.g., FX:EUR:USD)
+                let asset_id = canonical_asset_id(&AssetKind::FxRate, &from_owned, None, &to_owned);
                 let readable_name = format!("{}/{} Exchange Rate", &from_owned, &to_owned);
                 let notes = format!(
                     "Currency pair for converting from {} to {}",

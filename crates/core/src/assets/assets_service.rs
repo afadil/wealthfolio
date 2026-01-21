@@ -274,8 +274,8 @@ impl AssetServiceTrait for AssetService {
             .await
     }
 
-    async fn get_assets_by_symbols(&self, symbols: &[String]) -> Result<Vec<Asset>> {
-        self.asset_repository.list_by_symbols(symbols)
+    async fn get_assets_by_asset_ids(&self, asset_ids: &[String]) -> Result<Vec<Asset>> {
+        self.asset_repository.list_by_asset_ids(asset_ids)
     }
 
     /// Enriches an existing asset's profile with data from market data provider.

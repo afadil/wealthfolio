@@ -275,7 +275,11 @@ mod tests {
         // Sync Operations
         // =========================================================================
 
-        async fn sync(&self) -> Result<SyncResult> {
+        async fn sync(
+            &self,
+            _mode: crate::quotes::SyncMode,
+            _asset_ids: Option<Vec<String>>,
+        ) -> Result<SyncResult> {
             unimplemented!()
         }
 
@@ -321,6 +325,13 @@ mod tests {
 
         fn get_assets_needing_profile_enrichment(&self) -> Result<Vec<QuoteSyncState>> {
             Ok(Vec::new())
+        }
+
+        async fn update_position_status_from_holdings(
+            &self,
+            _current_holdings: &std::collections::HashMap<String, rust_decimal::Decimal>,
+        ) -> Result<()> {
+            Ok(())
         }
 
         // =========================================================================
@@ -398,8 +409,6 @@ mod tests {
                 currency: local_currency.to_string(),
                 notes: None,
                 pricing_mode: "MARKET".to_string(),
-                countries: None,
-                sectors: None,
                 preferred_provider: None,
                 classifications: None,
             })
