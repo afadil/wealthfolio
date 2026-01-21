@@ -210,6 +210,9 @@ pub trait QuoteServiceTrait: Send + Sync {
     /// Get assets that need profile enrichment.
     fn get_assets_needing_profile_enrichment(&self) -> Result<Vec<QuoteSyncState>>;
 
+    /// Get sync states that have errors (error_count > 0).
+    fn get_sync_states_with_errors(&self) -> Result<Vec<QuoteSyncState>>;
+
     // =========================================================================
     // Provider Settings
     // =========================================================================
@@ -701,6 +704,10 @@ where
 
     fn get_assets_needing_profile_enrichment(&self) -> Result<Vec<QuoteSyncState>> {
         self.sync_state_store.get_assets_needing_profile_enrichment()
+    }
+
+    fn get_sync_states_with_errors(&self) -> Result<Vec<QuoteSyncState>> {
+        self.sync_state_store.get_with_errors()
     }
 
     // =========================================================================

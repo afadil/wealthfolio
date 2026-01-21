@@ -127,6 +127,7 @@ import {
   TrendingDown,
   TrendingUp,
   Type,
+  Wand2,
   Undo2,
   Upload,
   User,
@@ -263,6 +264,7 @@ const IconsInternal = {
   ExternalLink: ExternalLink,
   TrendingUp: TrendingUp,
   TrendingDown: TrendingDown,
+  Wand2: Wand2,
   Link: Link,
   Building: Building2,
   Car: Car,
@@ -778,6 +780,7 @@ export type IconName =
   | "ExternalLink"
   | "TrendingUp"
   | "TrendingDown"
+  | "Wand2"
   | "Link"
   | "Building"
   | "Car"

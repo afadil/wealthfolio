@@ -566,4 +566,17 @@ impl SyncStateStore for QuoteSyncStateRepository {
 
         Ok(results.into_iter().map(QuoteSyncState::from).collect())
     }
+
+    fn get_with_errors(&self) -> Result<Vec<QuoteSyncState>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        // Get sync states where error_count > 0
+        let results = qss_dsl::quote_sync_state
+            .filter(qss_dsl::error_count.gt(0))
+            .order(qss_dsl::error_count.desc())
+            .load::<QuoteSyncStateDB>(&mut conn)
+            .map_err(StorageError::from)?;
+
+        Ok(results.into_iter().map(QuoteSyncState::from).collect())
+    }
 }

@@ -180,9 +180,18 @@ pub trait HealthDismissalStore: Send + Sync {
 // Health Service Trait
 // =============================================================================
 
-use super::checks::{AssetHoldingInfo, ConsistencyIssueInfo, FxPairInfo, UnclassifiedAssetInfo};
+use super::checks::{
+    AssetHoldingInfo, ConsistencyIssueInfo, FxPairInfo, LegacyMigrationInfo, QuoteSyncErrorInfo,
+    UnclassifiedAssetInfo,
+};
 use super::model::{FixAction, HealthStatus};
+use crate::accounts::AccountServiceTrait;
+use crate::assets::AssetServiceTrait;
+use crate::portfolio::holdings::HoldingsServiceTrait;
+use crate::quotes::QuoteServiceTrait;
+use crate::taxonomies::TaxonomyServiceTrait;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Service interface for health center operations.
 ///
@@ -212,22 +221,27 @@ pub trait HealthServiceTrait: Send + Sync {
     /// * `total_portfolio_value` - Total market value of the portfolio
     /// * `holdings` - Information about held assets
     /// * `latest_quote_times` - Latest quote timestamps by asset ID
+    /// * `quote_sync_errors` - Assets with quote sync failures
     /// * `fx_pairs` - FX pair information for currency checks
     /// * `unclassified_assets` - Assets missing classification
     /// * `consistency_issues` - Pre-detected data consistency issues
+    /// * `legacy_migration_info` - Info about legacy classification data needing migration
     ///
     /// # Returns
     ///
     /// The aggregated health status with all detected issues
+    #[allow(clippy::too_many_arguments)]
     async fn run_checks_with_data(
         &self,
         base_currency: &str,
         total_portfolio_value: f64,
         holdings: &[AssetHoldingInfo],
         latest_quote_times: &HashMap<String, DateTime<Utc>>,
+        quote_sync_errors: &[QuoteSyncErrorInfo],
         fx_pairs: &[FxPairInfo],
         unclassified_assets: &[UnclassifiedAssetInfo],
         consistency_issues: &[ConsistencyIssueInfo],
+        legacy_migration_info: &Option<LegacyMigrationInfo>,
     ) -> Result<HealthStatus>;
 
     /// Gets the cached health status.
@@ -274,6 +288,32 @@ pub trait HealthServiceTrait: Send + Sync {
     ///
     /// * `config` - The new configuration
     async fn update_config(&self, config: HealthConfig) -> Result<()>;
+
+    /// Clears the cached health status, forcing fresh checks on next request.
+    async fn clear_cache(&self);
+
+    /// Runs all health checks by gathering data from the provided services.
+    ///
+    /// This is the preferred method for running health checks as it handles all
+    /// data gathering internally, keeping API handlers thin.
+    ///
+    /// # Arguments
+    ///
+    /// * `base_currency` - The user's base currency
+    /// * `account_service` - Service for accessing accounts
+    /// * `holdings_service` - Service for accessing holdings
+    /// * `quote_service` - Service for accessing quotes
+    /// * `asset_service` - Service for accessing assets
+    /// * `taxonomy_service` - Service for accessing taxonomy data
+    async fn run_full_checks(
+        &self,
+        base_currency: &str,
+        account_service: Arc<dyn AccountServiceTrait>,
+        holdings_service: Arc<dyn HoldingsServiceTrait>,
+        quote_service: Arc<dyn QuoteServiceTrait>,
+        asset_service: Arc<dyn AssetServiceTrait>,
+        taxonomy_service: Arc<dyn TaxonomyServiceTrait>,
+    ) -> Result<HealthStatus>;
 }
 
 #[cfg(test)]

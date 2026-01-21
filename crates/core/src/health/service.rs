@@ -6,14 +6,21 @@
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use log::{debug, info, warn};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+use crate::accounts::AccountServiceTrait;
+use crate::assets::AssetServiceTrait;
 use crate::errors::Result;
+use crate::portfolio::holdings::HoldingsServiceTrait;
+use crate::quotes::QuoteServiceTrait;
+use crate::taxonomies::TaxonomyServiceTrait;
 
 use super::checks::{
     AssetHoldingInfo, ClassificationCheck, ConsistencyIssueInfo, DataConsistencyCheck,
-    FxIntegrityCheck, FxPairInfo, PriceStalenessCheck, UnclassifiedAssetInfo,
+    FxIntegrityCheck, FxPairInfo, LegacyMigrationInfo, PriceStalenessCheck, QuoteSyncCheck,
+    QuoteSyncErrorInfo, UnclassifiedAssetInfo,
 };
 use super::errors::HealthError;
 use super::model::{FixAction, HealthConfig, HealthIssue, HealthStatus, IssueDismissal};
@@ -38,6 +45,7 @@ pub struct HealthService {
 
     /// Individual check implementations
     price_check: PriceStalenessCheck,
+    quote_sync_check: QuoteSyncCheck,
     fx_check: FxIntegrityCheck,
     classification_check: ClassificationCheck,
     consistency_check: DataConsistencyCheck,
@@ -51,6 +59,7 @@ impl HealthService {
             config: RwLock::new(HealthConfig::default()),
             cached_status: RwLock::new(None),
             price_check: PriceStalenessCheck::new(),
+            quote_sync_check: QuoteSyncCheck::new(),
             fx_check: FxIntegrityCheck::new(),
             classification_check: ClassificationCheck::new(),
             consistency_check: DataConsistencyCheck::new(),
@@ -67,6 +76,7 @@ impl HealthService {
             config: RwLock::new(config),
             cached_status: RwLock::new(None),
             price_check: PriceStalenessCheck::new(),
+            quote_sync_check: QuoteSyncCheck::new(),
             fx_check: FxIntegrityCheck::new(),
             classification_check: ClassificationCheck::new(),
             consistency_check: DataConsistencyCheck::new(),
@@ -77,15 +87,18 @@ impl HealthService {
     ///
     /// This is the main entry point for running checks. The caller is responsible
     /// for gathering the necessary data from the portfolio.
+    #[allow(clippy::too_many_arguments)]
     pub async fn run_checks_with_data(
         &self,
         base_currency: &str,
         total_portfolio_value: f64,
         holdings: &[AssetHoldingInfo],
         latest_quote_times: &std::collections::HashMap<String, chrono::DateTime<chrono::Utc>>,
+        quote_sync_errors: &[QuoteSyncErrorInfo],
         fx_pairs: &[FxPairInfo],
         unclassified_assets: &[UnclassifiedAssetInfo],
         consistency_issues: &[ConsistencyIssueInfo],
+        legacy_migration_info: &Option<LegacyMigrationInfo>,
     ) -> Result<HealthStatus> {
         let config = self.config.read().await.clone();
         let ctx = HealthContext::new(config, base_currency, total_portfolio_value);
@@ -99,6 +112,15 @@ impl HealthService {
         let price_issues = self.price_check.analyze(holdings, latest_quote_times, &ctx);
         debug!("Price staleness check found {} issues", price_issues.len());
         all_issues.extend(price_issues);
+
+        // Run quote sync error check
+        debug!(
+            "Running quote sync check on {} assets with errors",
+            quote_sync_errors.len()
+        );
+        let sync_issues = self.quote_sync_check.analyze(quote_sync_errors, &ctx);
+        debug!("Quote sync check found {} issues", sync_issues.len());
+        all_issues.extend(sync_issues);
 
         // Run FX integrity check
         debug!("Running FX integrity check on {} pairs", fx_pairs.len());
@@ -114,6 +136,14 @@ impl HealthService {
         let class_issues = self.classification_check.analyze(unclassified_assets, &ctx);
         debug!("Classification check found {} issues", class_issues.len());
         all_issues.extend(class_issues);
+
+        // Run legacy migration check
+        debug!("Running legacy migration check");
+        let migration_issues = self
+            .classification_check
+            .analyze_legacy_migration(legacy_migration_info, &ctx);
+        debug!("Legacy migration check found {} issues", migration_issues.len());
+        all_issues.extend(migration_issues);
 
         // Run data consistency check
         debug!(
@@ -147,6 +177,100 @@ impl HealthService {
         );
 
         Ok(status)
+    }
+
+    /// Runs all health checks by gathering data from the provided services.
+    ///
+    /// This is the main entry point for health checks that handles all data gathering.
+    pub async fn run_full_checks(
+        &self,
+        base_currency: &str,
+        account_service: Arc<dyn AccountServiceTrait>,
+        holdings_service: Arc<dyn HoldingsServiceTrait>,
+        quote_service: Arc<dyn QuoteServiceTrait>,
+        asset_service: Arc<dyn AssetServiceTrait>,
+        taxonomy_service: Arc<dyn TaxonomyServiceTrait>,
+    ) -> Result<HealthStatus> {
+        // Gather holdings data from all accounts
+        let accounts = account_service.get_active_accounts()?;
+
+        let mut all_holdings: Vec<AssetHoldingInfo> = Vec::new();
+        let mut latest_quote_times: HashMap<String, chrono::DateTime<chrono::Utc>> = HashMap::new();
+        let mut total_portfolio_value = 0.0;
+
+        for account in &accounts {
+            let holdings = holdings_service
+                .get_holdings(&account.id, base_currency)
+                .await?;
+
+            for holding in holdings {
+                if let Some(ref instrument) = holding.instrument {
+                    let market_value_f64 = holding
+                        .market_value
+                        .base
+                        .to_string()
+                        .parse::<f64>()
+                        .unwrap_or(0.0);
+                    total_portfolio_value += market_value_f64;
+
+                    // Determine if uses market pricing
+                    let uses_market_pricing = instrument.pricing_mode.to_uppercase() == "MARKET";
+
+                    all_holdings.push(AssetHoldingInfo {
+                        asset_id: instrument.id.clone(),
+                        market_value: market_value_f64,
+                        uses_market_pricing,
+                    });
+                }
+            }
+        }
+
+        // Get latest quote timestamps for held assets
+        let asset_ids: Vec<String> = all_holdings.iter().map(|h| h.asset_id.clone()).collect();
+        if !asset_ids.is_empty() {
+            if let Ok(quotes) = quote_service.get_latest_quotes(&asset_ids) {
+                for (asset_id, quote) in quotes {
+                    latest_quote_times.insert(asset_id, quote.timestamp);
+                }
+            }
+        }
+
+        // Gather legacy migration status
+        let legacy_migration_info = super::gather_legacy_migration_status(
+            asset_service.as_ref(),
+            taxonomy_service.as_ref(),
+        );
+
+        // Gather quote sync errors
+        let holding_mv_map: HashMap<String, f64> = all_holdings
+            .iter()
+            .map(|h| (h.asset_id.clone(), h.market_value))
+            .collect();
+        let quote_sync_errors = super::gather_quote_sync_errors(
+            quote_service.as_ref(),
+            asset_service.as_ref(),
+            &holding_mv_map,
+        );
+
+        // For now, we'll use empty data for FX, unclassified, and consistency checks
+        // These can be enhanced later with proper data gathering
+        let fx_pairs: Vec<FxPairInfo> = Vec::new();
+        let unclassified_assets: Vec<UnclassifiedAssetInfo> = Vec::new();
+        let consistency_issues: Vec<ConsistencyIssueInfo> = Vec::new();
+
+        // Run checks with gathered data
+        self.run_checks_with_data(
+            base_currency,
+            total_portfolio_value,
+            &all_holdings,
+            &latest_quote_times,
+            &quote_sync_errors,
+            &fx_pairs,
+            &unclassified_assets,
+            &consistency_issues,
+            &legacy_migration_info,
+        )
+        .await
     }
 
     /// Filters out issues that have been dismissed (unless their data has changed).
@@ -205,9 +329,11 @@ impl HealthServiceTrait for HealthService {
         total_portfolio_value: f64,
         holdings: &[AssetHoldingInfo],
         latest_quote_times: &std::collections::HashMap<String, chrono::DateTime<chrono::Utc>>,
+        quote_sync_errors: &[QuoteSyncErrorInfo],
         fx_pairs: &[FxPairInfo],
         unclassified_assets: &[UnclassifiedAssetInfo],
         consistency_issues: &[ConsistencyIssueInfo],
+        legacy_migration_info: &Option<LegacyMigrationInfo>,
     ) -> Result<HealthStatus> {
         // Call the inherent method
         HealthService::run_checks_with_data(
@@ -216,9 +342,11 @@ impl HealthServiceTrait for HealthService {
             total_portfolio_value,
             holdings,
             latest_quote_times,
+            quote_sync_errors,
             fx_pairs,
             unclassified_assets,
             consistency_issues,
+            legacy_migration_info,
         )
         .await
     }
@@ -238,12 +366,14 @@ impl HealthServiceTrait for HealthService {
     async fn dismiss_issue(&self, issue_id: &str, data_hash: &str) -> Result<()> {
         let dismissal = IssueDismissal::new(issue_id, data_hash);
         self.dismissal_store.save_dismissal(&dismissal).await?;
+        self.clear_cache().await;
         info!("Dismissed health issue: {}", issue_id);
         Ok(())
     }
 
     async fn restore_issue(&self, issue_id: &str) -> Result<()> {
         self.dismissal_store.remove_dismissal(issue_id).await?;
+        self.clear_cache().await;
         info!("Restored health issue: {}", issue_id);
         Ok(())
     }
@@ -256,7 +386,7 @@ impl HealthServiceTrait for HealthService {
     async fn execute_fix(&self, action: &FixAction) -> Result<()> {
         info!("Executing fix action: {} ({})", action.label, action.id);
 
-        match action.id.as_str() {
+        let result = match action.id.as_str() {
             "sync_prices" => {
                 // Parse asset IDs from payload
                 let _asset_ids: Vec<String> = serde_json::from_value(action.payload.clone())
@@ -292,7 +422,16 @@ impl HealthServiceTrait for HealthService {
                 Ok(())
             }
             _ => Err(HealthError::UnknownFixAction(action.id.clone()).into()),
-        }
+        };
+
+        // Clear cache after fix so next check shows updated results
+        self.clear_cache().await;
+        result
+    }
+
+    async fn clear_cache(&self) {
+        *self.cached_status.write().await = None;
+        debug!("Health status cache cleared");
     }
 
     async fn get_config(&self) -> HealthConfig {
@@ -329,6 +468,27 @@ impl HealthServiceTrait for HealthService {
         *self.config.write().await = config;
         info!("Health configuration updated");
         Ok(())
+    }
+
+    async fn run_full_checks(
+        &self,
+        base_currency: &str,
+        account_service: Arc<dyn AccountServiceTrait>,
+        holdings_service: Arc<dyn HoldingsServiceTrait>,
+        quote_service: Arc<dyn QuoteServiceTrait>,
+        asset_service: Arc<dyn AssetServiceTrait>,
+        taxonomy_service: Arc<dyn TaxonomyServiceTrait>,
+    ) -> Result<HealthStatus> {
+        HealthService::run_full_checks(
+            self,
+            base_currency,
+            account_service,
+            holdings_service,
+            quote_service,
+            asset_service,
+            taxonomy_service,
+        )
+        .await
     }
 }
 
@@ -386,7 +546,7 @@ mod tests {
         let service = HealthService::new(store);
 
         let status = service
-            .run_checks_with_data("USD", 0.0, &[], &HashMap::new(), &[], &[], &[])
+            .run_checks_with_data("USD", 0.0, &[], &HashMap::new(), &[], &[], &[], &[], &None)
             .await
             .unwrap();
 
@@ -447,7 +607,7 @@ mod tests {
         let quote_times = HashMap::new();
 
         let status = service
-            .run_checks_with_data("USD", 100_000.0, &holdings, &quote_times, &[], &[], &[])
+            .run_checks_with_data("USD", 100_000.0, &holdings, &quote_times, &[], &[], &[], &[], &None)
             .await
             .unwrap();
 
@@ -469,7 +629,7 @@ mod tests {
         let quote_times = HashMap::new();
 
         let status = service
-            .run_checks_with_data("USD", 100_000.0, &holdings, &quote_times, &[], &[], &[])
+            .run_checks_with_data("USD", 100_000.0, &holdings, &quote_times, &[], &[], &[], &[], &None)
             .await
             .unwrap();
 
@@ -484,7 +644,7 @@ mod tests {
 
         // Run checks again - issue should be filtered out
         let status = service
-            .run_checks_with_data("USD", 100_000.0, &holdings, &quote_times, &[], &[], &[])
+            .run_checks_with_data("USD", 100_000.0, &holdings, &quote_times, &[], &[], &[], &[], &None)
             .await
             .unwrap();
 

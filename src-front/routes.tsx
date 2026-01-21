@@ -17,9 +17,11 @@ import PerformancePage from "@/pages/performance/performance-page";
 import SettingsAccountsPage from "@/pages/settings/accounts/accounts-page";
 import SettingsAppearancePage from "@/pages/settings/appearance/appearance-page";
 import AccountPage from "./pages/account/account-page";
+import AiAssistantPage from "./pages/ai-assistant/ai-assistant-page";
 import AssetProfilePage from "./pages/asset/asset-profile-page";
 import OnboardingPage from "./pages/onboarding/onboarding-page";
 import AddonSettingsPage from "./pages/settings/addons/addon-settings";
+import AiProvidersPage from "./pages/settings/ai-providers/ai-providers-page";
 import ContributionLimitPage from "./pages/settings/contribution-limits/contribution-limits-page";
 import ExportSettingsPage from "./pages/settings/exports/exports-page";
 import GeneralSettingsPage from "./pages/settings/general/general-page";
@@ -28,16 +30,14 @@ import MarketDataImportPage from "./pages/settings/market-data/market-data-impor
 import MarketDataSettingsPage from "./pages/settings/market-data/market-data-settings";
 import TaxonomiesPage from "./pages/settings/taxonomies/taxonomies-page";
 import ConnectSettingsPage from "./pages/settings/wealthfolio-connect/connect-settings-page";
-import AiProvidersPage from "./pages/settings/ai-providers/ai-providers-page";
-import AiAssistantPage from "./pages/ai-assistant/ai-assistant-page";
 // import QRScannerPage from './pages/qr-scanner/qr-scanner-page'; // File not found
 import { getDynamicRoutes, subscribeToNavigationUpdates } from "@/addons/addons-runtime-context";
-import NotFoundPage from "@/pages/not-found";
 import AuthCallbackPage from "@/features/wealthfolio-connect/pages/auth-callback-page";
 import ConnectPage from "@/features/wealthfolio-connect/pages/connect-page";
+import NotFoundPage from "@/pages/not-found";
+import HealthPage from "./pages/health/health-page";
 import HoldingsInsightsPage from "./pages/holdings/holdings-insights-page";
 import AboutSettingsPage from "./pages/settings/about/about-page";
-import HealthPage from "./pages/health/health-page";
 
 export function AppRoutes() {
   const [dynamicRoutes, setDynamicRoutes] = useState<
@@ -79,7 +79,6 @@ export function AppRoutes() {
         <Route path="/" element={<AppLayout />}>
           <Route index element={<PortfolioPage />} />
           <Route path="dashboard" element={<PortfolioPage />} />
-          <Route path="net-worth" element={<PortfolioPage />} />
           <Route path="activities" element={<ActivityPage />} />
           <Route path="activities/manage" element={<ActivityManagerPage />} />
           <Route path="holdings" element={<HoldingsPage />} />

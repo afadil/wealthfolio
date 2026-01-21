@@ -356,6 +356,9 @@ pub trait SyncStateStore: Send + Sync {
 
     /// Get assets that need profile enrichment (profile_enriched_at is NULL).
     fn get_assets_needing_profile_enrichment(&self) -> Result<Vec<QuoteSyncState>>;
+
+    /// Get sync states with errors (error_count > 0).
+    fn get_with_errors(&self) -> Result<Vec<QuoteSyncState>>;
 }
 
 #[cfg(test)]

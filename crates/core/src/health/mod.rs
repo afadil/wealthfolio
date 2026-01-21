@@ -49,6 +49,7 @@ pub mod model;
 pub mod traits;
 
 pub mod checks;
+pub mod fixes;
 pub mod service;
 
 #[cfg(test)]
@@ -57,10 +58,18 @@ mod tests;
 // Re-export commonly used types
 pub use errors::HealthError;
 pub use model::{
-    FixAction, HealthCategory, HealthConfig, HealthIssue, HealthIssueBuilder, HealthStatus,
-    IssueDismissal, NavigateAction, Severity,
+    AffectedItem, FixAction, HealthCategory, HealthConfig, HealthIssue, HealthIssueBuilder,
+    HealthStatus, IssueDismissal, NavigateAction, Severity,
 };
 pub use traits::{HealthCheck, HealthContext, HealthDismissalStore, HealthServiceTrait};
 
 // Re-export service
 pub use service::HealthService;
+
+// Re-export fix types
+pub use fixes::{
+    get_migration_status, migrate_legacy_classifications, MigrationResult, MigrationStatus,
+};
+
+// Re-export data gathering functions from checks
+pub use checks::{gather_legacy_migration_status, gather_quote_sync_errors};

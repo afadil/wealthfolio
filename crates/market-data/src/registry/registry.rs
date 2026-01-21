@@ -160,7 +160,7 @@ impl ProviderRegistry {
                 }
             };
 
-            info!(
+            debug!(
                 "Fetching quotes from provider '{}' with {:?} (source: {:?})",
                 provider_id, resolved.instrument, resolved.source
             );
@@ -204,7 +204,7 @@ impl ProviderRegistry {
                         continue;
                     }
 
-                    info!(
+                    debug!(
                         "Successfully fetched {} valid quotes from '{}'",
                         valid_quotes.len(),
                         provider_id
@@ -217,7 +217,7 @@ impl ProviderRegistry {
                     match retry_class {
                         RetryClass::Never => {
                             // Terminal error - don't try other providers
-                            info!(
+                            debug!(
                                 "Terminal error from '{}': {:?}, not retrying",
                                 provider_id, e
                             );
@@ -226,13 +226,13 @@ impl ProviderRegistry {
                         RetryClass::FailoverWithPenalty | RetryClass::CircuitOpen => {
                             // Record failure for circuit breaker
                             self.circuit_breaker.record_failure(&provider_id);
-                            warn!(
+                            debug!(
                                 "Provider '{}' failed with {:?}, recorded circuit breaker failure",
                                 provider_id, e
                             );
                         }
                         RetryClass::NextProvider => {
-                            info!(
+                            debug!(
                                 "Provider '{}' failed with {:?}, trying next provider",
                                 provider_id, e
                             );
@@ -613,7 +613,7 @@ impl ProviderRegistry {
                 }
             };
 
-            info!(
+            debug!(
                 "Fetching quotes from provider '{}' with {:?} (source: {:?})",
                 provider_id, resolved.instrument, resolved.source
             );

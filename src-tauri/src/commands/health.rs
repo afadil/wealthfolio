@@ -3,9 +3,7 @@ use std::sync::Arc;
 use crate::context::ServiceContext;
 use log::debug;
 use tauri::State;
-use wealthfolio_core::health::{
-    FixAction, HealthConfig, HealthServiceTrait, HealthStatus,
-};
+use wealthfolio_core::health::{FixAction, HealthConfig, HealthServiceTrait, HealthStatus};
 
 /// Get current health status (cached or fresh check).
 #[tauri::command]
@@ -38,87 +36,23 @@ pub async fn run_health_checks(
     run_health_checks_internal(&state, &base_currency).await
 }
 
-/// Internal function to run health checks by gathering data from services.
+/// Internal function to run health checks.
 async fn run_health_checks_internal(
     state: &State<'_, Arc<ServiceContext>>,
     base_currency: &str,
 ) -> Result<HealthStatus, String> {
-    use std::collections::HashMap;
-    use wealthfolio_core::health::checks::{
-        AssetHoldingInfo, ConsistencyIssueInfo, FxPairInfo, UnclassifiedAssetInfo,
-    };
-
-    let health_service = state.health_service();
-
-    // Gather data from various services
-    // For MVP, we'll start with basic checks
-
-    // Get accounts to iterate through holdings
-    let accounts = state
-        .account_service()
-        .get_active_accounts()
-        .map_err(|e| e.to_string())?;
-
-    let mut all_holdings: Vec<AssetHoldingInfo> = Vec::new();
-    let mut latest_quote_times: HashMap<String, chrono::DateTime<chrono::Utc>> = HashMap::new();
-    let mut total_portfolio_value = 0.0;
-
-    // Gather holdings data from each account
-    for account in &accounts {
-        let holdings = state
-            .holdings_service()
-            .get_holdings(&account.id, base_currency)
-            .await
-            .map_err(|e| e.to_string())?;
-
-        for holding in holdings {
-            if let Some(ref instrument) = holding.instrument {
-                let market_value_f64 = holding.market_value.base.to_string().parse::<f64>().unwrap_or(0.0);
-                total_portfolio_value += market_value_f64;
-
-                // Determine if uses market pricing
-                let uses_market_pricing = instrument.pricing_mode.to_uppercase() == "MARKET";
-
-                all_holdings.push(AssetHoldingInfo {
-                    asset_id: instrument.id.clone(),
-                    market_value: market_value_f64,
-                    uses_market_pricing,
-                });
-            }
-        }
-    }
-
-    // Get latest quote timestamps for held assets
-    let asset_ids: Vec<String> = all_holdings.iter().map(|h| h.asset_id.clone()).collect();
-    if !asset_ids.is_empty() {
-        if let Ok(quotes) = state.quote_service().get_latest_quotes(&asset_ids) {
-            for (asset_id, quote) in quotes {
-                latest_quote_times.insert(asset_id, quote.timestamp);
-            }
-        }
-    }
-
-    // For now, we'll use empty data for FX, unclassified, and consistency checks
-    // These can be enhanced later with proper data gathering
-    let fx_pairs: Vec<FxPairInfo> = Vec::new();
-    let unclassified_assets: Vec<UnclassifiedAssetInfo> = Vec::new();
-    let consistency_issues: Vec<ConsistencyIssueInfo> = Vec::new();
-
-    // Run checks with gathered data
-    let status = health_service
-        .run_checks_with_data(
+    state
+        .health_service()
+        .run_full_checks(
             base_currency,
-            total_portfolio_value,
-            &all_holdings,
-            &latest_quote_times,
-            &fx_pairs,
-            &unclassified_assets,
-            &consistency_issues,
+            state.account_service(),
+            state.holdings_service(),
+            state.quote_service(),
+            state.asset_service(),
+            state.taxonomy_service(),
         )
         .await
-        .map_err(|e| e.to_string())?;
-
-    Ok(status)
+        .map_err(|e| e.to_string())
 }
 
 /// Dismiss a health issue.
@@ -170,6 +104,14 @@ pub async fn execute_health_fix(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<(), String> {
     debug!("Executing health fix: {} ({})", action.label, action.id);
+
+    // Handle migrate_legacy_classifications action specially since it needs taxonomy service
+    if action.id == "migrate_legacy_classifications" {
+        // Use the shared migration function from taxonomy module
+        crate::commands::taxonomy::run_legacy_migration(&state).await?;
+        return Ok(());
+    }
+
     state
         .health_service()
         .execute_fix(&action)

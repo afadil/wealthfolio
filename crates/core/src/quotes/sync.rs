@@ -22,7 +22,7 @@
 
 use async_trait::async_trait;
 use chrono::{Duration, NaiveDate, TimeZone, Utc};
-use log::{debug, error, info, warn};
+use log::{debug, error, warn};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -450,7 +450,7 @@ where
             return SyncResult::default();
         }
 
-        info!("Executing sync for {} assets", plans.len());
+        debug!("Executing sync for {} assets", plans.len());
 
         // Get all assets for the plans
         let asset_ids: Vec<String> = plans.iter().map(|p| p.asset_id.clone()).collect();
@@ -487,7 +487,7 @@ where
             }
         }
 
-        info!(
+        debug!(
             "Sync complete: {} synced, {} failed, {} skipped, {} quotes total",
             result.synced, result.failed, result.skipped, result.quotes_synced
         );
@@ -545,7 +545,7 @@ where
 
     /// Build sync states from current holdings and activities.
     async fn refresh_sync_states(&self) -> Result<()> {
-        info!("Refreshing quote sync states...");
+        debug!("Refreshing quote sync states...");
 
         // Get all syncable assets
         let assets = self.asset_repo.list()?;
@@ -604,7 +604,7 @@ where
     A: AssetRepositoryTrait + 'static,
 {
     async fn sync(&self) -> Result<SyncResult> {
-        info!("Starting optimized quote sync...");
+        debug!("Starting optimized quote sync...");
 
         // Refresh sync state first
         if let Err(e) = self.refresh_sync_states().await {
@@ -615,16 +615,16 @@ where
         let plans = self.generate_sync_plan()?;
 
         if plans.is_empty() {
-            info!("No assets need syncing");
+            debug!("No assets need syncing");
             return Ok(SyncResult::default());
         }
 
-        info!("Syncing {} assets", plans.len());
+        debug!("Syncing {} assets", plans.len());
         Ok(self.execute_sync_plans(plans).await)
     }
 
     async fn resync(&self, asset_ids: Option<Vec<String>>) -> Result<SyncResult> {
-        info!("Starting resync for {:?}", asset_ids);
+        debug!("Starting resync for {:?}", asset_ids);
 
         let assets = match asset_ids {
             Some(ids) if !ids.is_empty() => self.asset_repo.list_by_symbols(&ids)?,
@@ -675,7 +675,7 @@ where
             return Ok(());
         }
 
-        info!(
+        debug!(
             "Handling new activity for {} on {}",
             symbol, activity_date.0
         );
@@ -740,7 +740,7 @@ where
             return Ok(());
         }
 
-        info!("Handling activity deletion for {}", symbol);
+        debug!("Handling activity deletion for {}", symbol);
 
         // Refresh activity dates from the activities table
         // This will recalculate first_activity_date and last_activity_date
