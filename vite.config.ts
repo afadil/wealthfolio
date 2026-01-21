@@ -31,7 +31,9 @@ const buildTarget = process.env.BUILD_TARGET || "tauri";
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  root: "src-front",
   plugins: [react(), tailwindcss()],
+  publicDir: "public",
   optimizeDeps: {
     include: [
       // Icon libraries (heavy barrel exports)
@@ -105,6 +107,8 @@ export default defineConfig({
   // https://tauri.app/v1/api/config#buildconfig.beforedevcommand
   envPrefix: ["VITE_", "TAURI_", "CONNECT_"],
   build: {
+    // Output to project root's dist folder (for Tauri)
+    outDir: "../dist",
     // Tauri uses Chromium on Windows and WebKit on macOS and Linux
     //target: process.env.TAURI_PLATFORM == 'windows' ? 'chrome105' : 'safari13',
     // don't minify for debug builds
@@ -115,7 +119,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "jsdom",
-    setupFiles: "./src-front/test/setup.ts",
-    include: ["src-front/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
+    setupFiles: "./test/setup.ts",
+    include: ["**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
   },
 } as unknown as import("vitest/config").UserConfigExport);

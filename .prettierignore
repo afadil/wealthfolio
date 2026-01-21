@@ -10,7 +10,7 @@ src-tauri/gen/
 **/*.d.ts
 
 # Assets and images
-public/
+src-front/public/
 
 # Rust code
 src-tauri/

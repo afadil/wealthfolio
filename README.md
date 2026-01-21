@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/afadil/wealthfolio">
-    <img src="public/logo.svg" alt="Logo" width="80" height="80">
+    <img src="src-front/public/logo.svg" alt="Logo" width="80" height="80">
   </a>
 
   <h3 align="center">Wealthfolio</h3>
@@ -20,7 +20,7 @@
 </div>
 <div align="center">
 
-[<img src="./public/button-buy-me-a-coffee.png" width="180" alt="Buy me a coffee button"/>](https://www.buymeacoffee.com/afadil)
+[<img src="./src-front/public/button-buy-me-a-coffee.png" width="180" alt="Buy me a coffee button"/>](https://www.buymeacoffee.com/afadil)
 
 </div>
 
@@ -46,7 +46,7 @@ Data Storage. No Subscriptions, No Cloud.
 
 Visit the app website at [Wealthfolio App](https://wealthfolio.app/).
 
-![Screenshot](public/screenshot.webp)
+![Screenshot](src-front/public/screenshot.webp)
 
 ### ✨ Key Features
 
@@ -597,7 +597,9 @@ wealthfolio/
 │   ├── features/                # Feature modules (self-contained)
 │   ├── pages/                   # Application pages and routes
 │   ├── hooks/                   # Custom React hooks
-│   └── lib/                     # Utility libraries and helpers
+│   ├── lib/                     # Utility libraries and helpers
+│   ├── public/                  # Static assets
+│   └── index.html               # HTML entry point
 ├── crates/                      # Rust crates (shared backend logic)
 │   ├── core/                    # Core business logic, services, models
 │   ├── storage-sqlite/          # SQLite storage layer (Diesel ORM)
@@ -619,11 +621,9 @@ wealthfolio/
 │   ├── activities/              # Activity types docs
 │   └── architecture/            # Architecture docs
 ├── db/                          # SQLite database and migrations
-├── public/                      # Static assets
 ├── Cargo.toml                   # Rust workspace config
 ├── package.json                 # Node.js dependencies
 ├── pnpm-workspace.yaml          # pnpm workspace config
-├── tailwind.config.js           # Tailwind CSS config
 ├── tsconfig.json                # TypeScript config
 └── vite.config.ts               # Vite build config
 ```
