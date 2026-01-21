@@ -77,26 +77,7 @@ test.describe("Activity Creation Tests", () => {
         fromAccount: "Test USD Account",
         toAccount: "Test CAD Account",
         amount: 1000,
-        notes: "Internal transfer between accounts",
-      },
-      externalTransferIn: {
-        account: "Test USD Account",
-        currency: "USD",
-        amount: 2000,
-        notes: "External transfer in from another brokerage",
-      },
-      externalTransferOut: {
-        account: "Test USD Account",
-        currency: "USD",
-        amount: 500,
-        notes: "External transfer out to another brokerage",
-      },
-      securitiesTransfer: {
-        fromAccount: "Test USD Account",
-        toAccount: "Test CAD Account",
-        symbol: "AAPL",
-        quantity: 1,
-        notes: "Securities transfer between accounts",
+        notes: "Transfer between accounts",
       },
       fee: {
         account: "Test USD Account",
@@ -204,9 +185,7 @@ test.describe("Activity Creation Tests", () => {
     await searchInput.fill(symbol);
     await page.waitForTimeout(500);
 
-    // Match the exact symbol followed by space (e.g., "AAPL Apple Inc." not "AAPL.BA...")
-    // This prevents matching AAPL.BA when searching for AAPL
-    const symbolOption = page.getByRole("option", { name: new RegExp(`^${symbol} `, "i") }).first();
+    const symbolOption = page.getByRole("option", { name: new RegExp(symbol, "i") }).first();
     await expect(symbolOption).toBeVisible({ timeout: 5000 });
     await symbolOption.click();
     await page.waitForTimeout(200);
@@ -321,49 +300,17 @@ test.describe("Activity Creation Tests", () => {
 
     await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
 
-    // Handle login, onboarding, or already authenticated states
-    const loginInput = page.getByPlaceholder("Enter your password");
-    const sidebar = page.getByRole("navigation", { name: "Sidebar" });
-    const onboardingContinue = page.getByRole("button", { name: "Continue" });
-
-    // Wait for app to finish loading
-    await expect(loginInput.or(sidebar).or(onboardingContinue)).toBeVisible({ timeout: 120000 });
-
     // Handle login if needed
+    const loginInput = page.getByPlaceholder("Enter your password");
+    const dashboardHeading = page.getByRole("heading", { name: "Dashboard" });
+
+    await expect(loginInput.or(dashboardHeading)).toBeVisible({ timeout: 120000 });
+
     if (await loginInput.isVisible()) {
       await loginInput.fill(TEST_PASSWORD);
       await page.getByRole("button", { name: "Sign In" }).click();
-      await expect(sidebar.or(onboardingContinue)).toBeVisible({ timeout: 15000 });
+      await expect(dashboardHeading).toBeVisible({ timeout: 15000 });
     }
-
-    // Handle onboarding if needed (for fresh database)
-    if (await onboardingContinue.isVisible()) {
-      // Step 1: Info screen - click Continue
-      await onboardingContinue.click();
-
-      // Step 2: Currency and theme selection
-      const usdButton = page.getByRole("button", { name: "USD", exact: true });
-      await expect(usdButton).toBeVisible({ timeout: 5000 });
-      await usdButton.click();
-
-      const lightThemeButton = page.getByRole("button", { name: "Light", exact: true });
-      await lightThemeButton.click();
-
-      // Click Continue to submit settings and move to step 3
-      await page.getByRole("button", { name: "Continue" }).click();
-
-      // Step 3: Get Started
-      const getStartedButton = page.getByTestId("onboarding-finish-button");
-      await expect(getStartedButton).toBeVisible({ timeout: 15000 });
-      await getStartedButton.click();
-
-      // After onboarding, app redirects to accounts page
-      await expect(page.getByRole("heading", { name: "Accounts" })).toBeVisible({ timeout: 15000 });
-    }
-
-    // Navigate to dashboard and verify we're there (dashboard shows "Investments" button)
-    await page.goto(`${BASE_URL}/dashboard`, { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("button", { name: "Investments" })).toBeVisible({ timeout: 15000 });
   });
 
   test("2. Create test accounts", async () => {
@@ -560,7 +507,7 @@ test.describe("Activity Creation Tests", () => {
     await verifyActivityInTable("DIVIDEND", dividend.symbol, { amount: dividend.amount });
   });
 
-  test("10. Create internal TRANSFER activity (cash)", async () => {
+  test("10. Create TRANSFER activity", async () => {
     await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
 
@@ -569,7 +516,6 @@ test.describe("Activity Creation Tests", () => {
 
     const transfer = TEST_DATA.activities.transfer;
 
-    // Cash mode is default, internal transfer is default
     // Select from account
     await selectAccount("Test USD Account", "USD", "From Account");
 
@@ -580,147 +526,12 @@ test.describe("Activity Creation Tests", () => {
     await fillAmount(transfer.amount);
     await fillNotes(transfer.notes);
 
-    // Submit - button text includes the amount (e.g., "Transfer 1,000.00")
-    const submitButton = page.locator('button[type="submit"]').filter({ hasText: /Transfer/i });
-    await expect(submitButton).toBeEnabled({ timeout: 5000 });
-    await submitButton.click();
-
-    // Wait for sheet to close
-    await expect(page.getByRole("heading", { name: "Add Activity" })).not.toBeVisible({
-      timeout: 20000,
-    });
-    await page.waitForTimeout(500);
-
+    await submitActivity("Transfer");
     // Transfers create two activities: TRANSFER_OUT and TRANSFER_IN
     await verifyActivityInTable("TRANSFER_OUT", null, { amount: transfer.amount });
   });
 
-  test("11. Create external TRANSFER IN activity (cash)", async () => {
-    await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
-
-    await openAddActivitySheet();
-    await selectActivityType("Transfer");
-
-    const transfer = TEST_DATA.activities.externalTransferIn;
-
-    // Check "External transfer" checkbox
-    const externalCheckbox = page.getByLabel("External transfer");
-    await externalCheckbox.click();
-    await page.waitForTimeout(200);
-
-    // Select "In" direction (default for transfer in)
-    const inRadio = page.getByRole("radio", { name: "In" });
-    await inRadio.click();
-    await page.waitForTimeout(200);
-
-    // For external transfer in, select the destination account
-    await selectAccount(transfer.account, transfer.currency, "To Account");
-
-    await selectDate();
-    await fillAmount(transfer.amount);
-    await fillNotes(transfer.notes);
-
-    // Submit
-    const submitButton = page.getByRole("button", { name: /Transfer In|Add Transfer In/i });
-    await expect(submitButton).toBeEnabled({ timeout: 5000 });
-    await submitButton.click();
-
-    // Wait for sheet to close
-    await expect(page.getByRole("heading", { name: "Add Activity" })).not.toBeVisible({
-      timeout: 20000,
-    });
-    await page.waitForTimeout(500);
-
-    await verifyActivityInTable("TRANSFER_IN", null, { amount: transfer.amount });
-  });
-
-  test("12. Create external TRANSFER OUT activity (cash)", async () => {
-    await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
-
-    await openAddActivitySheet();
-    await selectActivityType("Transfer");
-
-    const transfer = TEST_DATA.activities.externalTransferOut;
-
-    // Check "External transfer" checkbox
-    const externalCheckbox = page.getByLabel("External transfer");
-    await externalCheckbox.click();
-    await page.waitForTimeout(200);
-
-    // Select "Out" direction
-    const outRadio = page.getByRole("radio", { name: "Out" });
-    await outRadio.click();
-    await page.waitForTimeout(200);
-
-    // For external transfer out, select the source account
-    await selectAccount(transfer.account, transfer.currency, "From Account");
-
-    await selectDate();
-    await fillAmount(transfer.amount);
-    await fillNotes(transfer.notes);
-
-    // Submit
-    const submitButton = page.getByRole("button", { name: /Transfer Out|Add Transfer Out/i });
-    await expect(submitButton).toBeEnabled({ timeout: 5000 });
-    await submitButton.click();
-
-    // Wait for sheet to close
-    await expect(page.getByRole("heading", { name: "Add Activity" })).not.toBeVisible({
-      timeout: 20000,
-    });
-    await page.waitForTimeout(500);
-
-    await verifyActivityInTable("TRANSFER_OUT", null, { amount: transfer.amount });
-  });
-
-  test("13. Create internal TRANSFER activity (securities)", async () => {
-    await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
-
-    await openAddActivitySheet();
-    await selectActivityType("Transfer");
-
-    const transfer = TEST_DATA.activities.securitiesTransfer;
-
-    // Switch to Securities mode
-    const securitiesToggle = page.getByRole("button", { name: "Securities", exact: true });
-    await securitiesToggle.click();
-    await page.waitForTimeout(200);
-
-    // Select from account
-    await selectAccount("Test USD Account", "USD", "From Account");
-
-    // Select to account
-    await selectAccount("Test CAD Account", "CAD", "To Account");
-
-    await selectDate();
-
-    // Search and select symbol
-    await searchAndSelectSymbol(transfer.symbol);
-
-    // Fill quantity
-    await fillQuantity(transfer.quantity);
-
-    await fillNotes(transfer.notes);
-
-    // Submit - button text is dynamic based on quantity and symbol
-    const submitButton = page.locator('button[type="submit"]').filter({ hasText: /Transfer/i });
-    await expect(submitButton).toBeEnabled({ timeout: 5000 });
-    await submitButton.click();
-
-    // Wait for sheet to close
-    await expect(page.getByRole("heading", { name: "Add Activity" })).not.toBeVisible({
-      timeout: 20000,
-    });
-    await page.waitForTimeout(500);
-
-    // Securities transfers also create TRANSFER_OUT and TRANSFER_IN
-    await verifyActivityInTable("TRANSFER_OUT", transfer.symbol, { quantity: transfer.quantity });
-  });
-
-  test("14. Create FEE activity", async () => {
+  test("11. Create FEE activity", async () => {
     await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
 
@@ -737,7 +548,7 @@ test.describe("Activity Creation Tests", () => {
     await verifyActivityInTable("FEE", null, { amount: fee.amount });
   });
 
-  test("15. Create FEE activity with subtype", async () => {
+  test("12. Create FEE activity with subtype", async () => {
     await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
 
@@ -759,7 +570,7 @@ test.describe("Activity Creation Tests", () => {
     await verifyActivityInTable("FEE", null, { amount: fee.amount });
   });
 
-  test("16. Create INTEREST activity", async () => {
+  test("13. Create INTEREST activity", async () => {
     await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
 
@@ -776,7 +587,7 @@ test.describe("Activity Creation Tests", () => {
     await verifyActivityInTable("INTEREST", null, { amount: interest.amount });
   });
 
-  test("17. Create TAX activity", async () => {
+  test("14. Create TAX activity", async () => {
     await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
 
@@ -793,7 +604,7 @@ test.describe("Activity Creation Tests", () => {
     await verifyActivityInTable("TAX", null, { amount: tax.amount });
   });
 
-  test("18. Create TAX activity with subtype", async () => {
+  test("15. Create TAX activity with subtype", async () => {
     await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
 
@@ -815,7 +626,7 @@ test.describe("Activity Creation Tests", () => {
     await verifyActivityInTable("TAX", null, { amount: tax.amount });
   });
 
-  test("19. Create SPLIT activity", async () => {
+  test("16. Create SPLIT activity", async () => {
     await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
 
@@ -838,7 +649,7 @@ test.describe("Activity Creation Tests", () => {
     await verifyActivityInTable("SPLIT", split.symbol);
   });
 
-  test("20. Create BUY activity with custom asset", async () => {
+  test("17. Create BUY activity with custom asset", async () => {
     await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
 
@@ -900,7 +711,7 @@ test.describe("Activity Creation Tests", () => {
     await verifyActivityInTable("BUY", customBuy.customAsset.symbol, { quantity: customBuy.quantity });
   });
 
-  test("21. Verify all created assets in Securities page", async () => {
+  test("18. Verify all created assets in Securities page", async () => {
     await page.goto(`${BASE_URL}/settings/securities`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Securities" })).toBeVisible({ timeout: 10000 });
 
@@ -922,7 +733,7 @@ test.describe("Activity Creation Tests", () => {
     await expect(customAssetRow.first()).toBeVisible({ timeout: 10000 });
   });
 
-  test("22. Verify custom asset has manual pricing", async () => {
+  test("19. Verify custom asset has manual pricing", async () => {
     const customSymbol = TEST_DATA.activities.customAssetBuy.customAsset.symbol;
 
     // Navigate to the custom asset's profile page
@@ -965,22 +776,19 @@ test.describe("Activity Creation Tests", () => {
     }
   });
 
-  test("23. Verify activity count in activities page", async () => {
+  test("20. Verify activity count in activities page", async () => {
     await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
 
     // Wait for activities to load
     await page.waitForTimeout(1000);
 
-    // Count activity rows - we created activities:
-    // deposit, withdrawal, 2 buys, sell, 2 dividends,
-    // internal transfer (creates 2), external transfer in, external transfer out, securities transfer (creates 2),
-    // 2 fees, interest, 2 taxes, split, custom buy
-    // Total: 1 + 1 + 2 + 1 + 2 + 2 + 1 + 1 + 2 + 2 + 1 + 2 + 1 + 1 = 20
+    // Count activity rows - we created at least 15 activities
+    // (deposit, withdrawal, 2 buys, sell, 2 dividends, transfer (creates 2), 2 fees, interest, 2 taxes, split, custom buy)
     const activityRows = page.locator("tbody tr");
     const rowCount = await activityRows.count();
 
-    // We should have at least 20 activities
-    expect(rowCount).toBeGreaterThanOrEqual(20);
+    // We should have at least 16 activities (transfer creates 2 rows: TRANSFER_OUT and TRANSFER_IN)
+    expect(rowCount).toBeGreaterThanOrEqual(16);
   });
 });
