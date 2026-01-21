@@ -25,7 +25,7 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 use wealthfolio_core::{
     assets::{generate_asset_id, AssetKind, NewAsset, PricingMode},
-    quotes::{DataSource, Quote},
+    quotes::{DataSource, MarketSyncMode, Quote},
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -248,13 +248,12 @@ async fn create_alternative_asset(
 
     state.quote_service.update_quote(quote).await?;
 
-    // Trigger portfolio recalculation
+    // Trigger portfolio recalculation - no market sync needed for manual alternative assets
     enqueue_portfolio_job(
         state.clone(),
         PortfolioJobConfig {
             account_ids: None,
-            symbols: Some(vec![asset_id.clone()]),
-            refetch_all_market_data: false,
+            market_sync_mode: MarketSyncMode::None,
             force_full_recalculation: false,
         },
     );
@@ -301,13 +300,12 @@ async fn update_alternative_asset_valuation(
 
     state.quote_service.update_quote(quote).await?;
 
-    // Trigger portfolio recalculation
+    // Trigger portfolio recalculation - no market sync needed for manual valuation updates
     enqueue_portfolio_job(
         state.clone(),
         PortfolioJobConfig {
             account_ids: None,
-            symbols: Some(vec![asset_id]),
-            refetch_all_market_data: false,
+            market_sync_mode: MarketSyncMode::None,
             force_full_recalculation: false,
         },
     );
@@ -370,13 +368,12 @@ async fn delete_alternative_asset(
         .delete_alternative_asset(&asset_id)
         .await?;
 
-    // Trigger portfolio recalculation
+    // Trigger portfolio recalculation - no market sync needed for asset deletion
     enqueue_portfolio_job(
         state.clone(),
         PortfolioJobConfig {
             account_ids: None,
-            symbols: None,
-            refetch_all_market_data: false,
+            market_sync_mode: MarketSyncMode::None,
             force_full_recalculation: false,
         },
     );
@@ -477,18 +474,18 @@ async fn get_alternative_holdings(
         return Ok(Json(vec![]));
     }
 
-    // Get symbols for quote lookup
-    let symbols: Vec<String> = alternative_assets.iter().map(|a| a.symbol.clone()).collect();
+    // Use canonical asset IDs for quote lookup
+    let asset_ids: Vec<String> = alternative_assets.iter().map(|a| a.id.clone()).collect();
 
     // Fetch latest quotes for all alternative assets
-    let quotes = state.quote_service.get_latest_quotes(&symbols)?;
+    let quotes = state.quote_service.get_latest_quotes(&asset_ids)?;
 
     // Build response for each asset
     let holdings: Vec<AlternativeHoldingResponse> = alternative_assets
         .into_iter()
         .filter_map(|asset| {
             // Get the latest quote for this asset
-            let quote = quotes.get(&asset.symbol)?;
+            let quote = quotes.get(&asset.id)?;
 
             // Extract purchase_price from metadata
             let purchase_price = asset

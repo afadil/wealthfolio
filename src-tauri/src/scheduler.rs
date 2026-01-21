@@ -7,6 +7,8 @@ use std::sync::Arc;
 use log::{debug, info, warn};
 use tauri::AppHandle;
 
+use wealthfolio_core::quotes::MarketSyncMode;
+
 use crate::commands::brokers_sync::perform_broker_sync;
 use crate::context::ServiceContext;
 use crate::events::{
@@ -62,10 +64,11 @@ pub async fn run_startup_sync(handle: &AppHandle, context: &Arc<ServiceContext>)
                             "Triggering portfolio update after startup sync ({} activities synced)",
                             activities.activities_upserted
                         );
+                        // Startup broker sync uses incremental sync for all assets
                         crate::events::emit_portfolio_trigger_recalculate(
                             handle,
                             crate::events::PortfolioRequestPayload::builder()
-                                .refetch_all_market_data(false)
+                                .market_sync_mode(MarketSyncMode::Incremental { asset_ids: None })
                                 .build(),
                         );
                     }

@@ -14,15 +14,19 @@ use axum::{
 };
 use futures_core::stream::Stream;
 use tokio_stream::wrappers::{errors::BroadcastStreamRecvError, BroadcastStream};
+use wealthfolio_core::quotes::{MarketSyncMode, DEFAULT_HISTORY_DAYS};
 
 async fn update_portfolio(
     State(state): State<Arc<AppState>>,
     body: Option<Json<PortfolioRequestBody>>,
 ) -> ApiResult<StatusCode> {
-    let cfg = body
-        .map(|Json(inner)| inner)
-        .unwrap_or_default()
-        .into_config(false);
+    // Web-mode callers typically omit the body; preserve desktop behavior by defaulting
+    // to an explicit market sync policy (PRD: no implicit sync inside the job runner).
+    let mut request = body.map(|Json(inner)| inner).unwrap_or_default();
+    if matches!(request.market_sync_mode, MarketSyncMode::None) {
+        request.market_sync_mode = MarketSyncMode::Incremental { asset_ids: None };
+    }
+    let cfg = request.into_config(false);
     process_portfolio_job(state, cfg).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -31,10 +35,16 @@ async fn recalculate_portfolio(
     State(state): State<Arc<AppState>>,
     body: Option<Json<PortfolioRequestBody>>,
 ) -> ApiResult<StatusCode> {
-    let cfg = body
-        .map(|Json(inner)| inner)
-        .unwrap_or_default()
-        .into_config(true);
+    // In the UI, "recalculate portfolio" is used as "rebuild history", so default to a
+    // BackfillHistory sync when the client doesn't provide a mode.
+    let mut request = body.map(|Json(inner)| inner).unwrap_or_default();
+    if matches!(request.market_sync_mode, MarketSyncMode::None) {
+        request.market_sync_mode = MarketSyncMode::BackfillHistory {
+            asset_ids: None,
+            days: DEFAULT_HISTORY_DAYS,
+        };
+    }
+    let cfg = request.into_config(true);
     process_portfolio_job(state, cfg).await?;
     Ok(StatusCode::NO_CONTENT)
 }

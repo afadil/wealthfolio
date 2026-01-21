@@ -47,9 +47,9 @@ export const getAssets = async (): Promise<Asset[]> => {
   }
 };
 
-export const getLatestQuotes = async (symbols: string[]): Promise<Record<string, Quote>> => {
+export const getLatestQuotes = async (assetIds: string[]): Promise<Record<string, Quote>> => {
   try {
-    return await invoke<Record<string, Quote>>("get_latest_quotes", { symbols });
+    return await invoke<Record<string, Quote>>("get_latest_quotes", { assetIds });
   } catch (error) {
     logger.error("Error loading latest quotes.");
     throw error;
@@ -93,11 +93,15 @@ export const updateQuote = async (symbol: string, quote: Quote): Promise<void> =
   }
 };
 
-export const syncMarketData = async (symbols: string[], refetchAll: boolean): Promise<void> => {
+export const syncMarketData = async (
+  assetIds: string[],
+  refetchAll: boolean,
+  refetchRecentDays?: number,
+): Promise<void> => {
   try {
-    await invoke<void>("sync_market_data", { symbols, refetchAll });
+    await invoke<void>("sync_market_data", { assetIds, refetchAll, refetchRecentDays });
   } catch (error) {
-    logger.error(`Error refreshing quotes for symbols: ${String(error)}`);
+    logger.error(`Error refreshing quotes for assets: ${String(error)}`);
     throw error;
   }
 };

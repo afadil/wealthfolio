@@ -2,9 +2,11 @@ use super::activities_model::*;
 use crate::Result;
 use async_trait::async_trait;
 use chrono::DateTime;
+use chrono::NaiveDate;
 use chrono::NaiveDateTime;
 use chrono::Utc;
-use rust_decimal::Decimal; // Assuming Result is defined in activities_model or activities_errors
+use rust_decimal::Decimal;
+use std::collections::HashMap;
 
 /// Trait defining the contract for Activity repository operations.
 #[async_trait]
@@ -52,6 +54,20 @@ pub trait ActivityRepositoryTrait: Send + Sync {
     fn calculate_average_cost(&self, account_id: &str, asset_id: &str) -> Result<Decimal>;
     fn get_income_activities_data(&self) -> Result<Vec<IncomeData>>;
     fn get_first_activity_date_overall(&self) -> Result<DateTime<Utc>>;
+
+    /// Gets the first and last activity dates for each asset in the provided list.
+    ///
+    /// This is useful for sync planning to determine the date range needed for quotes.
+    /// The implementation should chunk the query if asset_ids.len() exceeds SQLite parameter limits.
+    ///
+    /// # Returns
+    ///
+    /// A map from asset_id to a tuple of (first_activity_date, last_activity_date).
+    /// Both dates may be None if no activities exist for the asset.
+    fn get_activity_bounds_for_assets(
+        &self,
+        asset_ids: &[String],
+    ) -> Result<HashMap<String, (Option<NaiveDate>, Option<NaiveDate>)>>;
 }
 
 /// Trait defining the contract for Activity service operations.

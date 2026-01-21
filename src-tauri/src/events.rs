@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::Emitter;
+use wealthfolio_core::quotes::MarketSyncMode;
 
 pub const PORTFOLIO_TOTAL_ACCOUNT_ID: &str = "TOTAL";
 
@@ -10,7 +11,7 @@ pub const APP_READY: &str = "app:ready";
 /// Event requesting a portfolio update, which may include market data sync and recalculation.
 pub const PORTFOLIO_TRIGGER_UPDATE: &str = "portfolio:trigger-update";
 
-/// Event requesting a full portfolio recalculation, including market data sync for specified accounts/symbols.
+/// Event requesting a full portfolio recalculation, including market data sync for specified accounts/asset_ids.
 pub const PORTFOLIO_TRIGGER_RECALCULATE: &str = "portfolio:trigger-recalculate";
 
 /// Event emitted when the background portfolio recalculation process starts.
@@ -91,11 +92,9 @@ impl ResourceEventPayload {
 pub struct PortfolioRequestPayload {
     /// Optional list of account IDs. None implies all/total accounts.
     pub account_ids: Option<Vec<String>>,
-    /// If syncing, specifies which symbols to sync. None implies sync all relevant symbols.
-    pub symbols: Option<Vec<String>>,
-    /// If syncing, specifies whether to refetch all symbols.
+    /// Controls market data sync behavior for this portfolio job.
     #[serde(default)]
-    pub refetch_all_market_data: bool,
+    pub market_sync_mode: MarketSyncMode,
 }
 
 impl PortfolioRequestPayload {
@@ -109,8 +108,7 @@ impl PortfolioRequestPayload {
 #[derive(Default)]
 pub struct PortfolioRequestPayloadBuilder {
     account_ids: Option<Vec<String>>,
-    symbols: Option<Vec<String>>,
-    refetch_all_market_data: Option<bool>,
+    market_sync_mode: MarketSyncMode,
 }
 
 impl PortfolioRequestPayloadBuilder {
@@ -128,15 +126,9 @@ impl PortfolioRequestPayloadBuilder {
         self
     }
 
-    /// Sets the specific symbols to synchronize.
-    pub fn symbols(mut self, symbols: Option<Vec<String>>) -> Self {
-        self.symbols = symbols;
-        self
-    }
-
-    /// Sets whether to refetch all symbols.
-    pub fn refetch_all_market_data(mut self, refetch_all: bool) -> Self {
-        self.refetch_all_market_data = Some(refetch_all);
+    /// Sets the market sync mode for this portfolio job.
+    pub fn market_sync_mode(mut self, mode: MarketSyncMode) -> Self {
+        self.market_sync_mode = mode;
         self
     }
 
@@ -144,8 +136,7 @@ impl PortfolioRequestPayloadBuilder {
     pub fn build(self) -> PortfolioRequestPayload {
         PortfolioRequestPayload {
             account_ids: self.account_ids,
-            symbols: self.symbols,
-            refetch_all_market_data: self.refetch_all_market_data.unwrap_or(false),
+            market_sync_mode: self.market_sync_mode,
         }
     }
 }

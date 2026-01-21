@@ -21,8 +21,9 @@ use super::import::{ImportValidationStatus, QuoteConverter, QuoteImport, QuoteVa
 use super::model::{DataSource, LatestQuotePair, Quote, QuoteSummary};
 use super::store::{ProviderSettingsStore, QuoteStore};
 use super::sync::{QuoteSyncService, QuoteSyncServiceTrait, SyncResult};
-use super::sync_state::{QuoteSyncState, SyncStateStore, SymbolSyncPlan};
+use super::sync_state::{QuoteSyncState, SyncMode, SyncStateStore, SymbolSyncPlan};
 use super::types::{AssetId, Day};
+use crate::activities::ActivityRepositoryTrait;
 use crate::assets::{needs_market_quotes, Asset, AssetKind, AssetRepositoryTrait, ProviderProfile};
 use crate::errors::Result;
 use crate::secrets::SecretStore;
@@ -177,10 +178,19 @@ pub trait QuoteServiceTrait: Send + Sync {
     // Sync Operations (via QuoteSyncService)
     // =========================================================================
 
-    /// Perform optimized sync.
-    async fn sync(&self) -> Result<SyncResult>;
+    /// Perform quote synchronization with the specified mode and optional asset filter.
+    ///
+    /// # Arguments
+    /// * `mode` - The sync mode determining how date ranges are calculated
+    /// * `asset_ids` - Optional list of specific assets to sync. If None, syncs all relevant assets.
+    ///
+    /// # Sync Modes
+    /// * `Incremental` - Default mode. Continues from last_quote_date with overlap to heal corrections.
+    /// * `RefetchRecent { days }` - Refetches the last N days regardless of existing quotes.
+    /// * `BackfillHistory { days }` - Rebuilds full history from activity start (or N days fallback).
+    async fn sync(&self, mode: SyncMode, asset_ids: Option<Vec<String>>) -> Result<SyncResult>;
 
-    /// Force resync for specific symbols (or all if None).
+    /// Force resync for specific symbols (or all if None) using BackfillHistory mode.
     async fn resync(&self, symbols: Option<Vec<String>>) -> Result<SyncResult>;
 
     /// Refresh sync state from holdings/activities.
@@ -210,6 +220,26 @@ pub trait QuoteServiceTrait: Send + Sync {
     /// Get assets that need profile enrichment.
     fn get_assets_needing_profile_enrichment(&self) -> Result<Vec<QuoteSyncState>>;
 
+    /// Update position status based on current holdings.
+    ///
+    /// This method should be called after portfolio snapshots are calculated to
+    /// derive open/closed position transitions for quote synchronization.
+    ///
+    /// # Arguments
+    /// * `current_holdings` - Map of asset_id to quantity from the latest TOTAL portfolio snapshot.
+    ///   Assets with quantity > 0 are marked as active; assets previously active but now with
+    ///   quantity = 0 (or missing from the map) are marked as inactive.
+    ///
+    /// # Behavior
+    /// - Assets with quantity > 0: marked as active (is_active=true, position_closed_date=NULL)
+    /// - Assets previously active but now with quantity <= 0: marked as inactive with today's date
+    /// - Inactive assets remain inactive unless they regain a position
+    /// - This enables the grace period logic in sync planning (CLOSED_POSITION_GRACE_PERIOD_DAYS)
+    async fn update_position_status_from_holdings(
+        &self,
+        current_holdings: &std::collections::HashMap<String, rust_decimal::Decimal>,
+    ) -> Result<()>;
+
     // =========================================================================
     // Provider Settings
     // =========================================================================
@@ -235,12 +265,13 @@ pub trait QuoteServiceTrait: Send + Sync {
 }
 
 /// Unified quote service implementation.
-pub struct QuoteService<Q, S, PS, A>
+pub struct QuoteService<Q, S, PS, A, R>
 where
     Q: QuoteStore,
     S: SyncStateStore,
     PS: ProviderSettingsStore,
     A: AssetRepositoryTrait,
+    R: ActivityRepositoryTrait,
 {
     /// Quote storage.
     quote_store: Arc<Q>,
@@ -250,20 +281,23 @@ where
     provider_settings_store: Arc<PS>,
     /// Asset repository.
     asset_repo: Arc<A>,
+    /// Activity repository.
+    activity_repo: Arc<R>,
     /// Market data client for provider operations.
     client: Arc<RwLock<MarketDataClient>>,
     /// Secret store for API keys.
     secret_store: Arc<dyn SecretStore>,
     /// Sync service.
-    sync_service: Arc<RwLock<Option<Arc<QuoteSyncService<Q, S, A>>>>>,
+    sync_service: Arc<RwLock<Option<Arc<QuoteSyncService<Q, S, A, R>>>>>,
 }
 
-impl<Q, S, PS, A> QuoteService<Q, S, PS, A>
+impl<Q, S, PS, A, R> QuoteService<Q, S, PS, A, R>
 where
     Q: QuoteStore + 'static,
     S: SyncStateStore + 'static,
     PS: ProviderSettingsStore + 'static,
     A: AssetRepositoryTrait + 'static,
+    R: ActivityRepositoryTrait + 'static,
 {
     /// Create a new quote service.
     pub async fn new(
@@ -271,6 +305,7 @@ where
         sync_state_store: Arc<S>,
         provider_settings_store: Arc<PS>,
         asset_repo: Arc<A>,
+        activity_repo: Arc<R>,
         secret_store: Arc<dyn SecretStore>,
     ) -> Result<Self> {
         // Get enabled providers with their priorities
@@ -294,6 +329,7 @@ where
             quote_store.clone(),
             sync_state_store.clone(),
             asset_repo.clone(),
+            activity_repo.clone(),
         );
 
         Ok(Self {
@@ -301,6 +337,7 @@ where
             sync_state_store,
             provider_settings_store,
             asset_repo,
+            activity_repo,
             client: client_arc,
             secret_store,
             sync_service: Arc::new(RwLock::new(Some(Arc::new(sync_service)))),
@@ -328,6 +365,7 @@ where
             self.quote_store.clone(),
             self.sync_state_store.clone(),
             self.asset_repo.clone(),
+            self.activity_repo.clone(),
         );
         *self.sync_service.write().await = Some(Arc::new(new_sync));
 
@@ -335,7 +373,7 @@ where
     }
 
     /// Get the sync service.
-    async fn get_sync_service(&self) -> Result<Arc<QuoteSyncService<Q, S, A>>> {
+    async fn get_sync_service(&self) -> Result<Arc<QuoteSyncService<Q, S, A, R>>> {
         let guard = self.sync_service.read().await;
         guard
             .as_ref()
@@ -403,12 +441,13 @@ where
 }
 
 #[async_trait]
-impl<Q, S, PS, A> QuoteServiceTrait for QuoteService<Q, S, PS, A>
+impl<Q, S, PS, A, R> QuoteServiceTrait for QuoteService<Q, S, PS, A, R>
 where
     Q: QuoteStore + 'static,
     S: SyncStateStore + 'static,
     PS: ProviderSettingsStore + 'static,
     A: AssetRepositoryTrait + 'static,
+    R: ActivityRepositoryTrait + 'static,
 {
     // =========================================================================
     // Quote CRUD
@@ -643,9 +682,9 @@ where
     // Sync Operations
     // =========================================================================
 
-    async fn sync(&self) -> Result<SyncResult> {
+    async fn sync(&self, mode: SyncMode, asset_ids: Option<Vec<String>>) -> Result<SyncResult> {
         let sync_service = self.get_sync_service().await?;
-        sync_service.sync().await
+        sync_service.sync(mode, asset_ids).await
     }
 
     async fn resync(&self, symbols: Option<Vec<String>>) -> Result<SyncResult> {
@@ -701,6 +740,62 @@ where
 
     fn get_assets_needing_profile_enrichment(&self) -> Result<Vec<QuoteSyncState>> {
         self.sync_state_store.get_assets_needing_profile_enrichment()
+    }
+
+    async fn update_position_status_from_holdings(
+        &self,
+        current_holdings: &std::collections::HashMap<String, rust_decimal::Decimal>,
+    ) -> Result<()> {
+        use rust_decimal::Decimal;
+
+        let today = Utc::now().date_naive();
+
+        // Get all sync states to determine previous active/inactive status
+        let all_sync_states = self.sync_state_store.get_all()?;
+
+        let mut marked_active = 0;
+        let mut marked_inactive = 0;
+
+        for sync_state in all_sync_states {
+            let asset_id = &sync_state.asset_id;
+            let current_qty = current_holdings.get(asset_id).copied().unwrap_or(Decimal::ZERO);
+            let has_open_position = current_qty > Decimal::ZERO;
+
+            if has_open_position {
+                // Asset has an open position
+                if !sync_state.is_active {
+                    // Was inactive, now has a position - mark as active (re-opened)
+                    debug!(
+                        "Marking asset {} as active (re-opened position, qty={})",
+                        asset_id, current_qty
+                    );
+                    self.sync_state_store.mark_active(asset_id).await?;
+                    marked_active += 1;
+                }
+                // If already active, no change needed
+            } else {
+                // Asset has no open position (quantity = 0 or not in holdings)
+                if sync_state.is_active {
+                    // Was active, now closed - mark as inactive with today's date
+                    debug!(
+                        "Marking asset {} as inactive (position closed)",
+                        asset_id
+                    );
+                    self.sync_state_store.mark_inactive(asset_id, today).await?;
+                    marked_inactive += 1;
+                }
+                // If already inactive, no change needed (preserve existing closed date)
+            }
+        }
+
+        if marked_active > 0 || marked_inactive > 0 {
+            info!(
+                "Position status update: {} marked active, {} marked inactive",
+                marked_active, marked_inactive
+            );
+        }
+
+        Ok(())
     }
 
     // =========================================================================

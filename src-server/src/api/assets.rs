@@ -11,7 +11,10 @@ use axum::{
     routing::{delete, get, put},
     Json, Router,
 };
-use wealthfolio_core::assets::{Asset as CoreAsset, UpdateAssetProfile};
+use wealthfolio_core::{
+    assets::{Asset as CoreAsset, UpdateAssetProfile},
+    quotes::MarketSyncMode,
+};
 
 #[derive(serde::Deserialize)]
 struct AssetQuery {
@@ -59,12 +62,14 @@ async fn update_pricing_mode(
         .asset_service
         .update_pricing_mode(&id, &body.pricing_mode)
         .await?;
+    // Pricing mode change requires incremental sync for this asset
     enqueue_portfolio_job(
         state.clone(),
         PortfolioJobConfig {
             account_ids: None,
-            symbols: Some(vec![id]),
-            refetch_all_market_data: true,
+            market_sync_mode: MarketSyncMode::Incremental {
+                asset_ids: Some(vec![id]),
+            },
             force_full_recalculation: true,
         },
     );

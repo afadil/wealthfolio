@@ -356,7 +356,7 @@ export const AssetProfilePage = () => {
           <div className="space-y-4">
             <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">
               <AssetHistoryCard
-                symbol={profile.symbol ?? ""}
+                assetId={profile.id ?? ""}
                 currency={profile.currency ?? "USD"}
                 marketPrice={profile.marketPrice}
                 totalGainAmount={profile.totalGainAmount}
@@ -503,9 +503,12 @@ export const AssetProfilePage = () => {
   const isLoading = isHoldingLoading || isQuotesLoading || isAssetProfileLoading;
 
   const handleRefreshQuotes = useCallback(() => {
+    if (!profile?.id) {
+      return;
+    }
     triggerHaptic();
-    syncMarketDataMutation.mutate([symbol]);
-  }, [symbol, syncMarketDataMutation, triggerHaptic]);
+    syncMarketDataMutation.mutate([profile.id]);
+  }, [profile?.id, syncMarketDataMutation, triggerHaptic]);
 
   const handleBack = useCallback(() => {
     navigate(-1);
@@ -715,7 +718,7 @@ export const AssetProfilePage = () => {
               <TabsContent value="overview" className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">
                   <AssetHistoryCard
-                    symbol={profile.symbol ?? ""}
+                    assetId={profile.id ?? ""}
                     currency={profile.currency ?? "USD"}
                     marketPrice={profile.marketPrice}
                     totalGainAmount={profile.totalGainAmount}

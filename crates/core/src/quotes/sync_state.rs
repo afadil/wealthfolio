@@ -10,6 +10,136 @@ use std::collections::HashMap;
 
 use crate::errors::Result;
 
+// =============================================================================
+// Sync Mode
+// =============================================================================
+
+/// Mode for quote synchronization - determines date window calculation.
+///
+/// This is a per-request parameter, NOT a persisted setting. Each sync call
+/// can specify a different mode based on the caller's needs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SyncMode {
+    /// Continue from last_quote_date with overlap, fill gaps to activity_min_date.
+    /// This is the default mode for regular sync operations.
+    /// - Uses last_quote_date - OVERLAP_DAYS as start (to heal provider corrections)
+    /// - Falls back to first_activity_date - BUFFER_DAYS if no quotes exist
+    Incremental,
+
+    /// Refetch recent window regardless of existing quotes.
+    /// Useful for forcing a refresh of recent data without full history rebuild.
+    /// - Start: today - days
+    /// - End: today
+    RefetchRecent {
+        /// Number of days to look back from today
+        days: i64,
+    },
+
+    /// Rebuild full history from activity start.
+    /// Used for manual resync or when history needs to be rebuilt.
+    /// - Start: first_activity_date - BUFFER_DAYS (or today - days as fallback)
+    /// - End: today
+    BackfillHistory {
+        /// Fallback days if no activity date exists
+        days: i64,
+    },
+}
+
+// =============================================================================
+// Market Sync Mode (for portfolio jobs)
+// =============================================================================
+
+/// Controls market data sync behavior for portfolio jobs.
+///
+/// This is a per-job parameter that determines whether and how market data
+/// should be synchronized before portfolio recalculation. Non-market changes
+/// (goals, limits, manual FX rates) should use `None` to skip market sync.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum MarketSyncMode {
+    /// No market sync - recalculation only.
+    /// Use for changes that don't require fresh market data:
+    /// - Goals/limits updates
+    /// - Manual exchange rate CRUD
+    /// - UI-driven recalculations with existing data
+    #[default]
+    None,
+
+    /// Incremental sync for specified assets (or all if asset_ids is None).
+    /// This is the typical mode for activity changes and manual portfolio updates.
+    Incremental {
+        /// Optional list of asset IDs to sync. None means sync all relevant assets.
+        #[serde(default)]
+        asset_ids: Option<Vec<String>>,
+    },
+
+    /// Refetch recent history window.
+    /// Use for forcing a refresh of recent data without full history rebuild.
+    RefetchRecent {
+        /// Optional list of asset IDs to sync. None means sync all relevant assets.
+        #[serde(default)]
+        asset_ids: Option<Vec<String>>,
+        /// Number of days to look back from today.
+        days: i64,
+    },
+
+    /// Full history rebuild from activity start.
+    /// Use for manual resync when history needs to be rebuilt.
+    BackfillHistory {
+        /// Optional list of asset IDs to sync. None means sync all relevant assets.
+        #[serde(default)]
+        asset_ids: Option<Vec<String>>,
+        /// Fallback days if no activity date exists.
+        days: i64,
+    },
+}
+
+impl MarketSyncMode {
+    /// Returns true if this mode requires market data synchronization.
+    pub fn requires_sync(&self) -> bool {
+        !matches!(self, MarketSyncMode::None)
+    }
+
+    /// Extracts the asset_ids from this mode, if any.
+    pub fn asset_ids(&self) -> Option<&Vec<String>> {
+        match self {
+            MarketSyncMode::None => None,
+            MarketSyncMode::Incremental { asset_ids } => asset_ids.as_ref(),
+            MarketSyncMode::RefetchRecent { asset_ids, .. } => asset_ids.as_ref(),
+            MarketSyncMode::BackfillHistory { asset_ids, .. } => asset_ids.as_ref(),
+        }
+    }
+
+    /// Converts this MarketSyncMode to the corresponding SyncMode for the quote service.
+    /// Returns None if this mode doesn't require sync.
+    pub fn to_sync_mode(&self) -> Option<SyncMode> {
+        match self {
+            MarketSyncMode::None => None,
+            MarketSyncMode::Incremental { .. } => Some(SyncMode::Incremental),
+            MarketSyncMode::RefetchRecent { days, .. } => Some(SyncMode::RefetchRecent { days: *days }),
+            MarketSyncMode::BackfillHistory { days, .. } => {
+                Some(SyncMode::BackfillHistory { days: *days })
+            }
+        }
+    }
+}
+
+impl Default for SyncMode {
+    fn default() -> Self {
+        SyncMode::Incremental
+    }
+}
+
+impl std::fmt::Display for SyncMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SyncMode::Incremental => write!(f, "Incremental"),
+            SyncMode::RefetchRecent { days } => write!(f, "RefetchRecent({}d)", days),
+            SyncMode::BackfillHistory { days } => write!(f, "BackfillHistory({}d)", days),
+        }
+    }
+}
+
 /// Sync category determines how a symbol should be synced.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SyncCategory {
@@ -322,6 +452,27 @@ pub trait SyncStateStore: Send + Sync {
     /// Update sync state after sync failure.
     async fn update_after_failure(&self, asset_id: &str, error: &str) -> Result<()>;
 
+    /// Update quote bounds monotonically.
+    ///
+    /// This method updates `earliest_quote_date` and `last_quote_date` using
+    /// monotonic logic (MIN for earliest, MAX for latest) to ensure bounds
+    /// never regress even under concurrent updates or crash recovery.
+    ///
+    /// # Arguments
+    /// * `asset_id` - The asset identifier
+    /// * `new_earliest` - New candidate for earliest quote date (will only update if < current)
+    /// * `new_latest` - New candidate for latest quote date (will only update if > current)
+    ///
+    /// # Monotonic Guarantees
+    /// - `earliest_quote_date` updates are monotonic: MIN(existing, new)
+    /// - `last_quote_date` updates are monotonic: MAX(existing, new)
+    async fn update_quote_bounds_monotonic(
+        &self,
+        asset_id: &str,
+        new_earliest: Option<NaiveDate>,
+        new_latest: Option<NaiveDate>,
+    ) -> Result<()>;
+
     /// Mark asset as inactive (position closed).
     async fn mark_inactive(&self, asset_id: &str, closed_date: NaiveDate) -> Result<()>;
 
@@ -356,6 +507,16 @@ pub trait SyncStateStore: Send + Sync {
 
     /// Get assets that need profile enrichment (profile_enriched_at is NULL).
     fn get_assets_needing_profile_enrichment(&self) -> Result<Vec<QuoteSyncState>>;
+
+    /// Get the earliest activity date across ALL active accounts.
+    ///
+    /// This is used for FX assets in BackfillHistory mode, since FX assets have no
+    /// activities attached to them. For full history recomputation jobs (like base
+    /// currency changes), FX pairs need quote coverage from the earliest activity
+    /// date across the entire portfolio.
+    ///
+    /// Returns `None` if there are no activities in any active account.
+    fn get_earliest_activity_date_global(&self) -> Result<Option<NaiveDate>>;
 }
 
 #[cfg(test)]

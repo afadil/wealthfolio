@@ -256,27 +256,27 @@ export function AppLauncher() {
         label: "Theme → System",
       },
       {
-        title: "Update Market Data",
+        title: "Update Quotes",
         href: "#update-portfolio",
         icon: isUpdatingPortfolio ? (
           <Icons.Spinner className="size-6 animate-spin" />
         ) : (
           <Icons.Refresh className="size-6" />
         ),
-        keywords: ["update", "portfolio", "market data", "quotes", "refresh"],
-        label: isUpdatingPortfolio ? "Updating market data..." : "Update market data",
+        keywords: ["update", "portfolio", "market data", "quotes", "refresh", "sync"],
+        label: isUpdatingPortfolio ? "Updating quotes..." : "Update quotes",
         disabled: isUpdatingPortfolio,
       },
       {
-        title: "Recalculate Portfolio",
+        title: "Rebuild Full History",
         href: "#recalculate-portfolio",
         icon: isRecalculatingPortfolio ? (
           <Icons.Spinner className="size-6 animate-spin" />
         ) : (
           <Icons.Clock className="size-6" />
         ),
-        keywords: ["recalculate", "portfolio", "reprice", "history", "refresh"],
-        label: isRecalculatingPortfolio ? "Recalculating portfolio..." : "Recalculate portfolio",
+        keywords: ["rebuild", "history", "recalculate", "portfolio", "backfill", "full"],
+        label: isRecalculatingPortfolio ? "Rebuilding history..." : "Rebuild full history",
         disabled: isRecalculatingPortfolio,
       },
       {

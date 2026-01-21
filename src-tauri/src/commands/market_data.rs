@@ -8,7 +8,7 @@ use crate::{
 
 use log::{debug, error};
 use tauri::{AppHandle, State};
-use wealthfolio_core::quotes::{service::ProviderInfo, Quote, QuoteImport, QuoteSummary};
+use wealthfolio_core::quotes::{service::ProviderInfo, MarketSyncMode, Quote, QuoteImport, QuoteSummary};
 
 #[tauri::command]
 pub async fn search_symbol(
@@ -24,14 +24,26 @@ pub async fn search_symbol(
 
 #[tauri::command]
 pub async fn sync_market_data(
-    symbols: Option<Vec<String>>,
+    asset_ids: Option<Vec<String>>,
     refetch_all: bool,
+    refetch_recent_days: Option<i64>,
     handle: AppHandle,
 ) -> Result<(), String> {
+    // Determine the appropriate market sync mode based on refetch_all flag
+    let market_sync_mode = if let Some(days) = refetch_recent_days {
+        MarketSyncMode::RefetchRecent { asset_ids, days }
+    } else if refetch_all {
+        MarketSyncMode::BackfillHistory {
+            asset_ids,
+            days: 365 * 5, // 5 years of history as fallback
+        }
+    } else {
+        MarketSyncMode::Incremental { asset_ids }
+    };
+
     let payload = PortfolioRequestPayload::builder()
         .account_ids(None)
-        .refetch_all_market_data(refetch_all)
-        .symbols(symbols)
+        .market_sync_mode(market_sync_mode)
         .build();
     emit_portfolio_trigger_update(&handle, payload);
     Ok(())
@@ -51,12 +63,12 @@ pub async fn update_quote(
         .map(|_| ())
         .map_err(|e| e.to_string())?;
 
+    // Manual quote update - no market sync needed
     let handle = handle.clone();
     tauri::async_runtime::spawn(async move {
         let payload = PortfolioRequestPayload::builder()
             .account_ids(None)
-            .refetch_all_market_data(true)
-            .symbols(Some(vec![quote.asset_id]))
+            .market_sync_mode(MarketSyncMode::None)
             .build();
         emit_portfolio_trigger_update(&handle, payload);
     });
@@ -76,12 +88,12 @@ pub async fn delete_quote(
         .await
         .map_err(|e| e.to_string())?;
 
+    // Manual quote deletion - no market sync needed
     let handle = handle.clone();
     tauri::async_runtime::spawn(async move {
         let payload = PortfolioRequestPayload::builder()
             .account_ids(None)
-            .refetch_all_market_data(false)
-            .symbols(None)
+            .market_sync_mode(MarketSyncMode::None)
             .build();
         emit_portfolio_trigger_update(&handle, payload);
     });
@@ -102,12 +114,12 @@ pub async fn get_quote_history(
 
 #[tauri::command]
 pub async fn get_latest_quotes(
-    symbols: Vec<String>,
+    asset_ids: Vec<String>,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<HashMap<String, Quote>, String> {
     state
         .quote_service()
-        .get_latest_quotes(&symbols)
+        .get_latest_quotes(&asset_ids)
         .map_err(|e| e.to_string())
 }
 
@@ -147,14 +159,13 @@ pub async fn import_quotes_csv(
             format!("Failed to import CSV quotes: {}", e)
         })?;
 
-    // Trigger portfolio update after import
+    // Quote import - no market sync needed, just recalculate
     let handle = handle.clone();
     tauri::async_runtime::spawn(async move {
         debug!("Triggering portfolio update after quote import");
         let payload = PortfolioRequestPayload::builder()
             .account_ids(None)
-            .refetch_all_market_data(false)
-            .symbols(None)
+            .market_sync_mode(MarketSyncMode::None)
             .build();
         emit_portfolio_trigger_update(&handle, payload);
     });

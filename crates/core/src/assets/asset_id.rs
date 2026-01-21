@@ -152,118 +152,6 @@ pub struct ParsedAssetId {
 // ID CONSTRUCTORS
 // ============================================================================
 
-/// Creates a security asset ID from ticker and exchange MIC.
-///
-/// # Arguments
-///
-/// * `symbol` - The ticker symbol (e.g., "AAPL", "SHOP")
-/// * `mic` - The ISO 10383 Market Identifier Code (e.g., "XNAS", "XTSE")
-///
-/// # Returns
-///
-/// A security asset ID in the format `{symbol}:{mic}`
-///
-/// # Examples
-///
-/// ```
-/// use wealthfolio_core::assets::security_id;
-///
-/// assert_eq!(security_id("AAPL", "XNAS"), "AAPL:XNAS");
-/// assert_eq!(security_id("SHOP", "XTSE"), "SHOP:XTSE");
-/// assert_eq!(security_id("SPY", "XNYS"), "SPY:XNYS");
-/// ```
-pub fn security_id(symbol: &str, mic: &str) -> String {
-    format!(
-        "{}{}{}",
-        symbol.to_uppercase(),
-        ASSET_ID_DELIMITER,
-        mic.to_uppercase()
-    )
-}
-
-/// Creates a cryptocurrency asset ID from base and quote currencies.
-///
-/// # Arguments
-///
-/// * `base` - The base currency (e.g., "BTC", "ETH")
-/// * `quote` - The quote currency (e.g., "USD", "CAD")
-///
-/// # Returns
-///
-/// A crypto asset ID in the format `{base}:{quote}`
-///
-/// # Examples
-///
-/// ```
-/// use wealthfolio_core::assets::crypto_id;
-///
-/// assert_eq!(crypto_id("BTC", "USD"), "BTC:USD");
-/// assert_eq!(crypto_id("ETH", "CAD"), "ETH:CAD");
-/// ```
-pub fn crypto_id(base: &str, quote: &str) -> String {
-    format!(
-        "{}{}{}",
-        base.to_uppercase(),
-        ASSET_ID_DELIMITER,
-        quote.to_uppercase()
-    )
-}
-
-/// Creates an FX rate asset ID from base and quote currencies.
-///
-/// # Arguments
-///
-/// * `base` - The base currency (e.g., "EUR", "GBP")
-/// * `quote` - The quote currency (e.g., "USD", "CAD")
-///
-/// # Returns
-///
-/// An FX rate asset ID in the format `{base}:{quote}`
-///
-/// # Examples
-///
-/// ```
-/// use wealthfolio_core::assets::fx_id;
-///
-/// assert_eq!(fx_id("EUR", "USD"), "EUR:USD");
-/// assert_eq!(fx_id("GBP", "CAD"), "GBP:CAD");
-/// ```
-pub fn fx_id(base: &str, quote: &str) -> String {
-    format!(
-        "{}{}{}",
-        base.to_uppercase(),
-        ASSET_ID_DELIMITER,
-        quote.to_uppercase()
-    )
-}
-
-/// Creates a cash asset ID from a currency code.
-///
-/// # Arguments
-///
-/// * `currency` - The ISO 4217 currency code (e.g., "USD", "CAD")
-///
-/// # Returns
-///
-/// A cash asset ID in the format `CASH:{currency}`
-///
-/// # Examples
-///
-/// ```
-/// use wealthfolio_core::assets::cash_id;
-///
-/// assert_eq!(cash_id("USD"), "CASH:USD");
-/// assert_eq!(cash_id("CAD"), "CASH:CAD");
-/// ```
-pub fn cash_id(currency: &str) -> String {
-    format!(
-        "{}{}{}",
-        CASH_PREFIX,
-        ASSET_ID_DELIMITER,
-        currency.to_uppercase()
-    )
-}
-
 /// Creates an alternative asset ID from a prefix and nanoid.
 ///
 /// This is typically used internally when generating new alternative asset IDs.
@@ -757,34 +645,6 @@ mod tests {
     // ------------------------------------------------------------------------
 
     #[test]
-    fn test_security_id() {
-        assert_eq!(security_id("AAPL", "XNAS"), "AAPL:XNAS");
-        assert_eq!(security_id("SHOP", "XTSE"), "SHOP:XTSE");
-        assert_eq!(security_id("spy", "xnys"), "SPY:XNYS"); // lowercase converted
-    }
-
-    #[test]
-    fn test_crypto_id() {
-        assert_eq!(crypto_id("BTC", "USD"), "BTC:USD");
-        assert_eq!(crypto_id("ETH", "CAD"), "ETH:CAD");
-        assert_eq!(crypto_id("btc", "usd"), "BTC:USD"); // lowercase converted
-    }
-
-    #[test]
-    fn test_fx_id() {
-        assert_eq!(fx_id("EUR", "USD"), "EUR:USD");
-        assert_eq!(fx_id("GBP", "CAD"), "GBP:CAD");
-        assert_eq!(fx_id("eur", "usd"), "EUR:USD"); // lowercase converted
-    }
-
-    #[test]
-    fn test_cash_id() {
-        assert_eq!(cash_id("USD"), "CASH:USD");
-        assert_eq!(cash_id("CAD"), "CASH:CAD");
-        assert_eq!(cash_id("usd"), "CASH:USD"); // lowercase converted
-    }
-
-    #[test]
     fn test_alternative_id() {
         assert_eq!(alternative_id("PROP", "a1b2c3d4"), "PROP:a1b2c3d4");
         assert_eq!(alternative_id("VEH", "x9y8z7w6"), "VEH:x9y8z7w6");
@@ -793,39 +653,6 @@ mod tests {
     // ------------------------------------------------------------------------
     // Parse Asset ID Tests
     // ------------------------------------------------------------------------
-
-    #[test]
-    fn test_parse_security_id() {
-        let parsed = parse_asset_id("AAPL:XNAS").unwrap();
-        assert_eq!(parsed.primary, "AAPL");
-        assert_eq!(parsed.qualifier, "XNAS");
-        assert_eq!(parsed.kind, Some(AssetKind::Security));
-    }
-
-    #[test]
-    fn test_parse_crypto_id() {
-        let parsed = parse_asset_id("BTC:USD").unwrap();
-        assert_eq!(parsed.primary, "BTC");
-        assert_eq!(parsed.qualifier, "USD");
-        // Note: BTC:USD matches FX pattern (3:3), so might be FX
-        // In practice, the kind is determined by the asset's actual data
-    }
-
-    #[test]
-    fn test_parse_fx_id() {
-        let parsed = parse_asset_id("EUR:USD").unwrap();
-        assert_eq!(parsed.primary, "EUR");
-        assert_eq!(parsed.qualifier, "USD");
-        assert_eq!(parsed.kind, Some(AssetKind::FxRate));
-    }
-
-    #[test]
-    fn test_parse_cash_id() {
-        let parsed = parse_asset_id("CASH:USD").unwrap();
-        assert_eq!(parsed.primary, "CASH");
-        assert_eq!(parsed.qualifier, "USD");
-        assert_eq!(parsed.kind, Some(AssetKind::Cash));
-    }
 
     #[test]
     fn test_parse_alternative_id() {

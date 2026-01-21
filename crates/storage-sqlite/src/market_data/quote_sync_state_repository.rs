@@ -11,6 +11,7 @@ use super::model::{QuoteSyncStateDB, QuoteSyncStateUpdateDB};
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
 use crate::schema::quote_sync_state::dsl as qss_dsl;
+use crate::utils::chunk_for_sqlite;
 use wealthfolio_core::quotes::{ProviderSyncStats, QuoteSyncState, SyncStateStore};
 use wealthfolio_core::Result;
 
@@ -132,19 +133,22 @@ impl SyncStateStore for QuoteSyncStateRepository {
         }
 
         let mut conn = get_connection(&self.pool)?;
+        let mut result_map = HashMap::new();
 
-        let results = qss_dsl::quote_sync_state
-            .filter(qss_dsl::asset_id.eq_any(asset_ids))
-            .load::<QuoteSyncStateDB>(&mut conn)
-            .map_err(StorageError::from)?;
+        // Chunk the asset_ids to avoid SQLite parameter limits
+        for chunk in chunk_for_sqlite(asset_ids) {
+            let results = qss_dsl::quote_sync_state
+                .filter(qss_dsl::asset_id.eq_any(chunk))
+                .load::<QuoteSyncStateDB>(&mut conn)
+                .map_err(StorageError::from)?;
 
-        Ok(results
-            .into_iter()
-            .map(|db| {
+            for db in results {
                 let state = QuoteSyncState::from(db);
-                (state.asset_id.clone(), state)
-            })
-            .collect())
+                result_map.insert(state.asset_id.clone(), state);
+            }
+        }
+
+        Ok(result_map)
     }
 
     fn get_active_assets(&self) -> Result<Vec<QuoteSyncState>> {
@@ -237,42 +241,80 @@ impl SyncStateStore for QuoteSyncStateRepository {
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
-                // Get current state to compare earliest_quote_date
-                let current: Option<QuoteSyncStateDB> = qss_dsl::quote_sync_state
-                    .filter(qss_dsl::asset_id.eq(&asset_id_owned))
-                    .first(conn)
-                    .optional()
-                    .map_err(StorageError::from)?;
+                // Use a single SQL UPDATE with monotonic MIN/MAX logic
+                // This ensures atomicity and prevents race conditions
+                //
+                // For earliest_quote_date: only update if new < existing (or existing is NULL)
+                // For last_quote_date: only update if new > existing (or existing is NULL)
+                //
+                // This is crash-safe because the entire update is atomic within the transaction
 
-                let mut update = QuoteSyncStateUpdateDB {
-                    last_synced_at: Some(Some(now.clone())),
-                    last_quote_date: Some(Some(last_quote_str)),
-                    data_source: data_source_owned,
-                    error_count: Some(0),
-                    last_error: Some(None),
-                    updated_at: Some(now),
-                    ..Default::default()
+                // Build the SQL query with optional data_source update
+                let sql = if data_source_owned.is_some() {
+                    r#"
+                    UPDATE quote_sync_state
+                    SET
+                        earliest_quote_date = CASE
+                            WHEN ?1 IS NOT NULL AND (earliest_quote_date IS NULL OR ?1 < earliest_quote_date)
+                            THEN ?1
+                            ELSE earliest_quote_date
+                        END,
+                        last_quote_date = CASE
+                            WHEN last_quote_date IS NULL OR ?2 > last_quote_date
+                            THEN ?2
+                            ELSE last_quote_date
+                        END,
+                        last_synced_at = ?3,
+                        data_source = ?4,
+                        error_count = 0,
+                        last_error = NULL,
+                        updated_at = ?3
+                    WHERE asset_id = ?5
+                    "#
+                } else {
+                    r#"
+                    UPDATE quote_sync_state
+                    SET
+                        earliest_quote_date = CASE
+                            WHEN ?1 IS NOT NULL AND (earliest_quote_date IS NULL OR ?1 < earliest_quote_date)
+                            THEN ?1
+                            ELSE earliest_quote_date
+                        END,
+                        last_quote_date = CASE
+                            WHEN last_quote_date IS NULL OR ?2 > last_quote_date
+                            THEN ?2
+                            ELSE last_quote_date
+                        END,
+                        last_synced_at = ?3,
+                        error_count = 0,
+                        last_error = NULL,
+                        updated_at = ?3
+                    WHERE asset_id = ?4
+                    "#
                 };
 
-                // Only update earliest_quote_date if:
-                // 1. We have a new earliest date AND
-                // 2. Either no existing date OR new date is earlier than existing
-                if let Some(ref new_earliest) = earliest_quote_str {
-                    let should_update = current
-                        .as_ref()
-                        .and_then(|c| c.earliest_quote_date.as_ref())
-                        .map(|existing| new_earliest < existing)
-                        .unwrap_or(true); // No existing date, so update
-
-                    if should_update {
-                        update.earliest_quote_date = Some(Some(new_earliest.clone()));
-                    }
+                if let Some(ref ds) = data_source_owned {
+                    diesel::sql_query(sql)
+                        .bind::<diesel::sql_types::Nullable<diesel::sql_types::Text>, _>(
+                            earliest_quote_str,
+                        )
+                        .bind::<diesel::sql_types::Text, _>(&last_quote_str)
+                        .bind::<diesel::sql_types::Text, _>(&now)
+                        .bind::<diesel::sql_types::Text, _>(ds)
+                        .bind::<diesel::sql_types::Text, _>(&asset_id_owned)
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
+                } else {
+                    diesel::sql_query(sql)
+                        .bind::<diesel::sql_types::Nullable<diesel::sql_types::Text>, _>(
+                            earliest_quote_str,
+                        )
+                        .bind::<diesel::sql_types::Text, _>(&last_quote_str)
+                        .bind::<diesel::sql_types::Text, _>(&now)
+                        .bind::<diesel::sql_types::Text, _>(&asset_id_owned)
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
                 }
-
-                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&asset_id_owned)))
-                    .set(&update)
-                    .execute(conn)
-                    .map_err(StorageError::from)?;
 
                 Ok(())
             })
@@ -306,6 +348,54 @@ impl SyncStateStore for QuoteSyncStateRepository {
                     .set(&update)
                     .execute(conn)
                     .map_err(StorageError::from)?;
+
+                Ok(())
+            })
+            .await
+    }
+
+    async fn update_quote_bounds_monotonic(
+        &self,
+        asset_id: &str,
+        new_earliest: Option<NaiveDate>,
+        new_latest: Option<NaiveDate>,
+    ) -> Result<()> {
+        let asset_id_owned = asset_id.to_string();
+        let earliest_str = new_earliest.map(|d| d.format("%Y-%m-%d").to_string());
+        let latest_str = new_latest.map(|d| d.format("%Y-%m-%d").to_string());
+        let now = Utc::now().to_rfc3339();
+
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                // Use SQL CASE expressions for monotonic updates:
+                // - earliest_quote_date: MIN(existing, new) - only update if new < existing
+                // - last_quote_date: MAX(existing, new) - only update if new > existing
+                //
+                // This is atomic and crash-safe within the transaction
+                diesel::sql_query(
+                    r#"
+                    UPDATE quote_sync_state
+                    SET
+                        earliest_quote_date = CASE
+                            WHEN ?1 IS NOT NULL AND (earliest_quote_date IS NULL OR ?1 < earliest_quote_date)
+                            THEN ?1
+                            ELSE earliest_quote_date
+                        END,
+                        last_quote_date = CASE
+                            WHEN ?2 IS NOT NULL AND (last_quote_date IS NULL OR ?2 > last_quote_date)
+                            THEN ?2
+                            ELSE last_quote_date
+                        END,
+                        updated_at = ?3
+                    WHERE asset_id = ?4
+                    "#,
+                )
+                .bind::<diesel::sql_types::Nullable<diesel::sql_types::Text>, _>(earliest_str)
+                .bind::<diesel::sql_types::Nullable<diesel::sql_types::Text>, _>(latest_str)
+                .bind::<diesel::sql_types::Text, _>(&now)
+                .bind::<diesel::sql_types::Text, _>(&asset_id_owned)
+                .execute(conn)
+                .map_err(StorageError::from)?;
 
                 Ok(())
             })
@@ -565,5 +655,32 @@ impl SyncStateStore for QuoteSyncStateRepository {
             .map_err(StorageError::from)?;
 
         Ok(results.into_iter().map(QuoteSyncState::from).collect())
+    }
+
+    fn get_earliest_activity_date_global(&self) -> Result<Option<NaiveDate>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        // Query for the global minimum activity date across all active accounts
+        #[derive(QueryableByName)]
+        struct MinDateRow {
+            #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+            min_date: Option<String>,
+        }
+
+        let result: MinDateRow = diesel::sql_query(
+            r#"
+            SELECT MIN(date(a.activity_date)) as min_date
+            FROM activities a
+            INNER JOIN accounts acc ON a.account_id = acc.id
+            WHERE acc.is_active = 1
+            "#,
+        )
+        .get_result(&mut conn)
+        .map_err(StorageError::from)?;
+
+        // Parse the date string into NaiveDate
+        Ok(result
+            .min_date
+            .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()))
     }
 }

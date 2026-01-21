@@ -160,6 +160,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             quote_sync_state_repository.clone(), // SyncStateStore
             market_data_repository.clone(),      // ProviderSettingsStore
             asset_repository.clone(),            // AssetRepositoryTrait
+            activity_repository.clone(),         // ActivityRepositoryTrait
             secret_store.clone(),
         )
         .await?,

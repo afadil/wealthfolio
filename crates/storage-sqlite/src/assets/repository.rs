@@ -11,6 +11,7 @@ use super::model::AssetDB;
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
 use crate::schema::{activities, assets, quotes};
+use crate::utils::chunk_for_sqlite;
 
 /// Repository for managing asset data in the database
 pub struct AssetRepository {
@@ -66,16 +67,26 @@ impl AssetRepository {
         Ok(results.into_iter().map(Asset::from).collect())
     }
 
-    pub fn list_by_symbols_impl(&self, symbols: &Vec<String>) -> Result<Vec<Asset>> {
+    pub fn list_by_asset_ids_impl(&self, asset_ids: &[String]) -> Result<Vec<Asset>> {
+        if asset_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
         let mut conn = get_connection(&self.pool)?;
+        let mut all_results = Vec::new();
 
-        let results = assets::table
-            .select(AssetDB::as_select())
-            .filter(assets::id.eq_any(symbols))
-            .load::<AssetDB>(&mut conn)
-            .map_err(StorageError::from)?;
+        // Chunk the asset_ids to avoid SQLite parameter limits
+        for chunk in chunk_for_sqlite(asset_ids) {
+            let results = assets::table
+                .select(AssetDB::as_select())
+                .filter(assets::id.eq_any(chunk))
+                .load::<AssetDB>(&mut conn)
+                .map_err(StorageError::from)?;
 
-        Ok(results.into_iter().map(Asset::from).collect())
+            all_results.extend(results.into_iter().map(Asset::from));
+        }
+
+        Ok(all_results)
     }
 
     /// Search for assets by symbol (case-insensitive partial match).
@@ -230,9 +241,9 @@ impl AssetRepositoryTrait for AssetRepository {
         self.list_cash_assets_impl(base_currency)
     }
 
-    /// Lists assets by their symbols
-    fn list_by_symbols(&self, symbols: &[String]) -> Result<Vec<Asset>> {
-        self.list_by_symbols_impl(&symbols.to_vec())
+    /// Lists assets by their asset IDs
+    fn list_by_asset_ids(&self, asset_ids: &[String]) -> Result<Vec<Asset>> {
+        self.list_by_asset_ids_impl(asset_ids)
     }
 
     async fn delete(&self, asset_id: &str) -> Result<()> {

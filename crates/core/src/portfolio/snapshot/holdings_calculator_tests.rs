@@ -94,15 +94,19 @@ mod tests {
             Ok(vec![]) // Not needed for these tests
         }
 
-        fn list_by_symbols(&self, symbols: &[String]) -> Result<Vec<Asset>> {
-            Ok(symbols
+        fn list_by_asset_ids(&self, asset_ids: &[String]) -> Result<Vec<Asset>> {
+            Ok(asset_ids
                 .iter()
-                .filter_map(|symbol| self.assets.get(symbol).cloned())
+                .filter_map(|asset_id| self.assets.get(asset_id).cloned())
                 .collect())
         }
 
         fn search_by_symbol(&self, _query: &str) -> Result<Vec<Asset>> {
             Ok(Vec::new())
+        }
+
+        async fn cleanup_legacy_metadata(&self, _asset_id: &str) -> Result<()> {
+            Ok(())
         }
     }
 
@@ -387,7 +391,7 @@ mod tests {
         Activity {
             id: id.to_string(),
             account_id: "acc_1".to_string(),
-            asset_id: Some(format!("$CASH-{}", currency)),
+            asset_id: Some(format!("CASH:{}", currency)),
             activity_type: activity_type.as_str().to_string(),
             activity_type_override: None,
             source_type: None,

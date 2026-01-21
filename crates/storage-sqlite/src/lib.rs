@@ -27,6 +27,7 @@
 pub mod db;
 pub mod errors;
 pub mod schema;
+pub mod utils;
 
 // Repository implementations
 pub mod accounts;
@@ -55,3 +56,6 @@ pub use errors::{IntoCore, StorageError};
 
 // Re-export from wealthfolio-core for convenience
 pub use wealthfolio_core::errors::{DatabaseError, Error, Result};
+
+// Re-export SQLite utilities
+pub use utils::{chunk_for_sqlite, SQLITE_MAX_PARAMS_CHUNK};

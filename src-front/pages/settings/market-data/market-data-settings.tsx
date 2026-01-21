@@ -591,10 +591,10 @@ export default function MarketDataSettingsPage() {
           <ActionConfirm
             handleConfirm={() => recalculatePortfolio()}
             isPending={isRecalculating}
-            confirmTitle="Are you sure?"
-            confirmMessage="This will refetch all market data history and recalculate the portfolio."
-            confirmButtonText="Refetch"
-            pendingText="Refetching..."
+            confirmTitle="Rebuild Full History?"
+            confirmMessage="This will rebuild quote history from your first activity date (up to 5 years) and recalculate the portfolio. Use this to fix gaps or sync issues."
+            confirmButtonText="Rebuild"
+            pendingText="Rebuilding..."
             cancelButtonText="Cancel"
             confirmButtonVariant="destructive"
             button={
@@ -603,7 +603,7 @@ export default function MarketDataSettingsPage() {
                 size="icon"
                 className="sm:hidden"
                 disabled={isRecalculating}
-                aria-label="Refetch all"
+                aria-label="Rebuild full history"
               >
                 {isRecalculating ? (
                   <Icons.Spinner className="h-4 w-4 animate-spin" />
@@ -631,10 +631,10 @@ export default function MarketDataSettingsPage() {
           <ActionConfirm
             handleConfirm={() => recalculatePortfolio()}
             isPending={isRecalculating}
-            confirmTitle="Are you sure?"
-            confirmMessage="This will refetch all market data history and recalculate the portfolio."
-            confirmButtonText="Refetch"
-            pendingText="Refetching..."
+            confirmTitle="Rebuild Full History?"
+            confirmMessage="This will rebuild quote history from your first activity date (up to 5 years) and recalculate the portfolio. Use this to fix gaps or sync issues."
+            confirmButtonText="Rebuild"
+            pendingText="Rebuilding..."
             cancelButtonText="Cancel"
             confirmButtonVariant="destructive"
             button={
@@ -649,7 +649,7 @@ export default function MarketDataSettingsPage() {
                 ) : (
                   <Icons.Clock className="mr-2 h-4 w-4" />
                 )}
-                Refetch all
+                Rebuild History
               </Button>
             }
           />

@@ -146,7 +146,7 @@ impl HoldingsServiceTrait for HoldingsService {
             .collect();
         let cash_balances_map: &HashMap<String, Decimal> = &latest_snapshot.cash_balances;
 
-        let security_symbols: Vec<String> = snapshot_positions
+        let security_asset_ids: Vec<String> = snapshot_positions
             .iter()
             .map(|p| p.asset_id.clone())
             .collect::<HashSet<_>>()
@@ -161,10 +161,10 @@ impl HoldingsServiceTrait for HoldingsService {
             purchase_price: Option<Decimal>,
         }
 
-        let assets_info_map: HashMap<String, AssetInfo> = if !security_symbols.is_empty() {
+        let assets_info_map: HashMap<String, AssetInfo> = if !security_asset_ids.is_empty() {
             match self
                 .asset_service
-                .get_assets_by_symbols(&security_symbols)
+                .get_assets_by_asset_ids(&security_asset_ids)
                 .await
             {
                 Ok(assets) => assets

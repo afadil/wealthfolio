@@ -9,7 +9,10 @@ use crate::{
 };
 use serde_json::json;
 use tauri::{AppHandle, State};
-use wealthfolio_core::assets::{Asset, UpdateAssetProfile};
+use wealthfolio_core::{
+    assets::{Asset, UpdateAssetProfile},
+    quotes::MarketSyncMode,
+};
 
 #[tauri::command]
 pub async fn get_asset_profile(
@@ -58,11 +61,12 @@ pub async fn update_pricing_mode(
 
     let handle = handle.clone();
     tauri::async_runtime::spawn(async move {
-        // Emit event to trigger market data sync using the builder
+        // Pricing mode change requires incremental sync for this asset
         let payload = PortfolioRequestPayload::builder()
             .account_ids(None)
-            .refetch_all_market_data(true)
-            .symbols(Some(vec![id]))
+            .market_sync_mode(MarketSyncMode::Incremental {
+                asset_ids: Some(vec![id]),
+            })
             .build();
         emit_portfolio_trigger_recalculate(&handle, payload);
     });

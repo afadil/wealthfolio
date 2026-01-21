@@ -1,9 +1,10 @@
-use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use diesel::expression_methods::ExpressionMethods;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::sqlite::SqliteConnection;
 use rust_decimal::Decimal;
+use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -20,8 +21,9 @@ use super::model::{ActivityDB, ActivityDetailsDB, ImportMappingDB};
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
 use crate::schema::{accounts, activities, activity_import_profiles, assets};
+use crate::utils::chunk_for_sqlite;
 use async_trait::async_trait;
-use diesel::dsl::min;
+use diesel::dsl::{max, min};
 use num_traits::Zero;
 
 /// Repository for managing activity data in the database
@@ -791,5 +793,57 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 }),
             None => Ok(None), // If no activity found, return None
         }
+    }
+
+    /// Gets the first and last activity dates for each asset in the provided list.
+    ///
+    /// Uses chunking to avoid SQLite's parameter limit in IN (...) queries.
+    fn get_activity_bounds_for_assets(
+        &self,
+        asset_ids: &[String],
+    ) -> Result<HashMap<String, (Option<NaiveDate>, Option<NaiveDate>)>> {
+        if asset_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let mut conn = get_connection(&self.pool)?;
+        let mut result_map: HashMap<String, (Option<NaiveDate>, Option<NaiveDate>)> = HashMap::new();
+
+        // Chunk the asset_ids to avoid SQLite parameter limits
+        for chunk in chunk_for_sqlite(asset_ids) {
+            // Query to get MIN and MAX activity dates per asset_id
+            let results = activities::table
+                .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
+                .filter(accounts::is_active.eq(true))
+                .filter(activities::asset_id.eq_any(chunk))
+                .group_by(activities::asset_id)
+                .select((
+                    activities::asset_id.assume_not_null(),
+                    min(activities::activity_date),
+                    max(activities::activity_date),
+                ))
+                .load::<(String, Option<String>, Option<String>)>(&mut conn)
+                .map_err(StorageError::from)?;
+
+            for (asset_id, min_date_str, max_date_str) in results {
+                // Parse the date strings (they are stored as RFC3339, extract the date portion)
+                let first_date = min_date_str.and_then(|s| {
+                    // Activity dates are stored as RFC3339, parse to get the date
+                    DateTime::parse_from_rfc3339(&s)
+                        .ok()
+                        .map(|dt| dt.date_naive())
+                });
+
+                let last_date = max_date_str.and_then(|s| {
+                    DateTime::parse_from_rfc3339(&s)
+                        .ok()
+                        .map(|dt| dt.date_naive())
+                });
+
+                result_map.insert(asset_id, (first_date, last_date));
+            }
+        }
+
+        Ok(result_map)
     }
 }

@@ -512,8 +512,8 @@ export const invoke = async <T>(
       break;
     }
     case "get_latest_quotes": {
-      const { symbols } = payload as { symbols: string[] };
-      body = JSON.stringify({ symbols });
+      const { assetIds } = payload as { assetIds: string[] };
+      body = JSON.stringify({ assetIds });
       break;
     }
     case "update_quote": {

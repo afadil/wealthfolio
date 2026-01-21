@@ -26,7 +26,8 @@ import { useIsMobileViewport } from "@/hooks/use-platform";
 export default function AssetsPage() {
   const { assets, isLoading } = useAssets();
   const { deleteAssetMutation } = useAssetManagement();
-  const refetchQuotesMutation = useSyncMarketDataMutation(true);
+  const refetchRecentDays = 45;
+  const refetchQuotesMutation = useSyncMarketDataMutation(false, refetchRecentDays);
   const updateQuotesMutation = useSyncMarketDataMutation(false);
   const isMobileViewport = useIsMobileViewport();
 
@@ -58,8 +59,8 @@ export default function AssetsPage() {
             isLoading={isLoading || isQuotesLoading}
             onEdit={(asset) => setEditingAsset(asset)}
             onDelete={(asset) => setAssetPendingDelete(asset)}
-            onUpdateQuotes={(asset) => updateQuotesMutation.mutate([asset.symbol])}
-            onRefetchQuotes={(asset) => refetchQuotesMutation.mutate([asset.symbol])}
+            onUpdateQuotes={(asset) => updateQuotesMutation.mutate([asset.id])}
+            onRefetchQuotes={(asset) => refetchQuotesMutation.mutate([asset.id])}
             isUpdatingQuotes={updateQuotesMutation.isPending}
             isRefetchingQuotes={refetchQuotesMutation.isPending}
           />
@@ -70,8 +71,8 @@ export default function AssetsPage() {
             isLoading={isLoading || isQuotesLoading}
             onEdit={(asset) => setEditingAsset(asset)}
             onDelete={(asset) => setAssetPendingDelete(asset)}
-            onUpdateQuotes={(asset) => updateQuotesMutation.mutate([asset.symbol])}
-            onRefetchQuotes={(asset) => refetchQuotesMutation.mutate([asset.symbol])}
+            onUpdateQuotes={(asset) => updateQuotesMutation.mutate([asset.id])}
+            onRefetchQuotes={(asset) => refetchQuotesMutation.mutate([asset.id])}
             isUpdatingQuotes={updateQuotesMutation.isPending}
             isRefetchingQuotes={refetchQuotesMutation.isPending}
           />

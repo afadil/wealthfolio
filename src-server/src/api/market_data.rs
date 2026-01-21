@@ -11,7 +11,7 @@ use axum::{
     routing::{delete, get, post, put},
     Json, Router,
 };
-use wealthfolio_core::quotes::{ProviderInfo, Quote, QuoteImport, QuoteSummary};
+use wealthfolio_core::quotes::{MarketSyncMode, ProviderInfo, Quote, QuoteImport, QuoteSummary};
 
 async fn get_market_data_providers(
     State(state): State<Arc<AppState>>,
@@ -79,14 +79,13 @@ async fn update_quote(
 ) -> ApiResult<StatusCode> {
     // Ensure asset_id matches path parameter
     quote.asset_id = symbol;
-    let target_asset_id = quote.asset_id.clone();
     state.quote_service.update_quote(quote).await?;
+    // Manual quote update - no market sync needed
     enqueue_portfolio_job(
         state.clone(),
         PortfolioJobConfig {
             account_ids: None,
-            symbols: Some(vec![target_asset_id]),
-            refetch_all_market_data: true,
+            market_sync_mode: MarketSyncMode::None,
             force_full_recalculation: false,
         },
     );
@@ -98,12 +97,12 @@ async fn delete_quote(
     State(state): State<Arc<AppState>>,
 ) -> ApiResult<StatusCode> {
     state.quote_service.delete_quote(&id).await?;
+    // Manual quote deletion - no market sync needed
     enqueue_portfolio_job(
         state,
         PortfolioJobConfig {
             account_ids: None,
-            symbols: None,
-            refetch_all_market_data: false,
+            market_sync_mode: MarketSyncMode::None,
             force_full_recalculation: false,
         },
     );
@@ -134,12 +133,12 @@ async fn import_quotes_csv(
         .import_quotes(body.quotes, body.overwrite_existing)
         .await?;
 
+    // Quote import - no market sync needed
     enqueue_portfolio_job(
         state,
         PortfolioJobConfig {
             account_ids: None,
-            symbols: None,
-            refetch_all_market_data: false,
+            market_sync_mode: MarketSyncMode::None,
             force_full_recalculation: false,
         },
     );
@@ -149,21 +148,40 @@ async fn import_quotes_csv(
 
 #[derive(serde::Deserialize)]
 struct SyncBody {
-    symbols: Option<Vec<String>>,
+    #[serde(rename = "assetIds")]
+    asset_ids: Option<Vec<String>>,
     #[serde(rename = "refetchAll")]
     refetch_all: bool,
+    #[serde(rename = "refetchRecentDays")]
+    refetch_recent_days: Option<i64>,
 }
 
 async fn sync_market_data(
     State(state): State<Arc<AppState>>,
     Json(body): Json<SyncBody>,
 ) -> ApiResult<StatusCode> {
+    // Determine the appropriate market sync mode based on refetch flags
+    let market_sync_mode = if let Some(days) = body.refetch_recent_days {
+        MarketSyncMode::RefetchRecent {
+            asset_ids: body.asset_ids,
+            days,
+        }
+    } else if body.refetch_all {
+        MarketSyncMode::BackfillHistory {
+            asset_ids: body.asset_ids,
+            days: 365 * 5, // 5 years of history as fallback
+        }
+    } else {
+        MarketSyncMode::Incremental {
+            asset_ids: body.asset_ids,
+        }
+    };
+
     enqueue_portfolio_job(
         state,
         PortfolioJobConfig {
             account_ids: None,
-            symbols: body.symbols,
-            refetch_all_market_data: body.refetch_all,
+            market_sync_mode,
             force_full_recalculation: false,
         },
     );
@@ -171,15 +189,16 @@ async fn sync_market_data(
 }
 
 #[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct LatestQuotesBody {
-    symbols: Vec<String>,
+    asset_ids: Vec<String>,
 }
 
 async fn get_latest_quotes(
     State(state): State<Arc<AppState>>,
     Json(body): Json<LatestQuotesBody>,
 ) -> ApiResult<Json<std::collections::HashMap<String, Quote>>> {
-    let quotes = state.quote_service.get_latest_quotes(&body.symbols)?;
+    let quotes = state.quote_service.get_latest_quotes(&body.asset_ids)?;
     Ok(Json(quotes))
 }
 
