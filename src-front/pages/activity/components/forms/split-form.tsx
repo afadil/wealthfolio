@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { normalizeCurrency } from "@/lib/utils";
 import { useForm, FormProvider, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -62,16 +63,24 @@ export function SplitForm({
   const { data: settings } = useSettings();
   const baseCurrency = settings?.baseCurrency;
 
+  // Compute initial account and currency for defaultValues
+  const initialAccountId = defaultValues?.accountId ?? (accounts.length === 1 ? accounts[0].value : "");
+  const initialAccount = accounts.find((a) => a.value === initialAccountId);
+  const initialCurrency =
+    defaultValues?.currency ??
+    normalizeCurrency(assetCurrency) ??
+    initialAccount?.currency;
+
   const form = useForm<SplitFormValues>({
     resolver: zodResolver(splitFormSchema) as Resolver<SplitFormValues>,
     mode: "onBlur", // Validate on blur
     defaultValues: {
-      accountId: accounts.length === 1 ? accounts[0].value : "",
+      accountId: initialAccountId,
       symbol: "",
       activityDate: new Date(),
       splitRatio: undefined,
       comment: null,
-      currency: undefined,
+      currency: initialCurrency,
       subtype: null,
       ...defaultValues,
     },
@@ -100,7 +109,7 @@ export function SplitForm({
             <AccountSelect name="accountId" accounts={accounts} />
 
             {/* Symbol Search/Input */}
-            <SymbolSearch name="symbol" label="Symbol" isManualAsset={isManualSymbol} />
+            <SymbolSearch name="symbol" label="Symbol" isManualAsset={isManualSymbol} currencyName="currency" />
 
             {/* Date Picker */}
             <DatePicker name="activityDate" label="Date" />

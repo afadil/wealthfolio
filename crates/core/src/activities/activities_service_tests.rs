@@ -1427,4 +1427,296 @@ mod tests {
             registered_pairs
         );
     }
+
+    // ==========================================================================
+    // Currency Normalization Tests (GBp -> GBP, etc.)
+    // ==========================================================================
+
+    /// Test: Activity with GBp currency is normalized to GBP with amount conversion
+    /// When user explicitly selects GBp (pence), the backend should:
+    /// 1. Convert currency GBp -> GBP
+    /// 2. Multiply unit_price by 0.01 (14082 pence -> 140.82 GBP)
+    /// 3. Multiply amount by 0.01
+    /// 4. Multiply fee by 0.01
+    #[tokio::test]
+    async fn test_gbp_pence_normalization_on_create() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        // Create GBP account
+        let account = create_test_account("acc-1", "GBP");
+        account_service.add_account(account);
+
+        // LSE stock with GBp currency
+        let asset = create_test_asset("SEC:AZN:XLON", "GBp");
+        asset_service.add_asset(asset);
+
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+        );
+
+        // User submits activity in GBp (pence) - 14082 pence per share
+        let new_activity = NewActivity {
+            id: Some("activity-1".to_string()),
+            account_id: "acc-1".to_string(),
+            asset_id: Some("SEC:AZN:XLON".to_string()),
+            symbol: None,
+            exchange_mic: None,
+            asset_kind: None,
+            pricing_mode: None,
+            asset_metadata: None,
+            activity_type: "BUY".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(dec!(10)),
+            unit_price: Some(dec!(14082)), // 14082 pence
+            currency: "GBp".to_string(),   // Pence currency
+            fee: Some(dec!(999)),          // 999 pence fee
+            amount: Some(dec!(140820)),    // 140820 pence total
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+        };
+
+        let result = activity_service.create_activity(new_activity).await;
+        assert!(result.is_ok(), "Activity creation should succeed");
+
+        let created = result.unwrap();
+
+        // Currency should be normalized to GBP
+        assert_eq!(
+            created.currency, "GBP",
+            "Currency should be normalized from GBp to GBP"
+        );
+
+        // Unit price should be converted: 14082 pence * 0.01 = 140.82 GBP
+        assert_eq!(
+            created.unit_price,
+            Some(dec!(140.82)),
+            "Unit price should be converted from pence to pounds"
+        );
+
+        // Fee should be converted: 999 pence * 0.01 = 9.99 GBP
+        assert_eq!(
+            created.fee,
+            Some(dec!(9.99)),
+            "Fee should be converted from pence to pounds"
+        );
+
+        // Amount should be converted: 140820 pence * 0.01 = 1408.20 GBP
+        assert_eq!(
+            created.amount,
+            Some(dec!(1408.20)),
+            "Amount should be converted from pence to pounds"
+        );
+
+        // Quantity should NOT be converted (shares, not currency)
+        assert_eq!(
+            created.quantity,
+            Some(dec!(10)),
+            "Quantity should remain unchanged"
+        );
+    }
+
+    /// Test: Activity with GBX currency (alternative pence code) is also normalized
+    #[tokio::test]
+    async fn test_gbx_normalization_on_create() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "GBP");
+        account_service.add_account(account);
+
+        let asset = create_test_asset("SEC:VOD:XLON", "GBX");
+        asset_service.add_asset(asset);
+
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+        );
+
+        let new_activity = NewActivity {
+            id: Some("activity-1".to_string()),
+            account_id: "acc-1".to_string(),
+            asset_id: Some("SEC:VOD:XLON".to_string()),
+            symbol: None,
+            exchange_mic: None,
+            asset_kind: None,
+            pricing_mode: None,
+            asset_metadata: None,
+            activity_type: "BUY".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(dec!(100)),
+            unit_price: Some(dec!(7500)), // 7500 pence
+            currency: "GBX".to_string(),  // Alternative pence code
+            fee: Some(dec!(0)),
+            amount: Some(dec!(750000)), // 750000 pence
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+        };
+
+        let result = activity_service.create_activity(new_activity).await;
+        assert!(result.is_ok());
+
+        let created = result.unwrap();
+        assert_eq!(created.currency, "GBP", "GBX should normalize to GBP");
+        assert_eq!(
+            created.unit_price,
+            Some(dec!(75)),
+            "7500 pence = 75 pounds"
+        );
+        assert_eq!(
+            created.amount,
+            Some(dec!(7500)),
+            "750000 pence = 7500 pounds"
+        );
+    }
+
+    /// Test: Activity with ZAc (South African cents) is normalized to ZAR
+    #[tokio::test]
+    async fn test_zac_normalization_on_create() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "ZAR");
+        account_service.add_account(account);
+
+        let asset = create_test_asset("SEC:NPN:XJSE", "ZAc");
+        asset_service.add_asset(asset);
+
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+        );
+
+        let new_activity = NewActivity {
+            id: Some("activity-1".to_string()),
+            account_id: "acc-1".to_string(),
+            asset_id: Some("SEC:NPN:XJSE".to_string()),
+            symbol: None,
+            exchange_mic: None,
+            asset_kind: None,
+            pricing_mode: None,
+            asset_metadata: None,
+            activity_type: "BUY".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(dec!(50)),
+            unit_price: Some(dec!(200000)), // 200000 cents = 2000 ZAR
+            currency: "ZAc".to_string(),
+            fee: Some(dec!(1000)), // 1000 cents = 10 ZAR
+            amount: Some(dec!(10000000)),
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+        };
+
+        let result = activity_service.create_activity(new_activity).await;
+        assert!(result.is_ok());
+
+        let created = result.unwrap();
+        assert_eq!(created.currency, "ZAR", "ZAc should normalize to ZAR");
+        assert_eq!(
+            created.unit_price,
+            Some(dec!(2000)),
+            "200000 cents = 2000 ZAR"
+        );
+        assert_eq!(created.fee, Some(dec!(10)), "1000 cents = 10 ZAR");
+    }
+
+    /// Test: Activity with regular GBP currency is NOT modified
+    #[tokio::test]
+    async fn test_regular_gbp_not_modified() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "GBP");
+        account_service.add_account(account);
+
+        let asset = create_test_asset("SEC:LLOY:XLON", "GBP");
+        asset_service.add_asset(asset);
+
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+        );
+
+        let new_activity = NewActivity {
+            id: Some("activity-1".to_string()),
+            account_id: "acc-1".to_string(),
+            asset_id: Some("SEC:LLOY:XLON".to_string()),
+            symbol: None,
+            exchange_mic: None,
+            asset_kind: None,
+            pricing_mode: None,
+            asset_metadata: None,
+            activity_type: "BUY".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(dec!(1000)),
+            unit_price: Some(dec!(0.45)), // Already in GBP
+            currency: "GBP".to_string(),  // Major currency
+            fee: Some(dec!(5)),
+            amount: Some(dec!(450)),
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+        };
+
+        let result = activity_service.create_activity(new_activity).await;
+        assert!(result.is_ok());
+
+        let created = result.unwrap();
+        assert_eq!(created.currency, "GBP", "GBP should remain GBP");
+        assert_eq!(
+            created.unit_price,
+            Some(dec!(0.45)),
+            "Unit price should not change for GBP"
+        );
+        assert_eq!(
+            created.amount,
+            Some(dec!(450)),
+            "Amount should not change for GBP"
+        );
+        assert_eq!(created.fee, Some(dec!(5)), "Fee should not change for GBP");
+    }
 }

@@ -7,7 +7,7 @@ use crate::errors::MarketDataError;
 use crate::models::{Currency, InstrumentId, ProviderId, QuoteContext};
 
 use super::asset_resolver::AssetResolver;
-use super::exchange_map::ExchangeMap;
+use super::exchange_suffixes::ExchangeMap;
 use super::rules_resolver::RulesResolver;
 use super::traits::{ResolvedInstrument, Resolver, SymbolResolver};
 

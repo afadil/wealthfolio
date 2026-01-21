@@ -15,8 +15,10 @@ export function useSettingsMutation(
       queryClient.invalidateQueries({ queryKey: [QueryKeys.SETTINGS] });
       setSettings(updatedSettings);
       applySettingsToDocument(updatedSettings);
-      // Don't show toast during onboarding (when onboardingCompleted is being set)
-      if (!("onboardingCompleted" in variables)) {
+      // Don't show toast during onboarding
+      const isOnboarding =
+        "onboardingCompleted" in variables || !updatedSettings.onboardingCompleted;
+      if (!isOnboarding) {
         toast({
           title: "Settings updated",
           description: "Your settings have been updated successfully.",

@@ -1,6 +1,6 @@
 use crate::activities::{Activity, ActivityType};
-use crate::assets::AssetRepositoryTrait;
 use crate::assets::is_cash_asset_id;
+use crate::assets::AssetRepositoryTrait;
 use crate::errors::{CalculatorError, Error, Result};
 use crate::fx::FxServiceTrait;
 use crate::portfolio::snapshot::AccountStateSnapshot;

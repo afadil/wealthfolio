@@ -1,10 +1,11 @@
 import { useSettings } from "@/hooks/use-settings";
+import { useSettingsContext } from "@/lib/settings-provider";
 import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { useRef, useState } from "react";
+import { Navigate } from "react-router-dom";
 import { OnboardingConnect } from "./onboarding-connect";
 import { OnboardingStep1 } from "./onboarding-step1";
 import { OnboardingStep2, OnboardingStep2Handle } from "./onboarding-step2";
@@ -12,16 +13,15 @@ import { OnboardingStep2, OnboardingStep2Handle } from "./onboarding-step2";
 const MAX_STEPS = 3;
 
 const OnboardingPage = () => {
-  const navigate = useNavigate();
   const { data: settings, isLoading: isSettingsLoading } = useSettings();
+  const { updateSettings } = useSettingsContext();
   const [currentStep, setCurrentStep] = useState(1);
   const [isStepValid, setIsStepValid] = useState(true);
   const settingsStepRef = useRef<OnboardingStep2Handle>(null);
 
-  // Redirect to home if onboarding is already completed
   if (isSettingsLoading) return null;
   if (settings?.onboardingCompleted) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/settings/accounts" replace />;
   }
 
   const handleNext = () => {
@@ -32,10 +32,6 @@ const OnboardingPage = () => {
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
-  const handleFinish = () => {
-    navigate("/settings/accounts");
-  };
-
   const handleContinue = () => {
     if (currentStep === 2 && settingsStepRef.current) {
       settingsStepRef.current.submitForm();
@@ -43,10 +39,6 @@ const OnboardingPage = () => {
       handleNext();
     }
   };
-
-  useEffect(() => {
-    setIsStepValid(currentStep !== 2);
-  }, [currentStep]);
 
   return (
     <div className="bg-background flex h-screen flex-col pt-[env(safe-area-inset-top)]">
@@ -116,7 +108,8 @@ const OnboardingPage = () => {
               <div className="order-1 flex flex-col gap-2 sm:order-2 sm:flex-row sm:gap-3">
                 <Button
                   asChild
-                  className="from-primary to-primary/90 bg-linear-to-r order-1 sm:order-2"
+                  variant="outline"
+                  className="order-2 sm:order-1"
                 >
                   <a
                     href={WEALTHFOLIO_CONNECT_PORTAL_URL}
@@ -128,11 +121,12 @@ const OnboardingPage = () => {
                   </a>
                 </Button>
                 <Button
-                  variant="outline"
-                  onClick={handleFinish}
-                  className="order-2 sm:order-1"
+                  data-testid="onboarding-finish-button"
+                  className="from-primary to-primary/90 bg-linear-to-r order-1 sm:order-2"
+                  onClick={() => updateSettings({ onboardingCompleted: true })}
                 >
-                  Skip, I'll manage manually
+                  Get Started
+                  <Icons.ArrowRight className="ml-1.5 h-4 w-4" />
                 </Button>
               </div>
             </div>

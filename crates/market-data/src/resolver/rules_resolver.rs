@@ -9,7 +9,7 @@ use std::sync::Arc;
 use crate::errors::MarketDataError;
 use crate::models::{Currency, InstrumentId, ProviderId, ProviderInstrument, QuoteContext};
 
-use super::exchange_map::ExchangeMap;
+use super::exchange_suffixes::ExchangeMap;
 use super::traits::{ResolutionSource, ResolvedInstrument, Resolver};
 
 /// Resolves provider instruments from deterministic MIC->suffix rules.
@@ -433,9 +433,9 @@ mod tests {
         let currency = resolver.get_equity_currency(&Some("XTSE".into()), &"YAHOO".into());
         assert_eq!(currency.as_deref(), Some("CAD"));
 
-        // London
+        // London (Yahoo returns prices in pence, so currency is GBp)
         let currency = resolver.get_equity_currency(&Some("XLON".into()), &"YAHOO".into());
-        assert_eq!(currency.as_deref(), Some("GBP"));
+        assert_eq!(currency.as_deref(), Some("GBp"));
 
         // No MIC
         let currency = resolver.get_equity_currency(&None, &"YAHOO".into());

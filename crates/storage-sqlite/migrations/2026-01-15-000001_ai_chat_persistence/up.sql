@@ -6,12 +6,16 @@
 CREATE TABLE ai_threads (
     id TEXT PRIMARY KEY NOT NULL,
     title TEXT,
+    config_snapshot TEXT,  -- JSON: providerId, modelId, promptTemplateId, promptVersion, toolsAllowlist
+    is_pinned INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
 
 -- Index for listing threads by recency
 CREATE INDEX idx_ai_threads_updated_at ON ai_threads(updated_at DESC);
+-- Index for sorting by pinned status (pinned first, then by updated_at)
+CREATE INDEX idx_ai_threads_pinned_updated ON ai_threads(is_pinned DESC, updated_at DESC);
 
 -- Table: ai_messages
 -- Stores messages within threads with structured content_json

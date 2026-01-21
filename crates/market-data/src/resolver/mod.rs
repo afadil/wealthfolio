@@ -77,16 +77,18 @@
 
 mod asset_resolver;
 mod chain;
-mod exchange_map;
+mod exchange_metadata;
+mod exchange_suffixes;
 mod rules_resolver;
 mod traits;
 
 // Re-export main types
 pub use asset_resolver::AssetResolver;
 pub use chain::ResolverChain;
-pub use exchange_map::{
-    exchanges_for_currency, mic_to_currency, mic_to_exchange_name, strip_yahoo_suffix,
-    yahoo_exchange_to_mic, yahoo_suffix_to_mic, ExchangeMap, ExchangeSuffix, YAHOO_EXCHANGE_SUFFIXES,
+pub use exchange_metadata::{exchanges_for_currency, mic_to_currency, mic_to_exchange_name};
+pub use exchange_suffixes::{
+    strip_yahoo_suffix, yahoo_exchange_to_mic, yahoo_suffix_to_mic, ExchangeMap, ExchangeSuffix,
+    YAHOO_EXCHANGE_SUFFIXES,
 };
 pub use rules_resolver::RulesResolver;
 pub use traits::{ResolutionSource, ResolvedInstrument, Resolver, SymbolResolver};

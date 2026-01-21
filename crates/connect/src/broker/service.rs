@@ -20,6 +20,7 @@ use rust_decimal::Decimal;
 use std::collections::HashSet;
 use wealthfolio_core::accounts::{Account, AccountServiceTrait, NewAccount};
 use wealthfolio_core::activities::{self, compute_idempotency_key, NewActivity};
+use wealthfolio_core::fx::currency::{get_normalization_rule, normalize_amount};
 use wealthfolio_core::assets::{canonical_asset_id, AssetKind, NewAsset};
 use wealthfolio_core::errors::Result;
 use wealthfolio_core::quotes::DataSource;
@@ -486,6 +487,21 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 .unwrap_or(Decimal::ZERO);
             let amount = activity.amount.and_then(Decimal::from_f64).map(|d| d.abs());
             let fx_rate = activity.fx_rate.and_then(Decimal::from_f64);
+
+            // Normalize minor currency units (e.g., GBp -> GBP) and convert amounts
+            // This handles edge cases where broker API returns minor currency codes
+            let (unit_price, quantity, fee, amount, currency_code) =
+                if get_normalization_rule(&currency_code).is_some() {
+                    let (norm_price, _) = normalize_amount(unit_price, &currency_code);
+                    let (norm_fee, _) = normalize_amount(fee, &currency_code);
+                    let norm_amount = amount.map(|a| normalize_amount(a, &currency_code).0);
+                    let (_, norm_currency) =
+                        normalize_amount(Decimal::ZERO, &currency_code);
+                    // Quantity stays the same (it's shares, not currency)
+                    (norm_price, quantity, norm_fee, norm_amount, norm_currency.to_string())
+                } else {
+                    (unit_price, quantity, fee, amount, currency_code)
+                };
 
             // Determine status: needs_review -> Draft (requires user review), otherwise Posted (ready for calculations)
             let status = if needs_review {

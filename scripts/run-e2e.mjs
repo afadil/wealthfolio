@@ -4,6 +4,7 @@ import { setTimeout } from "node:timers/promises";
 import { prepE2eEnv } from "./prep-e2e.mjs";
 
 const DEV_SERVER_URL = process.env.WF_E2E_BASE_URL || "http://localhost:1420";
+const BACKEND_URL = process.env.WF_E2E_BACKEND_URL || "http://localhost:8088";
 const cliArgs = process.argv.slice(2);
 const shouldUseUi = cliArgs.includes("--ui");
 
@@ -70,7 +71,12 @@ const run = async () => {
   process.once("exit", handleSignal);
 
   try {
+    // Wait for both frontend and backend to be ready
+    console.log("Waiting for frontend server...");
     await waitForServer(DEV_SERVER_URL, devServer);
+    console.log("Frontend ready. Waiting for backend server...");
+    await waitForServer(BACKEND_URL, devServer, { timeout: 120_000, interval: 1000 });
+    console.log("Backend ready. Starting tests...");
     await runPlaywrightTests(cliArgs);
   } finally {
     await cleanup();
