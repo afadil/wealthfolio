@@ -17,7 +17,7 @@ use num_traits::FromPrimitive;
 use reqwest::header;
 use rust_decimal::Decimal;
 use time::OffsetDateTime;
-use log::{debug, info, warn};
+use log::{debug, warn};
 use urlencoding::encode;
 use yahoo_finance_api as yahoo;
 
@@ -81,6 +81,31 @@ impl YahooProvider {
             ProviderInstrument::CryptoPair { symbol, market } => Ok(format!("{}-{}", symbol, market)),
             ProviderInstrument::FxPair { from, to } => Ok(format!("{}{}=X", from, to)),
             ProviderInstrument::MetalSymbol { symbol, .. } => Ok(symbol.to_string()),
+        }
+    }
+
+    /// Convert a Yahoo error to a MarketDataError, detecting rate limits.
+    fn convert_yahoo_error(&self, e: yahoo::YahooError, symbol: &str) -> MarketDataError {
+        let error_msg = e.to_string();
+
+        // Detect rate limiting from error message
+        if error_msg.contains("Too many requests")
+            || error_msg.contains("rate limit")
+            || error_msg.contains("429")
+        {
+            return MarketDataError::RateLimited {
+                provider: "YAHOO".to_string(),
+            };
+        }
+
+        // Handle known error types
+        if matches!(e, yahoo::YahooError::NoQuotes | yahoo::YahooError::NoResult) {
+            return MarketDataError::SymbolNotFound(symbol.to_string());
+        }
+
+        MarketDataError::ProviderError {
+            provider: "YAHOO".to_string(),
+            message: error_msg,
         }
     }
 
@@ -229,16 +254,7 @@ impl YahooProvider {
             .connector
             .get_latest_quotes(symbol, "1d")
             .await
-            .map_err(|e| {
-                if matches!(e, yahoo::YahooError::NoQuotes | yahoo::YahooError::NoResult) {
-                    MarketDataError::SymbolNotFound(symbol.to_string())
-                } else {
-                    MarketDataError::ProviderError {
-                        provider: "YAHOO".to_string(),
-                        message: e.to_string(),
-                    }
-                }
-            })?;
+            .map_err(|e| self.convert_yahoo_error(e, symbol))?;
 
         let yahoo_quote = response.last_quote().map_err(|e| {
             warn!("No quotes returned for {}: {}", symbol, e);
@@ -396,7 +412,7 @@ impl YahooProvider {
         })?;
 
         // Log first 500 chars of response for debugging
-        info!(
+        debug!(
             "[YAHOO QUOTE_SUMMARY RAW] symbol={}, response_preview={}",
             symbol,
             &response_text[..response_text.len().min(500)]
@@ -423,7 +439,7 @@ impl YahooProvider {
             .ok_or_else(|| MarketDataError::SymbolNotFound(symbol.to_string()))?;
 
         // Log raw Yahoo response for debugging
-        info!(
+        debug!(
             "[YAHOO PROFILE RAW] symbol={}, price={:?}, summary_profile={:?}, summary_detail={:?}",
             symbol,
             result.price,
@@ -554,7 +570,7 @@ impl YahooProvider {
         };
 
         // Log mapped profile for debugging
-        info!(
+        debug!(
             "[YAHOO PROFILE MAPPED] symbol={}, name={:?}, quote_type={:?}, sector={:?}, sectors={:?}, industry={:?}, country={:?}, description_len={:?}",
             symbol,
             profile.name,
@@ -597,8 +613,8 @@ impl MarketDataProvider for YahooProvider {
 
     fn rate_limit(&self) -> RateLimit {
         RateLimit {
-            requests_per_minute: 2000,
-            max_concurrency: 10,
+            requests_per_minute: 1000,
+            max_concurrency: 5,
             min_delay: Duration::from_millis(50),
         }
     }
@@ -656,16 +672,7 @@ impl MarketDataProvider for YahooProvider {
             .connector
             .get_quote_history(&symbol, start_time, end_time)
             .await
-            .map_err(|e| {
-                if matches!(e, yahoo::YahooError::NoQuotes | yahoo::YahooError::NoResult) {
-                    MarketDataError::SymbolNotFound(symbol.clone())
-                } else {
-                    MarketDataError::ProviderError {
-                        provider: "YAHOO".to_string(),
-                        message: e.to_string(),
-                    }
-                }
-            })?;
+            .map_err(|e| self.convert_yahoo_error(e, &symbol))?;
 
         match response.quotes() {
             Ok(yahoo_quotes) => {
@@ -695,10 +702,7 @@ impl MarketDataProvider for YahooProvider {
                 );
                 Err(MarketDataError::NoDataForRange)
             }
-            Err(e) => Err(MarketDataError::ProviderError {
-                provider: "YAHOO".to_string(),
-                message: e.to_string(),
-            }),
+            Err(e) => Err(self.convert_yahoo_error(e, &symbol)),
         }
     }
 
@@ -734,16 +738,16 @@ impl MarketDataProvider for YahooProvider {
     }
 
     async fn get_profile(&self, symbol: &str) -> Result<AssetProfile, MarketDataError> {
-        info!("[YAHOO] get_profile called for symbol: {}", symbol);
+        debug!("[YAHOO] get_profile called for symbol: {}", symbol);
 
         // Try quoteSummary API first (richest data)
         match self.fetch_quote_summary_profile(symbol).await {
             Ok(profile) => {
-                info!("[YAHOO] quoteSummary succeeded for {}", symbol);
+                debug!("[YAHOO] quoteSummary succeeded for {}", symbol);
                 return Ok(profile);
             }
             Err(e) => {
-                warn!(
+                debug!(
                     "quoteSummary failed for {}: {}, trying search fallback",
                     symbol, e
                 );
@@ -751,9 +755,9 @@ impl MarketDataProvider for YahooProvider {
         }
 
         // Last resort: search-based profile
-        info!("[YAHOO] Falling back to search-based profile for {}", symbol);
+        debug!("[YAHOO] Falling back to search-based profile for {}", symbol);
         let profile = self.fetch_search_profile(symbol).await?;
-        info!(
+        debug!(
             "[YAHOO PROFILE FROM SEARCH] symbol={}, name={:?}, quote_type={:?}",
             symbol, profile.name, profile.quote_type
         );

@@ -1460,6 +1460,16 @@ export interface FixAction {
 }
 
 /**
+ * An item affected by a health issue.
+ */
+export interface AffectedItem {
+  id: string;
+  name: string;
+  symbol?: string;
+  route?: string;
+}
+
+/**
  * A single health issue detected by the health center.
  */
 export interface HealthIssue {
@@ -1473,6 +1483,7 @@ export interface HealthIssue {
   fixAction?: FixAction;
   navigateAction?: NavigateAction;
   details?: string;
+  affectedItems?: AffectedItem[];
   dataHash: string;
   timestamp: string;
 }

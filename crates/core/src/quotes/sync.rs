@@ -31,10 +31,12 @@ use tokio::sync::RwLock;
 use super::client::MarketDataClient;
 use super::constants::*;
 use super::store::QuoteStore;
-use super::sync_state::{QuoteSyncState, SyncCategory, SyncMode, SyncStateStore, SymbolSyncPlan};
+use super::sync_state::{QuoteSyncState, SymbolSyncPlan, SyncCategory, SyncMode, SyncStateStore};
 use super::types::{AssetId, Day, ProviderId};
 use crate::activities::ActivityRepositoryTrait;
-use crate::assets::{is_cash_asset_id, is_fx_asset_id, Asset, AssetKind, AssetRepositoryTrait, PricingMode};
+use crate::assets::{
+    is_cash_asset_id, is_fx_asset_id, Asset, AssetKind, AssetRepositoryTrait, PricingMode,
+};
 use crate::errors::Result;
 
 // =============================================================================
@@ -75,7 +77,9 @@ impl Drop for SyncLockGuard {
 // Test helpers - expose lock functions for testing
 #[cfg(test)]
 fn try_acquire_sync_lock(asset_id: &str) -> bool {
-    SyncLockGuard::try_acquire(asset_id).map(std::mem::forget).is_some()
+    SyncLockGuard::try_acquire(asset_id)
+        .map(std::mem::forget)
+        .is_some()
 }
 
 #[cfg(test)]
@@ -371,7 +375,11 @@ where
         activity_bounds: &HashMap<String, (Option<NaiveDate>, Option<NaiveDate>)>,
     ) -> Option<SymbolSyncPlan> {
         // Get existing sync state
-        let mut state = self.sync_state_store.get_by_asset_id(&asset.id).ok().flatten();
+        let mut state = self
+            .sync_state_store
+            .get_by_asset_id(&asset.id)
+            .ok()
+            .flatten();
 
         if let Some(ref mut state) = state {
             let (first, last) = activity_bounds
@@ -558,10 +566,7 @@ where
         let _lock_guard = match SyncLockGuard::try_acquire(asset_id_str) {
             Some(guard) => guard,
             None => {
-                debug!(
-                    "Skipping sync for {} - already in progress",
-                    asset_id_str
-                );
+                debug!("Skipping sync for {} - already in progress", asset_id_str);
                 return AssetSyncResult {
                     asset_id,
                     quotes_added: 0,
@@ -577,14 +582,15 @@ where
         );
 
         // Convert dates to DateTime<Utc>
-        let start_dt = Utc
-            .from_utc_datetime(&plan.start_date.and_hms_opt(0, 0, 0).unwrap());
-        let end_dt = Utc
-            .from_utc_datetime(&plan.end_date.and_hms_opt(23, 59, 59).unwrap());
+        let start_dt = Utc.from_utc_datetime(&plan.start_date.and_hms_opt(0, 0, 0).unwrap());
+        let end_dt = Utc.from_utc_datetime(&plan.end_date.and_hms_opt(23, 59, 59).unwrap());
 
         // Fetch quotes via MarketDataClient
         let client = self.client.read().await;
-        match client.fetch_historical_quotes(asset, start_dt, end_dt).await {
+        match client
+            .fetch_historical_quotes(asset, start_dt, end_dt)
+            .await
+        {
             Ok(mut quotes) => {
                 // Sort quotes by timestamp to ensure correct ordering
                 // This is important because we use first()/last() to determine date ranges
@@ -674,7 +680,7 @@ where
             return SyncResult::default();
         }
 
-        info!("Executing sync for {} assets", plans.len());
+        debug!("Executing sync for {} assets", plans.len());
 
         // Get all assets for the plans
         let asset_ids: Vec<String> = plans.iter().map(|p| p.asset_id.clone()).collect();
@@ -711,7 +717,7 @@ where
             }
         }
 
-        info!(
+        debug!(
             "Sync complete: {} synced, {} failed, {} skipped, {} quotes total",
             result.synced, result.failed, result.skipped, result.quotes_synced
         );
@@ -822,7 +828,10 @@ where
     R: ActivityRepositoryTrait + 'static,
 {
     async fn sync(&self, mode: SyncMode, asset_ids: Option<Vec<String>>) -> Result<SyncResult> {
-        info!("Starting quote sync with mode: {}, assets: {:?}", mode, asset_ids);
+        info!(
+            "Starting quote sync with mode: {}, assets: {:?}",
+            mode, asset_ids
+        );
 
         // Initialize result to track skipped assets
         let mut result = SyncResult::default();
@@ -911,7 +920,8 @@ where
                     state.last_activity_date = last_activity_date;
                 }
 
-                let (start_date, end_date) = self.calculate_date_range_for_mode(&state, mode, today, &asset.id);
+                let (start_date, end_date) =
+                    self.calculate_date_range_for_mode(&state, mode, today, &asset.id);
 
                 // Determine category for priority
                 let category = state
@@ -977,7 +987,7 @@ where
             return Ok(());
         }
 
-        info!(
+        debug!(
             "Handling new activity for {} on {}",
             symbol, activity_date.0
         );
@@ -987,8 +997,8 @@ where
         if let Some(mut state) = existing {
             // Check if we need backfill
             // Use QUOTE_HISTORY_BUFFER_DAYS + BACKFILL_SAFETY_MARGIN_DAYS for conservative detection
-            let required_start =
-                activity_date.0 - Duration::days(QUOTE_HISTORY_BUFFER_DAYS + BACKFILL_SAFETY_MARGIN_DAYS);
+            let required_start = activity_date.0
+                - Duration::days(QUOTE_HISTORY_BUFFER_DAYS + BACKFILL_SAFETY_MARGIN_DAYS);
             let needs_backfill = state
                 .earliest_quote_date
                 .map(|earliest| required_start < earliest)
@@ -1042,7 +1052,7 @@ where
             return Ok(());
         }
 
-        info!("Handling activity deletion for {}", symbol);
+        debug!("Handling activity deletion for {}", symbol);
 
         debug!(
             "Activity deleted for {} - sync planning will recompute activity bounds on demand",
@@ -1411,7 +1421,10 @@ mod tests {
             let expected_start = last_quote - Duration::days(OVERLAP_DAYS);
 
             // Verify OVERLAP_DAYS is used in the overlap calculation
-            assert_eq!(OVERLAP_DAYS, 5, "OVERLAP_DAYS should be 5 for healing corrections");
+            assert_eq!(
+                OVERLAP_DAYS, 5,
+                "OVERLAP_DAYS should be 5 for healing corrections"
+            );
 
             // The overlap window ensures we pick up corrections from providers
             let overlap_window = OVERLAP_DAYS;
@@ -1625,7 +1638,10 @@ mod tests {
             };
 
             assert_eq!(mode.asset_ids(), Some(&target_assets));
-            assert_eq!(mode.to_sync_mode(), Some(SyncMode::RefetchRecent { days: 30 }));
+            assert_eq!(
+                mode.to_sync_mode(),
+                Some(SyncMode::RefetchRecent { days: 30 })
+            );
         }
 
         #[test]

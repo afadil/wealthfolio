@@ -116,7 +116,9 @@ impl MarketSyncMode {
         match self {
             MarketSyncMode::None => None,
             MarketSyncMode::Incremental { .. } => Some(SyncMode::Incremental),
-            MarketSyncMode::RefetchRecent { days, .. } => Some(SyncMode::RefetchRecent { days: *days }),
+            MarketSyncMode::RefetchRecent { days, .. } => {
+                Some(SyncMode::RefetchRecent { days: *days })
+            }
             MarketSyncMode::BackfillHistory { days, .. } => {
                 Some(SyncMode::BackfillHistory { days: *days })
             }
@@ -265,7 +267,9 @@ impl QuoteSyncState {
             (self.first_activity_date, self.earliest_quote_date)
         {
             let required_start = first_activity
-                - Duration::days(Self::QUOTE_HISTORY_BUFFER_DAYS + Self::BACKFILL_SAFETY_MARGIN_DAYS);
+                - Duration::days(
+                    Self::QUOTE_HISTORY_BUFFER_DAYS + Self::BACKFILL_SAFETY_MARGIN_DAYS,
+                );
             if required_start < earliest_quote {
                 return SyncCategory::NeedsBackfill;
             }
@@ -517,6 +521,9 @@ pub trait SyncStateStore: Send + Sync {
     ///
     /// Returns `None` if there are no activities in any active account.
     fn get_earliest_activity_date_global(&self) -> Result<Option<NaiveDate>>;
+
+    /// Get sync states with errors (error_count > 0).
+    fn get_with_errors(&self) -> Result<Vec<QuoteSyncState>>;
 }
 
 #[cfg(test)]
@@ -651,10 +658,20 @@ mod tests {
 
     #[test]
     fn test_category_priorities() {
-        assert!(SyncCategory::Active.default_priority() > SyncCategory::NeedsBackfill.default_priority());
-        assert!(SyncCategory::NeedsBackfill.default_priority() > SyncCategory::New.default_priority());
-        assert!(SyncCategory::New.default_priority() > SyncCategory::RecentlyClosed.default_priority());
-        assert!(SyncCategory::RecentlyClosed.default_priority() > SyncCategory::Closed.default_priority());
+        assert!(
+            SyncCategory::Active.default_priority()
+                > SyncCategory::NeedsBackfill.default_priority()
+        );
+        assert!(
+            SyncCategory::NeedsBackfill.default_priority() > SyncCategory::New.default_priority()
+        );
+        assert!(
+            SyncCategory::New.default_priority() > SyncCategory::RecentlyClosed.default_priority()
+        );
+        assert!(
+            SyncCategory::RecentlyClosed.default_priority()
+                > SyncCategory::Closed.default_priority()
+        );
     }
 
     #[test]

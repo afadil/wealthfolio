@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::{error::ApiResult, main_lib::AppState};
@@ -7,11 +6,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use wealthfolio_core::accounts::AccountServiceTrait;
-use wealthfolio_core::health::{
-    checks::{AssetHoldingInfo, ConsistencyIssueInfo, FxPairInfo, UnclassifiedAssetInfo},
-    FixAction, HealthConfig, HealthStatus,
-};
+use wealthfolio_core::health::{FixAction, HealthConfig, HealthStatus};
 
 /// Get current health status (cached or fresh check).
 async fn get_health_status(State(state): State<Arc<AppState>>) -> ApiResult<Json<HealthStatus>> {
@@ -35,78 +30,23 @@ async fn run_health_checks(State(state): State<Arc<AppState>>) -> ApiResult<Json
     Ok(Json(status))
 }
 
-/// Internal function to run health checks by gathering data from services.
+/// Internal function to run health checks.
 async fn run_health_checks_internal(
     state: &Arc<AppState>,
     base_currency: &str,
 ) -> Result<HealthStatus, anyhow::Error> {
-    // Get accounts to iterate through holdings
-    let accounts = state.account_service.get_active_accounts()?;
-
-    let mut all_holdings: Vec<AssetHoldingInfo> = Vec::new();
-    let mut latest_quote_times: HashMap<String, chrono::DateTime<chrono::Utc>> = HashMap::new();
-    let mut total_portfolio_value = 0.0;
-
-    // Gather holdings data from each account
-    for account in &accounts {
-        let holdings = state
-            .holdings_service
-            .get_holdings(&account.id, base_currency)
-            .await?;
-
-        for holding in holdings {
-            if let Some(ref instrument) = holding.instrument {
-                let market_value_f64 = holding
-                    .market_value
-                    .base
-                    .to_string()
-                    .parse::<f64>()
-                    .unwrap_or(0.0);
-                total_portfolio_value += market_value_f64;
-
-                // Determine if uses market pricing
-                let uses_market_pricing = instrument.pricing_mode.to_uppercase() == "MARKET";
-
-                all_holdings.push(AssetHoldingInfo {
-                    asset_id: instrument.id.clone(),
-                    market_value: market_value_f64,
-                    uses_market_pricing,
-                });
-            }
-        }
-    }
-
-    // Get latest quote timestamps for held assets
-    let asset_ids: Vec<String> = all_holdings.iter().map(|h| h.asset_id.clone()).collect();
-    if !asset_ids.is_empty() {
-        if let Ok(quotes) = state.quote_service.get_latest_quotes(&asset_ids) {
-            for (asset_id, quote) in quotes {
-                latest_quote_times.insert(asset_id, quote.timestamp);
-            }
-        }
-    }
-
-    // For now, we'll use empty data for FX, unclassified, and consistency checks
-    // These can be enhanced later with proper data gathering
-    let fx_pairs: Vec<FxPairInfo> = Vec::new();
-    let unclassified_assets: Vec<UnclassifiedAssetInfo> = Vec::new();
-    let consistency_issues: Vec<ConsistencyIssueInfo> = Vec::new();
-
-    // Run checks with gathered data
-    let status = state
+    state
         .health_service
-        .run_checks_with_data(
+        .run_full_checks(
             base_currency,
-            total_portfolio_value,
-            &all_holdings,
-            &latest_quote_times,
-            &fx_pairs,
-            &unclassified_assets,
-            &consistency_issues,
+            state.account_service.clone(),
+            state.holdings_service.clone(),
+            state.quote_service.clone(),
+            state.asset_service.clone(),
+            state.taxonomy_service.clone(),
         )
-        .await?;
-
-    Ok(status)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))
 }
 
 #[derive(serde::Deserialize)]
@@ -156,6 +96,16 @@ async fn execute_health_fix(
     State(state): State<Arc<AppState>>,
     Json(action): Json<FixAction>,
 ) -> ApiResult<()> {
+    // Handle migrate_legacy_classifications action specially
+    if action.id == "migrate_legacy_classifications" {
+        wealthfolio_core::health::migrate_legacy_classifications(
+            state.asset_service.as_ref(),
+            state.taxonomy_service.as_ref(),
+        )
+        .await?;
+        return Ok(());
+    }
+
     state.health_service.execute_fix(&action).await?;
     Ok(())
 }

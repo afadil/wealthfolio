@@ -148,6 +148,24 @@ impl FixAction {
             payload: serde_json::json!(asset_ids),
         }
     }
+
+    /// Creates a new fix action for migrating all legacy classifications.
+    pub fn migrate_legacy_classifications() -> Self {
+        Self {
+            id: "migrate_legacy_classifications".to_string(),
+            label: "Start Migration".to_string(),
+            payload: serde_json::json!(null),
+        }
+    }
+
+    /// Creates a new fix action for retrying sync on failed assets.
+    pub fn retry_sync(asset_ids: Vec<String>) -> Self {
+        Self {
+            id: "retry_sync".to_string(),
+            label: "Retry Sync".to_string(),
+            payload: serde_json::json!(asset_ids),
+        }
+    }
 }
 
 // =============================================================================
@@ -168,6 +186,69 @@ pub struct NavigateAction {
     pub query: Option<Value>,
     /// Human-readable button label (e.g., "View Holdings")
     pub label: String,
+}
+
+// =============================================================================
+// Affected Item
+// =============================================================================
+
+/// An item affected by a health issue.
+///
+/// Provides identifying information for display in the UI with optional
+/// navigation route to the item's detail page.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AffectedItem {
+    /// Unique identifier for the item (e.g., asset ID)
+    pub id: String,
+    /// Display name (e.g., "Apple Inc.")
+    pub name: String,
+    /// Symbol/ticker for badge display (e.g., "AAPL")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub symbol: Option<String>,
+    /// Optional route to navigate to the item's detail page
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub route: Option<String>,
+}
+
+impl AffectedItem {
+    /// Creates a new affected item for an asset with name and symbol.
+    pub fn asset_with_name(
+        id: impl Into<String>,
+        symbol: impl Into<String>,
+        name: Option<String>,
+    ) -> Self {
+        let id_str = id.into();
+        let symbol_str = symbol.into();
+        Self {
+            route: Some(format!("/holdings/{}", urlencoding::encode(&id_str))),
+            id: id_str,
+            name: name.unwrap_or_else(|| symbol_str.clone()),
+            symbol: Some(symbol_str),
+        }
+    }
+
+    /// Creates a new affected item for an asset (symbol only).
+    pub fn asset(id: impl Into<String>, symbol: impl Into<String>) -> Self {
+        let id_str = id.into();
+        let symbol_str = symbol.into();
+        Self {
+            route: Some(format!("/holdings/{}", urlencoding::encode(&id_str))),
+            id: id_str,
+            name: symbol_str.clone(),
+            symbol: Some(symbol_str),
+        }
+    }
+
+    /// Creates a new affected item without a route.
+    pub fn simple(id: impl Into<String>, name: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            name: name.into(),
+            symbol: None,
+            route: None,
+        }
+    }
 }
 
 impl NavigateAction {
@@ -195,6 +276,24 @@ impl NavigateAction {
             route: "/settings/accounts".to_string(),
             query: None,
             label: "View Accounts".to_string(),
+        }
+    }
+
+    /// Creates a navigate action to the taxonomies settings page.
+    pub fn to_taxonomies() -> Self {
+        Self {
+            route: "/settings/taxonomies".to_string(),
+            query: None,
+            label: "View Classifications".to_string(),
+        }
+    }
+
+    /// Creates a navigate action to the market data settings page.
+    pub fn to_market_data() -> Self {
+        Self {
+            route: "/settings/market-data".to_string(),
+            query: None,
+            label: "View Market Data".to_string(),
         }
     }
 }
@@ -250,6 +349,10 @@ pub struct HealthIssue {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub details: Option<String>,
 
+    /// List of affected items (e.g., assets, accounts) for display in detail view
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub affected_items: Option<Vec<AffectedItem>>,
+
     /// Hash of the underlying data that caused this issue.
     /// Used to detect when data changes after dismissal.
     pub data_hash: String,
@@ -278,6 +381,7 @@ pub struct HealthIssueBuilder {
     fix_action: Option<FixAction>,
     navigate_action: Option<NavigateAction>,
     details: Option<String>,
+    affected_items: Option<Vec<AffectedItem>>,
     data_hash: Option<String>,
 }
 
@@ -332,6 +436,11 @@ impl HealthIssueBuilder {
         self
     }
 
+    pub fn affected_items(mut self, items: Vec<AffectedItem>) -> Self {
+        self.affected_items = Some(items);
+        self
+    }
+
     pub fn data_hash(mut self, hash: impl Into<String>) -> Self {
         self.data_hash = Some(hash.into());
         self
@@ -354,6 +463,7 @@ impl HealthIssueBuilder {
             fix_action: self.fix_action,
             navigate_action: self.navigate_action,
             details: self.details,
+            affected_items: self.affected_items,
             data_hash: self.data_hash.expect("data_hash is required"),
             timestamp: Utc::now(),
         }
@@ -427,12 +537,18 @@ impl HealthStatus {
 
     /// Returns issues filtered by severity.
     pub fn issues_by_severity(&self, severity: Severity) -> Vec<&HealthIssue> {
-        self.issues.iter().filter(|i| i.severity == severity).collect()
+        self.issues
+            .iter()
+            .filter(|i| i.severity == severity)
+            .collect()
     }
 
     /// Returns issues filtered by category.
     pub fn issues_by_category(&self, category: HealthCategory) -> Vec<&HealthIssue> {
-        self.issues.iter().filter(|i| i.category == category).collect()
+        self.issues
+            .iter()
+            .filter(|i| i.category == category)
+            .collect()
     }
 
     /// Marks the status as stale.

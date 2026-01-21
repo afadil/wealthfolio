@@ -1,15 +1,17 @@
 import type { HealthCategory, HealthIssue, HealthSeverity } from "@/lib/types";
 import {
+  ActionConfirm,
   Badge,
   Button,
   Icons,
-  Separator,
+  ScrollArea,
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
 } from "@wealthfolio/ui";
 import { cn } from "@wealthfolio/ui/lib/utils";
+import { Link } from "react-router-dom";
 
 interface IssueDetailSheetProps {
   issue: HealthIssue | null;
@@ -23,64 +25,32 @@ interface IssueDetailSheetProps {
 
 const SEVERITY_CONFIG: Record<
   HealthSeverity,
-  { label: string; variant: "default" | "secondary" | "destructive" | "outline"; color: string }
+  { label: string; color: string }
 > = {
-  INFO: { label: "Info", variant: "secondary", color: "text-muted-foreground" },
-  WARNING: { label: "Warning", variant: "default", color: "text-yellow-500" },
-  ERROR: { label: "Error", variant: "destructive", color: "text-destructive" },
-  CRITICAL: { label: "Critical", variant: "destructive", color: "text-destructive" },
+  INFO: { label: "Info", color: "text-muted-foreground" },
+  WARNING: { label: "Warning", color: "text-yellow-600 dark:text-yellow-400" },
+  ERROR: { label: "Error", color: "text-destructive" },
+  CRITICAL: { label: "Critical", color: "text-destructive" },
 };
 
 const CATEGORY_LABELS: Record<HealthCategory, { label: string; description: string }> = {
   PRICE_STALENESS: {
     label: "Price Staleness",
-    description: "Market prices are outdated and need to be refreshed",
+    description: "Market prices are outdated and need to be refreshed. This can affect the accuracy of your portfolio valuation.",
   },
   FX_INTEGRITY: {
     label: "Exchange Rates",
-    description: "Missing or outdated exchange rates for currency conversion",
+    description: "Missing or outdated exchange rates for currency conversion. This may impact multi-currency portfolio calculations.",
   },
   CLASSIFICATION: {
     label: "Classification",
-    description: "Assets are missing categories or classifications",
+    description: "Assets are missing categories or classifications. This affects portfolio breakdowns and allocation analysis.",
   },
   DATA_CONSISTENCY: {
     label: "Data Consistency",
-    description: "Inconsistencies detected in portfolio data",
+    description: "Inconsistencies detected in portfolio data. This may cause inaccurate reporting or calculations.",
   },
 };
-
-interface DetailRowProps {
-  label: string;
-  value: React.ReactNode;
-}
-
-function DetailRow({ label, value }: DetailRowProps) {
-  return (
-    <div className="flex items-start justify-between gap-4 py-2">
-      <div className="text-muted-foreground text-sm">{label}</div>
-      <div className="text-right text-sm font-medium">{value}</div>
-    </div>
-  );
-}
-
-interface DetailSectionProps {
-  title: string;
-  icon?: React.ReactNode;
-  children: React.ReactNode;
-}
-
-function DetailSection({ title, icon, children }: DetailSectionProps) {
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-2 pb-2">
-        {icon}
-        <h4 className="text-sm font-semibold">{title}</h4>
-      </div>
-      <div className="bg-muted/30 rounded-lg border p-3">{children}</div>
-    </div>
-  );
-}
 
 export function IssueDetailSheet({
   issue,
@@ -98,132 +68,134 @@ export function IssueDetailSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
-        <SheetHeader className="pb-4">
-          <SheetTitle className="flex items-center gap-3">
-            <div
-              className={cn(
-                "flex h-10 w-10 items-center justify-center rounded-full",
-                issue.severity === "CRITICAL" && "bg-destructive/10",
-                issue.severity === "ERROR" && "bg-destructive/10",
-                issue.severity === "WARNING" && "bg-yellow-500/10",
-                issue.severity === "INFO" && "bg-muted",
-              )}
-            >
-              <Icons.AlertCircle className={cn("h-5 w-5", severityConfig.color)} />
-            </div>
-            <div className="flex flex-col items-start">
-              <span>Issue Details</span>
-              <span className="text-muted-foreground text-xs font-normal">
-                {categoryConfig.label}
-              </span>
-            </div>
-          </SheetTitle>
+      <SheetContent side="right" className="flex w-full flex-col sm:max-w-md">
+        <SheetHeader className="shrink-0 space-y-3 pb-6">
+          <div className="flex items-center gap-2 text-xs">
+            <span className={cn("font-medium", severityConfig.color)}>{severityConfig.label}</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="text-muted-foreground">{categoryConfig.label}</span>
+          </div>
+          <SheetTitle className="text-xl leading-tight">{issue.title}</SheetTitle>
+          <p className="text-muted-foreground text-sm leading-relaxed">{issue.message}</p>
         </SheetHeader>
 
-        <div className="space-y-6 pb-8">
-          {/* Header Summary */}
-          <div
-            className={cn(
-              "rounded-xl border p-4",
-              issue.severity === "CRITICAL" && "border-destructive/30 bg-destructive/5",
-              issue.severity === "ERROR" && "border-destructive/20 bg-destructive/5",
-              issue.severity === "WARNING" && "border-yellow-500/20 bg-yellow-500/5",
-              issue.severity === "INFO" && "bg-muted/30",
-            )}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <h3 className="font-semibold">{issue.title}</h3>
-              <Badge variant={severityConfig.variant}>{severityConfig.label}</Badge>
+        {/* Scrollable content area */}
+        <div className="flex min-h-0 flex-1 flex-col gap-6">
+          {/* Affected Items List - grows to fill space */}
+          {issue.affectedItems && issue.affectedItems.length > 0 && (
+            <div className="flex min-h-0 flex-1 flex-col gap-3">
+              <h4 className="text-muted-foreground shrink-0 text-xs font-medium uppercase tracking-wide">
+                Affected Items ({issue.affectedItems.length})
+              </h4>
+              <ScrollArea className="min-h-0 flex-1 rounded-md border">
+                <div className="p-1">
+                  {issue.affectedItems.map((item) => (
+                    <div key={item.id} className="group">
+                      {item.route ? (
+                        <Link
+                          to={item.route}
+                          className="hover:bg-muted flex items-center justify-between gap-2 rounded-md px-2 py-2 transition-colors"
+                        >
+                          <div className="flex min-w-0 flex-1 items-center gap-2">
+                            {item.symbol && (
+                              <Badge variant="secondary" className="shrink-0 font-mono text-xs">
+                                {item.symbol}
+                              </Badge>
+                            )}
+                            <span className="truncate text-sm">{item.name}</span>
+                          </div>
+                          <Icons.ChevronRight className="text-muted-foreground h-4 w-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
+                        </Link>
+                      ) : (
+                        <div className="flex items-center gap-2 px-2 py-2">
+                          {item.symbol && (
+                            <Badge variant="secondary" className="shrink-0 font-mono text-xs">
+                              {item.symbol}
+                            </Badge>
+                          )}
+                          <span className="truncate text-sm">{item.name}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
             </div>
-            <p className="text-muted-foreground mt-2 text-sm">{issue.message}</p>
-          </div>
+          )}
 
-          {/* Impact Details */}
-          <DetailSection title="Impact" icon={<Icons.BarChart className="h-4 w-4" />}>
-            <DetailRow
-              label="Affected Items"
-              value={`${issue.affectedCount} item${issue.affectedCount !== 1 ? "s" : ""}`}
-            />
-            {issue.affectedMvPct != null && issue.affectedMvPct > 0 && (
-              <DetailRow
-                label="Portfolio Impact"
-                value={`${(issue.affectedMvPct * 100).toFixed(2)}% of portfolio`}
-              />
-            )}
-          </DetailSection>
+          {/* Impact Stats - only show if no affected items list */}
+          {(issue.affectedCount > 0 || (issue.affectedMvPct != null && issue.affectedMvPct > 0)) && !issue.affectedItems && (
+            <div className="space-y-3">
+              <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Impact</h4>
+              <div className="grid grid-cols-2 gap-4">
+                {issue.affectedCount > 0 && (
+                  <div>
+                    <p className="text-2xl font-semibold tabular-nums">{issue.affectedCount}</p>
+                    <p className="text-muted-foreground text-xs">Affected items</p>
+                  </div>
+                )}
+                {issue.affectedMvPct != null && issue.affectedMvPct > 0 && (
+                  <div>
+                    <p className="text-2xl font-semibold tabular-nums">{(issue.affectedMvPct * 100).toFixed(1)}%</p>
+                    <p className="text-muted-foreground text-xs">Portfolio impact</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Additional Details */}
           {issue.details && (
-            <DetailSection title="Details" icon={<Icons.Info className="h-4 w-4" />}>
+            <div className="space-y-2">
+              <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Details</h4>
               <p className="text-muted-foreground text-sm">{issue.details}</p>
-            </DetailSection>
+            </div>
           )}
+        </div>
 
-          {/* Category Info */}
-          <DetailSection title="Category" icon={<Icons.Tag className="h-4 w-4" />}>
-            <DetailRow label="Type" value={<Badge variant="outline">{categoryConfig.label}</Badge>} />
-            <p className="text-muted-foreground mt-2 text-xs">{categoryConfig.description}</p>
-          </DetailSection>
+        {/* About this issue - before actions */}
+        <div className="shrink-0 space-y-2 border-t pt-6">
+          <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">About this issue</h4>
+          <p className="text-muted-foreground text-sm">{categoryConfig.description}</p>
+        </div>
 
-          {/* Technical Details */}
-          <DetailSection title="Technical Details" icon={<Icons.Info className="h-4 w-4" />}>
-            <DetailRow
-              label="Issue ID"
-              value={
-                <code className="bg-muted max-w-[200px] truncate rounded px-1.5 py-0.5 text-xs">
-                  {issue.id}
-                </code>
-              }
-            />
-            <DetailRow
-              label="Data Hash"
-              value={
-                <code className="bg-muted max-w-[150px] truncate rounded px-1.5 py-0.5 text-xs">
-                  {issue.dataHash.slice(0, 16)}...
-                </code>
-              }
-            />
-          </DetailSection>
-
-          <Separator />
-
-          {/* Actions */}
-          <div className="flex flex-col gap-3">
-            {issue.fixAction && (
-              <Button onClick={onFix} disabled={isFixing} className="w-full">
-                {isFixing ? (
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Icons.Settings2 className="mr-2 h-4 w-4" />
-                )}
-                {issue.fixAction.label}
-              </Button>
-            )}
-
-            {issue.navigateAction && (
-              <Button variant="outline" className="w-full" asChild>
-                <a href={issue.navigateAction.route}>
-                  <Icons.ExternalLink className="mr-2 h-4 w-4" />
-                  {issue.navigateAction.label}
-                </a>
-              </Button>
-            )}
-
-            <Button
-              variant="ghost"
-              onClick={onDismiss}
-              disabled={isDismissing}
-              className="w-full"
-            >
-              {isDismissing ? (
+        {/* Actions - fixed at bottom */}
+        <div className="mt-6 shrink-0 space-y-2">
+          {issue.fixAction && (
+            <Button onClick={onFix} disabled={isFixing} className="w-full">
+              {isFixing ? (
                 <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                <Icons.EyeOff className="mr-2 h-4 w-4" />
+                <Icons.Wand2 className="mr-2 h-4 w-4" />
               )}
-              Dismiss Issue
+              {issue.fixAction.label}
             </Button>
-          </div>
+          )}
+
+          {issue.navigateAction && (
+            <Button variant="outline" className="w-full" asChild>
+              <a href={issue.navigateAction.route}>
+                <Icons.ArrowRight className="mr-2 h-4 w-4" />
+                {issue.navigateAction.label}
+              </a>
+            </Button>
+          )}
+
+          <ActionConfirm
+            confirmTitle="Dismiss this issue?"
+            confirmMessage="This will hide the issue from your health center. It will reappear if the underlying data changes."
+            confirmButtonText="Dismiss"
+            confirmButtonVariant="default"
+            handleConfirm={onDismiss}
+            isPending={isDismissing}
+            pendingText="Dismissing..."
+            button={
+              <Button variant="ghost" className="text-muted-foreground w-full">
+                <Icons.EyeOff className="mr-2 h-4 w-4" />
+                Dismiss
+              </Button>
+            }
+          />
         </div>
       </SheetContent>
     </Sheet>

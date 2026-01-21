@@ -21,7 +21,7 @@ use super::import::{ImportValidationStatus, QuoteConverter, QuoteImport, QuoteVa
 use super::model::{DataSource, LatestQuotePair, Quote, QuoteSummary};
 use super::store::{ProviderSettingsStore, QuoteStore};
 use super::sync::{QuoteSyncService, QuoteSyncServiceTrait, SyncResult};
-use super::sync_state::{QuoteSyncState, SyncMode, SyncStateStore, SymbolSyncPlan};
+use super::sync_state::{QuoteSyncState, SymbolSyncPlan, SyncMode, SyncStateStore};
 use super::types::{AssetId, Day};
 use crate::activities::ActivityRepositoryTrait;
 use crate::assets::{needs_market_quotes, Asset, AssetKind, AssetRepositoryTrait, ProviderProfile};
@@ -70,7 +70,10 @@ pub trait QuoteServiceTrait: Send + Sync {
     fn get_latest_quotes(&self, symbols: &[String]) -> Result<HashMap<String, Quote>>;
 
     /// Get the latest quote pairs (current + previous) for multiple symbols.
-    fn get_latest_quotes_pair(&self, symbols: &[String]) -> Result<HashMap<String, LatestQuotePair>>;
+    fn get_latest_quotes_pair(
+        &self,
+        symbols: &[String],
+    ) -> Result<HashMap<String, LatestQuotePair>>;
 
     /// Get all historical quotes for a symbol.
     fn get_historical_quotes(&self, symbol: &str) -> Result<Vec<Quote>>;
@@ -240,6 +243,9 @@ pub trait QuoteServiceTrait: Send + Sync {
         current_holdings: &std::collections::HashMap<String, rust_decimal::Decimal>,
     ) -> Result<()>;
 
+    /// Get sync states that have errors (error_count > 0).
+    fn get_sync_states_with_errors(&self) -> Result<Vec<QuoteSyncState>>;
+
     // =========================================================================
     // Provider Settings
     // =========================================================================
@@ -260,8 +266,11 @@ pub trait QuoteServiceTrait: Send + Sync {
     // =========================================================================
 
     /// Import quotes from CSV data.
-    async fn import_quotes(&self, quotes: Vec<QuoteImport>, overwrite: bool)
-        -> Result<Vec<QuoteImport>>;
+    async fn import_quotes(
+        &self,
+        quotes: Vec<QuoteImport>,
+        overwrite: bool,
+    ) -> Result<Vec<QuoteImport>>;
 }
 
 /// Unified quote service implementation.
@@ -431,7 +440,10 @@ where
             quote_type: quote_type.to_string(),
             type_display: quote_type.to_string(),
             currency: Some(asset.currency.clone()),
-            data_source: asset.preferred_provider.clone().or_else(|| Some("MANUAL".to_string())),
+            data_source: asset
+                .preferred_provider
+                .clone()
+                .or_else(|| Some("MANUAL".to_string())),
             is_existing: true,
             existing_asset_id: Some(asset.id.clone()),
             index: String::new(),
@@ -524,7 +536,9 @@ where
         let lookback_start = start - Duration::days(QUOTE_LOOKBACK_DAYS);
         let mut all_quotes = Vec::new();
         for symbol in symbols {
-            let quotes = self.quote_store.get_quotes_in_range(symbol, lookback_start, end)?;
+            let quotes = self
+                .quote_store
+                .get_quotes_in_range(symbol, lookback_start, end)?;
             all_quotes.extend(quotes);
         }
 
@@ -591,7 +605,13 @@ where
         let existing_assets = self.asset_repo.search_by_symbol(query).unwrap_or_default();
 
         // 2. Search provider for external results
-        let provider_results = self.client.read().await.search(query).await.unwrap_or_default();
+        let provider_results = self
+            .client
+            .read()
+            .await
+            .search(query)
+            .await
+            .unwrap_or_default();
 
         // 3. Convert existing assets to QuoteSummary with is_existing flag
         let existing_summaries: Vec<QuoteSummary> = existing_assets
@@ -647,7 +667,9 @@ where
                 match a_rank.cmp(&b_rank) {
                     std::cmp::Ordering::Equal => {
                         // If same exchange rank, sort by provider score (descending)
-                        b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal)
+                        b.score
+                            .partial_cmp(&a.score)
+                            .unwrap_or(std::cmp::Ordering::Equal)
                     }
                     other => other,
                 }
@@ -710,9 +732,7 @@ where
         let sync_service = self.get_sync_service().await?;
         let asset_id = AssetId::new(symbol);
         let day = Day::new(activity_date);
-        sync_service
-            .handle_activity_created(&asset_id, day)
-            .await
+        sync_service.handle_activity_created(&asset_id, day).await
     }
 
     async fn handle_activity_deleted(&self, symbol: &str) -> Result<()> {
@@ -739,7 +759,8 @@ where
     }
 
     fn get_assets_needing_profile_enrichment(&self) -> Result<Vec<QuoteSyncState>> {
-        self.sync_state_store.get_assets_needing_profile_enrichment()
+        self.sync_state_store
+            .get_assets_needing_profile_enrichment()
     }
 
     async fn update_position_status_from_holdings(
@@ -758,7 +779,10 @@ where
 
         for sync_state in all_sync_states {
             let asset_id = &sync_state.asset_id;
-            let current_qty = current_holdings.get(asset_id).copied().unwrap_or(Decimal::ZERO);
+            let current_qty = current_holdings
+                .get(asset_id)
+                .copied()
+                .unwrap_or(Decimal::ZERO);
             let has_open_position = current_qty > Decimal::ZERO;
 
             if has_open_position {
@@ -777,10 +801,7 @@ where
                 // Asset has no open position (quantity = 0 or not in holdings)
                 if sync_state.is_active {
                     // Was active, now closed - mark as inactive with today's date
-                    debug!(
-                        "Marking asset {} as inactive (position closed)",
-                        asset_id
-                    );
+                    debug!("Marking asset {} as inactive (position closed)", asset_id);
                     self.sync_state_store.mark_inactive(asset_id, today).await?;
                     marked_inactive += 1;
                 }
@@ -796,6 +817,10 @@ where
         }
 
         Ok(())
+    }
+
+    fn get_sync_states_with_errors(&self) -> Result<Vec<QuoteSyncState>> {
+        self.sync_state_store.get_with_errors()
     }
 
     // =========================================================================
@@ -819,7 +844,10 @@ where
             // Check if provider requires an API key
             let requires_key = matches!(
                 setting.id.as_str(),
-                DATA_SOURCE_ALPHA_VANTAGE | DATA_SOURCE_MARKET_DATA_APP | DATA_SOURCE_METAL_PRICE_API | DATA_SOURCE_FINNHUB
+                DATA_SOURCE_ALPHA_VANTAGE
+                    | DATA_SOURCE_MARKET_DATA_APP
+                    | DATA_SOURCE_METAL_PRICE_API
+                    | DATA_SOURCE_FINNHUB
             );
             // Check if API key is set (this may trigger keychain prompt on macOS)
             let has_key = if requires_key {
@@ -841,9 +869,7 @@ where
                 .and_then(|s| s.last_synced_at)
                 .map(|dt| dt.to_rfc3339());
             let last_sync_error = stats.and_then(|s| s.last_error.clone());
-            let unique_errors = stats
-                .map(|s| s.unique_errors.clone())
-                .unwrap_or_default();
+            let unique_errors = stats.map(|s| s.unique_errors.clone()).unwrap_or_default();
 
             infos.push(ProviderInfo {
                 id: setting.id.clone(),
@@ -918,10 +944,9 @@ where
 
             // Check for duplicates if not overwriting
             if !overwrite {
-                let existing = self.quote_store.find_duplicate_quotes(
-                    &quote.symbol,
-                    quote.parse_date().unwrap_or_default(),
-                );
+                let existing = self
+                    .quote_store
+                    .find_duplicate_quotes(&quote.symbol, quote.parse_date().unwrap_or_default());
                 if existing.map(|v| !v.is_empty()).unwrap_or(false) {
                     quote.validation_status =
                         ImportValidationStatus::Warning("Quote already exists".to_string());
