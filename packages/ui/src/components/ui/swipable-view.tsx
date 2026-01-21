@@ -23,6 +23,11 @@ export interface SwipableViewProps {
    * The index to start on. Crucial for syncing with URL on first load.
    */
   initialIndex?: number;
+  /**
+   * Controlled mode: when provided, the component will scroll to this index
+   * whenever it changes. This is the single source of truth for the selected view.
+   */
+  selectedIndex?: number;
 }
 
 export function SwipableView({
@@ -34,6 +39,7 @@ export function SwipableView({
   onViewChange,
   onInit: onInitProp,
   initialIndex = 0,
+  selectedIndex: controlledIndex,
 }: SwipableViewProps) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: false,
@@ -88,6 +94,15 @@ export function SwipableView({
       emblaApi.off("select", onSelect);
     };
   }, [emblaApi, onInit, onSelect]);
+
+  // Controlled mode: scroll to controlledIndex when it changes
+  React.useEffect(() => {
+    if (controlledIndex === undefined || !emblaApi) return;
+    const currentIndex = emblaApi.selectedScrollSnap();
+    if (currentIndex !== controlledIndex) {
+      emblaApi.scrollTo(controlledIndex, true); // instant scroll for external changes
+    }
+  }, [controlledIndex, emblaApi]);
 
   // MEMORY OPTIMIZATION:
   // Only render the Active Slide and its immediate neighbors (±1).

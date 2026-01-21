@@ -135,8 +135,13 @@ impl MarketDataError {
             | Self::UnsupportedAssetType(_)
             | Self::ValidationFailed { .. } => RetryClass::Never,
 
-            // Transient errors - failover with circuit breaker penalty
-            Self::RateLimited { .. } | Self::Timeout { .. } => RetryClass::FailoverWithPenalty,
+            // Timeout - failover with circuit breaker penalty
+            Self::Timeout { .. } => RetryClass::FailoverWithPenalty,
+
+            // Rate limited - try next provider but don't penalize circuit breaker
+            // Rate limits are external throttling, not provider failures.
+            // We want to attempt all assets even if rate limited, so next sync can retry.
+            Self::RateLimited { .. } => RetryClass::NextProvider,
 
             // Provider-specific failures - try next provider
             // NoDataForRange: This provider has no data, but another might
@@ -189,11 +194,13 @@ mod tests {
     }
 
     #[test]
-    fn test_rate_limited_retries_with_backoff() {
+    fn test_rate_limited_tries_next_provider() {
+        // Rate limits should try next provider without circuit breaker penalty
+        // This allows all assets to be attempted even when rate limited
         let error = MarketDataError::RateLimited {
             provider: "YAHOO".to_string(),
         };
-        assert_eq!(error.retry_class(), RetryClass::FailoverWithPenalty);
+        assert_eq!(error.retry_class(), RetryClass::NextProvider);
     }
 
     #[test]

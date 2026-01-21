@@ -3,8 +3,7 @@ import { HealthStatusIndicator } from "@/components/health-status-icon";
 import { PrivacyToggle } from "@/components/privacy-toggle";
 import { useNavigationMode } from "@/pages/layouts/navigation/navigation-mode-context";
 import { Icons, Button } from "@wealthfolio/ui";
-import { Suspense, useEffect, useMemo } from "react";
-import { useLocation, useSearchParams } from "react-router-dom";
+import { Suspense, useMemo } from "react";
 import { DashboardContent } from "./dashboard-content";
 import { DashboardActions } from "./dashboard-actions";
 import { NetWorthContent } from "../net-worth/net-worth-content";
@@ -32,37 +31,23 @@ const PageLoader = () => (
 );
 
 export default function PortfolioPage() {
-  const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
   const { isFocusMode, toggleFocusMode } = useNavigationMode();
-
-  // Map URL path to default view
-  const defaultViewFromPath = location.pathname === "/net-worth" ? "net-worth" : "investments";
-
-  // On mount or path change, sync the tab parameter with the URL path
-  useEffect(() => {
-    const currentTab = searchParams.get("tab");
-    // Only set the tab if it's not already set
-    if (!currentTab) {
-      setSearchParams({ tab: defaultViewFromPath }, { replace: true });
-    }
-  }, [location.pathname, defaultViewFromPath, searchParams, setSearchParams]);
 
   // Shared actions for both views
   const sharedActions = (
     <>
+      <HealthStatusIndicator />
       {isFocusMode && (
         <Button
           variant="secondary"
           size="icon-xs"
-          className="rounded-full bg-secondary/50"
+          className="bg-secondary/50 rounded-full"
           onClick={toggleFocusMode}
         >
           <Icons.Fullscreen className="size-5" />
         </Button>
       )}
       <PrivacyToggle />
-      <HealthStatusIndicator />
       <DashboardActions />
     </>
   );
@@ -95,5 +80,5 @@ export default function PortfolioPage() {
     [sharedActions],
   );
 
-  return <SwipablePage views={views} defaultView={defaultViewFromPath} withPadding={false} />;
+  return <SwipablePage views={views} defaultView="investments" withPadding={false} />;
 }

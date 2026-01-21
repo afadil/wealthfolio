@@ -144,33 +144,17 @@ export function SwipablePage({
   const [searchParams, setSearchParams] = useSearchParams();
   const hapticFeedback = useHapticFeedback();
 
-  // Get current tab from URL, fallback to defaultView or first view
+  // Single source of truth: URL search params
   const tabFromUrl = searchParams.get("tab");
   const currentView =
     tabFromUrl && views.some((v) => v.value === tabFromUrl)
       ? tabFromUrl
       : (defaultView ?? views[0]?.value);
 
-  // Calculate numeric index for Embla
-  const initialIndex = React.useMemo(() => {
+  // Calculate numeric index from URL-derived currentView
+  const currentIndex = React.useMemo(() => {
     const idx = views.findIndex((v) => v.value === currentView);
     return idx === -1 ? 0 : idx;
-  }, [currentView, views]);
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const emblaApiRef = React.useRef<any>(null);
-
-  // Sync Embla carousel when URL-derived currentView changes
-  React.useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const api = emblaApiRef.current;
-    if (api) {
-      const targetIndex = views.findIndex((v) => v.value === currentView);
-      if (targetIndex !== -1) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-        api.scrollTo(targetIndex, true); // instant scroll on URL change
-      }
-    }
   }, [currentView, views]);
 
   const handleViewChange = React.useCallback(
@@ -183,22 +167,12 @@ export function SwipablePage({
         hapticFeedback();
       }
 
+      // Update URL - this is the single source of truth
+      // SwipableView will sync automatically via selectedIndex prop
       setSearchParams({ tab: nextView }, { replace: true });
-
-      // Sync with SwipableView carousel
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const api = emblaApiRef.current;
-      if (api) {
-        const targetIndex = views.findIndex((v) => v.value === nextView);
-        if (targetIndex !== -1) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-          api.scrollTo(targetIndex);
-        }
-      }
-
       onViewChange?.(nextView);
     },
-    [currentView, setSearchParams, onViewChange, views, isMobile, hapticFeedback],
+    [currentView, setSearchParams, onViewChange, isMobile, hapticFeedback],
   );
 
   return (
@@ -221,7 +195,8 @@ export function SwipablePage({
 
             <div className="min-h-0 flex-1 overflow-hidden">
               <SwipableView
-                initialIndex={initialIndex}
+                initialIndex={currentIndex}
+                selectedIndex={currentIndex}
                 items={views.map((v) => ({
                   name: v.label,
                   content: <div className={cn("pb-safe", withPadding && "p-2")}>{v.content}</div>,
@@ -231,11 +206,6 @@ export function SwipablePage({
                   const matchedView = views.find((v) => v.label === name);
                   if (matchedView) {
                     handleViewChange(matchedView.value);
-                  }
-                }}
-                onInit={(api) => {
-                  if (api) {
-                    emblaApiRef.current = api;
                   }
                 }}
               />

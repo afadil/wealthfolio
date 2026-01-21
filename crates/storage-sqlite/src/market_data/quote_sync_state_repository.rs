@@ -344,10 +344,12 @@ impl SyncStateStore for QuoteSyncStateRepository {
                     ..Default::default()
                 };
 
-                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&asset_id_owned)))
-                    .set(&update)
-                    .execute(conn)
-                    .map_err(StorageError::from)?;
+                diesel::update(
+                    qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&asset_id_owned)),
+                )
+                .set(&update)
+                .execute(conn)
+                .map_err(StorageError::from)?;
 
                 Ok(())
             })
@@ -422,10 +424,12 @@ impl SyncStateStore for QuoteSyncStateRepository {
                     ..Default::default()
                 };
 
-                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&asset_id_owned)))
-                    .set(&update)
-                    .execute(conn)
-                    .map_err(StorageError::from)?;
+                diesel::update(
+                    qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&asset_id_owned)),
+                )
+                .set(&update)
+                .execute(conn)
+                .map_err(StorageError::from)?;
 
                 Ok(())
             })
@@ -448,10 +452,12 @@ impl SyncStateStore for QuoteSyncStateRepository {
                     ..Default::default()
                 };
 
-                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&asset_id_owned)))
-                    .set(&update)
-                    .execute(conn)
-                    .map_err(StorageError::from)?;
+                diesel::update(
+                    qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&asset_id_owned)),
+                )
+                .set(&update)
+                .execute(conn)
+                .map_err(StorageError::from)?;
 
                 Ok(())
             })
@@ -509,10 +515,12 @@ impl SyncStateStore for QuoteSyncStateRepository {
                     }
                 }
 
-                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&asset_id_owned)))
-                    .set(&update)
-                    .execute(conn)
-                    .map_err(StorageError::from)?;
+                diesel::update(
+                    qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&asset_id_owned)),
+                )
+                .set(&update)
+                .execute(conn)
+                .map_err(StorageError::from)?;
 
                 Ok(())
             })
@@ -524,9 +532,11 @@ impl SyncStateStore for QuoteSyncStateRepository {
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
-                diesel::delete(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&asset_id_owned)))
-                    .execute(conn)
-                    .map_err(StorageError::from)?;
+                diesel::delete(
+                    qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&asset_id_owned)),
+                )
+                .execute(conn)
+                .map_err(StorageError::from)?;
                 Ok(())
             })
             .await
@@ -634,10 +644,12 @@ impl SyncStateStore for QuoteSyncStateRepository {
                     ..Default::default()
                 };
 
-                diesel::update(qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&asset_id_owned)))
-                    .set(&update)
-                    .execute(conn)
-                    .map_err(StorageError::from)?;
+                diesel::update(
+                    qss_dsl::quote_sync_state.filter(qss_dsl::asset_id.eq(&asset_id_owned)),
+                )
+                .set(&update)
+                .execute(conn)
+                .map_err(StorageError::from)?;
 
                 Ok(())
             })
@@ -682,5 +694,18 @@ impl SyncStateStore for QuoteSyncStateRepository {
         Ok(result
             .min_date
             .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()))
+    }
+
+    fn get_with_errors(&self) -> Result<Vec<QuoteSyncState>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        // Get sync states where error_count > 0
+        let results = qss_dsl::quote_sync_state
+            .filter(qss_dsl::error_count.gt(0))
+            .order(qss_dsl::error_count.desc())
+            .load::<QuoteSyncStateDB>(&mut conn)
+            .map_err(StorageError::from)?;
+
+        Ok(results.into_iter().map(QuoteSyncState::from).collect())
     }
 }
