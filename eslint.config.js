@@ -13,7 +13,7 @@ export default [
       "*.config.ts",
       "*.config.d.ts",
       "coverage/**",
-      "public/**",
+      "src-front/public/**",
       "**/*.d.ts",
       "**/recharts/**",
       "**/react-qr-code/**",
