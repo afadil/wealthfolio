@@ -23,9 +23,9 @@
 
 use async_trait::async_trait;
 use chrono::{Duration, NaiveDate, TimeZone, Utc};
-use log::{debug, error, info, warn};
-use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, LazyLock, Mutex};
+use log::{debug, error, warn};
+use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use super::client::MarketDataClient;
@@ -783,9 +783,9 @@ where
         Ok(plans)
     }
 
-    /// Ensure sync states exist for the provided assets (no activity/quote refresh).
-    async fn ensure_sync_states_for_assets(&self, assets: &[Asset]) -> Result<()> {
-        let mut new_states = Vec::new();
+    /// Build sync states from current holdings and activities.
+    async fn refresh_sync_states(&self) -> Result<()> {
+        debug!("Refreshing quote sync states...");
 
         for asset in assets.iter().filter(|a| self.should_sync_asset(a)) {
             let existing = self.sync_state_store.get_by_asset_id(&asset.id)?;
@@ -827,11 +827,8 @@ where
     A: AssetRepositoryTrait + 'static,
     R: ActivityRepositoryTrait + 'static,
 {
-    async fn sync(&self, mode: SyncMode, asset_ids: Option<Vec<String>>) -> Result<SyncResult> {
-        info!(
-            "Starting quote sync with mode: {}, assets: {:?}",
-            mode, asset_ids
-        );
+    async fn sync(&self) -> Result<SyncResult> {
+        debug!("Starting optimized quote sync...");
 
         // Initialize result to track skipped assets
         let mut result = SyncResult::default();
@@ -841,35 +838,21 @@ where
             Some(ids) if !ids.is_empty() => {
                 let found_assets = self.asset_repo.list_by_asset_ids(ids)?;
 
-                // Track assets that were requested but not found
-                let found_ids: std::collections::HashSet<&str> =
-                    found_assets.iter().map(|a| a.id.as_str()).collect();
-                for requested_id in ids {
-                    if !found_ids.contains(requested_id.as_str()) {
-                        debug!("Asset {} not found in repository", requested_id);
-                        result.add_skipped(requested_id.clone(), AssetSkipReason::NotFound);
-                    }
-                }
+        if plans.is_empty() {
+            debug!("No assets need syncing");
+            return Ok(SyncResult::default());
+        }
 
-                found_assets
-            }
-            _ => {
-                // For Incremental mode with no specific assets, use the optimized plan
-                if matches!(mode, SyncMode::Incremental) {
-                    if let Err(e) = self.ensure_sync_states_for_all_assets().await {
-                        warn!("Failed to ensure sync states: {:?}", e);
-                    }
-                    let plans = self.generate_sync_plan()?;
-                    if plans.is_empty() {
-                        info!("No assets need syncing");
-                        return Ok(SyncResult::default());
-                    }
-                    info!("Syncing {} assets in Incremental mode", plans.len());
-                    return Ok(self.execute_sync_plans(plans).await);
-                }
-                // For other modes, get all assets
-                self.asset_repo.list()?
-            }
+        debug!("Syncing {} assets", plans.len());
+        Ok(self.execute_sync_plans(plans).await)
+    }
+
+    async fn resync(&self, asset_ids: Option<Vec<String>>) -> Result<SyncResult> {
+        debug!("Starting resync for {:?}", asset_ids);
+
+        let assets = match asset_ids {
+            Some(ids) if !ids.is_empty() => self.asset_repo.list_by_symbols(&ids)?,
+            _ => self.asset_repo.list()?,
         };
 
         if let Err(e) = self.ensure_sync_states_for_assets(&assets).await {

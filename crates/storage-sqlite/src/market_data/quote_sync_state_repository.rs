@@ -669,33 +669,6 @@ impl SyncStateStore for QuoteSyncStateRepository {
         Ok(results.into_iter().map(QuoteSyncState::from).collect())
     }
 
-    fn get_earliest_activity_date_global(&self) -> Result<Option<NaiveDate>> {
-        let mut conn = get_connection(&self.pool)?;
-
-        // Query for the global minimum activity date across all active accounts
-        #[derive(QueryableByName)]
-        struct MinDateRow {
-            #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
-            min_date: Option<String>,
-        }
-
-        let result: MinDateRow = diesel::sql_query(
-            r#"
-            SELECT MIN(date(a.activity_date)) as min_date
-            FROM activities a
-            INNER JOIN accounts acc ON a.account_id = acc.id
-            WHERE acc.is_active = 1
-            "#,
-        )
-        .get_result(&mut conn)
-        .map_err(StorageError::from)?;
-
-        // Parse the date string into NaiveDate
-        Ok(result
-            .min_date
-            .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()))
-    }
-
     fn get_with_errors(&self) -> Result<Vec<QuoteSyncState>> {
         let mut conn = get_connection(&self.pool)?;
 

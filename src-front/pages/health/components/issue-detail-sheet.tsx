@@ -183,7 +183,7 @@ export function IssueDetailSheet({
 
           <ActionConfirm
             confirmTitle="Dismiss this issue?"
-            confirmMessage="This will hide the issue from view. It will reappear if the underlying data changes."
+            confirmMessage="This will hide the issue from your health center. It will reappear if the underlying data changes."
             confirmButtonText="Dismiss"
             confirmButtonVariant="default"
             handleConfirm={onDismiss}

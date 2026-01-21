@@ -512,16 +512,6 @@ pub trait SyncStateStore: Send + Sync {
     /// Get assets that need profile enrichment (profile_enriched_at is NULL).
     fn get_assets_needing_profile_enrichment(&self) -> Result<Vec<QuoteSyncState>>;
 
-    /// Get the earliest activity date across ALL active accounts.
-    ///
-    /// This is used for FX assets in BackfillHistory mode, since FX assets have no
-    /// activities attached to them. For full history recomputation jobs (like base
-    /// currency changes), FX pairs need quote coverage from the earliest activity
-    /// date across the entire portfolio.
-    ///
-    /// Returns `None` if there are no activities in any active account.
-    fn get_earliest_activity_date_global(&self) -> Result<Option<NaiveDate>>;
-
     /// Get sync states with errors (error_count > 0).
     fn get_with_errors(&self) -> Result<Vec<QuoteSyncState>>;
 }

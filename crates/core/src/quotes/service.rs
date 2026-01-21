@@ -223,26 +223,6 @@ pub trait QuoteServiceTrait: Send + Sync {
     /// Get assets that need profile enrichment.
     fn get_assets_needing_profile_enrichment(&self) -> Result<Vec<QuoteSyncState>>;
 
-    /// Update position status based on current holdings.
-    ///
-    /// This method should be called after portfolio snapshots are calculated to
-    /// derive open/closed position transitions for quote synchronization.
-    ///
-    /// # Arguments
-    /// * `current_holdings` - Map of asset_id to quantity from the latest TOTAL portfolio snapshot.
-    ///   Assets with quantity > 0 are marked as active; assets previously active but now with
-    ///   quantity = 0 (or missing from the map) are marked as inactive.
-    ///
-    /// # Behavior
-    /// - Assets with quantity > 0: marked as active (is_active=true, position_closed_date=NULL)
-    /// - Assets previously active but now with quantity <= 0: marked as inactive with today's date
-    /// - Inactive assets remain inactive unless they regain a position
-    /// - This enables the grace period logic in sync planning (CLOSED_POSITION_GRACE_PERIOD_DAYS)
-    async fn update_position_status_from_holdings(
-        &self,
-        current_holdings: &std::collections::HashMap<String, rust_decimal::Decimal>,
-    ) -> Result<()>;
-
     /// Get sync states that have errors (error_count > 0).
     fn get_sync_states_with_errors(&self) -> Result<Vec<QuoteSyncState>>;
 
@@ -817,6 +797,10 @@ where
         }
 
         Ok(())
+    }
+
+    fn get_sync_states_with_errors(&self) -> Result<Vec<QuoteSyncState>> {
+        self.sync_state_store.get_with_errors()
     }
 
     fn get_sync_states_with_errors(&self) -> Result<Vec<QuoteSyncState>> {
