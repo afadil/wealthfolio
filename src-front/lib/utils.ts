@@ -259,6 +259,29 @@ const getCurrencyFormatter = (currency: string) => {
   return formatter;
 };
 
+/**
+ * Minor currency normalization rules.
+ * Maps minor currency codes to their major equivalents.
+ */
+const MINOR_CURRENCY_MAP: Record<string, string> = {
+  GBp: "GBP", // British pence
+  GBX: "GBP", // British pence (alternative code)
+  ZAc: "ZAR", // South African cents
+  ZAC: "ZAR", // South African cents (uppercase)
+  ILA: "ILS", // Israeli agorot
+  KWF: "KWD", // Kuwaiti fils
+};
+
+/**
+ * Normalizes a minor currency code to its major equivalent.
+ * E.g., "GBp" -> "GBP", "ZAc" -> "ZAR"
+ * If no normalization rule exists, returns the input unchanged.
+ */
+export function normalizeCurrency(currency: string | undefined): string | undefined {
+  if (!currency) return currency;
+  return MINOR_CURRENCY_MAP[currency] ?? currency;
+}
+
 export function formatAmount(amount: number, currency: string, displayCurrency = true) {
   const rawCurrency = currency ?? "USD";
   const isPenceCurrency = rawCurrency === "GBp" || rawCurrency === "GBX";

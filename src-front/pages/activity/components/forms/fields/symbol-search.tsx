@@ -4,6 +4,7 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@wealt
 import { DataSource, PricingMode } from "@/lib/constants";
 import type { QuoteSummary } from "@/lib/types";
 import { useFormContext, type FieldPath, type FieldValues } from "react-hook-form";
+import { normalizeCurrency } from "@/lib/utils";
 
 /**
  * Strip exchange suffix from symbol (e.g., "VFV.TO" -> "VFV")
@@ -30,6 +31,8 @@ interface SymbolSearchProps<TFieldValues extends FieldValues = FieldValues> {
   exchangeMicName?: FieldPath<TFieldValues>;
   /** Field name for pricingMode (optional, to set manual pricing for custom assets) */
   pricingModeName?: FieldPath<TFieldValues>;
+  /** Field name for currency (optional, to set currency from search result) */
+  currencyName?: FieldPath<TFieldValues>;
 }
 
 export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
@@ -39,6 +42,7 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
   defaultCurrency,
   exchangeMicName,
   pricingModeName,
+  currencyName,
 }: SymbolSearchProps<TFieldValues>) {
   const { control, setValue } = useFormContext<TFieldValues>();
 
@@ -56,6 +60,13 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
     if (quoteSummary?.exchangeMic && exchangeMicName) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setValue(exchangeMicName, quoteSummary.exchangeMic as any);
+    }
+    // Set currency from search result (normalized: GBp -> GBP)
+    // This ensures users enter prices in the major currency unit
+    if (quoteSummary?.currency && currencyName) {
+      const normalizedCurrency = normalizeCurrency(quoteSummary.currency);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setValue(currencyName, normalizedCurrency as any);
     }
     // If the selected ticker is a custom/manual entry, automatically enable manual pricing
     if (quoteSummary?.dataSource === DataSource.MANUAL && pricingModeName) {

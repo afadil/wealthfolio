@@ -292,6 +292,8 @@ impl MarketDataClient {
         });
 
         // Currency hint: prefer asset.currency, fall back to MIC-derived currency
+        // Note: For LSE stocks, mic_to_currency returns "GBp" (pence) which enables
+        // proper normalization when calculating holdings values.
         let currency_hint: Option<Cow<'static, str>> = if !asset.currency.is_empty() {
             Some(Cow::Owned(asset.currency.clone()))
         } else {

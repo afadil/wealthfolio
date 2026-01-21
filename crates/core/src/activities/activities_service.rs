@@ -8,6 +8,7 @@ use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
 use crate::activities::{ActivityRepositoryTrait, ActivityServiceTrait};
 use crate::assets::{canonical_asset_id, AssetKind, AssetServiceTrait};
+use crate::fx::currency::{get_normalization_rule, normalize_amount};
 use crate::fx::FxServiceTrait;
 use crate::Result;
 use uuid::Uuid;
@@ -228,6 +229,31 @@ impl ActivityService {
             }
         }
 
+        // Normalize minor currency units (e.g., GBp -> GBP) and convert amounts
+        // This ensures activities are stored with major currency and properly scaled amounts
+        if get_normalization_rule(&activity.currency).is_some() {
+            if let Some(unit_price) = activity.unit_price {
+                let (normalized_price, _) = normalize_amount(unit_price, &activity.currency);
+                activity.unit_price = Some(normalized_price);
+            }
+            if let Some(amount) = activity.amount {
+                let (normalized_amount, _) = normalize_amount(amount, &activity.currency);
+                activity.amount = Some(normalized_amount);
+            }
+            if let Some(fee) = activity.fee {
+                let (normalized_fee, normalized_currency) =
+                    normalize_amount(fee, &activity.currency);
+                activity.fee = Some(normalized_fee);
+                // Update currency to major unit (e.g., GBp -> GBP)
+                activity.currency = normalized_currency.to_string();
+            } else {
+                // Still need to normalize currency even if no fee
+                let (_, normalized_currency) =
+                    normalize_amount(rust_decimal::Decimal::ZERO, &activity.currency);
+                activity.currency = normalized_currency.to_string();
+            }
+        }
+
         Ok(activity)
     }
 
@@ -305,6 +331,29 @@ impl ActivityService {
                 self.fx_service
                     .register_currency_pair(account.currency.as_str(), activity.currency.as_str())
                     .await?;
+            }
+        }
+
+        // Normalize minor currency units (e.g., GBp -> GBP) and convert amounts
+        // This ensures activities are stored with major currency and properly scaled amounts
+        if get_normalization_rule(&activity.currency).is_some() {
+            if let Some(unit_price) = activity.unit_price {
+                let (normalized_price, _) = normalize_amount(unit_price, &activity.currency);
+                activity.unit_price = Some(normalized_price);
+            }
+            if let Some(amount) = activity.amount {
+                let (normalized_amount, _) = normalize_amount(amount, &activity.currency);
+                activity.amount = Some(normalized_amount);
+            }
+            if let Some(fee) = activity.fee {
+                let (normalized_fee, normalized_currency) =
+                    normalize_amount(fee, &activity.currency);
+                activity.fee = Some(normalized_fee);
+                activity.currency = normalized_currency.to_string();
+            } else {
+                let (_, normalized_currency) =
+                    normalize_amount(rust_decimal::Decimal::ZERO, &activity.currency);
+                activity.currency = normalized_currency.to_string();
             }
         }
 

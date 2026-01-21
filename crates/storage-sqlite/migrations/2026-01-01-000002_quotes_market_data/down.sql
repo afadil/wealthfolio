@@ -3,9 +3,6 @@
 PRAGMA foreign_keys = OFF;
 PRAGMA legacy_alter_table = ON;
 
--- Drop exchanges table
-DROP TABLE IF EXISTS exchanges;
-
 -- Remove Finnhub provider
 DELETE FROM market_data_providers WHERE id = 'FINNHUB';
 

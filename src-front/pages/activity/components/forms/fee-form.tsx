@@ -47,15 +47,20 @@ export function FeeForm({ accounts, defaultValues, onSubmit, onCancel, isLoading
   const { data: settings } = useSettings();
   const baseCurrency = settings?.baseCurrency;
 
+  // Compute initial account and currency for defaultValues
+  const initialAccountId = defaultValues?.accountId ?? (accounts.length === 1 ? accounts[0].value : "");
+  const initialAccount = accounts.find((a) => a.value === initialAccountId);
+  const initialCurrency = defaultValues?.currency ?? initialAccount?.currency;
+
   const form = useForm<FeeFormValues>({
     resolver: zodResolver(feeFormSchema) as Resolver<FeeFormValues>,
     mode: "onBlur", // Validate on blur
     defaultValues: {
-      accountId: accounts.length === 1 ? accounts[0].value : "",
+      accountId: initialAccountId,
       activityDate: new Date(),
       amount: undefined,
       comment: null,
-      currency: undefined,
+      currency: initialCurrency,
       subtype: null,
       ...defaultValues,
     },

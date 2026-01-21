@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { normalizeCurrency } from "@/lib/utils";
 import { useForm, FormProvider, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -77,18 +78,26 @@ export function TransferForm({
   const { data: settings } = useSettings();
   const baseCurrency = settings?.baseCurrency;
 
+  // Compute initial account and currency for defaultValues
+  const initialFromAccountId = defaultValues?.fromAccountId ?? "";
+  const initialAccount = accounts.find((a) => a.value === initialFromAccountId);
+  const initialCurrency =
+    defaultValues?.currency ??
+    normalizeCurrency(assetCurrency) ??
+    initialAccount?.currency;
+
   const form = useForm<TransferFormValues>({
     resolver: zodResolver(transferFormSchema) as Resolver<TransferFormValues>,
     mode: "onBlur", // Validate on blur
     defaultValues: {
-      fromAccountId: "",
+      fromAccountId: initialFromAccountId,
       toAccountId: "",
       activityDate: new Date(),
       amount: undefined,
       assetId: null,
       quantity: null,
       comment: null,
-      currency: undefined,
+      currency: initialCurrency,
       subtype: null,
       pricingMode: PricingMode.MARKET,
       exchangeMic: undefined,
@@ -152,6 +161,7 @@ export function TransferForm({
                 isManualAsset={isManualAsset}
                 exchangeMicName="exchangeMic"
                 pricingModeName="pricingMode"
+                currencyName="currency"
               />
             </div>
 

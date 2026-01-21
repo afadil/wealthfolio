@@ -116,7 +116,6 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
         await updateSettings({
           baseCurrency: data.baseCurrency,
           theme: data.theme,
-          onboardingCompleted: true,
         });
         onNext();
       } catch (error) {

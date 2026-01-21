@@ -242,15 +242,19 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
     // For existing activities, assetId is preserved from the original data
     updated = { ...updated, assetSymbol: upper };
 
-    // Auto-fill currency: asset currency → account currency → base currency
-    const assetKey = upper;
-    const assetCurrency = assetCurrencyLookup.get(assetKey);
-    if (assetCurrency) {
-      updated = { ...updated, currency: assetCurrency };
-    } else if (updated.accountCurrency) {
+    // Auto-fill currency: account currency → asset currency → base currency
+    // Account currency takes precedence because users enter prices in their account's currency,
+    // and cash movements must use the account currency (e.g., GBP account uses GBP, not GBp pence)
+    if (updated.accountCurrency) {
       updated = { ...updated, currency: updated.accountCurrency };
     } else {
-      updated = { ...updated, currency: fallbackCurrency };
+      const assetKey = upper;
+      const assetCurrency = assetCurrencyLookup.get(assetKey);
+      if (assetCurrency) {
+        updated = { ...updated, currency: assetCurrency };
+      } else {
+        updated = { ...updated, currency: fallbackCurrency };
+      }
     }
   } else if (field === "activityType") {
     updated = { ...updated, activityType: value as ActivityType };
@@ -263,14 +267,8 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
     if (account) {
       updated = { ...updated, accountName: account.name, accountCurrency: account.currency };
 
-      // Auto-fill currency: asset currency → account currency → base currency
-      const assetKey = (updated.assetId ?? updated.assetSymbol ?? "").trim().toUpperCase();
-      const assetCurrency = assetCurrencyLookup.get(assetKey);
-      if (assetCurrency) {
-        updated = { ...updated, currency: assetCurrency };
-      } else {
-        updated = { ...updated, currency: account.currency };
-      }
+      // Auto-fill currency: account currency (users enter prices in account currency)
+      updated = { ...updated, currency: account.currency };
     }
     updated = applyCashDefaults(updated, resolveTransactionCurrency, fallbackCurrency);
     updated = applySplitDefaults(updated);

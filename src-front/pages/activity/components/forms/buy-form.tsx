@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
+import { normalizeCurrency } from "@/lib/utils";
 import { useForm, FormProvider, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -83,11 +84,20 @@ export function BuyForm({ accounts, defaultValues, onSubmit, onCancel, isLoading
   const { data: settings } = useSettings();
   const baseCurrency = settings?.baseCurrency;
 
+  // Compute initial account and currency for defaultValues
+  const initialAccountId = defaultValues?.accountId ?? (accounts.length === 1 ? accounts[0].value : "");
+  const initialAccount = accounts.find((a) => a.value === initialAccountId);
+  // Currency priority: provided default > normalized asset currency > account currency
+  const initialCurrency =
+    defaultValues?.currency ??
+    normalizeCurrency(assetCurrency) ??
+    initialAccount?.currency;
+
   const form = useForm<BuyFormValues>({
     resolver: zodResolver(buyFormSchema) as Resolver<BuyFormValues>,
     mode: "onBlur", // Validate on blur
     defaultValues: {
-      accountId: accounts.length === 1 ? accounts[0].value : "",
+      accountId: initialAccountId,
       assetId: "",
       activityDate: (() => {
         const date = new Date();
@@ -98,7 +108,7 @@ export function BuyForm({ accounts, defaultValues, onSubmit, onCancel, isLoading
       unitPrice: undefined,
       fee: 0,
       comment: null,
-      currency: undefined,
+      currency: initialCurrency,
       fxRate: undefined,
       pricingMode: PricingMode.MARKET,
       exchangeMic: undefined,
@@ -106,7 +116,7 @@ export function BuyForm({ accounts, defaultValues, onSubmit, onCancel, isLoading
     },
   });
 
-  const { watch, setValue, getValues } = form;
+  const { watch } = form;
   const accountId = watch("accountId");
   const quantity = watch("quantity");
   const unitPrice = watch("unitPrice");
@@ -128,18 +138,6 @@ export function BuyForm({ accounts, defaultValues, onSubmit, onCancel, isLoading
     [quantity, unitPrice, fee],
   );
 
-  // Auto-initialize currency from resolved priority: assetCurrency > accountCurrency > baseCurrency
-  useEffect(() => {
-    const currentCurrency = getValues("currency");
-    // Only auto-set if currency is empty/undefined
-    if (!currentCurrency) {
-      const resolvedCurrency = assetCurrency || accountCurrency || baseCurrency;
-      if (resolvedCurrency) {
-        setValue("currency", resolvedCurrency, { shouldValidate: false });
-      }
-    }
-  }, [assetCurrency, accountCurrency, baseCurrency, setValue, getValues]);
-
   const handleSubmit = form.handleSubmit(async (data) => {
     await onSubmit(data);
   });
@@ -158,6 +156,7 @@ export function BuyForm({ accounts, defaultValues, onSubmit, onCancel, isLoading
               isManualAsset={isManualAsset}
               exchangeMicName="exchangeMic"
               pricingModeName="pricingMode"
+              currencyName="currency"
             />
 
             {/* Date Picker */}

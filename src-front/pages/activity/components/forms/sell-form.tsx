@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
+import { normalizeCurrency } from "@/lib/utils";
 import { useForm, FormProvider, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -85,11 +86,20 @@ export function SellForm({ accounts, defaultValues, onSubmit, onCancel, isLoadin
   const { data: settings } = useSettings();
   const baseCurrency = settings?.baseCurrency;
 
+  // Compute initial account and currency for defaultValues
+  const initialAccountId = defaultValues?.accountId ?? (accounts.length === 1 ? accounts[0].value : "");
+  const initialAccount = accounts.find((a) => a.value === initialAccountId);
+  // Currency priority: provided default > normalized asset currency > account currency
+  const initialCurrency =
+    defaultValues?.currency ??
+    normalizeCurrency(assetCurrency) ??
+    initialAccount?.currency;
+
   const form = useForm<SellFormValues>({
     resolver: zodResolver(sellFormSchema) as Resolver<SellFormValues>,
     mode: "onBlur", // Validate on blur
     defaultValues: {
-      accountId: accounts.length === 1 ? accounts[0].value : "",
+      accountId: initialAccountId,
       assetId: "",
       activityDate: (() => {
         const date = new Date();
@@ -100,7 +110,7 @@ export function SellForm({ accounts, defaultValues, onSubmit, onCancel, isLoadin
       unitPrice: undefined,
       fee: 0,
       comment: null,
-      currency: undefined,
+      currency: initialCurrency,
       fxRate: undefined,
       pricingMode: PricingMode.MARKET,
       exchangeMic: undefined,
@@ -108,7 +118,7 @@ export function SellForm({ accounts, defaultValues, onSubmit, onCancel, isLoadin
     },
   });
 
-  const { watch, setValue, getValues } = form;
+  const { watch } = form;
   const accountId = watch("accountId");
   const assetId = watch("assetId");
   const quantity = watch("quantity");
@@ -147,18 +157,6 @@ export function SellForm({ accounts, defaultValues, onSubmit, onCancel, isLoadin
     [quantity, unitPrice, fee],
   );
 
-  // Auto-initialize currency from resolved priority: assetCurrency > accountCurrency > baseCurrency
-  useEffect(() => {
-    const currentCurrency = getValues("currency");
-    // Only auto-set if currency is empty/undefined
-    if (!currentCurrency) {
-      const resolvedCurrency = assetCurrency || accountCurrency || baseCurrency;
-      if (resolvedCurrency) {
-        setValue("currency", resolvedCurrency, { shouldValidate: false });
-      }
-    }
-  }, [assetCurrency, accountCurrency, baseCurrency, setValue, getValues]);
-
   const handleSubmit = form.handleSubmit(async (data) => {
     await onSubmit(data);
   });
@@ -177,6 +175,7 @@ export function SellForm({ accounts, defaultValues, onSubmit, onCancel, isLoadin
               isManualAsset={isManualAsset}
               exchangeMicName="exchangeMic"
               pricingModeName="pricingMode"
+              currencyName="currency"
             />
 
             {/* Date Picker */}

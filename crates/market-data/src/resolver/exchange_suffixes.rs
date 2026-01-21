@@ -1,7 +1,8 @@
-//! MIC to provider suffix mappings.
+//! Provider-specific symbol resolution.
 //!
-//! This module provides the exchange mapping data used by the rules resolver
-//! to convert canonical (ticker, MIC) pairs to provider-specific symbols.
+//! This module provides mappings from canonical (ticker, MIC) pairs to
+//! provider-specific symbols. Each provider (Yahoo, Alpha Vantage, etc.)
+//! uses different suffixes to identify exchanges.
 
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -81,13 +82,13 @@ impl ExchangeMap {
         );
 
         // ===== UK & Ireland =====
-        // London Stock Exchange
+        // London Stock Exchange - Yahoo returns prices in pence (GBp), not pounds
         self.add(
             "XLON",
-            &[("YAHOO", ".L", "GBP"), ("ALPHA_VANTAGE", ".LON", "GBP")],
+            &[("YAHOO", ".L", "GBp"), ("ALPHA_VANTAGE", ".LON", "GBP")],
         );
-        // London International
-        self.add("XLON_IL", &[("YAHOO", ".IL", "GBP")]);
+        // London International - also in pence
+        self.add("XLON_IL", &[("YAHOO", ".IL", "GBp")]);
         // Euronext Dublin
         self.add(
             "XDUB",
@@ -498,14 +499,6 @@ pub const YAHOO_EXCHANGE_SUFFIXES: &[&str] = &[
 ///
 /// # Returns
 /// The corresponding MIC if known, or None for unknown suffixes.
-///
-/// # Examples
-/// ```ignore
-/// assert_eq!(yahoo_suffix_to_mic("TO"), Some("XTSE"));
-/// assert_eq!(yahoo_suffix_to_mic("L"), Some("XLON"));
-/// assert_eq!(yahoo_suffix_to_mic("DE"), Some("XETR"));
-/// assert_eq!(yahoo_suffix_to_mic("UNKNOWN"), None);
-/// ```
 pub fn yahoo_suffix_to_mic(suffix: &str) -> Option<&'static str> {
     match suffix.to_uppercase().as_str() {
         // North America
@@ -576,8 +569,8 @@ pub fn yahoo_suffix_to_mic(suffix: &str) -> Option<&'static str> {
         "NS" => Some("XNSE"), // National Stock Exchange India
 
         // Taiwan
-        "TW" => Some("XTAI"),     // Taiwan
-        "TWO" => Some("XTAI"),    // Taiwan OTC (simplified to main exchange)
+        "TW" => Some("XTAI"),  // Taiwan
+        "TWO" => Some("XTAI"), // Taiwan OTC (simplified to main exchange)
 
         // Oceania
         "AX" => Some("XASX"), // Australia
@@ -602,238 +595,6 @@ pub fn yahoo_suffix_to_mic(suffix: &str) -> Option<&'static str> {
     }
 }
 
-/// Get the friendly exchange name for a MIC code.
-///
-/// Returns a human-readable short name for an exchange given its MIC code.
-///
-/// # Arguments
-/// * `mic` - The ISO 10383 Market Identifier Code
-///
-/// # Returns
-/// The friendly name if known, or None for unknown MICs.
-pub fn mic_to_exchange_name(mic: &str) -> Option<&'static str> {
-    match mic {
-        // North America
-        "XNYS" => Some("NYSE"),
-        "XNAS" => Some("NASDAQ"),
-        "XASE" => Some("NYSE American"),
-        "ARCX" => Some("NYSE Arca"),
-        "BATS" => Some("BATS"),
-        "XTSE" => Some("TSX"),
-        "XTSX" => Some("TSX-V"),
-        "XCNQ" => Some("CSE"),
-        "XMEX" => Some("BMV"),
-
-        // UK & Ireland
-        "XLON" => Some("LSE"),
-        "XDUB" => Some("Euronext Dublin"),
-
-        // Germany
-        "XETR" => Some("XETRA"),
-        "XFRA" => Some("Frankfurt"),
-        "XSTU" => Some("Stuttgart"),
-        "XHAM" => Some("Hamburg"),
-        "XDUS" => Some("Dusseldorf"),
-        "XMUN" => Some("Munich"),
-        "XBER" => Some("Berlin"),
-        "XHAN" => Some("Hanover"),
-
-        // Euronext
-        "XPAR" => Some("Euronext Paris"),
-        "XAMS" => Some("Euronext Amsterdam"),
-        "XBRU" => Some("Euronext Brussels"),
-        "XLIS" => Some("Euronext Lisbon"),
-
-        // Southern Europe
-        "XMIL" => Some("Borsa Italiana"),
-        "XMAD" => Some("BME"),
-        "XATH" => Some("Athens"),
-
-        // Nordic
-        "XSTO" => Some("Nasdaq Stockholm"),
-        "XHEL" => Some("Nasdaq Helsinki"),
-        "XCSE" => Some("Nasdaq Copenhagen"),
-        "XOSL" => Some("Oslo Bors"),
-        "XICE" => Some("Nasdaq Iceland"),
-
-        // Central/Eastern Europe
-        "XSWX" => Some("SIX"),
-        "XWBO" => Some("Vienna"),
-        "XWAR" => Some("WSE"),
-        "XPRA" => Some("Prague"),
-        "XBUD" => Some("Budapest"),
-        "XIST" => Some("Borsa Istanbul"),
-
-        // Asia - China & Hong Kong
-        "XSHG" => Some("Shanghai"),
-        "XSHE" => Some("Shenzhen"),
-        "XHKG" => Some("HKEX"),
-
-        // Asia - Japan & Korea
-        "XTKS" => Some("TSE"),
-        "XKRX" => Some("KRX"),
-        "XKOS" => Some("KOSDAQ"),
-
-        // Southeast Asia
-        "XSES" => Some("SGX"),
-        "XBKK" => Some("SET"),
-        "XIDX" => Some("IDX"),
-        "XKLS" => Some("Bursa Malaysia"),
-
-        // India
-        "XBOM" => Some("BSE"),
-        "XNSE" => Some("NSE"),
-
-        // Taiwan
-        "XTAI" => Some("TWSE"),
-
-        // Oceania
-        "XASX" => Some("ASX"),
-        "XNZE" => Some("NZX"),
-
-        // South America
-        "BVMF" => Some("B3"),
-        "XBUE" => Some("BCBA"),
-        "XSGO" => Some("Santiago"),
-
-        // Middle East
-        "XTAE" => Some("TASE"),
-        "XSAU" => Some("Tadawul"),
-        "XDFM" => Some("DFM"),
-        "XADS" => Some("ADX"),
-        "DSMD" => Some("QSE"),
-
-        // Africa
-        "XJSE" => Some("JSE"),
-        "XCAI" => Some("EGX"),
-
-        _ => None,
-    }
-}
-
-/// Get the primary currency for a MIC code.
-///
-/// Returns the primary trading currency for an exchange.
-///
-/// # Arguments
-/// * `mic` - The ISO 10383 Market Identifier Code
-///
-/// # Returns
-/// The primary currency code if known, or None for unknown MICs.
-pub fn mic_to_currency(mic: &str) -> Option<&'static str> {
-    match mic {
-        // North America
-        "XNYS" | "XNAS" | "XASE" | "ARCX" | "BATS" => Some("USD"),
-        "XTSE" | "XTSX" | "XCNQ" => Some("CAD"),
-        "XMEX" => Some("MXN"),
-
-        // UK & Ireland
-        "XLON" => Some("GBP"),
-        "XDUB" => Some("EUR"),
-
-        // Germany & Euronext
-        "XETR" | "XFRA" | "XSTU" | "XHAM" | "XDUS" | "XMUN" | "XBER" | "XHAN" => Some("EUR"),
-        "XPAR" | "XAMS" | "XBRU" | "XLIS" => Some("EUR"),
-
-        // Southern Europe
-        "XMIL" | "XMAD" | "XATH" => Some("EUR"),
-
-        // Nordic
-        "XSTO" => Some("SEK"),
-        "XHEL" => Some("EUR"),
-        "XCSE" => Some("DKK"),
-        "XOSL" => Some("NOK"),
-        "XICE" => Some("ISK"),
-
-        // Central/Eastern Europe
-        "XSWX" => Some("CHF"),
-        "XWBO" => Some("EUR"),
-        "XWAR" => Some("PLN"),
-        "XPRA" => Some("CZK"),
-        "XBUD" => Some("HUF"),
-        "XIST" => Some("TRY"),
-
-        // Asia - China & Hong Kong
-        "XSHG" | "XSHE" => Some("CNY"),
-        "XHKG" => Some("HKD"),
-
-        // Asia - Japan & Korea
-        "XTKS" => Some("JPY"),
-        "XKRX" | "XKOS" => Some("KRW"),
-
-        // Southeast Asia
-        "XSES" => Some("SGD"),
-        "XBKK" => Some("THB"),
-        "XIDX" => Some("IDR"),
-        "XKLS" => Some("MYR"),
-
-        // India
-        "XBOM" | "XNSE" => Some("INR"),
-
-        // Taiwan
-        "XTAI" => Some("TWD"),
-
-        // Oceania
-        "XASX" => Some("AUD"),
-        "XNZE" => Some("NZD"),
-
-        // South America
-        "BVMF" => Some("BRL"),
-        "XBUE" => Some("ARS"),
-        "XSGO" => Some("CLP"),
-
-        // Middle East
-        "XTAE" => Some("ILS"),
-        "XSAU" => Some("SAR"),
-        "XDFM" | "XADS" => Some("AED"),
-        "DSMD" => Some("QAR"),
-
-        // Africa
-        "XJSE" => Some("ZAR"),
-        "XCAI" => Some("EGP"),
-
-        _ => None,
-    }
-}
-
-/// Get the list of preferred exchanges for a given currency.
-///
-/// Returns exchanges sorted by priority for the given currency.
-/// Used for sorting search results by relevance to account currency.
-///
-/// # Arguments
-/// * `currency` - The currency code (e.g., "USD", "CAD")
-///
-/// # Returns
-/// A list of MIC codes in priority order.
-pub fn exchanges_for_currency(currency: &str) -> &'static [&'static str] {
-    match currency {
-        "USD" => &["XNYS", "XNAS", "ARCX", "BATS", "XASE"],
-        "CAD" => &["XTSE", "XTSX", "XCNQ"],
-        "GBP" => &["XLON"],
-        "EUR" => &["XETR", "XPAR", "XAMS", "XMIL", "XMAD"],
-        "CHF" => &["XSWX"],
-        "HKD" => &["XHKG"],
-        "JPY" => &["XTKS"],
-        "AUD" => &["XASX"],
-        "NZD" => &["XNZE"],
-        "SGD" => &["XSES"],
-        "CNY" => &["XSHG", "XSHE"],
-        "KRW" => &["XKRX", "XKOS"],
-        "INR" => &["XNSE", "XBOM"],
-        "BRL" => &["BVMF"],
-        "MXN" => &["XMEX"],
-        "SEK" => &["XSTO"],
-        "DKK" => &["XCSE"],
-        "NOK" => &["XOSL"],
-        "PLN" => &["XWAR"],
-        "ILS" => &["XTAE"],
-        "ZAR" => &["XJSE"],
-        "TWD" => &["XTAI"],
-        _ => &[],
-    }
-}
-
 /// Extract canonical ticker from Yahoo provider symbol.
 ///
 /// Uses a whitelist approach to safely strip exchange suffixes while preserving
@@ -844,14 +605,6 @@ pub fn exchanges_for_currency(currency: &str) -> &'static [&'static str] {
 ///
 /// # Returns
 /// The canonical ticker with exchange suffix removed if applicable.
-///
-/// # Examples
-/// ```ignore
-/// assert_eq!(strip_yahoo_suffix("SHOP.TO"), "SHOP");
-/// assert_eq!(strip_yahoo_suffix("BRK.B"), "BRK.B");  // Preserved
-/// assert_eq!(strip_yahoo_suffix("EURUSD=X"), "EURUSD");
-/// assert_eq!(strip_yahoo_suffix("GC=F"), "GC");
-/// ```
 pub fn strip_yahoo_suffix(symbol: &str) -> &str {
     // Handle special suffixes first
     if symbol.ends_with("=X") {
@@ -911,14 +664,14 @@ mod tests {
     fn test_exchange_map_europe() {
         let map = ExchangeMap::new();
 
-        // London
+        // London - Note: Yahoo returns GBp (pence)
         assert_eq!(
             map.get_suffix(&Cow::Borrowed("XLON"), &Cow::Borrowed("YAHOO")),
             Some(".L")
         );
         assert_eq!(
             map.get_currency(&Cow::Borrowed("XLON"), &Cow::Borrowed("YAHOO")),
-            Some("GBP")
+            Some("GBp")
         );
 
         // XETRA
@@ -976,40 +729,5 @@ mod tests {
         // Unknown
         assert_eq!(yahoo_suffix_to_mic("UNKNOWN"), None);
         assert_eq!(yahoo_suffix_to_mic("B"), None); // Share class, not suffix
-    }
-
-    #[test]
-    fn test_mic_to_exchange_name() {
-        assert_eq!(mic_to_exchange_name("XNYS"), Some("NYSE"));
-        assert_eq!(mic_to_exchange_name("XNAS"), Some("NASDAQ"));
-        assert_eq!(mic_to_exchange_name("XTSE"), Some("TSX"));
-        assert_eq!(mic_to_exchange_name("XLON"), Some("LSE"));
-        assert_eq!(mic_to_exchange_name("XETR"), Some("XETRA"));
-        assert_eq!(mic_to_exchange_name("UNKNOWN"), None);
-    }
-
-    #[test]
-    fn test_mic_to_currency() {
-        assert_eq!(mic_to_currency("XNYS"), Some("USD"));
-        assert_eq!(mic_to_currency("XNAS"), Some("USD"));
-        assert_eq!(mic_to_currency("XTSE"), Some("CAD"));
-        assert_eq!(mic_to_currency("XLON"), Some("GBP"));
-        assert_eq!(mic_to_currency("XETR"), Some("EUR"));
-        assert_eq!(mic_to_currency("XTKS"), Some("JPY"));
-        assert_eq!(mic_to_currency("UNKNOWN"), None);
-    }
-
-    #[test]
-    fn test_exchanges_for_currency() {
-        let us_exchanges = exchanges_for_currency("USD");
-        assert!(us_exchanges.contains(&"XNYS"));
-        assert!(us_exchanges.contains(&"XNAS"));
-
-        let ca_exchanges = exchanges_for_currency("CAD");
-        assert!(ca_exchanges.contains(&"XTSE"));
-        assert!(ca_exchanges.contains(&"XTSX"));
-
-        let unknown = exchanges_for_currency("XYZ");
-        assert!(unknown.is_empty());
     }
 }
