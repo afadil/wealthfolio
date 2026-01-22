@@ -71,7 +71,7 @@ export function HealthStatusIndicator() {
             className="rounded-full bg-secondary/50"
             asChild
           >
-            <Link to="/health" title="Health Center">
+            <Link to="/health" title="Data Status">
               <Icons.AlertTriangle className={cn("size-5", severityColor)} />
             </Link>
           </Button>

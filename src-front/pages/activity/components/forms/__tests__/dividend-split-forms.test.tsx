@@ -5,6 +5,15 @@ import { DividendForm } from "../dividend-form";
 import { SplitForm } from "../split-form";
 import type { AccountSelectOption } from "../fields";
 
+// Mock useSettings hook to avoid AuthProvider dependency
+vi.mock("@/hooks/use-settings", () => ({
+  useSettings: () => ({
+    data: { baseCurrency: "USD" },
+    isLoading: false,
+    error: null,
+  }),
+}));
+
 // Mock the fields components
 vi.mock("../fields", () => ({
   AccountSelect: ({ name, accounts }: { name: string; accounts: AccountSelectOption[] }) => (
@@ -44,6 +53,7 @@ vi.mock("../fields", () => ({
       <textarea data-testid={`textarea-${name}`} name={name} id={name} />
     </div>
   ),
+  AdvancedOptionsSection: () => <div data-testid="advanced-options-section" />,
 }));
 
 // Mock UI components

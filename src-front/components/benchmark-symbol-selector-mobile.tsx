@@ -11,7 +11,7 @@ import {
   SheetTrigger,
 } from "@wealthfolio/ui/components/ui/sheet";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { QuoteSummary } from "@/lib/types";
+import { SymbolSearchResult } from "@/lib/types";
 import { getExchangeDisplayName } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -97,7 +97,7 @@ export function BenchmarkSymbolSelectorMobile({
     data: searchResults,
     isLoading,
     isError,
-  } = useQuery<QuoteSummary[], Error>({
+  } = useQuery<SymbolSearchResult[], Error>({
     queryKey: ["benchmark-ticker-search", searchQuery],
     queryFn: () => searchTicker(searchQuery),
     enabled: searchQuery?.length > 2,
@@ -118,7 +118,7 @@ export function BenchmarkSymbolSelectorMobile({
     setSearchQuery("");
   };
 
-  const handleSearchResultSelect = (ticker: QuoteSummary) => {
+  const handleSearchResultSelect = (ticker: SymbolSearchResult) => {
     onSelect({ id: ticker.symbol, name: ticker.longName || ticker.symbol });
     setOpen(false);
     setSearchQuery("");

@@ -204,8 +204,12 @@ export function useActivityMutations(
       }
       return result;
     },
-    onSuccess: (_result: ActivityBulkMutationResult) => {
+    onSuccess: (result: ActivityBulkMutationResult) => {
       queryClient.invalidateQueries();
+      // Call onSuccess with first created activity for sheet close callback
+      if (onSuccess && result.created.length > 0) {
+        onSuccess({ accountId: result.created[0].accountId });
+      }
     },
     onError: (error: string) => {
       logger.error(`Error saving activities: ${String(error)}`);

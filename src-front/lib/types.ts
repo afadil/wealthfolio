@@ -298,7 +298,7 @@ export interface CsvRowError {
   index?: number;
 }
 
-export interface QuoteSummary {
+export interface SymbolSearchResult {
   exchange: string;
   /** Canonical exchange MIC code (e.g., "XNAS", "XTSE") */
   exchangeMic?: string;
@@ -316,6 +316,10 @@ export interface QuoteSummary {
   sector?: string;
   industry?: string;
   dataSource?: string;
+  /** True if this asset already exists in user's database */
+  isExisting?: boolean;
+  /** The existing asset ID if found (e.g., "SEC:AAPL:XNAS") */
+  existingAssetId?: string;
 }
 
 export interface MarketDataProviderInfo {

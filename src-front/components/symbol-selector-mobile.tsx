@@ -12,7 +12,7 @@ import {
   SheetTrigger,
 } from "@wealthfolio/ui/components/ui/sheet";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { QuoteSummary } from "@/lib/types";
+import { SymbolSearchResult } from "@/lib/types";
 import { getExchangeDisplayName } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -20,7 +20,7 @@ import { forwardRef, useState } from "react";
 import { CreateCustomAssetDialog } from "./create-custom-asset-dialog";
 
 interface SymbolSelectorMobileProps {
-  onSelect: (symbol: string, quoteSummary?: QuoteSummary) => void;
+  onSelect: (symbol: string, quoteSummary?: SymbolSearchResult) => void;
   value?: string;
   placeholder?: string;
   className?: string;
@@ -54,7 +54,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
       data: searchResults,
       isLoading,
       isError,
-    } = useQuery<QuoteSummary[], Error>({
+    } = useQuery<SymbolSearchResult[], Error>({
       queryKey: ["symbol-ticker-search", searchQuery],
       queryFn: () => searchTicker(searchQuery),
       enabled: searchQuery?.length > 1,
@@ -63,7 +63,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
     // Sort search results by score if available
     const sortedSearchResults = searchResults?.sort((a, b) => b.score - a.score) ?? [];
 
-    const handleSymbolSelect = (ticker: QuoteSummary) => {
+    const handleSymbolSelect = (ticker: SymbolSearchResult) => {
       onSelect(ticker.symbol, ticker);
       setOpen(false);
       setSearchQuery("");
@@ -74,7 +74,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
       setCustomAssetDialogOpen(true);
     };
 
-    const handleCustomAssetCreated = (quoteSummary: QuoteSummary) => {
+    const handleCustomAssetCreated = (quoteSummary: SymbolSearchResult) => {
       handleSymbolSelect(quoteSummary);
     };
 

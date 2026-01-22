@@ -9,7 +9,7 @@ use crate::quotes::DataSource;
 use crate::portfolio::snapshot::{AccountStateSnapshot, Position, SnapshotRepositoryTrait};
 use crate::portfolio::valuation::{DailyAccountValuation, ValuationRepositoryTrait};
 use crate::quotes::{
-    LatestQuotePair, ProviderInfo, Quote, QuoteImport, QuoteServiceTrait, QuoteSummary,
+    LatestQuotePair, ProviderInfo, Quote, QuoteImport, QuoteServiceTrait, SymbolSearchResult,
     QuoteSyncState, SymbolSyncPlan, SyncResult,
 };
 use async_trait::async_trait;
@@ -389,7 +389,7 @@ impl QuoteServiceTrait for MockMarketDataRepository {
     // Provider Operations
     // =========================================================================
 
-    async fn search_symbol(&self, _query: &str) -> Result<Vec<QuoteSummary>> {
+    async fn search_symbol(&self, _query: &str) -> Result<Vec<SymbolSearchResult>> {
         unimplemented!()
     }
 
@@ -397,7 +397,7 @@ impl QuoteServiceTrait for MockMarketDataRepository {
         &self,
         _query: &str,
         _account_currency: Option<&str>,
-    ) -> Result<Vec<QuoteSummary>> {
+    ) -> Result<Vec<SymbolSearchResult>> {
         unimplemented!()
     }
 
@@ -475,6 +475,10 @@ impl QuoteServiceTrait for MockMarketDataRepository {
         _current_holdings: &std::collections::HashMap<String, rust_decimal::Decimal>,
     ) -> Result<()> {
         Ok(())
+    }
+
+    fn get_sync_states_with_errors(&self) -> Result<Vec<QuoteSyncState>> {
+        Ok(Vec::new())
     }
 
     // =========================================================================

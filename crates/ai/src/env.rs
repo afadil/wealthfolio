@@ -77,8 +77,8 @@ pub mod test_env {
         goals::{Goal, GoalServiceTrait, GoalsAllocation, NewGoal},
         holdings::{Holding, HoldingsServiceTrait},
         quotes::{
-            LatestQuotePair, Quote, QuoteServiceTrait, QuoteSummary, QuoteSyncState, SyncResult,
-            SymbolSyncPlan, ProviderInfo, QuoteImport,
+            LatestQuotePair, Quote, QuoteServiceTrait, SymbolSearchResult, QuoteSyncState, SyncMode,
+            SyncResult, SymbolSyncPlan, ProviderInfo, QuoteImport,
         },
         secrets::SecretStore,
         settings::{Settings, SettingsServiceTrait, SettingsUpdate},
@@ -588,7 +588,7 @@ pub mod test_env {
     /// Mock quote service for testing.
     #[derive(Default)]
     pub struct MockQuoteService {
-        pub search_results: RwLock<Vec<QuoteSummary>>,
+        pub search_results: RwLock<Vec<SymbolSearchResult>>,
     }
 
     #[async_trait]
@@ -660,7 +660,7 @@ pub mod test_env {
             Ok(quotes.len())
         }
 
-        async fn search_symbol(&self, query: &str) -> CoreResult<Vec<QuoteSummary>> {
+        async fn search_symbol(&self, query: &str) -> CoreResult<Vec<SymbolSearchResult>> {
             self.search_symbol_with_currency(query, None).await
         }
 
@@ -668,7 +668,7 @@ pub mod test_env {
             &self,
             _query: &str,
             _account_currency: Option<&str>,
-        ) -> CoreResult<Vec<QuoteSummary>> {
+        ) -> CoreResult<Vec<SymbolSearchResult>> {
             Ok(self.search_results.read().unwrap().clone())
         }
 
@@ -685,7 +685,7 @@ pub mod test_env {
             Ok(Vec::new())
         }
 
-        async fn sync(&self) -> CoreResult<SyncResult> {
+        async fn sync(&self, _mode: SyncMode, _asset_ids: Option<Vec<String>>) -> CoreResult<SyncResult> {
             Ok(SyncResult::default())
         }
 
@@ -730,6 +730,17 @@ pub mod test_env {
         }
 
         fn get_assets_needing_profile_enrichment(&self) -> CoreResult<Vec<QuoteSyncState>> {
+            Ok(Vec::new())
+        }
+
+        async fn update_position_status_from_holdings(
+            &self,
+            _current_holdings: &std::collections::HashMap<String, rust_decimal::Decimal>,
+        ) -> CoreResult<()> {
+            Ok(())
+        }
+
+        fn get_sync_states_with_errors(&self) -> CoreResult<Vec<QuoteSyncState>> {
             Ok(Vec::new())
         }
 

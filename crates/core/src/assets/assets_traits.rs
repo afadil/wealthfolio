@@ -20,12 +20,14 @@ pub trait AssetServiceTrait: Send + Sync {
     /// Creates a minimal asset without network calls.
     /// Returns the existing asset if found, or creates a new minimal one.
     /// Accepts optional metadata hints from the caller (e.g., user-provided asset details).
+    /// If `pricing_mode_hint` is provided, it overrides the default pricing mode for the asset kind.
     /// Should be followed by an enrichment event for full profile data.
     async fn get_or_create_minimal_asset(
         &self,
         asset_id: &str,
         context_currency: Option<String>,
         metadata: Option<AssetMetadata>,
+        pricing_mode_hint: Option<String>,
     ) -> Result<Asset>;
     async fn update_pricing_mode(&self, asset_id: &str, pricing_mode: &str) -> Result<Asset>;
     async fn get_assets_by_asset_ids(&self, asset_ids: &[String]) -> Result<Vec<Asset>>;

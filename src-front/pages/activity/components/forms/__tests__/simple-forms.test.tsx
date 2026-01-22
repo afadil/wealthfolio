@@ -7,6 +7,15 @@ import { InterestForm } from "../interest-form";
 import { TaxForm } from "../tax-form";
 import type { AccountSelectOption } from "../fields";
 
+// Mock useSettings hook to avoid AuthProvider dependency
+vi.mock("@/hooks/use-settings", () => ({
+  useSettings: () => ({
+    data: { baseCurrency: "USD" },
+    isLoading: false,
+    error: null,
+  }),
+}));
+
 // Mock the fields components with actual form integration
 vi.mock("../fields", () => ({
   AccountSelect: ({ name, accounts }: { name: string; accounts: AccountSelectOption[] }) => (
@@ -34,6 +43,7 @@ vi.mock("../fields", () => ({
       <textarea data-testid={`textarea-${name}`} name={name} id={name} />
     </div>
   ),
+  AdvancedOptionsSection: () => <div data-testid="advanced-options-section" />,
 }));
 
 // Mock UI components

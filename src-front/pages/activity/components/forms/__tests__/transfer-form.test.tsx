@@ -4,6 +4,15 @@ import userEvent from "@testing-library/user-event";
 import { TransferForm } from "../transfer-form";
 import type { AccountSelectOption } from "../fields";
 
+// Mock useSettings hook to avoid AuthProvider dependency
+vi.mock("@/hooks/use-settings", () => ({
+  useSettings: () => ({
+    data: { baseCurrency: "USD" },
+    isLoading: false,
+    error: null,
+  }),
+}));
+
 // Mock the fields components
 vi.mock("../fields", () => ({
   AccountSelect: ({
@@ -49,6 +58,7 @@ vi.mock("../fields", () => ({
       <textarea data-testid={`textarea-${name}`} name={name} id={name} />
     </div>
   ),
+  AdvancedOptionsSection: () => <div data-testid="advanced-options-section" />,
 }));
 
 // Mock UI components
@@ -85,6 +95,92 @@ vi.mock("@wealthfolio/ui/components/ui/icons", () => ({
   },
 }));
 
+// Mock AnimatedToggleGroup
+vi.mock("@wealthfolio/ui/components/ui/animated-toggle-group", () => ({
+  AnimatedToggleGroup: ({
+    items,
+    value,
+    onValueChange,
+  }: {
+    items: { value: string; label: string }[];
+    value: string;
+    onValueChange: (value: string) => void;
+  }) => (
+    <div data-testid="transfer-mode-toggle">
+      {items.map((item) => (
+        <button
+          key={item.value}
+          data-testid={`toggle-${item.value}`}
+          onClick={() => onValueChange(item.value)}
+          data-active={value === item.value}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  ),
+}));
+
+// Mock Checkbox
+vi.mock("@wealthfolio/ui/components/ui/checkbox", () => ({
+  Checkbox: ({
+    id,
+    checked,
+    onCheckedChange,
+  }: {
+    id: string;
+    checked: boolean;
+    onCheckedChange: (checked: boolean) => void;
+  }) => (
+    <input
+      type="checkbox"
+      id={id}
+      data-testid={`checkbox-${id}`}
+      checked={checked}
+      onChange={(e) => onCheckedChange(e.target.checked)}
+    />
+  ),
+}));
+
+// Mock RadioGroup
+vi.mock("@wealthfolio/ui/components/ui/radio-group", () => ({
+  RadioGroup: ({
+    value,
+    onValueChange,
+    children,
+    className,
+  }: {
+    value: string;
+    onValueChange: (value: string) => void;
+    children: React.ReactNode;
+    className?: string;
+  }) => (
+    <div data-testid="radio-group" data-value={value} className={className}>
+      {children}
+    </div>
+  ),
+  RadioGroupItem: ({ value, id }: { value: string; id: string }) => (
+    <input type="radio" value={value} id={id} data-testid={`radio-${id}`} name="direction" />
+  ),
+}));
+
+// Mock Label
+vi.mock("@wealthfolio/ui/components/ui/label", () => ({
+  Label: ({
+    htmlFor,
+    children,
+    className,
+  }: {
+    htmlFor: string;
+    children: React.ReactNode;
+    className?: string;
+  }) => (
+    <label htmlFor={htmlFor} className={className}>
+      {children}
+    </label>
+  ),
+}));
+
 const mockAccounts: AccountSelectOption[] = [
   { value: "acc-1", label: "Savings Account", currency: "USD" },
   { value: "acc-2", label: "Investment Account", currency: "EUR" },
@@ -100,16 +196,37 @@ describe("TransferForm", () => {
   });
 
   describe("Render Tests", () => {
-    it("renders all form fields", () => {
+    it("renders transfer mode toggle", () => {
+      render(<TransferForm accounts={mockAccounts} onSubmit={mockOnSubmit} />);
+
+      expect(screen.getByTestId("transfer-mode-toggle")).toBeInTheDocument();
+      expect(screen.getByTestId("toggle-cash")).toBeInTheDocument();
+      expect(screen.getByTestId("toggle-securities")).toBeInTheDocument();
+    });
+
+    it("renders cash mode fields by default", () => {
       render(<TransferForm accounts={mockAccounts} onSubmit={mockOnSubmit} />);
 
       expect(screen.getByTestId("select-fromAccountId")).toBeInTheDocument();
       expect(screen.getByTestId("select-toAccountId")).toBeInTheDocument();
       expect(screen.getByTestId("date-picker-activityDate")).toBeInTheDocument();
       expect(screen.getByTestId("input-amount")).toBeInTheDocument();
+      expect(screen.getByTestId("textarea-comment")).toBeInTheDocument();
+      // Symbol and quantity should not be visible in cash mode
+      expect(screen.queryByTestId("symbol-search-assetId")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("input-quantity")).not.toBeInTheDocument();
+    });
+
+    it("renders securities mode fields when toggled", async () => {
+      const user = userEvent.setup();
+      render(<TransferForm accounts={mockAccounts} onSubmit={mockOnSubmit} />);
+
+      await user.click(screen.getByTestId("toggle-securities"));
+
       expect(screen.getByTestId("symbol-search-assetId")).toBeInTheDocument();
       expect(screen.getByTestId("input-quantity")).toBeInTheDocument();
-      expect(screen.getByTestId("textarea-comment")).toBeInTheDocument();
+      // Amount should not be visible in securities mode
+      expect(screen.queryByTestId("input-amount")).not.toBeInTheDocument();
     });
 
     it("renders from and to account labels", () => {
@@ -194,11 +311,25 @@ describe("TransferForm", () => {
     });
   });
 
-  describe("Optional Fields", () => {
-    it("renders optional security transfer message", () => {
+  describe("Transfer Mode Toggle", () => {
+    it("defaults to cash mode", () => {
       render(<TransferForm accounts={mockAccounts} onSubmit={mockOnSubmit} />);
 
-      expect(screen.getByText(/optional.*transferring securities/i)).toBeInTheDocument();
+      expect(screen.getByTestId("toggle-cash")).toHaveAttribute("data-active", "true");
+      expect(screen.getByTestId("toggle-securities")).toHaveAttribute("data-active", "false");
+    });
+
+    it("initializes to securities mode when defaultValues has assetId", () => {
+      render(
+        <TransferForm
+          accounts={mockAccounts}
+          onSubmit={mockOnSubmit}
+          defaultValues={{ assetId: "AAPL" }}
+        />,
+      );
+
+      expect(screen.getByTestId("toggle-cash")).toHaveAttribute("data-active", "false");
+      expect(screen.getByTestId("toggle-securities")).toHaveAttribute("data-active", "true");
     });
   });
 
@@ -213,6 +344,59 @@ describe("TransferForm", () => {
       render(<TransferForm accounts={mockAccounts} onSubmit={mockOnSubmit} isEditing={false} />);
 
       expect(screen.getByTestId("plus-icon")).toBeInTheDocument();
+    });
+  });
+
+  describe("External Transfer", () => {
+    it("renders external transfer checkbox", () => {
+      render(<TransferForm accounts={mockAccounts} onSubmit={mockOnSubmit} />);
+
+      expect(screen.getByTestId("checkbox-isExternal")).toBeInTheDocument();
+      expect(screen.getByText("External transfer")).toBeInTheDocument();
+    });
+
+    it("shows direction selector when external is checked", async () => {
+      const user = userEvent.setup();
+      render(<TransferForm accounts={mockAccounts} onSubmit={mockOnSubmit} />);
+
+      await user.click(screen.getByTestId("checkbox-isExternal"));
+
+      expect(screen.getByTestId("radio-group")).toBeInTheDocument();
+      expect(screen.getByText("In")).toBeInTheDocument();
+      expect(screen.getByText("Out")).toBeInTheDocument();
+    });
+
+    it("shows single account selector for external transfers", async () => {
+      const user = userEvent.setup();
+      render(<TransferForm accounts={mockAccounts} onSubmit={mockOnSubmit} />);
+
+      await user.click(screen.getByTestId("checkbox-isExternal"));
+
+      // Should show accountId selector, not fromAccountId/toAccountId
+      expect(screen.getByTestId("select-accountId")).toBeInTheDocument();
+      expect(screen.queryByTestId("select-fromAccountId")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("select-toAccountId")).not.toBeInTheDocument();
+    });
+
+    it("shows from/to account selectors for internal transfers", () => {
+      render(<TransferForm accounts={mockAccounts} onSubmit={mockOnSubmit} />);
+
+      expect(screen.getByTestId("select-fromAccountId")).toBeInTheDocument();
+      expect(screen.getByTestId("select-toAccountId")).toBeInTheDocument();
+      expect(screen.queryByTestId("select-accountId")).not.toBeInTheDocument();
+    });
+
+    it("initializes to external mode when defaultValues has isExternal", () => {
+      render(
+        <TransferForm
+          accounts={mockAccounts}
+          onSubmit={mockOnSubmit}
+          defaultValues={{ isExternal: true, direction: "in" }}
+        />,
+      );
+
+      expect(screen.getByTestId("checkbox-isExternal")).toBeChecked();
+      expect(screen.getByTestId("select-accountId")).toBeInTheDocument();
     });
   });
 });

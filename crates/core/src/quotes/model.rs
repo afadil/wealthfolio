@@ -122,10 +122,10 @@ pub struct Quote {
 }
 
 // =============================================================================
-// Quote Summary
+// Symbol Search Result
 // =============================================================================
 
-/// Summary information for a quote search result.
+/// Result from a symbol/ticker search operation.
 ///
 /// This is returned from symbol search operations and provides basic
 /// identifying information about a financial instrument. Enhanced with
@@ -149,7 +149,7 @@ pub struct Quote {
 /// * `score` - Relevance score from search
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct QuoteSummary {
+pub struct SymbolSearchResult {
     pub symbol: String,
     pub short_name: String,
     pub long_name: String,

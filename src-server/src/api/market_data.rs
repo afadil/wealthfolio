@@ -11,7 +11,7 @@ use axum::{
     routing::{delete, get, post, put},
     Json, Router,
 };
-use wealthfolio_core::quotes::{MarketSyncMode, ProviderInfo, Quote, QuoteImport, QuoteSummary};
+use wealthfolio_core::quotes::{MarketSyncMode, ProviderInfo, Quote, QuoteImport, SymbolSearchResult};
 
 async fn get_market_data_providers(
     State(state): State<Arc<AppState>>,
@@ -54,7 +54,7 @@ struct SearchQuery {
 async fn search_symbol(
     State(state): State<Arc<AppState>>,
     Query(q): Query<SearchQuery>,
-) -> ApiResult<Json<Vec<QuoteSummary>>> {
+) -> ApiResult<Json<Vec<SymbolSearchResult>>> {
     let res = state.quote_service.search_symbol(&q.query).await?;
     Ok(Json(res))
 }

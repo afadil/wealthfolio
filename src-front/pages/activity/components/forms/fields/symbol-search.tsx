@@ -2,7 +2,7 @@ import TickerSearchInput from "@/components/ticker-search";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@wealthfolio/ui";
 import { DataSource, PricingMode } from "@/lib/constants";
-import type { QuoteSummary } from "@/lib/types";
+import type { SymbolSearchResult } from "@/lib/types";
 import { useFormContext, type FieldPath, type FieldValues } from "react-hook-form";
 import { normalizeCurrency } from "@/lib/utils";
 
@@ -48,9 +48,16 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
 
   const handleTickerSelect = (
     symbol: string,
-    quoteSummary: QuoteSummary | undefined,
+    quoteSummary: SymbolSearchResult | undefined,
     onChange: (value: string) => void,
   ) => {
+    // If the selected ticker is a custom/manual entry, set pricing mode FIRST
+    // This must happen before the symbol is set to ensure the form state is correct
+    if (quoteSummary?.dataSource === DataSource.MANUAL && pricingModeName) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setValue(pricingModeName, PricingMode.MANUAL as any);
+    }
+
     // Strip exchange suffix when we have exchangeMic (e.g., "VFV.TO" -> "VFV")
     // Backend generates canonical ID as SEC:{symbol}:{mic}, so we need the base symbol
     const baseSymbol = quoteSummary?.exchangeMic ? stripExchangeSuffix(symbol) : symbol;
@@ -67,11 +74,6 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
       const normalizedCurrency = normalizeCurrency(quoteSummary.currency);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setValue(currencyName, normalizedCurrency as any);
-    }
-    // If the selected ticker is a custom/manual entry, automatically enable manual pricing
-    if (quoteSummary?.dataSource === DataSource.MANUAL && pricingModeName) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setValue(pricingModeName, PricingMode.MANUAL as any);
     }
   };
 
