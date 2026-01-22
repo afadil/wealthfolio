@@ -28,7 +28,7 @@ import type {
   NewContributionLimit,
   PerformanceMetrics,
   Quote,
-  QuoteSummary,
+  SymbolSearchResult,
   Settings,
   SimplePerformanceMetrics,
   UpdateAssetProfile,
@@ -67,7 +67,7 @@ export interface InternalHostAPI {
   getGoalsAllocation(): Promise<GoalAllocation[]>;
 
   // Market data
-  searchTicker(query: string): Promise<QuoteSummary[]>;
+  searchTicker(query: string): Promise<SymbolSearchResult[]>;
   syncHistoryQuotes(): Promise<void>;
   getAssetProfile(assetId: string): Promise<Asset>;
   updateAssetProfile(payload: UpdateAssetProfile): Promise<Asset>;

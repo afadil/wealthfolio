@@ -12,7 +12,7 @@ mod tests {
         HoldingsValuationService, HoldingsValuationServiceTrait,
     };
     use crate::quotes::{
-        LatestQuotePair, ProviderInfo, Quote, QuoteImport, QuoteSummary, QuoteServiceTrait,
+        LatestQuotePair, ProviderInfo, Quote, QuoteImport, SymbolSearchResult, QuoteServiceTrait,
         QuoteSyncState, SymbolSyncPlan, SyncResult,
     };
     use async_trait::async_trait;
@@ -246,7 +246,7 @@ mod tests {
         // Provider Operations
         // =========================================================================
 
-        async fn search_symbol(&self, _query: &str) -> Result<Vec<QuoteSummary>> {
+        async fn search_symbol(&self, _query: &str) -> Result<Vec<SymbolSearchResult>> {
             unimplemented!()
         }
 
@@ -254,7 +254,7 @@ mod tests {
             &self,
             _query: &str,
             _account_currency: Option<&str>,
-        ) -> Result<Vec<QuoteSummary>> {
+        ) -> Result<Vec<SymbolSearchResult>> {
             unimplemented!()
         }
 
@@ -332,6 +332,10 @@ mod tests {
             _current_holdings: &std::collections::HashMap<String, rust_decimal::Decimal>,
         ) -> Result<()> {
             Ok(())
+        }
+
+        fn get_sync_states_with_errors(&self) -> Result<Vec<QuoteSyncState>> {
+            Ok(Vec::new())
         }
 
         // =========================================================================

@@ -4,6 +4,15 @@ import userEvent from "@testing-library/user-event";
 import { BuyForm } from "../buy-form";
 import type { AccountSelectOption } from "../fields";
 
+// Mock useSettings hook to avoid AuthProvider dependency
+vi.mock("@/hooks/use-settings", () => ({
+  useSettings: () => ({
+    data: { baseCurrency: "USD" },
+    isLoading: false,
+    error: null,
+  }),
+}));
+
 // Mock the fields components
 vi.mock("../fields", () => ({
   AccountSelect: ({ name, accounts }: { name: string; accounts: AccountSelectOption[] }) => (
@@ -38,6 +47,7 @@ vi.mock("../fields", () => ({
       <textarea data-testid={`textarea-${name}`} name={name} id={name} />
     </div>
   ),
+  AdvancedOptionsSection: () => <div data-testid="advanced-options-section" />,
 }));
 
 // Mock UI components
@@ -105,7 +115,7 @@ describe("BuyForm", () => {
       expect(screen.getByTestId("input-quantity")).toBeInTheDocument();
       expect(screen.getByTestId("input-unitPrice")).toBeInTheDocument();
       expect(screen.getByTestId("input-fee")).toBeInTheDocument();
-      expect(screen.getByTestId("input-amount")).toBeInTheDocument();
+      // Amount is now calculated and displayed as text, not as an input field
       expect(screen.getByTestId("textarea-comment")).toBeInTheDocument();
     });
 
@@ -194,11 +204,14 @@ describe("BuyForm", () => {
   });
 
   describe("Amount Calculation Display", () => {
-    it("renders the calculated amount info text area", () => {
+    it("renders the form with quantity, price and fee fields for amount calculation", () => {
       render(<BuyForm accounts={mockAccounts} onSubmit={mockOnSubmit} />);
 
-      // The input-amount should be rendered
-      expect(screen.getByTestId("input-amount")).toBeInTheDocument();
+      // Amount is now calculated from quantity * price + fee and displayed as text
+      // The form should have the inputs for the calculation
+      expect(screen.getByTestId("input-quantity")).toBeInTheDocument();
+      expect(screen.getByTestId("input-unitPrice")).toBeInTheDocument();
+      expect(screen.getByTestId("input-fee")).toBeInTheDocument();
     });
   });
 

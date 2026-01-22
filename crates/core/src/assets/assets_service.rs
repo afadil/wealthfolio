@@ -149,11 +149,13 @@ impl AssetServiceTrait for AssetService {
     /// Creates a minimal asset without network calls.
     /// Returns the existing asset if found, or creates a new minimal one.
     /// Accepts optional metadata hints from the caller (e.g., user-provided asset details).
+    /// If `pricing_mode_hint` is provided, it overrides the default pricing mode for the asset kind.
     async fn get_or_create_minimal_asset(
         &self,
         asset_id: &str,
         context_currency: Option<String>,
         metadata: Option<super::assets_model::AssetMetadata>,
+        pricing_mode_hint: Option<String>,
     ) -> Result<Asset> {
         // Try to get existing asset first
         match self.asset_repository.get_by_id(asset_id) {
@@ -177,12 +179,30 @@ impl AssetServiceTrait for AssetService {
             .and_then(|m| m.kind.clone())
             .unwrap_or_else(|| infer_asset_kind(asset_id));
 
-        // Determine pricing mode based on kind
-        let pricing_mode = match &kind {
-            AssetKind::Cash => PricingMode::None,
-            AssetKind::Crypto | AssetKind::Security => PricingMode::Market,
-            // Alternative assets use manual pricing
-            _ => PricingMode::Manual,
+        // Determine pricing mode: use hint if provided, otherwise default based on kind
+        let pricing_mode = if let Some(ref hint) = pricing_mode_hint {
+            match hint.to_uppercase().as_str() {
+                "MANUAL" => PricingMode::Manual,
+                "MARKET" => PricingMode::Market,
+                "NONE" => PricingMode::None,
+                "DERIVED" => PricingMode::Derived,
+                _ => {
+                    // Fall back to kind-based default if hint is invalid
+                    match &kind {
+                        AssetKind::Cash => PricingMode::None,
+                        AssetKind::Crypto | AssetKind::Security => PricingMode::Market,
+                        _ => PricingMode::Manual,
+                    }
+                }
+            }
+        } else {
+            // Default pricing mode based on asset kind
+            match &kind {
+                AssetKind::Cash => PricingMode::None,
+                AssetKind::Crypto | AssetKind::Security => PricingMode::Market,
+                // Alternative assets use manual pricing
+                _ => PricingMode::Manual,
+            }
         };
 
         // Extract optional fields from metadata

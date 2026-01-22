@@ -173,10 +173,10 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Portfolio</DialogTitle>
+          <DialogTitle>Add Existing Holdings</DialogTitle>
           <DialogDescription>
             Quickly add multiple holdings to your portfolio. Enter your current positions with
-            ticker symbols, quantities, and average costs.
+            ticker symbols, quantities, and average costs. This will not affect your cash balance.
           </DialogDescription>
         </DialogHeader>
 

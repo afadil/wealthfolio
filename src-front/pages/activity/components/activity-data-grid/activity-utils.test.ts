@@ -96,17 +96,18 @@ describe("activity-utils", () => {
       expect(resolveAssetIdForTransaction(tx, "USD")).toBe("MSFT");
     });
 
-    it("should create cash asset ID for cash activities", () => {
+    it("should return undefined for cash activities (backend generates ID)", () => {
       const tx = createMockTransaction({
         activityType: ActivityType.DEPOSIT,
         assetId: "",
         assetSymbol: "",
         currency: "EUR",
       });
-      expect(resolveAssetIdForTransaction(tx, "USD")).toBe("$CASH-EUR");
+      // Backend now generates CASH:{currency} IDs, frontend returns undefined
+      expect(resolveAssetIdForTransaction(tx, "USD")).toBeUndefined();
     });
 
-    it("should use fallback currency for cash activities without currency", () => {
+    it("should return undefined for cash activities without currency (backend generates ID)", () => {
       const tx = createMockTransaction({
         activityType: ActivityType.WITHDRAWAL,
         assetId: "",
@@ -114,7 +115,8 @@ describe("activity-utils", () => {
         currency: "",
         accountCurrency: "",
       });
-      expect(resolveAssetIdForTransaction(tx, "GBP")).toBe("$CASH-GBP");
+      // Backend now generates CASH:{currency} IDs, frontend returns undefined
+      expect(resolveAssetIdForTransaction(tx, "GBP")).toBeUndefined();
     });
 
     it("should return undefined for non-cash activities without asset", () => {
@@ -352,7 +354,7 @@ describe("activity-utils", () => {
       expect(result.updates[0].activityDate).toBe("2024-06-15T14:30:00.000Z");
     });
 
-    it("should handle cash activities without assetId", () => {
+    it("should handle cash activities without assetId (backend generates ID)", () => {
       const transactions: LocalTransaction[] = [
         createMockTransaction({
           id: "tx-1",
@@ -373,7 +375,9 @@ describe("activity-utils", () => {
         "USD",
       );
 
-      expect(result.updates[0].assetId).toBe("$CASH-USD");
+      // Backend now generates CASH:{currency} IDs for cash activities
+      // Frontend doesn't set assetId for cash activities
+      expect(result.updates[0].assetId).toBeUndefined();
     });
 
     it("should remove quantity and unitPrice for SPLIT activities", () => {

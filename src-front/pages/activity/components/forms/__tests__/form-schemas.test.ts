@@ -309,115 +309,249 @@ describe("Form Schemas Validation", () => {
   });
 
   describe("transferFormSchema", () => {
-    it("validates a complete valid cash transfer", () => {
-      const validData = {
-        fromAccountId: "acc-123",
-        toAccountId: "acc-456",
-        activityDate: new Date(),
-        amount: 1000,
-        comment: "Transfer to savings",
-      };
+    describe("internal cash transfers", () => {
+      it("validates a complete valid internal cash transfer", () => {
+        const validData = {
+          isExternal: false,
+          direction: "in",
+          fromAccountId: "acc-123",
+          toAccountId: "acc-456",
+          activityDate: new Date(),
+          transferMode: "cash",
+          amount: 1000,
+          comment: "Transfer to savings",
+        };
 
-      const result = transferFormSchema.safeParse(validData);
-      expect(result.success).toBe(true);
+        const result = transferFormSchema.safeParse(validData);
+        expect(result.success).toBe(true);
+      });
+
+      it("fails when fromAccountId is empty for internal transfer", () => {
+        const invalidData = {
+          isExternal: false,
+          fromAccountId: "",
+          toAccountId: "acc-456",
+          activityDate: new Date(),
+          transferMode: "cash",
+          amount: 1000,
+        };
+
+        const result = transferFormSchema.safeParse(invalidData);
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          const error = result.error.issues.find((issue) =>
+            issue.message.includes("source account"),
+          );
+          expect(error).toBeDefined();
+        }
+      });
+
+      it("fails when toAccountId is empty for internal transfer", () => {
+        const invalidData = {
+          isExternal: false,
+          fromAccountId: "acc-123",
+          toAccountId: "",
+          activityDate: new Date(),
+          transferMode: "cash",
+          amount: 1000,
+        };
+
+        const result = transferFormSchema.safeParse(invalidData);
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          const error = result.error.issues.find((issue) =>
+            issue.message.includes("destination account"),
+          );
+          expect(error).toBeDefined();
+        }
+      });
+
+      it("fails when source and destination accounts are the same", () => {
+        const sameAccount = {
+          isExternal: false,
+          fromAccountId: "acc-123",
+          toAccountId: "acc-123",
+          activityDate: new Date(),
+          transferMode: "cash",
+          amount: 1000,
+        };
+
+        const result = transferFormSchema.safeParse(sameAccount);
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          const refinementError = result.error.issues.find(
+            (issue) => issue.path.includes("toAccountId") && issue.message.includes("different"),
+          );
+          expect(refinementError).toBeDefined();
+        }
+      });
+
+      it("fails when amount is not positive in cash mode", () => {
+        const invalidAmount = {
+          isExternal: false,
+          fromAccountId: "acc-123",
+          toAccountId: "acc-456",
+          activityDate: new Date(),
+          transferMode: "cash",
+          amount: 0,
+        };
+
+        const result = transferFormSchema.safeParse(invalidAmount);
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          const error = result.error.issues.find((issue) =>
+            issue.message.includes("enter an amount"),
+          );
+          expect(error).toBeDefined();
+        }
+      });
     });
 
-    it("validates a transfer with optional security fields", () => {
-      const validData = {
-        fromAccountId: "acc-123",
-        toAccountId: "acc-456",
-        activityDate: new Date(),
-        amount: 5000,
-        assetId: "AAPL",
-        quantity: 10,
-        comment: "Security transfer",
-      };
+    describe("internal securities transfers", () => {
+      it("validates a complete valid internal securities transfer", () => {
+        const validData = {
+          isExternal: false,
+          fromAccountId: "acc-123",
+          toAccountId: "acc-456",
+          activityDate: new Date(),
+          transferMode: "securities",
+          assetId: "AAPL",
+          quantity: 10,
+          comment: "Security transfer",
+        };
 
-      const result = transferFormSchema.safeParse(validData);
-      expect(result.success).toBe(true);
+        const result = transferFormSchema.safeParse(validData);
+        expect(result.success).toBe(true);
+      });
+
+      it("fails when assetId is missing in securities mode", () => {
+        const invalidData = {
+          isExternal: false,
+          fromAccountId: "acc-123",
+          toAccountId: "acc-456",
+          activityDate: new Date(),
+          transferMode: "securities",
+          quantity: 10,
+        };
+
+        const result = transferFormSchema.safeParse(invalidData);
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          const error = result.error.issues.find((issue) =>
+            issue.message.includes("select a symbol"),
+          );
+          expect(error).toBeDefined();
+        }
+      });
+
+      it("fails when quantity is missing in securities mode", () => {
+        const invalidData = {
+          isExternal: false,
+          fromAccountId: "acc-123",
+          toAccountId: "acc-456",
+          activityDate: new Date(),
+          transferMode: "securities",
+          assetId: "AAPL",
+        };
+
+        const result = transferFormSchema.safeParse(invalidData);
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          const error = result.error.issues.find((issue) =>
+            issue.message.includes("enter a quantity"),
+          );
+          expect(error).toBeDefined();
+        }
+      });
+
+      it("fails when quantity is zero or negative in securities mode", () => {
+        const invalidQuantity = {
+          isExternal: false,
+          fromAccountId: "acc-123",
+          toAccountId: "acc-456",
+          activityDate: new Date(),
+          transferMode: "securities",
+          assetId: "AAPL",
+          quantity: 0,
+        };
+
+        const result = transferFormSchema.safeParse(invalidQuantity);
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          const quantityError = result.error.issues.find((issue) =>
+            issue.message.includes("enter a quantity"),
+          );
+          expect(quantityError).toBeDefined();
+        }
+      });
     });
 
-    it("fails when fromAccountId is empty", () => {
-      const invalidData = {
-        fromAccountId: "",
-        toAccountId: "acc-456",
-        activityDate: new Date(),
-        amount: 1000,
-      };
+    describe("external transfers", () => {
+      it("validates a complete valid external transfer in (cash)", () => {
+        const validData = {
+          isExternal: true,
+          direction: "in",
+          accountId: "acc-123",
+          activityDate: new Date(),
+          transferMode: "cash",
+          amount: 2000,
+          comment: "External transfer in",
+        };
 
-      const result = transferFormSchema.safeParse(invalidData);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe("Please select a source account.");
-      }
-    });
+        const result = transferFormSchema.safeParse(validData);
+        expect(result.success).toBe(true);
+      });
 
-    it("fails when toAccountId is empty", () => {
-      const invalidData = {
-        fromAccountId: "acc-123",
-        toAccountId: "",
-        activityDate: new Date(),
-        amount: 1000,
-      };
+      it("validates a complete valid external transfer out (cash)", () => {
+        const validData = {
+          isExternal: true,
+          direction: "out",
+          accountId: "acc-123",
+          activityDate: new Date(),
+          transferMode: "cash",
+          amount: 500,
+          comment: "External transfer out",
+        };
 
-      const result = transferFormSchema.safeParse(invalidData);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe("Please select a destination account.");
-      }
-    });
+        const result = transferFormSchema.safeParse(validData);
+        expect(result.success).toBe(true);
+      });
 
-    it("fails when source and destination accounts are the same", () => {
-      const sameAccount = {
-        fromAccountId: "acc-123",
-        toAccountId: "acc-123",
-        activityDate: new Date(),
-        amount: 1000,
-      };
+      it("fails when accountId is empty for external transfer", () => {
+        const invalidData = {
+          isExternal: true,
+          direction: "in",
+          accountId: "",
+          activityDate: new Date(),
+          transferMode: "cash",
+          amount: 1000,
+        };
 
-      const result = transferFormSchema.safeParse(sameAccount);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        const refinementError = result.error.issues.find(
-          (issue) => issue.path.includes("toAccountId") && issue.message.includes("different"),
-        );
-        expect(refinementError).toBeDefined();
-      }
-    });
+        const result = transferFormSchema.safeParse(invalidData);
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          const error = result.error.issues.find((issue) =>
+            issue.message.includes("select an account"),
+          );
+          expect(error).toBeDefined();
+        }
+      });
 
-    it("fails when amount is not positive", () => {
-      const invalidAmount = {
-        fromAccountId: "acc-123",
-        toAccountId: "acc-456",
-        activityDate: new Date(),
-        amount: 0,
-      };
+      it("validates external securities transfer", () => {
+        const validData = {
+          isExternal: true,
+          direction: "in",
+          accountId: "acc-123",
+          activityDate: new Date(),
+          transferMode: "securities",
+          assetId: "AAPL",
+          quantity: 5,
+          comment: "External securities transfer in",
+        };
 
-      const result = transferFormSchema.safeParse(invalidAmount);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe("Amount must be greater than 0.");
-      }
-    });
-
-    it("fails when optional quantity is zero or negative", () => {
-      const invalidQuantity = {
-        fromAccountId: "acc-123",
-        toAccountId: "acc-456",
-        activityDate: new Date(),
-        amount: 5000,
-        assetId: "AAPL",
-        quantity: 0,
-      };
-
-      const result = transferFormSchema.safeParse(invalidQuantity);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        const quantityError = result.error.issues.find((issue) =>
-          issue.message.includes("Quantity must be greater than 0"),
-        );
-        expect(quantityError).toBeDefined();
-      }
+        const result = transferFormSchema.safeParse(validData);
+        expect(result.success).toBe(true);
+      });
     });
   });
 

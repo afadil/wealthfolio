@@ -35,7 +35,7 @@ import {
   CollapsibleTrigger,
 } from "@wealthfolio/ui/components/ui/collapsible";
 import { Icons, CurrencyInput } from "@wealthfolio/ui";
-import type { QuoteSummary } from "@/lib/types";
+import type { SymbolSearchResult } from "@/lib/types";
 
 // Simplified asset types for the form
 const ASSET_TYPE_OPTIONS = [
@@ -72,7 +72,7 @@ type CustomAssetFormValues = z.infer<typeof customAssetSchema>;
 interface CreateCustomAssetDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAssetCreated: (quoteSummary: QuoteSummary) => void;
+  onAssetCreated: (quoteSummary: SymbolSearchResult) => void;
   defaultSymbol?: string;
   defaultCurrency?: string;
 }
@@ -119,10 +119,9 @@ export function CreateCustomAssetDialog({
   }, [open, currency, defaultSymbol, form]);
 
   const handleSubmit = (values: CustomAssetFormValues) => {
-    // Create a QuoteSummary-like object for the custom asset
+    // Create a SymbolSearchResult-like object for the custom asset
     // The actual asset creation happens when the activity is created
-    // Note: currency is handled separately in the activity form, not stored in QuoteSummary
-    const quoteSummary: QuoteSummary = {
+    const quoteSummary: SymbolSearchResult = {
       symbol: values.symbol,
       longName: values.name,
       shortName: values.name,
@@ -132,6 +131,8 @@ export function CreateCustomAssetDialog({
       typeDisplay: "Custom Asset",
       dataSource: "MANUAL",
       score: 0,
+      // Include currency so SymbolSearch can set it in the form
+      currency: values.currency,
       // We don't set exchangeMic - this will result in SEC:SYMBOL:UNKNOWN for the asset ID
     };
 

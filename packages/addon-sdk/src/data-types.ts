@@ -367,8 +367,14 @@ export interface AssetProfile {
   url: string | null;
 }
 
-export interface QuoteSummary {
+export interface SymbolSearchResult {
   exchange: string;
+  /** Canonical exchange MIC code (e.g., "XNAS", "XTSE") */
+  exchangeMic?: string;
+  /** Friendly exchange name (e.g., "NASDAQ" instead of "NMS" or "XNAS") */
+  exchangeName?: string;
+  /** Currency derived from exchange (e.g., "USD", "CAD") */
+  currency?: string;
   shortName: string;
   quoteType: string;
   symbol: string;
@@ -378,7 +384,11 @@ export interface QuoteSummary {
   longName: string;
   sector?: string;
   industry?: string;
-  dataSource?: boolean;
+  dataSource?: string;
+  /** True if this asset already exists in user's database */
+  isExisting?: boolean;
+  /** The existing asset ID if found (e.g., "SEC:AAPL:XNAS") */
+  existingAssetId?: string;
 }
 
 export interface MarketDataProviderInfo {

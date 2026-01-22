@@ -8,13 +8,13 @@ use crate::{
 
 use log::{debug, error};
 use tauri::{AppHandle, State};
-use wealthfolio_core::quotes::{service::ProviderInfo, MarketSyncMode, Quote, QuoteImport, QuoteSummary};
+use wealthfolio_core::quotes::{service::ProviderInfo, MarketSyncMode, Quote, QuoteImport, SymbolSearchResult};
 
 #[tauri::command]
 pub async fn search_symbol(
     query: String,
     state: State<'_, Arc<ServiceContext>>,
-) -> Result<Vec<QuoteSummary>, String> {
+) -> Result<Vec<SymbolSearchResult>, String> {
     state
         .quote_service()
         .search_symbol(&query)

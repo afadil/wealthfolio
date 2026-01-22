@@ -22,6 +22,7 @@ import {
 export const dividendFormSchema = z.object({
   accountId: z.string().min(1, { message: "Please select an account." }),
   symbol: z.string().min(1, { message: "Please enter a symbol." }),
+  exchangeMic: z.string().optional(),
   activityDate: z.date({ required_error: "Please select a date." }),
   amount: z.coerce
     .number({
@@ -109,7 +110,13 @@ export function DividendForm({
             <AccountSelect name="accountId" accounts={accounts} />
 
             {/* Symbol Search/Input */}
-            <SymbolSearch name="symbol" label="Symbol" isManualAsset={isManualSymbol} currencyName="currency" />
+            <SymbolSearch
+              name="symbol"
+              label="Symbol"
+              isManualAsset={isManualSymbol}
+              exchangeMicName="exchangeMic"
+              currencyName="currency"
+            />
 
             {/* Date Picker */}
             <DatePicker name="activityDate" label="Date" />

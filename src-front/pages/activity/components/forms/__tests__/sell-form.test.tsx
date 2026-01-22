@@ -4,6 +4,15 @@ import userEvent from "@testing-library/user-event";
 import { SellForm } from "../sell-form";
 import type { AccountSelectOption } from "../fields";
 
+// Mock useSettings hook to avoid AuthProvider dependency
+vi.mock("@/hooks/use-settings", () => ({
+  useSettings: () => ({
+    data: { baseCurrency: "USD" },
+    isLoading: false,
+    error: null,
+  }),
+}));
+
 // Mock the useHoldings hook
 vi.mock("@/hooks/use-holdings", () => ({
   useHoldings: () => ({
@@ -46,6 +55,7 @@ vi.mock("../fields", () => ({
       <textarea data-testid={`textarea-${name}`} name={name} id={name} />
     </div>
   ),
+  AdvancedOptionsSection: () => <div data-testid="advanced-options-section" />,
 }));
 
 // Mock UI components
@@ -113,7 +123,7 @@ describe("SellForm", () => {
       expect(screen.getByTestId("input-quantity")).toBeInTheDocument();
       expect(screen.getByTestId("input-unitPrice")).toBeInTheDocument();
       expect(screen.getByTestId("input-fee")).toBeInTheDocument();
-      expect(screen.getByTestId("input-amount")).toBeInTheDocument();
+      // Amount is now calculated and displayed as text, not as an input field
       expect(screen.getByTestId("textarea-comment")).toBeInTheDocument();
     });
 

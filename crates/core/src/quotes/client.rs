@@ -32,7 +32,7 @@ use log::{debug, info, warn};
 use crate::assets::{Asset, ProviderProfile};
 use crate::errors::Result;
 use crate::quotes::constants::*;
-use crate::quotes::model::{DataSource, QuoteSummary};
+use crate::quotes::model::{DataSource, SymbolSearchResult};
 use crate::quotes::Quote;
 use crate::secrets::SecretStore;
 
@@ -434,7 +434,7 @@ impl MarketDataClient {
     /// # Returns
     ///
     /// Vector of search results from providers that support search.
-    pub async fn search(&self, query: &str) -> Result<Vec<QuoteSummary>> {
+    pub async fn search(&self, query: &str) -> Result<Vec<SymbolSearchResult>> {
         debug!("Searching for '{}'", query);
 
         let results = self
@@ -477,14 +477,14 @@ impl MarketDataClient {
         Ok(Self::convert_profile(profile, &asset.symbol))
     }
 
-    /// Convert a market-data SearchResult to core QuoteSummary.
+    /// Convert a market-data SearchResult to core SymbolSearchResult.
     ///
     /// Enriches the result with canonical MIC codes and friendly exchange names:
     /// 1. Try mapping from Yahoo's exchange code (e.g., "NMS" -> "XNAS")
     /// 2. Try extracting MIC from symbol suffix (e.g., "SHOP.TO" -> "XTSE")
     /// 3. Look up friendly exchange name from MIC
     /// 4. Infer currency from MIC if not provided
-    fn convert_search_result(result: MarketSearchResult) -> QuoteSummary {
+    fn convert_search_result(result: MarketSearchResult) -> SymbolSearchResult {
         // Try to determine MIC from Yahoo's exchange code first
         let mut exchange_mic = yahoo_exchange_to_mic(&result.exchange)
             .map(|mic| mic.to_string());
@@ -511,7 +511,7 @@ impl MarketDataClient {
                 .map(String::from)
         });
 
-        QuoteSummary {
+        SymbolSearchResult {
             symbol: result.symbol,
             short_name: result.name.clone(),
             long_name: result.name,

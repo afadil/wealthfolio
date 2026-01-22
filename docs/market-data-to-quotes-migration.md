@@ -19,7 +19,7 @@ crates/core/src/
 │
 └── quotes/                         # NEW - target module
     ├── mod.rs
-    ├── model.rs                    # Quote, QuoteSummary, LatestQuotePair, DataSource
+    ├── model.rs                    # Quote, SymbolSearchResult, LatestQuotePair, DataSource
     ├── store.rs                    # QuoteStore, ProviderSettingsStore traits
     ├── service.rs                  # QuoteService, QuoteServiceTrait
     ├── sync.rs                     # QuoteSyncService

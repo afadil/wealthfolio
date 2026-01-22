@@ -1,6 +1,6 @@
 // Market Data Commands
 import type {
-  QuoteSummary,
+  SymbolSearchResult,
   Asset,
   Quote,
   UpdateAssetProfile,
@@ -11,9 +11,9 @@ import type { MarketDataProviderSetting } from "../types";
 
 import { invoke, logger } from "./platform";
 
-export const searchTicker = async (query: string): Promise<QuoteSummary[]> => {
+export const searchTicker = async (query: string): Promise<SymbolSearchResult[]> => {
   try {
-    return await invoke<QuoteSummary[]>("search_symbol", { query });
+    return await invoke<SymbolSearchResult[]>("search_symbol", { query });
   } catch (error) {
     logger.error("Error searching for ticker.");
     throw error;

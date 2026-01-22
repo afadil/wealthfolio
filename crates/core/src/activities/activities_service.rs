@@ -177,16 +177,18 @@ impl ActivityService {
 
         // Process asset if asset_id is resolved
         if let Some(ref asset_id) = resolved_asset_id {
+            // Pass pricing_mode to asset creation so custom/manual assets get the right mode
             let asset = self
                 .asset_service
                 .get_or_create_minimal_asset(
                     asset_id,
                     Some(currency.clone()),
                     activity.asset_metadata.clone(),
+                    activity.pricing_mode.clone(),
                 )
                 .await?;
 
-            // Update asset pricing mode if specified
+            // Update asset pricing mode if specified (for existing assets that need mode change)
             if let Some(ref mode) = activity.pricing_mode {
                 let requested_mode = mode.to_uppercase();
                 let current_mode = asset.pricing_mode.as_db_str();
@@ -285,13 +287,18 @@ impl ActivityService {
 
         // Process asset if asset_id is resolved
         if let Some(ref asset_id) = resolved_asset_id {
-            // Updates don't carry asset metadata - pass None
+            // Pass pricing_mode for asset creation/update
             let asset = self
                 .asset_service
-                .get_or_create_minimal_asset(asset_id, Some(currency.clone()), None)
+                .get_or_create_minimal_asset(
+                    asset_id,
+                    Some(currency.clone()),
+                    None,
+                    activity.pricing_mode.clone(),
+                )
                 .await?;
 
-            // Update asset pricing mode if specified
+            // Update asset pricing mode if specified (for existing assets that need mode change)
             if let Some(ref mode) = activity.pricing_mode {
                 let requested_mode = mode.to_uppercase();
                 let current_mode = asset.pricing_mode.as_db_str();
@@ -538,10 +545,10 @@ impl ActivityServiceTrait for ActivityService {
                 &asset_context_currency,
             );
 
-            // CSV imports don't carry asset metadata - pass None
+            // CSV imports don't carry asset metadata or pricing mode hint - pass None
             let symbol_profile_result = self
                 .asset_service
-                .get_or_create_minimal_asset(&canonical_id, Some(asset_context_currency), None)
+                .get_or_create_minimal_asset(&canonical_id, Some(asset_context_currency), None, None)
                 .await;
 
             let (mut is_valid, mut error_message) = (true, None);

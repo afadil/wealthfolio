@@ -1,8 +1,10 @@
 import { useCallback, useMemo } from "react";
 import { logger } from "@/adapters";
-import type { ActivityDetails } from "@/lib/types";
+import { ActivityType } from "@/lib/constants";
+import type { ActivityCreate, ActivityDetails } from "@/lib/types";
 import type { AccountSelectOption } from "../components/forms/fields";
 import type { NewActivityFormValues } from "../components/forms/schemas";
+import type { TransferFormValues } from "../components/forms/transfer-form";
 import {
   ACTIVITY_FORM_CONFIG,
   type ActivityFormValues,
@@ -43,12 +45,18 @@ export function useActivityForm({
   selectedType,
   onSuccess,
 }: UseActivityFormParams): UseActivityFormReturn {
-  const { addActivityMutation, updateActivityMutation } = useActivityMutations(onSuccess);
+  const { addActivityMutation, updateActivityMutation, saveActivitiesMutation } =
+    useActivityMutations(onSuccess);
 
   const isEditing = !!activity?.id;
-  const isLoading = addActivityMutation.isPending || updateActivityMutation.isPending;
-  const error = addActivityMutation.error ?? updateActivityMutation.error;
-  const isError = addActivityMutation.isError || updateActivityMutation.isError;
+  const isLoading =
+    addActivityMutation.isPending ||
+    updateActivityMutation.isPending ||
+    saveActivitiesMutation.isPending;
+  const error =
+    addActivityMutation.error ?? updateActivityMutation.error ?? saveActivitiesMutation.error;
+  const isError =
+    addActivityMutation.isError || updateActivityMutation.isError || saveActivitiesMutation.isError;
 
   // Get config for selected type (undefined if no type selected)
   const config = selectedType ? ACTIVITY_FORM_CONFIG[selectedType] : undefined;
@@ -65,7 +73,73 @@ export function useActivityForm({
       if (!config) return;
 
       try {
-        // Transform form data to payload using config
+        // Handle internal transfers specially - need to create two activities
+        if (selectedType === "TRANSFER") {
+          const transferData = formData as TransferFormValues;
+
+          // Internal transfer: create both TRANSFER_OUT and TRANSFER_IN
+          if (!transferData.isExternal && transferData.fromAccountId && transferData.toAccountId) {
+            const formPayload = config.toPayload(formData);
+
+            // Get currencies for both accounts
+            const fromAccount = accounts.find((a) => a.value === transferData.fromAccountId);
+            const toAccount = accounts.find((a) => a.value === transferData.toAccountId);
+
+            // Extract assetId to convert to symbol (ActivityCreate uses symbol, not assetId)
+            const { assetId, ...sharedFields } = formPayload as { assetId?: string } & Record<
+              string,
+              unknown
+            >;
+
+            // Create TRANSFER_OUT on source account
+            const transferOutActivity: ActivityCreate = {
+              ...sharedFields,
+              accountId: transferData.fromAccountId,
+              activityType: ActivityType.TRANSFER_OUT,
+              currency: fromAccount?.currency,
+              symbol: assetId ?? undefined,
+            } as ActivityCreate;
+
+            // Create TRANSFER_IN on destination account
+            const transferInActivity: ActivityCreate = {
+              ...sharedFields,
+              accountId: transferData.toAccountId,
+              activityType: ActivityType.TRANSFER_IN,
+              currency: toAccount?.currency,
+              symbol: assetId ?? undefined,
+            } as ActivityCreate;
+
+            await saveActivitiesMutation.mutateAsync({
+              creates: [transferOutActivity, transferInActivity],
+            });
+            return;
+          }
+
+          // External transfer: determine activity type from direction
+          const activityType =
+            transferData.direction === "in" ? ActivityType.TRANSFER_IN : ActivityType.TRANSFER_OUT;
+          const basePayload = config.toPayload(formData);
+          const accountId = transferData.accountId;
+          const account = accounts.find((a) => a.value === accountId);
+
+          const submitData: NewActivityFormValues = {
+            ...basePayload,
+            activityType,
+            currency: account?.currency,
+          } as NewActivityFormValues;
+
+          if (isEditing && activity?.id) {
+            await updateActivityMutation.mutateAsync({
+              id: activity.id,
+              ...submitData,
+            });
+          } else {
+            await addActivityMutation.mutateAsync(submitData);
+          }
+          return;
+        }
+
+        // Standard activity handling
         const basePayload = config.toPayload(formData);
 
         // Get account currency for pure cash activities
@@ -93,7 +167,16 @@ export function useActivityForm({
         logger.error(`Activity Form Submit Error: ${JSON.stringify({ error: err, formData })}`);
       }
     },
-    [config, accounts, isEditing, activity?.id, addActivityMutation, updateActivityMutation],
+    [
+      config,
+      accounts,
+      isEditing,
+      activity?.id,
+      selectedType,
+      addActivityMutation,
+      updateActivityMutation,
+      saveActivitiesMutation,
+    ],
   );
 
   return {

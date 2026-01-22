@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
+@source "../packages/ui/src";
 @import "@fontsource/ibm-plex-mono";
 @import "@fontsource/ibm-plex-mono/200.css";
 @import "@fontsource/ibm-plex-mono/300.css";

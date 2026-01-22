@@ -2,7 +2,7 @@ import { AccountSelector } from "@/components/account-selector";
 import { TickerAvatar } from "@/components/ticker-avatar";
 import TickerSearchInput from "@/components/ticker-search";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Account, QuoteSummary } from "@/lib/types";
+import { Account, SymbolSearchResult } from "@/lib/types";
 import { PricingMode } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import {
@@ -117,7 +117,7 @@ const HoldingRow = memo(
     );
 
     const handleTickerSelect = useCallback(
-      (_symbol: string, quoteSummary?: QuoteSummary) => {
+      (_symbol: string, quoteSummary?: SymbolSearchResult) => {
         if (quoteSummary?.dataSource === "MANUAL") {
           setValue(`holdings.${index}.pricingMode`, PricingMode.MANUAL, { shouldDirty: true });
         } else {
@@ -342,7 +342,7 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
               name="activityDate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Start Date</FormLabel>
+                  <FormLabel>Acquisition Date</FormLabel>
                   <FormControl>
                     <DatePickerInput value={field.value} onChange={field.onChange} />
                   </FormControl>

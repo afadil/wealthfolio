@@ -11,7 +11,7 @@ import {
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { QuoteSummary } from "@/lib/types";
+import { SymbolSearchResult } from "@/lib/types";
 import { getExchangeDisplayName } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -91,7 +91,7 @@ export function BenchmarkSymbolSelector({
     data: searchResults,
     isLoading,
     isError,
-  } = useQuery<QuoteSummary[], Error>({
+  } = useQuery<SymbolSearchResult[], Error>({
     queryKey: ["benchmark-ticker-search", searchQuery],
     queryFn: () => searchTicker(searchQuery),
     enabled: searchQuery?.length > 2, // Only search when query is longer than 2 characters
@@ -113,7 +113,7 @@ export function BenchmarkSymbolSelector({
     setSearchQuery(""); // Clear search when selecting
   };
 
-  const handleSearchResultSelect = (ticker: QuoteSummary) => {
+  const handleSearchResultSelect = (ticker: SymbolSearchResult) => {
     setValue(ticker.longName || ticker.symbol);
     onSelect({ id: ticker.symbol, name: ticker.longName || ticker.symbol });
     setOpen(false);

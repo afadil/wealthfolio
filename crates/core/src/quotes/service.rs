@@ -18,7 +18,7 @@ use crate::utils::time_utils;
 
 use super::client::{MarketDataClient, ProviderConfig};
 use super::import::{ImportValidationStatus, QuoteConverter, QuoteImport, QuoteValidator};
-use super::model::{DataSource, LatestQuotePair, Quote, QuoteSummary};
+use super::model::{DataSource, LatestQuotePair, Quote, SymbolSearchResult};
 use super::store::{ProviderSettingsStore, QuoteStore};
 use super::sync::{QuoteSyncService, QuoteSyncServiceTrait, SyncResult};
 use super::sync_state::{QuoteSyncState, SymbolSyncPlan, SyncMode, SyncStateStore};
@@ -144,7 +144,7 @@ pub trait QuoteServiceTrait: Send + Sync {
     /// Returns search results merged with existing assets. Existing assets are
     /// returned first, followed by provider results. Results are deduplicated
     /// by symbol+exchange and sorted by relevance to account_currency.
-    async fn search_symbol(&self, query: &str) -> Result<Vec<QuoteSummary>>;
+    async fn search_symbol(&self, query: &str) -> Result<Vec<SymbolSearchResult>>;
 
     /// Search for symbols with account currency for relevance sorting.
     ///
@@ -161,7 +161,7 @@ pub trait QuoteServiceTrait: Send + Sync {
         &self,
         query: &str,
         account_currency: Option<&str>,
-    ) -> Result<Vec<QuoteSummary>>;
+    ) -> Result<Vec<SymbolSearchResult>>;
 
     /// Get asset profile from provider.
     ///
@@ -412,10 +412,10 @@ where
         })
     }
 
-    /// Convert an existing Asset to a QuoteSummary for search results.
+    /// Convert an existing Asset to a SymbolSearchResult for search results.
     ///
     /// Marks the result as existing and includes the asset ID.
-    fn asset_to_quote_summary(asset: &Asset) -> QuoteSummary {
+    fn asset_to_quote_summary(asset: &Asset) -> SymbolSearchResult {
         let exchange_name = asset
             .exchange_mic
             .as_ref()
@@ -430,7 +430,7 @@ where
             _ => "OTHER",
         };
 
-        QuoteSummary {
+        SymbolSearchResult {
             symbol: asset.symbol.clone(),
             short_name: asset.name.clone().unwrap_or_else(|| asset.symbol.clone()),
             long_name: asset.name.clone().unwrap_or_else(|| asset.symbol.clone()),
@@ -592,7 +592,7 @@ where
     // Provider Operations
     // =========================================================================
 
-    async fn search_symbol(&self, query: &str) -> Result<Vec<QuoteSummary>> {
+    async fn search_symbol(&self, query: &str) -> Result<Vec<SymbolSearchResult>> {
         self.search_symbol_with_currency(query, None).await
     }
 
@@ -600,7 +600,7 @@ where
         &self,
         query: &str,
         account_currency: Option<&str>,
-    ) -> Result<Vec<QuoteSummary>> {
+    ) -> Result<Vec<SymbolSearchResult>> {
         // 1. Search existing assets in user's database
         let existing_assets = self.asset_repo.search_by_symbol(query).unwrap_or_default();
 
@@ -613,8 +613,8 @@ where
             .await
             .unwrap_or_default();
 
-        // 3. Convert existing assets to QuoteSummary with is_existing flag
-        let existing_summaries: Vec<QuoteSummary> = existing_assets
+        // 3. Convert existing assets to SymbolSearchResult with is_existing flag
+        let existing_summaries: Vec<SymbolSearchResult> = existing_assets
             .iter()
             .filter(|a| a.kind != AssetKind::Cash && a.kind != AssetKind::FxRate)
             .map(|asset| Self::asset_to_quote_summary(asset))
@@ -627,7 +627,7 @@ where
             .collect();
 
         // 5. Filter provider results to exclude duplicates
-        let new_provider_results: Vec<QuoteSummary> = provider_results
+        let new_provider_results: Vec<SymbolSearchResult> = provider_results
             .into_iter()
             .filter(|r| {
                 // Check if this symbol+exchange combo already exists

@@ -42,7 +42,7 @@ import type { ActivityCreate } from "@/lib/types";
 import { today, getLocalTimeZone } from "@internationalized/date";
 import { parse as dateFnsParse } from "date-fns";
 import TickerSearchInput from "@/components/ticker-search";
-import type { QuoteSummary } from "@/lib/types";
+import type { SymbolSearchResult } from "@/lib/types";
 import { useRuntimeContext } from "../../hooks/use-runtime-context";
 
 // ============================================================================
@@ -698,7 +698,7 @@ function DraftForm({
 
   // Handle symbol selection from ticker search
   const handleSymbolSelect = useCallback(
-    (symbol: string, quoteSummary?: QuoteSummary) => {
+    (symbol: string, quoteSummary?: SymbolSearchResult) => {
       setSelectedSymbol(symbol);
       setValue("symbol", symbol);
       if (quoteSummary?.exchangeMic) {

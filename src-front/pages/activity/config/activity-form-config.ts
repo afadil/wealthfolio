@@ -192,6 +192,7 @@ export const ACTIVITY_FORM_CONFIG: Record<PickerActivityType, ActivityTypeConfig
       // Advanced options
       currency: activity?.currency,
       subtype: activity?.subtype ?? null,
+      exchangeMic: activity?.exchangeMic,
     }),
     toPayload: (data) => {
       const d = data as DividendFormValues;
@@ -203,6 +204,7 @@ export const ACTIVITY_FORM_CONFIG: Record<PickerActivityType, ActivityTypeConfig
         comment: d.comment,
         subtype: d.subtype,
         currency: d.currency,
+        exchangeMic: d.exchangeMic,
       };
     },
   },
@@ -210,24 +212,40 @@ export const ACTIVITY_FORM_CONFIG: Record<PickerActivityType, ActivityTypeConfig
   TRANSFER: {
     component: TransferForm as ComponentType<ActivityFormComponentProps<ActivityFormValues>>,
     activityType: ActivityType.TRANSFER_OUT,
-    getDefaults: (activity, _accounts) => ({
-      fromAccountId: activity?.accountId ?? "",
-      toAccountId: "",
-      activityDate: activity?.date ? new Date(activity.date) : new Date(),
-      amount: activity?.amount,
-      assetId: activity?.assetSymbol ?? activity?.assetId ?? null,
-      quantity: activity?.quantity ?? null,
-      comment: activity?.comment ?? null,
-      // Advanced options
-      currency: activity?.currency,
-      subtype: activity?.subtype ?? null,
-      pricingMode: activity?.assetPricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET,
-      exchangeMic: activity?.exchangeMic,
-    }),
+    getDefaults: (activity, _accounts) => {
+      // Derive transferMode from existing activity data
+      const hasSecurityData = !!(activity?.assetSymbol || activity?.assetId);
+      const transferMode = hasSecurityData ? "securities" : "cash";
+      // Derive isExternal from metadata (if flow.is_external is true)
+      const isExternal = activity?.metadata?.flow?.is_external === true;
+      // Derive direction from activity type
+      const direction =
+        activity?.activityType === ActivityType.TRANSFER_IN ? "in" : "out";
+      return {
+        isExternal,
+        direction,
+        accountId: isExternal ? activity?.accountId ?? "" : "",
+        fromAccountId: !isExternal ? activity?.accountId ?? "" : "",
+        toAccountId: "",
+        activityDate: activity?.date ? new Date(activity.date) : new Date(),
+        transferMode,
+        amount: activity?.amount,
+        assetId: activity?.assetSymbol ?? activity?.assetId ?? null,
+        quantity: activity?.quantity ?? null,
+        comment: activity?.comment ?? null,
+        // Advanced options
+        currency: activity?.currency,
+        subtype: activity?.subtype ?? null,
+        pricingMode: activity?.assetPricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET,
+        exchangeMic: activity?.exchangeMic,
+      };
+    },
     toPayload: (data) => {
       const d = data as TransferFormValues;
+      // For external transfers, use accountId; for internal, use fromAccountId
+      const accountId = d.isExternal ? d.accountId : d.fromAccountId;
       return {
-        accountId: d.fromAccountId,
+        accountId,
         activityDate: d.activityDate,
         amount: d.amount,
         assetId: d.assetId ?? undefined,
@@ -237,6 +255,8 @@ export const ACTIVITY_FORM_CONFIG: Record<PickerActivityType, ActivityTypeConfig
         currency: d.currency,
         pricingMode: d.pricingMode,
         exchangeMic: d.exchangeMic,
+        // Include external transfer metadata
+        ...(d.isExternal && { metadata: { flow: { is_external: true } } }),
       };
     },
   },
@@ -251,6 +271,7 @@ export const ACTIVITY_FORM_CONFIG: Record<PickerActivityType, ActivityTypeConfig
       // Advanced options
       currency: activity?.currency,
       subtype: activity?.subtype ?? null,
+      exchangeMic: activity?.exchangeMic,
     }),
     toPayload: (data) => {
       const d = data as SplitFormValues;
@@ -262,6 +283,7 @@ export const ACTIVITY_FORM_CONFIG: Record<PickerActivityType, ActivityTypeConfig
         comment: d.comment,
         subtype: d.subtype,
         currency: d.currency,
+        exchangeMic: d.exchangeMic,
       };
     },
   },

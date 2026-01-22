@@ -82,7 +82,7 @@ Application-level quote management with business logic.
 
 ```
 quotes/
-├── model.rs            # Quote, QuoteSummary, DataSource
+├── model.rs            # Quote, SymbolSearchResult, DataSource
 ├── types.rs            # AssetId, Day, ProviderId, QuoteSource
 ├── store.rs            # QuoteStore, ProviderSettingsStore traits
 ├── sync_state.rs       # QuoteSyncState, SyncStateStore
@@ -556,7 +556,7 @@ User Query: "AAPL"
 └────────┬────────┘
          │
          ▼
-   Vec<QuoteSummary>
+   Vec<SymbolSearchResult>
 ```
 
 ---

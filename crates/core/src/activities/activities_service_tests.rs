@@ -150,6 +150,7 @@ mod tests {
             asset_id: &str,
             _context_currency: Option<String>,
             _metadata: Option<crate::assets::AssetMetadata>,
+            _pricing_mode_hint: Option<String>,
         ) -> Result<Asset> {
             self.get_asset_by_id(asset_id)
         }

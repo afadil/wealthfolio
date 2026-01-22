@@ -103,7 +103,7 @@ The spec (Section 7) described a new "Asset Resolution" step for CSV import wher
 - `src-front/pages/activity/components/activity-data-grid/activity-utils.ts` - sends symbol + exchangeMic in payload
 - `src-front/pages/activity/components/activity-data-grid/activity-data-grid.tsx` - captures exchangeMic on symbol selection
 - `src-front/pages/activity/components/activity-data-grid/use-activity-columns.tsx` - passes onSymbolSelect callback
-- `src-front/lib/types.ts` - added exchangeMic to QuoteSummary and ActivityDetails
+- `src-front/lib/types.ts` - added exchangeMic to SymbolSearchResult and ActivityDetails
 - `src-front/components/ticker-search.tsx` - shows friendly exchange names (uses backend `exchangeName`)
 - `src-front/lib/constants.ts` - minimal fallback mapping (MANUAL, CCC, CCY, OTC only)
 - `packages/ui/src/components/data-grid/data-grid-types.ts` - added exchangeMic to SymbolSearchResult

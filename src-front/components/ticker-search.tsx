@@ -4,7 +4,7 @@ import { Command, CommandInput, CommandItem, CommandList, CommandSeparator } fro
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { QuoteSummary } from "@/lib/types";
+import { SymbolSearchResult } from "@/lib/types";
 import { getExchangeDisplayName } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -14,23 +14,23 @@ import { forwardRef, memo, useCallback, useMemo, useRef, useState } from "react"
 import { CreateCustomAssetDialog } from "./create-custom-asset-dialog";
 
 interface SearchProps {
-  selectedResult?: QuoteSummary;
+  selectedResult?: SymbolSearchResult;
   defaultValue?: string;
   value?: string;
   placeholder?: string;
-  onSelectResult: (symbol: string, quoteSummary?: QuoteSummary) => void;
+  onSelectResult: (symbol: string, quoteSummary?: SymbolSearchResult) => void;
   className?: string;
   /** Default currency to use for custom assets (typically from account) */
   defaultCurrency?: string;
 }
 
 interface SearchResultsProps {
-  results?: QuoteSummary[];
+  results?: SymbolSearchResult[];
   query: string;
   isLoading: boolean;
   isError?: boolean;
   selectedResult: SearchProps["selectedResult"];
-  onSelect: (symbol: QuoteSummary) => void;
+  onSelect: (symbol: SymbolSearchResult) => void;
   onCreateCustomAsset: () => void;
 }
 
@@ -156,7 +156,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
     );
 
     const handleSelectResult = useCallback(
-      (ticker: QuoteSummary) => {
+      (ticker: SymbolSearchResult) => {
         onSelectResult(ticker?.symbol, ticker);
         // Show symbol - name (exchange) for better context, using friendly exchange name
         const exchangeDisplay = ticker?.exchangeName || getExchangeDisplayName(ticker?.exchange);
@@ -178,7 +178,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
 
     // Handle custom asset created from dialog
     const handleCustomAssetCreated = useCallback(
-      (quoteSummary: QuoteSummary) => {
+      (quoteSummary: SymbolSearchResult) => {
         // Select the newly created custom asset
         handleSelectResult(quoteSummary);
       },
@@ -186,7 +186,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
     );
 
     // Use debounced query for API call
-    const { data, isLoading, isError } = useQuery<QuoteSummary[], Error>({
+    const { data, isLoading, isError } = useQuery<SymbolSearchResult[], Error>({
       queryKey: ["ticker-search", debouncedQuery],
       queryFn: () => searchTicker(debouncedQuery),
       enabled:
