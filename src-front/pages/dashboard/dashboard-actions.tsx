@@ -58,7 +58,7 @@ export function DashboardActions() {
           },
           {
             icon: "ShieldCheck",
-            label: "Run Health Check",
+            label: "Verify Data",
             onClick: () => runHealthChecksMutation.mutate(),
           },
         ],

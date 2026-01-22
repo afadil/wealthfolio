@@ -200,7 +200,7 @@ export default function HealthPage() {
   if (error) {
     return (
       <Page>
-        <PageHeader heading="Health Center" text="Review and resolve data quality issues" actions={headerActions} />
+        <PageHeader heading="Data Status" text="Review issues affecting your portfolio data" actions={headerActions} />
         <PageContent>
           <div className="flex min-h-[400px] flex-col items-center justify-center">
             <div className="bg-destructive/10 mb-6 flex h-16 w-16 items-center justify-center rounded-full">
@@ -220,7 +220,7 @@ export default function HealthPage() {
 
   return (
     <Page>
-      <PageHeader heading="Health Center" text="Review and resolve data quality issues" actions={headerActions} />
+      <PageHeader heading="Data Status" text="Review issues affecting your portfolio data" actions={headerActions} />
       <PageContent>
         {isLoading ? (
           <div className="space-y-6">
