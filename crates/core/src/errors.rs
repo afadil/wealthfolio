@@ -39,7 +39,7 @@ pub enum Error {
     #[error("Invalid exchange rate: {0}")]
     InvalidExchangeRate(String),
 
-    #[error("Input validation failed: {0}")]
+    #[error("{0}")]
     Validation(#[from] ValidationError),
 
     #[error("Failed to load configuration: {0}")]
