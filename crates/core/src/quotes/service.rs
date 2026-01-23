@@ -622,19 +622,21 @@ where
         merged.extend(existing_summaries);
         merged.extend(new_provider_results);
 
-        // 7. Sort by currency relevance if account_currency is provided
-        if let Some(currency) = account_currency {
-            let preferred_exchanges = exchanges_for_currency(currency);
+        // 7. Sort results: existing first, then by exchange relevance (if currency), then by score
+        let preferred_exchanges = account_currency
+            .map(|c| exchanges_for_currency(c))
+            .unwrap_or_default();
 
-            merged.sort_by(|a, b| {
-                // Existing assets always come first
-                match (a.is_existing, b.is_existing) {
-                    (true, false) => return std::cmp::Ordering::Less,
-                    (false, true) => return std::cmp::Ordering::Greater,
-                    _ => {}
-                }
+        merged.sort_by(|a, b| {
+            // Existing assets always come first
+            match (a.is_existing, b.is_existing) {
+                (true, false) => return std::cmp::Ordering::Less,
+                (false, true) => return std::cmp::Ordering::Greater,
+                _ => {}
+            }
 
-                // Then sort by exchange relevance
+            // Then sort by exchange relevance (if currency provided)
+            if !preferred_exchanges.is_empty() {
                 let a_rank = a
                     .exchange_mic
                     .as_ref()
@@ -647,16 +649,16 @@ where
                     .unwrap_or(usize::MAX);
 
                 match a_rank.cmp(&b_rank) {
-                    std::cmp::Ordering::Equal => {
-                        // If same exchange rank, sort by provider score (descending)
-                        b.score
-                            .partial_cmp(&a.score)
-                            .unwrap_or(std::cmp::Ordering::Equal)
-                    }
-                    other => other,
+                    std::cmp::Ordering::Equal => {}
+                    other => return other,
                 }
-            });
-        }
+            }
+
+            // Finally sort by provider score (descending, higher score first)
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         Ok(merged)
     }
