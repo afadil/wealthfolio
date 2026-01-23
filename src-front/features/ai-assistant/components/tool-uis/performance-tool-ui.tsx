@@ -158,17 +158,9 @@ function PerformanceLoadingSkeleton() {
   );
 }
 
+// Empty state - don't render anything, let LLM explain
 function EmptyState() {
-  return (
-    <Card className="bg-muted/40 border-primary/10">
-      <CardContent className="flex flex-col items-center justify-center py-8 text-center">
-        <p className="text-muted-foreground text-sm">No performance data available.</p>
-        <p className="text-muted-foreground mt-1 text-xs">
-          Performance data will appear once there is enough valuation history.
-        </p>
-      </CardContent>
-    </Card>
-  );
+  return null;
 }
 
 function ErrorState({ message }: { message?: string }) {

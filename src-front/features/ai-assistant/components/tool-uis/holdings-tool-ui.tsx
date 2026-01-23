@@ -280,15 +280,9 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
     );
   }
 
-  // Empty state
+  // Empty state - don't render anything, let LLM explain
   if (isComplete && holdingsCount === 0) {
-    return (
-      <Card className="bg-muted/40 border-primary/10 w-full">
-        <CardContent className="py-4">
-          <p className="text-muted-foreground text-sm">No holdings data available.</p>
-        </CardContent>
-      </Card>
-    );
+    return null;
   }
 
   // Complete state with data
