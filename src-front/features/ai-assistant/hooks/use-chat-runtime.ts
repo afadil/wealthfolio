@@ -320,18 +320,6 @@ export function useChatRuntime(config?: ChatModelConfig) {
   // Abort controller for cancelling streams
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Handler to update thread title in cache
-  const handleThreadTitleUpdate = useCallback(
-    (threadId: string, title: string) => {
-      queryClient.setQueryData(
-        QueryKeys.aiThread(threadId),
-        (old: ChatThread | undefined) => (old ? { ...old, title } : old),
-      );
-      queryClient.invalidateQueries({ queryKey: AI_THREADS_KEY });
-    },
-    [queryClient],
-  );
-
   const setCurrentThreadId = useCallback((threadId: string | null) => {
     threadIdRef.current = threadId;
     setCurrentThreadIdState(threadId);
@@ -388,7 +376,14 @@ export function useChatRuntime(config?: ChatModelConfig) {
       let reasoning = "";
       const toolCalls = new Map<string, ToolCallState>();
 
-      const updateAssistantMessage = () => {
+      // RAF-based throttling to batch rapid updates (prevents 100s of re-renders)
+      let rafId: number | null = null;
+      let updatePending = false;
+
+      const flushUpdate = () => {
+        rafId = null;
+        updatePending = false;
+
         const tcArray: ToolCall[] = [];
         const trArray: ToolResult[] = [];
 
@@ -424,6 +419,13 @@ export function useChatRuntime(config?: ChatModelConfig) {
         });
       };
 
+      const updateAssistantMessage = () => {
+        updatePending = true;
+        if (rafId === null) {
+          rafId = requestAnimationFrame(flushUpdate);
+        }
+      };
+
       try {
         for await (const event of streamChatResponse(
           {
@@ -440,7 +442,8 @@ export function useChatRuntime(config?: ChatModelConfig) {
               // Capture thread ID from system event
               if (event.threadId) {
                 setCurrentThreadId(event.threadId);
-                queryClient.invalidateQueries({ queryKey: AI_THREADS_KEY });
+                // Force refetch to show new thread in sidebar immediately
+                queryClient.refetchQueries({ queryKey: AI_THREADS_KEY });
               }
               break;
 
@@ -488,10 +491,10 @@ export function useChatRuntime(config?: ChatModelConfig) {
                 }
               }
               updateAssistantMessage();
-              break;
-
-            case "threadTitleUpdated":
-              handleThreadTitleUpdate(event.threadId, event.title);
+              // Refetch threads after a delay to pick up background-generated title
+              setTimeout(() => {
+                queryClient.refetchQueries({ queryKey: AI_THREADS_KEY });
+              }, 2000);
               break;
 
             case "error":
@@ -511,11 +514,19 @@ export function useChatRuntime(config?: ChatModelConfig) {
           updateAssistantMessage();
         }
       } finally {
+        // Cancel pending RAF and flush any remaining updates
+        if (rafId !== null) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+        if (updatePending) {
+          flushUpdate();
+        }
         setIsRunning(false);
         abortControllerRef.current = null;
       }
     },
-    [config, queryClient, handleThreadTitleUpdate, setCurrentThreadId],
+    [config, queryClient, setCurrentThreadId],
   );
 
   // Handle cancel

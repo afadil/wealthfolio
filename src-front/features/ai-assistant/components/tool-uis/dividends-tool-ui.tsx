@@ -302,18 +302,9 @@ function DividendsContent({ result, status }: DividendsContentProps) {
     );
   }
 
-  // Empty state
+  // Empty state - don't render anything, let LLM explain
   if (isComplete && dividendsCount === 0) {
-    return (
-      <Card className="bg-muted/40 border-primary/10 w-full">
-        <CardContent className="py-4">
-          <p className="text-muted-foreground text-sm">No dividend payments found.</p>
-          <p className="text-muted-foreground mt-1 text-xs">
-            Dividend income will appear here once recorded.
-          </p>
-        </CardContent>
-      </Card>
-    );
+    return null;
   }
 
   // Complete state with data

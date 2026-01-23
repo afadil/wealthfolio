@@ -156,6 +156,11 @@ function ValuationContent({ args, result, status }: ValuationContentProps) {
   const isIncomplete = status?.type === "incomplete" || status?.type === "requires-action";
   const hasData = chartData.length > 0;
 
+  // Empty state - don't render anything, let LLM explain
+  if (isComplete && !hasData) {
+    return null;
+  }
+
   // Show chart when complete or we have data
   const shouldRenderChart = hasData && (isComplete || isIncomplete || !isRunning);
 

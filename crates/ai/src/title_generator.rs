@@ -96,7 +96,14 @@ impl<E: AiEnvironment> TitleGenerator<E> {
         );
 
         let prompt = format!(
-            "Generate a very short title (4 words max, no quotes) for this chat message:\n\n\"{}\"\n\nTitle:",
+            "Generate a very short plain-text title (max 4 words) for this chat message.\n\
+Rules:\n\
+- Return ONLY the title text\n\
+- No markdown (no **bold**, no *italics*, no backticks)\n\
+- No quotes\n\
+- No leading \"Title:\" prefix\n\n\
+Message:\n\"{}\"\n\n\
+Title:",
             truncate_to_title(user_message, 200)
         );
 
@@ -142,13 +149,8 @@ impl<E: AiEnvironment> TitleGenerator<E> {
             }
         };
 
-        // Clean up the response
-        let title = response
-            .trim()
-            .trim_matches('"')
-            .trim_matches('\'')
-            .trim()
-            .to_string();
+        // Clean up the response (providers sometimes wrap titles in markdown/quotes).
+        let title = clean_generated_title(&response);
 
         // Ensure reasonable length
         if title.is_empty() || title.len() > 100 {
@@ -157,6 +159,54 @@ impl<E: AiEnvironment> TitleGenerator<E> {
 
         Ok(title)
     }
+}
+
+fn clean_generated_title(raw: &str) -> String {
+    let mut title = raw
+        .lines()
+        .find(|line| !line.trim().is_empty())
+        .unwrap_or(raw)
+        .trim()
+        .to_string();
+
+    // Iteratively strip common wrappers like **Title**, "Title", `Title`, etc.
+    for _ in 0..4 {
+        let trimmed = title.trim();
+        let mut changed = false;
+
+        if trimmed.starts_with("**") && trimmed.ends_with("**") && trimmed.len() > 4 {
+            title = trimmed[2..trimmed.len() - 2].trim().to_string();
+            changed = true;
+        } else if trimmed.starts_with("__") && trimmed.ends_with("__") && trimmed.len() > 4 {
+            title = trimmed[2..trimmed.len() - 2].trim().to_string();
+            changed = true;
+        } else if trimmed.starts_with('`') && trimmed.ends_with('`') && trimmed.len() > 2 {
+            title = trimmed[1..trimmed.len() - 1].trim().to_string();
+            changed = true;
+        } else if trimmed.starts_with('"') && trimmed.ends_with('"') && trimmed.len() > 2 {
+            title = trimmed[1..trimmed.len() - 1].trim().to_string();
+            changed = true;
+        } else if trimmed.starts_with('\'') && trimmed.ends_with('\'') && trimmed.len() > 2 {
+            title = trimmed[1..trimmed.len() - 1].trim().to_string();
+            changed = true;
+        } else if trimmed.starts_with('*') && trimmed.ends_with('*') && trimmed.len() > 2 {
+            title = trimmed[1..trimmed.len() - 1].trim().to_string();
+            changed = true;
+        }
+
+        if !changed {
+            break;
+        }
+    }
+
+    // Strip any remaining leading/trailing markdown decoration characters.
+    title = title
+        .trim_matches(|c: char| matches!(c, '*' | '_' | '`' | '"' | '\''))
+        .trim()
+        .to_string();
+
+    // Collapse whitespace.
+    title.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 #[async_trait]

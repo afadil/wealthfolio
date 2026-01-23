@@ -675,7 +675,11 @@ pub enum AiStreamEvent {
 
     /// Thread title updated event - sent after auto-generating title.
     #[serde(rename_all = "camelCase")]
-    ThreadTitleUpdated { thread_id: String, title: String },
+    ThreadTitleUpdated {
+        thread_id: String,
+        run_id: String,
+        title: String,
+    },
 }
 
 impl AiStreamEvent {
@@ -772,9 +776,10 @@ impl AiStreamEvent {
     }
 
     /// Create a thread title updated event.
-    pub fn thread_title_updated(thread_id: &str, title: &str) -> Self {
+    pub fn thread_title_updated(thread_id: &str, run_id: &str, title: &str) -> Self {
         Self::ThreadTitleUpdated {
             thread_id: thread_id.to_string(),
+            run_id: run_id.to_string(),
             title: title.to_string(),
         }
     }
@@ -1013,11 +1018,12 @@ mod tests {
 
     #[test]
     fn test_thread_title_updated_event_serialization() {
-        let event = AiStreamEvent::thread_title_updated("thread-1", "My Portfolio Summary");
+        let event = AiStreamEvent::thread_title_updated("thread-1", "run-1", "My Portfolio Summary");
         let json = serde_json::to_string(&event).unwrap();
         // Verify camelCase serialization: "threadTitleUpdated" as the type
         assert!(json.contains("threadTitleUpdated"));
         assert!(json.contains("threadId"));
+        assert!(json.contains("runId"));
         assert!(json.contains("thread-1"));
         assert!(json.contains("My Portfolio Summary"));
     }

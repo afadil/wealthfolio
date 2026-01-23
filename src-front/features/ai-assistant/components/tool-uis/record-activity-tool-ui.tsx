@@ -698,11 +698,11 @@ function DraftForm({
 
   // Handle symbol selection from ticker search
   const handleSymbolSelect = useCallback(
-    (symbol: string, quoteSummary?: SymbolSearchResult) => {
+    (symbol: string, searchResult?: SymbolSearchResult) => {
       setSelectedSymbol(symbol);
       setValue("symbol", symbol);
-      if (quoteSummary?.exchangeMic) {
-        setSelectedExchangeMic(quoteSummary.exchangeMic);
+      if (searchResult?.exchangeMic) {
+        setSelectedExchangeMic(searchResult.exchangeMic);
       }
     },
     [setValue]
@@ -721,20 +721,24 @@ function DraftForm({
         accountId: formValues.accountId,
         activityType: formValues.activityType,
         activityDate: formValues.activityDate.toISOString(),
-        symbol: selectedSymbol || undefined,
-        exchangeMic: selectedExchangeMic,
+        // Nest asset fields in asset object (required by backend)
+        asset: selectedSymbol
+          ? {
+              symbol: selectedSymbol,
+              exchangeMic: selectedExchangeMic,
+            }
+          : undefined,
         quantity: formValues.quantity,
         unitPrice: formValues.unitPrice,
         amount: formValues.amount ?? calculatedAmount,
         currency: formValues.currency,
         fee: formValues.fee,
         comment: formValues.notes || undefined,
+        subtype:
+          formValues.subtype && formValues.subtype !== "__none__"
+            ? formValues.subtype
+            : undefined,
       };
-
-      // Add subtype if specified
-      if (formValues.subtype && formValues.subtype !== "__none__") {
-        payload.subtype = formValues.subtype;
-      }
 
       // Create the activity
       const createdActivity = await createActivity(payload);

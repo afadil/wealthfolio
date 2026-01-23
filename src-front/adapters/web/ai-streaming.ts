@@ -107,7 +107,7 @@ export async function* streamAiChat(
           const event = JSON.parse(trimmed) as AiStreamEvent;
           yield event;
 
-          // Stop if we receive a terminal event
+          // Stop on terminal events
           if (event.type === "done" || event.type === "error") {
             return;
           }

@@ -122,8 +122,13 @@ impl ChatRepositoryTrait for AiChatRepository {
         // Build base query with optional search filter
         let mut query = ai_threads::table.into_boxed();
 
-        // Apply search filter if provided
-        if let Some(search) = &request.search {
+        // Apply search filter if provided (treat empty/whitespace as "no search")
+        if let Some(search) = request
+            .search
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        {
             let search_pattern = format!("%{}%", search);
             query = query.filter(ai_threads::title.like(search_pattern));
         }

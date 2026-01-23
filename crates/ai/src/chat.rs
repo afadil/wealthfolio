@@ -960,8 +960,8 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
         // Continue anyway - the message was streamed successfully
     }
 
-    // Generate title if thread has no title (new thread)
-    // Do this BEFORE sending done event so frontend receives title update
+    // Generate title in background if thread has no title (new thread)
+    // This is fire-and-forget - just updates DB, no stream event
     let needs_title = title_ctx
         .current_title
         .as_ref()
@@ -969,32 +969,36 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
         .unwrap_or(true);
 
     if needs_title {
-        debug!("Generating title for thread {}", thread_id);
-        let title_gen = TitleGenerator::new(title_ctx.env.clone(), TitleGeneratorConfig::default());
-        let new_title = title_gen
-            .generate_title(&title_ctx.user_message, &title_ctx.provider_id, &title_ctx.model_id)
-            .await;
+        let thread_id_bg = thread_id.clone();
+        let repo_bg = repo.clone();
+        let env_bg = title_ctx.env.clone();
+        let user_message_bg = title_ctx.user_message.clone();
+        let provider_id_bg = title_ctx.provider_id.clone();
+        let model_id_bg = title_ctx.model_id.clone();
 
-        // Update title in repository
-        let thread = repo.get_thread(&thread_id)?;
-        if let Some(thread) = thread {
-            let updated_thread = ChatThread {
-                title: Some(new_title.clone()),
-                updated_at: chrono::Utc::now(),
-                ..thread
-            };
-            if let Err(e) = repo.update_thread(updated_thread).await {
-                error!("Failed to update thread title: {}", e);
-            } else {
-                // Send title update event BEFORE done
-                let _ = tx
-                    .send(AiStreamEvent::thread_title_updated(&thread_id, &new_title))
-                    .await;
+        tokio::spawn(async move {
+            debug!("Generating title for thread {} (background)", thread_id_bg);
+            let title_gen = TitleGenerator::new(env_bg, TitleGeneratorConfig::default());
+            let new_title = title_gen
+                .generate_title(&user_message_bg, &provider_id_bg, &model_id_bg)
+                .await;
+
+            if let Ok(Some(thread)) = repo_bg.get_thread(&thread_id_bg) {
+                let updated_thread = ChatThread {
+                    title: Some(new_title.clone()),
+                    updated_at: chrono::Utc::now(),
+                    ..thread
+                };
+                if let Err(e) = repo_bg.update_thread(updated_thread).await {
+                    error!("Failed to update thread title: {}", e);
+                } else {
+                    debug!("Thread {} title updated to: {}", thread_id_bg, new_title);
+                }
             }
-        }
+        });
     }
 
-    // Send done event LAST - this is the terminal event
+    // Send done event - this is the terminal event, stream closes after this
     tx.send(AiStreamEvent::done(&thread_id, &run_id, final_message, None))
         .await
         .map_err(|e| AiError::Internal(e.to_string()))?;
