@@ -526,6 +526,65 @@ impl QuoteStore for MarketDataRepository {
 
         Ok(results.into_iter().map(Quote::from).collect())
     }
+
+    fn get_quote_bounds_for_assets(
+        &self,
+        asset_ids: &[String],
+        source: &str,
+    ) -> Result<HashMap<String, (NaiveDate, NaiveDate)>> {
+        if asset_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let mut conn = get_connection(&self.pool)?;
+        let mut result: HashMap<String, (NaiveDate, NaiveDate)> = HashMap::new();
+
+        #[derive(QueryableByName, Debug)]
+        struct QuoteBoundsRow {
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            asset_id: String,
+            #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+            min_day: Option<String>,
+            #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+            max_day: Option<String>,
+        }
+
+        // Chunk the asset_ids to avoid SQLite parameter limits
+        for chunk in chunk_for_sqlite(asset_ids) {
+            let placeholders = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+
+            let sql = format!(
+                "SELECT asset_id, MIN(day) as min_day, MAX(day) as max_day \
+                 FROM quotes \
+                 WHERE asset_id IN ({}) AND source = ? \
+                 GROUP BY asset_id",
+                placeholders
+            );
+
+            let mut query_builder = Box::new(sql_query(sql)).into_boxed::<Sqlite>();
+
+            for asset_id in chunk {
+                query_builder = query_builder.bind::<Text, _>(asset_id);
+            }
+            query_builder = query_builder.bind::<Text, _>(source);
+
+            let rows: Vec<QuoteBoundsRow> =
+                query_builder.load::<QuoteBoundsRow>(&mut conn).into_core()?;
+
+            for row in rows {
+                if let (Some(min_str), Some(max_str)) = (row.min_day, row.max_day) {
+                    if let (Ok(min_date), Ok(max_date)) = (
+                        NaiveDate::parse_from_str(&min_str, "%Y-%m-%d"),
+                        NaiveDate::parse_from_str(&max_str, "%Y-%m-%d"),
+                    ) {
+                        result.insert(row.asset_id, (min_date, max_date));
+                    }
+                }
+            }
+        }
+
+        Ok(result)
+    }
 }
 
 // =============================================================================

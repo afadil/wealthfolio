@@ -217,7 +217,8 @@ export const ACTIVITY_FORM_CONFIG: Record<PickerActivityType, ActivityTypeConfig
       const hasSecurityData = !!(activity?.assetSymbol || activity?.assetId);
       const transferMode = hasSecurityData ? "securities" : "cash";
       // Derive isExternal from metadata (if flow.is_external is true)
-      const isExternal = activity?.metadata?.flow?.is_external === true;
+      const flowMetadata = activity?.metadata?.flow as { is_external?: boolean } | undefined;
+      const isExternal = flowMetadata?.is_external === true;
       // Derive direction from activity type
       const direction =
         activity?.activityType === ActivityType.TRANSFER_IN ? "in" : "out";

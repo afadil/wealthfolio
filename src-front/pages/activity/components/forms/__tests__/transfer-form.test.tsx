@@ -146,12 +146,11 @@ vi.mock("@wealthfolio/ui/components/ui/checkbox", () => ({
 vi.mock("@wealthfolio/ui/components/ui/radio-group", () => ({
   RadioGroup: ({
     value,
-    onValueChange,
     children,
     className,
   }: {
     value: string;
-    onValueChange: (value: string) => void;
+    onValueChange?: (value: string) => void;
     children: React.ReactNode;
     className?: string;
   }) => (

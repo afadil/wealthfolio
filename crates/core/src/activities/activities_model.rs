@@ -367,6 +367,7 @@ pub struct ActivityDetails {
     pub idempotency_key: Option<String>,
     pub import_run_id: Option<String>,
     pub is_user_modified: bool,
+    pub metadata: Option<Value>,
 }
 
 impl ActivityDetails {
