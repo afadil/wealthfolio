@@ -197,10 +197,8 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       gcTime: 300000, // Keep in cache for 5 minutes (formerly cacheTime)
     });
 
-    // Memoize sorted results
-    const sortedTickers = useMemo(() => {
-      return data?.sort((a, b) => b.score - a.score);
-    }, [data]);
+    // Results are already sorted by backend (existing assets first, then by score)
+    const sortedTickers = data;
 
     // Calculate display name for the button
     const displayName = selected || placeholder;

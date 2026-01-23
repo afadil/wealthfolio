@@ -18,7 +18,7 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use crate::errors::MarketDataError;
-use crate::models::{AssetProfile, Coverage, InstrumentKind, ProviderInstrument, Quote, QuoteContext};
+use crate::models::{AssetProfile, Coverage, InstrumentKind, ProviderInstrument, Quote, QuoteContext, SearchResult};
 use crate::provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
 
 const BASE_URL: &str = "https://www.alphavantage.co/query";
@@ -171,6 +171,45 @@ impl CryptoDailyQuote {
         }
         None
     }
+}
+
+/// SYMBOL_SEARCH response for symbol lookup
+#[derive(Debug, Deserialize)]
+struct SymbolSearchResponse {
+    #[serde(rename = "bestMatches")]
+    best_matches: Option<Vec<SymbolMatch>>,
+    #[serde(rename = "Error Message")]
+    error_message: Option<String>,
+    #[serde(rename = "Note")]
+    note: Option<String>,
+    #[serde(rename = "Information")]
+    information: Option<String>,
+}
+
+/// Individual match from SYMBOL_SEARCH
+#[derive(Debug, Deserialize)]
+struct SymbolMatch {
+    #[serde(rename = "1. symbol")]
+    symbol: String,
+    #[serde(rename = "2. name")]
+    name: String,
+    #[serde(rename = "3. type")]
+    asset_type: String,
+    #[serde(rename = "4. region")]
+    region: String,
+    #[serde(rename = "5. marketOpen")]
+    #[allow(dead_code)]
+    market_open: String,
+    #[serde(rename = "6. marketClose")]
+    #[allow(dead_code)]
+    market_close: String,
+    #[serde(rename = "7. timezone")]
+    #[allow(dead_code)]
+    timezone: String,
+    #[serde(rename = "8. currency")]
+    currency: String,
+    #[serde(rename = "9. matchScore")]
+    match_score: String,
 }
 
 /// OVERVIEW response for company fundamentals
@@ -788,6 +827,58 @@ impl AlphaVantageProvider {
 
         Ok(response.to_asset_profile(symbol))
     }
+
+    /// Search for symbols using SYMBOL_SEARCH endpoint.
+    async fn search_symbols(&self, query: &str) -> Result<Vec<SearchResult>, MarketDataError> {
+        let params = [("function", "SYMBOL_SEARCH"), ("keywords", query)];
+
+        let text = self.fetch(&params).await?;
+
+        let response: SymbolSearchResponse =
+            serde_json::from_str(&text).map_err(|e| MarketDataError::ProviderError {
+                provider: PROVIDER_ID.to_string(),
+                message: format!("Failed to parse search response: {}", e),
+            })?;
+
+        // Check for API-level errors
+        Self::check_api_error(
+            &response.error_message,
+            &response.note,
+            &response.information,
+        )?;
+
+        let matches = response.best_matches.unwrap_or_default();
+
+        let results: Vec<SearchResult> = matches
+            .into_iter()
+            .map(|m| {
+                // Parse match score (0-1 as string, e.g., "1.0000")
+                let score = m.match_score.parse::<f64>().unwrap_or(0.0);
+
+                // Normalize asset type to match other providers
+                let asset_type = match m.asset_type.to_uppercase().as_str() {
+                    "EQUITY" => "EQUITY",
+                    "ETF" => "ETF",
+                    "MUTUAL FUND" => "MUTUALFUND",
+                    other => other,
+                }
+                .to_string();
+
+                SearchResult::new(&m.symbol, &m.name, &m.region, &asset_type)
+                    .with_currency(&m.currency)
+                    .with_score(score)
+                    .with_data_source(PROVIDER_ID)
+            })
+            .collect();
+
+        debug!(
+            "Alpha Vantage: search for '{}' returned {} results",
+            query,
+            results.len()
+        );
+
+        Ok(results)
+    }
 }
 
 // ============================================================================
@@ -812,7 +903,7 @@ impl MarketDataProvider for AlphaVantageProvider {
             coverage: Coverage::global_best_effort(),
             supports_latest: true,
             supports_historical: true,
-            supports_search: false,
+            supports_search: true, // Via SYMBOL_SEARCH endpoint
             supports_profile: true, // Via OVERVIEW endpoint for equities
         }
     }
@@ -983,6 +1074,11 @@ impl MarketDataProvider for AlphaVantageProvider {
 
         Ok(profile)
     }
+
+    async fn search(&self, query: &str) -> Result<Vec<SearchResult>, MarketDataError> {
+        debug!("Searching Alpha Vantage for '{}'", query);
+        self.search_symbols(query).await
+    }
 }
 
 #[cfg(test)]
@@ -1036,8 +1132,8 @@ mod tests {
         assert!(caps.instrument_kinds.contains(&InstrumentKind::Fx));
         assert!(caps.supports_latest);
         assert!(caps.supports_historical);
-        assert!(!caps.supports_search);
-        assert!(caps.supports_profile); // Now supports profile via OVERVIEW endpoint
+        assert!(caps.supports_search); // Via SYMBOL_SEARCH endpoint
+        assert!(caps.supports_profile); // Via OVERVIEW endpoint
     }
 
     #[test]
@@ -1228,5 +1324,61 @@ mod tests {
 
         // Test edge cases
         assert!(EtfProfileResponse::parse_weight("invalid").is_none());
+    }
+
+    #[test]
+    fn test_symbol_search_response_parsing() {
+        let json = r#"{
+            "bestMatches": [
+                {
+                    "1. symbol": "MSFT",
+                    "2. name": "Microsoft Corporation",
+                    "3. type": "Equity",
+                    "4. region": "United States",
+                    "5. marketOpen": "09:30",
+                    "6. marketClose": "16:00",
+                    "7. timezone": "UTC-04",
+                    "8. currency": "USD",
+                    "9. matchScore": "1.0000"
+                },
+                {
+                    "1. symbol": "MSF.DE",
+                    "2. name": "Microsoft Corporation",
+                    "3. type": "Equity",
+                    "4. region": "Germany",
+                    "5. marketOpen": "08:00",
+                    "6. marketClose": "20:00",
+                    "7. timezone": "UTC+02",
+                    "8. currency": "EUR",
+                    "9. matchScore": "0.6667"
+                }
+            ]
+        }"#;
+
+        let response: SymbolSearchResponse = serde_json::from_str(json).unwrap();
+        let matches = response.best_matches.unwrap();
+
+        assert_eq!(matches.len(), 2);
+
+        // First match
+        assert_eq!(matches[0].symbol, "MSFT");
+        assert_eq!(matches[0].name, "Microsoft Corporation");
+        assert_eq!(matches[0].asset_type, "Equity");
+        assert_eq!(matches[0].region, "United States");
+        assert_eq!(matches[0].currency, "USD");
+        assert_eq!(matches[0].match_score, "1.0000");
+
+        // Second match
+        assert_eq!(matches[1].symbol, "MSF.DE");
+        assert_eq!(matches[1].region, "Germany");
+        assert_eq!(matches[1].currency, "EUR");
+        assert_eq!(matches[1].match_score, "0.6667");
+    }
+
+    #[test]
+    fn test_symbol_search_empty_response() {
+        let json = r#"{"bestMatches": []}"#;
+        let response: SymbolSearchResponse = serde_json::from_str(json).unwrap();
+        assert!(response.best_matches.unwrap().is_empty());
     }
 }
