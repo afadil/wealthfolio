@@ -95,7 +95,7 @@
       ],
       "models": {
         "gemini-3-flash-preview": {
-          "capabilities": { "tools": false, "thinking": true, "vision": true }
+          "capabilities": { "tools": true, "thinking": true, "vision": true }
         },
         "gemini-2.5-flash": {
           "capabilities": { "tools": true, "thinking": true, "vision": true }
