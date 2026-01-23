@@ -28,11 +28,20 @@ use crate::env::AiEnvironment;
 use crate::error::AiError;
 use crate::providers::ProviderService;
 use crate::title_generator::{TitleGenerator, TitleGeneratorConfig, TitleGeneratorTrait};
+use crate::title_generator::truncate_to_title;
 use crate::tools::ToolSet;
 use crate::types::{
     AiStreamEvent, ChatMessage, ChatMessageContent, ChatMessagePart, ChatMessageRole, ChatRepositoryTrait, ChatThread,
     ListThreadsRequest, SendMessageRequest, SimpleChatMessage, ThreadPage, ToolCall, ToolResultData,
 };
+
+fn derive_initial_thread_title(first_user_message: &str) -> Option<String> {
+    let trimmed = first_user_message.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    Some(truncate_to_title(trimmed, 50))
+}
 
 // ============================================================================
 // Chat Stream Configuration
@@ -152,13 +161,19 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
         let repo = self.env.chat_repository();
 
         // Get or create thread
-        let thread = match &request.thread_id {
-            Some(id) => repo
-                .get_thread(id)?
-                .ok_or_else(|| AiError::ThreadNotFound(id.clone()))?,
+        let (thread, is_new_thread, initial_title) = match &request.thread_id {
+            Some(id) => {
+                let thread = repo
+                    .get_thread(id)?
+                    .ok_or_else(|| AiError::ThreadNotFound(id.clone()))?;
+                (thread, false, None)
+            }
             None => {
-                let new_thread = ChatThread::new();
-                repo.create_thread(new_thread).await?
+                let mut new_thread = ChatThread::new();
+                new_thread.title = derive_initial_thread_title(&request.content);
+                let created = repo.create_thread(new_thread).await?;
+                let initial_title = created.title.clone();
+                (created, true, initial_title)
             }
         };
 
@@ -215,6 +230,8 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
         let run_id_clone = run_id.clone();
         let message_id_clone = message_id.clone();
         let thread_title = thread.title.clone();
+        let initial_title_clone = initial_title.clone();
+        let is_new_thread_clone = is_new_thread;
 
         // Spawn the streaming task
         tokio::spawn(async move {
@@ -229,6 +246,8 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
                 run_id_clone.clone(),
                 message_id_clone,
                 thread_title,
+                initial_title_clone,
+                is_new_thread_clone,
             )
             .await
             {
@@ -357,6 +376,10 @@ struct TitleContext<E: AiEnvironment> {
     env: Arc<E>,
     /// Current thread title (None or empty triggers generation).
     current_title: Option<String>,
+    /// Deterministic title set at creation (used to avoid overwriting user edits).
+    initial_title: Option<String>,
+    /// Whether this stream created a new thread.
+    is_new_thread: bool,
     /// User message to generate title from.
     user_message: String,
     /// Provider ID to use for title generation.
@@ -377,6 +400,8 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     run_id: String,
     message_id: String,
     thread_title: Option<String>,
+    initial_title: Option<String>,
+    is_new_thread: bool,
 ) -> Result<(), AiError> {
     // Send system event first
     tx.send(AiStreamEvent::system(&thread_id, &run_id, &message_id))
@@ -446,6 +471,8 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     let title_ctx = TitleContext {
         env: env.clone(),
         current_title: thread_title,
+        initial_title,
+        is_new_thread,
         user_message: user_message.clone(),
         provider_id: provider_id.clone(),
         model_id: model_id.clone(),
@@ -729,6 +756,77 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
     // Start multi-turn streaming (up to 6 tool rounds)
     let mut stream = agent.stream_chat(prompt, history).multi_turn(6).await;
 
+    // Generate/refine title concurrently so it can update the UI during streaming.
+    let should_attempt_title = title_ctx.is_new_thread
+        || title_ctx
+            .current_title
+            .as_deref()
+            .map(str::trim)
+            .map(str::is_empty)
+            .unwrap_or(true);
+
+    if should_attempt_title {
+        let thread_id_bg = thread_id.clone();
+        let run_id_bg = run_id.clone();
+        let tx_bg = tx.clone();
+        let repo_bg = repo.clone();
+        let env_bg = title_ctx.env.clone();
+        let user_message_bg = title_ctx.user_message.clone();
+        let provider_id_bg = title_ctx.provider_id.clone();
+        let model_id_bg = title_ctx.model_id.clone();
+        let initial_title_bg = title_ctx.initial_title.clone();
+
+        tokio::spawn(async move {
+            debug!("Generating title for thread {} (concurrent)", thread_id_bg);
+            let title_gen = TitleGenerator::new(env_bg, TitleGeneratorConfig::default());
+            let new_title = title_gen
+                .generate_title(&user_message_bg, &provider_id_bg, &model_id_bg)
+                .await;
+
+            let next_title = new_title.trim();
+            if next_title.is_empty() {
+                return;
+            }
+
+            let Ok(Some(thread)) = repo_bg.get_thread(&thread_id_bg) else {
+                return;
+            };
+
+            let current_title_trimmed = thread.title.as_deref().unwrap_or("").trim();
+            let should_update = if let Some(initial) = initial_title_bg.as_deref() {
+                // New thread: only refine if user hasn't renamed it.
+                current_title_trimmed.is_empty() || current_title_trimmed == initial.trim()
+            } else {
+                // Existing thread: only fill missing title.
+                current_title_trimmed.is_empty()
+            };
+
+            if !should_update {
+                return;
+            }
+
+            if current_title_trimmed == next_title {
+                return;
+            }
+
+            let updated_thread = ChatThread {
+                title: Some(next_title.to_string()),
+                updated_at: chrono::Utc::now(),
+                ..thread
+            };
+
+            if repo_bg.update_thread(updated_thread).await.is_ok() {
+                let _ = tx_bg
+                    .send(AiStreamEvent::thread_title_updated(
+                        &thread_id_bg,
+                        &run_id_bg,
+                        next_title,
+                    ))
+                    .await;
+            }
+        });
+    }
+
     // Track content parts for final message
     let mut content_parts: Vec<ChatMessagePart> = vec![];
     let mut accumulated_text = String::new();
@@ -793,6 +891,13 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
             Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::ToolCall(
                 RigToolCall { id, function, .. },
             ))) => {
+                // Flush any accumulated text BEFORE the tool call to preserve order
+                if !accumulated_text.is_empty() {
+                    content_parts.push(ChatMessagePart::Text {
+                        content: std::mem::take(&mut accumulated_text),
+                    });
+                }
+
                 let args: serde_json::Value =
                     serde_json::from_str(&function.arguments.to_string()).unwrap_or_default();
 
@@ -929,6 +1034,7 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
     }
 
     // Add reasoning parsed from <think> tags to content parts
+    // Add parsed reasoning from <think> tags at the beginning
     let parsed_reasoning = think_parser.reasoning();
     if !parsed_reasoning.is_empty() {
         content_parts.insert(
@@ -939,15 +1045,12 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
         );
     }
 
-    // Add accumulated text to content parts
+    // Push any remaining accumulated text at the END to preserve interleaved order
+    // (text before tool calls was already flushed when tool calls arrived)
     if !accumulated_text.is_empty() {
-        let text_idx = if parsed_reasoning.is_empty() { 0 } else { 1 };
-        content_parts.insert(
-            text_idx,
-            ChatMessagePart::Text {
-                content: accumulated_text,
-            },
-        );
+        content_parts.push(ChatMessagePart::Text {
+            content: accumulated_text,
+        });
     }
 
     // Build final message
@@ -958,44 +1061,6 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
     if let Err(e) = repo.create_message(final_message.clone()).await {
         error!("Failed to save assistant message to repository: {}", e);
         // Continue anyway - the message was streamed successfully
-    }
-
-    // Generate title in background if thread has no title (new thread)
-    // This is fire-and-forget - just updates DB, no stream event
-    let needs_title = title_ctx
-        .current_title
-        .as_ref()
-        .map(|t| t.is_empty())
-        .unwrap_or(true);
-
-    if needs_title {
-        let thread_id_bg = thread_id.clone();
-        let repo_bg = repo.clone();
-        let env_bg = title_ctx.env.clone();
-        let user_message_bg = title_ctx.user_message.clone();
-        let provider_id_bg = title_ctx.provider_id.clone();
-        let model_id_bg = title_ctx.model_id.clone();
-
-        tokio::spawn(async move {
-            debug!("Generating title for thread {} (background)", thread_id_bg);
-            let title_gen = TitleGenerator::new(env_bg, TitleGeneratorConfig::default());
-            let new_title = title_gen
-                .generate_title(&user_message_bg, &provider_id_bg, &model_id_bg)
-                .await;
-
-            if let Ok(Some(thread)) = repo_bg.get_thread(&thread_id_bg) {
-                let updated_thread = ChatThread {
-                    title: Some(new_title.clone()),
-                    updated_at: chrono::Utc::now(),
-                    ..thread
-                };
-                if let Err(e) = repo_bg.update_thread(updated_thread).await {
-                    error!("Failed to update thread title: {}", e);
-                } else {
-                    debug!("Thread {} title updated to: {}", thread_id_bg, new_title);
-                }
-            }
-        });
     }
 
     // Send done event - this is the terminal event, stream closes after this

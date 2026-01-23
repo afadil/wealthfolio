@@ -347,7 +347,8 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
                     </div>
                   </TableCell>
                   <TableCell className="py-2 text-right font-medium tabular-nums">
-                    {formatValue(holding.marketValueBase)}
+                    <div>{formatValue(holding.marketValueBase)}</div>
+                    <div className="text-muted-foreground text-[10px]">{holding.currency}</div>
                   </TableCell>
                   <TableCell className="hidden py-2 text-right tabular-nums sm:table-cell">
                     {(holding.weight * 100).toFixed(1)}%
