@@ -119,7 +119,8 @@ export function createDraftTransaction(
   return {
     id: generateTempActivityId(),
     activityType: ActivityType.BUY,
-    date: now,
+    // Use ISO string to match server data format for consistent sorting
+    date: now.toISOString() as unknown as Date,
     quantity: 0,
     unitPrice: 0,
     amount: 0,
@@ -396,7 +397,6 @@ export function buildSavePayload(
       fee: toDecimalString(transaction.fee),
       fxRate: transaction.fxRate != null ? toDecimalString(transaction.fxRate) : null,
       comment: transaction.comment ?? undefined,
-      pricingMode: transaction.assetPricingMode,
     };
 
     // Remove quantity/unitPrice for split activities
@@ -406,33 +406,38 @@ export function buildSavePayload(
     }
 
     if (isNew) {
-      // Build CREATE payload - NO assetId allowed, only symbol + exchangeMic
+      // Build CREATE payload - NO asset.id allowed, only asset.symbol + asset.exchangeMic
       const createPayload: ActivityCreatePayload = { ...basePayload };
 
       if (!isCash) {
-        // For NEW market activities: send symbol + exchangeMic
+        // For NEW market activities: send asset with symbol + exchangeMic
         // Backend will generate the canonical ID
         const symbol = (transaction.assetSymbol || "").trim().toUpperCase();
         if (symbol) {
-          createPayload.symbol = symbol;
-          // Include exchangeMic if available from symbol search selection
-          if (transaction.exchangeMic) {
-            createPayload.exchangeMic = transaction.exchangeMic;
-          }
+          createPayload.asset = {
+            symbol,
+            exchangeMic: transaction.exchangeMic,
+            kind: transaction.pendingAssetKind,
+            name: transaction.pendingAssetName,
+            pricingMode: transaction.assetPricingMode,
+          };
         }
       }
-      // For cash activities: don't send symbol - backend generates CASH:{currency}
+      // For cash activities: don't send asset - backend generates CASH:{currency}
 
       creates.push(createPayload);
     } else {
-      // Build UPDATE payload - can include assetId for backward compatibility
+      // Build UPDATE payload - can include asset.id for backward compatibility
       const updatePayload: ActivityUpdatePayload = { ...basePayload };
 
       if (!isCash) {
-        // For EXISTING activities: send assetId for backward compatibility
+        // For EXISTING activities: send asset.id for backward compatibility
         const existingAssetId = resolveAssetIdForTransaction(transaction, fallbackCurrency);
         if (existingAssetId) {
-          updatePayload.assetId = existingAssetId;
+          updatePayload.asset = {
+            id: existingAssetId,
+            pricingMode: transaction.assetPricingMode,
+          };
         }
       }
 

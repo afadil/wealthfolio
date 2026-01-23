@@ -3,14 +3,19 @@ mod tests {
     use crate::accounts::{Account, AccountServiceTrait, AccountUpdate, NewAccount};
     use crate::activities::activities_model::*;
     use crate::activities::{ActivityRepositoryTrait, ActivityService, ActivityServiceTrait};
-    use crate::assets::{Asset, AssetServiceTrait, UpdateAssetProfile};
+    use crate::assets::{Asset, AssetServiceTrait, ProviderProfile, UpdateAssetProfile};
     use crate::errors::Result;
     use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
+    use crate::quotes::{
+        LatestQuotePair, Quote, QuoteImport, QuoteServiceTrait, QuoteSyncState, SyncMode,
+        SyncResult, SymbolSearchResult, SymbolSyncPlan,
+    };
+    use crate::quotes::service::ProviderInfo;
     use async_trait::async_trait;
     use chrono::{DateTime, NaiveDate, Utc};
     use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
-    use std::collections::HashSet;
+    use std::collections::{HashMap, HashSet};
     use std::sync::{Arc, Mutex};
 
     // --- Mock AccountService ---
@@ -277,6 +282,189 @@ mod tests {
         }
     }
 
+    // --- Mock QuoteService ---
+    #[derive(Clone, Default)]
+    struct MockQuoteService;
+
+    #[async_trait]
+    impl QuoteServiceTrait for MockQuoteService {
+        fn get_latest_quote(&self, _symbol: &str) -> Result<Quote> {
+            unimplemented!()
+        }
+
+        fn get_latest_quotes(&self, _symbols: &[String]) -> Result<HashMap<String, Quote>> {
+            unimplemented!()
+        }
+
+        fn get_latest_quotes_pair(
+            &self,
+            _symbols: &[String],
+        ) -> Result<HashMap<String, LatestQuotePair>> {
+            unimplemented!()
+        }
+
+        fn get_historical_quotes(&self, _symbol: &str) -> Result<Vec<Quote>> {
+            unimplemented!()
+        }
+
+        fn get_all_historical_quotes(&self) -> Result<HashMap<String, Vec<(NaiveDate, Quote)>>> {
+            unimplemented!()
+        }
+
+        fn get_quotes_in_range(
+            &self,
+            _symbols: &HashSet<String>,
+            _start: NaiveDate,
+            _end: NaiveDate,
+        ) -> Result<Vec<Quote>> {
+            unimplemented!()
+        }
+
+        fn get_quotes_in_range_filled(
+            &self,
+            _symbols: &HashSet<String>,
+            _start: NaiveDate,
+            _end: NaiveDate,
+            _first_appearance: &HashMap<String, NaiveDate>,
+        ) -> Result<Vec<Quote>> {
+            unimplemented!()
+        }
+
+        async fn get_daily_quotes(
+            &self,
+            _asset_ids: &HashSet<String>,
+            _start: NaiveDate,
+            _end: NaiveDate,
+        ) -> Result<HashMap<NaiveDate, HashMap<String, Quote>>> {
+            unimplemented!()
+        }
+
+        async fn add_quote(&self, _quote: &Quote) -> Result<Quote> {
+            unimplemented!()
+        }
+
+        async fn update_quote(&self, quote: Quote) -> Result<Quote> {
+            Ok(quote)
+        }
+
+        async fn delete_quote(&self, _quote_id: &str) -> Result<()> {
+            unimplemented!()
+        }
+
+        async fn bulk_upsert_quotes(&self, _quotes: Vec<Quote>) -> Result<usize> {
+            unimplemented!()
+        }
+
+        async fn search_symbol(&self, _query: &str) -> Result<Vec<SymbolSearchResult>> {
+            unimplemented!()
+        }
+
+        async fn search_symbol_with_currency(
+            &self,
+            _query: &str,
+            _account_currency: Option<&str>,
+        ) -> Result<Vec<SymbolSearchResult>> {
+            unimplemented!()
+        }
+
+        async fn get_asset_profile(&self, _asset: &Asset) -> Result<ProviderProfile> {
+            unimplemented!()
+        }
+
+        async fn fetch_quotes_from_provider(
+            &self,
+            _symbol: &str,
+            _start: NaiveDate,
+            _end: NaiveDate,
+        ) -> Result<Vec<Quote>> {
+            unimplemented!()
+        }
+
+        async fn sync(
+            &self,
+            _mode: SyncMode,
+            _asset_ids: Option<Vec<String>>,
+        ) -> Result<SyncResult> {
+            unimplemented!()
+        }
+
+        async fn resync(&self, _symbols: Option<Vec<String>>) -> Result<SyncResult> {
+            unimplemented!()
+        }
+
+        async fn refresh_sync_state(&self) -> Result<()> {
+            unimplemented!()
+        }
+
+        fn get_sync_plan(&self) -> Result<Vec<SymbolSyncPlan>> {
+            unimplemented!()
+        }
+
+        async fn handle_activity_created(
+            &self,
+            _symbol: &str,
+            _activity_date: NaiveDate,
+        ) -> Result<()> {
+            Ok(())
+        }
+
+        async fn handle_activity_deleted(&self, _symbol: &str) -> Result<()> {
+            Ok(())
+        }
+
+        async fn delete_sync_state(&self, _symbol: &str) -> Result<()> {
+            Ok(())
+        }
+
+        fn get_symbols_needing_sync(&self) -> Result<Vec<QuoteSyncState>> {
+            Ok(vec![])
+        }
+
+        fn get_sync_state(&self, _symbol: &str) -> Result<Option<QuoteSyncState>> {
+            Ok(None)
+        }
+
+        async fn mark_profile_enriched(&self, _symbol: &str) -> Result<()> {
+            Ok(())
+        }
+
+        fn get_assets_needing_profile_enrichment(&self) -> Result<Vec<QuoteSyncState>> {
+            Ok(vec![])
+        }
+
+        async fn update_position_status_from_holdings(
+            &self,
+            _current_holdings: &HashMap<String, Decimal>,
+        ) -> Result<()> {
+            Ok(())
+        }
+
+        fn get_sync_states_with_errors(&self) -> Result<Vec<QuoteSyncState>> {
+            Ok(vec![])
+        }
+
+        async fn get_providers_info(&self) -> Result<Vec<ProviderInfo>> {
+            Ok(vec![])
+        }
+
+        async fn update_provider_settings(
+            &self,
+            _provider_id: &str,
+            _priority: i32,
+            _enabled: bool,
+        ) -> Result<()> {
+            Ok(())
+        }
+
+        async fn import_quotes(
+            &self,
+            quotes: Vec<QuoteImport>,
+            _overwrite: bool,
+        ) -> Result<Vec<QuoteImport>> {
+            Ok(quotes)
+        }
+    }
+
     // --- Mock ActivityRepository ---
     #[derive(Clone, Default)]
     struct MockActivityRepository {
@@ -341,10 +529,12 @@ mod tests {
 
         async fn create_activity(&self, new_activity: NewActivity) -> Result<Activity> {
             use crate::activities::ActivityStatus;
+            // Extract asset_id before consuming other fields
+            let asset_id = new_activity.get_asset_id().map(|s| s.to_string());
             let activity = Activity {
                 id: new_activity.id.unwrap_or_else(|| "test-id".to_string()),
                 account_id: new_activity.account_id,
-                asset_id: new_activity.asset_id,
+                asset_id,
                 activity_type: new_activity.activity_type,
                 activity_type_override: None,
                 source_type: None,
@@ -499,23 +689,23 @@ mod tests {
         asset_service.add_asset(asset);
 
         // Create the activity service
+        let quote_service = Arc::new(MockQuoteService);
         let activity_service = ActivityService::new(
             activity_repository,
             account_service,
             asset_service,
             fx_service.clone(),
+            quote_service,
         );
 
         // Create activity with USD currency (same as account) but for EUR asset
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset_id: Some("NESN".to_string()),
-            symbol: None,
-            exchange_mic: None,
-            asset_kind: None,
-            pricing_mode: None,
-            asset_metadata: None,
+            asset: Some(AssetInput {
+                id: Some("NESN".to_string()),
+                ..Default::default()
+            }),
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -569,23 +759,23 @@ mod tests {
         asset_service.add_asset(asset);
 
         // Create the activity service
+        let quote_service = Arc::new(MockQuoteService);
         let activity_service = ActivityService::new(
             activity_repository,
             account_service,
             asset_service,
             fx_service.clone(),
+            quote_service,
         );
 
         // Create activity with EUR currency (different from account USD)
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset_id: Some("NESN".to_string()),
-            symbol: None,
-            exchange_mic: None,
-            asset_kind: None,
-            pricing_mode: None,
-            asset_metadata: None,
+            asset: Some(AssetInput {
+                id: Some("NESN".to_string()),
+                ..Default::default()
+            }),
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -639,23 +829,23 @@ mod tests {
         asset_service.add_asset(asset);
 
         // Create the activity service
+        let quote_service = Arc::new(MockQuoteService);
         let activity_service = ActivityService::new(
             activity_repository,
             account_service,
             asset_service,
             fx_service.clone(),
+            quote_service,
         );
 
         // Create activity with USD currency (same as account and asset)
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset_id: Some("AAPL".to_string()),
-            symbol: None,
-            exchange_mic: None,
-            asset_kind: None,
-            pricing_mode: None,
-            asset_metadata: None,
+            asset: Some(AssetInput {
+                id: Some("AAPL".to_string()),
+                ..Default::default()
+            }),
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -709,22 +899,23 @@ mod tests {
         let asset = create_test_asset("SEC:AAPL:XNAS", "USD");
         asset_service.add_asset(asset);
 
+        let quote_service = Arc::new(MockQuoteService);
         let activity_service = ActivityService::new(
             activity_repository.clone(),
             account_service,
             asset_service,
             fx_service,
+            quote_service,
         );
 
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset_id: None, // No asset_id provided
-            symbol: Some("AAPL".to_string()),
-            exchange_mic: Some("XNAS".to_string()),
-            asset_kind: None,
-            pricing_mode: None,
-            asset_metadata: None,
+            asset: Some(AssetInput {
+                symbol: Some("AAPL".to_string()),
+                exchange_mic: Some("XNAS".to_string()),
+                ..Default::default()
+            }),
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -769,22 +960,22 @@ mod tests {
         let asset = create_test_asset("SEC:TSLA:UNKNOWN", "USD");
         asset_service.add_asset(asset);
 
+        let quote_service = Arc::new(MockQuoteService);
         let activity_service = ActivityService::new(
             activity_repository.clone(),
             account_service,
             asset_service,
             fx_service,
+            quote_service,
         );
 
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset_id: None,
-            symbol: Some("TSLA".to_string()),
-            exchange_mic: None, // No exchange provided
-            asset_kind: None,
-            pricing_mode: None,
-            asset_metadata: None,
+            asset: Some(AssetInput {
+                symbol: Some("TSLA".to_string()),
+                ..Default::default()
+            }),
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -830,22 +1021,24 @@ mod tests {
         let asset = create_test_asset("SEC:AAPL:XNAS", "USD");
         asset_service.add_asset(asset);
 
+        let quote_service = Arc::new(MockQuoteService);
         let activity_service = ActivityService::new(
             activity_repository.clone(),
             account_service,
             asset_service,
             fx_service,
+            quote_service,
         );
 
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset_id: Some("IGNORED".to_string()), // Should be ignored when symbol is provided
-            symbol: Some("AAPL".to_string()),
-            exchange_mic: Some("XNAS".to_string()),
-            asset_kind: None,
-            pricing_mode: None,
-            asset_metadata: None,
+            asset: Some(AssetInput {
+                id: Some("IGNORED".to_string()), // Should be ignored when symbol is provided
+                symbol: Some("AAPL".to_string()),
+                exchange_mic: Some("XNAS".to_string()),
+                ..Default::default()
+            }),
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -890,22 +1083,19 @@ mod tests {
         let cash_asset = create_test_asset("CASH:USD", "USD");
         asset_service.add_asset(cash_asset);
 
+        let quote_service = Arc::new(MockQuoteService);
         let activity_service = ActivityService::new(
             activity_repository.clone(),
             account_service,
             asset_service,
             fx_service,
+            quote_service,
         );
 
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset_id: None,
-            symbol: None,
-            exchange_mic: None,
-            asset_kind: None,
-            pricing_mode: None,
-            asset_metadata: None,
+            asset: None,
             activity_type: "DEPOSIT".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -950,22 +1140,19 @@ mod tests {
         let cash_asset = create_test_asset("CASH:USD", "USD");
         asset_service.add_asset(cash_asset);
 
+        let quote_service = Arc::new(MockQuoteService);
         let activity_service = ActivityService::new(
             activity_repository.clone(),
             account_service,
             asset_service,
             fx_service,
+            quote_service,
         );
 
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset_id: None,
-            symbol: None,
-            exchange_mic: None,
-            asset_kind: None,
-            pricing_mode: None,
-            asset_metadata: None,
+            asset: None,
             activity_type: "WITHDRAWAL".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -1006,22 +1193,19 @@ mod tests {
         let account = create_test_account("acc-1", "USD");
         account_service.add_account(account);
 
+        let quote_service = Arc::new(MockQuoteService);
         let activity_service = ActivityService::new(
             activity_repository,
             account_service,
             asset_service,
             fx_service,
+            quote_service,
         );
 
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset_id: None,
-            symbol: None, // No symbol
-            exchange_mic: None,
-            asset_kind: None,
-            pricing_mode: None,
-            asset_metadata: None,
+            asset: None, // No asset info
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -1059,22 +1243,22 @@ mod tests {
         let asset = create_test_asset("CRYPTO:BTC:USD", "USD");
         asset_service.add_asset(asset);
 
+        let quote_service = Arc::new(MockQuoteService);
         let activity_service = ActivityService::new(
             activity_repository.clone(),
             account_service,
             asset_service,
             fx_service,
+            quote_service,
         );
 
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset_id: None,
-            symbol: Some("BTC".to_string()),
-            exchange_mic: None, // No exchange - should infer crypto
-            asset_kind: None,
-            pricing_mode: None,
-            asset_metadata: None,
+            asset: Some(AssetInput {
+                symbol: Some("BTC".to_string()),
+                ..Default::default()
+            }),
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -1119,22 +1303,22 @@ mod tests {
         let asset = create_test_asset("CRYPTO:BTC-USD:USD", "USD");
         asset_service.add_asset(asset);
 
+        let quote_service = Arc::new(MockQuoteService);
         let activity_service = ActivityService::new(
             activity_repository.clone(),
             account_service,
             asset_service,
             fx_service,
+            quote_service,
         );
 
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset_id: None,
-            symbol: Some("BTC-USD".to_string()), // Crypto pattern
-            exchange_mic: None,
-            asset_kind: None,
-            pricing_mode: None,
-            asset_metadata: None,
+            asset: Some(AssetInput {
+                symbol: Some("BTC-USD".to_string()),
+                ..Default::default()
+            }),
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -1182,22 +1366,24 @@ mod tests {
         let asset = create_test_asset("SEC:BTC:XNAS", "USD");
         asset_service.add_asset(asset);
 
+        let quote_service = Arc::new(MockQuoteService);
         let activity_service = ActivityService::new(
             activity_repository.clone(),
             account_service,
             asset_service,
             fx_service,
+            quote_service,
         );
 
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset_id: None,
-            symbol: Some("BTC".to_string()),
-            exchange_mic: Some("XNAS".to_string()),
-            asset_kind: Some("SECURITY".to_string()), // Explicit hint
-            pricing_mode: None,
-            asset_metadata: None,
+            asset: Some(AssetInput {
+                symbol: Some("BTC".to_string()),
+                exchange_mic: Some("XNAS".to_string()),
+                kind: Some("SECURITY".to_string()), // Explicit hint
+                ..Default::default()
+            }),
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -1241,23 +1427,24 @@ mod tests {
         let asset = create_test_asset("SEC:ETH:XTSE", "CAD");
         asset_service.add_asset(asset);
 
+        let quote_service = Arc::new(MockQuoteService);
         let activity_service = ActivityService::new(
             activity_repository.clone(),
             account_service,
             asset_service,
             fx_service,
+            quote_service,
         );
 
         // ETH would be inferred as crypto, but exchange_mic forces security
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset_id: None,
-            symbol: Some("ETH".to_string()),
-            exchange_mic: Some("XTSE".to_string()), // Has exchange = security
-            asset_kind: None,
-            pricing_mode: None,
-            asset_metadata: None,
+            asset: Some(AssetInput {
+                symbol: Some("ETH".to_string()),
+                exchange_mic: Some("XTSE".to_string()), // Has exchange = security
+                ..Default::default()
+            }),
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -1313,22 +1500,19 @@ mod tests {
             let cash_asset = create_test_asset("CASH:USD", "USD");
             asset_service.add_asset(cash_asset);
 
+            let quote_service = Arc::new(MockQuoteService);
             let activity_service = ActivityService::new(
                 activity_repository.clone(),
                 account_service,
                 asset_service,
                 fx_service,
+                quote_service,
             );
 
             let new_activity = NewActivity {
                 id: Some(format!("activity-{}", activity_type)),
                 account_id: "acc-1".to_string(),
-                asset_id: None,
-                symbol: None,
-                exchange_mic: None,
-                asset_kind: None,
-                pricing_mode: None,
-                asset_metadata: None,
+                asset: None,
                 activity_type: activity_type.to_string(),
                 subtype: None,
                 activity_date: "2024-01-15".to_string(),
@@ -1382,11 +1566,13 @@ mod tests {
         asset_service.add_asset(asset);
 
         // Create the activity service
+        let quote_service = Arc::new(MockQuoteService);
         let activity_service = ActivityService::new(
             activity_repository,
             account_service,
             asset_service,
             fx_service.clone(),
+            quote_service,
         );
 
         // Create bulk mutation request
@@ -1394,12 +1580,10 @@ mod tests {
             creates: vec![NewActivity {
                 id: Some("activity-1".to_string()),
                 account_id: "acc-1".to_string(),
-                asset_id: Some("NESN".to_string()),
-                symbol: None,
-                exchange_mic: None,
-                asset_kind: None,
-                pricing_mode: None,
-                asset_metadata: None,
+                asset: Some(AssetInput {
+                    id: Some("NESN".to_string()),
+                    ..Default::default()
+                }),
                 activity_type: "BUY".to_string(),
                 subtype: None,
                 activity_date: "2024-01-15".to_string(),
@@ -1462,23 +1646,23 @@ mod tests {
         let asset = create_test_asset("SEC:AZN:XLON", "GBp");
         asset_service.add_asset(asset);
 
+        let quote_service = Arc::new(MockQuoteService);
         let activity_service = ActivityService::new(
             activity_repository.clone(),
             account_service,
             asset_service,
             fx_service,
+            quote_service,
         );
 
         // User submits activity in GBp (pence) - 14082 pence per share
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset_id: Some("SEC:AZN:XLON".to_string()),
-            symbol: None,
-            exchange_mic: None,
-            asset_kind: None,
-            pricing_mode: None,
-            asset_metadata: None,
+            asset: Some(AssetInput {
+                id: Some("SEC:AZN:XLON".to_string()),
+                ..Default::default()
+            }),
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -1551,22 +1735,22 @@ mod tests {
         let asset = create_test_asset("SEC:VOD:XLON", "GBX");
         asset_service.add_asset(asset);
 
+        let quote_service = Arc::new(MockQuoteService);
         let activity_service = ActivityService::new(
             activity_repository.clone(),
             account_service,
             asset_service,
             fx_service,
+            quote_service,
         );
 
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset_id: Some("SEC:VOD:XLON".to_string()),
-            symbol: None,
-            exchange_mic: None,
-            asset_kind: None,
-            pricing_mode: None,
-            asset_metadata: None,
+            asset: Some(AssetInput {
+                id: Some("SEC:VOD:XLON".to_string()),
+                ..Default::default()
+            }),
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -1616,22 +1800,22 @@ mod tests {
         let asset = create_test_asset("SEC:NPN:XJSE", "ZAc");
         asset_service.add_asset(asset);
 
+        let quote_service = Arc::new(MockQuoteService);
         let activity_service = ActivityService::new(
             activity_repository.clone(),
             account_service,
             asset_service,
             fx_service,
+            quote_service,
         );
 
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset_id: Some("SEC:NPN:XJSE".to_string()),
-            symbol: None,
-            exchange_mic: None,
-            asset_kind: None,
-            pricing_mode: None,
-            asset_metadata: None,
+            asset: Some(AssetInput {
+                id: Some("SEC:NPN:XJSE".to_string()),
+                ..Default::default()
+            }),
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -1677,22 +1861,22 @@ mod tests {
         let asset = create_test_asset("SEC:LLOY:XLON", "GBP");
         asset_service.add_asset(asset);
 
+        let quote_service = Arc::new(MockQuoteService);
         let activity_service = ActivityService::new(
             activity_repository.clone(),
             account_service,
             asset_service,
             fx_service,
+            quote_service,
         );
 
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset_id: Some("SEC:LLOY:XLON".to_string()),
-            symbol: None,
-            exchange_mic: None,
-            asset_kind: None,
-            pricing_mode: None,
-            asset_metadata: None,
+            asset: Some(AssetInput {
+                id: Some("SEC:LLOY:XLON".to_string()),
+                ..Default::default()
+            }),
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),

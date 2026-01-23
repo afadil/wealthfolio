@@ -26,18 +26,26 @@ const DEFAULT_THREADS_LIMIT = 20;
  * @param search - Optional search string to filter threads by title
  */
 export function useThreads(search?: string) {
+  const normalizedSearch = search?.trim() || undefined;
+
   return useInfiniteQuery<ThreadPage, Error>({
     // When search is empty/undefined, use base key; otherwise include search in key
     // eslint-disable-next-line @tanstack/query/exhaustive-deps
-    queryKey: search ? [...AI_THREADS_KEY, "search", search] : AI_THREADS_KEY,
+    queryKey: normalizedSearch ? [...AI_THREADS_KEY, "search", normalizedSearch] : AI_THREADS_KEY,
     queryFn: ({ pageParam }) =>
       listAiThreads({
         cursor: pageParam as string | undefined,
         limit: DEFAULT_THREADS_LIMIT,
-        search: search ?? undefined,
+        // Treat empty/whitespace as "no search" to avoid excluding untitled threads.
+        search: normalizedSearch,
       }),
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     initialPageParam: undefined as string | undefined,
+    // Disable automatic refetches to prevent race conditions with optimistic updates
+    // Refetches only happen on explicit invalidation or manual trigger
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    staleTime: 30000, // 30 seconds before considered stale
   });
 }
 

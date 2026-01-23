@@ -26,6 +26,15 @@ import {
 export type TransferMode = "cash" | "securities";
 export type TransferDirection = "in" | "out";
 
+// Asset metadata schema for custom assets
+const assetMetadataSchema = z
+  .object({
+    name: z.string().optional(),
+    kind: z.string().optional(),
+    exchangeMic: z.string().optional(),
+  })
+  .optional();
+
 // Zod schema for TransferForm validation
 export const transferFormSchema = z
   .object({
@@ -59,6 +68,8 @@ export const transferFormSchema = z
     // Internal field for manual pricing mode
     pricingMode: z.enum([PricingMode.MARKET, PricingMode.MANUAL]).default(PricingMode.MARKET),
     exchangeMic: z.string().optional(),
+    // Asset metadata for custom assets (name, etc.)
+    assetMetadata: assetMetadataSchema,
   })
   // External transfer requires accountId
   .refine(
@@ -202,7 +213,7 @@ export function TransferForm({
 
   const form = useForm<TransferFormValues>({
     resolver: zodResolver(transferFormSchema) as Resolver<TransferFormValues>,
-    mode: "onBlur", // Validate on blur
+    mode: "onSubmit", // Validate only on submit - works correctly with default values
     defaultValues: {
       isExternal: initialIsExternal,
       direction: initialDirection,
@@ -409,7 +420,11 @@ export function TransferForm({
                   exchangeMicName="exchangeMic"
                   pricingModeName="pricingMode"
                   currencyName="currency"
+                  assetMetadataName="assetMetadata"
                 />
+                {/* Hidden fields to register assetMetadata for react-hook-form */}
+                <input type="hidden" {...form.register("assetMetadata.name")} />
+                <input type="hidden" {...form.register("assetMetadata.kind")} />
                 <QuantityInput name="quantity" label="Quantity" />
               </>
             )}

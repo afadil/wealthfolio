@@ -1,5 +1,6 @@
-use chrono::Utc;
+use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 use log::debug;
+use rust_decimal::Decimal;
 use std::sync::Arc;
 
 use crate::accounts::{Account, AccountServiceTrait};
@@ -10,6 +11,7 @@ use crate::activities::{ActivityRepositoryTrait, ActivityServiceTrait};
 use crate::assets::{canonical_asset_id, AssetKind, AssetServiceTrait};
 use crate::fx::currency::{get_normalization_rule, normalize_amount};
 use crate::fx::FxServiceTrait;
+use crate::quotes::{DataSource, Quote, QuoteServiceTrait};
 use crate::Result;
 use uuid::Uuid;
 
@@ -19,6 +21,7 @@ pub struct ActivityService {
     account_service: Arc<dyn AccountServiceTrait>,
     asset_service: Arc<dyn AssetServiceTrait>,
     fx_service: Arc<dyn FxServiceTrait>,
+    quote_service: Arc<dyn QuoteServiceTrait>,
 }
 
 impl ActivityService {
@@ -28,13 +31,76 @@ impl ActivityService {
         account_service: Arc<dyn AccountServiceTrait>,
         asset_service: Arc<dyn AssetServiceTrait>,
         fx_service: Arc<dyn FxServiceTrait>,
+        quote_service: Arc<dyn QuoteServiceTrait>,
     ) -> Self {
         Self {
             activity_repository,
             account_service,
             asset_service,
             fx_service,
+            quote_service,
         }
+    }
+
+    /// Creates a manual quote from activity data when pricing_mode is MANUAL.
+    /// This ensures the asset has a price point on the activity date.
+    async fn create_manual_quote_from_activity(
+        &self,
+        asset_id: &str,
+        unit_price: Decimal,
+        currency: &str,
+        activity_date: &str,
+    ) -> Result<()> {
+        // Parse activity date
+        let timestamp = if let Ok(dt) = DateTime::parse_from_rfc3339(activity_date) {
+            dt.with_timezone(&Utc)
+        } else if let Ok(date) = NaiveDate::parse_from_str(activity_date, "%Y-%m-%d") {
+            Utc.from_utc_datetime(&date.and_hms_opt(12, 0, 0).unwrap())
+        } else {
+            debug!(
+                "Could not parse activity date '{}' for manual quote creation",
+                activity_date
+            );
+            return Ok(());
+        };
+
+        // Generate quote ID: YYYYMMDD_ASSETID
+        let date_part = timestamp.format("%Y%m%d").to_string();
+        let quote_id = format!("{}_{}", date_part, asset_id.to_uppercase());
+
+        let quote = Quote {
+            id: quote_id,
+            asset_id: asset_id.to_string(),
+            timestamp,
+            open: unit_price,
+            high: unit_price,
+            low: unit_price,
+            close: unit_price,
+            adjclose: unit_price,
+            volume: Decimal::ZERO,
+            currency: currency.to_string(),
+            data_source: DataSource::Manual,
+            created_at: Utc::now(),
+            notes: None,
+        };
+
+        match self.quote_service.update_quote(quote).await {
+            Ok(_) => {
+                debug!(
+                    "Created manual quote for asset {} on {} at price {}",
+                    asset_id, activity_date, unit_price
+                );
+            }
+            Err(e) => {
+                // Log but don't fail the activity creation
+                debug!(
+                    "Failed to create manual quote for asset {}: {}",
+                    asset_id, e
+                );
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -151,29 +217,57 @@ impl ActivityService {
             account.currency.clone()
         };
 
+        // Extract asset fields from nested `asset` object
+        let symbol = activity.get_symbol().map(|s| s.to_string());
+        let exchange_mic = activity.get_exchange_mic().map(|s| s.to_string());
+        let asset_kind = activity.get_asset_kind().map(|s| s.to_string());
+        let asset_name = activity.get_asset_name().map(|s| s.to_string());
+        let pricing_mode = activity.get_pricing_mode().map(|s| s.to_string());
+
+        // Build asset metadata from extracted fields
+        let asset_metadata = if asset_name.is_some() || exchange_mic.is_some() {
+            Some(crate::assets::AssetMetadata {
+                name: asset_name.clone(),
+                kind: None,
+                exchange_mic: exchange_mic.clone(),
+            })
+        } else {
+            None
+        };
+
         // For NEW activities: prioritize symbol over asset_id to ensure canonical ID generation.
         // This prevents clients from accidentally sending raw symbols (e.g., "AAPL") as asset_id.
         // If symbol is provided, ignore asset_id and generate canonical ID.
-        let effective_asset_id = if activity.symbol.as_ref().is_some_and(|s| !s.is_empty()) {
+        let effective_asset_id = if symbol.as_ref().is_some_and(|s| !s.is_empty()) {
             // Symbol is provided, ignore any asset_id and let resolve_asset_id generate canonical ID
             None
         } else {
-            // No symbol provided, fall back to asset_id (backward compatibility for edge cases)
-            activity.asset_id.as_deref()
+            // No symbol provided, fall back to asset.id (for edge cases like editing existing activities)
+            activity.get_asset_id().map(|s| s.to_string())
         };
 
         // Resolve asset_id using canonical_asset_id() if symbol is provided
         let resolved_asset_id = self.resolve_asset_id(
-            effective_asset_id,
-            activity.symbol.as_deref(),
-            activity.exchange_mic.as_deref(),
-            activity.asset_kind.as_deref(),
+            effective_asset_id.as_deref(),
+            symbol.as_deref(),
+            exchange_mic.as_deref(),
+            asset_kind.as_deref(),
             &activity.activity_type,
             &currency,
         )?;
 
-        // Update activity with resolved asset_id
-        activity.asset_id = resolved_asset_id.clone();
+        // Update activity's asset with resolved asset_id
+        if let Some(ref resolved_id) = resolved_asset_id {
+            match activity.asset.as_mut() {
+                Some(asset) => asset.id = Some(resolved_id.clone()),
+                None => {
+                    activity.asset = Some(AssetInput {
+                        id: Some(resolved_id.clone()),
+                        ..Default::default()
+                    });
+                }
+            }
+        }
 
         // Process asset if asset_id is resolved
         if let Some(ref asset_id) = resolved_asset_id {
@@ -183,19 +277,32 @@ impl ActivityService {
                 .get_or_create_minimal_asset(
                     asset_id,
                     Some(currency.clone()),
-                    activity.asset_metadata.clone(),
-                    activity.pricing_mode.clone(),
+                    asset_metadata,
+                    pricing_mode.clone(),
                 )
                 .await?;
 
             // Update asset pricing mode if specified (for existing assets that need mode change)
-            if let Some(ref mode) = activity.pricing_mode {
+            if let Some(ref mode) = pricing_mode {
                 let requested_mode = mode.to_uppercase();
                 let current_mode = asset.pricing_mode.as_db_str();
                 if requested_mode != current_mode {
                     self.asset_service
                         .update_pricing_mode(&asset.id, &requested_mode)
                         .await?;
+                }
+
+                // Create manual quote for MANUAL pricing mode assets
+                if requested_mode == "MANUAL" {
+                    if let Some(unit_price) = activity.unit_price {
+                        self.create_manual_quote_from_activity(
+                            asset_id,
+                            unit_price,
+                            &currency,
+                            &activity.activity_date,
+                        )
+                        .await?;
+                    }
                 }
             }
 
@@ -251,7 +358,7 @@ impl ActivityService {
             } else {
                 // Still need to normalize currency even if no fee
                 let (_, normalized_currency) =
-                    normalize_amount(rust_decimal::Decimal::ZERO, &activity.currency);
+                    normalize_amount(Decimal::ZERO, &activity.currency);
                 activity.currency = normalized_currency.to_string();
             }
         }
@@ -272,18 +379,47 @@ impl ActivityService {
             account.currency.clone()
         };
 
+        // Extract asset fields using helper methods (supports both nested `asset` and legacy flat fields)
+        let asset_id_input = activity.get_asset_id().map(|s| s.to_string());
+        let symbol = activity.get_symbol().map(|s| s.to_string());
+        let exchange_mic = activity.get_exchange_mic().map(|s| s.to_string());
+        let asset_kind = activity.get_asset_kind().map(|s| s.to_string());
+        let asset_name = activity.get_asset_name().map(|s| s.to_string());
+        let pricing_mode = activity.get_pricing_mode().map(|s| s.to_string());
+
+        // Build asset metadata from extracted fields
+        let asset_metadata = if asset_name.is_some() {
+            Some(crate::assets::AssetMetadata {
+                name: asset_name.clone(),
+                kind: None,
+                exchange_mic: exchange_mic.clone(),
+            })
+        } else {
+            None
+        };
+
         // Resolve asset_id using canonical_asset_id() if symbol is provided
         let resolved_asset_id = self.resolve_asset_id(
-            activity.asset_id.as_deref(),
-            activity.symbol.as_deref(),
-            activity.exchange_mic.as_deref(),
-            activity.asset_kind.as_deref(),
+            asset_id_input.as_deref(),
+            symbol.as_deref(),
+            exchange_mic.as_deref(),
+            asset_kind.as_deref(),
             &activity.activity_type,
             &currency,
         )?;
 
-        // Update activity with resolved asset_id
-        activity.asset_id = resolved_asset_id.clone();
+        // Update activity's asset with resolved asset_id
+        if let Some(ref resolved_id) = resolved_asset_id {
+            match activity.asset.as_mut() {
+                Some(asset) => asset.id = Some(resolved_id.clone()),
+                None => {
+                    activity.asset = Some(AssetInput {
+                        id: Some(resolved_id.clone()),
+                        ..Default::default()
+                    });
+                }
+            }
+        }
 
         // Process asset if asset_id is resolved
         if let Some(ref asset_id) = resolved_asset_id {
@@ -293,19 +429,32 @@ impl ActivityService {
                 .get_or_create_minimal_asset(
                     asset_id,
                     Some(currency.clone()),
-                    None,
-                    activity.pricing_mode.clone(),
+                    asset_metadata,
+                    pricing_mode.clone(),
                 )
                 .await?;
 
             // Update asset pricing mode if specified (for existing assets that need mode change)
-            if let Some(ref mode) = activity.pricing_mode {
+            if let Some(ref mode) = pricing_mode {
                 let requested_mode = mode.to_uppercase();
                 let current_mode = asset.pricing_mode.as_db_str();
                 if requested_mode != current_mode {
                     self.asset_service
                         .update_pricing_mode(&asset.id, &requested_mode)
                         .await?;
+                }
+
+                // Create manual quote for MANUAL pricing mode assets
+                if requested_mode == "MANUAL" {
+                    if let Some(unit_price) = activity.unit_price {
+                        self.create_manual_quote_from_activity(
+                            asset_id,
+                            unit_price,
+                            &currency,
+                            &activity.activity_date,
+                        )
+                        .await?;
+                    }
                 }
             }
 
@@ -652,13 +801,14 @@ impl ActivityServiceTrait for ActivityService {
                 NewActivity {
                     id: activity.id.clone(),
                     account_id: activity.account_id.clone().unwrap_or_default(),
-                    // Use the canonical asset ID generated above
-                    asset_id: Some(canonical_id),
-                    symbol: Some(activity.symbol.clone()),
-                    exchange_mic: None, // CSV imports don't typically include exchange info
-                    asset_kind: None,   // Already used for canonical ID generation
-                    pricing_mode: None, // CSV imports default to MARKET pricing
-                    asset_metadata: None, // CSV imports don't carry asset metadata
+                    asset: Some(AssetInput {
+                        id: Some(canonical_id),
+                        symbol: Some(activity.symbol.clone()),
+                        exchange_mic: None, // CSV imports don't typically include exchange info
+                        kind: None,         // Already used for canonical ID generation
+                        name: None,         // CSV imports don't carry asset name
+                        pricing_mode: None, // CSV imports default to MARKET pricing
+                    }),
                     activity_type: activity.activity_type.clone(),
                     subtype: None,
                     activity_date: activity.date.clone(),

@@ -54,7 +54,7 @@ export function InterestForm({ accounts, defaultValues, onSubmit, onCancel, isLo
 
   const form = useForm<InterestFormValues>({
     resolver: zodResolver(interestFormSchema) as Resolver<InterestFormValues>,
-    mode: "onBlur", // Validate on blur
+    mode: "onSubmit", // Validate only on submit - works correctly with default values
     defaultValues: {
       accountId: initialAccountId,
       activityDate: new Date(),

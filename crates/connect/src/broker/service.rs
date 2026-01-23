@@ -19,7 +19,7 @@ use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 use std::collections::HashSet;
 use wealthfolio_core::accounts::{Account, AccountServiceTrait, NewAccount};
-use wealthfolio_core::activities::{self, compute_idempotency_key, NewActivity};
+use wealthfolio_core::activities::{self, compute_idempotency_key, AssetInput, NewActivity};
 use wealthfolio_core::fx::currency::{get_normalization_rule, normalize_amount};
 use wealthfolio_core::assets::{canonical_asset_id, AssetKind, NewAsset};
 use wealthfolio_core::errors::Result;
@@ -534,12 +534,14 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 id: Some(activity_id),
                 account_id: account_id.clone(),
                 // Broker sync provides asset_id directly (already resolved by mapping)
-                asset_id: Some(asset_id), // Now Option<String>
-                symbol: None, // Not using new symbol-based resolution for broker sync
-                exchange_mic: None,
-                asset_kind: None,
-                pricing_mode: None,
-                asset_metadata: None, // Broker sync uses enrichment events instead
+                asset: Some(AssetInput {
+                    id: Some(asset_id),
+                    symbol: None, // Broker sync uses resolved asset_id directly
+                    exchange_mic: None,
+                    kind: None,
+                    name: None, // Broker sync uses enrichment events for asset metadata
+                    pricing_mode: None,
+                }),
                 activity_type,
                 subtype,
                 activity_date,

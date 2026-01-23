@@ -1,4 +1,4 @@
-import type { ActivityDetails, PricingMode } from "@/lib/types";
+import type { ActivityDetails } from "@/lib/types";
 
 /**
  * Represents a local transaction that extends ActivityDetails with draft state
@@ -6,6 +6,10 @@ import type { ActivityDetails, PricingMode } from "@/lib/types";
 export interface LocalTransaction extends ActivityDetails {
   /** Indicates if the transaction is newly created and not yet persisted */
   isNew?: boolean;
+  /** Pending asset name from custom asset dialog (not yet persisted) */
+  pendingAssetName?: string;
+  /** Pending asset kind from custom asset dialog (e.g., "SECURITY", "CRYPTO", "OTHER") */
+  pendingAssetKind?: string;
 }
 
 /**
@@ -109,40 +113,50 @@ interface ActivityBasePayload {
   fee?: string;
   fxRate?: string | null;
   comment?: string;
-  pricingMode?: PricingMode;
+}
+
+/**
+ * Asset input for activity payloads - matches backend's AssetInput struct
+ */
+export interface AssetInput {
+  /** Asset ID - optional, for backward compatibility with existing assets */
+  id?: string;
+  /** Symbol (e.g., "AAPL", "BTC") - used to generate canonical asset ID */
+  symbol?: string;
+  /** Exchange MIC code (e.g., "XNAS", "XTSE") for securities */
+  exchangeMic?: string;
+  /** Asset kind hint (e.g., "SECURITY", "CRYPTO") - if not provided, inferred */
+  kind?: string;
+  /** Asset name for custom/manual assets */
+  name?: string;
+  /** Pricing mode: "MARKET" or "MANUAL" - controls how asset is priced */
+  pricingMode?: string;
 }
 
 /**
  * Payload for creating a NEW activity
  *
  * Asset identification:
- * - Send symbol + exchangeMic, backend generates the canonical ID
- * - For CASH activities: don't send symbol, backend generates CASH:{currency}
+ * - Send asset.symbol + asset.exchangeMic, backend generates the canonical ID
+ * - For CASH activities: don't send asset, backend generates CASH:{currency}
  *
- * IMPORTANT: assetId is NOT allowed for creates - backend generates canonical IDs
+ * IMPORTANT: asset.id is NOT allowed for creates - backend generates canonical IDs
  */
 export interface ActivityCreatePayload extends ActivityBasePayload {
-  // Asset identification (backend generates ID from these)
-  symbol?: string; // e.g., "AAPL" or undefined for cash
-  exchangeMic?: string; // e.g., "XNAS" or undefined
-  assetKind?: string; // e.g., "Security", "Crypto" - helps backend determine ID format
-  // NOTE: No assetId field - backend generates canonical ID from symbol + exchangeMic
+  /** Asset input - consolidates id, symbol, exchangeMic, kind, name, pricingMode */
+  asset?: AssetInput;
 }
 
 /**
  * Payload for updating an EXISTING activity
  *
  * Asset identification:
- * - Send assetId for existing assets (backward compatibility)
- * - Or send symbol + exchangeMic to re-resolve the asset
+ * - Send asset.id for existing assets (backward compatibility)
+ * - Or send asset.symbol + asset.exchangeMic to re-resolve the asset
  */
 export interface ActivityUpdatePayload extends ActivityBasePayload {
-  // For existing activities: use the existing assetId
-  assetId?: string;
-  // Or re-resolve from symbol + exchangeMic
-  symbol?: string;
-  exchangeMic?: string;
-  assetKind?: string;
+  /** Asset input - consolidates id, symbol, exchangeMic, kind, name, pricingMode */
+  asset?: AssetInput;
 }
 
 /**

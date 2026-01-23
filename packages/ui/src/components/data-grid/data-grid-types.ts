@@ -22,6 +22,8 @@ export interface SymbolSearchResult {
   currency?: string;
   score: number;
   dataSource?: string;
+  /** Asset kind for custom assets (e.g., "SECURITY", "CRYPTO", "OTHER") */
+  assetKind?: string;
 }
 
 export type CellOpts =
@@ -74,6 +76,8 @@ export type CellOpts =
       onSearch: (query: string) => Promise<SymbolSearchResult[]>;
       /** Called when a symbol is selected. Receives rowIndex, symbol, and full result */
       onSelect?: (rowIndex: number, symbol: string, result?: SymbolSearchResult) => void;
+      /** Called when user wants to create a custom asset. Opens a dialog to collect asset metadata. */
+      onCreateCustomAsset?: (rowIndex: number, symbol: string) => void;
     }
   | {
       variant: "currency";

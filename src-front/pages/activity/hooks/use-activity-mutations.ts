@@ -1,21 +1,11 @@
-import {
-  logger,
-  createActivity,
-  deleteActivity,
-  saveActivities,
-  updateActivity,
-  updateQuote,
-} from "@/adapters";
+import { logger, createActivity, deleteActivity, saveActivities, updateActivity } from "@/adapters";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
-import { DataSource, PricingMode } from "@/lib/constants";
-import { QueryKeys } from "@/lib/query-keys";
 import {
   ActivityBulkMutationRequest,
   ActivityBulkMutationResult,
   ActivityCreate,
   ActivityDetails,
   ActivityUpdate,
-  Quote,
 } from "@/lib/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { NewActivityFormValues } from "../components/forms/schemas";
@@ -24,56 +14,6 @@ export function useActivityMutations(
   onSuccess?: (activity: { accountId?: string | null }) => void,
 ) {
   const queryClient = useQueryClient();
-
-  const createQuoteFromActivity = async (data: ActivityCreate | ActivityUpdate) => {
-    // Get symbol from either symbol (creates) or assetId (updates)
-    const symbolOrAssetId = ("symbol" in data && data.symbol) || ("assetId" in data && data.assetId);
-    if (
-      "pricingMode" in data &&
-      data.pricingMode === PricingMode.MANUAL &&
-      symbolOrAssetId &&
-      "unitPrice" in data &&
-      data.unitPrice &&
-      "quantity" in data &&
-      data.quantity
-    ) {
-      const quote: Omit<Quote, "id" | "createdAt"> & { id?: string; createdAt?: string } = {
-        assetId: symbolOrAssetId,
-        timestamp: new Date(data.activityDate).toISOString(),
-        open: data.unitPrice,
-        high: data.unitPrice,
-        low: data.unitPrice,
-        close: data.unitPrice,
-        adjclose: data.unitPrice,
-        volume: data.quantity,
-        currency: data.currency || "",
-        dataSource: DataSource.MANUAL,
-      };
-
-      const datePart = new Date(quote.timestamp).toISOString().slice(0, 10).replace(/-/g, "");
-      const fullQuote: Quote = {
-        ...quote,
-        id: `${datePart}_${quote.assetId.toUpperCase()}`,
-        createdAt: new Date().toISOString(),
-      };
-
-      try {
-        await updateQuote(fullQuote.assetId, fullQuote);
-        queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSET_DATA, fullQuote.assetId] });
-        toast({
-          title: "Quote added successfully.",
-          variant: "success",
-        });
-      } catch (error) {
-        logger.error(`Error saving quote from activity: ${String(error)}`);
-        toast({
-          title: "Uh oh! Something went wrong.",
-          description: `There was a problem saving the quote from the activity.`,
-          variant: "destructive",
-        });
-      }
-    }
-  };
 
   const createMutationOptions = (action: string) => ({
     onSuccess: (activity: { accountId?: string | null }) => {
@@ -94,44 +34,66 @@ export function useActivityMutations(
 
   const addActivityMutation = useMutation({
     mutationFn: async (data: NewActivityFormValues) => {
-      // Convert form's assetId to symbol for new activities
-      // Backend generates canonical asset ID from symbol + exchangeMic
-      const { assetId, exchangeMic, metadata, ...rest } = data as NewActivityFormValues & {
+      // Extract asset-related fields from form data
+      const { assetId, exchangeMic, metadata, assetMetadata, pricingMode, assetKind, ...rest } = data as NewActivityFormValues & {
         assetId?: string;
         exchangeMic?: string;
         metadata?: Record<string, unknown>;
+        assetMetadata?: { name?: string; kind?: string; exchangeMic?: string };
+        pricingMode?: string;
+        assetKind?: string;
       };
+
+      // Build nested asset object
       const createPayload: ActivityCreate = {
         ...rest,
-        // Use symbol instead of assetId for creates
-        symbol: assetId,
-        // Pass exchangeMic for canonical ID generation (e.g., "XNAS", "XTSE")
-        exchangeMic,
+        // Use nested asset object (preferred over flat fields)
+        asset: {
+          symbol: assetId,
+          exchangeMic,
+          kind: assetKind || assetMetadata?.kind,
+          name: assetMetadata?.name,
+          pricingMode: pricingMode as ActivityCreate["asset"] extends { pricingMode?: infer P } ? P : never,
+        },
         // Serialize metadata object to JSON string for backend
         metadata: metadata ? JSON.stringify(metadata) : undefined,
       };
-      const activity = await createActivity(createPayload);
-      await createQuoteFromActivity(data);
-      return activity;
+      // Backend handles quote creation for MANUAL pricing mode
+      return await createActivity(createPayload);
     },
     ...createMutationOptions("adding"),
   });
 
   const updateActivityMutation = useMutation({
     mutationFn: async (data: NewActivityFormValues & { id: string }) => {
-      // Extract metadata to serialize it
-      const { metadata, ...rest } = data as NewActivityFormValues & {
+      // Extract asset-related fields from form data
+      const { assetId, exchangeMic, metadata, assetMetadata, pricingMode, assetKind, ...rest } = data as NewActivityFormValues & {
         id: string;
+        assetId?: string;
+        exchangeMic?: string;
         metadata?: Record<string, unknown>;
+        assetMetadata?: { name?: string; kind?: string; exchangeMic?: string };
+        pricingMode?: string;
+        assetKind?: string;
       };
+
+      // Build nested asset object
       const updatePayload: ActivityUpdate = {
         ...rest,
+        // Use nested asset object (preferred over flat fields)
+        asset: {
+          id: assetId, // For updates, assetId may be the canonical ID
+          symbol: assetId,
+          exchangeMic,
+          kind: assetKind || assetMetadata?.kind,
+          name: assetMetadata?.name,
+          pricingMode: pricingMode as ActivityUpdate["asset"] extends { pricingMode?: infer P } ? P : never,
+        },
         // Serialize metadata object to JSON string for backend
         metadata: metadata ? JSON.stringify(metadata) : undefined,
       };
-      const activity = await updateActivity(updatePayload);
-      await createQuoteFromActivity(data);
-      return activity;
+      // Backend handles quote creation for MANUAL pricing mode
+      return await updateActivity(updatePayload);
     },
     ...createMutationOptions("updating"),
   });
@@ -150,16 +112,22 @@ export function useActivityMutations(
       date,
       assetId: _assetId,
       assetSymbol,
+      exchangeMic,
+      assetPricingMode,
       ...restOfActivityData
     } = activityToDuplicate;
 
-    // For duplicating, use symbol instead of assetId - backend generates canonical ID
+    // For duplicating, use nested asset object
     const createPayload: ActivityCreate = {
       ...restOfActivityData,
       activityDate: date,
       comment: "Duplicated",
-      // Use symbol for creates, not assetId
-      symbol: assetSymbol,
+      // Use nested asset object
+      asset: {
+        symbol: assetSymbol,
+        exchangeMic,
+        pricingMode: assetPricingMode,
+      },
     };
 
     return await createActivity(createPayload);
@@ -193,16 +161,8 @@ export function useActivityMutations(
         deleteIds: request.deleteIds,
       };
 
-      const result = await saveActivities(normalizedRequest);
-
-      const quoteCandidates: (ActivityCreate | ActivityUpdate)[] = [
-        ...(request.creates ?? []),
-        ...(request.updates ?? []),
-      ];
-      for (const candidate of quoteCandidates) {
-        await createQuoteFromActivity(candidate);
-      }
-      return result;
+      // Backend handles quote creation for MANUAL pricing mode
+      return await saveActivities(normalizedRequest);
     },
     onSuccess: (result: ActivityBulkMutationResult) => {
       queryClient.invalidateQueries();

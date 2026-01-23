@@ -2379,6 +2379,7 @@ export function SymbolCell<TData>({
   const symbolCellOpts = cellOpts?.variant === "symbol" ? cellOpts : null;
   const onSearch = symbolCellOpts?.onSearch;
   const onSelectCallback = symbolCellOpts?.onSelect;
+  const onCreateCustomAssetCallback = symbolCellOpts?.onCreateCustomAsset;
   const sideOffset = -(containerRef.current?.clientHeight ?? 0);
 
   const prevInitialValueRef = React.useRef(initialValue);
@@ -2434,8 +2435,18 @@ export function SymbolCell<TData>({
   const handleCustomSymbol = React.useCallback(() => {
     const trimmed = searchQuery.trim();
     if (!trimmed) return;
-    handleSelect(trimmed, undefined);
-  }, [searchQuery, handleSelect]);
+
+    // If a custom asset creation callback is provided, use it instead of just setting the symbol
+    if (onCreateCustomAssetCallback) {
+      setSearchQuery("");
+      setOptions([]);
+      tableMeta?.onCellEditingStop?.();
+      onCreateCustomAssetCallback(rowIndex, trimmed);
+    } else {
+      // Fallback: just set the symbol value directly
+      handleSelect(trimmed, undefined);
+    }
+  }, [searchQuery, handleSelect, onCreateCustomAssetCallback, rowIndex, tableMeta]);
 
   const onOpenChange = React.useCallback(
     (isOpen: boolean) => {

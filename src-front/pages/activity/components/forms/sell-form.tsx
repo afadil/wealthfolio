@@ -21,6 +21,15 @@ import {
   type AccountSelectOption,
 } from "./fields";
 
+// Asset metadata schema for custom assets
+const assetMetadataSchema = z
+  .object({
+    name: z.string().optional(),
+    kind: z.string().optional(),
+    exchangeMic: z.string().optional(),
+  })
+  .optional();
+
 // Zod schema for SellForm validation
 export const sellFormSchema = z.object({
   accountId: z.string().min(1, { message: "Please select an account." }),
@@ -56,6 +65,8 @@ export const sellFormSchema = z.object({
   // Internal fields
   pricingMode: z.enum([PricingMode.MARKET, PricingMode.MANUAL]).default(PricingMode.MARKET),
   exchangeMic: z.string().optional(),
+  // Asset metadata for custom assets (name, etc.)
+  assetMetadata: assetMetadataSchema,
 });
 
 export type SellFormValues = z.infer<typeof sellFormSchema>;
@@ -97,7 +108,7 @@ export function SellForm({ accounts, defaultValues, onSubmit, onCancel, isLoadin
 
   const form = useForm<SellFormValues>({
     resolver: zodResolver(sellFormSchema) as Resolver<SellFormValues>,
-    mode: "onBlur", // Validate on blur
+    mode: "onSubmit", // Validate only on submit - works correctly with default values
     defaultValues: {
       accountId: initialAccountId,
       assetId: "",
@@ -176,7 +187,11 @@ export function SellForm({ accounts, defaultValues, onSubmit, onCancel, isLoadin
               exchangeMicName="exchangeMic"
               pricingModeName="pricingMode"
               currencyName="currency"
+              assetMetadataName="assetMetadata"
             />
+            {/* Hidden fields to register assetMetadata for react-hook-form */}
+            <input type="hidden" {...form.register("assetMetadata.name")} />
+            <input type="hidden" {...form.register("assetMetadata.kind")} />
 
             {/* Date Picker */}
             <DatePicker name="activityDate" label="Date" enableTime={true} />

@@ -20,8 +20,8 @@ pub use activities_model::{
     parse_decimal_string_tolerant, Activity, ActivityBulkIdentifierMapping,
     ActivityBulkMutationError, ActivityBulkMutationRequest, ActivityBulkMutationResult,
     ActivityDetails, ActivityImport, ActivitySearchResponse, ActivitySearchResponseMeta,
-    ActivityStatus, ActivityType, ActivityUpdate, ImportMapping, ImportMappingData, IncomeData,
-    NewActivity, Sort,
+    ActivityStatus, ActivityType, ActivityUpdate, AssetInput, ImportMapping, ImportMappingData,
+    IncomeData, NewActivity, Sort,
 };
 pub use activities_service::ActivityService;
 pub use activities_traits::{ActivityRepositoryTrait, ActivityServiceTrait};

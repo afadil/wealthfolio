@@ -18,7 +18,7 @@ interface SearchProps {
   defaultValue?: string;
   value?: string;
   placeholder?: string;
-  onSelectResult: (symbol: string, quoteSummary?: SymbolSearchResult) => void;
+  onSelectResult: (symbol: string, searchResult?: SymbolSearchResult) => void;
   className?: string;
   /** Default currency to use for custom assets (typically from account) */
   defaultCurrency?: string;
@@ -178,9 +178,9 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
 
     // Handle custom asset created from dialog
     const handleCustomAssetCreated = useCallback(
-      (quoteSummary: SymbolSearchResult) => {
+      (searchResult: SymbolSearchResult) => {
         // Select the newly created custom asset
-        handleSelectResult(quoteSummary);
+        handleSelectResult(searchResult);
       },
       [handleSelectResult],
     );

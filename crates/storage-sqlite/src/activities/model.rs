@@ -453,10 +453,13 @@ impl From<NewActivity> for ActivityDB {
             .unwrap_or("POSTED")
             .to_string();
 
+        // Extract asset_id before consuming domain fields
+        let asset_id = domain.get_asset_id().map(|s| s.to_string());
+
         Self {
             id: domain.id.unwrap_or_default(),
             account_id: domain.account_id,
-            asset_id: domain.asset_id,
+            asset_id,
 
             // Classification
             activity_type: domain.activity_type,
@@ -538,10 +541,13 @@ impl From<ActivityUpdate> for ActivityDB {
             .unwrap_or("POSTED")
             .to_string();
 
+        // Extract asset_id before consuming domain fields
+        let asset_id = domain.get_asset_id().map(|s| s.to_string());
+
         Self {
             id: domain.id,
             account_id: domain.account_id,
-            asset_id: domain.asset_id,
+            asset_id,
 
             // Classification
             activity_type: domain.activity_type,

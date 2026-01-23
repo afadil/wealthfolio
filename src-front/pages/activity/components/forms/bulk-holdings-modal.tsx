@@ -116,11 +116,12 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
         accountId: data.accountId,
         activityType: ActivityType.TRANSFER_IN,
         activityDate: activityDate.toISOString(),
-        // Use symbol instead of assetId - backend generates canonical ID
-        symbol: (holding.assetId || holding.ticker || "").toUpperCase().trim(),
-        // Pass exchangeMic for canonical ID generation (e.g., "XNAS", "XTSE")
-        exchangeMic: holding.exchangeMic,
-        pricingMode: holding.pricingMode ?? PricingMode.MARKET,
+        // Nest asset fields in asset object (required by backend)
+        asset: {
+          symbol: (holding.assetId || holding.ticker || "").toUpperCase().trim(),
+          exchangeMic: holding.exchangeMic,
+          pricingMode: holding.pricingMode ?? PricingMode.MARKET,
+        },
         quantity: Number(holding.sharesOwned),
         unitPrice: Number(holding.averageCost),
         amount: Number(holding.sharesOwned) * Number(holding.averageCost),
