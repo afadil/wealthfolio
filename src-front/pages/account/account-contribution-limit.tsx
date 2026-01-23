@@ -26,29 +26,20 @@ export function AccountContributionLimit({ accountId }: AccountContributionLimit
 
   const { data: deposits, isLoading: isDepositsLoading } = useQuery<DepositsCalculation, Error>({
     queryKey: [QueryKeys.CONTRIBUTION_LIMIT_PROGRESS, accountId, currentYear],
-    queryFn: () => calculateDepositsForLimit(limitForAccount?.id ?? ""),
-    enabled: !isLimitsLoading,
+    queryFn: () => calculateDepositsForLimit(limitForAccount!.id),
+    enabled: !isLimitsLoading && !!limitForAccount,
   });
 
-  if (isLimitsLoading || isDepositsLoading) {
+  if (isLimitsLoading) {
     return <AccountContributionLimit.Skeleton />;
   }
-
-  const accountDeposit = deposits?.byAccount[accountId];
 
   if (!limitForAccount) {
     return (
       <Card className="border-muted bg-muted/70 border-none p-6 shadow-none">
         <div className="flex items-center justify-between text-sm">
           <span>
-            You&apos;ve contributed{" "}
-            <span className="font-semibold">
-              <PrivacyAmount
-                value={accountDeposit?.convertedAmount ?? 0}
-                currency={deposits?.baseCurrency ?? "USD"}
-              />
-            </span>{" "}
-            so far in {currentYear}. There&apos;s no contribution limit set for this account.{" "}
+            No contribution limit set for this account.{" "}
             <Link
               to="/settings/contribution-limits"
               className="text-primary inline-flex items-center gap-1 font-semibold"
@@ -61,6 +52,12 @@ export function AccountContributionLimit({ accountId }: AccountContributionLimit
       </Card>
     );
   }
+
+  if (isDepositsLoading) {
+    return <AccountContributionLimit.Skeleton />;
+  }
+
+  const accountDeposit = deposits?.byAccount[accountId];
 
   return (
     <div className="space-y-4">

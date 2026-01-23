@@ -273,14 +273,10 @@ diesel::table! {
 
 diesel::table! {
     quote_sync_state (asset_id) {
-        asset_id -> Nullable<Text>,
+        asset_id -> Text,
         is_active -> Integer,
-        first_activity_date -> Nullable<Text>,
-        last_activity_date -> Nullable<Text>,
         position_closed_date -> Nullable<Text>,
         last_synced_at -> Nullable<Text>,
-        last_quote_date -> Nullable<Text>,
-        earliest_quote_date -> Nullable<Text>,
         data_source -> Text,
         sync_priority -> Integer,
         error_count -> Integer,

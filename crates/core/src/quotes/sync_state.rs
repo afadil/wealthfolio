@@ -170,6 +170,148 @@ impl SyncCategory {
     }
 }
 
+// =============================================================================
+// Sync Planning (Explicit Inputs)
+// =============================================================================
+
+use super::constants::{
+    BACKFILL_SAFETY_MARGIN_DAYS, MIN_SYNC_LOOKBACK_DAYS, OVERLAP_DAYS, QUOTE_HISTORY_BUFFER_DAYS,
+};
+
+/// Inputs for sync planning, computed on-the-fly from operational tables.
+///
+/// These values are NOT cached in the sync_state table. They are computed
+/// fresh at plan time to ensure correctness.
+#[derive(Debug, Clone)]
+pub struct SyncPlanningInputs {
+    /// Is this an active position (has open holdings)?
+    pub is_active: bool,
+    /// When the position was closed (if applicable)
+    pub position_closed_date: Option<NaiveDate>,
+    /// Earliest activity date for this asset (computed from activities table)
+    pub activity_min: Option<NaiveDate>,
+    /// Latest activity date for this asset (computed from activities table)
+    pub activity_max: Option<NaiveDate>,
+    /// Earliest quote date for this asset+provider (computed from quotes table)
+    pub quote_min: Option<NaiveDate>,
+    /// Latest quote date for this asset+provider (computed from quotes table)
+    pub quote_max: Option<NaiveDate>,
+}
+
+/// Determines the sync category based on explicit planning inputs.
+///
+/// This is a pure function that takes all required inputs explicitly,
+/// making it easy to test and reason about.
+pub fn determine_sync_category(
+    inputs: &SyncPlanningInputs,
+    grace_period_days: i64,
+    today: NaiveDate,
+) -> SyncCategory {
+    // FIRST: Check for NEW assets - has activities but no quotes yet
+    if inputs.activity_min.is_some() && inputs.quote_min.is_none() {
+        return SyncCategory::New;
+    }
+
+    // Check if needs backfill (activity date - buffer - margin before earliest quote)
+    if let (Some(activity_min), Some(quote_min)) = (inputs.activity_min, inputs.quote_min) {
+        let required_start =
+            activity_min - Duration::days(QUOTE_HISTORY_BUFFER_DAYS + BACKFILL_SAFETY_MARGIN_DAYS);
+        if required_start < quote_min {
+            return SyncCategory::NeedsBackfill;
+        }
+    }
+
+    // Check if symbol has open position
+    if inputs.is_active {
+        return SyncCategory::Active;
+    }
+
+    // Position is closed - check grace period
+    if let Some(closed_date) = inputs.position_closed_date {
+        let days_since_close = (today - closed_date).num_days();
+        if days_since_close <= grace_period_days {
+            return SyncCategory::RecentlyClosed;
+        }
+    }
+
+    // Fallback: check activity_max for recently closed without explicit closed_date
+    if let Some(activity_max) = inputs.activity_max {
+        let days_since_activity = (today - activity_max).num_days();
+        if days_since_activity <= grace_period_days {
+            return SyncCategory::RecentlyClosed;
+        }
+    }
+
+    SyncCategory::Closed
+}
+
+/// Calculates the sync date window based on category and inputs.
+///
+/// Returns (start_date, end_date) for the sync operation.
+/// Returns None if the asset should not be synced.
+pub fn calculate_sync_window(
+    category: &SyncCategory,
+    inputs: &SyncPlanningInputs,
+    today: NaiveDate,
+) -> Option<(NaiveDate, NaiveDate)> {
+    match category {
+        SyncCategory::Closed => None,
+
+        SyncCategory::Active | SyncCategory::RecentlyClosed => {
+            // Continue from last quote with overlap, or start from activity if no quotes
+            let start = inputs
+                .quote_max
+                .map(|d| d - Duration::days(OVERLAP_DAYS))
+                .or_else(|| {
+                    inputs
+                        .activity_min
+                        .map(|d| d - Duration::days(QUOTE_HISTORY_BUFFER_DAYS))
+                })
+                .unwrap_or_else(|| today - Duration::days(QUOTE_HISTORY_BUFFER_DAYS));
+
+            // Ensure minimum lookback
+            let start = if start >= today {
+                today - Duration::days(MIN_SYNC_LOOKBACK_DAYS)
+            } else {
+                start
+            };
+
+            Some((start, today))
+        }
+
+        SyncCategory::New => {
+            // Full history from activity start
+            let start = inputs
+                .activity_min
+                .map(|d| d - Duration::days(QUOTE_HISTORY_BUFFER_DAYS))
+                .unwrap_or_else(|| today - Duration::days(QUOTE_HISTORY_BUFFER_DAYS));
+
+            Some((start, today))
+        }
+
+        SyncCategory::NeedsBackfill => {
+            // Fill gap before earliest quote
+            // Use same buffer as detection to ensure we cover the required range
+            let start = inputs
+                .activity_min
+                .map(|d| d - Duration::days(QUOTE_HISTORY_BUFFER_DAYS + BACKFILL_SAFETY_MARGIN_DAYS))
+                .unwrap_or(today);
+
+            // End at quote_min - 1 to avoid refetching existing data
+            let end = inputs
+                .quote_min
+                .map(|d| d - Duration::days(1))
+                .unwrap_or(today);
+
+            if start > end {
+                None
+            } else {
+                Some((start, end))
+            }
+        }
+    }
+}
+
 /// Plan for syncing a specific asset.
 #[derive(Debug, Clone)]
 pub struct SymbolSyncPlan {
@@ -185,20 +327,27 @@ pub struct SymbolSyncPlan {
 }
 
 /// Domain model for quote sync state.
+///
+/// This table tracks sync coordination state per asset. It is NOT a cache of
+/// operational data. Activity dates and quote bounds are computed on-the-fly
+/// from the activities and quotes tables at sync planning time.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QuoteSyncState {
     pub asset_id: String,
+    /// Whether this asset has an open position (derived from snapshots)
     pub is_active: bool,
-    pub first_activity_date: Option<NaiveDate>,
-    pub last_activity_date: Option<NaiveDate>,
+    /// When the position was closed (if applicable)
     pub position_closed_date: Option<NaiveDate>,
+    /// When the last sync was attempted
     pub last_synced_at: Option<DateTime<Utc>>,
-    pub last_quote_date: Option<NaiveDate>,
-    pub earliest_quote_date: Option<NaiveDate>,
+    /// Which provider to use for this asset
     pub data_source: String,
+    /// Priority for sync ordering
     pub sync_priority: i32,
+    /// Number of consecutive sync failures
     pub error_count: i32,
+    /// Last sync error message
     pub last_error: Option<String>,
     /// Timestamp when asset profile was last enriched from provider.
     /// NULL means the asset needs profile enrichment.
@@ -208,26 +357,14 @@ pub struct QuoteSyncState {
 }
 
 impl QuoteSyncState {
-    /// Buffer days to fetch quotes before the first activity date.
-    /// Should match QUOTE_HISTORY_BUFFER_DAYS from constants.rs.
-    const QUOTE_HISTORY_BUFFER_DAYS: i64 = 45;
-
-    /// Additional safety margin for backfill detection.
-    /// Should match BACKFILL_SAFETY_MARGIN_DAYS from constants.rs.
-    const BACKFILL_SAFETY_MARGIN_DAYS: i64 = 7;
-
     /// Create a new sync state for an asset.
     pub fn new(asset_id: String, data_source: String) -> Self {
         let now = Utc::now();
         QuoteSyncState {
             asset_id,
             is_active: true,
-            first_activity_date: None,
-            last_activity_date: None,
             position_closed_date: None,
             last_synced_at: None,
-            last_quote_date: None,
-            earliest_quote_date: None,
             data_source,
             sync_priority: SyncCategory::New.default_priority(),
             error_count: 0,
@@ -249,61 +386,9 @@ impl QuoteSyncState {
         self.updated_at = Utc::now();
     }
 
-    /// Determine the sync category based on current state.
-    pub fn determine_category(&self, grace_period_days: i64) -> SyncCategory {
-        let today = Utc::now().date_naive();
-
-        // FIRST: Check for NEW assets - has activities but no quotes yet
-        // This takes precedence because we need quotes regardless of is_active status
-        // (is_active might be false simply because no snapshot exists yet for new assets)
-        if self.first_activity_date.is_some() && self.earliest_quote_date.is_none() {
-            return SyncCategory::New;
-        }
-
-        // Check if needs backfill (activity date - buffer - safety margin before earliest quote)
-        // This also applies regardless of is_active status
-        // Use safety margin to be conservative and avoid edge cases
-        if let (Some(first_activity), Some(earliest_quote)) =
-            (self.first_activity_date, self.earliest_quote_date)
-        {
-            let required_start = first_activity
-                - Duration::days(
-                    Self::QUOTE_HISTORY_BUFFER_DAYS + Self::BACKFILL_SAFETY_MARGIN_DAYS,
-                );
-            if required_start < earliest_quote {
-                return SyncCategory::NeedsBackfill;
-            }
-        }
-
-        // Check if symbol has open position
-        if self.is_active {
-            return SyncCategory::Active;
-        }
-
-        // Position is closed - check grace period
-        if let Some(closed_date) = self.position_closed_date {
-            let days_since_close = (today - closed_date).num_days();
-            if days_since_close <= grace_period_days {
-                return SyncCategory::RecentlyClosed;
-            }
-        }
-
-        // Fallback: check last_activity_date for recently closed without explicit closed_date
-        // This handles cases where position was closed but closed_date wasn't set
-        if let Some(last_activity) = self.last_activity_date {
-            let days_since_activity = (today - last_activity).num_days();
-            if days_since_activity <= grace_period_days {
-                return SyncCategory::RecentlyClosed;
-            }
-        }
-
-        SyncCategory::Closed
-    }
-
     /// Mark as synced successfully.
-    pub fn mark_synced(&mut self, last_quote_date: NaiveDate) {
+    pub fn mark_synced(&mut self) {
         self.last_synced_at = Some(Utc::now());
-        self.last_quote_date = Some(last_quote_date);
         self.error_count = 0;
         self.last_error = None;
         self.updated_at = Utc::now();
@@ -313,41 +398,6 @@ impl QuoteSyncState {
     pub fn mark_sync_failed(&mut self, error: String) {
         self.error_count += 1;
         self.last_error = Some(error);
-        self.updated_at = Utc::now();
-    }
-
-    /// Update activity dates.
-    pub fn update_activity_dates(
-        &mut self,
-        first_date: Option<NaiveDate>,
-        last_date: Option<NaiveDate>,
-    ) {
-        // Only update if the new first date is earlier
-        if let Some(new_first) = first_date {
-            match self.first_activity_date {
-                Some(existing) if new_first < existing => {
-                    self.first_activity_date = Some(new_first);
-                }
-                None => {
-                    self.first_activity_date = Some(new_first);
-                }
-                _ => {}
-            }
-        }
-
-        // Only update if the new last date is later
-        if let Some(new_last) = last_date {
-            match self.last_activity_date {
-                Some(existing) if new_last > existing => {
-                    self.last_activity_date = Some(new_last);
-                }
-                None => {
-                    self.last_activity_date = Some(new_last);
-                }
-                _ => {}
-            }
-        }
-
         self.updated_at = Utc::now();
     }
 
@@ -366,32 +416,14 @@ impl QuoteSyncState {
         self.sync_priority = SyncCategory::Active.default_priority();
         self.updated_at = Utc::now();
     }
-
-    /// Update the earliest quote date.
-    pub fn update_earliest_quote_date(&mut self, date: NaiveDate) {
-        match self.earliest_quote_date {
-            Some(existing) if date < existing => {
-                self.earliest_quote_date = Some(date);
-            }
-            None => {
-                self.earliest_quote_date = Some(date);
-            }
-            _ => {}
-        }
-        self.updated_at = Utc::now();
-    }
 }
 
 /// Update payload for partial updates to sync state.
 #[derive(Debug, Clone, Default)]
 pub struct QuoteSyncStateUpdate {
     pub is_active: Option<bool>,
-    pub first_activity_date: Option<Option<NaiveDate>>,
-    pub last_activity_date: Option<Option<NaiveDate>>,
     pub position_closed_date: Option<Option<NaiveDate>>,
     pub last_synced_at: Option<Option<DateTime<Utc>>>,
-    pub last_quote_date: Option<Option<NaiveDate>>,
-    pub earliest_quote_date: Option<Option<NaiveDate>>,
     pub sync_priority: Option<i32>,
     pub error_count: Option<i32>,
     pub last_error: Option<Option<String>>,
@@ -445,37 +477,10 @@ pub trait SyncStateStore: Send + Sync {
     async fn upsert_batch(&self, states: &[QuoteSyncState]) -> Result<usize>;
 
     /// Update sync state after successful sync.
-    async fn update_after_sync(
-        &self,
-        asset_id: &str,
-        last_quote_date: NaiveDate,
-        earliest_quote_date: Option<NaiveDate>,
-        data_source: Option<&str>,
-    ) -> Result<()>;
+    async fn update_after_sync(&self, asset_id: &str) -> Result<()>;
 
     /// Update sync state after sync failure.
     async fn update_after_failure(&self, asset_id: &str, error: &str) -> Result<()>;
-
-    /// Update quote bounds monotonically.
-    ///
-    /// This method updates `earliest_quote_date` and `last_quote_date` using
-    /// monotonic logic (MIN for earliest, MAX for latest) to ensure bounds
-    /// never regress even under concurrent updates or crash recovery.
-    ///
-    /// # Arguments
-    /// * `asset_id` - The asset identifier
-    /// * `new_earliest` - New candidate for earliest quote date (will only update if < current)
-    /// * `new_latest` - New candidate for latest quote date (will only update if > current)
-    ///
-    /// # Monotonic Guarantees
-    /// - `earliest_quote_date` updates are monotonic: MIN(existing, new)
-    /// - `last_quote_date` updates are monotonic: MAX(existing, new)
-    async fn update_quote_bounds_monotonic(
-        &self,
-        asset_id: &str,
-        new_earliest: Option<NaiveDate>,
-        new_latest: Option<NaiveDate>,
-    ) -> Result<()>;
 
     /// Mark asset as inactive (position closed).
     async fn mark_inactive(&self, asset_id: &str, closed_date: NaiveDate) -> Result<()>;
@@ -483,28 +488,11 @@ pub trait SyncStateStore: Send + Sync {
     /// Mark asset as active.
     async fn mark_active(&self, asset_id: &str) -> Result<()>;
 
-    /// Update activity dates for an asset.
-    async fn update_activity_dates(
-        &self,
-        asset_id: &str,
-        first_date: Option<NaiveDate>,
-        last_date: Option<NaiveDate>,
-    ) -> Result<()>;
-
     /// Delete sync state for an asset.
     async fn delete(&self, asset_id: &str) -> Result<()>;
 
     /// Delete all sync states (used for reset).
     async fn delete_all(&self) -> Result<usize>;
-
-    /// Refresh activity dates for all sync states from the activities table.
-    /// This efficiently populates first_activity_date and last_activity_date
-    /// for all sync states by querying the activities table directly.
-    async fn refresh_activity_dates_from_activities(&self) -> Result<usize>;
-
-    /// Refresh earliest_quote_date for all sync states from the quotes table.
-    /// This ensures earliest_quote_date reflects the actual minimum quote date.
-    async fn refresh_earliest_quote_dates(&self) -> Result<usize>;
 
     /// Mark asset profile as enriched (sets profile_enriched_at timestamp).
     async fn mark_profile_enriched(&self, asset_id: &str) -> Result<()>;
@@ -520,19 +508,37 @@ pub trait SyncStateStore: Send + Sync {
 mod tests {
     use super::*;
 
-    fn create_test_state() -> QuoteSyncState {
-        QuoteSyncState::new("TEST".to_string(), "YAHOO".to_string())
+    fn create_inputs(
+        is_active: bool,
+        position_closed_date: Option<NaiveDate>,
+        activity_min: Option<NaiveDate>,
+        activity_max: Option<NaiveDate>,
+        quote_min: Option<NaiveDate>,
+        quote_max: Option<NaiveDate>,
+    ) -> SyncPlanningInputs {
+        SyncPlanningInputs {
+            is_active,
+            position_closed_date,
+            activity_min,
+            activity_max,
+            quote_min,
+            quote_max,
+        }
     }
 
     #[test]
     fn test_new_asset_with_activity_but_no_quotes() {
-        let mut state = create_test_state();
-        state.is_active = false;
-        state.first_activity_date = Some(Utc::now().date_naive());
-        state.last_activity_date = Some(Utc::now().date_naive());
-        state.earliest_quote_date = None;
+        let today = Utc::now().date_naive();
+        let inputs = create_inputs(
+            false,
+            None,
+            Some(today),         // has activity
+            Some(today),
+            None,                // no quotes
+            None,
+        );
 
-        let category = state.determine_category(30);
+        let category = determine_sync_category(&inputs, 30, today);
         assert_eq!(
             category,
             SyncCategory::New,
@@ -542,49 +548,54 @@ mod tests {
 
     #[test]
     fn test_active_position_with_quotes() {
-        let mut state = create_test_state();
-        state.is_active = true;
         let today = Utc::now().date_naive();
-        state.first_activity_date = Some(today - Duration::days(10));
-        // earliest_quote_date must be at least (10 + buffer + margin) = 10 + 52 = 62 days ago
-        // to avoid triggering NeedsBackfill
-        state.earliest_quote_date = Some(today - Duration::days(70));
-        state.last_quote_date = Some(today - Duration::days(1));
+        let inputs = create_inputs(
+            true,
+            None,
+            Some(today - Duration::days(10)),
+            Some(today - Duration::days(1)),
+            // quote_min must be at least (10 + buffer + margin) = 62 days before activity_min
+            Some(today - Duration::days(70)),
+            Some(today - Duration::days(1)),
+        );
 
-        let category = state.determine_category(30);
+        let category = determine_sync_category(&inputs, 30, today);
         assert_eq!(category, SyncCategory::Active);
     }
 
     #[test]
     fn test_needs_backfill_activity_before_quotes() {
-        let mut state = create_test_state();
-        state.is_active = true;
         let today = Utc::now().date_naive();
-        state.first_activity_date = Some(today - Duration::days(60));
-        state.earliest_quote_date = Some(today - Duration::days(20));
-        state.last_quote_date = Some(today - Duration::days(1));
+        let inputs = create_inputs(
+            true,
+            None,
+            Some(today - Duration::days(60)),  // activity started 60 days ago
+            Some(today - Duration::days(1)),
+            Some(today - Duration::days(20)),  // but quotes only go back 20 days
+            Some(today - Duration::days(1)),
+        );
 
-        let category = state.determine_category(30);
+        let category = determine_sync_category(&inputs, 30, today);
         assert_eq!(
             category,
             SyncCategory::NeedsBackfill,
-            "Should need backfill when first_activity - buffer < earliest_quote"
+            "Should need backfill when activity_min - buffer < quote_min"
         );
     }
 
     #[test]
     fn test_recently_closed_within_grace_period() {
-        let mut state = create_test_state();
-        state.is_active = false;
         let today = Utc::now().date_naive();
-        state.first_activity_date = Some(today - Duration::days(100));
-        state.last_activity_date = Some(today - Duration::days(5));
-        state.position_closed_date = Some(today - Duration::days(5));
-        // earliest_quote_date must be at least (100 + buffer + margin) = 152 days ago
-        // to avoid triggering NeedsBackfill
-        state.earliest_quote_date = Some(today - Duration::days(160));
+        let inputs = create_inputs(
+            false,
+            Some(today - Duration::days(5)),   // closed 5 days ago
+            Some(today - Duration::days(100)),
+            Some(today - Duration::days(5)),
+            Some(today - Duration::days(160)), // enough history to avoid NeedsBackfill
+            Some(today - Duration::days(5)),
+        );
 
-        let category = state.determine_category(30);
+        let category = determine_sync_category(&inputs, 30, today);
         assert_eq!(
             category,
             SyncCategory::RecentlyClosed,
@@ -594,35 +605,37 @@ mod tests {
 
     #[test]
     fn test_recently_closed_fallback_to_last_activity() {
-        let mut state = create_test_state();
-        state.is_active = false;
         let today = Utc::now().date_naive();
-        state.first_activity_date = Some(today - Duration::days(100));
-        state.last_activity_date = Some(today - Duration::days(10));
-        state.position_closed_date = None;
-        // earliest_quote_date must be at least (100 + buffer + margin) = 152 days ago
-        state.earliest_quote_date = Some(today - Duration::days(160));
+        let inputs = create_inputs(
+            false,
+            None,                              // no explicit closed date
+            Some(today - Duration::days(100)),
+            Some(today - Duration::days(10)), // last activity 10 days ago
+            Some(today - Duration::days(160)),
+            Some(today - Duration::days(10)),
+        );
 
-        let category = state.determine_category(30);
+        let category = determine_sync_category(&inputs, 30, today);
         assert_eq!(
             category,
             SyncCategory::RecentlyClosed,
-            "Should fallback to last_activity_date when position_closed_date is None"
+            "Should fallback to activity_max when position_closed_date is None"
         );
     }
 
     #[test]
     fn test_closed_beyond_grace_period() {
-        let mut state = create_test_state();
-        state.is_active = false;
         let today = Utc::now().date_naive();
-        state.first_activity_date = Some(today - Duration::days(100));
-        state.last_activity_date = Some(today - Duration::days(50));
-        state.position_closed_date = Some(today - Duration::days(50));
-        // earliest_quote_date must be at least (100 + buffer + margin) = 152 days ago
-        state.earliest_quote_date = Some(today - Duration::days(160));
+        let inputs = create_inputs(
+            false,
+            Some(today - Duration::days(50)),  // closed 50 days ago
+            Some(today - Duration::days(100)),
+            Some(today - Duration::days(50)),
+            Some(today - Duration::days(160)),
+            Some(today - Duration::days(50)),
+        );
 
-        let category = state.determine_category(30);
+        let category = determine_sync_category(&inputs, 30, today);
         assert_eq!(
             category,
             SyncCategory::Closed,
@@ -632,13 +645,17 @@ mod tests {
 
     #[test]
     fn test_needs_backfill_even_when_not_active() {
-        let mut state = create_test_state();
-        state.is_active = false;
         let today = Utc::now().date_naive();
-        state.first_activity_date = Some(today - Duration::days(100));
-        state.earliest_quote_date = Some(today - Duration::days(50));
+        let inputs = create_inputs(
+            false,
+            None,
+            Some(today - Duration::days(100)), // activity started 100 days ago
+            Some(today - Duration::days(50)),
+            Some(today - Duration::days(50)),  // quotes only go back 50 days
+            Some(today - Duration::days(1)),
+        );
 
-        let category = state.determine_category(30);
+        let category = determine_sync_category(&inputs, 30, today);
         assert_eq!(
             category,
             SyncCategory::NeedsBackfill,
@@ -666,14 +683,12 @@ mod tests {
 
     #[test]
     fn test_mark_synced() {
-        let mut state = create_test_state();
+        let mut state = QuoteSyncState::new("TEST".to_string(), "YAHOO".to_string());
         state.error_count = 3;
         state.last_error = Some("Previous error".to_string());
 
-        let quote_date = Utc::now().date_naive();
-        state.mark_synced(quote_date);
+        state.mark_synced();
 
-        assert_eq!(state.last_quote_date, Some(quote_date));
         assert!(state.last_synced_at.is_some());
         assert_eq!(state.error_count, 0);
         assert!(state.last_error.is_none());
@@ -681,7 +696,7 @@ mod tests {
 
     #[test]
     fn test_mark_sync_failed() {
-        let mut state = create_test_state();
+        let mut state = QuoteSyncState::new("TEST".to_string(), "YAHOO".to_string());
         assert_eq!(state.error_count, 0);
 
         state.mark_sync_failed("Connection timeout".to_string());

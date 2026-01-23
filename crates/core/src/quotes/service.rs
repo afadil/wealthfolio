@@ -24,7 +24,9 @@ use super::sync::{QuoteSyncService, QuoteSyncServiceTrait, SyncResult};
 use super::sync_state::{QuoteSyncState, SymbolSyncPlan, SyncMode, SyncStateStore};
 use super::types::{AssetId, Day};
 use crate::activities::ActivityRepositoryTrait;
-use crate::assets::{needs_market_quotes, Asset, AssetKind, AssetRepositoryTrait, ProviderProfile};
+use crate::assets::{
+    is_fx_asset_id, needs_market_quotes, Asset, AssetKind, AssetRepositoryTrait, ProviderProfile,
+};
 use crate::errors::Result;
 use crate::secrets::SecretStore;
 
@@ -759,6 +761,14 @@ where
 
         for sync_state in all_sync_states {
             let asset_id = &sync_state.asset_id;
+
+            // Skip FX assets - they don't have "positions" in the holdings sense.
+            // FX rates are always needed for currency conversion as long as there are
+            // foreign-currency activities or holdings. Their lifecycle is managed separately.
+            if is_fx_asset_id(asset_id) {
+                continue;
+            }
+
             let current_qty = current_holdings
                 .get(asset_id)
                 .copied()

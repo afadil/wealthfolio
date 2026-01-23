@@ -83,16 +83,24 @@ CREATE INDEX idx_quotes_manual ON quotes(asset_id, day DESC) WHERE source = 'MAN
 -- ============================================================================
 -- STEP 2: CREATE QUOTE_SYNC_STATE TABLE
 -- ============================================================================
+--
+-- This table tracks sync coordination state per asset. It is NOT a cache of
+-- operational data. Activity dates and quote bounds are computed on-the-fly
+-- from the activities and quotes tables at sync planning time.
+--
+-- Fields:
+--   is_active, position_closed_date: position state (derived from snapshots)
+--   last_synced_at: when last sync was attempted
+--   data_source: which provider to use for this asset
+--   sync_priority: ordering for sync operations
+--   error_count, last_error: health tracking for retry logic
+--   profile_enriched_at: tracks asset profile enrichment
 
 CREATE TABLE quote_sync_state (
     asset_id TEXT PRIMARY KEY,
     is_active INTEGER NOT NULL DEFAULT 1,
-    first_activity_date TEXT,
-    last_activity_date TEXT,
     position_closed_date TEXT,
     last_synced_at TEXT,
-    last_quote_date TEXT,
-    earliest_quote_date TEXT,
     data_source TEXT NOT NULL DEFAULT 'YAHOO',
     sync_priority INTEGER NOT NULL DEFAULT 1,
     error_count INTEGER NOT NULL DEFAULT 0,

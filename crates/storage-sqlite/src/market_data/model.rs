@@ -108,22 +108,14 @@ pub struct UpdateMarketDataProviderSettingDB {
 #[diesel(primary_key(asset_id))]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct QuoteSyncStateDB {
-    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
-    pub asset_id: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub asset_id: String,
     #[diesel(sql_type = diesel::sql_types::Integer)]
     pub is_active: i32,
-    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
-    pub first_activity_date: Option<String>,
-    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
-    pub last_activity_date: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub position_closed_date: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub last_synced_at: Option<String>,
-    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
-    pub last_quote_date: Option<String>,
-    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
-    pub earliest_quote_date: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub data_source: String,
     #[diesel(sql_type = diesel::sql_types::Integer)]
@@ -145,12 +137,8 @@ pub struct QuoteSyncStateDB {
 #[diesel(table_name = crate::schema::quote_sync_state)]
 pub struct QuoteSyncStateUpdateDB {
     pub is_active: Option<i32>,
-    pub first_activity_date: Option<Option<String>>,
-    pub last_activity_date: Option<Option<String>>,
     pub position_closed_date: Option<Option<String>>,
     pub last_synced_at: Option<Option<String>>,
-    pub last_quote_date: Option<Option<String>>,
-    pub earliest_quote_date: Option<Option<String>>,
     pub data_source: Option<String>,
     pub sync_priority: Option<i32>,
     pub error_count: Option<i32>,
@@ -274,15 +262,10 @@ impl From<QuoteSyncStateDB> for QuoteSyncState {
             |s: &str| -> Option<NaiveDate> { NaiveDate::parse_from_str(s, "%Y-%m-%d").ok() };
 
         QuoteSyncState {
-            // asset_id from DB (schema has Nullable but shouldn't be null in practice)
-            asset_id: db.asset_id.unwrap_or_default(),
+            asset_id: db.asset_id,
             is_active: db.is_active != 0,
-            first_activity_date: db.first_activity_date.as_deref().and_then(parse_date),
-            last_activity_date: db.last_activity_date.as_deref().and_then(parse_date),
             position_closed_date: db.position_closed_date.as_deref().and_then(parse_date),
             last_synced_at: db.last_synced_at.as_deref().map(parse_datetime),
-            last_quote_date: db.last_quote_date.as_deref().and_then(parse_date),
-            earliest_quote_date: db.earliest_quote_date.as_deref().and_then(parse_date),
             data_source: db.data_source,
             sync_priority: db.sync_priority,
             error_count: db.error_count,
@@ -297,25 +280,12 @@ impl From<QuoteSyncStateDB> for QuoteSyncState {
 impl From<&QuoteSyncState> for QuoteSyncStateDB {
     fn from(state: &QuoteSyncState) -> Self {
         QuoteSyncStateDB {
-            // Map asset_id (schema has Nullable but we always have a value)
-            asset_id: Some(state.asset_id.clone()),
+            asset_id: state.asset_id.clone(),
             is_active: if state.is_active { 1 } else { 0 },
-            first_activity_date: state
-                .first_activity_date
-                .map(|d| d.format("%Y-%m-%d").to_string()),
-            last_activity_date: state
-                .last_activity_date
-                .map(|d| d.format("%Y-%m-%d").to_string()),
             position_closed_date: state
                 .position_closed_date
                 .map(|d| d.format("%Y-%m-%d").to_string()),
             last_synced_at: state.last_synced_at.map(|dt| dt.to_rfc3339()),
-            last_quote_date: state
-                .last_quote_date
-                .map(|d| d.format("%Y-%m-%d").to_string()),
-            earliest_quote_date: state
-                .earliest_quote_date
-                .map(|d| d.format("%Y-%m-%d").to_string()),
             data_source: state.data_source.clone(),
             sync_priority: state.sync_priority,
             error_count: state.error_count,

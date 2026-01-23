@@ -158,6 +158,8 @@ pub struct ActivityDetailsDB {
     pub asset_name: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub asset_pricing_mode: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub metadata: Option<String>,
 }
 
 impl ActivityDetailsDB {
@@ -273,6 +275,7 @@ impl From<ActivityDetailsDB> for wealthfolio_core::activities::ActivityDetails {
             idempotency_key: db.idempotency_key,
             import_run_id: db.import_run_id,
             is_user_modified: db.is_user_modified != 0,
+            metadata: db.metadata.and_then(|s| serde_json::from_str(&s).ok()),
         }
     }
 }

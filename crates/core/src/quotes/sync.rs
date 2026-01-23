@@ -31,7 +31,10 @@ use tokio::sync::RwLock;
 use super::client::MarketDataClient;
 use super::constants::*;
 use super::store::QuoteStore;
-use super::sync_state::{QuoteSyncState, SymbolSyncPlan, SyncCategory, SyncMode, SyncStateStore};
+use super::sync_state::{
+    calculate_sync_window, determine_sync_category, QuoteSyncState, SyncPlanningInputs,
+    SymbolSyncPlan, SyncCategory, SyncMode, SyncStateStore,
+};
 use super::types::{AssetId, Day, ProviderId};
 use crate::activities::ActivityRepositoryTrait;
 use crate::assets::{
@@ -334,10 +337,32 @@ where
             .get_activity_bounds_for_assets(&asset_ids)
             .unwrap_or_default();
 
+        // Compute quote bounds per provider
+        // Group assets by preferred_provider and batch query
+        let mut quote_bounds: HashMap<String, (NaiveDate, NaiveDate)> = HashMap::new();
+        let mut assets_by_provider: HashMap<String, Vec<String>> = HashMap::new();
+        for asset in assets.iter().filter(|a| self.should_sync_asset(a)) {
+            let provider = asset
+                .preferred_provider
+                .clone()
+                .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string());
+            assets_by_provider
+                .entry(provider)
+                .or_default()
+                .push(asset.id.clone());
+        }
+        for (provider, ids) in &assets_by_provider {
+            if let Ok(bounds) = self.quote_store.get_quote_bounds_for_assets(&ids, provider) {
+                quote_bounds.extend(bounds);
+            }
+        }
+
         assets
             .iter()
             .filter(|a| self.should_sync_asset(a))
-            .filter_map(|asset| self.build_asset_sync_plan(asset, today, &activity_bounds))
+            .filter_map(|asset| {
+                self.build_asset_sync_plan(asset, today, &activity_bounds, &quote_bounds)
+            })
             .collect()
     }
 
@@ -373,34 +398,44 @@ where
         asset: &Asset,
         today: NaiveDate,
         activity_bounds: &HashMap<String, (Option<NaiveDate>, Option<NaiveDate>)>,
+        quote_bounds: &HashMap<String, (NaiveDate, NaiveDate)>,
     ) -> Option<SymbolSyncPlan> {
         // Get existing sync state
-        let mut state = self
+        let state = self
             .sync_state_store
             .get_by_asset_id(&asset.id)
             .ok()
             .flatten();
 
-        if let Some(ref mut state) = state {
-            let (first, last) = activity_bounds
-                .get(&state.asset_id)
-                .copied()
-                .unwrap_or((None, None));
-            state.first_activity_date = first;
-            state.last_activity_date = last;
-        }
+        // Build SyncPlanningInputs from computed bounds
+        let (activity_min, activity_max) = activity_bounds
+            .get(&asset.id)
+            .copied()
+            .unwrap_or((None, None));
 
-        let category = state
-            .as_ref()
-            .map(|s| s.determine_category(CLOSED_POSITION_GRACE_PERIOD_DAYS))
-            .unwrap_or(SyncCategory::New);
+        let (quote_min, quote_max) = quote_bounds
+            .get(&asset.id)
+            .map(|(min, max)| (Some(*min), Some(*max)))
+            .unwrap_or((None, None));
+
+        let inputs = SyncPlanningInputs {
+            is_active: state.as_ref().map(|s| s.is_active).unwrap_or(true),
+            position_closed_date: state.as_ref().and_then(|s| s.position_closed_date),
+            activity_min,
+            activity_max,
+            quote_min,
+            quote_max,
+        };
+
+        let category = determine_sync_category(&inputs, CLOSED_POSITION_GRACE_PERIOD_DAYS, today);
 
         // Skip closed positions
         if matches!(category, SyncCategory::Closed) {
             return None;
         }
 
-        let (start_date, end_date) = self.calculate_date_range(&state, &category, today);
+        // Use the new calculate_sync_window function
+        let (start_date, end_date) = calculate_sync_window(&category, &inputs, today)?;
 
         // Validate date range
         if start_date > end_date {
@@ -425,62 +460,6 @@ where
         })
     }
 
-    /// Calculate the date range for syncing an asset based on category (used for Incremental mode).
-    fn calculate_date_range(
-        &self,
-        state: &Option<QuoteSyncState>,
-        category: &SyncCategory,
-        today: NaiveDate,
-    ) -> (NaiveDate, NaiveDate) {
-        match category {
-            SyncCategory::Active => {
-                // For active assets, start from last_quote_date - OVERLAP_DAYS to heal corrections
-                let start = state
-                    .as_ref()
-                    .and_then(|s| s.last_quote_date)
-                    .map(|d| d - Duration::days(OVERLAP_DAYS))
-                    .or_else(|| {
-                        state.as_ref().and_then(|s| {
-                            s.first_activity_date
-                                .map(|d| d - Duration::days(QUOTE_HISTORY_BUFFER_DAYS))
-                        })
-                    })
-                    .unwrap_or_else(|| today - Duration::days(QUOTE_HISTORY_BUFFER_DAYS));
-                (start, today)
-            }
-            SyncCategory::New => {
-                let start = state
-                    .as_ref()
-                    .and_then(|s| s.first_activity_date)
-                    .map(|d| d - Duration::days(QUOTE_HISTORY_BUFFER_DAYS))
-                    .unwrap_or_else(|| today - Duration::days(QUOTE_HISTORY_BUFFER_DAYS));
-                (start, today)
-            }
-            SyncCategory::NeedsBackfill => {
-                let start = state
-                    .as_ref()
-                    .and_then(|s| s.first_activity_date)
-                    .map(|d| d - Duration::days(QUOTE_HISTORY_BUFFER_DAYS))
-                    .unwrap_or(today);
-                let end = state
-                    .as_ref()
-                    .and_then(|s| s.earliest_quote_date)
-                    .unwrap_or(today);
-                (start, end)
-            }
-            SyncCategory::RecentlyClosed => {
-                // For recently closed, start from last_quote_date - OVERLAP_DAYS
-                let start = state
-                    .as_ref()
-                    .and_then(|s| s.last_quote_date)
-                    .map(|d| d - Duration::days(OVERLAP_DAYS))
-                    .unwrap_or_else(|| today - Duration::days(MIN_SYNC_LOOKBACK_DAYS));
-                (start, today)
-            }
-            SyncCategory::Closed => (today, today), // Should not reach here
-        }
-    }
-
     /// Calculate the date range for syncing an asset based on SyncMode.
     ///
     /// This is the primary method for determining sync windows, used when an explicit
@@ -489,15 +468,15 @@ where
     /// # FX Asset Handling (US-006)
     ///
     /// FX assets (e.g., `FX:EUR:USD`) have no activities attached to them, so their
-    /// `first_activity_date` is always NULL. For full history recomputation jobs
+    /// activity_min is always NULL. For full history recomputation jobs
     /// (BackfillHistory mode), FX assets need quote coverage from the earliest
     /// activity date across ALL accounts to support valuation history calculations.
     ///
     /// - **BackfillHistory mode + FX asset**: Use global earliest activity date
-    /// - **Incremental mode + FX asset**: Continue from last_quote_date (no backfill)
+    /// - **Incremental mode + FX asset**: Continue from quote_max (no backfill)
     fn calculate_date_range_for_mode(
         &self,
-        state: &Option<QuoteSyncState>,
+        inputs: &SyncPlanningInputs,
         mode: SyncMode,
         today: NaiveDate,
         asset_id: &str,
@@ -505,12 +484,9 @@ where
         match mode {
             SyncMode::Incremental => {
                 // Use category-based calculation for incremental mode
-                // For FX in Incremental mode: continue from last_quote_date, do NOT backfill
-                let category = state
-                    .as_ref()
-                    .map(|s| s.determine_category(CLOSED_POSITION_GRACE_PERIOD_DAYS))
-                    .unwrap_or(SyncCategory::New);
-                self.calculate_date_range(state, &category, today)
+                let category = determine_sync_category(inputs, CLOSED_POSITION_GRACE_PERIOD_DAYS, today);
+                calculate_sync_window(&category, inputs, today)
+                    .unwrap_or((today - Duration::days(QUOTE_HISTORY_BUFFER_DAYS), today))
             }
             SyncMode::RefetchRecent { days } => {
                 // Simply fetch the last N days, ignoring existing quotes
@@ -519,7 +495,7 @@ where
             }
             SyncMode::BackfillHistory { days: _days } => {
                 // For FX assets in BackfillHistory mode, use global earliest activity date
-                // FX assets have no activities, so first_activity_date is always NULL
+                // FX assets have no activities, so activity_min is always NULL
                 if is_fx_asset_id(asset_id) {
                     // Get global earliest activity date for FX coverage
                     let global_earliest = self
@@ -539,10 +515,9 @@ where
                     );
                     (start, today)
                 } else {
-                    // Non-FX: Fetch from activity start (with buffer) or fallback to N days
-                    let start = state
-                        .as_ref()
-                        .and_then(|s| s.first_activity_date)
+                    // Non-FX: Fetch from activity start (with buffer) or fallback to buffer days
+                    let start = inputs
+                        .activity_min
                         .map(|d| d - Duration::days(QUOTE_HISTORY_BUFFER_DAYS))
                         // Unify fallback policy: missing activity bounds should never imply a multi-year fetch.
                         .unwrap_or_else(|| today - Duration::days(QUOTE_HISTORY_BUFFER_DAYS));
@@ -604,22 +579,10 @@ where
                         Ok(_) => {
                             debug!("Saved {} quotes for {}", quotes_count, asset.id);
 
-                            // Update sync state
-                            if let Some(last_quote) = quotes.last() {
-                                let earliest = quotes.first().map(|q| q.timestamp.date_naive());
-                                let data_source = last_quote.data_source.as_str();
-                                if let Err(e) = self
-                                    .sync_state_store
-                                    .update_after_sync(
-                                        &asset.id,
-                                        last_quote.timestamp.date_naive(),
-                                        earliest,
-                                        Some(data_source),
-                                    )
-                                    .await
-                                {
-                                    warn!("Failed to update sync state for {}: {:?}", asset.id, e);
-                                }
+                            // Update sync state - just mark as synced
+                            if let Err(e) = self.sync_state_store.update_after_sync(&asset.id).await
+                            {
+                                warn!("Failed to update sync state for {}: {:?}", asset.id, e);
                             }
 
                             AssetSyncResult {
@@ -726,6 +689,9 @@ where
     }
 
     /// Generate sync plan based on current sync states.
+    ///
+    /// This function computes both activity bounds and quote bounds on-the-fly
+    /// from the operational tables, ensuring planning is based on fresh data.
     fn generate_sync_plan(&self) -> Result<Vec<SymbolSyncPlan>> {
         let states = self
             .sync_state_store
@@ -733,27 +699,65 @@ where
 
         let today = Utc::now().date_naive();
         let asset_ids: Vec<String> = states.iter().map(|state| state.asset_id.clone()).collect();
+
+        // Compute activity bounds on-the-fly from activities table
         let activity_bounds = self
             .activity_repo
             .get_activity_bounds_for_assets(&asset_ids)?;
 
+        // Compute quote bounds on-the-fly from quotes table, filtered by provider
+        // Group states by data_source to batch quote bounds queries
+        let mut quote_bounds_by_source: HashMap<String, HashMap<String, (NaiveDate, NaiveDate)>> =
+            HashMap::new();
+        for state in &states {
+            if !quote_bounds_by_source.contains_key(&state.data_source) {
+                let source_assets: Vec<String> = states
+                    .iter()
+                    .filter(|s| s.data_source == state.data_source)
+                    .map(|s| s.asset_id.clone())
+                    .collect();
+                let bounds = self
+                    .quote_store
+                    .get_quote_bounds_for_assets(&source_assets, &state.data_source)?;
+                quote_bounds_by_source.insert(state.data_source.clone(), bounds);
+            }
+        }
+
         let mut plans = Vec::new();
 
-        for mut state in states {
-            let (first_activity_date, last_activity_date) = activity_bounds
+        for state in states {
+            // Build SyncPlanningInputs from computed bounds
+            let (activity_min, activity_max) = activity_bounds
                 .get(&state.asset_id)
                 .copied()
                 .unwrap_or((None, None));
-            state.first_activity_date = first_activity_date;
-            state.last_activity_date = last_activity_date;
-            let category = state.determine_category(CLOSED_POSITION_GRACE_PERIOD_DAYS);
+
+            let (quote_min, quote_max) = quote_bounds_by_source
+                .get(&state.data_source)
+                .and_then(|bounds| bounds.get(&state.asset_id))
+                .map(|(min, max)| (Some(*min), Some(*max)))
+                .unwrap_or((None, None));
+
+            let inputs = SyncPlanningInputs {
+                is_active: state.is_active,
+                position_closed_date: state.position_closed_date,
+                activity_min,
+                activity_max,
+                quote_min,
+                quote_max,
+            };
+
+            let category = determine_sync_category(&inputs, CLOSED_POSITION_GRACE_PERIOD_DAYS, today);
 
             if matches!(category, SyncCategory::Closed) {
                 continue;
             }
 
-            let (start_date, end_date) =
-                self.calculate_date_range(&Some(state.clone()), &category, today);
+            // Use the new calculate_sync_window function
+            let Some((start_date, end_date)) = calculate_sync_window(&category, &inputs, today)
+            else {
+                continue;
+            };
 
             // Ensure minimum lookback
             let start_date = if start_date >= today {
@@ -884,33 +888,61 @@ where
             .activity_repo
             .get_activity_bounds_for_assets(&syncable_ids)?;
 
+        // Compute quote bounds per provider
+        let mut quote_bounds: HashMap<String, (NaiveDate, NaiveDate)> = HashMap::new();
+        let mut assets_by_provider: HashMap<String, Vec<String>> = HashMap::new();
+        for asset in &syncable {
+            let provider = asset
+                .preferred_provider
+                .clone()
+                .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string());
+            assets_by_provider
+                .entry(provider)
+                .or_default()
+                .push(asset.id.clone());
+        }
+        for (provider, ids) in &assets_by_provider {
+            if let Ok(bounds) = self.quote_store.get_quote_bounds_for_assets(&ids, provider) {
+                quote_bounds.extend(bounds);
+            }
+        }
+
         // Build plans using the mode-specific date range calculation
         let plans: Vec<SymbolSyncPlan> = syncable
             .iter()
             .map(|asset| {
-                let mut state = self
+                let state = self
                     .sync_state_store
                     .get_by_asset_id(&asset.id)
                     .ok()
                     .flatten();
 
-                if let Some(ref mut state) = state {
-                    let (first_activity_date, last_activity_date) = activity_bounds
-                        .get(&state.asset_id)
-                        .copied()
-                        .unwrap_or((None, None));
-                    state.first_activity_date = first_activity_date;
-                    state.last_activity_date = last_activity_date;
-                }
+                // Build SyncPlanningInputs from computed bounds
+                let (activity_min, activity_max) = activity_bounds
+                    .get(&asset.id)
+                    .copied()
+                    .unwrap_or((None, None));
+
+                let (quote_min, quote_max) = quote_bounds
+                    .get(&asset.id)
+                    .map(|(min, max)| (Some(*min), Some(*max)))
+                    .unwrap_or((None, None));
+
+                let inputs = SyncPlanningInputs {
+                    is_active: state.as_ref().map(|s| s.is_active).unwrap_or(true),
+                    position_closed_date: state.as_ref().and_then(|s| s.position_closed_date),
+                    activity_min,
+                    activity_max,
+                    quote_min,
+                    quote_max,
+                };
 
                 let (start_date, end_date) =
-                    self.calculate_date_range_for_mode(&state, mode, today, &asset.id);
+                    self.calculate_date_range_for_mode(&inputs, mode, today, &asset.id);
 
                 // Determine category for priority
-                let category = state
-                    .as_ref()
-                    .map(|s| s.determine_category(CLOSED_POSITION_GRACE_PERIOD_DAYS))
-                    .unwrap_or(SyncCategory::New);
+                let category =
+                    determine_sync_category(&inputs, CLOSED_POSITION_GRACE_PERIOD_DAYS, today);
 
                 SymbolSyncPlan {
                     asset_id: asset.id.clone(),
@@ -978,24 +1010,31 @@ where
         let existing = self.sync_state_store.get_by_asset_id(symbol)?;
 
         if let Some(mut state) = existing {
-            // Check if we need backfill
+            // Check if we need backfill by computing quote bounds on-the-fly
             // Use QUOTE_HISTORY_BUFFER_DAYS + BACKFILL_SAFETY_MARGIN_DAYS for conservative detection
             let required_start = activity_date.0
                 - Duration::days(QUOTE_HISTORY_BUFFER_DAYS + BACKFILL_SAFETY_MARGIN_DAYS);
-            let needs_backfill = state
-                .earliest_quote_date
+
+            // Compute quote bounds for this asset filtered by provider
+            let quote_bounds = self
+                .quote_store
+                .get_quote_bounds_for_assets(&[symbol.to_string()], &state.data_source)
+                .unwrap_or_default();
+            let earliest_quote = quote_bounds.get(symbol).map(|(min, _)| *min);
+
+            let needs_backfill = earliest_quote
                 .map(|earliest| required_start < earliest)
-                .unwrap_or(true); // If no earliest_quote_date, assume backfill needed
+                .unwrap_or(true); // If no quotes exist, assume backfill needed
 
             if needs_backfill {
                 state.sync_priority = SyncCategory::NeedsBackfill.default_priority();
                 debug!(
                     "Activity {} needs backfill: required_start={}, earliest_quote={:?}",
-                    symbol, required_start, state.earliest_quote_date
+                    symbol, required_start, earliest_quote
                 );
             }
 
-            state.update_activity_dates(Some(activity_date.0), Some(activity_date.0));
+            // Activity dates are computed on-the-fly, no need to update them here
 
             if !state.is_active {
                 state.mark_active();
@@ -1015,8 +1054,7 @@ where
                         .preferred_provider
                         .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string()),
                 );
-                state.first_activity_date = Some(activity_date.0);
-                state.last_activity_date = Some(activity_date.0);
+                // Activity dates are computed on-the-fly, no need to set them here
                 state.is_active = true;
                 state.sync_priority = SyncCategory::New.default_priority();
 

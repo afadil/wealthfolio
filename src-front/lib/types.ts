@@ -188,6 +188,7 @@ export interface ActivityDetails {
   idempotencyKey?: string;
   importRunId?: string;
   isUserModified?: boolean;
+  metadata?: Record<string, unknown>;
   subRows?: ActivityDetails[];
 }
 
