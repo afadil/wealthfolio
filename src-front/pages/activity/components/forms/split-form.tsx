@@ -74,7 +74,7 @@ export function SplitForm({
 
   const form = useForm<SplitFormValues>({
     resolver: zodResolver(splitFormSchema) as Resolver<SplitFormValues>,
-    mode: "onBlur", // Validate on blur
+    mode: "onSubmit", // Validate only on submit - works correctly with default values
     defaultValues: {
       accountId: initialAccountId,
       symbol: "",

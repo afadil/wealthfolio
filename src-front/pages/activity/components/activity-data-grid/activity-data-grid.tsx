@@ -4,7 +4,8 @@ import type { Account, ActivityDetails } from "@/lib/types";
 import { useAssets } from "@/pages/asset/hooks/use-assets";
 import type { SortingState, Updater } from "@tanstack/react-table";
 import { DataGrid, useDataGrid, type SymbolSearchResult } from "@wealthfolio/ui";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { CreateCustomAssetDialog } from "@/components/create-custom-asset-dialog";
 import { ActivityDataGridPagination } from "./activity-data-grid-pagination";
 import { ActivityDataGridToolbar } from "./activity-data-grid-toolbar";
 import {
@@ -144,7 +145,14 @@ export function ActivityDataGrid({
     [markForDeletion],
   );
 
-  // Handle symbol selection to capture exchangeMic and currency from search result
+  // Custom asset dialog state
+  const [customAssetDialog, setCustomAssetDialog] = useState<{
+    open: boolean;
+    rowIndex: number;
+    symbol: string;
+  }>({ open: false, rowIndex: -1, symbol: "" });
+
+  // Handle symbol selection to capture exchangeMic, currency, and asset metadata from search result
   const handleSymbolSelect = useCallback(
     (rowIndex: number, result: SymbolSearchResult) => {
       setLocalTransactions((prev) => {
@@ -158,12 +166,56 @@ export function ActivityDataGrid({
             exchangeMic: result.exchangeMic,
             assetPricingMode: result.dataSource === "MANUAL" ? "MANUAL" : "MARKET",
             currency,
+            // Capture asset metadata for custom assets
+            pendingAssetName: result.longName,
+            pendingAssetKind: result.assetKind,
           };
         }
         return updated;
       });
     },
     [setLocalTransactions, fallbackCurrency],
+  );
+
+  // Handle request to create a custom asset - opens the dialog
+  const handleCreateCustomAsset = useCallback((rowIndex: number, symbol: string) => {
+    setCustomAssetDialog({ open: true, rowIndex, symbol });
+  }, []);
+
+  // Handle custom asset created from dialog
+  const handleCustomAssetCreated = useCallback(
+    (result: SymbolSearchResult) => {
+      const { rowIndex } = customAssetDialog;
+      if (rowIndex < 0) return;
+
+      // Update the transaction with the symbol and asset metadata
+      setLocalTransactions((prev) => {
+        const updated = [...prev];
+        if (updated[rowIndex]) {
+          const row = updated[rowIndex];
+          const currency = result.currency ?? row.accountCurrency ?? fallbackCurrency;
+          updated[rowIndex] = {
+            ...row,
+            assetSymbol: result.symbol,
+            exchangeMic: result.exchangeMic,
+            assetPricingMode: "MANUAL",
+            currency,
+            pendingAssetName: result.longName,
+            pendingAssetKind: result.assetKind,
+          };
+        }
+        return updated;
+      });
+
+      // Mark the transaction as dirty
+      const transaction = localTransactions[rowIndex];
+      if (transaction) {
+        markDirtyBatch([transaction.id]);
+      }
+
+      setCustomAssetDialog({ open: false, rowIndex: -1, symbol: "" });
+    },
+    [customAssetDialog, setLocalTransactions, fallbackCurrency, localTransactions, markDirtyBatch],
   );
 
   // Column definitions
@@ -173,6 +225,7 @@ export function ActivityDataGrid({
     onDuplicate: handleDuplicate,
     onDelete: handleDelete,
     onSymbolSelect: handleSymbolSelect,
+    onCreateCustomAsset: handleCreateCustomAsset,
   });
 
   // Data change handler - processes changes from the data grid
@@ -365,6 +418,12 @@ export function ActivityDataGrid({
     });
   }, [dataGrid.table, onRefetch, resetChangeState, setLocalTransactions]);
 
+  // Get default currency for custom asset dialog from the row's account
+  const dialogDefaultCurrency =
+    customAssetDialog.rowIndex >= 0 && localTransactions[customAssetDialog.rowIndex]
+      ? localTransactions[customAssetDialog.rowIndex].accountCurrency ?? fallbackCurrency
+      : fallbackCurrency;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col space-y-3">
       <ActivityDataGridToolbar
@@ -393,6 +452,18 @@ export function ActivityDataGrid({
         isFetching={isFetching}
         onPageChange={onPageChange}
         onPageSizeChange={onPageSizeChange}
+      />
+
+      <CreateCustomAssetDialog
+        open={customAssetDialog.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCustomAssetDialog({ open: false, rowIndex: -1, symbol: "" });
+          }
+        }}
+        onAssetCreated={handleCustomAssetCreated}
+        defaultSymbol={customAssetDialog.symbol}
+        defaultCurrency={dialogDefaultCurrency}
       />
     </div>
   );

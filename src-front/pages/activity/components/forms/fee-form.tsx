@@ -54,7 +54,7 @@ export function FeeForm({ accounts, defaultValues, onSubmit, onCancel, isLoading
 
   const form = useForm<FeeFormValues>({
     resolver: zodResolver(feeFormSchema) as Resolver<FeeFormValues>,
-    mode: "onBlur", // Validate on blur
+    mode: "onSubmit", // Validate only on submit - works correctly with default values
     defaultValues: {
       accountId: initialAccountId,
       activityDate: new Date(),

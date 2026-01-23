@@ -265,12 +265,10 @@ mod tests {
         NewActivity {
             id: None,
             account_id: "account-1".to_string(),
-            asset_id: Some("AAPL".to_string()),
-            symbol: None,
-            exchange_mic: None,
-            asset_kind: None,
-            pricing_mode: None,
-            asset_metadata: None,
+            asset: Some(AssetInput {
+                id: Some("AAPL".to_string()),
+                ..Default::default()
+            }),
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -362,7 +360,7 @@ mod tests {
     #[test]
     fn test_new_activity_allows_null_asset_id() {
         let mut activity = create_test_new_activity();
-        activity.asset_id = None;
+        activity.asset = None;
         activity.activity_type = "DEPOSIT".to_string();
 
         let result = activity.validate();
@@ -377,11 +375,10 @@ mod tests {
         ActivityUpdate {
             id: "activity-1".to_string(),
             account_id: "account-1".to_string(),
-            asset_id: Some("AAPL".to_string()),
-            symbol: None,
-            exchange_mic: None,
-            asset_kind: None,
-            pricing_mode: None,
+            asset: Some(AssetInput {
+            id: Some("AAPL".to_string()),
+                ..Default::default()
+            }),
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -436,7 +433,7 @@ mod tests {
     #[test]
     fn test_activity_update_allows_null_asset_id() {
         let mut update = create_test_activity_update();
-        update.asset_id = None;
+        update.asset = None;
         update.activity_type = "DEPOSIT".to_string();
 
         let result = update.validate();

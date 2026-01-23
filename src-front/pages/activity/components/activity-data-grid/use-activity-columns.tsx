@@ -32,6 +32,8 @@ interface UseActivityColumnsOptions {
   onDelete: (activity: ActivityDetails) => void;
   /** Called when a symbol is selected from search, with the full result including exchangeMic */
   onSymbolSelect?: (rowIndex: number, result: SymbolSearchResult) => void;
+  /** Called when user wants to create a custom asset. Opens a dialog to collect asset metadata. */
+  onCreateCustomAsset?: (rowIndex: number, symbol: string) => void;
 }
 
 /**
@@ -43,6 +45,7 @@ export function useActivityColumns({
   onDuplicate,
   onDelete,
   onSymbolSelect,
+  onCreateCustomAsset,
 }: UseActivityColumnsOptions) {
   const activityTypeOptions = useMemo(
     () =>
@@ -189,6 +192,7 @@ export function useActivityColumns({
                   }
                 }
               : undefined,
+            onCreateCustomAsset,
           },
         },
       },
@@ -298,6 +302,7 @@ export function useActivityColumns({
       accountOptions,
       activityTypeOptions,
       handleSymbolSearch,
+      onCreateCustomAsset,
       onDelete,
       onDuplicate,
       onEditActivity,

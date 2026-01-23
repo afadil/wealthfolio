@@ -1,7 +1,6 @@
 //! Activity domain models.
 
 use crate::activities::activities_errors::ActivityError;
-use crate::assets::AssetMetadata;
 use crate::Result;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use rust_decimal::prelude::FromPrimitive;
@@ -176,6 +175,25 @@ impl Activity {
     }
 }
 
+/// Input for asset identification when creating/updating activities.
+/// Consolidates all asset-related fields into a single nested object.
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetInput {
+    /// Asset ID - optional, for backward compatibility with existing assets
+    pub id: Option<String>,
+    /// Symbol (e.g., "AAPL", "BTC") - used to generate canonical asset ID
+    pub symbol: Option<String>,
+    /// Exchange MIC code (e.g., "XNAS", "XTSE") for securities
+    pub exchange_mic: Option<String>,
+    /// Asset kind hint (e.g., "SECURITY", "CRYPTO") - if not provided, inferred
+    pub kind: Option<String>,
+    /// Asset name for custom/manual assets
+    pub name: Option<String>,
+    /// Pricing mode: "MARKET" or "MANUAL" - controls how asset is priced
+    pub pricing_mode: Option<String>,
+}
+
 /// Input model for creating a new activity
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -183,15 +201,10 @@ pub struct NewActivity {
     pub id: Option<String>,
     pub account_id: String,
 
-    // Asset identification - prefer symbol + exchange_mic for new activities
-    // Backend will generate canonical asset_id from these fields
-    pub asset_id: Option<String>, // Optional - can be provided for backward compatibility
-    pub symbol: Option<String>,   // Symbol (e.g., "AAPL", "BTC")
-    pub exchange_mic: Option<String>, // Exchange MIC code (e.g., "XNAS", "XTSE") for securities
-    pub asset_kind: Option<String>, // Asset kind hint (e.g., "SECURITY", "CRYPTO") - if not provided, inferred
+    /// Asset input - consolidates id, symbol, exchangeMic, kind, name, pricingMode
+    /// Optional for cash activities which don't require an asset
+    pub asset: Option<AssetInput>,
 
-    pub pricing_mode: Option<String>, // "MARKET" or "MANUAL" - controls how asset is priced
-    pub asset_metadata: Option<AssetMetadata>, // Optional asset hints for inline creation
     pub activity_type: String,
     pub subtype: Option<String>, // Semantic variation (DRIP, STAKING_REWARD, etc.)
     pub activity_date: String,
@@ -219,7 +232,6 @@ impl NewActivity {
                 "Account ID cannot be empty".to_string(),
             ));
         }
-        // asset_id is now optional - no validation needed for empty asset_id
         if self.activity_type.trim().is_empty() {
             return Err(crate::activities::ActivityError::InvalidData(
                 "Activity type cannot be empty".to_string(),
@@ -237,6 +249,32 @@ impl NewActivity {
 
         Ok(())
     }
+
+    // Helper methods to extract asset fields from nested `asset`
+
+    pub fn get_asset_id(&self) -> Option<&str> {
+        self.asset.as_ref().and_then(|a| a.id.as_deref())
+    }
+
+    pub fn get_symbol(&self) -> Option<&str> {
+        self.asset.as_ref().and_then(|a| a.symbol.as_deref())
+    }
+
+    pub fn get_exchange_mic(&self) -> Option<&str> {
+        self.asset.as_ref().and_then(|a| a.exchange_mic.as_deref())
+    }
+
+    pub fn get_asset_kind(&self) -> Option<&str> {
+        self.asset.as_ref().and_then(|a| a.kind.as_deref())
+    }
+
+    pub fn get_asset_name(&self) -> Option<&str> {
+        self.asset.as_ref().and_then(|a| a.name.as_deref())
+    }
+
+    pub fn get_pricing_mode(&self) -> Option<&str> {
+        self.asset.as_ref().and_then(|a| a.pricing_mode.as_deref())
+    }
 }
 
 /// Input model for updating an existing activity
@@ -246,14 +284,10 @@ pub struct ActivityUpdate {
     pub id: String,
     pub account_id: String,
 
-    // Asset identification - prefer symbol + exchange_mic for new activities
-    // Backend will generate canonical asset_id from these fields
-    pub asset_id: Option<String>, // Optional - can be provided for backward compatibility
-    pub symbol: Option<String>,   // Symbol (e.g., "AAPL", "BTC")
-    pub exchange_mic: Option<String>, // Exchange MIC code (e.g., "XNAS", "XTSE") for securities
-    pub asset_kind: Option<String>, // Asset kind hint (e.g., "SECURITY", "CRYPTO") - if not provided, inferred
+    /// Asset input - consolidates id, symbol, exchangeMic, kind, name, pricingMode
+    /// Optional for cash activities which don't require an asset
+    pub asset: Option<AssetInput>,
 
-    pub pricing_mode: Option<String>, // "MARKET" or "MANUAL" - controls how asset is priced
     pub activity_type: String,
     pub subtype: Option<String>, // Semantic variation (DRIP, STAKING_REWARD, etc.)
     pub activity_date: String,
@@ -282,7 +316,6 @@ impl ActivityUpdate {
             )
             .into());
         }
-        // asset_id is now optional - no validation needed for empty asset_id
         if self.activity_type.trim().is_empty() {
             return Err(crate::activities::ActivityError::InvalidData(
                 "Activity type cannot be empty".to_string(),
@@ -290,6 +323,32 @@ impl ActivityUpdate {
             .into());
         }
         Ok(())
+    }
+
+    // Helper methods to extract asset fields from nested `asset`
+
+    pub fn get_asset_id(&self) -> Option<&str> {
+        self.asset.as_ref().and_then(|a| a.id.as_deref())
+    }
+
+    pub fn get_symbol(&self) -> Option<&str> {
+        self.asset.as_ref().and_then(|a| a.symbol.as_deref())
+    }
+
+    pub fn get_exchange_mic(&self) -> Option<&str> {
+        self.asset.as_ref().and_then(|a| a.exchange_mic.as_deref())
+    }
+
+    pub fn get_asset_kind(&self) -> Option<&str> {
+        self.asset.as_ref().and_then(|a| a.kind.as_deref())
+    }
+
+    pub fn get_asset_name(&self) -> Option<&str> {
+        self.asset.as_ref().and_then(|a| a.name.as_deref())
+    }
+
+    pub fn get_pricing_mode(&self) -> Option<&str> {
+        self.asset.as_ref().and_then(|a| a.pricing_mode.as_deref())
     }
 }
 

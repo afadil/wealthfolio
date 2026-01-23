@@ -108,6 +108,7 @@ export const ACTIVITY_FORM_CONFIG: Record<PickerActivityType, ActivityTypeConfig
         exchangeMic: d.exchangeMic,
         currency: d.currency,
         fxRate: d.fxRate,
+        assetMetadata: d.assetMetadata,
       };
     },
   },
@@ -142,6 +143,7 @@ export const ACTIVITY_FORM_CONFIG: Record<PickerActivityType, ActivityTypeConfig
         exchangeMic: d.exchangeMic,
         currency: d.currency,
         fxRate: d.fxRate,
+        assetMetadata: d.assetMetadata,
       };
     },
   },
@@ -256,6 +258,7 @@ export const ACTIVITY_FORM_CONFIG: Record<PickerActivityType, ActivityTypeConfig
         currency: d.currency,
         pricingMode: d.pricingMode,
         exchangeMic: d.exchangeMic,
+        assetMetadata: d.assetMetadata,
         // Include external transfer metadata
         ...(d.isExternal && { metadata: { flow: { is_external: true } } }),
       };

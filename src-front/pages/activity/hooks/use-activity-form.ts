@@ -97,7 +97,7 @@ export function useActivityForm({
               accountId: transferData.fromAccountId,
               activityType: ActivityType.TRANSFER_OUT,
               currency: fromAccount?.currency,
-              symbol: assetId ?? undefined,
+              asset: assetId ? { symbol: assetId } : undefined,
             } as ActivityCreate;
 
             // Create TRANSFER_IN on destination account
@@ -106,7 +106,7 @@ export function useActivityForm({
               accountId: transferData.toAccountId,
               activityType: ActivityType.TRANSFER_IN,
               currency: toAccount?.currency,
-              symbol: assetId ?? undefined,
+              asset: assetId ? { symbol: assetId } : undefined,
             } as ActivityCreate;
 
             await saveActivitiesMutation.mutateAsync({

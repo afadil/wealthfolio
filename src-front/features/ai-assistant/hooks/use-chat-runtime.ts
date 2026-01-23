@@ -12,13 +12,25 @@ import {
   type ExternalStoreAdapter,
 } from "@assistant-ui/react";
 import { useMemo, useCallback, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 
 import { streamChatResponse, type ChatModelConfig } from "../api";
-import type { ChatMessage, ChatThread, ToolCall, ToolResult } from "../types";
+import type { AiThread, ChatMessage, ChatThread, ThreadPage, ToolCall, ToolResult } from "../types";
 import { QueryKeys } from "@/lib/query-keys";
 import { AI_THREADS_KEY } from "./use-threads";
 import { deleteAiThread, getAiThreadMessages, updateAiThread } from "@/adapters";
+
+function deriveInitialThreadTitle(firstUserMessage: string): string {
+  const normalized = firstUserMessage.replace(/\s+/g, " ").trim();
+  if (!normalized) return "";
+  const maxChars = 50;
+  if (normalized.length <= maxChars) return normalized;
+
+  const truncated = normalized.slice(0, maxChars);
+  const lastSpace = truncated.lastIndexOf(" ");
+  const cut = lastSpace > maxChars / 2 ? truncated.slice(0, lastSpace) : truncated;
+  return `${cut.trim()}...`;
+}
 
 /**
  * Extract error message from provider response.
@@ -325,6 +337,37 @@ export function useChatRuntime(config?: ChatModelConfig) {
     setCurrentThreadIdState(threadId);
   }, []);
 
+  const setThreadTitleInCaches = useCallback(
+    (threadId: string, title: string) => {
+      // Update thread detail cache, if present.
+      queryClient.setQueryData<ChatThread | null>(QueryKeys.aiThread(threadId), (old) =>
+        old ? { ...old, title } : old,
+      );
+
+      // Update any cached thread list pages (base + search variants).
+      queryClient.setQueriesData<InfiniteData<ThreadPage>>({ queryKey: AI_THREADS_KEY }, (old) => {
+        if (!old?.pages?.length) return old;
+
+        let changed = false;
+        const pages = old.pages.map((page) => {
+          let pageChanged = false;
+          const threads = page.threads.map((t) => {
+            if (t.id !== threadId) return t;
+            if (t.title === title) return t;
+            pageChanged = true;
+            return { ...t, title };
+          });
+          if (!pageChanged) return page;
+          changed = true;
+          return { ...page, threads };
+        });
+
+        return changed ? { ...old, pages } : old;
+      });
+    },
+    [queryClient],
+  );
+
   const updateThreadListState = useCallback((threads: ChatThread[], isLoading: boolean) => {
     const nextItems = buildThreadListItems(threads);
     setThreadListItems((prevItems) =>
@@ -343,6 +386,7 @@ export function useChatRuntime(config?: ChatModelConfig) {
         .join("\n");
 
       if (!content.trim()) return;
+      const initialThreadTitle = deriveInitialThreadTitle(content);
 
       // Create user message
       const userMessage: ExternalMessage = {
@@ -441,11 +485,68 @@ export function useChatRuntime(config?: ChatModelConfig) {
             case "system":
               // Capture thread ID from system event
               if (event.threadId) {
-                setCurrentThreadId(event.threadId);
-                // Force refetch to show new thread in sidebar immediately
-                queryClient.refetchQueries({ queryKey: AI_THREADS_KEY });
+                const newThreadId = event.threadId;
+                setCurrentThreadId(newThreadId);
+
+                // Optimistically add the new thread to the cache immediately
+                // This ensures the thread appears in the sidebar right away
+                queryClient.setQueryData<InfiniteData<ThreadPage>>(
+                  AI_THREADS_KEY,
+                  (old) => {
+                    // Create placeholder thread - title will be updated when title generation completes
+                    const placeholderThread: AiThread = {
+                      id: newThreadId,
+                      title: initialThreadTitle,
+                      createdAt: new Date().toISOString(),
+                      updatedAt: new Date().toISOString(),
+                      isPinned: false,
+                      tags: [],
+                    };
+
+                    if (!old?.pages?.length) {
+                      // No existing data - create initial structure with the new thread
+                      return {
+                        pages: [
+                          {
+                            threads: [placeholderThread],
+                            nextCursor: null,
+                            hasMore: false,
+                          },
+                        ],
+                        pageParams: [undefined],
+                      };
+                    }
+
+                    // Check if thread already exists in any page
+                    const threadExists = old.pages.some((page) =>
+                      page.threads.some((t) => t.id === newThreadId),
+                    );
+                    if (threadExists) return old;
+
+                    // Add new thread to the beginning of the first page
+                    const newPages = [...old.pages];
+                    if (newPages[0]) {
+                      newPages[0] = {
+                        ...newPages[0],
+                        threads: [placeholderThread, ...newPages[0].threads],
+                      };
+                    }
+
+                    return { ...old, pages: newPages };
+                  },
+                );
+                // Don't invalidate here - it would overwrite optimistic update with stale data
+                // The title will be updated when the stream completes via invalidation in "done" handler
               }
               break;
+
+            case "threadTitleUpdated": {
+              const nextTitle = event.title?.trim();
+              if (event.threadId && nextTitle) {
+                setThreadTitleInCaches(event.threadId, nextTitle);
+              }
+              break;
+            }
 
             case "textDelta":
               text += event.delta;
@@ -491,10 +592,11 @@ export function useChatRuntime(config?: ChatModelConfig) {
                 }
               }
               updateAssistantMessage();
-              // Refetch threads after a delay to pick up background-generated title
+              // Invalidate threads to refresh from DB (updates title if generated)
+              // Use setTimeout to give DB time to commit and title generation to complete
               setTimeout(() => {
-                queryClient.refetchQueries({ queryKey: AI_THREADS_KEY });
-              }, 2000);
+                queryClient.invalidateQueries({ queryKey: AI_THREADS_KEY });
+              }, 1000);
               break;
 
             case "error":
@@ -526,7 +628,7 @@ export function useChatRuntime(config?: ChatModelConfig) {
         abortControllerRef.current = null;
       }
     },
-    [config, queryClient, setCurrentThreadId],
+    [config, queryClient, setCurrentThreadId, setThreadTitleInCaches],
   );
 
   // Handle cancel

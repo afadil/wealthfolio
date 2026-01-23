@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -21,7 +21,6 @@ import {
 } from "@wealthfolio/ui/components/ui/form";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Button } from "@wealthfolio/ui/components/ui/button";
-import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -29,12 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@wealthfolio/ui/components/ui/select";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@wealthfolio/ui/components/ui/collapsible";
-import { Icons, CurrencyInput } from "@wealthfolio/ui";
+import { CurrencyInput } from "@wealthfolio/ui";
 import type { SymbolSearchResult } from "@/lib/types";
 
 // Simplified asset types for the form
@@ -56,15 +50,6 @@ const customAssetSchema = z.object({
     .max(100, "Name must be 100 characters or less"),
   assetType: z.enum(["SECURITY", "CRYPTO", "OTHER"]),
   currency: z.string().min(1, "Currency is required"),
-  notes: z.string().optional(),
-  isin: z
-    .string()
-    .optional()
-    .transform((val) => val?.trim() || undefined),
-  cusip: z
-    .string()
-    .optional()
-    .transform((val) => val?.trim() || undefined),
 });
 
 type CustomAssetFormValues = z.infer<typeof customAssetSchema>;
@@ -72,7 +57,7 @@ type CustomAssetFormValues = z.infer<typeof customAssetSchema>;
 interface CreateCustomAssetDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAssetCreated: (quoteSummary: SymbolSearchResult) => void;
+  onAssetCreated: (searchResult: SymbolSearchResult) => void;
   defaultSymbol?: string;
   defaultCurrency?: string;
 }
@@ -84,7 +69,6 @@ export function CreateCustomAssetDialog({
   defaultSymbol = "",
   defaultCurrency,
 }: CreateCustomAssetDialogProps) {
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const { settings } = useSettingsContext();
 
   // Use provided defaultCurrency, or fall back to settings base currency
@@ -97,9 +81,6 @@ export function CreateCustomAssetDialog({
       name: "",
       assetType: "SECURITY",
       currency,
-      notes: "",
-      isin: "",
-      cusip: "",
     },
   });
 
@@ -111,9 +92,6 @@ export function CreateCustomAssetDialog({
         name: "",
         assetType: "SECURITY",
         currency,
-        notes: "",
-        isin: "",
-        cusip: "",
       });
     }
   }, [open, currency, defaultSymbol, form]);
@@ -121,7 +99,7 @@ export function CreateCustomAssetDialog({
   const handleSubmit = (values: CustomAssetFormValues) => {
     // Create a SymbolSearchResult-like object for the custom asset
     // The actual asset creation happens when the activity is created
-    const quoteSummary: SymbolSearchResult = {
+    const searchResult: SymbolSearchResult = {
       symbol: values.symbol,
       longName: values.name,
       shortName: values.name,
@@ -133,19 +111,19 @@ export function CreateCustomAssetDialog({
       score: 0,
       // Include currency so SymbolSearch can set it in the form
       currency: values.currency,
+      // Include asset kind for custom assets (SECURITY, CRYPTO, OTHER)
+      assetKind: values.assetType,
       // We don't set exchangeMic - this will result in SEC:SYMBOL:UNKNOWN for the asset ID
     };
 
-    onAssetCreated(quoteSummary);
+    onAssetCreated(searchResult);
     onOpenChange(false);
     form.reset();
-    setShowAdvanced(false);
   };
 
   const handleCancel = () => {
     onOpenChange(false);
     form.reset();
-    setShowAdvanced(false);
   };
 
   return (
@@ -233,67 +211,6 @@ export function CreateCustomAssetDialog({
                 )}
               />
             </div>
-
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes (optional)</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Add any notes about this asset..."
-                      className="resize-none"
-                      rows={2}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="w-full justify-between">
-                  <span className="text-muted-foreground text-sm">Advanced Options</span>
-                  <Icons.ChevronDown
-                    className={`h-4 w-4 transition-transform ${showAdvanced ? "rotate-180" : ""}`}
-                  />
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-4 pt-2">
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="isin"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>ISIN</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g., US0378331005" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="cusip"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>CUSIP</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g., 037833100" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
 
             <DialogFooter className="gap-2 sm:gap-0">
               <Button type="button" variant="outline" onClick={handleCancel}>

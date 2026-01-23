@@ -116,17 +116,21 @@ const HoldingRow = memo(
       [index, isLast, onAddRow, setFocus],
     );
 
-    const handleTickerSelect = useCallback(
-      (_symbol: string, quoteSummary?: SymbolSearchResult) => {
-        if (quoteSummary?.dataSource === "MANUAL") {
-          setValue(`holdings.${index}.pricingMode`, PricingMode.MANUAL, { shouldDirty: true });
-        } else {
-          setValue(`holdings.${index}.pricingMode`, PricingMode.MARKET, { shouldDirty: true });
-        }
+    const handleAssetSelect = useCallback(
+      (_symbol: string, searchResult?: SymbolSearchResult) => {
+        const isManualAsset = searchResult?.dataSource === "MANUAL";
+        setValue(`holdings.${index}.pricingMode`, isManualAsset ? PricingMode.MANUAL : PricingMode.MARKET, { shouldDirty: true });
+
         // Capture exchangeMic for canonical asset ID generation
-        if (quoteSummary?.exchangeMic) {
-          setValue(`holdings.${index}.exchangeMic`, quoteSummary.exchangeMic, { shouldDirty: true });
+        if (searchResult?.exchangeMic) {
+          setValue(`holdings.${index}.exchangeMic`, searchResult.exchangeMic, { shouldDirty: true });
         }
+
+        // Capture name for custom assets
+        if (isManualAsset && searchResult?.longName) {
+          setValue(`holdings.${index}.name`, searchResult.longName, { shouldDirty: true });
+        }
+
         setFocus(`holdings.${index}.sharesOwned`);
       },
       [index, setFocus, setValue],
@@ -163,9 +167,9 @@ const HoldingRow = memo(
                 render={({ field: tickerField }) => (
                   <TickerSearchInput
                     ref={tickerField.ref}
-                    onSelectResult={(symbol: string, quoteSummary) => {
+                    onSelectResult={(symbol: string, searchResult) => {
                       tickerField.onChange(symbol);
-                      handleTickerSelect(symbol, quoteSummary);
+                      handleAssetSelect(symbol, searchResult);
                     }}
                     value={tickerField.value}
                     placeholder="Search ticker..."

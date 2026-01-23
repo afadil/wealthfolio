@@ -1,6 +1,15 @@
 import { z } from "zod";
 import { ActivityType, PricingMode } from "@/lib/constants";
 
+// Asset metadata schema for custom assets
+export const assetMetadataSchema = z
+  .object({
+    name: z.string().optional(),
+    kind: z.string().optional(),
+    exchangeMic: z.string().optional(),
+  })
+  .optional();
+
 export const baseActivitySchema = z.object({
   id: z.string().optional(),
   accountId: z.string().min(1, { message: "Please select an account." }),
@@ -15,6 +24,8 @@ export const baseActivitySchema = z.object({
     .nullable(),
   // Exchange MIC for canonical asset ID generation (e.g., "XNAS", "XTSE")
   exchangeMic: z.string().optional(),
+  // Asset metadata for custom assets (name, etc.)
+  assetMetadata: assetMetadataSchema,
 });
 
 // Holdings schema: TRANSFER_IN/OUT with is_external=true represents add/remove holding

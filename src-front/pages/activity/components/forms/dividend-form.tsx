@@ -74,7 +74,7 @@ export function DividendForm({
 
   const form = useForm<DividendFormValues>({
     resolver: zodResolver(dividendFormSchema) as Resolver<DividendFormValues>,
-    mode: "onBlur", // Validate on blur
+    mode: "onSubmit", // Validate only on submit - works correctly with default values
     defaultValues: {
       accountId: initialAccountId,
       symbol: "",

@@ -1,4 +1,8 @@
 import { searchTicker } from "@/adapters";
+import { getExchangeDisplayName } from "@/lib/constants";
+import { SymbolSearchResult } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { ScrollArea } from "@wealthfolio/ui/components/ui/scroll-area";
@@ -12,15 +16,11 @@ import {
   SheetTrigger,
 } from "@wealthfolio/ui/components/ui/sheet";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { SymbolSearchResult } from "@/lib/types";
-import { getExchangeDisplayName } from "@/lib/constants";
-import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
 import { forwardRef, useState } from "react";
 import { CreateCustomAssetDialog } from "./create-custom-asset-dialog";
 
 interface SymbolSelectorMobileProps {
-  onSelect: (symbol: string, quoteSummary?: SymbolSearchResult) => void;
+  onSelect: (symbol: string, searchResult?: SymbolSearchResult) => void;
   value?: string;
   placeholder?: string;
   className?: string;
@@ -74,8 +74,8 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
       setCustomAssetDialogOpen(true);
     };
 
-    const handleCustomAssetCreated = (quoteSummary: SymbolSearchResult) => {
-      handleSymbolSelect(quoteSummary);
+    const handleCustomAssetCreated = (searchResult: SymbolSearchResult) => {
+      handleSymbolSelect(searchResult);
     };
 
     // Find the currently selected symbol's info
@@ -216,7 +216,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                     onClick={handleCreateCustomAsset}
                     className="card-mobile hover:bg-accent active:bg-accent/80 focus:border-primary flex w-full items-center gap-3 border border-dashed text-left transition-colors focus:outline-none"
                   >
-                    <div className="bg-muted flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full">
+                    <div className="bg-muted flex h-12 w-12 shrink-0 items-center justify-center rounded-full">
                       <Icons.Plus className="text-muted-foreground h-5 w-5" />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -227,7 +227,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                           : "Track assets not found in market data"}
                       </div>
                     </div>
-                    <Icons.ChevronRight className="text-muted-foreground h-5 w-5 flex-shrink-0" />
+                    <Icons.ChevronRight className="text-muted-foreground h-5 w-5 shrink-0" />
                   </button>
                 </>
               )}

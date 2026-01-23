@@ -54,7 +54,7 @@ export function TaxForm({ accounts, defaultValues, onSubmit, onCancel, isLoading
 
   const form = useForm<TaxFormValues>({
     resolver: zodResolver(taxFormSchema) as Resolver<TaxFormValues>,
-    mode: "onBlur", // Validate on blur
+    mode: "onSubmit", // Validate only on submit - works correctly with default values
     defaultValues: {
       accountId: initialAccountId,
       activityDate: new Date(),

@@ -33,6 +33,8 @@ interface SymbolSearchProps<TFieldValues extends FieldValues = FieldValues> {
   pricingModeName?: FieldPath<TFieldValues>;
   /** Field name for currency (optional, to set currency from search result) */
   currencyName?: FieldPath<TFieldValues>;
+  /** Field name for assetMetadata (optional, to capture asset name for custom assets) */
+  assetMetadataName?: FieldPath<TFieldValues>;
 }
 
 export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
@@ -43,37 +45,49 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
   exchangeMicName,
   pricingModeName,
   currencyName,
+  assetMetadataName,
 }: SymbolSearchProps<TFieldValues>) {
   const { control, setValue } = useFormContext<TFieldValues>();
 
-  const handleTickerSelect = (
-    symbol: string,
-    quoteSummary: SymbolSearchResult | undefined,
-    onChange: (value: string) => void,
-  ) => {
-    // If the selected ticker is a custom/manual entry, set pricing mode FIRST
-    // This must happen before the symbol is set to ensure the form state is correct
-    if (quoteSummary?.dataSource === DataSource.MANUAL && pricingModeName) {
+  const handleAssetSelect = (symbol: string, searchResult: SymbolSearchResult | undefined) => {
+    const isManualAsset = searchResult?.dataSource === DataSource.MANUAL;
+
+    // Set pricing mode for manual/custom assets
+    if (isManualAsset && pricingModeName) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setValue(pricingModeName, PricingMode.MANUAL as any);
     }
 
     // Strip exchange suffix when we have exchangeMic (e.g., "VFV.TO" -> "VFV")
     // Backend generates canonical ID as SEC:{symbol}:{mic}, so we need the base symbol
-    const baseSymbol = quoteSummary?.exchangeMic ? stripExchangeSuffix(symbol) : symbol;
-    onChange(baseSymbol);
+    const baseSymbol = searchResult?.exchangeMic ? stripExchangeSuffix(symbol) : symbol;
 
-    // Capture exchangeMic from search result for canonical asset ID generation
-    if (quoteSummary?.exchangeMic && exchangeMicName) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setValue(name, baseSymbol as any, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+
+    // Capture exchangeMic for canonical asset ID generation
+    if (searchResult?.exchangeMic && exchangeMicName) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setValue(exchangeMicName, quoteSummary.exchangeMic as any);
+      setValue(exchangeMicName, searchResult.exchangeMic as any);
     }
+
     // Set currency from search result (normalized: GBp -> GBP)
-    // This ensures users enter prices in the major currency unit
-    if (quoteSummary?.currency && currencyName) {
-      const normalizedCurrency = normalizeCurrency(quoteSummary.currency);
+    if (searchResult?.currency && currencyName) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setValue(currencyName, normalizedCurrency as any);
+      setValue(currencyName, normalizeCurrency(searchResult.currency) as any);
+    }
+
+    // Capture asset name and kind for custom assets (backend uses this when creating the asset)
+    // Set the nested fields directly so they match the registered hidden input paths
+    if (isManualAsset && assetMetadataName) {
+      if (searchResult?.longName) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setValue(`${assetMetadataName}.name` as any, searchResult.longName as any, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+      }
+      if (searchResult?.assetKind) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setValue(`${assetMetadataName}.kind` as any, searchResult.assetKind as any, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+      }
     }
   };
 
@@ -95,9 +109,7 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
               />
             ) : (
               <TickerSearchInput
-                onSelectResult={(symbol, quoteSummary) =>
-                  handleTickerSelect(symbol, quoteSummary, field.onChange)
-                }
+                onSelectResult={handleAssetSelect}
                 value={field.value}
                 defaultCurrency={defaultCurrency}
                 aria-label={label}

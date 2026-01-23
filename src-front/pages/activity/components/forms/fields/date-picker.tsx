@@ -1,6 +1,6 @@
 import { DatePickerInput, FormField, FormItem, FormLabel, FormMessage } from "@wealthfolio/ui";
 import { useFormContext, type FieldPath, type FieldValues } from "react-hook-form";
-import { today, getLocalTimeZone } from "@internationalized/date";
+import { today, now, getLocalTimeZone } from "@internationalized/date";
 
 interface DatePickerProps<TFieldValues extends FieldValues = FieldValues> {
   name: FieldPath<TFieldValues>;
@@ -23,7 +23,9 @@ export function DatePicker<TFieldValues extends FieldValues = FieldValues>({
   const { control } = useFormContext<TFieldValues>();
 
   // Calculate maxValue for disabling future dates
-  const maxValue = allowFutureDates ? undefined : today(getLocalTimeZone());
+  // Use now() for time-enabled pickers to include current time in comparison
+  // Use today() for date-only pickers
+  const maxValue = allowFutureDates ? undefined : enableTime ? now(getLocalTimeZone()) : today(getLocalTimeZone());
 
   return (
     <FormField

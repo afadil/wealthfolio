@@ -310,7 +310,7 @@ function SymbolDisplayCell({
       <div className="w-full sm:w-auto sm:min-w-[180px]">
         <TickerSearchInput
           defaultValue={mappedSymbol || ""}
-          onSelectResult={(newSymbol, _quoteSummary) => handleSymbolMapping(csvSymbol, newSymbol)}
+          onSelectResult={(newSymbol, _searchResult) => handleSymbolMapping(csvSymbol, newSymbol)}
         />
       </div>
     </div>

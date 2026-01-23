@@ -52,7 +52,7 @@ export function DepositForm({ accounts, defaultValues, onSubmit, onCancel, isLoa
 
   const form = useForm<DepositFormValues>({
     resolver: zodResolver(depositFormSchema) as Resolver<DepositFormValues>,
-    mode: "onBlur", // Validate on blur
+    mode: "onSubmit", // Validate only on submit - works correctly with default values
     defaultValues: {
       accountId: initialAccountId,
       activityDate: new Date(),

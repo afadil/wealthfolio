@@ -208,17 +208,31 @@ export interface ActivitySearchResponse {
  *
  * IMPORTANT: assetId is NOT allowed for creates - backend generates canonical IDs
  */
+/**
+ * Asset input for creating/updating activities.
+ * Groups all asset-related fields into a single nested object.
+ */
+export interface AssetInput {
+  id?: string; // Only for updates (backend generates ID for creates)
+  symbol?: string; // e.g., "AAPL" or undefined for cash
+  exchangeMic?: string; // e.g., "XNAS" or undefined
+  kind?: string; // e.g., "Security", "Crypto" - helps backend determine ID format
+  name?: string; // Asset name (for custom assets)
+  pricingMode?: PricingMode;
+}
+
 export interface ActivityCreate {
   id?: string;
   accountId: string;
   activityType: string;
   subtype?: string | null; // Semantic variation (DRIP, STAKING_REWARD, etc.)
   activityDate: string | Date;
-  // Asset identification (backend generates ID from these)
-  symbol?: string; // e.g., "AAPL" or undefined for cash
-  exchangeMic?: string; // e.g., "XNAS" or undefined
-  assetKind?: string; // e.g., "Security", "Crypto" - helps backend determine ID format
-  // NOTE: No assetId field - backend generates canonical ID from symbol + exchangeMic
+  // Nested asset input (preferred)
+  asset?: AssetInput;
+  // Legacy flat fields (deprecated - use asset object instead)
+  symbol?: string;
+  exchangeMic?: string;
+  assetKind?: string;
   pricingMode?: PricingMode;
   quantity?: number;
   unitPrice?: number;
@@ -234,8 +248,8 @@ export interface ActivityCreate {
  * Payload for updating an EXISTING activity.
  *
  * Asset identification:
- * - Send assetId for existing assets (backward compatibility)
- * - Or send symbol + exchangeMic to re-resolve the asset
+ * - Use nested asset object (preferred)
+ * - Or use legacy flat fields (assetId, symbol, exchangeMic)
  */
 export interface ActivityUpdate {
   id: string;
@@ -243,9 +257,10 @@ export interface ActivityUpdate {
   activityType: string;
   subtype?: string | null;
   activityDate: string | Date;
-  // For existing activities: use the existing assetId
+  // Nested asset input (preferred)
+  asset?: AssetInput;
+  // Legacy flat fields (deprecated - use asset object instead)
   assetId?: string;
-  // Or re-resolve from symbol + exchangeMic
   symbol?: string;
   exchangeMic?: string;
   assetKind?: string;
@@ -314,9 +329,9 @@ export interface SymbolSearchResult {
   score: number;
   typeDisplay: string;
   longName: string;
-  sector?: string;
-  industry?: string;
   dataSource?: string;
+  /** Asset kind for custom assets (e.g., "SECURITY", "CRYPTO", "OTHER") */
+  assetKind?: string;
   /** True if this asset already exists in user's database */
   isExisting?: boolean;
   /** The existing asset ID if found (e.g., "SEC:AAPL:XNAS") */

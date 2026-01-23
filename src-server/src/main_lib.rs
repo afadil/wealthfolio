@@ -255,6 +255,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             account_service.clone(),
             asset_service.clone(),
             fx_service.clone(),
+            quote_service.clone(),
         ));
 
     // Alternative asset repository for alternative assets operations

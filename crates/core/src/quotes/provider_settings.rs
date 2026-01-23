@@ -70,6 +70,7 @@ impl ProviderCapabilities {
                 features: vec![
                     "Real-time".to_string(),
                     "Historical".to_string(),
+                    "Search".to_string(),
                     "Profiles".to_string(),
                 ],
             }),

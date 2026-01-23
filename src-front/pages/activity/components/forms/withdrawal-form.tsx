@@ -52,7 +52,7 @@ export function WithdrawalForm({ accounts, defaultValues, onSubmit, onCancel, is
 
   const form = useForm<WithdrawalFormValues>({
     resolver: zodResolver(withdrawalFormSchema) as Resolver<WithdrawalFormValues>,
-    mode: "onBlur", // Validate on blur
+    mode: "onSubmit", // Validate only on submit - works correctly with default values
     defaultValues: {
       accountId: initialAccountId,
       activityDate: new Date(),
