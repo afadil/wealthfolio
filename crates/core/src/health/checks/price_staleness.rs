@@ -7,7 +7,7 @@ use chrono::{DateTime, Duration, Utc};
 use std::collections::HashMap;
 
 use crate::errors::Result;
-use crate::health::model::{FixAction, HealthCategory, HealthIssue, Severity};
+use crate::health::model::{AffectedItem, FixAction, HealthCategory, HealthIssue, Severity};
 use crate::health::traits::{HealthCheck, HealthContext};
 
 /// Data about an asset holding for staleness checks.
@@ -15,6 +15,10 @@ use crate::health::traits::{HealthCheck, HealthContext};
 pub struct AssetHoldingInfo {
     /// Asset ID (e.g., "SEC:AAPL:XNAS")
     pub asset_id: String,
+    /// Asset symbol for display (e.g., "AAPL")
+    pub symbol: String,
+    /// Asset name for display (e.g., "Apple Inc.")
+    pub name: Option<String>,
     /// Market value in base currency
     pub market_value: f64,
     /// Whether this asset uses market pricing (vs manual)
@@ -54,9 +58,9 @@ impl PriceStalenessCheck {
         let critical_threshold =
             ctx.now - Duration::hours(ctx.config.price_stale_critical_hours as i64);
 
-        // Track stale assets by severity
-        let mut warning_assets: Vec<String> = Vec::new();
-        let mut error_assets: Vec<String> = Vec::new();
+        // Track stale assets by severity (keep full info for affected items)
+        let mut warning_assets: Vec<&AssetHoldingInfo> = Vec::new();
+        let mut error_assets: Vec<&AssetHoldingInfo> = Vec::new();
         let mut warning_mv = 0.0;
         let mut error_mv = 0.0;
 
@@ -70,16 +74,16 @@ impl PriceStalenessCheck {
             match latest_quote_times.get(&holding.asset_id) {
                 Some(quote_time) => {
                     if *quote_time < critical_threshold {
-                        error_assets.push(holding.asset_id.clone());
+                        error_assets.push(holding);
                         error_mv += holding.market_value;
                     } else if *quote_time < warning_threshold {
-                        warning_assets.push(holding.asset_id.clone());
+                        warning_assets.push(holding);
                         warning_mv += holding.market_value;
                     }
                 }
                 None => {
                     // No quote at all is an error
-                    error_assets.push(holding.asset_id.clone());
+                    error_assets.push(holding);
                     error_mv += holding.market_value;
                 }
             }
@@ -107,7 +111,14 @@ impl PriceStalenessCheck {
                 format!("Outdated prices for {} holdings", count)
             };
 
-            let data_hash = compute_data_hash(&error_assets, severity, mv_pct);
+            let asset_ids: Vec<String> = error_assets.iter().map(|a| a.asset_id.clone()).collect();
+            let data_hash = compute_data_hash(&asset_ids, severity, mv_pct);
+
+            // Build affected items list for display
+            let affected_items: Vec<AffectedItem> = error_assets
+                .iter()
+                .map(|a| AffectedItem::asset_with_name(&a.asset_id, &a.symbol, a.name.clone()))
+                .collect();
 
             issues.push(
                 HealthIssue::builder()
@@ -120,7 +131,8 @@ impl PriceStalenessCheck {
                     )
                     .affected_count(count as u32)
                     .affected_mv_pct(mv_pct)
-                    .fix_action(FixAction::sync_prices(error_assets))
+                    .affected_items(affected_items)
+                    .fix_action(FixAction::sync_prices(asset_ids))
                     .data_hash(data_hash)
                     .build(),
             );
@@ -148,7 +160,14 @@ impl PriceStalenessCheck {
                 format!("Price updates needed for {} holdings", count)
             };
 
-            let data_hash = compute_data_hash(&warning_assets, severity, mv_pct);
+            let asset_ids: Vec<String> = warning_assets.iter().map(|a| a.asset_id.clone()).collect();
+            let data_hash = compute_data_hash(&asset_ids, severity, mv_pct);
+
+            // Build affected items list for display
+            let affected_items: Vec<AffectedItem> = warning_assets
+                .iter()
+                .map(|a| AffectedItem::asset_with_name(&a.asset_id, &a.symbol, a.name.clone()))
+                .collect();
 
             issues.push(
                 HealthIssue::builder()
@@ -161,7 +180,8 @@ impl PriceStalenessCheck {
                     )
                     .affected_count(count as u32)
                     .affected_mv_pct(mv_pct)
-                    .fix_action(FixAction::sync_prices(warning_assets))
+                    .affected_items(affected_items)
+                    .fix_action(FixAction::sync_prices(asset_ids))
                     .data_hash(data_hash)
                     .build(),
             );
@@ -239,6 +259,8 @@ mod tests {
 
         let holdings = vec![AssetHoldingInfo {
             asset_id: "SEC:AAPL:XNAS".to_string(),
+            symbol: "AAPL".to_string(),
+            name: Some("Apple Inc.".to_string()),
             market_value: 10_000.0,
             uses_market_pricing: true,
         }];
@@ -253,6 +275,10 @@ mod tests {
         let issues = check.analyze(&holdings, &quote_times, &ctx);
         assert_eq!(issues.len(), 1);
         assert_eq!(issues[0].severity, Severity::Warning);
+        // Verify affected items are populated
+        assert!(issues[0].affected_items.is_some());
+        assert_eq!(issues[0].affected_items.as_ref().unwrap().len(), 1);
+        assert_eq!(issues[0].affected_items.as_ref().unwrap()[0].symbol, Some("AAPL".to_string()));
     }
 
     #[test]
@@ -262,6 +288,8 @@ mod tests {
 
         let holdings = vec![AssetHoldingInfo {
             asset_id: "SEC:AAPL:XNAS".to_string(),
+            symbol: "AAPL".to_string(),
+            name: Some("Apple Inc.".to_string()),
             market_value: 10_000.0,
             uses_market_pricing: true,
         }];
@@ -272,6 +300,8 @@ mod tests {
         let issues = check.analyze(&holdings, &quote_times, &ctx);
         assert_eq!(issues.len(), 1);
         assert_eq!(issues[0].severity, Severity::Error);
+        // Verify affected items are populated
+        assert!(issues[0].affected_items.is_some());
     }
 
     #[test]
@@ -281,6 +311,8 @@ mod tests {
 
         let holdings = vec![AssetHoldingInfo {
             asset_id: "SEC:AAPL:XNAS".to_string(),
+            symbol: "AAPL".to_string(),
+            name: None,
             market_value: 10_000.0,
             uses_market_pricing: true,
         }];
@@ -300,6 +332,8 @@ mod tests {
 
         let holdings = vec![AssetHoldingInfo {
             asset_id: "ALT:HOUSE".to_string(),
+            symbol: "HOUSE".to_string(),
+            name: Some("My House".to_string()),
             market_value: 500_000.0,
             uses_market_pricing: false, // Manual pricing
         }];

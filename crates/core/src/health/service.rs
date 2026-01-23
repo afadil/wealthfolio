@@ -218,6 +218,8 @@ impl HealthService {
 
                     all_holdings.push(AssetHoldingInfo {
                         asset_id: instrument.id.clone(),
+                        symbol: instrument.symbol.clone(),
+                        name: instrument.name.clone(),
                         market_value: market_value_f64,
                         uses_market_pricing,
                     });
@@ -599,6 +601,8 @@ mod tests {
 
         let holdings = vec![AssetHoldingInfo {
             asset_id: "SEC:AAPL:XNAS".to_string(),
+            symbol: "AAPL".to_string(),
+            name: Some("Apple Inc.".to_string()),
             market_value: 10_000.0,
             uses_market_pricing: true,
         }];
@@ -623,6 +627,8 @@ mod tests {
         // First, run checks to get an issue
         let holdings = vec![AssetHoldingInfo {
             asset_id: "SEC:AAPL:XNAS".to_string(),
+            symbol: "AAPL".to_string(),
+            name: Some("Apple Inc.".to_string()),
             market_value: 10_000.0,
             uses_market_pricing: true,
         }];
