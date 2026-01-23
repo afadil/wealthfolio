@@ -96,6 +96,38 @@ export function useSaveActivities({
 
       const result = await saveActivitiesMutation.mutateAsync(request);
 
+      // Check for backend validation errors (partial failure)
+      const hasErrors = result.errors && result.errors.length > 0;
+      const hasSuccesses =
+        result.created.length > 0 || result.updated.length > 0 || result.deleted.length > 0;
+
+      if (hasErrors) {
+        const errorMessages = result.errors
+          .slice(0, 3)
+          .map((err) => err.message)
+          .join("\n");
+        const suffix = result.errors.length > 3 ? `\n...and ${result.errors.length - 3} more` : "";
+
+        logger.warn(`Backend validation errors: ${JSON.stringify(result.errors)}`);
+
+        if (!hasSuccesses) {
+          // Complete failure - no items were saved
+          toast({
+            title: "Failed to save activities",
+            description: errorMessages + suffix,
+            variant: "destructive",
+          });
+          return { success: false };
+        }
+
+        // Partial success - some items saved, some failed
+        toast({
+          title: "Some activities failed to save",
+          description: errorMessages + suffix,
+          variant: "destructive",
+        });
+      }
+
       // Map temporary IDs to persisted IDs
       const createdMappings = new Map(
         (result.createdMappings ?? [])
@@ -103,11 +135,21 @@ export function useSaveActivities({
           .map((mapping) => [mapping.tempId!, mapping.activityId]),
       );
 
-      // Update local state with persisted IDs
+      // Build set of failed temp IDs so we keep them in local state
+      const failedTempIds = new Set(result.errors?.map((err) => err.id) ?? []);
+
+      // Update local state with persisted IDs, keep failed items
       setLocalTransactions((prev) =>
         prev
-          .filter((transaction) => !pendingDeleteIds.has(transaction.id))
+          .filter((transaction) => {
+            // Keep failed items so user can fix them
+            if (failedTempIds.has(transaction.id)) return true;
+            // Remove successfully deleted items
+            return !pendingDeleteIds.has(transaction.id);
+          })
           .map((transaction) => {
+            // Don't update failed items
+            if (failedTempIds.has(transaction.id)) return transaction;
             if (transaction.isNew) {
               const mappedId = createdMappings.get(transaction.id);
               if (mappedId) {
@@ -121,16 +163,20 @@ export function useSaveActivities({
       resetChangeState();
       resetRowSelection();
 
-      toast({
-        title: "Activities saved",
-        description: "Your pending changes are now saved.",
-        variant: "success",
-      });
+      if (!hasErrors) {
+        toast({
+          title: "Activities saved",
+          description: "Your pending changes are now saved.",
+          variant: "success",
+        });
+      }
 
       await onRefetch();
 
-      logger.info("Activities saved successfully");
-      return { success: true };
+      logger.info(
+        `Activities save completed: ${result.created.length} created, ${result.updated.length} updated, ${result.deleted.length} deleted, ${result.errors?.length ?? 0} errors`,
+      );
+      return { success: !hasErrors || hasSuccesses };
     } catch (error) {
       logger.error(`Failed to save activities: ${error instanceof Error ? error.message : String(error)}`);
       // Error toast is handled by the mutation hook
