@@ -15,7 +15,7 @@ import { useMemo, useCallback, useRef, useState } from "react";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 
 import { streamChatResponse, type ChatModelConfig } from "../api";
-import type { AiThread, ChatMessage, ChatThread, ThreadPage, ToolCall, ToolResult } from "../types";
+import type { AiThread, ChatMessage, ChatThread, ThreadPage } from "../types";
 import { QueryKeys } from "@/lib/query-keys";
 import { AI_THREADS_KEY } from "./use-threads";
 import { deleteAiThread, getAiThreadMessages, updateAiThread } from "@/adapters";
@@ -134,28 +134,30 @@ function formatErrorMessage(error: string): string {
 }
 
 /**
- * Internal tool call state during streaming.
+ * A part of a message's content for the external store.
+ * Preserves ordering from backend/streaming to render tool UIs inline.
  */
-interface ToolCallState {
-  toolCallId: string;
-  toolName: string;
-  args: Record<string, unknown>;
-  argsText: string;
-  result?: unknown;
-  meta?: Record<string, unknown>;
-}
+export type ExternalMessagePart =
+  | { type: "text"; content: string }
+  | { type: "reasoning"; content: string }
+  | {
+      type: "toolCall";
+      toolCallId: string;
+      name: string;
+      arguments: Record<string, unknown>;
+      result?: unknown;
+      meta?: Record<string, unknown>;
+    };
 
 /**
  * Message stored in external state (matches DB format loosely).
+ * Uses ordered parts array to preserve interleaved text/tool positions.
  */
 export interface ExternalMessage {
   id: string;
   role: "user" | "assistant";
-  content: string;
+  parts: ExternalMessagePart[];
   createdAt: Date;
-  reasoning?: string;
-  toolCalls?: ToolCall[];
-  toolResults?: ToolResult[];
 }
 
 /**
@@ -192,48 +194,54 @@ interface ThreadListItemData {
 
 /**
  * Convert a ChatMessage from the database to ExternalMessage format.
+ * Preserves part ordering for inline tool UI rendering.
  */
 function convertToExternalMessage(msg: ChatMessage): ExternalMessage {
-  let textContent = "";
-  let reasoning: string | undefined;
-  const toolCalls: ToolCall[] = [];
-  const toolResults: ToolResult[] = [];
+  const parts: ExternalMessagePart[] = [];
+  // Map toolCallId -> part index for attaching results
+  const toolCallIndexes = new Map<string, number>();
 
   for (const part of msg.content.parts) {
     switch (part.type) {
       case "text":
-        textContent += part.content;
+        parts.push({ type: "text", content: part.content });
         break;
       case "reasoning":
-        reasoning = (reasoning ?? "") + part.content;
+        parts.push({ type: "reasoning", content: part.content });
         break;
       case "toolCall":
-        toolCalls.push({
-          id: part.toolCallId,
+        toolCallIndexes.set(part.toolCallId, parts.length);
+        parts.push({
+          type: "toolCall",
+          toolCallId: part.toolCallId,
           name: part.name,
           arguments: part.arguments,
         });
         break;
-      case "toolResult":
-        toolResults.push({
-          toolCallId: part.toolCallId,
-          success: part.success,
-          data: part.data,
-          meta: part.meta,
-          error: part.error,
-        });
+      case "toolResult": {
+        // Attach result to its corresponding toolCall part
+        const idx = toolCallIndexes.get(part.toolCallId);
+        if (idx !== undefined) {
+          const tcPart = parts[idx];
+          if (tcPart && tcPart.type === "toolCall") {
+            tcPart.result = part.success
+              ? part.meta
+                ? { data: part.data, meta: part.meta }
+                : part.data
+              : { error: part.error };
+            tcPart.meta = part.meta;
+          }
+        }
         break;
+      }
     }
   }
 
   return {
     id: msg.id,
     role: msg.role,
-    content: textContent,
+    parts,
     createdAt: new Date(msg.createdAt),
-    reasoning: reasoning?.trim() || undefined,
-    toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-    toolResults: toolResults.length > 0 ? toolResults : undefined,
   };
 }
 
@@ -262,39 +270,35 @@ function areThreadListItemsEqual(
 
 /**
  * Convert external message to assistant-ui ThreadMessageLike format.
+ * Preserves part ordering for inline tool UI rendering.
  */
 function convertMessage(msg: ExternalMessage): ThreadMessageLike {
   const parts: ContentPart[] = [];
 
-  // Add reasoning first if present
-  if (msg.reasoning?.trim()) {
-    parts.push({ type: "reasoning", text: msg.reasoning });
-  }
-
-  // Add tool calls with results
-  if (msg.toolCalls) {
-    for (const tc of msg.toolCalls) {
-      const result = msg.toolResults?.find((r) => r.toolCallId === tc.id);
-      parts.push({
-        type: "tool-call",
-        toolCallId: tc.id,
-        toolName: tc.name,
-        args: tc.arguments as JSONObject,
-        argsText: JSON.stringify(tc.arguments, null, 2),
-        result: result?.success
-          ? result.meta
-            ? { data: result.data, meta: result.meta }
-            : result.data
-          : result?.error
-            ? { error: result.error }
-            : undefined,
-      });
+  // Convert parts in order to preserve interleaved text/tool positioning
+  for (const part of msg.parts) {
+    switch (part.type) {
+      case "text":
+        if (part.content?.trim()) {
+          parts.push({ type: "text", text: part.content });
+        }
+        break;
+      case "reasoning":
+        if (part.content?.trim()) {
+          parts.push({ type: "reasoning", text: part.content });
+        }
+        break;
+      case "toolCall":
+        parts.push({
+          type: "tool-call",
+          toolCallId: part.toolCallId,
+          toolName: part.name,
+          args: part.arguments as JSONObject,
+          argsText: JSON.stringify(part.arguments, null, 2),
+          result: part.result,
+        });
+        break;
     }
-  }
-
-  // Add text content
-  if (msg.content?.trim()) {
-    parts.push({ type: "text", text: msg.content });
   }
 
   return {
@@ -392,7 +396,7 @@ export function useChatRuntime(config?: ChatModelConfig) {
       const userMessage: ExternalMessage = {
         id: crypto.randomUUID(),
         role: "user",
-        content,
+        parts: [{ type: "text", content }],
         createdAt: new Date(),
       };
 
@@ -404,7 +408,7 @@ export function useChatRuntime(config?: ChatModelConfig) {
       const assistantMessage: ExternalMessage = {
         id: assistantMessageId,
         role: "assistant",
-        content: "",
+        parts: [],
         createdAt: new Date(),
       };
 
@@ -415,10 +419,12 @@ export function useChatRuntime(config?: ChatModelConfig) {
       abortControllerRef.current = new AbortController();
       const { signal } = abortControllerRef.current;
 
-      // Streaming state
-      let text = "";
-      let reasoning = "";
-      const toolCalls = new Map<string, ToolCallState>();
+      // Streaming state - ordered parts array preserves interleaved text/tool positions
+      // We track indexes for text/reasoning to append deltas, and toolCallId -> index for results
+      const streamParts: ExternalMessagePart[] = [];
+      let textPartIndex: number | null = null;
+      let reasoningPartIndex: number | null = null;
+      const toolCallIndexes = new Map<string, number>();
 
       // RAF-based throttling to batch rapid updates (prevents 100s of re-renders)
       let rafId: number | null = null;
@@ -428,35 +434,13 @@ export function useChatRuntime(config?: ChatModelConfig) {
         rafId = null;
         updatePending = false;
 
-        const tcArray: ToolCall[] = [];
-        const trArray: ToolResult[] = [];
-
-        for (const tc of toolCalls.values()) {
-          tcArray.push({
-            id: tc.toolCallId,
-            name: tc.toolName,
-            arguments: tc.args,
-          });
-          if (tc.result !== undefined) {
-            trArray.push({
-              toolCallId: tc.toolCallId,
-              success: !("error" in (tc.result as Record<string, unknown> || {})),
-              data: tc.result,
-              meta: tc.meta,
-            });
-          }
-        }
-
         setMessages((prev) => {
           const updated = [...prev];
           const idx = updated.findIndex((m) => m.id === assistantMessageId);
           if (idx !== -1) {
             updated[idx] = {
               ...updated[idx],
-              content: text,
-              reasoning: reasoning || undefined,
-              toolCalls: tcArray.length > 0 ? tcArray : undefined,
-              toolResults: trArray.length > 0 ? trArray : undefined,
+              parts: [...streamParts],
             };
           }
           return updated;
@@ -549,51 +533,68 @@ export function useChatRuntime(config?: ChatModelConfig) {
             }
 
             case "textDelta":
-              text += event.delta;
+              // Append to existing text part or create new one
+              if (textPartIndex !== null) {
+                const part = streamParts[textPartIndex];
+                if (part && part.type === "text") {
+                  part.content += event.delta;
+                }
+              } else {
+                textPartIndex = streamParts.length;
+                streamParts.push({ type: "text", content: event.delta });
+              }
               updateAssistantMessage();
               break;
 
             case "reasoningDelta":
-              reasoning += event.delta;
+              // Append to existing reasoning part or create new one
+              if (reasoningPartIndex !== null) {
+                const part = streamParts[reasoningPartIndex];
+                if (part && part.type === "reasoning") {
+                  part.content += event.delta;
+                }
+              } else {
+                reasoningPartIndex = streamParts.length;
+                streamParts.push({ type: "reasoning", content: event.delta });
+              }
               updateAssistantMessage();
               break;
 
             case "toolCall":
-              toolCalls.set(event.toolCall.id, {
+              // Add tool call part and track its index for result attachment
+              toolCallIndexes.set(event.toolCall.id, streamParts.length);
+              streamParts.push({
+                type: "toolCall",
                 toolCallId: event.toolCall.id,
-                toolName: event.toolCall.name,
-                args: event.toolCall.arguments,
-                argsText: JSON.stringify(event.toolCall.arguments, null, 2),
+                name: event.toolCall.name,
+                arguments: event.toolCall.arguments,
               });
+              // Reset text part index so subsequent text appears after this tool
+              textPartIndex = null;
               updateAssistantMessage();
               break;
 
             case "toolResult": {
-              const existing = toolCalls.get(event.result.toolCallId);
-              if (existing) {
-                existing.result = event.result.success
-                  ? event.result.data
-                  : { error: event.result.error };
-                existing.meta = event.result.meta;
+              // Attach result to its corresponding toolCall part
+              const tcIdx = toolCallIndexes.get(event.result.toolCallId);
+              if (tcIdx !== undefined) {
+                const part = streamParts[tcIdx];
+                if (part && part.type === "toolCall") {
+                  part.result = event.result.success
+                    ? event.result.meta
+                      ? { data: event.result.data, meta: event.result.meta }
+                      : event.result.data
+                    : { error: event.result.error };
+                  part.meta = event.result.meta;
+                }
               }
               updateAssistantMessage();
               break;
             }
 
             case "done":
-              // Extract final content from done event's structured message
-              if (event.message.content?.parts) {
-                for (const part of event.message.content.parts) {
-                  if (part.type === "text") {
-                    text = part.content;
-                  } else if (part.type === "reasoning") {
-                    reasoning = part.content;
-                  }
-                }
-              }
-              updateAssistantMessage();
-              // Invalidate threads to refresh from DB (updates title if generated)
-              // Use setTimeout to give DB time to commit and title generation to complete
+              // The streamParts array already has all content in order
+              // Just invalidate threads to refresh from DB (updates title if generated)
               setTimeout(() => {
                 queryClient.invalidateQueries({ queryKey: AI_THREADS_KEY });
               }, 1000);
@@ -602,7 +603,10 @@ export function useChatRuntime(config?: ChatModelConfig) {
             case "error":
               console.error("Stream error:", event.message);
               // Show formatted error to user in the assistant message
-              text = formatErrorMessage(event.message);
+              streamParts.push({
+                type: "text",
+                content: formatErrorMessage(event.message),
+              });
               updateAssistantMessage();
               break;
           }
@@ -612,7 +616,10 @@ export function useChatRuntime(config?: ChatModelConfig) {
           console.error("Streaming error:", error);
           // Show formatted error to user in the assistant message
           const errorMessage = error instanceof Error ? error.message : String(error);
-          text = formatErrorMessage(errorMessage);
+          streamParts.push({
+            type: "text",
+            content: formatErrorMessage(errorMessage),
+          });
           updateAssistantMessage();
         }
       } finally {
