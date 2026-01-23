@@ -17,7 +17,7 @@ export function SidebarNav({ className, items, ...props }: SidebarNavProps) {
 
   return (
     <nav
-      className={cn("flex space-x-2 lg:flex-col lg:space-y-1 lg:space-x-0", className)}
+      className={cn("flex space-x-2 lg:flex-col lg:space-y-0.5 lg:space-x-0", className)}
       {...props}
     >
       {items.map((item) => (
@@ -25,15 +25,14 @@ export function SidebarNav({ className, items, ...props }: SidebarNavProps) {
           key={item.href}
           to={item.href}
           className={cn(
-            buttonVariants({ variant: "ghost" }),
-            "rounded-md",
+            buttonVariants({ variant: "ghost", size: "sm" }),
+            "rounded-md justify-start px-2.5 py-1 text-[13px] [&_svg]:size-4",
             location.pathname.includes(item.href)
               ? "bg-muted hover:bg-muted"
-              : "hover:bg-transparent hover:underline",
-            "justify-start",
+              : "hover:bg-muted/50",
           )}
         >
-          {item.icon && <span className="mr-2 hidden lg:inline-block">{item.icon}</span>}
+          {item.icon && <span className="mr-1.5 hidden lg:inline-block">{item.icon}</span>}
           {item.title}
         </NavLink>
       ))}
