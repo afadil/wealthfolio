@@ -4,84 +4,114 @@ import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { SidebarNav } from "./sidebar-nav";
 
-const sidebarNavItems = [
+const settingsSections = [
   {
-    title: "General",
-    href: "general",
-    subtitle: "Currency and general preferences",
-    icon: <Icons.Settings2 className="size-5" />,
+    title: "Preferences",
+    items: [
+      {
+        title: "General",
+        href: "general",
+        subtitle: "Currency, exchange rates, and updates",
+        icon: <Icons.Settings2 className="size-5" />,
+      },
+      {
+        title: "Appearance",
+        href: "appearance",
+        subtitle: "Theme, font, and menu bar",
+        icon: <Icons.Monitor className="size-5" />,
+      },
+    ],
   },
   {
-    title: "Appearance",
-    href: "appearance",
-    subtitle: "Theme, typography, and density",
-    icon: <Icons.Monitor className="size-5" />,
+    title: "Portfolio",
+    items: [
+      {
+        title: "Accounts",
+        href: "accounts",
+        subtitle: "Investment and savings accounts",
+        icon: <Icons.CreditCard className="size-5" />,
+      },
+      {
+        title: "Goals & Allocations",
+        href: "goals",
+        subtitle: "Targets and allocation rules",
+        icon: <Icons.Goal className="size-5" />,
+      },
+      {
+        title: "Contribution Limits",
+        href: "contribution-limits",
+        subtitle: "Limits by year and account",
+        icon: <Icons.TrendingUp className="size-5" />,
+      },
+    ],
   },
   {
-    title: "Accounts",
-    href: "accounts",
-    subtitle: "Investment and savings accounts",
-    icon: <Icons.CreditCard className="size-5" />,
+    title: "Data",
+    items: [
+      {
+        title: "Securities",
+        href: "securities",
+        subtitle: "Manage security definitions",
+        icon: <Icons.BadgeDollarSign className="size-5" />,
+      },
+      {
+        title: "Classifications",
+        href: "taxonomies",
+        subtitle: "Asset classification hierarchies",
+        icon: <Icons.Blocks className="size-5" />,
+      },
+      {
+        title: "Backup & Export",
+        href: "exports",
+        subtitle: "Backups and data exports",
+        icon: <Icons.Download className="size-5" />,
+      },
+    ],
   },
   {
-    title: "Limits",
-    href: "contribution-limits",
-    subtitle: "Contribution limits and rules",
-    icon: <Icons.TrendingUp className="size-5" />,
+    title: "Connections",
+    items: [
+      {
+        title: "Market Data",
+        href: "market-data",
+        subtitle: "Providers, sync, and imports",
+        icon: <Icons.BarChart className="size-5" />,
+      },
+      {
+        title: "Wealthfolio Connect",
+        href: "connect",
+        subtitle: "Broker and device linking",
+        icon: <Icons.CloudSync2 className="size-6 text-blue-400" />,
+      },
+      {
+        title: "AI Providers",
+        href: "ai-providers",
+        subtitle: "Configure AI for portfolio insights",
+        icon: <Icons.SparklesOutline className="size-5" />,
+      },
+    ],
   },
   {
-    title: "Goals",
-    href: "goals",
-    subtitle: "Plan and track objectives",
-    icon: <Icons.Goal className="size-5" />,
-  },
-  {
-    title: "Securities",
-    href: "securities",
-    subtitle: "Manage security definitions",
-    icon: <Icons.BadgeDollarSign className="size-5" />,
-  },
-  {
-    title: "Classifications",
-    href: "taxonomies",
-    subtitle: "Asset classification hierarchies",
-    icon: <Icons.Blocks className="size-5" />,
-  },
-  {
-    title: "Market Data",
-    href: "market-data",
-    subtitle: "Providers and data update",
-    icon: <Icons.BarChart className="size-5" />,
-  },
-  {
-    title: "AI Providers",
-    href: "ai-providers",
-    subtitle: "Configure AI for portfolio insights",
-    icon: <Icons.SparklesOutline className="size-5" />,
-  },
-  {
-    title: "Add-ons",
-    href: "addons",
-    subtitle: "Extend Wealthfolio with features",
-    icon: <Icons.Package className="size-5" />,
-  },
-  {
-    title: "Data Export",
-    href: "exports",
-    subtitle: "Backup and export your data",
-    icon: <Icons.Download className="size-5" />,
-  },
-  {
-    title: "Connect",
-    href: "connect",
-    subtitle: "Login to your Wealthfolio Connect account",
-    icon: <Icons.CloudSync2 className="size-6 text-blue-400" />,
+    title: "Extensions",
+    items: [
+      {
+        title: "Add-ons",
+        href: "addons",
+        subtitle: "Extend Wealthfolio with features",
+        icon: <Icons.Package className="size-5" />,
+      },
+    ],
   },
   {
     title: "About",
-    href: "about",
-    subtitle: "About Wealthfolio",
-    icon: <Icons.InfoCircle className="size-5" />,
+    items: [
+      {
+        title: "About",
+        href: "about",
+        subtitle: "Application information",
+        icon: <Icons.InfoCircle className="size-5" />,
+      },
+    ],
   },
 ];
 
@@ -106,32 +136,39 @@ export default function SettingsLayout() {
                 <h1 className="text-lg font-semibold">Settings</h1>
               </div>
             </div>
-            <div className="p-3 lg:p-4">
-              <div className="divide-border bg-card divide-y overflow-hidden rounded-2xl border shadow-sm">
-                {sidebarNavItems.map((item) => (
-                  <button
-                    key={item.href}
-                    onClick={() => navigate(item.href)}
-                    className="hover:bg-muted/40 flex w-full items-center justify-between gap-3 px-4 py-4 text-left transition-colors active:opacity-90"
-                    aria-label={item.title}
-                  >
-                    <div className="flex min-w-0 flex-1 items-center gap-3">
-                      <div className="text-muted-foreground shrink-0">{item.icon}</div>
-                      <div className="min-w-0">
-                        <div className="text-foreground truncate text-base font-medium">
-                          {item.title}
-                        </div>
-                        {item?.subtitle && (
-                          <div className="text-muted-foreground truncate text-sm">
-                            {item.subtitle}
+            <div className="space-y-6 p-3 lg:p-4">
+              {settingsSections.map((section) => (
+                <div key={section.title} className="space-y-3">
+                  <div className="text-muted-foreground px-2 text-xs font-semibold uppercase tracking-widest">
+                    {section.title}
+                  </div>
+                  <div className="divide-border bg-card divide-y overflow-hidden rounded-2xl border shadow-sm">
+                    {section.items.map((item) => (
+                      <button
+                        key={item.href}
+                        onClick={() => navigate(item.href)}
+                        className="hover:bg-muted/40 flex w-full items-center justify-between gap-3 px-4 py-4 text-left transition-colors active:opacity-90"
+                        aria-label={item.title}
+                      >
+                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                          <div className="text-muted-foreground shrink-0">{item.icon}</div>
+                          <div className="min-w-0">
+                            <div className="text-foreground truncate text-base font-medium">
+                              {item.title}
+                            </div>
+                            {item?.subtitle && (
+                              <div className="text-muted-foreground truncate text-sm">
+                                {item.subtitle}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    </div>
-                    <Icons.ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
-                  </button>
-                ))}
-              </div>
+                        </div>
+                        <Icons.ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         ) : (
@@ -154,7 +191,16 @@ export default function SettingsLayout() {
           <Separator className="my-6" />
           <div className="flex gap-10">
             <aside className="hidden w-[240px] shrink-0 lg:sticky lg:top-24 lg:flex lg:flex-col lg:self-start">
-              <SidebarNav items={sidebarNavItems} />
+              <div className="space-y-6">
+                {settingsSections.map((section) => (
+                  <div key={section.title} className="space-y-2">
+                  <div className="text-muted-foreground pl-2.5 text-[11px] font-semibold uppercase tracking-widest">
+                    {section.title}
+                  </div>
+                  <SidebarNav items={section.items} />
+                </div>
+              ))}
+              </div>
             </aside>
             <div className="mb-8 min-w-0 flex-1">
               <Outlet />
