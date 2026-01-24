@@ -18,7 +18,6 @@ use rig::{
     message::{AssistantContent, Reasoning, Text, ToolCall as RigToolCall, ToolChoice, ToolResultContent, UserContent},
     providers::{
         anthropic, gemini, groq, ollama, openai,
-        gemini::completion::gemini_api_types::{GenerationConfig, ThinkingConfig},
         groq::{GroqAdditionalParameters, ReasoningFormat},
     },
     streaming::{StreamedAssistantContent, StreamedUserContent, StreamingChat},
@@ -636,26 +635,20 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         }))
     };
 
-    // Gemini: Use rig-core's native GenerationConfig with ThinkingConfig
-    // thinking_budget: 0 disables, higher values enable with token budget
+    // Gemini: Only pass thinking_config to avoid sending unsupported fields.
+    // The full GenerationConfig struct includes fields (temperature, maxOutputTokens)
+    // that may not be accepted by all Gemini API versions/models.
     let gemini_thinking_params: Option<serde_json::Value> = if capabilities.thinking {
         // Enable thinking with a reasonable budget
-        serde_json::to_value(GenerationConfig {
-            thinking_config: Some(ThinkingConfig {
-                thinking_budget: 8192,
-                include_thoughts: Some(true),
-            }),
-            ..Default::default()
-        }).ok()
+        Some(serde_json::json!({
+            "thinking_config": {
+                "thinking_budget": 8192,
+                "include_thoughts": true
+            }
+        }))
     } else {
-        // Disable thinking by setting budget to 0
-        serde_json::to_value(GenerationConfig {
-            thinking_config: Some(ThinkingConfig {
-                thinking_budget: 0,
-                include_thoughts: Some(false),
-            }),
-            ..Default::default()
-        }).ok()
+        // Don't send thinking_config at all when disabled - simpler and avoids API issues
+        None
     };
 
     // Route to provider with tool support check
