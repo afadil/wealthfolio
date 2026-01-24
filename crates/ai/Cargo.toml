@@ -30,6 +30,9 @@ rig = { package = "rig-core", version = "0.29" }
 # Lazy static initialization
 once_cell = "1"
 
+# CSV parsing
+csv = "1.3"
+
 # Streaming
 tokio-stream = "0.1"
 

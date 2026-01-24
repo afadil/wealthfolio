@@ -10,6 +10,9 @@ import {
   type ThreadMessageLike,
   type AppendMessage,
   type ExternalStoreAdapter,
+  type AttachmentAdapter,
+  type PendingAttachment,
+  type CompleteAttachment,
 } from "@assistant-ui/react";
 import { useMemo, useCallback, useRef, useState } from "react";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
@@ -193,6 +196,44 @@ interface ThreadListItemData {
 }
 
 /**
+ * CSV attachment adapter for importing activity data.
+ * Accepts CSV files and reads content as text for AI processing.
+ */
+const csvAttachmentAdapter: AttachmentAdapter = {
+  accept: ".csv,text/csv,application/csv",
+
+  async add({ file }): Promise<PendingAttachment> {
+    return {
+      id: crypto.randomUUID(),
+      type: "document",
+      name: file.name,
+      contentType: file.type || "text/csv",
+      file,
+      status: { type: "requires-action", reason: "composer-send" },
+    };
+  },
+
+  async remove(): Promise<void> {
+    // No cleanup needed for local file references
+  },
+
+  async send(attachment: PendingAttachment): Promise<CompleteAttachment> {
+    // Read CSV file content as text
+    const csvContent = await attachment.file.text();
+
+    return {
+      id: attachment.id,
+      type: "document",
+      name: attachment.name,
+      contentType: attachment.contentType,
+      status: { type: "complete" },
+      // Store CSV content as text part for AI to process
+      content: [{ type: "text", text: csvContent }],
+    };
+  },
+};
+
+/**
  * Convert a ChatMessage from the database to ExternalMessage format.
  * Preserves part ordering for inline tool UI rendering.
  */
@@ -279,12 +320,12 @@ function convertMessage(msg: ExternalMessage): ThreadMessageLike {
   for (const part of msg.parts) {
     switch (part.type) {
       case "text":
-        if (part.content?.trim()) {
+        if (part.content.length > 0) {
           parts.push({ type: "text", text: part.content });
         }
         break;
       case "reasoning":
-        if (part.content?.trim()) {
+        if (part.content.length > 0) {
           parts.push({ type: "reasoning", text: part.content });
         }
         break;
@@ -384,19 +425,58 @@ export function useChatRuntime(config?: ChatModelConfig) {
   const handleNew = useCallback(
     async (message: AppendMessage) => {
       // Extract text content from the message
-      const content = message.content
+      const textContent = message.content
         .filter((part): part is { type: "text"; text: string } => part.type === "text")
         .map((part) => part.text)
         .join("\n");
 
-      if (!content.trim()) return;
-      const initialThreadTitle = deriveInitialThreadTitle(content);
+      // Extract CSV attachment content if present
+      // Attachments are processed by csvAttachmentAdapter.send() which stores content as text parts
+      let attachmentContent = "";
+      const attachmentNames: string[] = [];
+      let hasCsvAttachment = false;
+      if (message.attachments && message.attachments.length > 0) {
+        for (const attachment of message.attachments) {
+          attachmentNames.push(attachment.name);
+          if (attachment.content) {
+            const csvText = attachment.content
+              .filter((part): part is { type: "text"; text: string } => part.type === "text")
+              .map((part) => part.text)
+              .join("\n");
+            if (csvText) {
+              hasCsvAttachment = true;
+              // Format attachment content with metadata for AI
+              attachmentContent += `\n\n[Attached CSV file: ${attachment.name}]\n${csvText}`;
+            }
+          }
+        }
+      }
 
-      // Create user message
+      // Content for AI includes both text and attachment content
+      // For CSV files, prepend explicit tool instruction for smaller models
+      let contentForAi = textContent + attachmentContent;
+      if (hasCsvAttachment) {
+        contentForAi = `[INSTRUCTION: A CSV file is attached. You MUST call the import_csv tool with the full CSV content in csvContent parameter. Do NOT analyze or summarize the data yourself - use the tool.]\n\n${contentForAi}`;
+      }
+
+      if (!contentForAi.trim()) return;
+      const initialThreadTitle = deriveInitialThreadTitle(textContent || attachmentNames[0] || "New chat");
+
+      // Build user message parts - show text and attachment indicator separately
+      const userMessageParts: ExternalMessagePart[] = [];
+      if (textContent.trim()) {
+        userMessageParts.push({ type: "text", content: textContent });
+      }
+      // Add attachment indicator for display (not the full CSV content)
+      for (const name of attachmentNames) {
+        userMessageParts.push({ type: "text", content: `📎 ${name}` });
+      }
+
+      // Create user message for UI display
       const userMessage: ExternalMessage = {
         id: crypto.randomUUID(),
         role: "user",
-        parts: [{ type: "text", content }],
+        parts: userMessageParts.length > 0 ? userMessageParts : [{ type: "text", content: "(empty)" }],
         createdAt: new Date(),
       };
 
@@ -457,7 +537,7 @@ export function useChatRuntime(config?: ChatModelConfig) {
       try {
         for await (const event of streamChatResponse(
           {
-            content,
+            content: contentForAi,
             config,
             threadId: threadIdRef.current ?? undefined,
           },
@@ -543,6 +623,7 @@ export function useChatRuntime(config?: ChatModelConfig) {
                 textPartIndex = streamParts.length;
                 streamParts.push({ type: "text", content: event.delta });
               }
+              reasoningPartIndex = null;
               updateAssistantMessage();
               break;
 
@@ -557,6 +638,7 @@ export function useChatRuntime(config?: ChatModelConfig) {
                 reasoningPartIndex = streamParts.length;
                 streamParts.push({ type: "reasoning", content: event.delta });
               }
+              textPartIndex = null;
               updateAssistantMessage();
               break;
 
@@ -571,6 +653,7 @@ export function useChatRuntime(config?: ChatModelConfig) {
               });
               // Reset text part index so subsequent text appears after this tool
               textPartIndex = null;
+              reasoningPartIndex = null;
               updateAssistantMessage();
               break;
 
@@ -721,6 +804,7 @@ export function useChatRuntime(config?: ChatModelConfig) {
       onNew: handleNew,
       onCancel: handleCancel,
       adapters: {
+        attachments: csvAttachmentAdapter,
         threadList: {
           threadId: currentThreadId ?? undefined,
           isLoading: isThreadListLoading,

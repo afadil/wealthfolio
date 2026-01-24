@@ -1,198 +1,23 @@
 "use client";
 
-import { memo, useCallback, useRef, useState, type FC, type PropsWithChildren } from "react";
+import { memo, useRef } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { useState, useEffect } from "react";
 
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 
 import {
   useAssistantState,
-  useScrollLock,
   useMessagePartReasoning,
   type ReasoningGroupComponent,
   type ReasoningMessagePartComponent,
 } from "@assistant-ui/react";
 
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@wealthfolio/ui/components/ui/collapsible";
-import { cn } from "@/lib/utils";
-
-const ANIMATION_DURATION = 200;
+const CONTENT_HEIGHT = 160; // px - fixed height for content area
 
 /**
- * Root collapsible container that manages open/closed state and scroll lock.
- * Provides animation timing via CSS variable and prevents scroll jumps on collapse.
- */
-const ReasoningRoot: FC<
-  PropsWithChildren<{
-    className?: string;
-  }>
-> = ({ className, children }) => {
-  const collapsibleRef = useRef<HTMLDivElement>(null);
-  const [isOpen, setIsOpen] = useState(false);
-  const lockScroll = useScrollLock(collapsibleRef, ANIMATION_DURATION);
-
-  const handleOpenChange = useCallback(
-    (open: boolean) => {
-      if (!open) {
-        lockScroll();
-      }
-      setIsOpen(open);
-    },
-    [lockScroll],
-  );
-
-  return (
-    <Collapsible
-      ref={collapsibleRef}
-      open={isOpen}
-      onOpenChange={handleOpenChange}
-      className={cn("aui-reasoning-root mb-4 w-full", className)}
-      style={
-        {
-          "--animation-duration": `${ANIMATION_DURATION}ms`,
-        } as React.CSSProperties
-      }
-    >
-      {children}
-    </Collapsible>
-  );
-};
-
-ReasoningRoot.displayName = "ReasoningRoot";
-
-/**
- * Gradient overlay that softens the bottom edge during expand/collapse animations.
- * Animation: Fades out with delay when opening and fades back in when closing.
- */
-const GradientFade: FC<{ className?: string }> = ({ className }) => (
-  <div
-    className={cn(
-      "aui-reasoning-fade pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16",
-      "bg-[linear-gradient(to_top,var(--color-background),transparent)]",
-      "fade-in-0 animate-in",
-      "group-data-[state=open]/collapsible-content:animate-out",
-      "group-data-[state=open]/collapsible-content:fade-out-0",
-      "group-data-[state=open]/collapsible-content:delay-[calc(var(--animation-duration)*0.75)]", // calc for timing the delay
-      "group-data-[state=open]/collapsible-content:fill-mode-forwards",
-      "duration-(--animation-duration)",
-      "group-data-[state=open]/collapsible-content:duration-(--animation-duration)",
-      className,
-    )}
-  />
-);
-
-/**
- * Trigger button for the Reasoning collapsible.
- * Composed of icons, label, and text shimmer animation when reasoning is being streamed.
- */
-const ReasoningTrigger: FC<{ active: boolean; className?: string }> = ({ active, className }) => (
-  <CollapsibleTrigger
-    className={cn(
-      "aui-reasoning-trigger group/trigger text-muted-foreground hover:text-foreground -mb-2 flex max-w-[75%] items-center gap-2 py-2 text-sm transition-colors",
-      className,
-    )}
-  >
-    <Icons.Brain className="aui-reasoning-trigger-icon size-4 shrink-0" />
-    <span className="aui-reasoning-trigger-label-wrapper relative inline-block leading-none">
-      <span>Reasoning</span>
-      {active ? (
-        <span
-          aria-hidden
-          className="aui-reasoning-trigger-shimmer shimmer pointer-events-none absolute inset-0 motion-reduce:animate-none"
-        >
-          Reasoning
-        </span>
-      ) : null}
-    </span>
-    <Icons.ChevronDown
-      className={cn(
-        "aui-reasoning-trigger-chevron mt-0.5 size-4 shrink-0",
-        "transition-transform duration-(--animation-duration) ease-out",
-        "group-data-[state=closed]/trigger:-rotate-90",
-        "group-data-[state=open]/trigger:rotate-0",
-      )}
-    />
-  </CollapsibleTrigger>
-);
-
-/**
- * Collapsible content wrapper that handles height expand/collapse animation.
- * Animation: Height animates up (collapse) and down (expand).
- * Also provides group context for child animations via data-state attributes.
- */
-const ReasoningContent: FC<
-  PropsWithChildren<{
-    className?: string;
-    "aria-busy"?: boolean;
-  }>
-> = ({ className, children, "aria-busy": ariaBusy }) => (
-  <CollapsibleContent
-    className={cn(
-      "aui-reasoning-content text-muted-foreground relative overflow-hidden text-sm outline-none",
-      "group/collapsible-content ease-out",
-      "data-[state=closed]:animate-collapsible-up",
-      "data-[state=open]:animate-collapsible-down",
-      "data-[state=closed]:fill-mode-forwards",
-      "data-[state=closed]:pointer-events-none",
-      "data-[state=open]:duration-(--animation-duration)",
-      "data-[state=closed]:duration-(--animation-duration)",
-      className,
-    )}
-    aria-busy={ariaBusy}
-  >
-    {children}
-    <GradientFade />
-  </CollapsibleContent>
-);
-
-ReasoningContent.displayName = "ReasoningContent";
-
-/**
- * Text content wrapper that animates the reasoning text visibility.
- * Animation: Slides in from top + fades in when opening, reverses when closing.
- * Reacts to parent ReasoningContent's data-state via Radix group selectors.
- */
-const ReasoningText: FC<
-  PropsWithChildren<{
-    className?: string;
-  }>
-> = ({ className, children }) => (
-  <div
-    className={cn(
-      "aui-reasoning-text relative z-0 space-y-4 pt-4 pl-6 leading-relaxed",
-      "transform-gpu transition-[transform,opacity]",
-      "group-data-[state=open]/collapsible-content:animate-in",
-      "group-data-[state=closed]/collapsible-content:animate-out",
-      "group-data-[state=open]/collapsible-content:fade-in-0",
-      "group-data-[state=closed]/collapsible-content:fade-out-0",
-      "group-data-[state=open]/collapsible-content:slide-in-from-top-4",
-      "group-data-[state=closed]/collapsible-content:slide-out-to-top-4",
-      "group-data-[state=open]/collapsible-content:duration-(--animation-duration)",
-      "group-data-[state=closed]/collapsible-content:duration-(--animation-duration)",
-      "[&_p]:-mb-2",
-      className,
-    )}
-  >
-    {children}
-  </div>
-);
-
-ReasoningText.displayName = "ReasoningText";
-
-/**
- * Renders a single reasoning part's text with markdown support.
+ * Renders a single reasoning part's text.
  * Consecutive reasoning parts are automatically grouped by ReasoningGroup.
- *
- * Pass Reasoning to MessagePrimitive.Parts in thread.tsx
- *
- * @example:
- * ```tsx
- * <MessagePrimitive.Parts
- *   components={{
- *     Reasoning: Reasoning,
- *     ReasoningGroup: ReasoningGroup,
- *   }}
- * />
- * ```
  */
 const ReasoningImpl: ReasoningMessagePartComponent = () => {
   const { text } = useMessagePartReasoning();
@@ -201,25 +26,16 @@ const ReasoningImpl: ReasoningMessagePartComponent = () => {
 
 /**
  * Collapsible wrapper that groups consecutive reasoning parts together.
- *  Includes scroll lock to prevent page jumps during collapse animation.
- *
- *  Pass ReasoningGroup to MessagePrimitive.Parts in thread.tsx
- *
- * @example:
- * ```tsx
- * <MessagePrimitive.Parts
- *   components={{
- *     Reasoning: Reasoning,
- *     ReasoningGroup: ReasoningGroup,
- *   }}
- * />
- * ```
+ * Streams content naturally like regular messages.
  */
 const ReasoningGroupImpl: ReasoningGroupComponent = ({ children, startIndex, endIndex }) => {
+  const [isExpanded, setIsExpanded] = useState(false); // Start collapsed
+  const contentRef = useRef<HTMLDivElement>(null);
+
   /**
    * Detects if reasoning is currently streaming within this group's range.
    */
-  const isReasoningStreaming = useAssistantState(({ message }) => {
+  const isThinking = useAssistantState(({ message }) => {
     if (message.status?.type !== "running") return false;
     const lastIndex = message.parts.length - 1;
     if (lastIndex < 0) return false;
@@ -228,14 +44,90 @@ const ReasoningGroupImpl: ReasoningGroupComponent = ({ children, startIndex, end
     return lastIndex >= startIndex && lastIndex <= endIndex;
   });
 
-  return (
-    <ReasoningRoot>
-      <ReasoningTrigger active={isReasoningStreaming} />
+  /**
+   * Get the reasoning text length to trigger scroll on content change.
+   */
+  const reasoningLength = useAssistantState(({ message }) => {
+    return message.parts
+      .slice(startIndex, endIndex + 1)
+      .filter((part) => part.type === "reasoning")
+      .reduce((acc, part) => acc + ("text" in part ? part.text.length : 0), 0);
+  });
 
-      <ReasoningContent aria-busy={isReasoningStreaming}>
-        <ReasoningText>{children}</ReasoningText>
-      </ReasoningContent>
-    </ReasoningRoot>
+  const hasFinishedThinking = !isThinking;
+
+  // Smooth auto-scroll to bottom while streaming
+  useEffect(() => {
+    if (!hasFinishedThinking && contentRef.current) {
+      contentRef.current.scrollTo({
+        top: contentRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  }, [reasoningLength, hasFinishedThinking]);
+
+  const toggleExpanded = () => {
+    setIsExpanded(!isExpanded);
+  };
+
+  const headerText = "Thinking";
+
+  return (
+    <motion.div
+      className="bg-muted/50 mb-4 flex w-full flex-col overflow-hidden rounded-xl"
+      initial={{ opacity: 0, y: 5 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+    >
+      {/* Header */}
+      <div
+        className="flex cursor-pointer select-none items-center justify-between px-3 py-2 transition-colors hover:bg-muted/80"
+        onClick={toggleExpanded}
+      >
+        <div className="flex items-center gap-2">
+          <Icons.Brain className={`size-4 ${!hasFinishedThinking ? "shimmer text-muted-foreground" : "text-muted-foreground"}`} />
+          <span className={`text-sm ${!hasFinishedThinking ? "shimmer text-muted-foreground" : "text-muted-foreground"}`}>
+            {headerText}
+          </span>
+        </div>
+        <motion.div
+          animate={{ rotate: isExpanded ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+          className="text-muted-foreground"
+        >
+          <Icons.ChevronDown className="size-4" />
+        </motion.div>
+      </div>
+
+      {/* Content Area */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            key="content"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: CONTENT_HEIGHT, opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="relative"
+          >
+            <div
+              ref={contentRef}
+              className="text-muted-foreground h-full overflow-y-auto px-3 pb-6 text-xs leading-relaxed"
+              style={{ height: CONTENT_HEIGHT }}
+            >
+              {children}
+            </div>
+            {/* Bottom fade gradient */}
+            <div
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-12"
+              style={{
+                background: "linear-gradient(to top, hsl(var(--muted) / 0.5), transparent)",
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 };
 

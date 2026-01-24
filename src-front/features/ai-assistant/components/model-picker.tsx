@@ -15,12 +15,13 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import type { MergedModel } from "../types";
-import { useChatModel } from "../hooks/use-chat-model";
+import { useChatModelContext } from "../hooks/use-chat-model-context";
+import { ThinkingToggle } from "./thinking-toggle";
 
 export const ModelPicker: FC = () => {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
-  const { isLoading, currentProvider, currentModelId, selectModel } = useChatModel();
+  const { isLoading, currentProvider, currentModelId, selectModel } = useChatModelContext();
 
   // Get selected/favorite models from provider settings
   const selectedModels = useMemo(() => {
@@ -89,25 +90,29 @@ export const ModelPicker: FC = () => {
   // If only one model, just show the name without dropdown
   if (selectedModels.length <= 1) {
     return (
-      <div className="text-muted-foreground flex items-center gap-1.5 px-3 text-xs">
-        <span>{currentModel ? getDisplayName(currentModel.id) : "No model"}</span>
+      <div className="flex items-center">
+        <div className="text-muted-foreground flex items-center gap-1.5 px-3 text-xs">
+          <span>{currentModel ? getDisplayName(currentModel.id) : "No model"}</span>
+        </div>
+        <ThinkingToggle />
       </div>
     );
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground hover:text-foreground h-8 gap-1.5 px-3 text-xs font-normal"
-          aria-label="Select model"
-        >
-          <span>{currentModel ? getDisplayName(currentModel.id) : "Select model"}</span>
-          <Icons.ChevronDown className="size-3 opacity-50" />
-        </Button>
-      </PopoverTrigger>
+    <div className="flex items-center">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground h-8 gap-1.5 px-3 text-xs font-normal"
+            aria-label="Select model"
+          >
+            <span>{currentModel ? getDisplayName(currentModel.id) : "Select model"}</span>
+            <Icons.ChevronDown className="size-3 opacity-50" />
+          </Button>
+        </PopoverTrigger>
       <PopoverContent className="w-fit min-w-56 p-1.5" align="start" sideOffset={8}>
         <Command>
           <CommandEmpty>No models available</CommandEmpty>
@@ -142,6 +147,8 @@ export const ModelPicker: FC = () => {
           </CommandGroup>
         </Command>
       </PopoverContent>
-    </Popover>
+      </Popover>
+      <ThinkingToggle />
+    </div>
   );
 };

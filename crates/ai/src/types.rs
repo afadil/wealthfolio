@@ -812,6 +812,10 @@ pub struct ChatModelConfig {
     /// Model ID (e.g., "gpt-4o", "claude-3-sonnet", "llama3.2").
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+    /// Override thinking/reasoning capability for this request.
+    /// If None, uses the model's default capability from the catalog/settings.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thinking: Option<bool>,
 }
 
 /// Request to send a chat message.

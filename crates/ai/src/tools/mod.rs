@@ -20,6 +20,7 @@ pub mod constants;
 pub mod dividends;
 pub mod goals;
 pub mod holdings;
+pub mod import_csv;
 pub mod performance;
 pub mod record_activity;
 pub mod valuation;
@@ -34,6 +35,7 @@ pub use allocation::GetAssetAllocationTool;
 pub use dividends::GetDividendsTool;
 pub use goals::GetGoalsTool;
 pub use holdings::GetHoldingsTool;
+pub use import_csv::ImportCsvTool;
 pub use performance::GetPerformanceTool;
 pub use record_activity::RecordActivityTool;
 pub use valuation::GetValuationHistoryTool;
@@ -53,6 +55,7 @@ pub struct ToolSet<E: AiEnvironment> {
     pub goals: GetGoalsTool<E>,
     pub performance: GetPerformanceTool<E>,
     pub record_activity: RecordActivityTool<E>,
+    pub import_csv: ImportCsvTool<E>,
 }
 
 impl<E: AiEnvironment> ToolSet<E> {
@@ -66,8 +69,9 @@ impl<E: AiEnvironment> ToolSet<E> {
             dividends: GetDividendsTool::new(env.clone()),
             valuation: GetValuationHistoryTool::new(env.clone(), base_currency.clone()),
             goals: GetGoalsTool::new(env.clone()),
-            performance: GetPerformanceTool::new(env.clone(), base_currency),
-            record_activity: RecordActivityTool::new(env),
+            performance: GetPerformanceTool::new(env.clone(), base_currency.clone()),
+            record_activity: RecordActivityTool::new(env.clone()),
+            import_csv: ImportCsvTool::new(env, base_currency),
         }
     }
 }

@@ -242,17 +242,32 @@ impl<E: AiEnvironment + 'static> TitleGeneratorTrait for TitleGenerator<E> {
 pub fn truncate_to_title(text: &str, max_chars: usize) -> String {
     let text = text.trim();
 
-    // If short enough, return as-is
-    if text.len() <= max_chars {
+    // If short enough, return as-is (char-count, not byte-count).
+    if text.chars().count() <= max_chars {
         return text.to_string();
     }
 
-    // Find the last word boundary before max_chars
-    let truncated = &text[..max_chars];
-    let last_space = truncated.rfind(char::is_whitespace);
+    // Find the byte index for the max char boundary and the last whitespace within it.
+    let mut end_byte = text.len();
+    let mut last_space_byte: Option<usize> = None;
+    let mut last_space_char: Option<usize> = None;
+    let mut chars_seen = 0usize;
 
-    let title = match last_space {
-        Some(pos) if pos > max_chars / 2 => &truncated[..pos],
+    for (idx, ch) in text.char_indices() {
+        if chars_seen == max_chars {
+            end_byte = idx;
+            break;
+        }
+        if ch.is_whitespace() {
+            last_space_byte = Some(idx);
+            last_space_char = Some(chars_seen);
+        }
+        chars_seen += 1;
+    }
+
+    let truncated = &text[..end_byte];
+    let title = match (last_space_byte, last_space_char) {
+        (Some(byte_idx), Some(char_idx)) if char_idx > max_chars / 2 => &truncated[..byte_idx],
         _ => truncated,
     };
 

@@ -205,6 +205,19 @@ type AccountsToolUIContentProps = ToolCallMessagePartProps<GetAccountsArgs, GetA
 function AccountsToolUIContent({ result, status }: AccountsToolUIContentProps) {
   const parsed = useMemo(() => normalizeResult(result), [result]);
 
+  // Group accounts by currency for the summary - must be before early returns
+  const currencySummary = useMemo(() => {
+    if (!parsed || parsed.accounts.length === 0) return "";
+    const byCurrency = new Map<string, number>();
+    for (const account of parsed.accounts) {
+      byCurrency.set(account.currency, (byCurrency.get(account.currency) ?? 0) + 1);
+    }
+    return Array.from(byCurrency.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([currency, cnt]) => `${cnt} ${currency}`)
+      .join(", ");
+  }, [parsed]);
+
   const isLoading = status?.type === "running";
   const isIncomplete = status?.type === "incomplete";
 
@@ -224,18 +237,6 @@ function AccountsToolUIContent({ result, status }: AccountsToolUIContentProps) {
   }
 
   const { accounts, count, truncated, originalCount } = parsed;
-
-  // Group accounts by currency for the summary
-  const currencySummary = useMemo(() => {
-    const byCurrency = new Map<string, number>();
-    for (const account of accounts) {
-      byCurrency.set(account.currency, (byCurrency.get(account.currency) ?? 0) + 1);
-    }
-    return Array.from(byCurrency.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(([currency, cnt]) => `${cnt} ${currency}`)
-      .join(", ");
-  }, [accounts]);
 
   return (
     <Card className="bg-muted/40 border-primary/10">

@@ -29,3 +29,6 @@ pub const MAX_GOALS: usize = 50;
 
 /// Maximum number of accounts returned per tool call.
 pub const MAX_ACCOUNTS: usize = 50;
+
+/// Maximum number of rows to import from CSV per tool call.
+pub const MAX_IMPORT_ROWS: usize = 500;

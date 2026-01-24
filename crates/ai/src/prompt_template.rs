@@ -68,6 +68,9 @@ pub struct TemplateSections {
     pub portfolio_domain: TemplateSection,
     /// Rules for how and when to use tools.
     pub tool_usage: TemplateSection,
+    /// CSV import instructions (critical for file attachments).
+    #[serde(default)]
+    pub csv_import: Option<TemplateSection>,
     /// Guardrails for advice, disclaimers, and safety.
     pub advice_guardrails: TemplateSection,
 }
@@ -137,6 +140,11 @@ impl PromptTemplate {
 
         // Tool usage rules
         parts.push(self.sections.tool_usage.content.clone());
+
+        // CSV import instructions (important for smaller models)
+        if let Some(csv_import) = &self.sections.csv_import {
+            parts.push(csv_import.content.clone());
+        }
 
         // Advice guardrails
         parts.push(self.sections.advice_guardrails.content.clone());
