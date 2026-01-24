@@ -6,7 +6,7 @@ import { cn } from "@wealthfolio/ui/lib/utils";
 import { useHapticFeedback } from "@/hooks";
 
 export interface ActionPaletteItem {
-  icon: "Plus" | "Minus" | "Pencil" | "Refresh" | "Trash" | "Eye" | "EyeOff" | "Settings2" | "Download" | "Upload" | "Copy" | "ExternalLink" | "HandCoins" | "MoreVertical" | "TrendingUp" | "TrendingDown" | "Coins" | "Ellipsis" | "History" | "Fullscreen" | "ShieldCheck";
+  icon: React.ComponentType<{ className?: string }>;
   label: string;
   onClick: () => void;
   variant?: "default" | "destructive";
@@ -26,30 +26,6 @@ interface ActionPaletteProps {
   align?: "start" | "center" | "end";
   side?: "top" | "bottom" | "left" | "right";
 }
-
-const iconMap: Record<ActionPaletteItem["icon"], React.ComponentType<{ className?: string }>> = {
-  Plus: Icons.Plus,
-  Minus: Icons.Minus,
-  Pencil: Icons.Pencil,
-  Refresh: Icons.Refresh,
-  Trash: Icons.Trash,
-  Eye: Icons.Eye,
-  EyeOff: Icons.EyeOff,
-  Settings2: Icons.Settings2,
-  Download: Icons.Download,
-  Upload: Icons.Upload,
-  Copy: Icons.Copy,
-  ExternalLink: Icons.ExternalLink,
-  HandCoins: Icons.HandCoins,
-  MoreVertical: Icons.MoreVertical,
-  TrendingUp: Icons.TrendingUp,
-  TrendingDown: Icons.TrendingDown,
-  Coins: Icons.Coins,
-  Ellipsis: Icons.Ellipsis,
-  History: Icons.History,
-  Fullscreen: Icons.Fullscreen,
-  ShieldCheck: Icons.ShieldCheck,
-};
 
 export function ActionPalette({
   open,
@@ -127,7 +103,7 @@ export function ActionPalette({
               )}
               <div>
                 {group.items.map((item, itemIndex) => {
-                  const IconComponent = iconMap[item.icon];
+                  const IconComponent = item.icon;
                   const isDestructive = item.variant === "destructive";
                   return (
                     <React.Fragment key={itemIndex}>

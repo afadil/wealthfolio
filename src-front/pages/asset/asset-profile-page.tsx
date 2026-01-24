@@ -623,25 +623,25 @@ export const AssetProfilePage = () => {
                   title: "Record Transaction",
                   items: [
                     {
-                      icon: "TrendingUp",
+                      icon: Icons.TrendingUp,
                       label: "Buy",
                       onClick: () =>
                         navigate(`/activities/manage?symbol=${encodeURIComponent(symbol)}&type=BUY`),
                     },
                     {
-                      icon: "TrendingDown",
+                      icon: Icons.TrendingDown,
                       label: "Sell",
                       onClick: () =>
                         navigate(`/activities/manage?symbol=${encodeURIComponent(symbol)}&type=SELL`),
                     },
                     {
-                      icon: "Coins",
+                      icon: Icons.Coins,
                       label: "Dividend",
                       onClick: () =>
                         navigate(`/activities/manage?symbol=${encodeURIComponent(symbol)}&type=DIVIDEND`),
                     },
                     {
-                      icon: "Ellipsis",
+                      icon: Icons.Ellipsis,
                       label: "Other",
                       onClick: () =>
                         navigate(`/activities/manage?symbol=${encodeURIComponent(symbol)}`),
@@ -652,12 +652,12 @@ export const AssetProfilePage = () => {
                   title: "Manage",
                   items: [
                     {
-                      icon: "Refresh",
+                      icon: Icons.Refresh,
                       label: "Refresh Price",
                       onClick: handleRefreshQuotes,
                     },
                     {
-                      icon: "Pencil",
+                      icon: Icons.Pencil,
                       label: "Edit",
                       onClick: () => setEditSheetOpen(true),
                     },

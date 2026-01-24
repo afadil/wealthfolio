@@ -99,6 +99,8 @@ export const importActivitySchema = z
       .optional(),
     accountName: z.string().optional(),
     symbolName: z.string().optional(),
+    /** Resolved exchange MIC for the symbol (populated during validation) */
+    exchangeMic: z.string().optional(),
     errors: z.record(z.string(), z.array(z.string())).optional(),
     isValid: z.boolean().default(false),
     lineNumber: z.number().optional(),

@@ -8,11 +8,6 @@ import { useQuery } from "@tanstack/react-query";
 import type { SortingState } from "@tanstack/react-table";
 import {
   Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
   Icons,
   Page,
   PageContent,
@@ -20,7 +15,7 @@ import {
 } from "@wealthfolio/ui";
 import { debounce } from "lodash";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ActivityDeleteModal } from "./components/activity-delete-modal";
 import { ActivityDataGrid } from "./components/activity-data-grid/activity-data-grid";
 import { ActivityFormV2 as ActivityForm } from "./components/activity-form-v2";
@@ -35,6 +30,7 @@ import { useActivityMutations } from "./hooks/use-activity-mutations";
 import { useActivitySearch, type ActivityStatusFilter } from "./hooks/use-activity-search";
 import { SyncButton } from "@/features/wealthfolio-connect/components/sync-button";
 import { AlternativeAssetQuickAddModal } from "@/features/alternative-assets";
+import { ActionPalette, type ActionPaletteGroup } from "@/components/action-palette";
 
 const ActivityPage = () => {
   const [showForm, setShowForm] = useState(false);
@@ -42,6 +38,7 @@ const ActivityPage = () => {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [showBulkHoldingsForm, setShowBulkHoldingsForm] = useState(false);
   const [showAlternativeAssetModal, setShowAlternativeAssetModal] = useState(false);
+  const [showActionPalette, setShowActionPalette] = useState(false);
 
   // Filter and search state
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
@@ -64,6 +61,7 @@ const ActivityPage = () => {
   const [pageSize, setPageSize] = usePersistentState("activity-datagrid-page-size", 50);
 
   const isMobileViewport = useIsMobileViewport();
+  const navigate = useNavigate();
 
   // Debounced search handler
   const debouncedUpdateSearch = useMemo(
@@ -160,41 +158,52 @@ const ActivityPage = () => {
     setSelectedActivity(undefined);
   }, []);
 
+  const actionPaletteGroups: ActionPaletteGroup[] = useMemo(
+    () => [
+      {
+        items: [
+          {
+            icon: Icons.Activity,
+            label: "Add Transaction",
+            onClick: () => handleEdit(undefined),
+          },
+          {
+            icon: Icons.UploadSimple,
+            label: "Import from CSV",
+            onClick: () => navigate("/import"),
+          },
+          {
+            icon: Icons.Holdings,
+            label: "Add Holdings",
+            onClick: () => setShowBulkHoldingsForm(true),
+          },
+          {
+            icon: Icons.House,
+            label: "Add Alternative Asset",
+            onClick: () => setShowAlternativeAssetModal(true),
+          },
+        ],
+      },
+    ],
+    [handleEdit, navigate]
+  );
+
   const headerActions = (
     <div className="flex flex-wrap items-center gap-2">
       <SyncButton />
-      {/* Desktop dropdown menu */}
+      {/* Desktop action palette */}
       <div className="hidden sm:flex">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+        <ActionPalette
+          open={showActionPalette}
+          onOpenChange={setShowActionPalette}
+          groups={actionPaletteGroups}
+          trigger={
             <Button size="sm">
               <Icons.Plus className="mr-2 h-4 w-4" />
               Add Activities
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem asChild>
-              <Link to={"/import"} className="flex cursor-pointer items-center py-2.5">
-                <Icons.Import className="mr-2 h-4 w-4" />
-                Import from CSV
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setShowBulkHoldingsForm(true)} className="py-2.5">
-              <Icons.Holdings className="mr-2 h-4 w-4" />
-              Add Holdings
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setShowAlternativeAssetModal(true)} className="py-2.5">
-              <Icons.Building className="mr-2 h-4 w-4" />
-              Add Alternative Asset
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => handleEdit(undefined)} className="py-2.5">
-              <Icons.Activity className="mr-2 h-4 w-4" />
-              Add Transaction
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          }
+        />
       </div>
 
       {/* Mobile add button */}

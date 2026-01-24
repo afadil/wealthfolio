@@ -330,6 +330,8 @@ export interface ActivityImport {
   fee?: number;
   accountName?: string;
   symbolName?: string;
+  /** Resolved exchange MIC for the symbol (populated during validation) */
+  exchangeMic?: string;
   errors?: Record<string, string[]>;
   isValid: boolean;
   lineNumber?: number;

@@ -79,6 +79,18 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
     defaultValues: defaultValues as any,
   });
 
+  // Handle sheet close - reset form and step
+  const handleOpenChange = (isOpen: boolean) => {
+    if (!isOpen) {
+      // Reset step when closing (unless editing)
+      if (!activity?.id) {
+        setCurrentStep(1);
+      }
+      form.reset(defaultValues);
+    }
+    onClose?.();
+  };
+
   const isLoading = addActivityMutation.isPending || updateActivityMutation.isPending;
 
   const onSubmit: SubmitHandler<NewActivityFormValues> = async (data) => {
@@ -167,7 +179,7 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
   };
 
   return (
-    <Sheet open={open} onOpenChange={onClose}>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent side="bottom" className="mx-1 flex h-[90vh] flex-col rounded-t-4xl p-0">
         <SheetHeader className="border-b px-6 py-4">
           <div className="flex flex-col items-center space-y-2">

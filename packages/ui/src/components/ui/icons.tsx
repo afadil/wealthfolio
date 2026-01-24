@@ -144,8 +144,10 @@ import { DotsThreeOutlineIcon } from "@phosphor-icons/react/dist/csr/DotsThreeOu
 import { DotsThreeOutlineVerticalIcon } from "@phosphor-icons/react/dist/csr/DotsThreeOutlineVertical";
 import { EyeIcon } from "@phosphor-icons/react/dist/csr/Eye";
 import { EyeSlashIcon } from "@phosphor-icons/react/dist/csr/EyeSlash";
+import { HouseIcon } from "@phosphor-icons/react/dist/csr/House";
 import { SparkleIcon } from "@phosphor-icons/react/dist/csr/Sparkle";
 import { TagIcon } from "@phosphor-icons/react/dist/csr/Tag";
+import { UploadSimpleIcon } from "@phosphor-icons/react/dist/csr/UploadSimple";
 import { UserSwitchIcon } from "@phosphor-icons/react/dist/csr/UserSwitch";
 
 // Unified icon props that work with both Lucide and Phosphor
@@ -675,6 +677,12 @@ const IconsInternal = {
   Sparkles: ({ size, className, style, color }: IconProps) => (
     <SparkleIcon size={size} weight="duotone" className={className} style={style} color={color} />
   ),
+  House: ({ size, className, style, color }: IconProps) => (
+    <HouseIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
+  UploadSimple: ({ size, className, style, color }: IconProps) => (
+    <UploadSimpleIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
 };
 
 /**
@@ -848,7 +856,9 @@ export type IconName =
   | "X"
   | "Upload"
   | "DotsThreeVertical"
-  | "DotsThree";
+  | "DotsThree"
+  | "House"
+  | "UploadSimple";
 
 /**
  * Icons object with unified typing - all icons have the same Icon type
