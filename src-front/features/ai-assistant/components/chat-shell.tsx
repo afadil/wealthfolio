@@ -28,11 +28,12 @@ import {
   DividendsToolUI,
   GoalsToolUI,
   HoldingsToolUI,
+  ImportCsvToolUI,
   PerformanceToolUI,
   RecordActivityToolUI,
   ValuationToolUI,
 } from "./tool-uis";
-import { useChatModel } from "../hooks/use-chat-model";
+import { ChatModelProvider, useChatModelContext } from "../hooks/use-chat-model-context";
 import { useChatRuntime } from "../hooks/use-chat-runtime";
 import { RuntimeProvider } from "../hooks/use-runtime-context";
 
@@ -162,20 +163,24 @@ function NoProvidersEmptyState({ className }: { className?: string }) {
 }
 
 /**
- * Main chat shell component with thread sidebar and message panel.
- * Uses @assistant-ui/react for the chat interface.
+ * Inner chat shell component that uses the chat model context.
  */
-export function ChatShell({ className }: ChatShellProps) {
+function ChatShellInner({ className }: ChatShellProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const { currentProviderId, currentModelId, enabledProviders, isLoading } = useChatModel();
+  const { currentProviderId, currentModelId, enabledProviders, isLoading, thinkingEnabled, supportsThinking } = useChatModelContext();
 
   // Build chat config from current selection
   const chatConfig = useMemo(() => {
     if (!currentProviderId || !currentModelId) {
       return undefined;
     }
-    return { provider: currentProviderId, model: currentModelId };
-  }, [currentProviderId, currentModelId]);
+    return {
+      provider: currentProviderId,
+      model: currentModelId,
+      // Only include thinking if model supports it and user has toggled it
+      thinking: supportsThinking ? thinkingEnabled : undefined,
+    };
+  }, [currentProviderId, currentModelId, supportsThinking, thinkingEnabled]);
 
   // Create the chat runtime
   const runtime = useChatRuntime(chatConfig);
@@ -198,6 +203,7 @@ export function ChatShell({ className }: ChatShellProps) {
         <AllocationToolUI />
         <PerformanceToolUI />
         <RecordActivityToolUI />
+        <ImportCsvToolUI />
 
         <div className={cn("bg-background flex h-full w-full", className)}>
           {/* Desktop Sidebar */}
@@ -220,5 +226,18 @@ export function ChatShell({ className }: ChatShellProps) {
         </div>
       </AssistantRuntimeProvider>
     </RuntimeProvider>
+  );
+}
+
+/**
+ * Main chat shell component with thread sidebar and message panel.
+ * Uses @assistant-ui/react for the chat interface.
+ * Wraps the inner component in ChatModelProvider to share state.
+ */
+export function ChatShell({ className }: ChatShellProps) {
+  return (
+    <ChatModelProvider>
+      <ChatShellInner className={className} />
+    </ChatModelProvider>
   );
 }

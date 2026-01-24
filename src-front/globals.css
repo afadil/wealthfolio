@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "tw-shimmer";
 @plugin "@tailwindcss/typography";
 @source "../packages/ui/src";
 @import "@fontsource/ibm-plex-mono";
@@ -717,6 +718,7 @@ number-flow-react.muted-fraction::part(fraction) {
     transform: translateX(400%);
   }
 }
+
 
 @utility animate-accordion-down {
   animation: accordion-down 0.2s ease-out;

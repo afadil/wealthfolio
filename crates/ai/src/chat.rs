@@ -16,7 +16,11 @@ use rig::{
     client::{CompletionClient, Nothing},
     completion::{CompletionModel, Message},
     message::{AssistantContent, Reasoning, Text, ToolCall as RigToolCall, ToolChoice, ToolResultContent, UserContent},
-    providers::{anthropic, gemini, groq, ollama, openai},
+    providers::{
+        anthropic, gemini, groq, ollama, openai,
+        gemini::completion::gemini_api_types::{GenerationConfig, ThinkingConfig},
+        groq::{GroqAdditionalParameters, ReasoningFormat},
+    },
     streaming::{StreamedAssistantContent, StreamedUserContent, StreamingChat},
     OneOrMany,
 };
@@ -232,6 +236,7 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
         let thread_title = thread.title.clone();
         let initial_title_clone = initial_title.clone();
         let is_new_thread_clone = is_new_thread;
+        let thinking_override = request.config.as_ref().and_then(|c| c.thinking);
 
         // Spawn the streaming task
         tokio::spawn(async move {
@@ -248,6 +253,7 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
                 thread_title,
                 initial_title_clone,
                 is_new_thread_clone,
+                thinking_override,
             )
             .await
             {
@@ -281,6 +287,7 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
             "get_asset_allocation".to_string(),
             "get_performance".to_string(),
             "record_activity".to_string(),
+            "import_csv".to_string(),
         ]
     }
 
@@ -402,6 +409,7 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     thread_title: Option<String>,
     initial_title: Option<String>,
     is_new_thread: bool,
+    thinking_override: Option<bool>,
 ) -> Result<(), AiError> {
     // Send system event first
     tx.send(AiStreamEvent::system(&thread_id, &run_id, &message_id))
@@ -412,11 +420,16 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     let provider_service = ProviderService::new(env.clone());
     let api_key = provider_service.get_api_key(&provider_id)?;
     let provider_url = provider_service.get_provider_url(&provider_id);
-    let capabilities = provider_service.get_model_capabilities(&provider_id, &model_id);
+    let mut capabilities = provider_service.get_model_capabilities(&provider_id, &model_id);
+
+    // Apply thinking override from request if provided
+    if let Some(thinking) = thinking_override {
+        capabilities.thinking = thinking;
+    }
 
     debug!(
-        "Starting chat stream: provider={}, model={}, supports_tools={}",
-        provider_id, model_id, capabilities.tools
+        "Starting chat stream: provider={}, model={}, supports_tools={}, thinking={}",
+        provider_id, model_id, capabilities.tools, capabilities.thinking
     );
 
     // Build preamble - include tool limitation notice if model doesn't support tools
@@ -453,19 +466,21 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         current_date, current_datetime, base_currency, account_count, account_list
     );
 
-    let preamble = if capabilities.tools {
-        format!("{}{}", base_preamble, dynamic_context)
-    } else {
-        format!(
-            "{}{}\n\n## Important Limitation\n\
+    // Build preamble with capability-specific instructions
+    let mut preamble = format!("{}{}", base_preamble, dynamic_context);
+
+    // Add tool limitation notice if model doesn't support tools
+    if !capabilities.tools {
+        preamble.push_str(
+            "\n\n## Important Limitation\n\
             You do not have access to tools or function calling. You cannot retrieve real-time \
             portfolio data, account information, or transaction history. When users ask about \
             their specific holdings, accounts, or financial data, politely explain that you \
             cannot access this information with the current model and suggest they switch to \
-            a model that supports tools (look for the wrench icon in the model picker).",
-            base_preamble, dynamic_context
-        )
-    };
+            a model that supports tools (look for the wrench icon in the model picker)."
+        );
+    }
+
 
     // Create title context for post-stream title generation (clone user_message before move)
     let title_ctx = TitleContext {
@@ -522,7 +537,14 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
                 .tool(tools.allocation)
                 .tool(tools.performance)
                 .tool(tools.record_activity)
+                .tool(tools.import_csv)
                 .tool_choice(ToolChoice::Auto);
+
+            // Ollama cannot enforce tool_choice and some local models are brittle at higher
+            // temperatures; use a deterministic temperature to improve tool-call reliability.
+            if provider_id == "ollama" {
+                builder = builder.temperature(0.0);
+            }
 
             if let Some(params) = $thinking_params {
                 builder = builder.additional_params(params);
@@ -547,30 +569,101 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         }};
     }
 
-    // Provider-specific reasoning params:
-    // - Gemini: Enable thinking with thinkingBudget (-1 = dynamic)
-    // - Groq: Use reasoning_format "parsed" (required when using tools, "raw" not allowed with tools)
-    // - Ollama: we don't pass think:true because not all models support Ollama's think API
-    //   (e.g., deepseek-r1:14b). Models output <think> tags which ThinkTagParser handles.
-    let groq_reasoning_params: Option<serde_json::Value> = if capabilities.thinking {
+    // Provider-specific reasoning params using rig-core native types where available:
+    // - Groq: GroqAdditionalParameters with reasoning_format and include_reasoning
+    // - Ollama: Raw JSON with think: true/false
+    // - Gemini: GenerationConfig with ThinkingConfig
+    // - Anthropic: Raw JSON (no native rig-core struct)
+    // - OpenAI: Raw JSON (Reasoning struct is for responses_api only)
+    let groq_reasoning_params_with_tools: Option<serde_json::Value> = if capabilities.thinking {
+        serde_json::to_value(GroqAdditionalParameters {
+            reasoning_format: Some(ReasoningFormat::Hidden), // Model reasons but output hidden
+            include_reasoning: Some(true),
+            extra: None,
+        }).ok()
+    } else {
+        serde_json::to_value(GroqAdditionalParameters {
+            reasoning_format: None,
+            include_reasoning: Some(false),
+            extra: None,
+        }).ok()
+    };
+
+    let groq_reasoning_params_no_tools: Option<serde_json::Value> = if capabilities.thinking {
+        serde_json::to_value(GroqAdditionalParameters {
+            reasoning_format: Some(ReasoningFormat::Parsed), // Reasoning exposed in response
+            include_reasoning: Some(true),
+            extra: None,
+        }).ok()
+    } else {
+        serde_json::to_value(GroqAdditionalParameters {
+            reasoning_format: None,
+            include_reasoning: Some(false),
+            extra: None,
+        }).ok()
+    };
+
+    // Ollama: pass think parameter to enable/disable thinking mode
+    // When false, models like qwen3 and deepseek-r1 skip chain-of-thought reasoning
+    // Note: Some models may ignore the API parameter and still emit thinking.
+    let ollama_thinking_params: Option<serde_json::Value> = Some(serde_json::json!({
+        "think": capabilities.thinking
+    }));
+
+
+    // Anthropic: extended thinking with budget_tokens
+    // Only enable thinking when capabilities.thinking is true
+    let anthropic_thinking_params: Option<serde_json::Value> = if capabilities.thinking {
         Some(serde_json::json!({
-            "reasoning_format": "parsed",
-            "reasoning_effort": "default"
+            "thinking": {
+                "type": "enabled",
+                "budget_tokens": 8000
+            }
         }))
     } else {
         None
     };
 
-    // Gemini: thinkingConfig not supported via additional_params in rig-core.
-    // Gemini 2.5 has thinking enabled by default, rig-core should handle thought parts.
-    let gemini_thinking_params: Option<serde_json::Value> = None;
+    // OpenAI: reasoning_effort for o1/o3 models
+    // Use "low" when thinking disabled, "medium" when enabled
+    let openai_thinking_params: Option<serde_json::Value> = if capabilities.thinking {
+        Some(serde_json::json!({
+            "reasoning_effort": "medium"
+        }))
+    } else {
+        Some(serde_json::json!({
+            "reasoning_effort": "low"
+        }))
+    };
+
+    // Gemini: Use rig-core's native GenerationConfig with ThinkingConfig
+    // thinking_budget: 0 disables, higher values enable with token budget
+    let gemini_thinking_params: Option<serde_json::Value> = if capabilities.thinking {
+        // Enable thinking with a reasonable budget
+        serde_json::to_value(GenerationConfig {
+            thinking_config: Some(ThinkingConfig {
+                thinking_budget: 8192,
+                include_thoughts: Some(true),
+            }),
+            ..Default::default()
+        }).ok()
+    } else {
+        // Disable thinking by setting budget to 0
+        serde_json::to_value(GenerationConfig {
+            thinking_config: Some(ThinkingConfig {
+                thinking_budget: 0,
+                include_thoughts: Some(false),
+            }),
+            ..Default::default()
+        }).ok()
+    };
 
     // Route to provider with tool support check
     if capabilities.tools {
         match provider_id.as_str() {
             "anthropic" => {
                 let client = create_anthropic_client(api_key, &provider_id)?;
-                build_with_tools_and_stream!(client, None::<serde_json::Value>)
+                build_with_tools_and_stream!(client, anthropic_thinking_params.clone())
             }
             "gemini" | "google" => {
                 let client = create_gemini_client(api_key, &provider_id)?;
@@ -578,11 +671,15 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
             }
             "groq" => {
                 let client = create_groq_client(api_key, &provider_id)?;
-                build_with_tools_and_stream!(client, groq_reasoning_params.clone())
+                build_with_tools_and_stream!(client, groq_reasoning_params_with_tools.clone())
             }
             "ollama" => {
                 let client = create_ollama_client(provider_url)?;
-                build_with_tools_and_stream!(client, None::<serde_json::Value>)
+                build_with_tools_and_stream!(client, ollama_thinking_params.clone())
+            }
+            "openai" => {
+                let client = create_openai_client(api_key, &provider_id)?;
+                build_with_tools_and_stream!(client, openai_thinking_params.clone())
             }
             _ => {
                 let client = create_openai_client(api_key, &provider_id)?;
@@ -593,7 +690,7 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         match provider_id.as_str() {
             "anthropic" => {
                 let client = create_anthropic_client(api_key, &provider_id)?;
-                build_without_tools_and_stream!(client, None::<serde_json::Value>)
+                build_without_tools_and_stream!(client, anthropic_thinking_params.clone())
             }
             "gemini" | "google" => {
                 let client = create_gemini_client(api_key, &provider_id)?;
@@ -601,11 +698,15 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
             }
             "groq" => {
                 let client = create_groq_client(api_key, &provider_id)?;
-                build_without_tools_and_stream!(client, groq_reasoning_params.clone())
+                build_without_tools_and_stream!(client, groq_reasoning_params_no_tools.clone())
             }
             "ollama" => {
                 let client = create_ollama_client(provider_url)?;
-                build_without_tools_and_stream!(client, None::<serde_json::Value>)
+                build_without_tools_and_stream!(client, ollama_thinking_params.clone())
+            }
+            "openai" => {
+                let client = create_openai_client(api_key, &provider_id)?;
+                build_without_tools_and_stream!(client, openai_thinking_params.clone())
             }
             _ => {
                 let client = create_openai_client(api_key, &provider_id)?;
@@ -830,6 +931,7 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
     // Track content parts for final message
     let mut content_parts: Vec<ChatMessagePart> = vec![];
     let mut accumulated_text = String::new();
+    let mut accumulated_reasoning = String::new();
 
     // Parser for <think> tags (fallback for models that don't use native thinking API)
     let mut think_parser = ThinkTagParser::default();
@@ -842,6 +944,8 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
             ))) => {
                 if !text.is_empty() {
                     debug!("Text delta received: {} chars", text.len());
+
+                    // Parse <think> tags and emit reasoning (models should not think if disabled via API)
                     let (text_out, reasoning_out) = think_parser.process(&text);
 
                     // Emit reasoning if extracted from <think> tags
@@ -866,7 +970,7 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
                 }
             }
 
-            // Reasoning/thinking streaming
+            // Reasoning/thinking streaming (provider-native)
             Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Reasoning(
                 Reasoning { reasoning, .. },
             ))) => {
@@ -881,6 +985,23 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
                         &run_id,
                         &message_id,
                         &reasoning_text,
+                    ))
+                    .await
+                    .map_err(|e| AiError::Internal(e.to_string()))?;
+                }
+            }
+
+            // Reasoning delta (provider-native streaming)
+            Ok(MultiTurnStreamItem::StreamAssistantItem(
+                StreamedAssistantContent::ReasoningDelta { reasoning, .. },
+            )) => {
+                if !reasoning.is_empty() {
+                    accumulated_reasoning.push_str(&reasoning);
+                    tx.send(AiStreamEvent::reasoning_delta(
+                        &thread_id,
+                        &run_id,
+                        &message_id,
+                        &reasoning,
                     ))
                     .await
                     .map_err(|e| AiError::Internal(e.to_string()))?;
@@ -919,6 +1040,19 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
                 ))
                 .await
                 .map_err(|e| AiError::Internal(e.to_string()))?;
+            }
+
+            // Tool call delta (provider-native)
+            Ok(MultiTurnStreamItem::StreamAssistantItem(
+                StreamedAssistantContent::ToolCallDelta { .. },
+            )) => {
+                // Tool call deltas are handled by providers that stream tool args incrementally.
+                // We currently rely on full ToolCall items for execution.
+            }
+
+            // Provider-specific final payload
+            Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Final(_))) => {
+                // No-op: FinalResponse is handled separately; some providers emit a final payload here.
             }
 
             // Tool result
@@ -1034,7 +1168,6 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
     }
 
     // Add reasoning parsed from <think> tags to content parts
-    // Add parsed reasoning from <think> tags at the beginning
     let parsed_reasoning = think_parser.reasoning();
     if !parsed_reasoning.is_empty() {
         content_parts.insert(
@@ -1043,6 +1176,12 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
                 content: parsed_reasoning.to_string(),
             },
         );
+    }
+
+    if !accumulated_reasoning.is_empty() {
+        content_parts.push(ChatMessagePart::Reasoning {
+            content: accumulated_reasoning,
+        });
     }
 
     // Push any remaining accumulated text at the END to preserve interleaved order

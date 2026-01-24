@@ -124,6 +124,8 @@ export interface AiChatModelConfig {
   provider?: string;
   /** Model ID (e.g., "gpt-4o", "claude-3-sonnet"). */
   model?: string;
+  /** Override thinking/reasoning capability for this request. */
+  thinking?: boolean;
 }
 
 /**
@@ -417,3 +419,196 @@ export type AiChatMessage = ChatMessage;
 
 /** @alias UsageStats - for adapter layer compatibility */
 export type AiUsageStats = UsageStats;
+
+// ============================================================================
+// Import CSV Tool Types (Plan-Based Architecture)
+// ============================================================================
+
+/**
+ * Column index mappings for CSV import.
+ * Maps field names to 0-based column indices.
+ */
+export interface ImportCsvColumnMappings {
+  date?: number | null;
+  activityType?: number | null;
+  symbol?: number | null;
+  quantity?: number | null;
+  unitPrice?: number | null;
+  amount?: number | null;
+  fee?: number | null;
+  currency?: number | null;
+  account?: number | null;
+  comment?: number | null;
+}
+
+/**
+ * Transform operation to apply to a field.
+ */
+export type ImportCsvTransformOp =
+  | "trim"
+  | "uppercase"
+  | "parse_date"
+  | "parse_number"
+  | "parse_number_abs"
+  | "strip_currency"
+  | "coalesce";
+
+/**
+ * A single transform to apply to a field.
+ */
+export interface ImportCsvTransform {
+  field: string;
+  op: ImportCsvTransformOp;
+  formatHints?: string[];
+  inputs?: number[];
+}
+
+/**
+ * Sign rule for numeric fields.
+ */
+export type ImportCsvSignRule = "negative_is_sell" | "negative_is_withdrawal" | "always_abs";
+
+/**
+ * Sign rule configuration for a field.
+ */
+export interface ImportCsvSignRuleConfig {
+  field: "amount" | "quantity" | "unitPrice" | "fee";
+  rule: ImportCsvSignRule;
+}
+
+/**
+ * Enum mappings for normalizing values.
+ */
+export interface ImportCsvEnumMaps {
+  activityType?: Record<string, string>;
+}
+
+/**
+ * Confidence scores for the import plan.
+ */
+export interface ImportCsvConfidence {
+  overall: number;
+  byField?: Record<string, number>;
+}
+
+/**
+ * The Import Plan proposed by the LLM.
+ * Schema-enforced; non-conforming output is rejected.
+ */
+export interface ImportPlan {
+  columnMappings: ImportCsvColumnMappings;
+  transforms: ImportCsvTransform[];
+  enumMaps: ImportCsvEnumMaps;
+  signRules?: ImportCsvSignRuleConfig[];
+  confidence: ImportCsvConfidence;
+  notes?: string[];
+  abstain: boolean;
+}
+
+/**
+ * Description of a cleaning action performed on the CSV data.
+ */
+export interface ImportCsvCleaningAction {
+  type: "skip_rows" | "skip_metadata" | "normalize_dates" | "clean_numbers" | "map_activity_types";
+  description: string;
+  affectedRows?: number;
+}
+
+/**
+ * Validation error/warning for a specific row.
+ */
+export interface ImportCsvRowError {
+  row: number;
+  field: string;
+  message: string;
+  severity: "error" | "warning";
+}
+
+/**
+ * Summary of validation results for the import.
+ */
+export interface ImportCsvValidationSummary {
+  totalRows: number;
+  validRows: number;
+  warningRows: number;
+  errorRows: number;
+  errors: ImportCsvRowError[];
+  globalErrors?: string[];
+}
+
+/**
+ * Account option for the import UI.
+ */
+export interface ImportCsvAccountOption {
+  id: string;
+  name: string;
+  currency: string;
+}
+
+/**
+ * A single parsed activity draft from CSV import.
+ * Matches the structure expected by ActivityDataGrid's LocalTransaction.
+ */
+export interface ImportCsvActivityDraft {
+  tempId: string;
+  isNew: true;
+  accountId?: string;
+  activityType?: string;
+  activityDate?: string;
+  symbol?: string;
+  /** Resolved exchange MIC for the symbol (e.g., "XNAS", "XNYS") */
+  exchangeMic?: string;
+  quantity?: number;
+  unitPrice?: number;
+  amount?: number;
+  fee?: number;
+  currency?: string;
+  comment?: string;
+  /** Validation status for this row */
+  validationStatus: "valid" | "warning" | "error";
+  /** Validation error messages for this row */
+  validationErrors?: string[];
+  /** Original row number in CSV (for error reference) */
+  sourceRow: number;
+}
+
+/**
+ * Arguments for the import_csv tool.
+ */
+export interface ImportCsvArgs {
+  csvContent: string;
+  accountId?: string;
+  importPlan?: ImportPlan;
+  /** @deprecated Use importPlan */
+  columnMappings?: ImportCsvColumnMappings;
+}
+
+/**
+ * Output from the import_csv tool.
+ */
+export interface ImportCsvOutput {
+  /** Parsed activities as drafts ready for editing */
+  activities: ImportCsvActivityDraft[];
+  /** The import plan that was applied (or auto-detected) */
+  appliedPlan: ImportPlan;
+  /** @deprecated Use appliedPlan */
+  suggestedMappings?: ImportCsvColumnMappings;
+  /** List of cleaning actions performed */
+  cleaningActions: ImportCsvCleaningAction[];
+  /** Validation summary */
+  validation: ImportCsvValidationSummary;
+  /** Available accounts for selection */
+  availableAccounts: ImportCsvAccountOption[];
+  /** Detected headers from CSV */
+  detectedHeaders?: string[];
+  /** Total rows in source CSV */
+  totalRows?: number;
+  /** Whether output was truncated */
+  truncated?: boolean;
+  /** Persisted state: whether activities have been saved */
+  submitted?: boolean;
+  /** IDs of created activities (after save) */
+  createdActivityIds?: string[];
+  /** Timestamp when activities were saved */
+  submittedAt?: string;
+}

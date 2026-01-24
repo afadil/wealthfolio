@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getAiProviders } from "@/adapters";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { QueryKeys } from "@/lib/query-keys";
-import type { AiProvidersResponse, MergedProvider } from "@/lib/types";
+import type { AiProvidersResponse, MergedProvider, MergedModel } from "@/lib/types";
 
 export const CHAT_MODEL_STORAGE_KEY = "chat_selected_model";
 
@@ -20,7 +20,14 @@ export interface ChatModelState {
   currentProviderId: string | undefined;
   currentModelId: string | undefined;
   currentProvider: MergedProvider | undefined;
+  currentModel: MergedModel | undefined;
   selectModel: (providerId: string, modelId: string) => Promise<void>;
+  /** Whether the current model supports thinking */
+  supportsThinking: boolean;
+  /** Whether thinking is enabled for this session (can be toggled by user) */
+  thinkingEnabled: boolean;
+  /** Toggle thinking on/off */
+  toggleThinking: () => void;
 }
 
 export function useChatModel(): ChatModelState {
@@ -94,6 +101,32 @@ export function useChatModel(): ChatModelState {
     return enabledProviders.find((p) => p.id === currentProviderId);
   }, [enabledProviders, currentProviderId]);
 
+  // Get current model object
+  const currentModel = useMemo(() => {
+    if (!currentProvider || !currentModelId) return undefined;
+    return currentProvider.models.find((m) => m.id === currentModelId);
+  }, [currentProvider, currentModelId]);
+
+  // Check if current model supports thinking
+  const supportsThinking = useMemo(() => {
+    return currentModel?.capabilities?.thinking ?? false;
+  }, [currentModel]);
+
+  // Thinking enabled state - defaults to model's capability, but can be toggled
+  // Reset to model default when model changes
+  const [thinkingEnabled, setThinkingEnabled] = useState(supportsThinking);
+
+  // Sync thinking state when model changes
+  useEffect(() => {
+    setThinkingEnabled(supportsThinking);
+  }, [supportsThinking]);
+
+  const toggleThinking = useCallback(() => {
+    if (supportsThinking) {
+      setThinkingEnabled((prev) => !prev);
+    }
+  }, [supportsThinking]);
+
   // Select a model
   const selectModel = useCallback(
     async (providerId: string, modelId: string) => {
@@ -116,6 +149,10 @@ export function useChatModel(): ChatModelState {
     currentProviderId,
     currentModelId,
     currentProvider,
+    currentModel,
     selectModel,
+    supportsThinking,
+    thinkingEnabled,
+    toggleThinking,
   };
 }
