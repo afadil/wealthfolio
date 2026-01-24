@@ -78,6 +78,8 @@ interface BackendActivityDraft {
   activity_date?: string;
   activityDate?: string;
   symbol?: string;
+  exchange_mic?: string;
+  exchangeMic?: string;
   quantity?: number;
   unit_price?: number;
   unitPrice?: number;

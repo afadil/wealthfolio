@@ -1,10 +1,11 @@
-import { CurrencySelectorMobile } from "@/components/currency-selector-mobile";
 import { SymbolSelectorMobile } from "@/components/symbol-selector-mobile";
-import { Checkbox } from "@wealthfolio/ui/components/ui/checkbox";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { ScrollArea } from "@wealthfolio/ui/components/ui/scroll-area";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
-import { PricingMode } from "@/lib/constants";
+import { PricingMode, type ActivityType } from "@/lib/constants";
+import type { SymbolSearchResult } from "@/lib/types";
+import { useSettingsContext } from "@/lib/settings-provider";
+import { AdvancedOptionsSection } from "../forms/fields/advanced-options-section";
 import {
   Button,
   DatePickerInput,
@@ -34,9 +35,10 @@ interface MobileDetailsStepProps {
 
 export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepProps) {
   const { control, watch, setValue } = useFormContext<NewActivityFormValues>();
+  const { settings } = useSettingsContext();
   const isManualAsset = watch("pricingMode") === PricingMode.MANUAL;
-  const showCurrencySelect = watch("showCurrencySelect");
   const accountId = watch("accountId");
+  const assetCurrency = watch("currency");
   const [accountSheetOpen, setAccountSheetOpen] = useState(false);
   const [symbolSheetOpen, setSymbolSheetOpen] = useState(false);
 
@@ -71,13 +73,43 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
   ].includes(activityType);
 
   const needsSplitRatio = activityType === "SPLIT";
-  const showSkipSymbolLookup = needsAssetSymbol && activityType !== "INTEREST";
-  const showCurrencyOption = true;
 
   const selectedAccount = accounts.find((acc) => acc.value === accountId);
+  const accountCurrency = selectedAccount?.currency;
+  const baseCurrency = settings?.baseCurrency;
   const displayAccountText = selectedAccount
     ? `${selectedAccount.label} (${selectedAccount.currency})`
     : "Select an account";
+
+  // Handle symbol selection with automatic manual pricing for custom assets
+  const handleSymbolSelect = (symbol: string, searchResult?: SymbolSearchResult) => {
+    setValue("assetId", symbol);
+
+    // Set asset metadata for custom assets
+    if (searchResult?.assetKind) {
+      setValue("assetMetadata", {
+        name: searchResult.longName,
+        kind: searchResult.assetKind,
+      });
+    }
+
+    // Set exchange MIC if available
+    if (searchResult?.exchangeMic) {
+      setValue("exchangeMic", searchResult.exchangeMic);
+    }
+
+    // Auto-set currency from search result
+    if (searchResult?.currency) {
+      setValue("currency", searchResult.currency);
+    }
+
+    // Auto-set manual pricing for custom assets
+    if (searchResult?.dataSource === "MANUAL") {
+      setValue("pricingMode", PricingMode.MANUAL);
+    }
+
+    setSymbolSheetOpen(false);
+  };
 
   return (
     <div className="flex h-full flex-col">
@@ -95,7 +127,7 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
                     variant="outline"
                     role="combobox"
                     size="lg"
-                    className="w-full justify-between font-normal"
+                    className="w-full justify-between rounded-md font-normal"
                     onClick={() => setAccountSheetOpen(true)}
                     type="button"
                   >
@@ -128,60 +160,6 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
               </FormItem>
             )}
           />
-          {/* Configuration Options */}
-          <div className="card-mobile bg-muted/30 flex flex-col gap-4 border">
-            {showSkipSymbolLookup && (
-              <FormField
-                control={control}
-                name="pricingMode"
-                render={({ field }) => (
-                  <FormItem>
-                    <div className="flex items-center justify-between">
-                      <label
-                        htmlFor="manual-pricing-checkbox"
-                        className="cursor-pointer text-sm font-medium"
-                      >
-                        Manual Pricing
-                      </label>
-                      <Checkbox
-                        id="manual-pricing-checkbox"
-                        checked={field.value === PricingMode.MANUAL}
-                        onCheckedChange={(checked) => {
-                          field.onChange(checked ? PricingMode.MANUAL : PricingMode.MARKET);
-                        }}
-                        className="h-6 w-6"
-                      />
-                    </div>
-                  </FormItem>
-                )}
-              />
-            )}
-            {showCurrencyOption && (
-              <FormField
-                control={control}
-                name="showCurrencySelect"
-                render={({ field }) => (
-                  <FormItem>
-                    <div className="flex items-center justify-between">
-                      <label
-                        htmlFor="use-different-currency-checkbox"
-                        className="cursor-pointer text-sm font-medium"
-                      >
-                        Use Different Currency
-                      </label>
-                      <Checkbox
-                        id="use-different-currency-checkbox"
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        className="h-6 w-6"
-                      />
-                    </div>
-                  </FormItem>
-                )}
-              />
-            )}
-          </div>
-
           {/* Asset Symbol */}
           {needsAssetSymbol && (
             <FormField
@@ -199,10 +177,11 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
                       />
                     ) : (
                       <SymbolSelectorMobile
-                        onSelect={field.onChange}
+                        onSelect={handleSymbolSelect}
                         value={field.value}
                         open={symbolSheetOpen}
                         onOpenChange={setSymbolSheetOpen}
+                        defaultCurrency={accountCurrency}
                       />
                     )}
                   </FormControl>
@@ -321,22 +300,17 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
             />
           )}
 
-          {/* Currency (if enabled) */}
-          {showCurrencySelect && (
-            <FormField
-              control={control}
-              name="currency"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-base font-medium">Activity Currency</FormLabel>
-                  <FormControl>
-                    <CurrencySelectorMobile onSelect={field.onChange} value={field.value} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          )}
+          {/* Advanced Options */}
+          <AdvancedOptionsSection
+            variant="mobile"
+            currencyName="currency"
+            fxRateName="fxRate"
+            subtypeName="subtype"
+            activityType={activityType as ActivityType}
+            assetCurrency={assetCurrency}
+            accountCurrency={accountCurrency}
+            baseCurrency={baseCurrency}
+          />
 
           {/* Comment */}
           <FormField
@@ -348,7 +322,7 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
                 <FormControl>
                   <Textarea
                     placeholder="Add a note or comment..."
-                    className="min-h-[100px] resize-none rounded-xl text-base sm:text-sm"
+                    className="min-h-[100px] resize-none text-base sm:text-sm"
                     {...field}
                     value={field.value ?? ""}
                   />

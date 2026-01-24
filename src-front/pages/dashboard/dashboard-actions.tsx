@@ -33,31 +33,31 @@ export function DashboardActions() {
       {
         items: [
           {
-            icon: "Plus",
+            icon: Icons.Plus,
             label: "Record Transaction",
             onClick: () => navigate("/activities/manage"),
           },
           ...(showSyncAction
             ? [
                 {
-                  icon: "Download" as const,
+                  icon: Icons.Download,
                   label: "Sync Broker Accounts",
                   onClick: () => syncBrokerData(),
                 },
               ]
             : []),
           {
-            icon: "Refresh",
+            icon: Icons.Refresh,
             label: "Update Prices",
             onClick: () => updatePortfolioMutation.mutate(),
           },
           {
-            icon: "History",
+            icon: Icons.History,
             label: "Rebuild Full History",
             onClick: () => recalculatePortfolioMutation.mutate(),
           },
           {
-            icon: "ShieldCheck",
+            icon: Icons.ShieldCheck,
             label: "Verify Data",
             onClick: () => runHealthChecksMutation.mutate(),
           },

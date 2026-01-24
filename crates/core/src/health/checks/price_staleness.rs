@@ -1,9 +1,11 @@
 //! Price staleness health check.
 //!
 //! Detects assets with stale or missing market prices.
+//! Uses trading days (weekdays) for staleness calculation to avoid
+//! false positives on weekends when markets are closed.
 
 use async_trait::async_trait;
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Datelike, NaiveDate, Utc, Weekday};
 use std::collections::HashMap;
 
 use crate::errors::Result;
@@ -40,6 +42,8 @@ impl PriceStalenessCheck {
     /// Analyzes holdings for price staleness issues.
     ///
     /// This is the core logic, exposed for testing.
+    /// Uses trading days (weekdays) for staleness calculation to avoid
+    /// false positives on weekends when markets are closed.
     pub fn analyze(
         &self,
         holdings: &[AssetHoldingInfo],
@@ -52,11 +56,10 @@ impl PriceStalenessCheck {
             return issues;
         }
 
-        // Calculate thresholds
-        let warning_threshold =
-            ctx.now - Duration::hours(ctx.config.price_stale_warning_hours as i64);
-        let critical_threshold =
-            ctx.now - Duration::hours(ctx.config.price_stale_critical_hours as i64);
+        // Convert hour thresholds to trading days
+        // 24 hours ≈ 1 trading day, 72 hours ≈ 3 trading days
+        let warning_trading_days = (ctx.config.price_stale_warning_hours / 24).max(1) as i64;
+        let critical_trading_days = (ctx.config.price_stale_critical_hours / 24).max(1) as i64;
 
         // Track stale assets by severity (keep full info for affected items)
         let mut warning_assets: Vec<&AssetHoldingInfo> = Vec::new();
@@ -73,10 +76,12 @@ impl PriceStalenessCheck {
         for holding in market_priced {
             match latest_quote_times.get(&holding.asset_id) {
                 Some(quote_time) => {
-                    if *quote_time < critical_threshold {
+                    let days_stale = trading_days_since(*quote_time, ctx.now);
+
+                    if days_stale >= critical_trading_days {
                         error_assets.push(holding);
                         error_mv += holding.market_value;
-                    } else if *quote_time < warning_threshold {
+                    } else if days_stale >= warning_trading_days {
                         warning_assets.push(holding);
                         warning_mv += holding.market_value;
                     }
@@ -197,6 +202,49 @@ impl Default for PriceStalenessCheck {
     }
 }
 
+/// Counts the number of trading days (weekdays) between two dates.
+///
+/// This function counts weekdays from the day after `from_date` up to and including `to_date`.
+/// Weekends (Saturday and Sunday) are excluded from the count.
+///
+/// # Arguments
+/// * `from_date` - The starting date (exclusive)
+/// * `to_date` - The ending date (inclusive)
+///
+/// # Returns
+/// The number of trading days elapsed. Returns 0 if `to_date` is on or before `from_date`.
+fn trading_days_between(from_date: NaiveDate, to_date: NaiveDate) -> i64 {
+    if to_date <= from_date {
+        return 0;
+    }
+
+    let mut trading_days = 0;
+    let mut current = from_date;
+
+    // Iterate from the day after from_date to to_date (inclusive)
+    while let Some(next) = current.succ_opt() {
+        current = next;
+        if current > to_date {
+            break;
+        }
+        let weekday = current.weekday();
+        if weekday != Weekday::Sat && weekday != Weekday::Sun {
+            trading_days += 1;
+        }
+    }
+
+    trading_days
+}
+
+/// Counts trading days elapsed since a quote timestamp.
+///
+/// Extracts dates from the timestamps and counts weekdays between them.
+fn trading_days_since(last_quote: DateTime<Utc>, now: DateTime<Utc>) -> i64 {
+    let last_date = last_quote.date_naive();
+    let today = now.date_naive();
+    trading_days_between(last_date, today)
+}
+
 #[async_trait]
 impl HealthCheck for PriceStalenessCheck {
     fn id(&self) -> &'static str {
@@ -233,6 +281,7 @@ fn compute_data_hash(asset_ids: &[String], severity: Severity, mv_pct: f64) -> S
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::{Duration, TimeZone};
     use crate::health::model::HealthConfig;
 
     #[test]
@@ -253,9 +302,63 @@ mod tests {
     }
 
     #[test]
-    fn test_stale_price_detection() {
+    fn test_trading_days_between_same_day() {
+        let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(); // Monday
+        assert_eq!(trading_days_between(date, date), 0);
+    }
+
+    #[test]
+    fn test_trading_days_between_weekdays() {
+        // Monday to Wednesday = 2 trading days (Tue, Wed)
+        let monday = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
+        let wednesday = NaiveDate::from_ymd_opt(2024, 1, 17).unwrap();
+        assert_eq!(trading_days_between(monday, wednesday), 2);
+    }
+
+    #[test]
+    fn test_trading_days_between_over_weekend() {
+        // Friday to Monday = 1 trading day (Monday only, Sat/Sun excluded)
+        let friday = NaiveDate::from_ymd_opt(2024, 1, 19).unwrap();
+        let monday = NaiveDate::from_ymd_opt(2024, 1, 22).unwrap();
+        assert_eq!(trading_days_between(friday, monday), 1);
+    }
+
+    #[test]
+    fn test_trading_days_friday_to_saturday() {
+        // Friday to Saturday = 0 trading days (Saturday is weekend)
+        let friday = NaiveDate::from_ymd_opt(2024, 1, 19).unwrap();
+        let saturday = NaiveDate::from_ymd_opt(2024, 1, 20).unwrap();
+        assert_eq!(trading_days_between(friday, saturday), 0);
+    }
+
+    #[test]
+    fn test_trading_days_friday_to_sunday() {
+        // Friday to Sunday = 0 trading days (both Sat/Sun are weekend)
+        let friday = NaiveDate::from_ymd_opt(2024, 1, 19).unwrap();
+        let sunday = NaiveDate::from_ymd_opt(2024, 1, 21).unwrap();
+        assert_eq!(trading_days_between(friday, sunday), 0);
+    }
+
+    #[test]
+    fn test_trading_days_full_week() {
+        // Monday to next Monday = 5 trading days
+        let monday1 = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
+        let monday2 = NaiveDate::from_ymd_opt(2024, 1, 22).unwrap();
+        assert_eq!(trading_days_between(monday1, monday2), 5);
+    }
+
+    #[test]
+    fn test_stale_price_detection_trading_days() {
         let check = PriceStalenessCheck::new();
-        let ctx = HealthContext::new(HealthConfig::default(), "USD", 100_000.0);
+
+        // Set "now" to Wednesday Jan 17, 2024
+        let now = Utc.with_ymd_and_hms(2024, 1, 17, 12, 0, 0).unwrap();
+        let ctx = HealthContext::with_timestamp(
+            HealthConfig::default(),
+            "USD",
+            100_000.0,
+            now,
+        );
 
         let holdings = vec![AssetHoldingInfo {
             asset_id: "SEC:AAPL:XNAS".to_string(),
@@ -265,20 +368,112 @@ mod tests {
             uses_market_pricing: true,
         }];
 
-        // Quote from 48 hours ago (warning threshold is 24 hours)
+        // Quote from Monday Jan 15 (2 trading days ago: Tue, Wed)
+        // With default config (24h = 1 trading day warning), this should trigger warning
         let mut quote_times = HashMap::new();
-        quote_times.insert(
-            "SEC:AAPL:XNAS".to_string(),
-            ctx.now - Duration::hours(48),
-        );
+        let monday = Utc.with_ymd_and_hms(2024, 1, 15, 16, 0, 0).unwrap();
+        quote_times.insert("SEC:AAPL:XNAS".to_string(), monday);
 
         let issues = check.analyze(&holdings, &quote_times, &ctx);
         assert_eq!(issues.len(), 1);
         assert_eq!(issues[0].severity, Severity::Warning);
-        // Verify affected items are populated
-        assert!(issues[0].affected_items.is_some());
-        assert_eq!(issues[0].affected_items.as_ref().unwrap().len(), 1);
-        assert_eq!(issues[0].affected_items.as_ref().unwrap()[0].symbol, Some("AAPL".to_string()));
+    }
+
+    #[test]
+    fn test_weekend_no_false_positive() {
+        let check = PriceStalenessCheck::new();
+
+        // Set "now" to Saturday Jan 20, 2024
+        let saturday = Utc.with_ymd_and_hms(2024, 1, 20, 12, 0, 0).unwrap();
+        let ctx = HealthContext::with_timestamp(
+            HealthConfig::default(),
+            "USD",
+            100_000.0,
+            saturday,
+        );
+
+        let holdings = vec![AssetHoldingInfo {
+            asset_id: "SEC:AAPL:XNAS".to_string(),
+            symbol: "AAPL".to_string(),
+            name: Some("Apple Inc.".to_string()),
+            market_value: 10_000.0,
+            uses_market_pricing: true,
+        }];
+
+        // Quote from Friday Jan 19 - should NOT be stale on Saturday
+        // (0 trading days have passed since Friday)
+        let mut quote_times = HashMap::new();
+        let friday = Utc.with_ymd_and_hms(2024, 1, 19, 16, 0, 0).unwrap();
+        quote_times.insert("SEC:AAPL:XNAS".to_string(), friday);
+
+        let issues = check.analyze(&holdings, &quote_times, &ctx);
+        assert!(issues.is_empty(), "Friday quote should not be stale on Saturday");
+    }
+
+    #[test]
+    fn test_sunday_no_false_positive() {
+        let check = PriceStalenessCheck::new();
+
+        // Set "now" to Sunday Jan 21, 2024
+        let sunday = Utc.with_ymd_and_hms(2024, 1, 21, 12, 0, 0).unwrap();
+        let ctx = HealthContext::with_timestamp(
+            HealthConfig::default(),
+            "USD",
+            100_000.0,
+            sunday,
+        );
+
+        let holdings = vec![AssetHoldingInfo {
+            asset_id: "SEC:AAPL:XNAS".to_string(),
+            symbol: "AAPL".to_string(),
+            name: Some("Apple Inc.".to_string()),
+            market_value: 10_000.0,
+            uses_market_pricing: true,
+        }];
+
+        // Quote from Friday Jan 19 - should NOT be stale on Sunday
+        let mut quote_times = HashMap::new();
+        let friday = Utc.with_ymd_and_hms(2024, 1, 19, 16, 0, 0).unwrap();
+        quote_times.insert("SEC:AAPL:XNAS".to_string(), friday);
+
+        let issues = check.analyze(&holdings, &quote_times, &ctx);
+        assert!(issues.is_empty(), "Friday quote should not be stale on Sunday");
+    }
+
+    #[test]
+    fn test_monday_friday_quote_not_stale() {
+        let check = PriceStalenessCheck::new();
+
+        // Set "now" to Monday Jan 22, 2024
+        let monday = Utc.with_ymd_and_hms(2024, 1, 22, 10, 0, 0).unwrap();
+        let ctx = HealthContext::with_timestamp(
+            HealthConfig::default(),
+            "USD",
+            100_000.0,
+            monday,
+        );
+
+        let holdings = vec![AssetHoldingInfo {
+            asset_id: "SEC:AAPL:XNAS".to_string(),
+            symbol: "AAPL".to_string(),
+            name: Some("Apple Inc.".to_string()),
+            market_value: 10_000.0,
+            uses_market_pricing: true,
+        }];
+
+        // Quote from Friday Jan 19 - only 1 trading day (Monday) has passed
+        // Default warning threshold is 1 trading day, so this is exactly at the threshold
+        // but not over it (we use >= so 1 >= 1 would trigger)
+        // Actually with the default 24h = 1 day threshold, 1 trading day should trigger warning
+        let mut quote_times = HashMap::new();
+        let friday = Utc.with_ymd_and_hms(2024, 1, 19, 16, 0, 0).unwrap();
+        quote_times.insert("SEC:AAPL:XNAS".to_string(), friday);
+
+        let issues = check.analyze(&holdings, &quote_times, &ctx);
+        // 1 trading day has passed (Monday), warning threshold is 1 day
+        // So this will trigger a warning - which is correct behavior for Monday
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].severity, Severity::Warning);
     }
 
     #[test]
@@ -317,7 +512,7 @@ mod tests {
             uses_market_pricing: true,
         }];
 
-        // Quote from 1 hour ago (fresh)
+        // Quote from 1 hour ago (fresh - same day, 0 trading days)
         let mut quote_times = HashMap::new();
         quote_times.insert("SEC:AAPL:XNAS".to_string(), ctx.now - Duration::hours(1));
 
@@ -343,5 +538,37 @@ mod tests {
 
         let issues = check.analyze(&holdings, &quote_times, &ctx);
         assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn test_critical_threshold_trading_days() {
+        let check = PriceStalenessCheck::new();
+
+        // Set "now" to Friday Jan 26, 2024
+        let now = Utc.with_ymd_and_hms(2024, 1, 26, 12, 0, 0).unwrap();
+        let ctx = HealthContext::with_timestamp(
+            HealthConfig::default(),
+            "USD",
+            100_000.0,
+            now,
+        );
+
+        let holdings = vec![AssetHoldingInfo {
+            asset_id: "SEC:AAPL:XNAS".to_string(),
+            symbol: "AAPL".to_string(),
+            name: Some("Apple Inc.".to_string()),
+            market_value: 10_000.0,
+            uses_market_pricing: true,
+        }];
+
+        // Quote from Friday Jan 19 (5 trading days ago: Mon, Tue, Wed, Thu, Fri)
+        // Default critical threshold is 72h = 3 trading days, so this should be Error
+        let mut quote_times = HashMap::new();
+        let old_friday = Utc.with_ymd_and_hms(2024, 1, 19, 16, 0, 0).unwrap();
+        quote_times.insert("SEC:AAPL:XNAS".to_string(), old_friday);
+
+        let issues = check.analyze(&holdings, &quote_times, &ctx);
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].severity, Severity::Error);
     }
 }

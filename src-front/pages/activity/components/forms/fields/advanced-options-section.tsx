@@ -50,6 +50,8 @@ interface AdvancedOptionsSectionProps<TFieldValues extends FieldValues = FieldVa
   showSubtype?: boolean;
   /** Default open state */
   defaultOpen?: boolean;
+  /** Variant for different layouts */
+  variant?: "desktop" | "mobile";
 }
 
 /**
@@ -68,7 +70,9 @@ export function AdvancedOptionsSection<TFieldValues extends FieldValues = FieldV
   showFxRate = true,
   showSubtype = true,
   defaultOpen = false,
+  variant = "desktop",
 }: AdvancedOptionsSectionProps<TFieldValues>) {
+  const isMobile = variant === "mobile";
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const { control } = useFormContext<TFieldValues>();
 
@@ -101,13 +105,17 @@ export function AdvancedOptionsSection<TFieldValues extends FieldValues = FieldV
   }
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full">
+    <Collapsible
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      className={isMobile ? "bg-muted/30 rounded-md border px-3 py-2 w-full" : "w-full"}
+    >
       <CollapsibleTrigger asChild>
         <Button
           variant="ghost"
           size="sm"
           type="button"
-          className="text-muted-foreground hover:text-foreground flex w-full items-center justify-between px-0 py-2"
+          className="text-muted-foreground hover:text-foreground hover:bg-transparent flex w-full items-center justify-between px-0 py-1"
         >
           <span className="text-sm font-medium">Advanced Options</span>
           <Icons.ChevronDown
@@ -116,7 +124,7 @@ export function AdvancedOptionsSection<TFieldValues extends FieldValues = FieldV
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent className="space-y-4 pt-2">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className={isMobile ? "grid grid-cols-1 gap-4" : "grid grid-cols-1 gap-4 sm:grid-cols-2"}>
           {/* Currency Field */}
           {showCurrency && currencyName && (
             <FormField

@@ -1,6 +1,7 @@
 use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 use log::debug;
 use rust_decimal::Decimal;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use crate::accounts::{Account, AccountServiceTrait};
@@ -40,6 +41,55 @@ impl ActivityService {
             fx_service,
             quote_service,
         }
+    }
+
+    /// Resolves symbols to exchange MICs in batch.
+    /// First checks existing assets in the database, then falls back to quote service
+    /// for symbols not found locally.
+    async fn resolve_symbols_batch(
+        &self,
+        symbols: HashSet<String>,
+        currency: &str,
+    ) -> HashMap<String, Option<String>> {
+        let mut cache: HashMap<String, Option<String>> = HashMap::new();
+
+        if symbols.is_empty() {
+            return cache;
+        }
+
+        // 1. Get all existing assets and build a lookup map (case-insensitive)
+        let existing_assets = self.asset_service.get_assets().unwrap_or_default();
+        let existing_map: HashMap<String, Option<String>> = existing_assets
+            .into_iter()
+            .map(|a| (a.symbol.to_lowercase(), a.exchange_mic))
+            .collect();
+
+        // 2. Check each symbol against existing assets first
+        let mut missing_symbols: Vec<String> = Vec::new();
+
+        for symbol in &symbols {
+            if let Some(exchange_mic) = existing_map.get(&symbol.to_lowercase()) {
+                // Found in existing assets
+                cache.insert(symbol.clone(), exchange_mic.clone());
+            } else {
+                // Need to resolve via quote service
+                missing_symbols.push(symbol.clone());
+            }
+        }
+
+        // 3. Resolve missing symbols via quote service (with provider lookup)
+        for symbol in missing_symbols {
+            let results = self
+                .quote_service
+                .search_symbol_with_currency(&symbol, Some(currency))
+                .await
+                .unwrap_or_default();
+
+            let exchange_mic = results.first().and_then(|r| r.exchange_mic.clone());
+            cache.insert(symbol, exchange_mic);
+        }
+
+        cache
     }
 
     /// Creates a manual quote from activity data when pricing_mode is MANUAL.
@@ -591,12 +641,54 @@ impl ActivityServiceTrait for ActivityService {
 
     async fn bulk_mutate_activities(
         &self,
-        request: ActivityBulkMutationRequest,
+        mut request: ActivityBulkMutationRequest,
     ) -> Result<ActivityBulkMutationResult> {
         let mut errors: Vec<ActivityBulkMutationError> = Vec::new();
         let mut prepared_creates: Vec<NewActivity> = Vec::new();
         let mut prepared_updates: Vec<ActivityUpdate> = Vec::new();
         let mut valid_delete_ids: Vec<String> = Vec::new();
+
+        // Batch resolve symbols that don't have exchange_mic
+        // Collect unique symbols from creates that need resolution
+        let symbols_to_resolve: HashSet<String> = request
+            .creates
+            .iter()
+            .filter_map(|a| {
+                let symbol = a.get_symbol();
+                let has_mic = a.get_exchange_mic().is_some();
+                let is_cash = symbol.map(|s| s.starts_with("$CASH-")).unwrap_or(false);
+                // Only resolve if we have a symbol but no MIC, and it's not a cash symbol
+                if symbol.is_some() && !has_mic && !is_cash {
+                    symbol.map(|s| s.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Resolve symbols in batch (checks existing assets first, then quote service)
+        let symbol_mic_cache = if !symbols_to_resolve.is_empty() {
+            // Use USD as default currency for resolution; the actual activity currency
+            // will be used during asset creation
+            self.resolve_symbols_batch(symbols_to_resolve, "USD").await
+        } else {
+            HashMap::new()
+        };
+
+        // Update creates with resolved exchange_mic
+        for activity in &mut request.creates {
+            if let Some(symbol) = activity.get_symbol() {
+                let has_mic = activity.get_exchange_mic().is_some();
+                if !has_mic {
+                    if let Some(mic) = symbol_mic_cache.get(symbol).cloned().flatten() {
+                        // Update the asset's exchange_mic
+                        if let Some(ref mut asset) = activity.asset {
+                            asset.exchange_mic = Some(mic);
+                        }
+                    }
+                }
+            }
+        }
 
         for new_activity in request.creates {
             let temp_id = new_activity.id.clone();
@@ -664,6 +756,12 @@ impl ActivityServiceTrait for ActivityService {
     ) -> Result<Vec<ActivityImport>> {
         let account: Account = self.account_service.get_account(&account_id)?;
 
+        // Batch resolve all unique symbols to get exchange MICs
+        let unique_symbols: HashSet<String> = activities.iter().map(|a| a.symbol.clone()).collect();
+        let symbol_mic_cache = self
+            .resolve_symbols_batch(unique_symbols, &account.currency)
+            .await;
+
         let mut activities_with_status: Vec<ActivityImport> = Vec::new();
 
         for mut activity in activities {
@@ -683,21 +781,66 @@ impl ActivityServiceTrait for ActivityService {
                 account.currency.clone()
             };
 
-            // Generate canonical asset ID for the symbol
-            // CSV imports don't include exchange info, so we infer kind and use UNKNOWN qualifier
-            let inferred_kind =
-                self.infer_asset_kind(&activity.symbol, None, None);
+            // Get resolved exchange MIC from cache
+            let exchange_mic = symbol_mic_cache
+                .get(&activity.symbol)
+                .cloned()
+                .flatten();
+
+            // Store resolved exchange_mic in activity for use during import
+            activity.exchange_mic = exchange_mic.clone();
+
+            // Generate canonical asset ID using resolved exchange MIC
+            let inferred_kind = self.infer_asset_kind(&activity.symbol, None, None);
+
+            // Check if this is a security that couldn't be resolved
+            // Cash symbols ($CASH-XXX) and cash activities don't need exchange MIC
+            let is_cash_symbol = activity.symbol.starts_with("$CASH-");
+            let is_cash_type = is_cash_activity(&activity.activity_type);
+            let needs_exchange_mic = inferred_kind == AssetKind::Security
+                && !is_cash_symbol
+                && !is_cash_type;
+
+            // Early validation: if we need exchange MIC but couldn't resolve it, mark as invalid
+            if needs_exchange_mic && exchange_mic.is_none() {
+                activity.is_valid = false;
+                let mut errors = std::collections::HashMap::new();
+                errors.insert(
+                    activity.symbol.clone(),
+                    vec![format!(
+                        "Could not find '{}' in market data. Please search for the correct ticker symbol.",
+                        &activity.symbol
+                    )],
+                );
+                activity.errors = Some(errors);
+                activities_with_status.push(activity);
+                continue;
+            }
+
             let canonical_id = canonical_asset_id(
                 &inferred_kind,
                 &activity.symbol,
-                None, // CSV imports don't have exchange MIC
+                exchange_mic.as_deref(),
                 &asset_context_currency,
             );
 
-            // CSV imports don't carry asset metadata or pricing mode hint - pass None
+            // Pass exchange_mic as metadata for asset creation
+            let asset_metadata = exchange_mic.as_ref().map(|mic| {
+                crate::assets::AssetMetadata {
+                    name: None,
+                    kind: None,
+                    exchange_mic: Some(mic.clone()),
+                }
+            });
+
             let symbol_profile_result = self
                 .asset_service
-                .get_or_create_minimal_asset(&canonical_id, Some(asset_context_currency), None, None)
+                .get_or_create_minimal_asset(
+                    &canonical_id,
+                    Some(asset_context_currency),
+                    asset_metadata,
+                    None,
+                )
                 .await;
 
             let (mut is_valid, mut error_message) = (true, None);
@@ -789,12 +932,12 @@ impl ActivityServiceTrait for ActivityService {
                     &account.currency
                 };
 
-                // Generate canonical asset ID (same logic as check_activities_import)
+                // Generate canonical asset ID using exchange_mic resolved during validation
                 let inferred_kind = self.infer_asset_kind(&activity.symbol, None, None);
                 let canonical_id = canonical_asset_id(
                     &inferred_kind,
                     &activity.symbol,
-                    None, // CSV imports don't have exchange MIC
+                    activity.exchange_mic.as_deref(),
                     currency,
                 );
 
@@ -804,10 +947,10 @@ impl ActivityServiceTrait for ActivityService {
                     asset: Some(AssetInput {
                         id: Some(canonical_id),
                         symbol: Some(activity.symbol.clone()),
-                        exchange_mic: None, // CSV imports don't typically include exchange info
-                        kind: None,         // Already used for canonical ID generation
-                        name: None,         // CSV imports don't carry asset name
-                        pricing_mode: None, // CSV imports default to MARKET pricing
+                        exchange_mic: activity.exchange_mic.clone(),
+                        kind: None,
+                        name: None,
+                        pricing_mode: None,
                     }),
                     activity_type: activity.activity_type.clone(),
                     subtype: None,

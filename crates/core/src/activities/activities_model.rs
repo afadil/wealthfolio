@@ -496,6 +496,8 @@ pub struct ActivityImport {
     pub account_id: Option<String>,
     pub account_name: Option<String>,
     pub symbol_name: Option<String>,
+    /// Resolved exchange MIC for the symbol (populated during validation)
+    pub exchange_mic: Option<String>,
     pub errors: Option<std::collections::HashMap<String, Vec<String>>>,
     pub is_draft: bool,
     pub is_valid: bool,
