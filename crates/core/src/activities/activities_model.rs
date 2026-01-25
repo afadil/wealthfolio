@@ -1,6 +1,7 @@
 //! Activity domain models.
 
 use crate::activities::activities_errors::ActivityError;
+use crate::activities::csv_parser::ParseConfig;
 use crate::Result;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use rust_decimal::prelude::FromPrimitive;
@@ -299,6 +300,7 @@ pub struct ActivityUpdate {
     pub status: Option<ActivityStatus>,
     pub notes: Option<String>,
     pub fx_rate: Option<Decimal>,
+    pub metadata: Option<String>, // JSON blob for metadata (e.g., flow.is_external)
 }
 
 impl ActivityUpdate {
@@ -480,7 +482,7 @@ pub struct ActivitySearchResponse {
 }
 
 /// Model for importing activities
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ActivityImport {
     pub id: Option<String>,
@@ -502,6 +504,8 @@ pub struct ActivityImport {
     pub is_draft: bool,
     pub is_valid: bool,
     pub line_number: Option<i32>,
+    pub fx_rate: Option<Decimal>,
+    pub subtype: Option<String>,
 }
 
 /// Model for sorting activities
@@ -517,23 +521,47 @@ pub struct Sort {
 #[serde(rename_all = "camelCase")]
 pub struct ImportMapping {
     pub account_id: String,
-    pub field_mappings: String,
-    pub activity_mappings: String,
-    pub symbol_mappings: String,
+    pub name: String,
+    /// JSON containing all config: fieldMappings, activityMappings, symbolMappings, accountMappings, parseConfig
+    pub config: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
-    pub account_mappings: String,
 }
 
 /// Model for activity import mapping data with structured mappings
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportMappingData {
     pub account_id: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
     pub field_mappings: std::collections::HashMap<String, String>,
+    #[serde(default)]
     pub activity_mappings: std::collections::HashMap<String, Vec<String>>,
+    #[serde(default)]
     pub symbol_mappings: std::collections::HashMap<String, String>,
+    #[serde(default)]
     pub account_mappings: std::collections::HashMap<String, String>,
+    /// CSV parsing configuration (delimiter, date format, etc.)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parse_config: Option<ParseConfig>,
+}
+
+/// Internal config structure for JSON serialization
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportMappingConfig {
+    #[serde(default)]
+    pub field_mappings: std::collections::HashMap<String, String>,
+    #[serde(default)]
+    pub activity_mappings: std::collections::HashMap<String, Vec<String>>,
+    #[serde(default)]
+    pub symbol_mappings: std::collections::HashMap<String, String>,
+    #[serde(default)]
+    pub account_mappings: std::collections::HashMap<String, String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parse_config: Option<ParseConfig>,
 }
 
 impl Default for ImportMappingData {
@@ -567,34 +595,48 @@ impl Default for ImportMappingData {
 
         ImportMappingData {
             account_id: String::new(),
+            name: String::new(),
             field_mappings,
             activity_mappings,
             symbol_mappings: std::collections::HashMap::new(),
             account_mappings: std::collections::HashMap::new(),
+            parse_config: None,
         }
     }
 }
 
 impl ImportMapping {
     pub fn to_mapping_data(&self) -> std::result::Result<ImportMappingData, serde_json::Error> {
+        // Parse the config JSON blob
+        let config: ImportMappingConfig = serde_json::from_str(&self.config)?;
+
         Ok(ImportMappingData {
             account_id: self.account_id.clone(),
-            field_mappings: serde_json::from_str(&self.field_mappings)?,
-            activity_mappings: serde_json::from_str(&self.activity_mappings)?,
-            symbol_mappings: serde_json::from_str(&self.symbol_mappings)?,
-            account_mappings: serde_json::from_str(&self.account_mappings)?,
+            name: self.name.clone(),
+            field_mappings: config.field_mappings,
+            activity_mappings: config.activity_mappings,
+            symbol_mappings: config.symbol_mappings,
+            account_mappings: config.account_mappings,
+            parse_config: config.parse_config,
         })
     }
 
     pub fn from_mapping_data(
         data: &ImportMappingData,
     ) -> std::result::Result<Self, serde_json::Error> {
+        // Create the config object
+        let config = ImportMappingConfig {
+            field_mappings: data.field_mappings.clone(),
+            activity_mappings: data.activity_mappings.clone(),
+            symbol_mappings: data.symbol_mappings.clone(),
+            account_mappings: data.account_mappings.clone(),
+            parse_config: data.parse_config.clone(),
+        };
+
         Ok(Self {
             account_id: data.account_id.clone(),
-            field_mappings: serde_json::to_string(&data.field_mappings)?,
-            activity_mappings: serde_json::to_string(&data.activity_mappings)?,
-            symbol_mappings: serde_json::to_string(&data.symbol_mappings)?,
-            account_mappings: serde_json::to_string(&data.account_mappings)?,
+            name: data.name.clone(),
+            config: serde_json::to_string(&config)?,
             created_at: chrono::Utc::now().naive_utc(),
             updated_at: chrono::Utc::now().naive_utc(),
         })
@@ -756,4 +798,32 @@ pub struct IncomeData {
     pub symbol_name: String,
     pub currency: String,
     pub amount: Decimal,
+}
+
+/// Result of importing activities, includes import run metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportActivitiesResult {
+    /// The validated/imported activities
+    pub activities: Vec<ActivityImport>,
+    /// Import run ID for tracking this batch
+    pub import_run_id: String,
+    /// Summary statistics for the import
+    pub summary: ImportActivitiesSummary,
+}
+
+/// Summary statistics for an activity import
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportActivitiesSummary {
+    /// Total number of activities in the import request
+    pub total: u32,
+    /// Number of activities successfully imported
+    pub imported: u32,
+    /// Number of activities skipped (invalid or errors)
+    pub skipped: u32,
+    /// Number of new assets created during import
+    pub assets_created: u32,
+    /// Whether the import was successful (no validation errors)
+    pub success: bool,
 }

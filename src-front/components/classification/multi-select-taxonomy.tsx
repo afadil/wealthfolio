@@ -7,6 +7,7 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandSeparator,
 } from "@wealthfolio/ui/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
@@ -241,6 +242,7 @@ export function MultiSelectTaxonomy({
               setOpen(isOpen);
               if (!isOpen) setPendingCategory(null);
             }}
+            modal={true}
           >
             <PopoverTrigger asChild>
               <button
@@ -252,7 +254,7 @@ export function MultiSelectTaxonomy({
                 Add
               </button>
             </PopoverTrigger>
-            <PopoverContent className="w-80 p-0" align="end" sideOffset={4}>
+            <PopoverContent className="w-[450px] p-0" align="end" sideOffset={4}>
               {/* Pending category weight input */}
               {pendingCategory && (
                 <div className="border-b p-3">
@@ -314,46 +316,49 @@ export function MultiSelectTaxonomy({
               {/* Category tree */}
               <Command>
                 <CommandInput placeholder="Search categories..." className="h-9" />
-                <CommandList className="max-h-64">
+                <CommandList className="max-h-72 overflow-y-auto">
                   <CommandEmpty>No categories found.</CommandEmpty>
-                  <CommandGroup>
-                    {flatCategories.map((category) => {
+                  <CommandGroup className="[&_[cmdk-group-items]]:!overflow-visible">
+                    {flatCategories.map((category, index) => {
                       const isAssigned = assignedCategoryIds.has(category.id);
                       const hasChildren = category.children.length > 0;
                       const isPendingThis = pendingCategory?.category.id === category.id;
+                      const showSeparator = category.level === 0 && index > 0;
 
                       return (
-                        <CommandItem
-                          key={category.id}
-                          value={category.name}
-                          onSelect={() => {
-                            if (!isAssigned && !hasChildren) {
-                              handleSelectCategory(category);
-                            }
-                          }}
-                          disabled={isAssigned || hasChildren}
-                          className={cn(
-                            "flex items-center gap-2",
-                            isAssigned && "opacity-40",
-                            hasChildren && "font-medium opacity-60",
-                            isPendingThis && "bg-accent",
-                          )}
-                          style={{ paddingLeft: `${category.level * 16 + 8}px` }}
-                        >
-                          <span
-                            className="h-2.5 w-2.5 shrink-0 rounded-full"
-                            style={{ backgroundColor: category.color }}
-                          />
-                          <span className="flex-1 truncate">{category.name}</span>
-                          {isAssigned && (
-                            <Icons.Check className="text-primary h-4 w-4 shrink-0" />
-                          )}
-                          {hasChildren && (
-                            <span className="text-muted-foreground text-xs">
-                              ({category.children.length})
-                            </span>
-                          )}
-                        </CommandItem>
+                        <div key={category.id}>
+                          {showSeparator && <CommandSeparator className="my-1" />}
+                          <CommandItem
+                            value={`${category.name} ${category.id}`}
+                            onSelect={() => {
+                              if (!isAssigned) {
+                                handleSelectCategory(category);
+                              }
+                            }}
+                            disabled={isAssigned}
+                            className={cn(
+                              "flex items-center gap-2",
+                              isAssigned && "opacity-40",
+                              hasChildren && "font-medium",
+                              isPendingThis && "bg-accent",
+                            )}
+                            style={{ paddingLeft: `${category.level * 16 + 8}px` }}
+                          >
+                            <span
+                              className="h-2.5 w-2.5 shrink-0 rounded-full"
+                              style={{ backgroundColor: category.color }}
+                            />
+                            <span className="flex-1 truncate">{category.name}</span>
+                            {isAssigned && (
+                              <Icons.Check className="text-primary h-4 w-4 shrink-0" />
+                            )}
+                            {hasChildren && (
+                              <span className="text-muted-foreground text-xs">
+                                ({category.children.length})
+                              </span>
+                            )}
+                          </CommandItem>
+                        </div>
                       );
                     })}
                   </CommandGroup>

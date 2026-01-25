@@ -1,5 +1,3 @@
-import { useState } from "react";
-import { Badge, Button, Icons, Page, PageContent, PageHeader, Skeleton } from "@wealthfolio/ui";
 import {
   useDismissHealthIssue,
   useExecuteHealthFix,
@@ -7,24 +5,65 @@ import {
   useRunHealthChecks,
 } from "@/hooks/use-health";
 import type { HealthCategory, HealthIssue, HealthSeverity } from "@/lib/types";
+import {
+  Badge,
+  Button,
+  Icons,
+  Page,
+  PageContent,
+  PageHeader,
+  Skeleton,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@wealthfolio/ui";
 import { cn } from "@wealthfolio/ui/lib/utils";
+import { useState } from "react";
 import { IssueDetailSheet } from "./components/issue-detail-sheet";
 
-const SEVERITY_CONFIG: Record<HealthSeverity, { label: string; textColor: string }> = {
-  INFO: { label: "Info", textColor: "text-muted-foreground" },
-  WARNING: { label: "Warning", textColor: "text-yellow-600 dark:text-yellow-400" },
-  ERROR: { label: "Error", textColor: "text-destructive" },
-  CRITICAL: { label: "Critical", textColor: "text-destructive" },
+const SEVERITY_CONFIG: Record<
+  HealthSeverity,
+  { label: string; bgColor: string; textColor: string; dotColor: string }
+> = {
+  INFO: {
+    label: "Info",
+    bgColor: "bg-muted",
+    textColor: "text-muted-foreground",
+    dotColor: "bg-muted-foreground",
+  },
+  WARNING: {
+    label: "Warning",
+    bgColor: "bg-warning/15",
+    textColor: "text-warning",
+    dotColor: "bg-warning",
+  },
+  ERROR: {
+    label: "Error",
+    bgColor: "bg-destructive/10",
+    textColor: "text-destructive",
+    dotColor: "bg-destructive",
+  },
+  CRITICAL: {
+    label: "Critical",
+    bgColor: "bg-destructive/15",
+    textColor: "text-destructive",
+    dotColor: "bg-destructive",
+  },
 };
 
-const CATEGORY_CONFIG: Record<HealthCategory, { label: string }> = {
-  PRICE_STALENESS: { label: "Price Staleness" },
-  FX_INTEGRITY: { label: "Exchange Rates" },
-  CLASSIFICATION: { label: "Classification" },
-  DATA_CONSISTENCY: { label: "Data Consistency" },
+const CATEGORY_CONFIG: Record<HealthCategory, { label: string; icon: keyof typeof Icons }> = {
+  PRICE_STALENESS: { label: "Prices", icon: "TrendingUp" },
+  FX_INTEGRITY: { label: "FX Rates", icon: "ArrowLeftRight" },
+  CLASSIFICATION: { label: "Categories", icon: "Tag" },
+  DATA_CONSISTENCY: { label: "Data", icon: "Database" },
 };
 
-function HealthIssueCard({
+function SeverityDot({ severity }: { severity: HealthSeverity }) {
+  const config = SEVERITY_CONFIG[severity];
+  return <span className={cn("h-2 w-2 shrink-0 rounded-full", config.dotColor)} />;
+}
+
+function HealthIssueRow({
   issue,
   onClick,
   onDismiss,
@@ -39,118 +78,153 @@ function HealthIssueCard({
   isDismissing: boolean;
   isFixing: boolean;
 }) {
-  const severityConfig = SEVERITY_CONFIG[issue.severity];
   const categoryConfig = CATEGORY_CONFIG[issue.category];
+  const CategoryIcon = Icons[categoryConfig.icon];
 
   return (
     <div
-      className="group cursor-pointer p-4 transition-colors hover:bg-muted/30"
+      className="group hover:bg-muted/50 flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors"
       onClick={onClick}
     >
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className={cn("text-sm font-medium", severityConfig.textColor)}>
-              {severityConfig.label}
-            </span>
-            <span className="text-muted-foreground text-xs">·</span>
-            <span className="text-muted-foreground text-xs">{categoryConfig.label}</span>
-          </div>
-          <h3 className="mt-1 font-medium">{issue.title}</h3>
-          <p className="text-muted-foreground mt-0.5 line-clamp-1 text-sm">{issue.message}</p>
+      <SeverityDot severity={issue.severity} />
 
-          {/* Impact info */}
-          {(issue.affectedCount > 0 || (issue.affectedMvPct != null && issue.affectedMvPct > 0)) && (
-            <div className="text-muted-foreground mt-2 flex items-center gap-3 text-xs">
-              {issue.affectedCount > 0 && (
-                <span>{issue.affectedCount} affected</span>
-              )}
-              {issue.affectedMvPct != null && issue.affectedMvPct > 0 && (
-                <span>{(issue.affectedMvPct * 100).toFixed(1)}% of portfolio</span>
-              )}
-            </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm font-medium">{issue.title}</span>
+          {issue.affectedCount > 0 && (
+            <Badge variant="secondary" className="h-5 shrink-0 px-1.5 text-[10px] font-medium">
+              {issue.affectedCount}
+            </Badge>
           )}
         </div>
+        <p className="text-muted-foreground mt-0.5 line-clamp-1 text-xs">{issue.message}</p>
+      </div>
 
-        {/* Actions */}
-        <div className="flex shrink-0 items-center gap-1">
-          {issue.fixAction && (
-            <Button
-              size="sm"
-              variant="default"
-              onClick={(e: React.MouseEvent) => {
-                e.stopPropagation();
-                onFix();
-              }}
-              disabled={isFixing}
+      <div className="flex shrink-0 items-center gap-1.5">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge
+              variant="outline"
+              className="text-muted-foreground h-6 gap-1 px-2 text-[10px] font-normal"
             >
-              {isFixing ? (
-                <Icons.Spinner className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Icons.Wand2 className="mr-1.5 h-3.5 w-3.5" />
-              )}
-              Fix
-            </Button>
-          )}
+              <CategoryIcon className="h-3 w-3" />
+              {categoryConfig.label}
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent side="top">{CATEGORY_CONFIG[issue.category].label}</TooltipContent>
+        </Tooltip>
+
+        {issue.fixAction && (
           <Button
             size="sm"
-            variant="ghost"
+            variant="secondary"
+            className="h-7 px-2.5 text-xs"
             onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
-              onDismiss();
+              onFix();
             }}
-            disabled={isDismissing}
-            className="text-muted-foreground"
+            disabled={isFixing}
           >
-            {isDismissing ? (
-              <Icons.Spinner className="h-4 w-4 animate-spin" />
+            {isFixing ? (
+              <Icons.Spinner className="h-3 w-3 animate-spin" />
             ) : (
-              <Icons.X className="h-4 w-4" />
+              <>
+                <Icons.Wand2 className="mr-1 h-3 w-3" />
+                Fix
+              </>
             )}
           </Button>
-        </div>
+        )}
+        <Button
+          size="icon"
+          variant="ghost"
+          className="text-muted-foreground h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100"
+          onClick={(e: React.MouseEvent) => {
+            e.stopPropagation();
+            onDismiss();
+          }}
+          disabled={isDismissing}
+        >
+          {isDismissing ? (
+            <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Icons.X className="h-3.5 w-3.5" />
+          )}
+        </Button>
       </div>
     </div>
   );
 }
 
-function StatCard({
-  label,
-  count,
-  color,
-  isActive,
-  onClick,
+function StatusSummary({
+  counts,
+  selectedSeverity,
+  onSeverityClick,
 }: {
-  label: string;
-  count: number;
-  color: string;
-  isActive: boolean;
-  onClick: () => void;
+  counts: Partial<Record<HealthSeverity, number>>;
+  selectedSeverity: HealthSeverity | null;
+  onSeverityClick: (severity: HealthSeverity | null) => void;
 }) {
+  const totalIssues = Object.values(counts).reduce((a, b) => (a ?? 0) + (b ?? 0), 0);
+
+  if (totalIssues === 0) {
+    return (
+      <div className="bg-success/10 border-success/20 flex items-center gap-2 rounded-lg border px-3 py-2">
+        <Icons.CheckCircle className="text-success h-4 w-4" />
+        <span className="text-success text-sm font-medium">All systems healthy</span>
+      </div>
+    );
+  }
+
+  const severities: HealthSeverity[] = ["CRITICAL", "ERROR", "WARNING", "INFO"];
+
   return (
-    <button
-      onClick={onClick}
-      disabled={count === 0}
-      className={cn(
-        "flex flex-col items-center justify-center rounded-lg border py-4 text-center transition-all",
-        isActive ? "ring-primary border-primary/50 ring-2" : "hover:border-foreground/20",
-        count === 0 && "cursor-default opacity-40",
+    <div className="flex items-center gap-1">
+      {severities.map((severity) => {
+        const count = counts[severity] ?? 0;
+        if (count === 0) return null;
+        const config = SEVERITY_CONFIG[severity];
+        const isActive = selectedSeverity === severity;
+
+        return (
+          <button
+            key={severity}
+            onClick={() => onSeverityClick(isActive ? null : severity)}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all",
+              config.bgColor,
+              config.textColor,
+              isActive && "ring-2 ring-current ring-offset-1",
+            )}
+          >
+            <SeverityDot severity={severity} />
+            <span>{count}</span>
+            <span className="hidden sm:inline">{config.label}</span>
+          </button>
+        );
+      })}
+      {selectedSeverity && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground ml-1 h-7 px-2 text-xs"
+          onClick={() => onSeverityClick(null)}
+        >
+          Clear
+        </Button>
       )}
-    >
-      <p className={cn("text-3xl font-bold tabular-nums", count > 0 ? color : "text-muted-foreground")}>{count}</p>
-      <p className="text-muted-foreground mt-1 text-xs font-medium uppercase tracking-wide">{label}</p>
-    </button>
+    </div>
   );
 }
 
 function HealthyState() {
   return (
-    <div className="flex flex-col items-center justify-center py-20">
-      <Icons.CheckCircle className="text-success mb-4 h-12 w-12" />
-      <h2 className="mb-1 text-lg font-semibold">All Clear</h2>
-      <p className="text-muted-foreground text-sm">
-        No issues detected. Your data looks good.
-      </p>
+    <div className="flex flex-col items-center justify-center py-16">
+      <div className="bg-success/10 mb-4 flex h-12 w-12 items-center justify-center rounded-full">
+        <Icons.CheckCircle className="text-success h-6 w-6" />
+      </div>
+      <h2 className="mb-1 text-base font-medium">All Clear</h2>
+      <p className="text-muted-foreground text-sm">No issues detected</p>
     </div>
   );
 }
@@ -175,24 +249,18 @@ export default function HealthPage() {
 
   const headerActions = (
     <div className="flex items-center gap-2">
-      {status?.isStale && (
-        <Badge variant="outline" className="border-yellow-500/50 text-yellow-600">
-          <Icons.Clock className="mr-1 h-3 w-3" />
-          Stale
-        </Badge>
-      )}
       <Button
-        variant="outline"
+        variant="ghost"
         size="sm"
         onClick={handleRefresh}
         disabled={runChecksMutation.isPending}
+        className="h-8"
       >
         {runChecksMutation.isPending ? (
-          <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+          <Icons.Spinner className="h-4 w-4 animate-spin" />
         ) : (
-          <Icons.RefreshCw className="mr-2 h-4 w-4" />
+          <Icons.RefreshCw className="h-4 w-4" />
         )}
-        Refresh
       </Button>
     </div>
   );
@@ -200,17 +268,21 @@ export default function HealthPage() {
   if (error) {
     return (
       <Page>
-        <PageHeader heading="Health Center" text="Review and resolve data quality issues" actions={headerActions} />
-        <PageContent>
-          <div className="flex min-h-[400px] flex-col items-center justify-center">
-            <div className="bg-destructive/10 mb-6 flex h-16 w-16 items-center justify-center rounded-full">
-              <Icons.AlertCircle className="text-destructive h-8 w-8" />
+        <PageHeader
+          heading="Data Health"
+          text="Identify and resolve data quality issues"
+          actions={headerActions}
+        />
+        <PageContent className="pt-4">
+          <div className="flex min-h-[300px] flex-col items-center justify-center">
+            <div className="bg-destructive/10 mb-4 flex h-12 w-12 items-center justify-center rounded-full">
+              <Icons.AlertCircle className="text-destructive h-6 w-6" />
             </div>
-            <h2 className="mb-2 text-lg font-semibold">Failed to load health status</h2>
-            <p className="text-muted-foreground mb-6 text-sm">{error.message}</p>
-            <Button onClick={handleRefresh}>
-              <Icons.RefreshCw className="mr-2 h-4 w-4" />
-              Try Again
+            <h2 className="mb-1 text-base font-medium">Failed to load health status</h2>
+            <p className="text-muted-foreground mb-4 text-sm">{error.message}</p>
+            <Button size="sm" variant="outline" onClick={handleRefresh}>
+              <Icons.RefreshCw className="mr-2 h-3.5 w-3.5" />
+              Retry
             </Button>
           </div>
         </PageContent>
@@ -220,75 +292,51 @@ export default function HealthPage() {
 
   return (
     <Page>
-      <PageHeader heading="Health Center" text="Review and resolve data quality issues" actions={headerActions} />
-      <PageContent>
+      <PageHeader
+        heading="Data Health"
+        text="Identify and resolve data quality issues"
+        actions={headerActions}
+      />
+      <PageContent className="mt-6">
         {isLoading ? (
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              {[1, 2, 3, 4].map((i) => (
-                <Skeleton key={i} className="h-20 rounded-xl" />
-              ))}
-            </div>
-            <Skeleton className="h-32 rounded-xl" />
-            <Skeleton className="h-32 rounded-xl" />
+          <div className="space-y-3">
+            <Skeleton className="h-10 w-48 rounded-lg" />
+            <Skeleton className="h-14 rounded-lg" />
+            <Skeleton className="h-14 rounded-lg" />
+            <Skeleton className="h-14 rounded-lg" />
           </div>
         ) : status ? (
-          <div className="space-y-6">
-            {/* Stats Row */}
-            <div className="grid grid-cols-4 gap-2">
-              <StatCard
-                label="Critical"
-                count={status.issueCounts.CRITICAL ?? 0}
-                color="text-destructive"
-                isActive={selectedSeverity === "CRITICAL"}
-                onClick={() => setSelectedSeverity(selectedSeverity === "CRITICAL" ? null : "CRITICAL")}
+          <div className="space-y-4">
+            {/* Summary Bar */}
+            <div className="flex items-center justify-between">
+              <StatusSummary
+                counts={status.issueCounts}
+                selectedSeverity={selectedSeverity}
+                onSeverityClick={setSelectedSeverity}
               />
-              <StatCard
-                label="Errors"
-                count={status.issueCounts.ERROR ?? 0}
-                color="text-destructive"
-                isActive={selectedSeverity === "ERROR"}
-                onClick={() => setSelectedSeverity(selectedSeverity === "ERROR" ? null : "ERROR")}
-              />
-              <StatCard
-                label="Warnings"
-                count={status.issueCounts.WARNING ?? 0}
-                color="text-yellow-600 dark:text-yellow-400"
-                isActive={selectedSeverity === "WARNING"}
-                onClick={() => setSelectedSeverity(selectedSeverity === "WARNING" ? null : "WARNING")}
-              />
-              <StatCard
-                label="Info"
-                count={status.issueCounts.INFO ?? 0}
-                color="text-muted-foreground"
-                isActive={selectedSeverity === "INFO"}
-                onClick={() => setSelectedSeverity(selectedSeverity === "INFO" ? null : "INFO")}
-              />
+              {status.checkedAt && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-muted-foreground flex cursor-default items-center gap-1.5 text-xs">
+                      {status.isStale && <Icons.AlertCircle className="h-3 w-3 text-amber-500" />}
+                      Updated{" "}
+                      {new Date(status.checkedAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>{new Date(status.checkedAt).toLocaleString()}</TooltipContent>
+                </Tooltip>
+              )}
             </div>
 
-            {/* Filter indicator */}
-            {selectedSeverity && (
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground text-sm">
-                  Showing {SEVERITY_CONFIG[selectedSeverity].label.toLowerCase()} issues
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSelectedSeverity(null)}
-                  className="h-6 px-2 text-xs"
-                >
-                  Clear filter
-                </Button>
-              </div>
-            )}
-
             {/* Issues List */}
-            <div>
+            <div className="bg-card rounded-lg border">
               {filteredIssues && filteredIssues.length > 0 ? (
-                <div className="divide-y rounded-lg border">
+                <div className="divide-y">
                   {filteredIssues.map((issue) => (
-                    <HealthIssueCard
+                    <HealthIssueRow
                       key={issue.id}
                       issue={issue}
                       onClick={() => setSelectedIssue(issue)}
@@ -308,13 +356,6 @@ export default function HealthPage() {
                 <HealthyState />
               )}
             </div>
-
-            {/* Last checked timestamp */}
-            {status.checkedAt && (
-              <div className="text-muted-foreground text-center text-xs">
-                Last checked: {new Date(status.checkedAt).toLocaleString()}
-              </div>
-            )}
           </div>
         ) : null}
       </PageContent>

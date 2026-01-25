@@ -44,7 +44,7 @@ pub struct RecordActivityArgs {
     /// Account name or ID. If ambiguous/missing, tool returns available accounts.
     pub account: Option<String>,
 
-    /// Activity subtype: DRIP, QUALIFIED, STAKING_REWARD, etc.
+    /// Activity subtype: DRIP, DIVIDEND_IN_KIND, STAKING_REWARD, BONUS.
     pub subtype: Option<String>,
 
     /// Optional notes.
@@ -195,117 +195,29 @@ const ACTIVITY_TYPES: &[&str] = &[
 // ============================================================================
 
 /// Get available subtypes for an activity type.
+/// Only includes subtypes that affect calculations (compiler expansion or flow classification).
 fn get_subtypes_for_activity_type(activity_type: &str) -> Vec<SubtypeOption> {
     match activity_type.to_uppercase().as_str() {
+        // DIVIDEND subtypes
         "DIVIDEND" => vec![
             SubtypeOption {
                 value: "DRIP".to_string(),
-                label: "Dividend Reinvested".to_string(),
-            },
-            SubtypeOption {
-                value: "QUALIFIED".to_string(),
-                label: "Qualified Dividend".to_string(),
-            },
-            SubtypeOption {
-                value: "ORDINARY".to_string(),
-                label: "Ordinary Dividend".to_string(),
-            },
-            SubtypeOption {
-                value: "RETURN_OF_CAPITAL".to_string(),
-                label: "Return of Capital".to_string(),
+                label: "Dividend Reinvested (DRIP)".to_string(),
             },
             SubtypeOption {
                 value: "DIVIDEND_IN_KIND".to_string(),
-                label: "Dividend (In Kind)".to_string(),
+                label: "Dividend in Kind".to_string(),
             },
         ],
-        "INTEREST" => vec![
-            SubtypeOption {
-                value: "STAKING_REWARD".to_string(),
-                label: "Staking Reward".to_string(),
-            },
-            SubtypeOption {
-                value: "LENDING_INTEREST".to_string(),
-                label: "Lending Interest".to_string(),
-            },
-            SubtypeOption {
-                value: "COUPON".to_string(),
-                label: "Bond Coupon".to_string(),
-            },
-        ],
-        "SPLIT" => vec![
-            SubtypeOption {
-                value: "STOCK_DIVIDEND".to_string(),
-                label: "Stock Dividend".to_string(),
-            },
-            SubtypeOption {
-                value: "REVERSE_SPLIT".to_string(),
-                label: "Reverse Split".to_string(),
-            },
-        ],
-        "BUY" | "SELL" => vec![
-            SubtypeOption {
-                value: "OPTION_ASSIGNMENT".to_string(),
-                label: "Option Assignment".to_string(),
-            },
-            SubtypeOption {
-                value: "OPTION_EXERCISE".to_string(),
-                label: "Option Exercise".to_string(),
-            },
-        ],
-        "FEE" => vec![
-            SubtypeOption {
-                value: "MANAGEMENT_FEE".to_string(),
-                label: "Management Fee".to_string(),
-            },
-            SubtypeOption {
-                value: "ADR_FEE".to_string(),
-                label: "ADR Fee".to_string(),
-            },
-            SubtypeOption {
-                value: "INTEREST_CHARGE".to_string(),
-                label: "Interest Charge".to_string(),
-            },
-        ],
-        "TAX" => vec![
-            SubtypeOption {
-                value: "WITHHOLDING".to_string(),
-                label: "Withholding Tax".to_string(),
-            },
-            SubtypeOption {
-                value: "NRA_WITHHOLDING".to_string(),
-                label: "NRA Withholding Tax".to_string(),
-            },
-        ],
-        "CREDIT" => vec![
-            SubtypeOption {
-                value: "FEE_REFUND".to_string(),
-                label: "Fee Refund".to_string(),
-            },
-            SubtypeOption {
-                value: "TAX_REFUND".to_string(),
-                label: "Tax Refund".to_string(),
-            },
-            SubtypeOption {
-                value: "BONUS".to_string(),
-                label: "Bonus".to_string(),
-            },
-            SubtypeOption {
-                value: "ADJUSTMENT".to_string(),
-                label: "Adjustment".to_string(),
-            },
-            SubtypeOption {
-                value: "REBATE".to_string(),
-                label: "Rebate".to_string(),
-            },
-            SubtypeOption {
-                value: "REVERSAL".to_string(),
-                label: "Reversal".to_string(),
-            },
-        ],
-        "TRANSFER_IN" => vec![SubtypeOption {
-            value: "OPENING_POSITION".to_string(),
-            label: "Opening Position".to_string(),
+        // STAKING_REWARD expands to INTEREST + BUY
+        "INTEREST" => vec![SubtypeOption {
+            value: "STAKING_REWARD".to_string(),
+            label: "Staking Reward".to_string(),
+        }],
+        // BONUS is external flow (affects TWR)
+        "CREDIT" => vec![SubtypeOption {
+            value: "BONUS".to_string(),
+            label: "Bonus".to_string(),
         }],
         _ => vec![],
     }
@@ -553,7 +465,7 @@ impl<E: AiEnvironment + 'static> Tool for RecordActivityTool<E> {
                     },
                     "subtype": {
                         "type": "string",
-                        "description": "Activity subtype for semantic variations: DRIP (dividend reinvested), STAKING_REWARD (crypto staking), QUALIFIED (qualified dividend), etc."
+                        "description": "Activity subtype for semantic variations: DRIP (dividend reinvested), DIVIDEND_IN_KIND (dividend paid in asset), STAKING_REWARD (crypto staking), BONUS (promotional credit)"
                     },
                     "notes": {
                         "type": "string",
@@ -843,7 +755,7 @@ mod tests {
     async fn test_get_subtypes_for_activity_type() {
         let subtypes = get_subtypes_for_activity_type("DIVIDEND");
         assert!(subtypes.iter().any(|s| s.value == "DRIP"));
-        assert!(subtypes.iter().any(|s| s.value == "QUALIFIED"));
+        assert_eq!(subtypes.len(), 1); // Only DRIP
 
         let subtypes = get_subtypes_for_activity_type("INTEREST");
         assert!(subtypes.iter().any(|s| s.value == "STAKING_REWARD"));

@@ -233,7 +233,10 @@ pub mod test_env {
         }
 
         fn get_import_mapping(&self, _account_id: String) -> CoreResult<ImportMappingData> {
-            unimplemented!("MockActivityService::get_import_mapping")
+            // Return error to simulate no saved mapping (tests will use auto-detection)
+            Err(wealthfolio_core::errors::DatabaseError::NotFound(
+                "No saved import mapping".to_string(),
+            ).into())
         }
 
         async fn create_activity(&self, _activity: NewActivity) -> CoreResult<Activity> {
@@ -259,6 +262,7 @@ pub mod test_env {
             &self,
             _account_id: String,
             _activities: Vec<ActivityImport>,
+            _dry_run: bool,
         ) -> CoreResult<Vec<ActivityImport>> {
             unimplemented!("MockActivityService::check_activities_import")
         }
@@ -267,7 +271,7 @@ pub mod test_env {
             &self,
             _account_id: String,
             _activities: Vec<ActivityImport>,
-        ) -> CoreResult<Vec<ActivityImport>> {
+        ) -> CoreResult<wealthfolio_core::activities::ImportActivitiesResult> {
             unimplemented!("MockActivityService::import_activities")
         }
 
@@ -276,6 +280,22 @@ pub mod test_env {
             _mapping_data: ImportMappingData,
         ) -> CoreResult<ImportMappingData> {
             unimplemented!("MockActivityService::save_import_mapping")
+        }
+
+        fn check_existing_duplicates(
+            &self,
+            _idempotency_keys: Vec<String>,
+        ) -> CoreResult<std::collections::HashMap<String, String>> {
+            Ok(std::collections::HashMap::new())
+        }
+
+        fn parse_csv(
+            &self,
+            content: &[u8],
+            config: &wealthfolio_core::activities::ParseConfig,
+        ) -> CoreResult<wealthfolio_core::activities::ParsedCsvResult> {
+            // Delegate to the actual core parser for testing
+            wealthfolio_core::activities::parse_csv(content, config)
         }
     }
 

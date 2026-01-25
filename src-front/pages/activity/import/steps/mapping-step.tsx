@@ -38,6 +38,7 @@ export const MappingStep = ({
     accountId,
     defaultMapping: {
       accountId: accountId || "",
+      name: "",
       fieldMappings: {},
       activityMappings: {},
       symbolMappings: {},

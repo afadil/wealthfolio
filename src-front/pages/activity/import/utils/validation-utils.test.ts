@@ -85,6 +85,7 @@ describe("validation-utils", () => {
   describe("validateActivityImport with negative values", () => {
     const testMapping = {
       accountId: "test-account",
+      name: "Test Mapping",
       fieldMappings: {
         [ImportFormat.DATE]: "date",
         [ImportFormat.SYMBOL]: "symbol",

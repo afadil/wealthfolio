@@ -1,5 +1,7 @@
 //! Import run domain models.
 
+use crate::Result;
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -173,4 +175,20 @@ impl ImportRun {
         self.finished_at = Some(Utc::now());
         self.updated_at = Utc::now();
     }
+}
+
+/// Trait for ImportRun persistence operations
+#[async_trait]
+pub trait ImportRunRepositoryTrait: Send + Sync {
+    /// Create a new import run
+    async fn create(&self, import_run: ImportRun) -> Result<ImportRun>;
+
+    /// Update an import run
+    async fn update(&self, import_run: ImportRun) -> Result<ImportRun>;
+
+    /// Get import run by ID
+    fn get_by_id(&self, id: &str) -> Result<Option<ImportRun>>;
+
+    /// Get recent import runs for an account
+    fn get_recent_for_account(&self, account_id: &str, limit: i64) -> Result<Vec<ImportRun>>;
 }

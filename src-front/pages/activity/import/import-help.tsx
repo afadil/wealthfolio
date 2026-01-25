@@ -11,11 +11,12 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@wealthfolio/ui";
+import { downloadSampleCsv } from "./utils/sample-csv";
 
 export function ImportHelpPopover() {
   const { isMobile } = usePlatform();
 
-  const helpContent = (
+  const helpContentColumn1 = (
     <div className="space-y-4">
       <div>
         <h4 className="text-lg font-semibold">Importing Account Activities</h4>
@@ -33,7 +34,8 @@ export function ImportHelpPopover() {
           <li>
             Map CSV columns to required fields:
             <span className="text-muted-foreground ml-2 text-xs">
-              date, symbol, quantity, activityType, unitPrice, currency, fee, amount
+              date, symbol, quantity, activityType, unitPrice, currency, fee, amount, fxRate,
+              subtype
             </span>
           </li>
           <li>Map activity types and symbols if needed</li>
@@ -68,6 +70,57 @@ export function ImportHelpPopover() {
         </div>
       </div>
 
+      <p className="text-xs">
+        For more details, see the{" "}
+        <a
+          href="https://wealthfolio.app/docs/concepts/activity-types"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline"
+        >
+          Activity Reference documentation
+        </a>
+        .
+      </p>
+    </div>
+  );
+
+  const helpContentColumn2 = (
+    <div className="space-y-4">
+      <div>
+        <p className="font-semibold">Example CSV format:</p>
+        <pre className="bg-muted mt-2 overflow-x-auto p-3 text-xs leading-relaxed select-all">
+          <span className="text-muted-foreground"># Standard format:</span>
+          <br />
+          date,symbol,quantity,activityType,unitPrice,currency,fee,amount,fxRate,subtype
+          <br />
+          2024-01-01,MSFT,1,DIVIDEND,57.5,USD,0,57.5,,DRIP
+          <br />
+          2023-12-15,MSFT,30,BUY,368.60,USD,0,,,
+          <br />
+          2023-08-11,$CASH-USD,1,DEPOSIT,1,USD,0,600.03,,
+          <br />
+          2024-02-01,AAPL,10,BUY,185.50,CAD,5,,1.35,
+          <br />
+          <br />
+          <span className="text-muted-foreground"># With currency symbols (auto-parsed):</span>
+          <br />
+          06/27/2025,AAPL,25,SELL,$48.95,USD,,$1223.63,,
+          <br />
+          06/20/2025,AAPL,8,BUY,$86.56,USD,,-$692.48,,
+        </pre>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="mt-3 flex items-center gap-1.5"
+          onClick={downloadSampleCsv}
+        >
+          <Icons.Download className="h-4 w-4" />
+          Download Sample CSV
+        </Button>
+      </div>
+
       <div>
         <p className="font-semibold">Supported Activity Types:</p>
         <pre className="bg-muted mt-2 overflow-x-auto p-4 text-xs">
@@ -88,41 +141,6 @@ export function ImportHelpPopover() {
           </ul>
         </pre>
       </div>
-
-      <div>
-        <p className="font-semibold">Example CSV format:</p>
-        <pre className="bg-muted mt-2 overflow-x-auto p-3 text-xs leading-relaxed select-all">
-          <span className="text-muted-foreground"># Standard format:</span>
-          <br />
-          date,symbol,quantity,activityType,unitPrice,currency,fee,amount
-          <br />
-          2024-01-01,MSFT,1,DIVIDEND,57.5,USD,0,57.5
-          <br />
-          2023-12-15,MSFT,30,BUY,368.60,USD,0
-          <br />
-          2023-08-11,$CASH-USD,1,DEPOSIT,1,USD,0,600.03
-          <br />
-          <br />
-          <span className="text-muted-foreground"># With currency symbols (auto-parsed):</span>
-          <br />
-          06/27/2025,AAPL,25,SELL,$48.95,USD,,$1223.63
-          <br />
-          06/20/2025,AAPL,8,BUY,$86.56,USD,,-$692.48
-        </pre>
-      </div>
-
-      <p className="text-xs">
-        For more details, see the{" "}
-        <a
-          href="https://wealthfolio.app/docs/concepts/activity-types"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline"
-        >
-          Activity Reference documentation
-        </a>
-        .
-      </p>
     </div>
   );
 
@@ -138,7 +156,10 @@ export function ImportHelpPopover() {
           <SheetHeader>
             <SheetTitle>How to Import CSV</SheetTitle>
           </SheetHeader>
-          <ScrollArea className="h-[calc(85vh-4rem)] pr-4">{helpContent}</ScrollArea>
+          <ScrollArea className="h-[calc(85vh-4rem)] pr-4">
+            {helpContentColumn1}
+            <div className="mt-6">{helpContentColumn2}</div>
+          </ScrollArea>
         </SheetContent>
       </Sheet>
     );
@@ -153,7 +174,10 @@ export function ImportHelpPopover() {
         </Button>
       </PopoverTrigger>
       <PopoverContent className="m-4 w-[900px] max-w-[calc(100vw-2rem)] p-6 text-sm">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">{helpContent}</div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {helpContentColumn1}
+          {helpContentColumn2}
+        </div>
       </PopoverContent>
     </Popover>
   );

@@ -8,12 +8,17 @@ use crate::accounts::{Account, AccountServiceTrait};
 use crate::activities::activities_constants::is_cash_activity;
 use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
+use crate::activities::csv_parser::{self, ParseConfig, ParsedCsvResult};
 use crate::activities::{ActivityRepositoryTrait, ActivityServiceTrait};
 use crate::assets::{canonical_asset_id, AssetKind, AssetServiceTrait};
 use crate::fx::currency::{get_normalization_rule, normalize_amount};
 use crate::fx::FxServiceTrait;
 use crate::quotes::{DataSource, Quote, QuoteServiceTrait};
+use crate::sync::{
+    ImportRun, ImportRunMode, ImportRunRepositoryTrait, ImportRunSummary, ImportRunType, ReviewMode,
+};
 use crate::Result;
+use log::warn;
 use uuid::Uuid;
 
 /// Service for managing activities
@@ -23,6 +28,7 @@ pub struct ActivityService {
     asset_service: Arc<dyn AssetServiceTrait>,
     fx_service: Arc<dyn FxServiceTrait>,
     quote_service: Arc<dyn QuoteServiceTrait>,
+    import_run_repository: Option<Arc<dyn ImportRunRepositoryTrait>>,
 }
 
 impl ActivityService {
@@ -40,6 +46,26 @@ impl ActivityService {
             asset_service,
             fx_service,
             quote_service,
+            import_run_repository: None,
+        }
+    }
+
+    /// Creates a new ActivityService instance with import run tracking support
+    pub fn with_import_run_repository(
+        activity_repository: Arc<dyn ActivityRepositoryTrait>,
+        account_service: Arc<dyn AccountServiceTrait>,
+        asset_service: Arc<dyn AssetServiceTrait>,
+        fx_service: Arc<dyn FxServiceTrait>,
+        quote_service: Arc<dyn QuoteServiceTrait>,
+        import_run_repository: Arc<dyn ImportRunRepositoryTrait>,
+    ) -> Self {
+        Self {
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+            import_run_repository: Some(import_run_repository),
         }
     }
 
@@ -151,6 +177,11 @@ impl ActivityService {
         }
 
         Ok(())
+    }
+
+    /// Parses CSV content with the given configuration.
+    pub fn parse_csv(&self, content: &[u8], config: &ParseConfig) -> Result<ParsedCsvResult> {
+        csv_parser::parse_csv(content, config)
     }
 }
 
@@ -749,10 +780,14 @@ impl ActivityServiceTrait for ActivityService {
     }
 
     /// Verifies the activities import from CSV file
+    /// When `dry_run` is true, this performs read-only validation without creating
+    /// assets or registering FX pairs. When `dry_run` is false (default legacy behavior),
+    /// it creates minimal assets and registers FX pairs as needed.
     async fn check_activities_import(
         &self,
         account_id: String,
         activities: Vec<ActivityImport>,
+        dry_run: bool,
     ) -> Result<Vec<ActivityImport>> {
         let account: Account = self.account_service.get_account(&account_id)?;
 
@@ -824,66 +859,106 @@ impl ActivityServiceTrait for ActivityService {
                 &asset_context_currency,
             );
 
-            // Pass exchange_mic as metadata for asset creation
-            let asset_metadata = exchange_mic.as_ref().map(|mic| {
-                crate::assets::AssetMetadata {
-                    name: None,
-                    kind: None,
-                    exchange_mic: Some(mic.clone()),
-                }
-            });
-
-            let symbol_profile_result = self
-                .asset_service
-                .get_or_create_minimal_asset(
-                    &canonical_id,
-                    Some(asset_context_currency),
-                    asset_metadata,
-                    None,
-                )
-                .await;
-
             let (mut is_valid, mut error_message) = (true, None);
 
-            match symbol_profile_result {
-                Ok(asset) => {
-                    // symbol_profile_result now returns Asset
-                    activity.symbol_name = asset.name; // Use asset name
+            if dry_run {
+                // Dry-run mode: read-only validation without side effects
+                // Just check if asset exists (don't create it)
+                match self.asset_service.get_asset_by_id(&canonical_id) {
+                    Ok(asset) => {
+                        activity.symbol_name = asset.name;
+                    }
+                    Err(_) => {
+                        // Asset doesn't exist yet - that's OK for dry-run
+                        // It will be created during actual import
+                        // Use the symbol as a placeholder name
+                        activity.symbol_name = Some(activity.symbol.clone());
+                    }
+                }
 
-                    // Check if activity currency (from import) is valid and handle FX
-                    if activity.currency.is_empty() {
-                        // Activity must have a currency specified in the import
+                // Validate currency without registering FX pair
+                if activity.currency.is_empty() {
+                    is_valid = false;
+                    error_message =
+                        Some("Activity currency is missing in the import data.".to_string());
+                } else if activity.currency != account.currency {
+                    // In dry-run mode, just check that currencies are valid 3-letter codes
+                    // The actual FX pair will be registered during import
+                    let from = &account.currency;
+                    let to = &activity.currency;
+                    if from.len() != 3
+                        || !from.chars().all(|c| c.is_alphabetic())
+                        || to.len() != 3
+                        || !to.chars().all(|c| c.is_alphabetic())
+                    {
                         is_valid = false;
-                        error_message =
-                            Some("Activity currency is missing in the import data.".to_string());
-                    } else if activity.currency != account.currency {
-                        match self
-                            .fx_service
-                            .register_currency_pair(
-                                account.currency.as_str(),
-                                activity.currency.as_str(), // Use currency from import data
-                            )
-                            .await
-                        {
-                            Ok(_) => { /* FX pair registered or already exists */ }
-                            Err(e) => {
-                                is_valid = false;
-                                error_message =
-                                    Some(format!("Failed to register currency pair for FX: {}", e));
+                        error_message = Some(format!(
+                            "Invalid currency code: {} or {}",
+                            from, to
+                        ));
+                    }
+                }
+            } else {
+                // Legacy mode: create assets and register FX pairs
+                // Pass exchange_mic as metadata for asset creation
+                let asset_metadata = exchange_mic.as_ref().map(|mic| {
+                    crate::assets::AssetMetadata {
+                        name: None,
+                        kind: None,
+                        exchange_mic: Some(mic.clone()),
+                    }
+                });
+
+                let symbol_profile_result = self
+                    .asset_service
+                    .get_or_create_minimal_asset(
+                        &canonical_id,
+                        Some(asset_context_currency),
+                        asset_metadata,
+                        None,
+                    )
+                    .await;
+
+                match symbol_profile_result {
+                    Ok(asset) => {
+                        // symbol_profile_result now returns Asset
+                        activity.symbol_name = asset.name; // Use asset name
+
+                        // Check if activity currency (from import) is valid and handle FX
+                        if activity.currency.is_empty() {
+                            // Activity must have a currency specified in the import
+                            is_valid = false;
+                            error_message =
+                                Some("Activity currency is missing in the import data.".to_string());
+                        } else if activity.currency != account.currency {
+                            match self
+                                .fx_service
+                                .register_currency_pair(
+                                    account.currency.as_str(),
+                                    activity.currency.as_str(), // Use currency from import data
+                                )
+                                .await
+                            {
+                                Ok(_) => { /* FX pair registered or already exists */ }
+                                Err(e) => {
+                                    is_valid = false;
+                                    error_message =
+                                        Some(format!("Failed to register currency pair for FX: {}", e));
+                                }
                             }
                         }
                     }
+                    Err(e) => {
+                        // Failed to get or create asset
+                        let error_msg = format!(
+                            "Failed to resolve asset for symbol '{}': {}",
+                            &activity.symbol, e
+                        );
+                        is_valid = false;
+                        error_message = Some(error_msg);
+                    }
                 }
-                Err(e) => {
-                    // Failed to get or create asset
-                    let error_msg = format!(
-                        "Failed to resolve asset for symbol '{}': {}",
-                        &activity.symbol, e
-                    );
-                    is_valid = false;
-                    error_message = Some(error_msg);
-                }
-            };
+            }
 
             activity.is_valid = is_valid;
             if let Some(error_msg) = error_message {
@@ -903,11 +978,30 @@ impl ActivityServiceTrait for ActivityService {
         &self,
         account_id: String,
         activities: Vec<ActivityImport>,
-    ) -> Result<Vec<ActivityImport>> {
+    ) -> Result<ImportActivitiesResult> {
         let account = self.account_service.get_account(&account_id)?;
+        let total_count = activities.len() as u32;
+
+        // Create import run at the start
+        let import_run = ImportRun::new(
+            account_id.clone(),
+            "CSV".to_string(),
+            ImportRunType::Import,
+            ImportRunMode::Initial,
+            ReviewMode::Never,
+        );
+        let import_run_id = import_run.id.clone();
+
+        // Try to persist the import run if repository is available
+        if let Some(ref repo) = self.import_run_repository {
+            if let Err(e) = repo.create(import_run.clone()).await {
+                warn!("Failed to create import run record: {}", e);
+                // Continue with import even if tracking fails
+            }
+        }
 
         let validated_activities = self
-            .check_activities_import(account_id.clone(), activities)
+            .check_activities_import(account_id.clone(), activities, false)
             .await?;
 
         let has_errors = validated_activities.iter().any(|activity| {
@@ -919,7 +1013,41 @@ impl ActivityServiceTrait for ActivityService {
         });
 
         if has_errors {
-            return Ok(validated_activities);
+            // Mark import run as failed due to validation errors
+            let skipped_count = validated_activities
+                .iter()
+                .filter(|a| !a.is_valid)
+                .count() as u32;
+
+            if let Some(ref repo) = self.import_run_repository {
+                let mut failed_run = import_run;
+                failed_run.fail("Validation errors in import data".to_string());
+                failed_run.summary = Some(ImportRunSummary {
+                    fetched: total_count,
+                    inserted: 0,
+                    updated: 0,
+                    skipped: skipped_count,
+                    warnings: 0,
+                    errors: skipped_count,
+                    removed: 0,
+                    assets_created: 0,
+                });
+                if let Err(e) = repo.update(failed_run).await {
+                    warn!("Failed to update import run with failure status: {}", e);
+                }
+            }
+
+            return Ok(ImportActivitiesResult {
+                activities: validated_activities,
+                import_run_id,
+                summary: ImportActivitiesSummary {
+                    total: total_count,
+                    imported: 0,
+                    skipped: skipped_count,
+                    assets_created: 0,
+                    success: false,
+                },
+            });
         }
 
         let new_activities: Vec<NewActivity> = validated_activities
@@ -953,7 +1081,7 @@ impl ActivityServiceTrait for ActivityService {
                         pricing_mode: None,
                     }),
                     activity_type: activity.activity_type.clone(),
-                    subtype: None,
+                    subtype: activity.subtype.clone(),
                     activity_date: activity.date.clone(),
                     quantity: Some(activity.quantity),
                     unit_price: Some(activity.unit_price),
@@ -966,7 +1094,7 @@ impl ActivityServiceTrait for ActivityService {
                         Some(crate::activities::ActivityStatus::Posted)
                     },
                     notes: activity.comment.clone(),
-                    fx_rate: None,
+                    fx_rate: activity.fx_rate,
                     metadata: None,
                     needs_review: None,
                     source_system: Some("CSV".to_string()),
@@ -982,7 +1110,36 @@ impl ActivityServiceTrait for ActivityService {
             .await?;
         debug!("Successfully imported {} activities", count);
 
-        Ok(validated_activities)
+        // Mark import run as successful
+        if let Some(ref repo) = self.import_run_repository {
+            let mut success_run = import_run;
+            success_run.complete();
+            success_run.summary = Some(ImportRunSummary {
+                fetched: total_count,
+                inserted: count as u32,
+                updated: 0,
+                skipped: 0,
+                warnings: 0,
+                errors: 0,
+                removed: 0,
+                assets_created: 0, // TODO: Track assets created during import
+            });
+            if let Err(e) = repo.update(success_run).await {
+                warn!("Failed to update import run with success status: {}", e);
+            }
+        }
+
+        Ok(ImportActivitiesResult {
+            activities: validated_activities,
+            import_run_id,
+            summary: ImportActivitiesSummary {
+                total: total_count,
+                imported: count as u32,
+                skipped: 0,
+                assets_created: 0,
+                success: true,
+            },
+        })
     }
 
     /// Gets the first activity date for given account IDs
@@ -1018,5 +1175,24 @@ impl ActivityServiceTrait for ActivityService {
             .save_import_mapping(&mapping)
             .await?;
         Ok(mapping_data)
+    }
+
+    /// Checks for existing activities with the given idempotency keys.
+    ///
+    /// Returns a map of {idempotency_key: existing_activity_id} for keys that already exist.
+    fn check_existing_duplicates(
+        &self,
+        idempotency_keys: Vec<String>,
+    ) -> Result<HashMap<String, String>> {
+        self.activity_repository
+            .check_existing_duplicates(&idempotency_keys)
+    }
+
+    fn parse_csv(
+        &self,
+        content: &[u8],
+        config: &csv_parser::ParseConfig,
+    ) -> Result<csv_parser::ParsedCsvResult> {
+        csv_parser::parse_csv(content, config)
     }
 }

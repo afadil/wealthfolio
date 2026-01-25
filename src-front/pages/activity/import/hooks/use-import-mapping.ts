@@ -6,23 +6,260 @@ import { getAccountImportMapping, saveAccountImportMapping, logger } from "@/ada
 import { QueryKeys } from "@/lib/query-keys";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 
+/**
+ * Common column name aliases for each ImportFormat field.
+ * Used for smart auto-mapping of CSV columns.
+ * Includes variations: lowercase, camelCase, snake_case, with spaces
+ */
+const COLUMN_ALIASES: Record<string, string[]> = {
+  [ImportFormat.DATE]: [
+    "date",
+    "trade date",
+    "tradedate",
+    "transaction date",
+    "transactiondate",
+    "settlement date",
+    "settlementdate",
+    "settledate",
+    "activity date",
+    "activitydate",
+    "time",
+    "datetime",
+    "timestamp",
+    "executed at",
+    "executedat",
+    "trade_date",
+    "transaction_date",
+  ],
+  [ImportFormat.ACTIVITY_TYPE]: [
+    "activitytype",
+    "activity type",
+    "activity_type",
+    "type",
+    "action",
+    "transaction",
+    "transaction type",
+    "transactiontype",
+    "transaction_type",
+    "trans type",
+    "transtype",
+    "trans_type",
+    "activity",
+    "operation",
+    "trade type",
+    "tradetype",
+  ],
+  [ImportFormat.SYMBOL]: [
+    "symbol",
+    "ticker",
+    "tickersymbol",
+    "ticker symbol",
+    "ticker_symbol",
+    "security",
+    "securitysymbol",
+    "security symbol",
+    "stock",
+    "stocksymbol",
+    "stock symbol",
+    "asset",
+    "assetid",
+    "asset id",
+    "asset_id",
+    "instrument",
+    "isin",
+    "cusip",
+    "security id",
+    "securityid",
+  ],
+  [ImportFormat.QUANTITY]: [
+    "quantity",
+    "qty",
+    "shares",
+    "units",
+    "no of shares",
+    "numberofshares",
+    "number of shares",
+    "share quantity",
+    "sharequantity",
+    "num shares",
+    "numshares",
+    "volume",
+  ],
+  [ImportFormat.UNIT_PRICE]: [
+    "unitprice",
+    "unit price",
+    "unit_price",
+    "price",
+    "shareprice",
+    "share price",
+    "share_price",
+    "cost per share",
+    "costpershare",
+    "price per share",
+    "pricepershare",
+    "avg price",
+    "avgprice",
+    "average price",
+    "averageprice",
+    "execution price",
+    "executionprice",
+    "trade price",
+    "tradeprice",
+    "cost basis",
+    "costbasis",
+  ],
+  [ImportFormat.AMOUNT]: [
+    "amount",
+    "total",
+    "totalamount",
+    "total amount",
+    "total_amount",
+    "value",
+    "totalvalue",
+    "total value",
+    "total_value",
+    "netamount",
+    "net amount",
+    "net_amount",
+    "grossamount",
+    "gross amount",
+    "gross_amount",
+    "marketvalue",
+    "market value",
+    "market_value",
+    "netvalue",
+    "net value",
+    "proceeds",
+    "cost",
+  ],
+  [ImportFormat.CURRENCY]: [
+    "currency",
+    "currencycode",
+    "currency code",
+    "currency_code",
+    "ccy",
+    "curr",
+    "tradecurrency",
+    "trade currency",
+    "trade_currency",
+  ],
+  [ImportFormat.FEE]: [
+    "fee",
+    "fees",
+    "commission",
+    "commissions",
+    "tradingfee",
+    "trading fee",
+    "trading_fee",
+    "transactionfee",
+    "transaction fee",
+    "transaction_fee",
+    "brokerage",
+    "brokeragefee",
+    "brokerage fee",
+    "brokerage_fee",
+    "charges",
+  ],
+  [ImportFormat.ACCOUNT]: [
+    "account",
+    "accountid",
+    "account id",
+    "account_id",
+    "accountname",
+    "account name",
+    "account_name",
+    "portfolio",
+    "portfolioid",
+    "portfolio id",
+    "accountnumber",
+    "account number",
+    "account_number",
+    "acct",
+  ],
+  [ImportFormat.COMMENT]: [
+    "comment",
+    "comments",
+    "note",
+    "notes",
+    "description",
+    "memo",
+    "remarks",
+    "details",
+  ],
+  [ImportFormat.FX_RATE]: [
+    "fxrate",
+    "fx rate",
+    "fx_rate",
+    "exchangerate",
+    "exchange rate",
+    "exchange_rate",
+    "forex rate",
+    "forexrate",
+    "conversion rate",
+    "conversionrate",
+  ],
+  [ImportFormat.SUBTYPE]: [
+    "subtype",
+    "sub type",
+    "sub_type",
+    "variation",
+    "subcategory",
+    "sub category",
+  ],
+};
+
+/**
+ * Normalize a header string for comparison.
+ * Removes special characters, converts to lowercase, and trims whitespace.
+ */
+function normalizeHeader(header: string): string {
+  return header
+    .toLowerCase()
+    .trim()
+    .replace(/[_\-\.]/g, " ") // Replace underscores, hyphens, dots with spaces
+    .replace(/\s+/g, " "); // Collapse multiple spaces
+}
+
+/**
+ * Initialize column mapping by matching CSV headers to ImportFormat fields.
+ * Uses smart matching with common aliases and variations.
+ */
 export function initializeColumnMapping(
   headerRow: string[],
 ): Partial<Record<ImportFormat, string>> {
   const initialMapping: Partial<Record<ImportFormat, string>> = {};
-  Object.values(ImportFormat).forEach((field) => {
-    const matchingHeader = headerRow.find(
-      (header) => header.toLowerCase().trim() === field.toLowerCase(),
-    );
+  const usedHeaders = new Set<string>();
+
+  // For each ImportFormat field, try to find a matching header
+  for (const field of Object.values(ImportFormat)) {
+    const aliases = COLUMN_ALIASES[field] ?? [field];
+
+    // Find the first header that matches any alias
+    const matchingHeader = headerRow.find((header) => {
+      if (usedHeaders.has(header)) return false;
+
+      const normalizedHeader = normalizeHeader(header);
+
+      return aliases.some((alias) => {
+        const normalizedAlias = normalizeHeader(alias);
+        // Exact match only - avoid false positives from partial matches
+        // e.g., "id" should not match "assetid"
+        return normalizedHeader === normalizedAlias;
+      });
+    });
+
     if (matchingHeader) {
-      initialMapping[field] = matchingHeader;
+      initialMapping[field as ImportFormat] = matchingHeader;
+      usedHeaders.add(matchingHeader);
     }
-  });
+  }
+
   return initialMapping;
 }
 
 const initialMapping: ImportMappingData = {
   accountId: "",
+  name: "",
   fieldMappings: {},
   activityMappings: {},
   symbolMappings: {},
@@ -74,12 +311,19 @@ export function useImportMapping({
     },
   });
 
-  // Handle saving the mapping
-  const saveMapping = useCallback(() => {
-    if (accountId) {
-      saveMappingMutation.mutate({ ...mapping, accountId });
-    }
-  }, [mapping, accountId, saveMappingMutation]);
+  // Handle saving the mapping (with optional parseConfig from context)
+  const saveMapping = useCallback(
+    (parseConfig?: Record<string, unknown>) => {
+      if (accountId) {
+        saveMappingMutation.mutate({
+          ...mapping,
+          accountId,
+          ...(parseConfig && { parseConfig }),
+        });
+      }
+    },
+    [mapping, accountId, saveMappingMutation],
+  );
 
   useEffect(() => {
     if (fetchedMappingData) {

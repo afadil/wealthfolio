@@ -282,6 +282,12 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
   } else if (field === "fxRate") {
     // Use high precision for FX rates
     updated = { ...updated, fxRate: parseDecimalInput(value as string | number, 12) };
+  } else if (field === "subtype") {
+    // Subtype is optional, can be string or null/undefined
+    updated = { ...updated, subtype: typeof value === "string" && value ? value : undefined };
+  } else if (field === "isExternal") {
+    // isExternal flag for TRANSFER_IN/TRANSFER_OUT (stored in metadata.flow.is_external)
+    updated = { ...updated, isExternal: Boolean(value) };
   }
 
   return { ...updated, updatedAt: new Date() };
@@ -380,6 +386,25 @@ export function buildSavePayload(
     const isCash = isCashActivity(transaction.activityType);
     const isNew = transaction.isNew === true;
 
+    // Build metadata JSON if needed (e.g., for isExternal flag on transfers)
+    let metadataJson: string | undefined;
+    const isTransfer =
+      transaction.activityType === ActivityType.TRANSFER_IN ||
+      transaction.activityType === ActivityType.TRANSFER_OUT;
+    if (isTransfer && transaction.isExternal != null) {
+      // Merge with existing metadata if present
+      const existingMeta =
+        typeof transaction.metadata === "object" ? transaction.metadata : {};
+      const newMeta = {
+        ...existingMeta,
+        flow: {
+          ...(existingMeta as Record<string, unknown>)?.flow as Record<string, unknown> | undefined,
+          is_external: transaction.isExternal,
+        },
+      };
+      metadataJson = JSON.stringify(newMeta);
+    }
+
     // Common payload fields (shared between create and update)
     const basePayload = {
       id: transaction.id,
@@ -390,6 +415,7 @@ export function buildSavePayload(
           ? transaction.date.toISOString()
           : new Date(transaction.date).toISOString(),
       // Activity data
+      subtype: transaction.subtype ?? undefined,
       quantity: toDecimalString(transaction.quantity),
       unitPrice: toDecimalString(transaction.unitPrice),
       amount: toDecimalString(transaction.amount),
@@ -397,6 +423,7 @@ export function buildSavePayload(
       fee: toDecimalString(transaction.fee),
       fxRate: transaction.fxRate != null ? toDecimalString(transaction.fxRate) : null,
       comment: transaction.comment ?? undefined,
+      metadata: metadataJson,
     };
 
     // Remove quantity/unitPrice for split activities
@@ -457,6 +484,8 @@ export function buildSavePayload(
  */
 export const TRACKED_FIELDS: (keyof LocalTransaction)[] = [
   "activityType",
+  "subtype",
+  "isExternal",
   "date",
   "assetSymbol",
   "quantity",

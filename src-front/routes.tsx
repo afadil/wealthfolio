@@ -7,7 +7,7 @@ import SettingsLayout from "@/pages/settings/settings-layout";
 
 import ActivityManagerPage from "@/pages/activity/activity-manager-page";
 import ActivityPage from "@/pages/activity/activity-page";
-import ActivityImportPage from "@/pages/activity/import/activity-import-page";
+import ActivityImportPage from "@/pages/activity/import/activity-import-page-v2";
 import AssetsPage from "@/pages/asset/assets-page";
 import PortfolioPage from "@/pages/dashboard/portfolio-page";
 import HoldingsPage from "@/pages/holdings/holdings-page";

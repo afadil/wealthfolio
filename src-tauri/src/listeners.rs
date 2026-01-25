@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use tauri::{async_runtime::spawn, AppHandle, Emitter, Listener, Manager};
 use wealthfolio_core::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
+use wealthfolio_core::health::HealthServiceTrait;
 use wealthfolio_core::quotes::MarketSyncMode;
 
 use crate::context::ServiceContext;
@@ -92,6 +93,17 @@ fn handle_portfolio_request(handle: AppHandle, payload_str: &str, force_recalc: 
                             Ok(result) => {
                                 // Convert SyncResult to legacy format for backwards compatibility
                                 let failed_syncs = result.failures;
+
+                                // If there were sync failures, clear health cache so the next
+                                // health check will detect missing market data issues
+                                if !failed_syncs.is_empty() {
+                                    let health_service = context.health_service();
+                                    let health_clone = health_service.clone();
+                                    spawn(async move {
+                                        health_clone.clear_cache().await;
+                                    });
+                                }
+
                                 let result_payload = MarketSyncResult { failed_syncs };
                                 if let Err(e) =
                                     handle_clone.emit(MARKET_SYNC_COMPLETE, &result_payload)

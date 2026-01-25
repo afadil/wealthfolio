@@ -61,11 +61,6 @@ impl ActivityCompiler for DefaultActivityCompiler {
                 Ok(self.compile_dividend_in_kind(activity))
             }
 
-            // Stock Dividend: Pass through as SPLIT (more shares of same asset)
-            (ACTIVITY_TYPE_SPLIT, Some(ACTIVITY_SUBTYPE_STOCK_DIVIDEND)) => {
-                Ok(vec![activity.clone()])
-            }
-
             // Default: Pass through unchanged
             _ => Ok(vec![activity.clone()]),
         }
@@ -424,25 +419,6 @@ mod tests {
         assert_eq!(result.len(), 2);
         // TRANSFER_IN should fall back to the original asset_id
         assert_eq!(result[1].asset_id, Some("AAPL".to_string()));
-    }
-
-    #[test]
-    fn test_compile_stock_dividend_passthrough() {
-        let compiler = DefaultActivityCompiler::new();
-        let mut activity = create_test_activity();
-        activity.activity_type = ACTIVITY_TYPE_SPLIT.to_string();
-        activity.subtype = Some(ACTIVITY_SUBTYPE_STOCK_DIVIDEND.to_string());
-        activity.quantity = Some(dec!(10)); // additional shares
-
-        let result = compiler.compile(&activity).unwrap();
-
-        // Stock dividend passes through as SPLIT
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].activity_type, ACTIVITY_TYPE_SPLIT);
-        assert_eq!(
-            result[0].subtype,
-            Some(ACTIVITY_SUBTYPE_STOCK_DIVIDEND.to_string())
-        );
     }
 
     #[test]

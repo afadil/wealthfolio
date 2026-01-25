@@ -9,6 +9,7 @@ import {
 import { importActivitySchema } from "@/lib/schemas";
 import { tryParseDate } from "@/lib/utils";
 import { logger } from "@/adapters";
+import { SUBTYPES_BY_ACTIVITY_TYPE, SUBTYPE_DISPLAY_NAMES } from "@/lib/constants";
 
 // Ticker symbol validation regex
 const tickerRegex = /^(\$CASH-[A-Z]{3}|[A-Z0-9]{1,10}([.-][A-Z0-9]+){0,2})$/;
@@ -16,6 +17,75 @@ const tickerRegex = /^(\$CASH-[A-Z]{3}|[A-Z0-9]{1,10}([.-][A-Z0-9]+){0,2})$/;
 // Helper to validate ticker symbol format
 export function validateTickerSymbol(symbol: string): boolean {
   return tickerRegex.test(symbol.trim());
+}
+
+// Build reverse lookup from display names to subtype codes
+const DISPLAY_NAME_TO_SUBTYPE: Record<string, string> = {};
+for (const [code, displayName] of Object.entries(SUBTYPE_DISPLAY_NAMES)) {
+  DISPLAY_NAME_TO_SUBTYPE[displayName.toUpperCase()] = code;
+}
+
+/**
+ * Normalizes a subtype value to match the expected format.
+ * Handles variations like "drip" -> "DRIP", "Dividend Reinvested" -> "DRIP"
+ */
+function normalizeSubtype(rawSubtype: string): string | undefined {
+  if (!rawSubtype) return undefined;
+
+  const trimmed = rawSubtype.trim();
+  if (!trimmed) return undefined;
+
+  const upper = trimmed.toUpperCase();
+
+  // Check if it's already a valid subtype code
+  if (SUBTYPE_DISPLAY_NAMES[upper]) {
+    return upper;
+  }
+
+  // Check if it matches a display name
+  if (DISPLAY_NAME_TO_SUBTYPE[upper]) {
+    return DISPLAY_NAME_TO_SUBTYPE[upper];
+  }
+
+  // Try with underscores replaced by spaces and vice versa
+  const withSpaces = upper.replace(/_/g, " ");
+  if (DISPLAY_NAME_TO_SUBTYPE[withSpaces]) {
+    return DISPLAY_NAME_TO_SUBTYPE[withSpaces];
+  }
+
+  const withUnderscores = upper.replace(/ /g, "_");
+  if (SUBTYPE_DISPLAY_NAMES[withUnderscores]) {
+    return withUnderscores;
+  }
+
+  // Return the uppercase version if no match found
+  // It will be validated later against allowed subtypes for the activity type
+  return upper;
+}
+
+/**
+ * Validates and returns the subtype if it's valid for the given activity type.
+ * Returns undefined if the subtype is not valid for the activity type.
+ */
+function validateSubtypeForActivityType(
+  subtype: string | undefined,
+  activityType: ActivityType | undefined,
+): string | undefined {
+  if (!subtype || !activityType) return undefined;
+
+  const allowedSubtypes = SUBTYPES_BY_ACTIVITY_TYPE[activityType];
+  if (!allowedSubtypes || allowedSubtypes.length === 0) {
+    // Activity type doesn't support subtypes
+    return undefined;
+  }
+
+  // Check if the subtype is in the allowed list
+  if (allowedSubtypes.includes(subtype)) {
+    return subtype;
+  }
+
+  // Subtype not valid for this activity type
+  return undefined;
 }
 
 /**
@@ -286,6 +356,13 @@ function transformRowToActivity(
   activity.fee = rawFee;
   activity.amount = rawAmount;
   activity.lineNumber = parseInt(row.lineNumber);
+  activity.comment = getMappedValue(ImportFormat.COMMENT)?.trim() || undefined;
+
+  // Extract optional fields: fxRate, subtype (subtype will be validated after activity type is determined)
+  activity.fxRate = parseAndAbsoluteValue(getMappedValue(ImportFormat.FX_RATE));
+  if (activity.fxRate !== undefined && isNaN(activity.fxRate)) activity.fxRate = undefined;
+  const rawSubtype = getMappedValue(ImportFormat.SUBTYPE);
+  const normalizedSubtype = normalizeSubtype(rawSubtype || "");
 
   // Apply Symbol Mapping BEFORE determining activity type logic
   if (activity.symbol && mapping.symbolMappings[activity.symbol]) {
@@ -302,6 +379,9 @@ function transformRowToActivity(
       }
     }
   }
+
+  // Validate subtype against allowed subtypes for the determined activity type
+  activity.subtype = validateSubtypeForActivityType(normalizedSubtype, activity.activityType);
 
   // 3. Apply Logic from Configuration
   const logic = activity.activityType

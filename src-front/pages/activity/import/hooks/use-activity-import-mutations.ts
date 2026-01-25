@@ -1,26 +1,22 @@
 import { useMutation } from "@tanstack/react-query";
 import { logger, importActivities } from "@/adapters";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
+import type { ImportActivitiesResult, ActivityImport } from "@/lib/types";
 
 export function useActivityImportMutations({
   onSuccess,
   onError,
 }: {
-  onSuccess?: (activities: unknown[]) => void;
+  onSuccess?: (activities: ActivityImport[], result: ImportActivitiesResult) => void;
   onError?: (error: string) => void;
 } = {}) {
   const confirmImportMutation = useMutation({
     mutationFn: importActivities,
-    onSuccess: async (result: unknown) => {
+    onSuccess: async (result: ImportActivitiesResult) => {
       // Call the provided onSuccess callback if it exists
+      // Note: We don't show a toast here since the result step displays the success state
       if (onSuccess) {
-        // Ensure we pass an array of activities to the callback
-        const activities = Array.isArray(result) ? result : [result];
-        onSuccess(activities);
-        toast({
-          title: "Import successful",
-          description: "Activities have been imported successfully.",
-        });
+        onSuccess(result.activities, result);
       }
     },
     onError: (error: unknown) => {

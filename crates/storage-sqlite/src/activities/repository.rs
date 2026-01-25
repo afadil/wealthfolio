@@ -847,4 +847,36 @@ impl ActivityRepositoryTrait for ActivityRepository {
 
         Ok(result_map)
     }
+
+    /// Checks for existing activities with the given idempotency keys.
+    ///
+    /// Returns a map of {idempotency_key: existing_activity_id} for keys that already exist.
+    fn check_existing_duplicates(
+        &self,
+        idempotency_keys: &[String],
+    ) -> Result<HashMap<String, String>> {
+        if idempotency_keys.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let mut conn = get_connection(&self.pool)?;
+        let mut result_map: HashMap<String, String> = HashMap::new();
+
+        // Chunk the keys to avoid SQLite parameter limits
+        for chunk in chunk_for_sqlite(idempotency_keys) {
+            let results = activities::table
+                .filter(activities::idempotency_key.eq_any(chunk))
+                .select((activities::id, activities::idempotency_key))
+                .load::<(String, Option<String>)>(&mut conn)
+                .map_err(StorageError::from)?;
+
+            for (activity_id, key_opt) in results {
+                if let Some(key) = key_opt {
+                    result_map.insert(key, activity_id);
+                }
+            }
+        }
+
+        Ok(result_map)
+    }
 }

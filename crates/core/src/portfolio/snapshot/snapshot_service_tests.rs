@@ -416,6 +416,13 @@ mod tests {
         > {
             Ok(std::collections::HashMap::new())
         }
+
+        fn check_existing_duplicates(
+            &self,
+            _idempotency_keys: &[String],
+        ) -> AppResult<std::collections::HashMap<String, String>> {
+            Ok(std::collections::HashMap::new())
+        }
     }
 
     #[derive(Clone, Debug)]
@@ -532,6 +539,13 @@ mod tests {
         ) -> AppResult<
             std::collections::HashMap<String, (Option<chrono::NaiveDate>, Option<chrono::NaiveDate>)>,
         > {
+            Ok(std::collections::HashMap::new())
+        }
+
+        fn check_existing_duplicates(
+            &self,
+            _idempotency_keys: &[String],
+        ) -> AppResult<std::collections::HashMap<String, String>> {
             Ok(std::collections::HashMap::new())
         }
     }
@@ -1857,6 +1871,211 @@ mod tests {
         assert_eq!(frame_d2.cash_balances.get("USD"), Some(&dec!(4900)));
 
         // Net contribution NOT affected by tax
+        assert_eq!(frame_d2.net_contribution, dec!(5000));
+    }
+
+    // ==================== CREDIT ACTIVITY TESTS ====================
+
+    #[tokio::test]
+    async fn test_credit_bonus_increases_cash_and_net_contribution() {
+        // CREDIT with BONUS subtype is an external flow (new capital)
+        // It should increase cash AND net_contribution (like DEPOSIT)
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+
+        let deposit = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(5000)),
+            "USD",
+        );
+
+        // Create CREDIT activity with BONUS subtype
+        let mut credit_bonus = create_test_activity(
+            "credit1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "CREDIT",
+            d2,
+            None,
+            None,
+            Some(dec!(100)),
+            "USD",
+        );
+        credit_bonus.subtype = Some("BONUS".to_string());
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![deposit, credit_bonus]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+
+        let frames = snapshot_repo.get_saved_snapshots();
+        let mut sorted = frames.clone();
+        sorted.sort_by_key(|s| s.snapshot_date);
+
+        let frame_d2 = &sorted[1];
+
+        // Cash increased by CREDIT/BONUS
+        assert_eq!(frame_d2.cash_balances.get("USD"), Some(&dec!(5100)));
+
+        // Net contribution ALSO increased by CREDIT/BONUS (external flow)
+        assert_eq!(frame_d2.net_contribution, dec!(5100));
+    }
+
+    #[tokio::test]
+    async fn test_credit_rebate_increases_cash_but_not_net_contribution() {
+        // CREDIT with REBATE subtype is an internal flow (trading rebate)
+        // It should increase cash but NOT net_contribution
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+
+        let deposit = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(5000)),
+            "USD",
+        );
+
+        // Create CREDIT activity with REBATE subtype
+        let mut credit_rebate = create_test_activity(
+            "credit1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "CREDIT",
+            d2,
+            None,
+            None,
+            Some(dec!(50)),
+            "USD",
+        );
+        credit_rebate.subtype = Some("REBATE".to_string());
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![deposit, credit_rebate]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+
+        let frames = snapshot_repo.get_saved_snapshots();
+        let mut sorted = frames.clone();
+        sorted.sort_by_key(|s| s.snapshot_date);
+
+        let frame_d2 = &sorted[1];
+
+        // Cash increased by CREDIT/REBATE
+        assert_eq!(frame_d2.cash_balances.get("USD"), Some(&dec!(5050)));
+
+        // Net contribution NOT affected by CREDIT/REBATE (internal flow)
+        assert_eq!(frame_d2.net_contribution, dec!(5000));
+    }
+
+    #[tokio::test]
+    async fn test_credit_no_subtype_increases_cash_but_not_net_contribution() {
+        // CREDIT with no subtype is an internal flow
+        // It should increase cash but NOT net_contribution
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+
+        let deposit = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(5000)),
+            "USD",
+        );
+
+        // Create CREDIT activity with no subtype
+        let credit = create_test_activity(
+            "credit1",
+            &acc.id,
+            Some("$CASH-USD"),
+            "CREDIT",
+            d2,
+            None,
+            None,
+            Some(dec!(75)),
+            "USD",
+        );
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![deposit, credit]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+
+        let frames = snapshot_repo.get_saved_snapshots();
+        let mut sorted = frames.clone();
+        sorted.sort_by_key(|s| s.snapshot_date);
+
+        let frame_d2 = &sorted[1];
+
+        // Cash increased by CREDIT
+        assert_eq!(frame_d2.cash_balances.get("USD"), Some(&dec!(5075)));
+
+        // Net contribution NOT affected by CREDIT without subtype (internal flow)
         assert_eq!(frame_d2.net_contribution, dec!(5000));
     }
 

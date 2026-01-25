@@ -22,6 +22,7 @@ import type {
   Goal,
   GoalAllocation,
   Holding,
+  ImportActivitiesResult,
   ImportMappingData,
   IncomeSummary,
   MarketDataProviderInfo,
@@ -144,7 +145,7 @@ export interface InternalHostAPI {
   listenMarketSyncComplete<T>(handler: EventCallback<T>): Promise<UnlistenFn>;
 
   // Activity import
-  importActivities(params: { activities: ActivityImport[] }): Promise<ActivityImport[]>;
+  importActivities(params: { activities: ActivityImport[] }): Promise<ImportActivitiesResult>;
   checkActivitiesImport(params: {
     accountId: string;
     activities: ActivityImport[];

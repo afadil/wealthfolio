@@ -10,6 +10,8 @@ export interface LocalTransaction extends ActivityDetails {
   pendingAssetName?: string;
   /** Pending asset kind from custom asset dialog (e.g., "SECURITY", "CRYPTO", "OTHER") */
   pendingAssetKind?: string;
+  /** Whether this transfer is external (from/to outside tracked accounts). Stored in metadata.flow.is_external */
+  isExternal?: boolean;
 }
 
 /**
@@ -28,7 +30,10 @@ export function toLocalTransaction(activity: ActivityDetails): LocalTransaction 
   if (isLocalTransaction(activity)) {
     return activity;
   }
-  return { ...activity, isNew: false };
+  // Extract isExternal from metadata.flow.is_external
+  const flowMeta = activity.metadata?.flow as Record<string, unknown> | undefined;
+  const isExternal = flowMeta?.is_external === true;
+  return { ...activity, isNew: false, isExternal };
 }
 
 /**
@@ -106,6 +111,7 @@ interface ActivityBasePayload {
   activityDate: string;
 
   // Activity data
+  subtype?: string;
   quantity?: string;
   unitPrice?: string;
   amount?: string;
@@ -113,6 +119,8 @@ interface ActivityBasePayload {
   fee?: string;
   fxRate?: string | null;
   comment?: string;
+  /** JSON blob for metadata (e.g., flow.is_external for transfers) */
+  metadata?: string;
 }
 
 /**

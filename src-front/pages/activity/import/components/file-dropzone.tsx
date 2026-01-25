@@ -66,19 +66,14 @@ export const FileDropzone = ({
   };
 
   // Determine the border and background colors based on state
+  // Use same styling as AccountSelector - icons show status colors, not background
   const getBorderClasses = () => {
     if (isDragging) {
       return "border-primary bg-primary/5";
     }
 
-    if (file) {
-      if (isLoading) {
-        return "border-blue-500 bg-blue-50 dark:bg-blue-900/10";
-      }
-      if (!isValid || error) {
-        return "border-red-500 bg-red-50 dark:bg-red-900/10";
-      }
-      return "border-green-500 bg-green-50 dark:bg-green-900/10";
+    if (file && isValid && !error && !isLoading) {
+      return "border-border bg-background";
     }
 
     return "border-border bg-background/50 hover:bg-background/80 hover:border-muted-foreground/50";
@@ -124,9 +119,12 @@ export const FileDropzone = ({
     },
   } as const;
 
+  // Use solid border when file is valid
+  const useSolidBorder = file && isValid && !error && !isLoading;
+
   return (
     <div
-      className={`group relative flex h-full flex-col justify-center rounded-lg border border-dashed p-4 transition-colors ${getBorderClasses()} ${!file && !isLoading ? "cursor-pointer" : ""}`}
+      className={`group relative flex h-full flex-col justify-center rounded-lg border p-4 transition-colors ${useSolidBorder ? "" : "border-dashed"} ${getBorderClasses()} ${!file && !isLoading ? "cursor-pointer" : ""}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}

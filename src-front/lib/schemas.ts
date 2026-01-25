@@ -10,12 +10,43 @@ import {
   isSplitActivity,
 } from "./activity-utils";
 
+/**
+ * Configuration for CSV parsing (delimiter, date format, etc.)
+ */
+export const parseConfigSchema = z.object({
+  /** Whether the CSV has a header row */
+  hasHeaderRow: z.boolean().optional(),
+  /** Index of the header row (0-based) */
+  headerRowIndex: z.number().optional(),
+  /** Column delimiter: ",", ";", "\t", or "auto" */
+  delimiter: z.string().optional(),
+  /** Quote character for fields */
+  quoteChar: z.string().optional(),
+  /** Number of rows to skip at the top (after header) */
+  skipTopRows: z.number().optional(),
+  /** Number of rows to skip at the bottom */
+  skipBottomRows: z.number().optional(),
+  /** Whether to skip empty rows */
+  skipEmptyRows: z.boolean().optional(),
+  /** Date format: "auto", "YYYY-MM-DD", "DD/MM/YYYY", etc. */
+  dateFormat: z.string().optional(),
+  /** Decimal separator: "auto", ".", or "," */
+  decimalSeparator: z.string().optional(),
+  /** Thousands separator: "auto", ",", ".", " ", or "none" */
+  thousandsSeparator: z.string().optional(),
+  /** Default currency to use when not specified in CSV */
+  defaultCurrency: z.string().optional(),
+});
+
 export const importMappingSchema = z.object({
   accountId: z.string(),
-  fieldMappings: z.record(z.string(), z.string()),
-  activityMappings: z.record(z.string(), z.array(z.string())),
-  symbolMappings: z.record(z.string(), z.string()),
-  accountMappings: z.record(z.string(), z.string()),
+  name: z.string().optional().default(""),
+  fieldMappings: z.record(z.string(), z.string()).optional().default({}),
+  activityMappings: z.record(z.string(), z.array(z.string())).optional().default({}),
+  symbolMappings: z.record(z.string(), z.string()).optional().default({}),
+  accountMappings: z.record(z.string(), z.string()).optional().default({}),
+  /** CSV parsing configuration */
+  parseConfig: parseConfigSchema.optional(),
 });
 
 export const newAccountSchema = z.object({
@@ -106,6 +137,8 @@ export const importActivitySchema = z
     lineNumber: z.number().optional(),
     isDraft: z.boolean(),
     comment: z.string().optional(),
+    fxRate: z.coerce.number().positive().optional(),
+    subtype: z.string().optional(),
   })
   .refine(
     (data) => {

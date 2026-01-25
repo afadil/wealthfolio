@@ -376,7 +376,7 @@ mod tests {
             id: "activity-1".to_string(),
             account_id: "account-1".to_string(),
             asset: Some(AssetInput {
-            id: Some("AAPL".to_string()),
+                id: Some("AAPL".to_string()),
                 ..Default::default()
             }),
             activity_type: "BUY".to_string(),
@@ -390,6 +390,7 @@ mod tests {
             status: None,
             notes: None,
             fx_rate: None,
+            metadata: None,
         }
     }
 

@@ -194,7 +194,8 @@ impl HealthService {
         // Gather holdings data from all accounts
         let accounts = account_service.get_active_accounts()?;
 
-        let mut all_holdings: Vec<AssetHoldingInfo> = Vec::new();
+        // Use a map to consolidate holdings by asset_id (same asset in multiple accounts)
+        let mut holdings_map: HashMap<String, AssetHoldingInfo> = HashMap::new();
         let mut latest_quote_times: HashMap<String, chrono::DateTime<chrono::Utc>> = HashMap::new();
         let mut total_portfolio_value = 0.0;
 
@@ -216,16 +217,25 @@ impl HealthService {
                     // Determine if uses market pricing
                     let uses_market_pricing = instrument.pricing_mode.to_uppercase() == "MARKET";
 
-                    all_holdings.push(AssetHoldingInfo {
-                        asset_id: instrument.id.clone(),
-                        symbol: instrument.symbol.clone(),
-                        name: instrument.name.clone(),
-                        market_value: market_value_f64,
-                        uses_market_pricing,
-                    });
+                    // Consolidate by asset_id - if same asset appears in multiple accounts,
+                    // combine market values
+                    holdings_map
+                        .entry(instrument.id.clone())
+                        .and_modify(|existing| {
+                            existing.market_value += market_value_f64;
+                        })
+                        .or_insert(AssetHoldingInfo {
+                            asset_id: instrument.id.clone(),
+                            symbol: instrument.symbol.clone(),
+                            name: instrument.name.clone(),
+                            market_value: market_value_f64,
+                            uses_market_pricing,
+                        });
                 }
             }
         }
+
+        let all_holdings: Vec<AssetHoldingInfo> = holdings_map.into_values().collect();
 
         // Get latest quote timestamps for held assets
         let asset_ids: Vec<String> = all_holdings.iter().map(|h| h.asset_id.clone()).collect();
@@ -252,6 +262,7 @@ impl HealthService {
             quote_service.as_ref(),
             asset_service.as_ref(),
             &holding_mv_map,
+            &latest_quote_times,
         );
 
         // For now, we'll use empty data for FX, unclassified, and consistency checks
@@ -389,7 +400,7 @@ impl HealthServiceTrait for HealthService {
         info!("Executing fix action: {} ({})", action.label, action.id);
 
         let result = match action.id.as_str() {
-            "sync_prices" => {
+            "sync_prices" | "retry_sync" => {
                 // Parse asset IDs from payload
                 let _asset_ids: Vec<String> = serde_json::from_value(action.payload.clone())
                     .map_err(|e| {
@@ -398,7 +409,7 @@ impl HealthServiceTrait for HealthService {
 
                 // TODO: Call quote sync service to refresh prices
                 // This will be wired up when integrating with the service context
-                warn!("sync_prices fix action not yet implemented");
+                warn!("{} fix action not yet implemented", action.id);
                 Ok(())
             }
             "fetch_fx" => {

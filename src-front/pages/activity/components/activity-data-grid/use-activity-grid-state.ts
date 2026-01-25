@@ -1,6 +1,7 @@
 import type { ActivityDetails } from "@/lib/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangesSummary, LocalTransaction, TransactionChangeState } from "./types";
+import { toLocalTransaction } from "./types";
 
 /**
  * Generates a unique temporary ID for new transactions
@@ -65,15 +66,16 @@ interface UseActivityGridStateReturn {
 export const useActivityGridState = ({
   activities,
 }: UseActivityGridStateOptions): UseActivityGridStateReturn => {
-  // Normalize server transactions to ensure all have valid IDs
+  // Normalize server transactions to ensure all have valid IDs and extract derived fields
   const serverTransactions = useMemo(
     () =>
       activities.map((activity) => {
         const trimmedId = typeof activity.id === "string" ? activity.id.trim() : "";
-        if (trimmedId.length > 0) {
-          return activity;
-        }
-        return { ...activity, id: generateTempActivityId() };
+        const activityWithId = trimmedId.length > 0
+          ? activity
+          : { ...activity, id: generateTempActivityId() };
+        // Convert to LocalTransaction to extract derived fields like isExternal from metadata
+        return toLocalTransaction(activityWithId);
       }),
     [activities],
   );

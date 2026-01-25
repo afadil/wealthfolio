@@ -201,12 +201,11 @@ impl ActivityDetailsDB {
 #[serde(rename_all = "camelCase")]
 pub struct ImportMappingDB {
     pub account_id: String,
-    pub field_mappings: String,
-    pub activity_mappings: String,
-    pub symbol_mappings: String,
+    pub name: String,
+    /// JSON containing all mapping config: fieldMappings, activityMappings, symbolMappings, accountMappings, parseConfig
+    pub config: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
-    pub account_mappings: String,
 }
 
 /// Database model for income data query results
@@ -284,12 +283,10 @@ impl From<ImportMappingDB> for wealthfolio_core::activities::ImportMapping {
     fn from(db: ImportMappingDB) -> Self {
         Self {
             account_id: db.account_id,
-            field_mappings: db.field_mappings,
-            activity_mappings: db.activity_mappings,
-            symbol_mappings: db.symbol_mappings,
+            name: db.name,
+            config: db.config,
             created_at: db.created_at,
             updated_at: db.updated_at,
-            account_mappings: db.account_mappings,
         }
     }
 }
@@ -298,12 +295,10 @@ impl From<wealthfolio_core::activities::ImportMapping> for ImportMappingDB {
     fn from(domain: wealthfolio_core::activities::ImportMapping) -> Self {
         Self {
             account_id: domain.account_id,
-            field_mappings: domain.field_mappings,
-            activity_mappings: domain.activity_mappings,
-            symbol_mappings: domain.symbol_mappings,
+            name: domain.name,
+            config: domain.config,
             created_at: domain.created_at,
             updated_at: domain.updated_at,
-            account_mappings: domain.account_mappings,
         }
     }
 }
@@ -570,7 +565,7 @@ impl From<ActivityUpdate> for ActivityDB {
 
             // Metadata
             notes: domain.notes,
-            metadata: None,
+            metadata: domain.metadata,
 
             // Source identity - these will be preserved from existing record in repository
             source_system: None,

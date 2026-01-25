@@ -3,7 +3,10 @@
 //! This module classifies activities as external or internal flows for TWR calculation.
 //! Only external flows (money crossing the portfolio boundary) affect TWR.
 
-use crate::activities::Activity;
+use crate::activities::{
+    Activity, ACTIVITY_SUBTYPE_BONUS, ACTIVITY_TYPE_CREDIT, ACTIVITY_TYPE_DEPOSIT,
+    ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT, ACTIVITY_TYPE_WITHDRAWAL,
+};
 
 /// Flow type for performance calculation
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -38,27 +41,29 @@ pub enum PerformanceScope {
 /// - BUY, SELL, DIVIDEND, INTEREST, SPLIT (asset reallocation)
 /// - TRANSFER_IN, TRANSFER_OUT (money moving between accounts)
 /// - FEE, TAX (deductions from existing money)
-/// - CREDIT with other subtypes (refunds, rebates = not new money)
+/// - CREDIT with other subtypes (REBATE, REFUND = not new money)
 pub fn classify_flow(activity: &Activity) -> FlowType {
-    match activity.effective_type() {
-        // External flows - money crossing portfolio boundary
-        "DEPOSIT" | "WITHDRAWAL" => FlowType::External,
+    let effective_type = activity.effective_type();
 
-        // CREDIT: depends on subtype
-        "CREDIT" => {
-            match activity.subtype.as_deref() {
-                // BONUS is external (new money entering portfolio)
-                Some("BONUS") => FlowType::External,
-                // FEE_REFUND, TAX_REFUND, REBATE, REVERSAL, ADJUSTMENT are internal
-                // (corrections/refunds of existing transactions, not new money)
-                _ => FlowType::Internal,
-            }
-        }
-
-        // Everything else is internal
-        // BUY, SELL, DIVIDEND, INTEREST, TRANSFER_*, FEE, TAX, SPLIT, CREDIT, ADJUSTMENT
-        _ => FlowType::Internal,
+    // External flows - money crossing portfolio boundary
+    if effective_type == ACTIVITY_TYPE_DEPOSIT || effective_type == ACTIVITY_TYPE_WITHDRAWAL {
+        return FlowType::External;
     }
+
+    // CREDIT: depends on subtype
+    if effective_type == ACTIVITY_TYPE_CREDIT {
+        return match activity.subtype.as_deref() {
+            // BONUS is external (new money entering portfolio)
+            Some(ACTIVITY_SUBTYPE_BONUS) => FlowType::External,
+            // REBATE, REFUND, and other subtypes are internal
+            // (corrections/refunds of existing transactions, not new money)
+            _ => FlowType::Internal,
+        };
+    }
+
+    // Everything else is internal
+    // BUY, SELL, DIVIDEND, INTEREST, TRANSFER_*, FEE, TAX, SPLIT, ADJUSTMENT
+    FlowType::Internal
 }
 
 /// Classify flow for a specific scope.
@@ -69,18 +74,26 @@ pub fn classify_flow_for_scope(activity: &Activity, scope: PerformanceScope) -> 
     match scope {
         PerformanceScope::Portfolio => classify_flow(activity),
         PerformanceScope::Account => {
-            match activity.effective_type() {
-                // For account-level, transfers are external
-                "DEPOSIT" | "WITHDRAWAL" | "TRANSFER_IN" | "TRANSFER_OUT" => FlowType::External,
+            let effective_type = activity.effective_type();
 
-                // CREDIT still follows the same rules
-                "CREDIT" => match activity.subtype.as_deref() {
-                    Some("BONUS") => FlowType::External,
-                    _ => FlowType::Internal,
-                },
-
-                _ => FlowType::Internal,
+            // For account-level, deposits/withdrawals/transfers are external
+            if effective_type == ACTIVITY_TYPE_DEPOSIT
+                || effective_type == ACTIVITY_TYPE_WITHDRAWAL
+                || effective_type == ACTIVITY_TYPE_TRANSFER_IN
+                || effective_type == ACTIVITY_TYPE_TRANSFER_OUT
+            {
+                return FlowType::External;
             }
+
+            // CREDIT still follows the same rules
+            if effective_type == ACTIVITY_TYPE_CREDIT {
+                return match activity.subtype.as_deref() {
+                    Some(ACTIVITY_SUBTYPE_BONUS) => FlowType::External,
+                    _ => FlowType::Internal,
+                };
+            }
+
+            FlowType::Internal
         }
     }
 }

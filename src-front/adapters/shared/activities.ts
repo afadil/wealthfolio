@@ -8,6 +8,7 @@ import type {
   ActivitySearchResponse,
   ActivityUpdate,
   ActivityImport,
+  ImportActivitiesResult,
   ImportMappingData,
 } from "@/lib/types";
 
@@ -131,37 +132,44 @@ export const deleteActivity = async (activityId: string): Promise<Activity> => {
 /**
  * Import activities into the system.
  * Extracts accountId from the first activity for the backend call.
+ * Returns ImportActivitiesResult with activities, import_run_id, and summary.
  */
 export const importActivities = async ({
   activities,
 }: {
   activities: ActivityImport[];
-}): Promise<ActivityImport[]> => {
+}): Promise<ImportActivitiesResult> => {
   try {
-    return await invoke<ActivityImport[]>("import_activities", {
+    return await invoke<ImportActivitiesResult>("import_activities", {
       accountId: activities[0].accountId,
       activities,
     });
   } catch (err) {
-    logger.error("Error checking activities import.");
+    logger.error("Error importing activities.");
     throw err;
   }
 };
 
 /**
  * Check activities before import (validation/preview).
+ * @param accountId - The account ID to import activities into
+ * @param activities - The activities to validate
+ * @param dryRun - If true, performs read-only validation without creating assets or FX pairs
  */
 export const checkActivitiesImport = async ({
   accountId,
   activities,
+  dryRun,
 }: {
   accountId: string;
   activities: ActivityImport[];
+  dryRun?: boolean;
 }): Promise<ActivityImport[]> => {
   try {
     return await invoke<ActivityImport[]>("check_activities_import", {
       accountId,
       activities,
+      dryRun,
     });
   } catch (err) {
     logger.error("Error checking activities import.");
@@ -194,3 +202,19 @@ export const saveAccountImportMapping = async (
     throw err;
   }
 };
+
+/**
+ * Check for existing duplicate activities based on idempotency keys.
+ * Returns a map of {idempotency_key: existing_activity_id} for duplicates found.
+ */
+export const checkExistingDuplicates = async (
+  idempotencyKeys: string[],
+): Promise<Record<string, string>> => {
+  try {
+    return await invoke<Record<string, string>>("check_existing_duplicates", { idempotencyKeys });
+  } catch (err) {
+    logger.error("Error checking for duplicate activities.");
+    throw err;
+  }
+};
+

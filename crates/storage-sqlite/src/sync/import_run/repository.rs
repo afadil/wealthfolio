@@ -1,12 +1,13 @@
 //! Repository for import run persistence.
 
+use async_trait::async_trait;
 use diesel::prelude::*;
 use diesel::r2d2::{self, Pool};
 use diesel::sqlite::SqliteConnection;
 use std::sync::Arc;
 
 use wealthfolio_core::errors::Result;
-use wealthfolio_core::sync::ImportRun;
+use wealthfolio_core::sync::{ImportRun, ImportRunRepositoryTrait};
 
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
@@ -126,5 +127,24 @@ impl ImportRunRepository {
             .map_err(StorageError::from)?;
 
         Ok(results.into_iter().map(Into::into).collect())
+    }
+}
+
+#[async_trait]
+impl ImportRunRepositoryTrait for ImportRunRepository {
+    async fn create(&self, import_run: ImportRun) -> Result<ImportRun> {
+        ImportRunRepository::create(self, import_run).await
+    }
+
+    async fn update(&self, import_run: ImportRun) -> Result<ImportRun> {
+        ImportRunRepository::update(self, import_run).await
+    }
+
+    fn get_by_id(&self, id: &str) -> Result<Option<ImportRun>> {
+        ImportRunRepository::get_by_id(self, id)
+    }
+
+    fn get_recent_for_account(&self, account_id: &str, limit: i64) -> Result<Vec<ImportRun>> {
+        ImportRunRepository::get_recent_for_account(self, account_id, limit)
     }
 }

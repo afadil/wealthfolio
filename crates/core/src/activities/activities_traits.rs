@@ -68,6 +68,14 @@ pub trait ActivityRepositoryTrait: Send + Sync {
         &self,
         asset_ids: &[String],
     ) -> Result<HashMap<String, (Option<NaiveDate>, Option<NaiveDate>)>>;
+
+    /// Checks for existing activities with the given idempotency keys.
+    ///
+    /// Returns a map of {idempotency_key: existing_activity_id} for keys that already exist.
+    fn check_existing_duplicates(
+        &self,
+        idempotency_keys: &[String],
+    ) -> Result<HashMap<String, String>>;
 }
 
 /// Trait defining the contract for Activity service operations.
@@ -105,14 +113,30 @@ pub trait ActivityServiceTrait: Send + Sync {
         &self,
         account_id: String,
         activities: Vec<ActivityImport>,
+        dry_run: bool,
     ) -> Result<Vec<ActivityImport>>;
     async fn import_activities(
         &self,
         account_id: String,
         activities: Vec<ActivityImport>,
-    ) -> Result<Vec<ActivityImport>>;
+    ) -> Result<ImportActivitiesResult>;
     async fn save_import_mapping(
         &self,
         mapping_data: ImportMappingData,
     ) -> Result<ImportMappingData>;
+
+    /// Checks for existing activities with the given idempotency keys.
+    ///
+    /// Returns a map of {idempotency_key: existing_activity_id} for keys that already exist.
+    fn check_existing_duplicates(
+        &self,
+        idempotency_keys: Vec<String>,
+    ) -> Result<HashMap<String, String>>;
+
+    /// Parses CSV content with the given configuration.
+    fn parse_csv(
+        &self,
+        content: &[u8],
+        config: &super::csv_parser::ParseConfig,
+    ) -> Result<super::csv_parser::ParsedCsvResult>;
 }

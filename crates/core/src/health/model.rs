@@ -240,6 +240,22 @@ impl AffectedItem {
         }
     }
 
+    /// Creates a new affected item for an asset with market data issues.
+    /// Links to the asset page with the market-data tab.
+    pub fn asset_market_data(id: impl Into<String>, symbol: impl Into<String>) -> Self {
+        let id_str = id.into();
+        let symbol_str = symbol.into();
+        Self {
+            route: Some(format!(
+                "/holdings/{}?tab=market-data",
+                urlencoding::encode(&id_str)
+            )),
+            id: id_str,
+            name: symbol_str.clone(),
+            symbol: Some(symbol_str),
+        }
+    }
+
     /// Creates a new affected item without a route.
     pub fn simple(id: impl Into<String>, name: impl Into<String>) -> Self {
         Self {

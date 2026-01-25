@@ -3,12 +3,15 @@
 import * as React from "react";
 import { useComposedRefs } from "../../lib/compose-refs";
 import { cn } from "../../lib/utils";
-import type { DataGridCellProps } from "./data-grid-types";
+import type { CellValidationState, DataGridCellProps } from "./data-grid-types";
 import { getCellKey } from "./data-grid-utils";
 
 interface DataGridCellWrapperProps<TData>
   extends DataGridCellProps<TData>,
-    React.ComponentProps<"div"> {}
+    React.ComponentProps<"div"> {
+  /** Cell validation state for error/warning highlighting */
+  cellState?: CellValidationState;
+}
 
 export function DataGridCellWrapper<TData>({
   tableMeta,
@@ -21,6 +24,7 @@ export function DataGridCellWrapper<TData>({
   isActiveSearchMatch,
   readOnly,
   rowHeight,
+  cellState,
   className,
   onClick: onClickProp,
   onKeyDown: onKeyDownProp,
@@ -165,6 +169,24 @@ export function DataGridCellWrapper<TData>({
     }
   }, [tableMeta, isEditing]);
 
+  // Compute cell validation background style (matches ImportAlert component: 10% opacity)
+  const cellStateStyle = React.useMemo(() => {
+    if (isSelected || isSearchMatch || !cellState) return undefined;
+    if (cellState.type === "error") {
+      return { backgroundColor: "color-mix(in oklab, var(--destructive) 10%, transparent)" };
+    }
+    if (cellState.type === "warning") {
+      return { backgroundColor: "color-mix(in oklab, var(--warning) 10%, transparent)" };
+    }
+    return undefined;
+  }, [cellState, isSelected, isSearchMatch]);
+
+  // Use native title attribute for tooltip (performant with virtualization)
+  const cellTitle = React.useMemo(() => {
+    if (!cellState?.messages?.length) return undefined;
+    return cellState.messages.join('\n');
+  }, [cellState]);
+
   return (
     <div
       role="button"
@@ -172,9 +194,12 @@ export function DataGridCellWrapper<TData>({
       data-editing={isEditing ? "" : undefined}
       data-focused={isFocused ? "" : undefined}
       data-selected={isSelected ? "" : undefined}
+      data-cell-state={cellState?.type}
       tabIndex={isFocused && !isEditing ? 0 : -1}
+      title={cellTitle}
       {...props}
       ref={composedRef}
+      style={{ ...props.style, ...cellStateStyle }}
       className={cn(
         "size-full px-2 py-1.5 text-start text-sm outline-none has-data-[slot=checkbox]:pt-2.5",
         {
