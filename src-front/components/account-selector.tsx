@@ -203,11 +203,15 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
               role="combobox"
               aria-expanded={open}
               aria-label="Select an account"
-              className={`h-full w-full justify-center rounded-lg border border-dashed p-2 transition-colors ${
+              className={cn(
+                "h-full w-full justify-center rounded-lg border p-2 transition-colors",
+                !selectedAccount && "border-dashed",
                 open
                   ? "border-primary bg-primary/5"
-                  : "border-border bg-background/50 hover:bg-background/80 hover:border-muted-foreground/50"
-              }`}
+                  : selectedAccount
+                    ? "border-border bg-background"
+                    : "border-border bg-background/50 hover:bg-background/80 hover:border-muted-foreground/50"
+              )}
             >
               <div className="flex flex-col items-center justify-center space-y-1">
                 <AnimatePresence mode="wait">

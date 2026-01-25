@@ -68,26 +68,31 @@ impl PriceStalenessCheck {
         let mut error_mv = 0.0;
 
         // Only check assets that use market pricing
-        let market_priced: Vec<_> = holdings
-            .iter()
-            .filter(|h| h.uses_market_pricing && h.market_value > 0.0)
-            .collect();
+        // Note: We check all market-priced holdings, not just those with market_value > 0,
+        // because assets with no quotes will have market_value = 0 (price * quantity = 0)
+        // and we want to detect those as "missing price" issues.
+        let market_priced: Vec<_> = holdings.iter().filter(|h| h.uses_market_pricing).collect();
 
         for holding in market_priced {
             match latest_quote_times.get(&holding.asset_id) {
                 Some(quote_time) => {
-                    let days_stale = trading_days_since(*quote_time, ctx.now);
+                    // Only check staleness for assets with positive market value
+                    // (assets with 0 quantity are not actively held)
+                    if holding.market_value > 0.0 {
+                        let days_stale = trading_days_since(*quote_time, ctx.now);
 
-                    if days_stale >= critical_trading_days {
-                        error_assets.push(holding);
-                        error_mv += holding.market_value;
-                    } else if days_stale >= warning_trading_days {
-                        warning_assets.push(holding);
-                        warning_mv += holding.market_value;
+                        if days_stale >= critical_trading_days {
+                            error_assets.push(holding);
+                            error_mv += holding.market_value;
+                        } else if days_stale >= warning_trading_days {
+                            warning_assets.push(holding);
+                            warning_mv += holding.market_value;
+                        }
                     }
                 }
                 None => {
-                    // No quote at all is an error
+                    // No quote at all is an error - this catches assets that failed
+                    // to sync and have never had any price data
                     error_assets.push(holding);
                     error_mv += holding.market_value;
                 }
@@ -110,8 +115,21 @@ impl PriceStalenessCheck {
             };
 
             let count = error_assets.len();
-            let title = if count == 1 {
-                "Missing price for 1 holding".to_string()
+            // Check if any assets are missing quotes entirely vs just stale
+            let missing_count = error_assets
+                .iter()
+                .filter(|a| !latest_quote_times.contains_key(&a.asset_id))
+                .count();
+
+            let title = if missing_count == count {
+                // All assets are missing prices (no quote data at all)
+                if count == 1 {
+                    format!("No market data for {}", error_assets[0].symbol)
+                } else {
+                    format!("No market data for {} holdings", count)
+                }
+            } else if count == 1 {
+                "Outdated price for 1 holding".to_string()
             } else {
                 format!("Outdated prices for {} holdings", count)
             };
@@ -125,19 +143,27 @@ impl PriceStalenessCheck {
                 .map(|a| AffectedItem::asset_with_name(&a.asset_id, &a.symbol, a.name.clone()))
                 .collect();
 
+            // Build details string listing affected assets
+            let details = build_asset_details(&error_assets, latest_quote_times);
+
+            let message = if missing_count > 0 {
+                "Unable to fetch market data for some holdings. This may be due to invalid symbols or provider issues. Your portfolio value may be inaccurate."
+            } else {
+                "Some holdings haven't had prices updated in over 3 days. Your portfolio value may be inaccurate."
+            };
+
             issues.push(
                 HealthIssue::builder()
                     .id(format!("price_stale:error:{}", data_hash))
                     .severity(severity)
                     .category(HealthCategory::PriceStaleness)
                     .title(title)
-                    .message(
-                        "Some holdings haven't had prices updated in over 3 days. Your portfolio value may be inaccurate.",
-                    )
+                    .message(message)
                     .affected_count(count as u32)
                     .affected_mv_pct(mv_pct)
                     .affected_items(affected_items)
                     .fix_action(FixAction::sync_prices(asset_ids))
+                    .details(details)
                     .data_hash(data_hash)
                     .build(),
             );
@@ -174,6 +200,9 @@ impl PriceStalenessCheck {
                 .map(|a| AffectedItem::asset_with_name(&a.asset_id, &a.symbol, a.name.clone()))
                 .collect();
 
+            // Build details string listing affected assets
+            let details = build_asset_details(&warning_assets, latest_quote_times);
+
             issues.push(
                 HealthIssue::builder()
                     .id(format!("price_stale:warning:{}", data_hash))
@@ -187,6 +216,7 @@ impl PriceStalenessCheck {
                     .affected_mv_pct(mv_pct)
                     .affected_items(affected_items)
                     .fix_action(FixAction::sync_prices(asset_ids))
+                    .details(details)
                     .data_hash(data_hash)
                     .build(),
             );
@@ -276,6 +306,31 @@ fn compute_data_hash(asset_ids: &[String], severity: Severity, mv_pct: f64) -> S
     ((mv_pct * 100.0) as u32).hash(&mut hasher);
 
     format!("{:x}", hasher.finish())
+}
+
+/// Builds a details string listing affected assets.
+fn build_asset_details(
+    assets: &[&AssetHoldingInfo],
+    latest_quote_times: &HashMap<String, DateTime<Utc>>,
+) -> String {
+    let mut lines = Vec::new();
+    for (i, asset) in assets.iter().take(5).enumerate() {
+        let status = if latest_quote_times.contains_key(&asset.asset_id) {
+            "outdated"
+        } else {
+            "no data"
+        };
+        let name = asset
+            .name
+            .as_deref()
+            .map(|n| format!(" ({})", n))
+            .unwrap_or_default();
+        lines.push(format!("{}. {}{} - {}", i + 1, asset.symbol, name, status));
+    }
+    if assets.len() > 5 {
+        lines.push(format!("... and {} more", assets.len() - 5));
+    }
+    lines.join("\n")
 }
 
 #[cfg(test)]

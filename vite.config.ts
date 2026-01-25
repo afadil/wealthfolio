@@ -32,6 +32,7 @@ const buildTarget = process.env.BUILD_TARGET || "tauri";
 // https://vitejs.dev/config/
 export default defineConfig({
   root: "src-front",
+  envDir: "..", // Load .env from project root, not src-front
   plugins: [react(), tailwindcss()],
   publicDir: "public",
   optimizeDeps: {

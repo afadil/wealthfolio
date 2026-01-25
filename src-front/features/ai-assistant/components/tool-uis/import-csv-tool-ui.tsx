@@ -24,8 +24,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/compone
 import { useMemo, useState, useCallback } from "react";
 import { searchTicker } from "@/adapters";
 import { saveActivities, updateToolResult } from "@/adapters";
-import { ActivityType, ActivityTypeNames } from "@/lib/constants";
-import type { ColumnDef } from "@tanstack/react-table";
+import { CreateCustomAssetDialog } from "@/components/create-custom-asset-dialog";
 import type { SymbolSearchResult } from "@wealthfolio/ui";
 import type {
   ImportCsvArgs,
@@ -34,8 +33,7 @@ import type {
   ImportCsvCleaningAction,
   ImportCsvValidationSummary,
   ImportCsvAccountOption,
-  ImportPlan,
-  ImportCsvSignRuleConfig,
+  ImportCsvMappingData,
 } from "../../types";
 import { useRuntimeContext } from "../../hooks/use-runtime-context";
 
@@ -49,21 +47,28 @@ interface ImportLocalTransaction {
   isNew: boolean;
   accountId?: string;
   activityType?: string;
-  date?: Date;
-  assetSymbol?: string;
+  subtype?: string;
+  /** Whether this is an external transfer (for TRANSFER_IN/TRANSFER_OUT) */
+  isExternal?: boolean;
+  /** Activity date as string (ISO format) - aligned with DraftActivity */
+  activityDate?: string;
+  /** Symbol - aligned with DraftActivity */
+  symbol?: string;
   /** Resolved exchange MIC for the symbol */
   exchangeMic?: string;
   quantity?: number;
   unitPrice?: number;
   amount?: number;
   fee?: number;
+  fxRate?: number;
   currency?: string;
   comment?: string;
+  // Row index for display
+  rowIndex: number;
   // Validation
   isValid: boolean;
   errors: string[];
   warnings: string[];
-  sourceRow: number;
 }
 
 // ============================================================================
@@ -155,35 +160,16 @@ function normalizeAccount(raw: Record<string, unknown>): ImportCsvAccountOption 
   };
 }
 
-function normalizePlan(raw: Record<string, unknown>): ImportPlan {
-  const columnMappingsRaw = (raw.column_mappings ?? raw.columnMappings ?? {}) as Record<string, unknown>;
-  const enumMapsRaw = (raw.enum_maps ?? raw.enumMaps ?? {}) as Record<string, unknown>;
-  const confidenceRaw = (raw.confidence ?? {}) as Record<string, unknown>;
-
+function normalizeMapping(raw: Record<string, unknown>): ImportCsvMappingData {
+  // Handle both snake_case and camelCase
   return {
-    columnMappings: {
-      date: columnMappingsRaw.date as number | null | undefined,
-      activityType: (columnMappingsRaw.activity_type ?? columnMappingsRaw.activityType) as number | null | undefined,
-      symbol: columnMappingsRaw.symbol as number | null | undefined,
-      quantity: columnMappingsRaw.quantity as number | null | undefined,
-      unitPrice: (columnMappingsRaw.unit_price ?? columnMappingsRaw.unitPrice) as number | null | undefined,
-      amount: columnMappingsRaw.amount as number | null | undefined,
-      fee: columnMappingsRaw.fee as number | null | undefined,
-      currency: columnMappingsRaw.currency as number | null | undefined,
-      account: columnMappingsRaw.account as number | null | undefined,
-      comment: columnMappingsRaw.comment as number | null | undefined,
-    },
-    transforms: Array.isArray(raw.transforms) ? raw.transforms : [],
-    enumMaps: {
-      activityType: (enumMapsRaw.activity_type ?? enumMapsRaw.activityType) as Record<string, string> | undefined,
-    },
-    signRules: Array.isArray(raw.sign_rules ?? raw.signRules) ? (raw.sign_rules ?? raw.signRules) as ImportCsvSignRuleConfig[] : [],
-    confidence: {
-      overall: (confidenceRaw.overall as number) ?? 0.5,
-      byField: (confidenceRaw.by_field ?? confidenceRaw.byField) as Record<string, number> | undefined,
-    },
-    notes: Array.isArray(raw.notes) ? raw.notes : [],
-    abstain: (raw.abstain as boolean) ?? false,
+    accountId: (raw.account_id ?? raw.accountId) as string | undefined,
+    name: raw.name as string | undefined,
+    fieldMappings: (raw.field_mappings ?? raw.fieldMappings ?? {}) as Record<string, string>,
+    activityMappings: (raw.activity_mappings ?? raw.activityMappings ?? {}) as Record<string, string[]>,
+    symbolMappings: (raw.symbol_mappings ?? raw.symbolMappings ?? {}) as Record<string, string>,
+    accountMappings: (raw.account_mappings ?? raw.accountMappings ?? {}) as Record<string, string>,
+    parseConfig: (raw.parse_config ?? raw.parseConfig) as ImportCsvMappingData["parseConfig"],
   };
 }
 
@@ -209,8 +195,9 @@ function normalizeResult(result: unknown): ImportCsvOutput | null {
   const activitiesRaw = Array.isArray(candidate.activities) ? candidate.activities : [];
   const activities = activitiesRaw.map((a: BackendActivityDraft, i: number) => normalizeActivityDraft(a, i));
 
-  const planRaw = (candidate.applied_plan ?? candidate.appliedPlan ?? {}) as Record<string, unknown>;
-  const appliedPlan = normalizePlan(planRaw);
+  // Handle applied_mapping (new format)
+  const mappingRaw = (candidate.applied_mapping ?? candidate.appliedMapping ?? {}) as Record<string, unknown>;
+  const appliedMapping = normalizeMapping(mappingRaw);
 
   const cleaningRaw = Array.isArray(candidate.cleaning_actions ?? candidate.cleaningActions)
     ? (candidate.cleaning_actions ?? candidate.cleaningActions)
@@ -231,13 +218,14 @@ function normalizeResult(result: unknown): ImportCsvOutput | null {
 
   return {
     activities,
-    appliedPlan,
+    appliedMapping,
     cleaningActions,
     validation,
     availableAccounts,
     detectedHeaders,
     totalRows: (candidate.total_rows ?? candidate.totalRows) as number | undefined,
     truncated: candidate.truncated as boolean | undefined,
+    usedSavedProfile: (candidate.used_saved_profile ?? candidate.usedSavedProfile) as boolean | undefined,
     submitted: candidate.submitted as boolean | undefined,
     createdActivityIds: (candidate.created_activity_ids ?? candidate.createdActivityIds) as string[] | undefined,
     submittedAt: (candidate.submitted_at ?? candidate.submittedAt) as string | undefined,
@@ -248,26 +236,30 @@ function normalizeResult(result: unknown): ImportCsvOutput | null {
 // Convert to LocalTransaction for DataGrid
 // ============================================================================
 
-function toLocalTransaction(draft: ImportCsvActivityDraft): ImportLocalTransaction {
+function toLocalTransaction(draft: ImportCsvActivityDraft, index: number): ImportLocalTransaction {
+  const draftAny = draft as unknown as Record<string, unknown>;
   return {
     id: draft.tempId,
     tempId: draft.tempId,
     isNew: true,
     accountId: draft.accountId,
     activityType: draft.activityType,
-    date: draft.activityDate ? new Date(draft.activityDate) : undefined,
-    assetSymbol: draft.symbol,
+    subtype: draftAny.subtype as string | undefined,
+    isExternal: draftAny.isExternal as boolean | undefined,
+    activityDate: draft.activityDate,
+    symbol: draft.symbol,
     exchangeMic: draft.exchangeMic,
     quantity: draft.quantity,
     unitPrice: draft.unitPrice,
     amount: draft.amount,
     fee: draft.fee,
+    fxRate: draftAny.fxRate as number | undefined,
     currency: draft.currency,
     comment: draft.comment,
+    rowIndex: index,
     isValid: draft.validationStatus !== "error",
     errors: draft.validationErrors?.filter((_, i) => i < (draft.validationStatus === "error" ? Infinity : 0)) ?? [],
     warnings: draft.validationStatus === "warning" ? (draft.validationErrors ?? []) : [],
-    sourceRow: draft.sourceRow,
   };
 }
 
@@ -330,36 +322,43 @@ function SuccessState({ activityCount }: SuccessStateProps) {
 }
 
 // ============================================================================
-// Confidence Badge
+// Mapping Quality Badge
 // ============================================================================
 
-interface ConfidenceBadgeProps {
-  confidence: number;
+interface MappingQualityBadgeProps {
+  mapping: ImportCsvMappingData;
+  usedSavedProfile?: boolean;
 }
 
-function ConfidenceBadge({ confidence }: ConfidenceBadgeProps) {
-  const percentage = Math.round(confidence * 100);
-  let className = "";
+function MappingQualityBadge({ mapping, usedSavedProfile }: MappingQualityBadgeProps) {
+  // Calculate quality from number of mapped fields (out of 6 core fields)
+  const coreFields = ["date", "activityType", "symbol", "quantity", "unitPrice", "amount"];
+  const mappedCount = coreFields.filter(
+    (f) => mapping.fieldMappings?.[f] && mapping.fieldMappings[f].length > 0
+  ).length;
+  const quality = mappedCount / coreFields.length;
 
-  if (confidence >= 0.8) {
+  let className = "";
+  let label = "";
+
+  if (usedSavedProfile) {
+    className = "bg-blue-500/10 text-blue-500 border-blue-500/30";
+    label = "Saved profile";
+  } else if (quality >= 0.8) {
     className = "bg-success/10 text-success border-success/30";
-  } else if (confidence >= 0.5) {
+    label = `${mappedCount}/${coreFields.length} fields mapped`;
+  } else if (quality >= 0.5) {
     className = "bg-warning/10 text-warning border-warning/30";
+    label = `${mappedCount}/${coreFields.length} fields mapped`;
   } else {
     className = "bg-destructive/10 text-destructive border-destructive/30";
+    label = `${mappedCount}/${coreFields.length} fields mapped`;
   }
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Badge variant="outline" className={className}>
-          {percentage}% confidence
-        </Badge>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p>AI confidence in column mapping accuracy</p>
-      </TooltipContent>
-    </Tooltip>
+    <Badge variant="outline" className={className}>
+      {label}
+    </Badge>
   );
 }
 
@@ -369,14 +368,10 @@ function ConfidenceBadge({ confidence }: ConfidenceBadgeProps) {
 
 interface CleaningActionsSummaryProps {
   actions: ImportCsvCleaningAction[];
-  plan: ImportPlan;
 }
 
-function CleaningActionsSummary({ actions, plan }: CleaningActionsSummaryProps) {
-  const hasActions = actions.length > 0;
-  const hasNotes = plan.notes && plan.notes.length > 0;
-
-  if (!hasActions && !hasNotes) return null;
+function CleaningActionsSummary({ actions }: CleaningActionsSummaryProps) {
+  if (actions.length === 0) return null;
 
   return (
     <Collapsible>
@@ -385,35 +380,21 @@ function CleaningActionsSummary({ actions, plan }: CleaningActionsSummaryProps) 
           <span className="flex items-center gap-2">
             <Icons.Sparkles className="h-4 w-4" />
             <span className="text-xs">
-              {actions.length > 0 && `${actions.length} auto-cleaning action${actions.length > 1 ? "s" : ""} applied`}
-              {actions.length > 0 && hasNotes && " • "}
-              {hasNotes && `${plan.notes!.length} note${plan.notes!.length > 1 ? "s" : ""}`}
+              {actions.length} auto-cleaning action{actions.length > 1 ? "s" : ""} applied
             </span>
           </span>
           <Icons.ChevronDown className="h-4 w-4" />
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent className="px-2 pt-2 space-y-2">
-        {hasActions && (
-          <ul className="space-y-1 text-xs text-muted-foreground">
-            {actions.map((action, i) => (
-              <li key={i} className="flex items-start gap-2">
-                <Icons.Check className="h-3 w-3 mt-0.5 text-success" />
-                <span>{action.description}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {hasNotes && (
-          <ul className="space-y-1 text-xs text-muted-foreground">
-            {plan.notes!.map((note, i) => (
-              <li key={i} className="flex items-start gap-2">
-                <Icons.Info className="h-3 w-3 mt-0.5 text-blue-500" />
-                <span>{note}</span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <ul className="space-y-1 text-xs text-muted-foreground">
+          {actions.map((action, i) => (
+            <li key={i} className="flex items-start gap-2">
+              <Icons.Check className="h-3 w-3 mt-0.5 text-success" />
+              <span>{action.description}</span>
+            </li>
+          ))}
+        </ul>
       </CollapsibleContent>
     </Collapsible>
   );
@@ -448,186 +429,10 @@ function ValidationSummaryBadges({ validation }: ValidationSummaryProps) {
 }
 
 // ============================================================================
-// Import Data Grid Columns
+// Import Data Grid Columns (uses shared columns from import-columns.tsx)
 // ============================================================================
 
-function useImportColumns(accounts: ImportCsvAccountOption[]) {
-  const activityTypeOptions = useMemo(
-    () =>
-      (Object.values(ActivityType) as ActivityType[]).map((type) => ({
-        value: type,
-        label: ActivityTypeNames[type],
-      })),
-    [],
-  );
-
-  const accountOptions = useMemo(
-    () =>
-      accounts.map((account) => ({
-        value: account.id,
-        label: `${account.name} (${account.currency})`,
-      })),
-    [accounts],
-  );
-
-  const handleSymbolSearch = useCallback(async (query: string): Promise<SymbolSearchResult[]> => {
-    const results = await searchTicker(query);
-    return results.map((result) => ({
-      symbol: result.symbol,
-      shortName: result.shortName,
-      longName: result.longName,
-      exchange: result.exchange,
-      exchangeMic: result.exchangeMic,
-      currency: result.currency,
-      score: result.score,
-      dataSource: result.dataSource,
-    }));
-  }, []);
-
-  const columns = useMemo<ColumnDef<ImportLocalTransaction>[]>(
-    () => [
-      // Row number
-      {
-        id: "sourceRow",
-        accessorKey: "sourceRow",
-        header: "#",
-        size: 50,
-        minSize: 50,
-        maxSize: 50,
-        enableSorting: false,
-        enableResizing: false,
-        cell: ({ row }) => (
-          <span className="text-muted-foreground text-xs">{row.original.sourceRow}</span>
-        ),
-      },
-      // Status indicator
-      {
-        id: "status",
-        header: "",
-        size: 32,
-        minSize: 32,
-        maxSize: 32,
-        enableResizing: false,
-        enableSorting: false,
-        cell: ({ row }) => {
-          const { isValid, errors, warnings } = row.original;
-          if (isValid && warnings.length === 0) {
-            return <Icons.CheckCircle className="h-4 w-4 text-success" />;
-          }
-          if (!isValid) {
-            return (
-              <Tooltip>
-                <TooltipTrigger>
-                  <Icons.AlertCircle className="h-4 w-4 text-destructive" />
-                </TooltipTrigger>
-                <TooltipContent>{errors.join(", ")}</TooltipContent>
-              </Tooltip>
-            );
-          }
-          return (
-            <Tooltip>
-              <TooltipTrigger>
-                <Icons.AlertTriangle className="h-4 w-4 text-warning" />
-              </TooltipTrigger>
-              <TooltipContent>{warnings.join(", ")}</TooltipContent>
-            </Tooltip>
-          );
-        },
-      },
-      // Account
-      {
-        id: "accountId",
-        accessorKey: "accountId",
-        header: "Account",
-        size: 160,
-        meta: { cell: { variant: "select", options: accountOptions } },
-      },
-      // Type
-      {
-        accessorKey: "activityType",
-        header: "Type",
-        size: 130,
-        meta: {
-          cell: {
-            variant: "select",
-            options: activityTypeOptions,
-          },
-        },
-      },
-      // Date
-      {
-        id: "date",
-        accessorKey: "date",
-        header: "Date",
-        size: 140,
-        meta: { cell: { variant: "datetime" } },
-      },
-      // Symbol
-      {
-        accessorKey: "assetSymbol",
-        header: "Symbol",
-        size: 120,
-        meta: {
-          cell: {
-            variant: "symbol",
-            onSearch: handleSymbolSearch,
-          },
-        },
-      },
-      // Quantity
-      {
-        accessorKey: "quantity",
-        header: "Qty",
-        size: 100,
-        enableSorting: false,
-        meta: { cell: { variant: "number", step: 0.000001 } },
-      },
-      // Price
-      {
-        accessorKey: "unitPrice",
-        header: "Price",
-        size: 100,
-        enableSorting: false,
-        meta: { cell: { variant: "number", step: 0.000001 } },
-      },
-      // Amount
-      {
-        accessorKey: "amount",
-        header: "Amount",
-        size: 100,
-        enableSorting: false,
-        meta: { cell: { variant: "number", step: 0.01 } },
-      },
-      // Fee
-      {
-        accessorKey: "fee",
-        header: "Fee",
-        size: 80,
-        enableSorting: false,
-        meta: { cell: { variant: "number", step: 0.01 } },
-      },
-      // Currency
-      {
-        accessorKey: "currency",
-        header: "CCY",
-        size: 80,
-        enableSorting: false,
-        meta: { cell: { variant: "currency" } },
-      },
-      // Comment
-      {
-        accessorKey: "comment",
-        header: "Comment",
-        size: 200,
-        enableSorting: false,
-        meta: { cell: { variant: "long-text" } },
-      },
-    ],
-    [accountOptions, activityTypeOptions, handleSymbolSearch],
-  );
-
-  return columns;
-}
+import { useImportColumns } from "@/pages/activity/import/components/import-columns";
 
 // ============================================================================
 // Main Import Form with DataGrid
@@ -645,7 +450,7 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
 
   // Convert drafts to local transactions
   const initialTransactions = useMemo(
-    () => data.activities.map(toLocalTransaction),
+    () => data.activities.map((draft, index) => toLocalTransaction(draft, index)),
     [data.activities],
   );
 
@@ -656,7 +461,129 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const columns = useImportColumns(data.availableAccounts);
+  // Custom asset dialog state
+  const [customAssetDialog, setCustomAssetDialog] = useState<{
+    open: boolean;
+    rowIndex: number;
+    symbol: string;
+  }>({ open: false, rowIndex: -1, symbol: "" });
+
+  // Get fallback currency from selected account or first available
+  const fallbackCurrency = useMemo(() => {
+    if (selectedAccountId) {
+      const account = data.availableAccounts.find(a => a.id === selectedAccountId);
+      if (account) return account.currency;
+    }
+    return data.availableAccounts[0]?.currency ?? "USD";
+  }, [selectedAccountId, data.availableAccounts]);
+
+  // Symbol selection handler - update transaction with symbol and currency from search result
+  const handleSymbolSelect = useCallback(
+    (rowIndex: number, _symbol: string, result?: SymbolSearchResult) => {
+      if (!result) return;
+
+      setTransactions(prev => {
+        const updated = [...prev];
+        if (updated[rowIndex]) {
+          const row = updated[rowIndex];
+          const currency = result.currency ?? row.currency ?? fallbackCurrency;
+          updated[rowIndex] = {
+            ...row,
+            symbol: result.symbol,
+            exchangeMic: result.exchangeMic,
+            currency,
+          };
+        }
+        return updated;
+      });
+    },
+    [fallbackCurrency]
+  );
+
+  // Request to create a custom asset - opens the dialog
+  const handleCreateCustomAsset = useCallback((rowIndex: number, symbol: string) => {
+    setCustomAssetDialog({ open: true, rowIndex, symbol });
+  }, []);
+
+  // Handle custom asset created from dialog
+  const handleCustomAssetCreated = useCallback(
+    (result: SymbolSearchResult) => {
+      const { rowIndex } = customAssetDialog;
+      if (rowIndex < 0) return;
+
+      setTransactions(prev => {
+        const updated = [...prev];
+        if (updated[rowIndex]) {
+          const row = updated[rowIndex];
+          const currency = result.currency ?? row.currency ?? fallbackCurrency;
+          updated[rowIndex] = {
+            ...row,
+            symbol: result.symbol,
+            exchangeMic: result.exchangeMic,
+            currency,
+          };
+        }
+        return updated;
+      });
+
+      setCustomAssetDialog({ open: false, rowIndex: -1, symbol: "" });
+    },
+    [customAssetDialog, fallbackCurrency]
+  );
+
+  // Symbol search handler
+  const handleSymbolSearch = useCallback(async (query: string): Promise<SymbolSearchResult[]> => {
+    const results = await searchTicker(query);
+    return results.map((result) => ({
+      symbol: result.symbol,
+      shortName: result.shortName,
+      longName: result.longName,
+      exchange: result.exchange,
+      exchangeMic: result.exchangeMic,
+      currency: result.currency,
+      score: result.score,
+      dataSource: result.dataSource,
+    }));
+  }, []);
+
+  // Status cell renderer for validation display
+  const renderStatusCell = useCallback((row: ImportLocalTransaction) => {
+    const { isValid, errors, warnings, rowIndex } = row;
+    return (
+      <div className="flex items-center gap-1.5">
+        <span className="text-muted-foreground text-xs w-5">{rowIndex + 1}</span>
+        {isValid && warnings.length === 0 && (
+          <Icons.CheckCircle className="h-4 w-4 text-success" />
+        )}
+        {!isValid && (
+          <Tooltip>
+            <TooltipTrigger>
+              <Icons.AlertCircle className="h-4 w-4 text-destructive" />
+            </TooltipTrigger>
+            <TooltipContent>{errors.join(", ")}</TooltipContent>
+          </Tooltip>
+        )}
+        {isValid && warnings.length > 0 && (
+          <Tooltip>
+            <TooltipTrigger>
+              <Icons.AlertTriangle className="h-4 w-4 text-warning" />
+            </TooltipTrigger>
+            <TooltipContent>{warnings.join(", ")}</TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+    );
+  }, []);
+
+  const columns = useImportColumns<ImportLocalTransaction>({
+    accounts: data.availableAccounts,
+    onSymbolSearch: handleSymbolSearch,
+    onSymbolSelect: handleSymbolSelect,
+    onCreateCustomAsset: handleCreateCustomAsset,
+    enableSelection: false,
+    enableStatusColumn: true,
+    renderStatusCell,
+  });
 
   const validCount = useMemo(() => transactions.filter(t => t.isValid).length, [transactions]);
   const errorCount = useMemo(() => transactions.filter(t => !t.isValid).length, [transactions]);
@@ -685,7 +612,10 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
     enablePaste: true,
     onDataChange,
     initialState: {
-      columnVisibility: {},
+      columnVisibility: {
+        subtype: false, // Hidden by default
+        isExternal: true,
+      },
     },
   });
 
@@ -703,12 +633,15 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
         id: t.tempId,
         accountId: selectedAccountId,
         activityType: t.activityType ?? "BUY",
-        activityDate: t.date?.toISOString() ?? new Date().toISOString(),
-        asset: t.assetSymbol ? { symbol: t.assetSymbol, exchangeMic: t.exchangeMic } : undefined,
+        subtype: t.subtype,
+        isExternal: t.isExternal,
+        activityDate: t.activityDate ?? new Date().toISOString(),
+        asset: t.symbol ? { symbol: t.symbol, exchangeMic: t.exchangeMic } : undefined,
         quantity: t.quantity,
         unitPrice: t.unitPrice,
         amount: t.amount,
         fee: t.fee,
+        fxRate: t.fxRate,
         currency: t.currency,
         comment: t.comment,
       }));
@@ -753,14 +686,14 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
           <div className="flex items-center gap-2">
             <Icons.FileSpreadsheet className="h-5 w-5 text-primary" />
             <CardTitle className="text-base">CSV Import Preview</CardTitle>
-            <ConfidenceBadge confidence={data.appliedPlan.confidence.overall} />
+            <MappingQualityBadge mapping={data.appliedMapping} usedSavedProfile={data.usedSavedProfile} />
           </div>
           <ValidationSummaryBadges validation={data.validation} />
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Cleaning actions and notes summary */}
-        <CleaningActionsSummary actions={data.cleaningActions} plan={data.appliedPlan} />
+        {/* Cleaning actions summary */}
+        <CleaningActionsSummary actions={data.cleaningActions} />
 
         {/* Account selector */}
         <div className="flex items-center gap-2">
@@ -819,6 +752,23 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
             Import {validCount} Activities
           </Button>
         </div>
+
+        {/* Custom asset creation dialog */}
+        <CreateCustomAssetDialog
+          open={customAssetDialog.open}
+          onOpenChange={(open) => {
+            if (!open) {
+              setCustomAssetDialog({ open: false, rowIndex: -1, symbol: "" });
+            }
+          }}
+          onAssetCreated={handleCustomAssetCreated}
+          defaultSymbol={customAssetDialog.symbol}
+          defaultCurrency={
+            customAssetDialog.rowIndex >= 0
+              ? transactions[customAssetDialog.rowIndex]?.currency ?? fallbackCurrency
+              : fallbackCurrency
+          }
+        />
       </CardContent>
     </Card>
   );
@@ -908,10 +858,7 @@ function ImportCsvToolUIContent({ result, status, toolCallId }: ImportCsvToolUIC
     );
   }
 
-  if (parsed.appliedPlan?.abstain) {
-    return <AbstainState globalErrors={parsed.validation.globalErrors ?? []} />;
-  }
-
+  // Show abstain state if there are global errors and no valid activities
   if (parsed.validation.globalErrors && parsed.validation.globalErrors.length > 0 && parsed.activities.length === 0) {
     return <AbstainState globalErrors={parsed.validation.globalErrors} />;
   }

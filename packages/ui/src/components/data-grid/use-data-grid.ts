@@ -608,12 +608,6 @@ function useDataGrid<TData>({
       if (currentState.cutCells.size > 0) {
         store.setState("cutCells", new Set());
       }
-
-      toast.success(
-        `${selectedCellsArray.length} cell${
-          selectedCellsArray.length !== 1 ? "s" : ""
-        } copied`,
-      );
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to copy to clipboard",
@@ -710,12 +704,6 @@ function useDataGrid<TData>({
       await navigator.clipboard.writeText(tsvData);
 
       store.setState("cutCells", new Set(selectedCellsArray));
-
-      toast.success(
-        `${selectedCellsArray.length} cell${
-          selectedCellsArray.length !== 1 ? "s" : ""
-        } cut`,
-      );
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to cut to clipboard",
@@ -1170,18 +1158,6 @@ function useDataGrid<TData>({
           }
 
           onDataUpdate(allUpdates);
-
-          if (cellsSkipped > 0) {
-            toast.success(
-              `${cellsUpdated} cell${
-                cellsUpdated !== 1 ? "s" : ""
-              } pasted, ${cellsSkipped} skipped`,
-            );
-          } else {
-            toast.success(
-              `${cellsUpdated} cell${cellsUpdated !== 1 ? "s" : ""} pasted`,
-            );
-          }
 
           const endColumnId = navigableColumnIds[endColIndex];
           if (endColumnId) {
@@ -2212,6 +2188,9 @@ function useDataGrid<TData>({
       getIsCellSelected,
       getIsSearchMatch,
       getIsActiveSearchMatch,
+      get getCellState() {
+        return propsRef.current.meta?.getCellState;
+      },
       onRowHeightChange,
       onRowSelect,
       onDataUpdate,

@@ -4,6 +4,7 @@ import {
   ActivityType,
   ActivityTypeNames,
   SUBTYPE_DISPLAY_NAMES,
+  SUBTYPES_BY_ACTIVITY_TYPE,
 } from "@/lib/constants";
 import type { Account, ActivityDetails } from "@/lib/types";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -161,22 +162,57 @@ export function useActivityColumns({
           },
         },
       },
-      // 6. Subtype (hidden by default; show when type implies ambiguity)
+      // 6. Subtype (hidden by default; dynamic options based on activity type)
       {
         id: "subtype",
         accessorKey: "subtype",
         header: "Subtype",
-        size: 140,
+        size: 160,
         enableSorting: false,
         enableHiding: true,
-        cell: ({ row }) => {
-          const subtype = row.original.subtype;
-          if (!subtype) return <span className="text-muted-foreground">—</span>;
-          const displayName = SUBTYPE_DISPLAY_NAMES[subtype] || subtype;
-          return <span className="text-xs">{displayName}</span>;
+        meta: {
+          cell: {
+            variant: "select",
+            // Dynamic options based on activity type
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            options: ((rowData: any) => {
+              const activityType = rowData?.activityType?.toUpperCase();
+              if (!activityType) return [];
+              const allowedSubtypes = SUBTYPES_BY_ACTIVITY_TYPE[activityType] || [];
+              return allowedSubtypes.map((subtype) => ({
+                value: subtype,
+                label: SUBTYPE_DISPLAY_NAMES[subtype] || subtype,
+              }));
+            }) as any,
+            allowEmpty: true,
+            emptyLabel: "None",
+          },
         },
       },
-      // 7. Symbol
+      // 7. External (checkbox for TRANSFER_IN/TRANSFER_OUT only)
+      {
+        id: "isExternal",
+        accessorKey: "isExternal",
+        header: "External",
+        size: 80,
+        enableSorting: false,
+        enableHiding: true,
+        meta: {
+          cell: {
+            variant: "checkbox",
+            // Only enabled for transfer types
+            isDisabled: (rowData: unknown) => {
+              const row = rowData as LocalTransaction;
+              const activityType = row.activityType?.toUpperCase();
+              return (
+                activityType !== ActivityType.TRANSFER_IN &&
+                activityType !== ActivityType.TRANSFER_OUT
+              );
+            },
+          },
+        },
+      },
+      // 8. Symbol
       {
         accessorKey: "assetSymbol",
         header: "Symbol",

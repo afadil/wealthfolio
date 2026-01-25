@@ -54,17 +54,10 @@ export function SingleSelectTaxonomy({
 
   const isLoading = isLoadingTaxonomy || isLoadingAssignments;
 
-  // Get leaf categories only (categories without children)
-  const leafCategories = useMemo(() => {
+  // Get all categories sorted by sort order
+  const allCategories = useMemo(() => {
     if (!taxonomyData?.categories) return [];
-
-    const parentIds = new Set(
-      taxonomyData.categories.filter((c) => c.parentId).map((c) => c.parentId),
-    );
-
-    return taxonomyData.categories
-      .filter((c) => !parentIds.has(c.id))
-      .sort((a, b) => a.sortOrder - b.sortOrder);
+    return [...taxonomyData.categories].sort((a, b) => a.sortOrder - b.sortOrder);
   }, [taxonomyData?.categories]);
 
   // Find current assignment for this taxonomy
@@ -114,7 +107,7 @@ export function SingleSelectTaxonomy({
   const isDisabled = disabled || assignMutation.isPending;
 
   // Use dropdown for many categories
-  if (leafCategories.length > MAX_RADIO_ITEMS) {
+  if (allCategories.length > MAX_RADIO_ITEMS) {
     return (
       <div className="space-y-2">
         {label && <Label className="text-muted-foreground text-sm font-medium">{label}</Label>}
@@ -127,13 +120,13 @@ export function SingleSelectTaxonomy({
             <SelectValue placeholder="Select...">
               {selectedCategoryId && (
                 <CategoryDisplay
-                  category={leafCategories.find((c) => c.id === selectedCategoryId)}
+                  category={allCategories.find((c) => c.id === selectedCategoryId)}
                 />
               )}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {leafCategories.map((category) => (
+            {allCategories.map((category) => (
               <SelectItem key={category.id} value={category.id}>
                 <CategoryDisplay category={category} />
               </SelectItem>
@@ -154,7 +147,7 @@ export function SingleSelectTaxonomy({
         disabled={isDisabled}
         className="flex flex-wrap gap-1.5 pt-2"
       >
-        {leafCategories.map((category) => {
+        {allCategories.map((category) => {
           const isSelected = selectedCategoryId === category.id;
           const displayName = getDisplayName(category.name);
 

@@ -630,6 +630,13 @@ mod tests {
         {
             Ok(std::collections::HashMap::new())
         }
+
+        fn check_existing_duplicates(
+            &self,
+            _idempotency_keys: &[String],
+        ) -> Result<std::collections::HashMap<String, String>> {
+            Ok(std::collections::HashMap::new())
+        }
     }
 
     // Helper to create a test account

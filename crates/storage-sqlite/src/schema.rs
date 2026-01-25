@@ -54,12 +54,10 @@ diesel::table! {
 diesel::table! {
     activity_import_profiles (account_id) {
         account_id -> Text,
-        field_mappings -> Text,
-        activity_mappings -> Text,
-        symbol_mappings -> Text,
+        name -> Text,
+        config -> Text,
         created_at -> Timestamp,
         updated_at -> Timestamp,
-        account_mappings -> Text,
     }
 }
 

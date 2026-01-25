@@ -40,6 +40,7 @@ use wealthfolio_storage_sqlite::{
     market_data::{MarketDataRepository, QuoteSyncStateRepository},
     portfolio::{snapshot::SnapshotRepository, valuation::ValuationRepository},
     settings::SettingsRepository,
+    sync::ImportRunRepository,
     taxonomies::TaxonomyRepository,
 };
 
@@ -117,12 +118,17 @@ pub async fn initialize_context(
         fx_service.clone(),
         base_currency.clone(),
     ));
-    let activity_service = Arc::new(ActivityService::new(
+
+    // Import run repository for tracking CSV imports
+    let import_run_repository = Arc::new(ImportRunRepository::new(pool.clone(), writer.clone()));
+
+    let activity_service = Arc::new(ActivityService::with_import_run_repository(
         activity_repository.clone(),
         account_service.clone(),
         asset_service.clone(),
         fx_service.clone(),
         quote_service.clone(),
+        import_run_repository,
     ));
     let goal_service = Arc::new(GoalService::new(goal_repo.clone()));
     let limits_service = Arc::new(ContributionLimitService::new(

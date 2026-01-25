@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
 use crate::context::ServiceContext;
-use log::debug;
+use log::{debug, info, warn};
 use tauri::State;
 use wealthfolio_core::health::{FixAction, HealthConfig, HealthServiceTrait, HealthStatus};
+use wealthfolio_core::quotes::SyncMode;
 
 /// Get current health status (cached or fresh check).
 #[tauri::command]
@@ -109,6 +110,34 @@ pub async fn execute_health_fix(
     if action.id == "migrate_legacy_classifications" {
         // Use the shared migration function from taxonomy module
         crate::commands::taxonomy::run_legacy_migration(&state).await?;
+        return Ok(());
+    }
+
+    // Handle sync_prices and retry_sync actions - these need quote service
+    if action.id == "sync_prices" || action.id == "retry_sync" {
+        let asset_ids: Vec<String> = serde_json::from_value(action.payload.clone())
+            .map_err(|e| format!("Failed to parse asset IDs: {}", e))?;
+
+        info!(
+            "Syncing market data for {} assets: {:?}",
+            asset_ids.len(),
+            asset_ids
+        );
+
+        let quote_service = state.quote_service();
+        let result = quote_service
+            .sync(SyncMode::Incremental, Some(asset_ids))
+            .await
+            .map_err(|e| format!("Failed to sync market data: {}", e))?;
+
+        if !result.failures.is_empty() {
+            let failed_symbols: Vec<_> = result.failures.iter().map(|(s, _)| s.as_str()).collect();
+            warn!("Some assets failed to sync: {:?}", failed_symbols);
+        }
+
+        // Clear health cache so next check reflects the sync results
+        state.health_service().clear_cache().await;
+
         return Ok(());
     }
 

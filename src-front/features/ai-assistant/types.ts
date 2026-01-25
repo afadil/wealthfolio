@@ -421,88 +421,40 @@ export type AiChatMessage = ChatMessage;
 export type AiUsageStats = UsageStats;
 
 // ============================================================================
-// Import CSV Tool Types (Plan-Based Architecture)
+// Import CSV Tool Types (uses same format as manual import)
 // ============================================================================
 
 /**
- * Column index mappings for CSV import.
- * Maps field names to 0-based column indices.
+ * Import mapping data - same format as manual import.
+ * Uses header names (e.g., "Date") instead of column indices.
  */
-export interface ImportCsvColumnMappings {
-  date?: number | null;
-  activityType?: number | null;
-  symbol?: number | null;
-  quantity?: number | null;
-  unitPrice?: number | null;
-  amount?: number | null;
-  fee?: number | null;
-  currency?: number | null;
-  account?: number | null;
-  comment?: number | null;
-}
-
-/**
- * Transform operation to apply to a field.
- */
-export type ImportCsvTransformOp =
-  | "trim"
-  | "uppercase"
-  | "parse_date"
-  | "parse_number"
-  | "parse_number_abs"
-  | "strip_currency"
-  | "coalesce";
-
-/**
- * A single transform to apply to a field.
- */
-export interface ImportCsvTransform {
-  field: string;
-  op: ImportCsvTransformOp;
-  formatHints?: string[];
-  inputs?: number[];
-}
-
-/**
- * Sign rule for numeric fields.
- */
-export type ImportCsvSignRule = "negative_is_sell" | "negative_is_withdrawal" | "always_abs";
-
-/**
- * Sign rule configuration for a field.
- */
-export interface ImportCsvSignRuleConfig {
-  field: "amount" | "quantity" | "unitPrice" | "fee";
-  rule: ImportCsvSignRule;
-}
-
-/**
- * Enum mappings for normalizing values.
- */
-export interface ImportCsvEnumMaps {
-  activityType?: Record<string, string>;
-}
-
-/**
- * Confidence scores for the import plan.
- */
-export interface ImportCsvConfidence {
-  overall: number;
-  byField?: Record<string, number>;
-}
-
-/**
- * The Import Plan proposed by the LLM.
- * Schema-enforced; non-conforming output is rejected.
- */
-export interface ImportPlan {
-  columnMappings: ImportCsvColumnMappings;
-  transforms: ImportCsvTransform[];
-  enumMaps: ImportCsvEnumMaps;
-  signRules?: ImportCsvSignRuleConfig[];
-  confidence: ImportCsvConfidence;
-  notes?: string[];
-  abstain: boolean;
+export interface ImportCsvMappingData {
+  /** Account ID this mapping belongs to */
+  accountId?: string;
+  /** Optional name for this mapping profile */
+  name?: string;
+  /** Field mappings: fieldName → headerName (e.g., { date: "Date", symbol: "Ticker" }) */
+  fieldMappings?: Record<string, string>;
+  /** Activity type mappings: ActivityType → [csvValues] (e.g., { BUY: ["Purchase", "Buy"] }) */
+  activityMappings?: Record<string, string[]>;
+  /** Symbol mappings: csvSymbol → canonicalSymbol */
+  symbolMappings?: Record<string, string>;
+  /** Account mappings: csvAccount → accountId */
+  accountMappings?: Record<string, string>;
+  /** CSV parsing configuration */
+  parseConfig?: {
+    hasHeaderRow?: boolean;
+    headerRowIndex?: number;
+    delimiter?: string;
+    quoteChar?: string;
+    skipTopRows?: number;
+    skipBottomRows?: number;
+    skipEmptyRows?: boolean;
+    dateFormat?: string;
+    decimalSeparator?: string;
+    thousandsSeparator?: string;
+    defaultCurrency?: string;
+  };
 }
 
 /**
@@ -578,9 +530,8 @@ export interface ImportCsvActivityDraft {
 export interface ImportCsvArgs {
   csvContent: string;
   accountId?: string;
-  importPlan?: ImportPlan;
-  /** @deprecated Use importPlan */
-  columnMappings?: ImportCsvColumnMappings;
+  /** User-provided mapping to apply */
+  mapping?: ImportCsvMappingData;
 }
 
 /**
@@ -589,10 +540,8 @@ export interface ImportCsvArgs {
 export interface ImportCsvOutput {
   /** Parsed activities as drafts ready for editing */
   activities: ImportCsvActivityDraft[];
-  /** The import plan that was applied (or auto-detected) */
-  appliedPlan: ImportPlan;
-  /** @deprecated Use appliedPlan */
-  suggestedMappings?: ImportCsvColumnMappings;
+  /** The mapping that was applied (from saved profile, LLM suggestion, or auto-detected) */
+  appliedMapping: ImportCsvMappingData;
   /** List of cleaning actions performed */
   cleaningActions: ImportCsvCleaningAction[];
   /** Validation summary */
@@ -605,6 +554,8 @@ export interface ImportCsvOutput {
   totalRows?: number;
   /** Whether output was truncated */
   truncated?: boolean;
+  /** Whether a saved profile was used as the starting point */
+  usedSavedProfile?: boolean;
   /** Persisted state: whether activities have been saved */
   submitted?: boolean;
   /** IDs of created activities (after save) */

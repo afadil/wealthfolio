@@ -219,6 +219,8 @@ pub fn run() {
             commands::activity::import_activities,
             commands::activity::get_account_import_mapping,
             commands::activity::save_account_import_mapping,
+            commands::activity::check_existing_duplicates,
+            commands::activity::parse_csv,
             // Settings commands
             commands::settings::get_settings,
             commands::settings::is_auto_update_check_enabled,

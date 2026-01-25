@@ -64,20 +64,22 @@ const SearchResults = memo(
           results.map((ticker) => {
             // Use exchangeName if available (from backend), otherwise map exchange code to friendly name
             const exchangeDisplay = ticker.exchangeName || getExchangeDisplayName(ticker.exchange);
+            const displayName = ticker.longName || ticker.shortName || ticker.symbol;
             return (
               <CommandItem
                 key={ticker.symbol}
                 onSelect={() => onSelect(ticker)}
                 value={ticker.symbol}
-                className="h-11 rounded-none"
+                className="flex items-center justify-between py-2"
               >
-                <Icons.Check
-                  className={cn(
-                    "mr-2 h-4 w-4",
-                    selectedResult?.symbol === ticker.symbol ? "opacity-100" : "opacity-0",
-                  )}
-                />
-                {ticker.symbol} - {ticker.longName} ({exchangeDisplay})
+                <div className="flex flex-col">
+                  <span className="font-mono text-xs font-semibold uppercase">{ticker.symbol}</span>
+                  <span className="text-muted-foreground text-xs line-clamp-1">{displayName}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground text-xs">{exchangeDisplay}</span>
+                  {selectedResult?.symbol === ticker.symbol && <Icons.Check className="size-4" />}
+                </div>
               </CommandItem>
             );
           })}
@@ -89,10 +91,15 @@ const SearchResults = memo(
             <CommandItem
               onSelect={onCreateCustomAsset}
               value={`create-custom-${query}`}
-              className="text-muted-foreground hover:text-foreground h-11 rounded-none"
+              className="flex items-center gap-3 py-2"
             >
-              <Icons.Plus className="mr-2 h-4 w-4" />
-              Create custom asset{query.trim() ? `: "${query.trim().toUpperCase()}"` : "..."}
+              <Icons.PlusCircle className="text-muted-foreground size-4" />
+              <div className="flex flex-col">
+                <span className="font-mono text-xs font-semibold uppercase">
+                  {query.trim().toUpperCase() || "..."}
+                </span>
+                <span className="text-muted-foreground text-xs">Create custom (manual)</span>
+              </div>
             </CommandItem>
           </>
         )}
@@ -251,7 +258,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
           <PopoverContent
             side="bottom"
             align="start"
-            className="h-auto w-(--radix-popover-trigger-width) p-0"
+            className="h-auto min-w-[280px] w-(--radix-popover-trigger-width) p-0"
             onOpenAutoFocus={handleOpenAutoFocus}
             onCloseAutoFocus={handleCloseAutoFocus}
           >

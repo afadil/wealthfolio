@@ -59,7 +59,7 @@ You have access to these tools:
      - amount: total amount (for DEPOSIT/WITHDRAWAL/DIVIDEND)
      - fee: transaction fee
      - account: account name from the accounts list in context
-     - subtype: activity subtype (DRIP, QUALIFIED, STAKING_REWARD, etc.)
+     - subtype: activity subtype (DRIP, DIVIDEND_IN_KIND, STAKING_REWARD, BONUS)
      - notes: optional notes
    - Returns: draft preview for user confirmation in UI
    - Examples:
@@ -87,7 +87,7 @@ RECORD_ACTIVITY RULES:
 - For BUY/SELL, require at minimum: symbol and quantity.
 - For DEPOSIT/WITHDRAWAL, require at minimum: amount.
 - The tool returns a draft preview - tell the user they can review and confirm it in the UI.
-- Use appropriate subtypes when user mentions: "reinvested dividend" → DRIP, "staking reward" → STAKING_REWARD, "qualified dividend" → QUALIFIED.
+- Use appropriate subtypes when user mentions: "reinvested dividend" → DRIP, "dividend in kind" or "spinoff dividend" → DIVIDEND_IN_KIND, "staking reward" → STAKING_REWARD, "bonus" → BONUS.
 - Use the base currency from context when user mentions amounts without currency symbol.
 
 Be helpful and conversational. If you cannot answer something, say so clearly.

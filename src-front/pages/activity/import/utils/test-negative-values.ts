@@ -29,6 +29,7 @@ const testData = [
 
 const mapping = {
   accountId: "test-account",
+  name: "Test Mapping",
   fieldMappings: {
     [ImportFormat.DATE]: "date",
     [ImportFormat.SYMBOL]: "symbol",

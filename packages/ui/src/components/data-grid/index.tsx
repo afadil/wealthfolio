@@ -5,6 +5,7 @@ export type {
   CellPosition,
   CellRange,
   CellSelectOption,
+  CellValidationState,
   ContextMenuState,
   DataGridCellProps,
   DateFilterOperator,

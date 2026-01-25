@@ -334,7 +334,8 @@ export function ActivityDataGrid({
       sorting,
       columnPinning: { left: [...PINNED_COLUMNS.left], right: [...PINNED_COLUMNS.right] },
       columnVisibility: {
-        subtype: false,
+        subtype: true,
+        isExternal: true,
         activityStatus: false,
       },
     },

@@ -222,13 +222,20 @@ impl NetWorthService {
     }
 
     /// Calculate staleness info for valuations.
+    /// Cash is excluded from staleness checks since it doesn't need market data updates.
     fn calculate_staleness(
         valuations: &[ValuationInfo],
         reference_date: NaiveDate,
     ) -> (Option<NaiveDate>, Vec<StaleAssetInfo>) {
-        let oldest_date = valuations.iter().map(|v| v.valuation_date).min();
+        // Exclude Cash from staleness calculations - Cash is always "fresh" (1:1 value)
+        let non_cash_valuations: Vec<_> = valuations
+            .iter()
+            .filter(|v| v.category != AssetCategory::Cash)
+            .collect();
 
-        let stale_assets: Vec<StaleAssetInfo> = valuations
+        let oldest_date = non_cash_valuations.iter().map(|v| v.valuation_date).min();
+
+        let stale_assets: Vec<StaleAssetInfo> = non_cash_valuations
             .iter()
             .filter_map(|v| {
                 let days_stale = (reference_date - v.valuation_date).num_days();

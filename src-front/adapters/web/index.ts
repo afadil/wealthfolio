@@ -81,7 +81,9 @@ export {
   checkActivitiesImport,
   getAccountImportMapping,
   saveAccountImportMapping,
+  checkExistingDuplicates,
 } from "../shared/activities";
+export { parseCsv } from "./activities";
 
 // Goal Commands
 export {

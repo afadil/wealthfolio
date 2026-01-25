@@ -30,6 +30,7 @@ export const DataGridCell = React.memo(DataGridCellImpl, (prev, next) => {
   if (prev.rowIndex !== next.rowIndex) return false;
   if (prev.columnId !== next.columnId) return false;
   if (prev.rowHeight !== next.rowHeight) return false;
+  if (prev.cellState !== next.cellState) return false;
 
   // Check cell value using row.original instead of getValue() for stability
   // getValue() is unstable and recreates on every render, breaking memoization
@@ -57,6 +58,7 @@ function DataGridCellImpl<TData>({
   isActiveSearchMatch,
   readOnly,
   rowHeight,
+  cellState,
 }: DataGridCellProps<TData>) {
   const cellOpts = cell.column.columnDef.meta?.cell;
   const variant = cellOpts?.variant ?? "text";
@@ -122,6 +124,7 @@ function DataGridCellImpl<TData>({
       isSearchMatch={isSearchMatch}
       isActiveSearchMatch={isActiveSearchMatch}
       readOnly={readOnly}
+      cellState={cellState}
     />
   );
 }

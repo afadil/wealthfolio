@@ -217,6 +217,7 @@ function DataGridRowImpl<TData>({
 
         const isSearchMatch = searchMatchColumns?.has(columnId) ?? false;
         const isActiveSearchMatch = activeSearchMatch?.columnId === columnId;
+        const cellState = tableMeta?.getCellState?.(virtualRowIndex, columnId) ?? null;
 
         return (
           <div
@@ -256,6 +257,7 @@ function DataGridRowImpl<TData>({
                 isSearchMatch={isSearchMatch}
                 isActiveSearchMatch={isActiveSearchMatch}
                 readOnly={readOnly}
+                cellState={cellState}
               />
             )}
           </div>

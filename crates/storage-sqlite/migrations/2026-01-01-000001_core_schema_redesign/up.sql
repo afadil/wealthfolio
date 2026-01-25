@@ -130,69 +130,60 @@ INSERT INTO assets (
     notes, metadata, is_active, created_at, updated_at
 )
 SELECT
-    -- id: New canonical format {primary}:{qualifier}
-    -- FX: EUR:USD (base:quote)
-    -- Crypto: BTC:USD (base:quote)
+    -- id: Canonical typed prefix format {TYPE}:{symbol}:{qualifier}
+    -- Security: SEC:AAPL:XNAS (prefix:symbol:mic)
+    -- FX: FX:EUR:USD (prefix:base:quote)
+    -- Crypto: CRYPTO:BTC:USD (prefix:symbol:quote)
     -- Cash: CASH:USD (prefix:currency)
-    -- Security with suffix: SHOP:XTSE (symbol:mic)
-    -- Security without suffix (US): AAPL:XNAS (symbol:mic, default to XNAS)
-    -- Alternative assets: Keep existing ID but replace - with : (PROP-abc -> PROP:abc)
     CASE
-        -- FX: base:quote
+        -- FX: FX:base:quote
         WHEN asset_type IN ('Forex', 'Currency', 'FOREX') AND symbol LIKE '%=X' THEN
-            substr(replace(symbol, '=X', ''), 1, 3) || ':' || substr(replace(symbol, '=X', ''), 4, 3)
+            'FX:' || substr(replace(symbol, '=X', ''), 1, 3) || ':' || substr(replace(symbol, '=X', ''), 4, 3)
         WHEN asset_type IN ('Forex', 'Currency', 'FOREX') AND length(symbol) = 6 AND symbol NOT LIKE '%.%' THEN
-            substr(symbol, 1, 3) || ':' || substr(symbol, 4, 3)
-        -- Crypto: base:quote (BTC-CAD -> BTC:CAD)
+            'FX:' || substr(symbol, 1, 3) || ':' || substr(symbol, 4, 3)
+        -- Crypto: CRYPTO:base:quote (BTC-CAD -> CRYPTO:BTC:CAD)
         WHEN asset_type IN ('Cryptocurrency', 'Crypto', 'CRYPTOCURRENCY', 'CRYPTO') AND symbol LIKE '%-%' THEN
-            substr(symbol, 1, instr(symbol, '-') - 1) || ':' || currency
+            'CRYPTO:' || substr(symbol, 1, instr(symbol, '-') - 1) || ':' || currency
         -- Cash: CASH:currency
         WHEN asset_type IN ('Cash', 'CASH') OR id LIKE '$CASH-%' THEN
             'CASH:' || currency
-        -- Alternative assets: PROP-xxx -> PROP:xxx, VEH-xxx -> VEH:xxx, etc.
-        WHEN id LIKE 'PROP-%' THEN 'PROP:' || substr(id, 6)
-        WHEN id LIKE 'VEH-%' THEN 'VEH:' || substr(id, 5)
-        WHEN id LIKE 'COLL-%' THEN 'COLL:' || substr(id, 6)
-        WHEN id LIKE 'PREC-%' THEN 'PREC:' || substr(id, 6)
-        WHEN id LIKE 'LIAB-%' THEN 'LIAB:' || substr(id, 6)
-        WHEN id LIKE 'ALT-%' THEN 'ALT:' || substr(id, 5)
-        -- Security with exchange suffix: symbol:MIC
-        WHEN symbol LIKE '%.TO' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XTSE'
-        WHEN symbol LIKE '%.V' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XTSX'
-        WHEN symbol LIKE '%.CN' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XCNQ'
-        WHEN symbol LIKE '%.L' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XLON'
-        WHEN symbol LIKE '%.DE' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XETR'
-        WHEN symbol LIKE '%.PA' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XPAR'
-        WHEN symbol LIKE '%.AS' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XAMS'
-        WHEN symbol LIKE '%.MI' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XMIL'
-        WHEN symbol LIKE '%.MC' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XMAD'
-        WHEN symbol LIKE '%.ST' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XSTO'
-        WHEN symbol LIKE '%.HE' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XHEL'
-        WHEN symbol LIKE '%.CO' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XCSE'
-        WHEN symbol LIKE '%.OL' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XOSL'
-        WHEN symbol LIKE '%.SW' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XSWX'
-        WHEN symbol LIKE '%.VI' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XWBO'
-        WHEN symbol LIKE '%.T' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XTKS'
-        WHEN symbol LIKE '%.HK' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XHKG'
-        WHEN symbol LIKE '%.SS' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XSHG'
-        WHEN symbol LIKE '%.SZ' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XSHE'
-        WHEN symbol LIKE '%.AX' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XASX'
-        WHEN symbol LIKE '%.NZ' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XNZE'
-        WHEN symbol LIKE '%.SA' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':BVMF'
-        WHEN symbol LIKE '%.NS' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XNSE'
-        WHEN symbol LIKE '%.BO' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XBOM'
-        WHEN symbol LIKE '%.TW' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XTAI'
-        WHEN symbol LIKE '%.SI' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XSES'
-        WHEN symbol LIKE '%.KS' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XKRX'
-        WHEN symbol LIKE '%.KQ' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XKOS'
-        WHEN symbol LIKE '%.BK' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XBKK'
-        WHEN symbol LIKE '%.JK' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XIDX'
-        WHEN symbol LIKE '%.KL' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XKLS'
-        WHEN symbol LIKE '%.TA' THEN substr(symbol, 1, instr(symbol, '.') - 1) || ':XTAE'
-        -- US stocks without suffix: default to XNAS (Yahoo's NMS -> XNAS)
+        -- Security with exchange suffix: SEC:symbol:MIC
+        WHEN symbol LIKE '%.TO' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XTSE'
+        WHEN symbol LIKE '%.V' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XTSX'
+        WHEN symbol LIKE '%.CN' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XCNQ'
+        WHEN symbol LIKE '%.L' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XLON'
+        WHEN symbol LIKE '%.DE' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XETR'
+        WHEN symbol LIKE '%.PA' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XPAR'
+        WHEN symbol LIKE '%.AS' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XAMS'
+        WHEN symbol LIKE '%.MI' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XMIL'
+        WHEN symbol LIKE '%.MC' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XMAD'
+        WHEN symbol LIKE '%.ST' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XSTO'
+        WHEN symbol LIKE '%.HE' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XHEL'
+        WHEN symbol LIKE '%.CO' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XCSE'
+        WHEN symbol LIKE '%.OL' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XOSL'
+        WHEN symbol LIKE '%.SW' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XSWX'
+        WHEN symbol LIKE '%.VI' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XWBO'
+        WHEN symbol LIKE '%.T' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XTKS'
+        WHEN symbol LIKE '%.HK' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XHKG'
+        WHEN symbol LIKE '%.SS' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XSHG'
+        WHEN symbol LIKE '%.SZ' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XSHE'
+        WHEN symbol LIKE '%.AX' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XASX'
+        WHEN symbol LIKE '%.NZ' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XNZE'
+        WHEN symbol LIKE '%.SA' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':BVMF'
+        WHEN symbol LIKE '%.NS' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XNSE'
+        WHEN symbol LIKE '%.BO' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XBOM'
+        WHEN symbol LIKE '%.TW' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XTAI'
+        WHEN symbol LIKE '%.SI' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XSES'
+        WHEN symbol LIKE '%.KS' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XKRX'
+        WHEN symbol LIKE '%.KQ' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XKOS'
+        WHEN symbol LIKE '%.BK' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XBKK'
+        WHEN symbol LIKE '%.JK' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XIDX'
+        WHEN symbol LIKE '%.KL' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XKLS'
+        WHEN symbol LIKE '%.TA' THEN 'SEC:' || substr(symbol, 1, instr(symbol, '.') - 1) || ':XTAE'
+        -- US stocks without suffix: SEC:symbol:XNAS (default to XNAS)
         WHEN asset_type IN ('Stock', 'Equity', 'ETF', 'Etf', 'Mutual Fund', 'MutualFund', 'STOCK', 'EQUITY', 'ETF', 'MUTUALFUND')
              AND symbol NOT LIKE '%.%' THEN
-            symbol || ':XNAS'
+            'SEC:' || symbol || ':XNAS'
         -- Fallback: keep original id (shouldn't happen with proper data)
         ELSE id
     END,

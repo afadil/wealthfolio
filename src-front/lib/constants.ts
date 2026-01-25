@@ -243,6 +243,8 @@ export const ImportFormat = {
   FEE: "fee",
   ACCOUNT: "account",
   COMMENT: "comment",
+  FX_RATE: "fxRate",
+  SUBTYPE: "subtype",
 } as const;
 
 export type ImportFormat = (typeof ImportFormat)[keyof typeof ImportFormat];
@@ -258,6 +260,8 @@ export const importFormatSchema = z.enum([
   ImportFormat.FEE,
   ImportFormat.ACCOUNT,
   ImportFormat.COMMENT,
+  ImportFormat.FX_RATE,
+  ImportFormat.SUBTYPE,
 ]);
 
 export const IMPORT_REQUIRED_FIELDS = [
@@ -406,121 +410,44 @@ export const ActivityStatus = {
 
 export type ActivityStatus = (typeof ActivityStatus)[keyof typeof ActivityStatus];
 
-// Known subtypes for UI
+// Subtypes that affect calculations (compiler expansion or flow classification)
+// Other subtypes are just labels - the backend accepts any string value
 export const ACTIVITY_SUBTYPES = {
-  // Dividend subtypes
+  // DIVIDEND subtypes
+  // DRIP: cash dividend → immediately reinvested as BUY of same ticker
   DRIP: "DRIP",
-  QUALIFIED: "QUALIFIED",
-  ORDINARY: "ORDINARY",
-  RETURN_OF_CAPITAL: "RETURN_OF_CAPITAL",
+  // DIVIDEND_IN_KIND: dividend paid in asset (not cash), e.g., spinoff shares
   DIVIDEND_IN_KIND: "DIVIDEND_IN_KIND",
 
-  // Interest subtypes
+  // INTEREST subtypes - STAKING_REWARD expands to INTEREST + BUY
   STAKING_REWARD: "STAKING_REWARD",
-  LENDING_INTEREST: "LENDING_INTEREST",
-  COUPON: "COUPON",
 
-  // Split subtypes
-  STOCK_DIVIDEND: "STOCK_DIVIDEND",
-  REVERSE_SPLIT: "REVERSE_SPLIT",
-
-  // Option subtypes
-  OPTION_OPEN: "OPTION_OPEN",
-  OPTION_CLOSE: "OPTION_CLOSE",
-  OPTION_EXPIRE: "OPTION_EXPIRE",
-  OPTION_ASSIGNMENT: "OPTION_ASSIGNMENT",
-  OPTION_EXERCISE: "OPTION_EXERCISE",
-
-  // Fee subtypes
-  MANAGEMENT_FEE: "MANAGEMENT_FEE",
-  ADR_FEE: "ADR_FEE",
-  INTEREST_CHARGE: "INTEREST_CHARGE",
-
-  // Tax subtypes
-  WITHHOLDING: "WITHHOLDING",
-  NRA_WITHHOLDING: "NRA_WITHHOLDING",
-
-  // Credit subtypes
-  FEE_REFUND: "FEE_REFUND",
-  TAX_REFUND: "TAX_REFUND",
+  // CREDIT subtypes
+  // BONUS: external flow (new capital, affects TWR/net_contribution)
   BONUS: "BONUS",
-  ADJUSTMENT: "ADJUSTMENT",
+  // REBATE: internal flow (trading rebate, negative fee, no net_contribution change)
   REBATE: "REBATE",
-  REVERSAL: "REVERSAL",
-
-  // Liability subtypes
-  LIABILITY_INTEREST_ACCRUAL: "LIABILITY_INTEREST_ACCRUAL",
-  LIABILITY_PRINCIPAL_PAYMENT: "LIABILITY_PRINCIPAL_PAYMENT",
-
-  // Alternative asset subtypes
-  OPENING_POSITION: "OPENING_POSITION",
+  // REFUND: internal flow (fee correction/reversal, no net_contribution change)
+  REFUND: "REFUND",
 } as const;
 
 export type ActivitySubtype = (typeof ACTIVITY_SUBTYPES)[keyof typeof ACTIVITY_SUBTYPES];
 
 // Display names for subtypes
 export const SUBTYPE_DISPLAY_NAMES: Record<string, string> = {
-  DRIP: "Dividend Reinvested",
+  DRIP: "Dividend Reinvested (DRIP)",
+  DIVIDEND_IN_KIND: "Dividend in Kind",
   STAKING_REWARD: "Staking Reward",
-  DIVIDEND_IN_KIND: "Dividend (In Kind)",
-  STOCK_DIVIDEND: "Stock Dividend",
-  OPTION_OPEN: "Option Open",
-  OPTION_CLOSE: "Option Close",
-  OPTION_EXPIRE: "Option Expired",
-  OPTION_ASSIGNMENT: "Option Assignment",
-  OPTION_EXERCISE: "Option Exercise",
-  QUALIFIED: "Qualified Dividend",
-  ORDINARY: "Ordinary Dividend",
-  RETURN_OF_CAPITAL: "Return of Capital",
-  COUPON: "Bond Coupon",
-  WITHHOLDING: "Withholding Tax",
-  NRA_WITHHOLDING: "NRA Withholding Tax",
-  FEE_REFUND: "Fee Refund",
-  TAX_REFUND: "Tax Refund",
   BONUS: "Bonus",
-  ADJUSTMENT: "Adjustment",
-  REBATE: "Rebate",
-  REVERSAL: "Reversal",
-  MANAGEMENT_FEE: "Management Fee",
-  ADR_FEE: "ADR Fee",
-  INTEREST_CHARGE: "Interest Charge",
-  LENDING_INTEREST: "Lending Interest",
-  REVERSE_SPLIT: "Reverse Split",
-  LIABILITY_INTEREST_ACCRUAL: "Liability Interest Accrual",
-  LIABILITY_PRINCIPAL_PAYMENT: "Liability Principal Payment",
-  OPENING_POSITION: "Opening Position",
+  REBATE: "Trading Rebate",
+  REFUND: "Fee Refund",
 };
 
 // Suggested subtypes per activity type
 export const SUBTYPES_BY_ACTIVITY_TYPE: Record<string, string[]> = {
-  [ActivityType.DIVIDEND]: [
-    ACTIVITY_SUBTYPES.DRIP,
-    ACTIVITY_SUBTYPES.QUALIFIED,
-    ACTIVITY_SUBTYPES.ORDINARY,
-    ACTIVITY_SUBTYPES.RETURN_OF_CAPITAL,
-    ACTIVITY_SUBTYPES.DIVIDEND_IN_KIND,
-  ],
-  [ActivityType.INTEREST]: [
-    ACTIVITY_SUBTYPES.STAKING_REWARD,
-    ACTIVITY_SUBTYPES.LENDING_INTEREST,
-    ACTIVITY_SUBTYPES.COUPON,
-  ],
-  [ActivityType.SPLIT]: [ACTIVITY_SUBTYPES.STOCK_DIVIDEND, ACTIVITY_SUBTYPES.REVERSE_SPLIT],
-  [ActivityType.FEE]: [
-    ACTIVITY_SUBTYPES.MANAGEMENT_FEE,
-    ACTIVITY_SUBTYPES.ADR_FEE,
-    ACTIVITY_SUBTYPES.INTEREST_CHARGE,
-  ],
-  [ActivityType.TAX]: [ACTIVITY_SUBTYPES.WITHHOLDING, ACTIVITY_SUBTYPES.NRA_WITHHOLDING],
-  [ActivityType.CREDIT]: [
-    ACTIVITY_SUBTYPES.FEE_REFUND,
-    ACTIVITY_SUBTYPES.TAX_REFUND,
-    ACTIVITY_SUBTYPES.BONUS,
-    ACTIVITY_SUBTYPES.ADJUSTMENT,
-    ACTIVITY_SUBTYPES.REBATE,
-    ACTIVITY_SUBTYPES.REVERSAL,
-  ],
-  [ActivityType.TRANSFER_IN]: [ACTIVITY_SUBTYPES.OPENING_POSITION],
+  [ActivityType.DIVIDEND]: [ACTIVITY_SUBTYPES.DRIP, ACTIVITY_SUBTYPES.DIVIDEND_IN_KIND],
+  [ActivityType.INTEREST]: [ACTIVITY_SUBTYPES.STAKING_REWARD],
+  [ActivityType.CREDIT]: [ACTIVITY_SUBTYPES.BONUS, ACTIVITY_SUBTYPES.REBATE, ACTIVITY_SUBTYPES.REFUND],
 };
 
 // Asset kinds for behavior classification

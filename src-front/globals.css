@@ -491,6 +491,11 @@
     @apply bg-background text-foreground;
   }
 
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
   /* Safe area support for notched devices */
   @supports (padding: max(0px)) {
     .pt-safe {
@@ -787,4 +792,3 @@ html.app-lockdown .allow-select {
   pointer-events: none;
   z-index: 1;
 }
-

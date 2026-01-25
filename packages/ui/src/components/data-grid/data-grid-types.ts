@@ -41,9 +41,14 @@ export type CellOpts =
     }
   | {
       variant: "select";
-      options: CellSelectOption[];
+      /** Static options or function to get options dynamically based on row data */
+      options: CellSelectOption[] | ((rowData: unknown) => CellSelectOption[]);
       /** Custom renderer for the selected value in display mode */
       valueRenderer?: (value: string, option?: CellSelectOption) => React.ReactNode;
+      /** Whether to allow clearing the selection (adds empty option) */
+      allowEmpty?: boolean;
+      /** Label for the empty option (default: "None") */
+      emptyLabel?: string;
     }
   | {
       variant: "multi-select";
@@ -51,6 +56,8 @@ export type CellOpts =
     }
   | {
       variant: "checkbox";
+      /** Function to determine if checkbox is disabled based on row data */
+      isDisabled?: (rowData: unknown) => boolean;
     }
   | {
       variant: "date";
@@ -108,6 +115,8 @@ declare module "@tanstack/react-table" {
     getIsCellSelected?: (rowIndex: number, columnId: string) => boolean;
     getIsSearchMatch?: (rowIndex: number, columnId: string) => boolean;
     getIsActiveSearchMatch?: (rowIndex: number, columnId: string) => boolean;
+    /** Returns cell validation state with type and messages */
+    getCellState?: (rowIndex: number, columnId: string) => CellValidationState | null;
     rowHeight?: RowHeightValue;
     onRowHeightChange?: (value: RowHeightValue) => void;
     onRowSelect?: (rowIndex: number, checked: boolean, shiftKey: boolean) => void;
@@ -202,6 +211,11 @@ export interface SearchState {
   onNavigateToPrevMatch: () => void;
 }
 
+export interface CellValidationState {
+  type: 'error' | 'warning';
+  messages: string[];
+}
+
 export interface DataGridCellProps<TData> {
   cell: Cell<TData, unknown>;
   tableMeta: TableMeta<TData>;
@@ -214,6 +228,8 @@ export interface DataGridCellProps<TData> {
   isSearchMatch: boolean;
   isActiveSearchMatch: boolean;
   readOnly: boolean;
+  /** Cell validation state for error/warning highlighting */
+  cellState?: CellValidationState;
 }
 
 export interface FileCellData {

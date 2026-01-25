@@ -4,7 +4,6 @@ import { Button } from "@wealthfolio/ui/components/ui/button";
 import { IMPORT_REQUIRED_FIELDS } from "@/lib/constants";
 import {
   Account,
-  ACTIVITY_TYPE_PREFIX_LENGTH,
   ActivityType,
   CsvRowData,
   ImportFormat,
@@ -99,12 +98,37 @@ export function MappingHeaderCell({
   );
 }
 
+// Smart defaults for activity type mapping
+const ACTIVITY_TYPE_SMART_DEFAULTS: Record<string, ActivityType> = {
+  BUY: ActivityType.BUY,
+  PURCHASE: ActivityType.BUY,
+  BOUGHT: ActivityType.BUY,
+  SELL: ActivityType.SELL,
+  SOLD: ActivityType.SELL,
+  DIVIDEND: ActivityType.DIVIDEND,
+  DIV: ActivityType.DIVIDEND,
+  DEPOSIT: ActivityType.DEPOSIT,
+  WITHDRAWAL: ActivityType.WITHDRAWAL,
+  WITHDRAW: ActivityType.WITHDRAWAL,
+  FEE: ActivityType.FEE,
+  TAX: ActivityType.TAX,
+  TRANSFER_IN: ActivityType.TRANSFER_IN,
+  TRANSFER: ActivityType.TRANSFER_IN,
+  TRANSFER_OUT: ActivityType.TRANSFER_OUT,
+  INTEREST: ActivityType.INTEREST,
+  INT: ActivityType.INTEREST,
+  SPLIT: ActivityType.SPLIT,
+  CREDIT: ActivityType.CREDIT,
+  ADJUSTMENT: ActivityType.ADJUSTMENT,
+};
+
 function findAppTypeForCsvType(
   csvType: string,
   mappings: Record<string, string[]>,
 ): ActivityType | null {
   const normalizedCsvType = csvType.trim().toUpperCase();
 
+  // Check explicit mappings first
   for (const [appType, csvTypes] of Object.entries(mappings)) {
     if (
       csvTypes?.some((mappedType) => {
@@ -115,6 +139,19 @@ function findAppTypeForCsvType(
       return appType as ActivityType;
     }
   }
+
+  // Check smart defaults - exact match
+  if (ACTIVITY_TYPE_SMART_DEFAULTS[normalizedCsvType]) {
+    return ACTIVITY_TYPE_SMART_DEFAULTS[normalizedCsvType];
+  }
+
+  // Check smart defaults - partial match
+  for (const [key, value] of Object.entries(ACTIVITY_TYPE_SMART_DEFAULTS)) {
+    if (normalizedCsvType.startsWith(key) || normalizedCsvType.includes(key)) {
+      return value;
+    }
+  }
+
   return null;
 }
 
@@ -159,28 +196,21 @@ function ActivityTypeDisplayCell({
   }
 
   return (
-    <div className="flex w-full flex-col items-start gap-2 sm:flex-row sm:items-center">
-      <div className="max-w-[180px] truncate">
-        {displayValue.length > ACTIVITY_TYPE_PREFIX_LENGTH ? (
-          <span className="text-destructive" title={trimmedCsvType}>
-            {displayValue}
-          </span>
-        ) : (
-          <Badge variant="destructive" title={trimmedCsvType} className="whitespace-nowrap">
-            {displayValue}
-          </Badge>
-        )}
-      </div>
+    <div className="flex w-full items-center gap-2">
+      <Badge variant="destructive" title={trimmedCsvType} className="shrink-0 whitespace-nowrap text-xs">
+        {displayValue}
+      </Badge>
       <SearchableSelect
         options={Object.values(ActivityType).map((type) => ({
           value: type,
           label: type,
         }))}
+        value=""
         onValueChange={(newType) =>
           handleActivityTypeMapping(trimmedCsvType, newType as ActivityType)
         }
         placeholder="Map to..."
-        value=""
+        className="h-8 w-[140px]"
       />
     </div>
   );

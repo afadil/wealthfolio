@@ -12,7 +12,7 @@ wealthfolio-device-sync = { workspace = true }
 wealthfolio-ai = { workspace = true }
 
 # Web framework
-axum = { version = "0.8", features = ["json", "macros"] }
+axum = { version = "0.8", features = ["json", "macros", "multipart"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "trace", "compression-full", "timeout", "request-id", "fs"] }
 

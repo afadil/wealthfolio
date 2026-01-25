@@ -3,7 +3,7 @@ import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { ProgressIndicator } from "@wealthfolio/ui/components/ui/progress-indicator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
-import { Account, ActivityImport, CsvRowData } from "@/lib/types";
+import { Account, ActivityImport, CsvRowData, ImportActivitiesResult } from "@/lib/types";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { CSVFileViewer } from "../components/csv-file-viewer";
@@ -58,7 +58,8 @@ export const DataPreviewStep = ({
     if (confirmImportMutation.isSuccess || confirmImportMutation.isError) {
       timer = setTimeout(() => {
         if (confirmImportMutation.isSuccess) {
-          onNext((confirmImportMutation.data as ActivityImport[]) || []);
+          const result = confirmImportMutation.data as ImportActivitiesResult;
+          onNext(result?.activities || []);
         }
         confirmImportMutation.reset();
         setConfirmationState("initial");

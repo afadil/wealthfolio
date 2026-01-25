@@ -1,4 +1,4 @@
-import { importActivitySchema, importMappingSchema } from "@/lib/schemas";
+import { importActivitySchema, importMappingSchema, parseConfigSchema } from "@/lib/schemas";
 import * as z from "zod";
 import {
   AccountType,
@@ -298,6 +298,7 @@ export interface ActivityBulkMutationResult {
 }
 export type ActivityImport = z.infer<typeof importActivitySchema>;
 export type ImportMappingData = z.infer<typeof importMappingSchema>;
+export type ParseConfig = z.infer<typeof parseConfigSchema>;
 
 // Define a generic type for the parsed row data
 export type CsvRowData = Record<string, string> & { lineNumber: string };
@@ -312,6 +313,36 @@ export interface CsvRowError {
   row?: number;
   /** Column/field index where the error occurred (optional) */
   index?: number;
+}
+
+/**
+ * Error encountered during CSV parsing.
+ */
+export interface ParseError {
+  /** Row index where the error occurred (if applicable) */
+  rowIndex?: number;
+  /** Column index where the error occurred (if applicable) */
+  columnIndex?: number;
+  /** Human-readable error message */
+  message: string;
+  /** Error type: "parse", "encoding", "structure" */
+  errorType: string;
+}
+
+/**
+ * Result of parsing a CSV file.
+ */
+export interface ParsedCsvResult {
+  /** Headers extracted from the CSV */
+  headers: string[];
+  /** Data rows (each row is an array of string values) */
+  rows: string[][];
+  /** The configuration values actually used (with auto-detected values filled in) */
+  detectedConfig: ParseConfig;
+  /** Any errors encountered during parsing */
+  errors: ParseError[];
+  /** Total number of data rows (excluding headers and skipped rows) */
+  rowCount: number;
 }
 
 export interface SymbolSearchResult {
@@ -369,6 +400,34 @@ export interface ImportValidationResult {
     validCount: number;
     invalidCount: number;
   };
+}
+
+/**
+ * Result of importing activities, includes import run metadata
+ */
+export interface ImportActivitiesResult {
+  /** The validated/imported activities */
+  activities: ActivityImport[];
+  /** Import run ID for tracking this batch */
+  importRunId: string;
+  /** Summary statistics for the import */
+  summary: ImportActivitiesSummary;
+}
+
+/**
+ * Summary statistics for an activity import
+ */
+export interface ImportActivitiesSummary {
+  /** Total number of activities in the import request */
+  total: number;
+  /** Number of activities successfully imported */
+  imported: number;
+  /** Number of activities skipped (invalid or errors) */
+  skipped: number;
+  /** Number of new assets created during import */
+  assetsCreated: number;
+  /** Whether the import was successful (no validation errors) */
+  success: boolean;
 }
 
 export type ValidationResult = { status: "success" } | { status: "error"; errors: string[] };

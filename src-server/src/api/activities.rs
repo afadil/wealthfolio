@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use crate::{
@@ -7,14 +7,15 @@ use crate::{
     main_lib::AppState,
 };
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Multipart, Path, Query, State},
     routing::{delete, get, post},
     Json, Router,
 };
 use tracing::info;
 use wealthfolio_core::activities::{
     Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityImport,
-    ActivitySearchResponse, ActivityUpdate, ImportMappingData, NewActivity,
+    ActivitySearchResponse, ActivityUpdate, ImportActivitiesResult, ImportMappingData, NewActivity,
+    ParseConfig, ParsedCsvResult,
 };
 
 #[derive(serde::Deserialize)]
@@ -175,15 +176,18 @@ struct ImportCheckBody {
     #[serde(rename = "accountId")]
     account_id: String,
     activities: Vec<ActivityImport>,
+    #[serde(rename = "dryRun")]
+    dry_run: Option<bool>,
 }
 
 async fn check_activities_import(
     State(state): State<Arc<AppState>>,
     Json(body): Json<ImportCheckBody>,
 ) -> ApiResult<Json<Vec<ActivityImport>>> {
+    let dry_run = body.dry_run.unwrap_or(false);
     let res = state
         .activity_service
-        .check_activities_import(body.account_id, body.activities)
+        .check_activities_import(body.account_id, body.activities, dry_run)
         .await?;
     Ok(Json(res))
 }
@@ -198,14 +202,15 @@ struct ImportBody {
 async fn import_activities(
     State(state): State<Arc<AppState>>,
     Json(body): Json<ImportBody>,
-) -> ApiResult<Json<Vec<ActivityImport>>> {
-    let res = state
+) -> ApiResult<Json<ImportActivitiesResult>> {
+    let result = state
         .activity_service
         .import_activities(body.account_id, body.activities)
         .await?;
 
     // Trigger asset enrichment for all assets from imported activities (service handles filtering)
-    let imported_asset_ids: Vec<String> = res
+    let imported_asset_ids: Vec<String> = result
+        .activities
         .iter()
         .filter(|a| a.is_valid)
         .map(|a| a.symbol.clone())
@@ -223,7 +228,9 @@ async fn import_activities(
 
     trigger_activity_portfolio_job(
         state,
-        res.iter()
+        result
+            .activities
+            .iter()
             .map(|item| {
                 ActivityImpact::from_parts(
                     item.account_id.clone().unwrap_or_default(),
@@ -233,7 +240,7 @@ async fn import_activities(
             })
             .collect(),
     );
-    Ok(Json(res))
+    Ok(Json(result))
 }
 
 #[derive(serde::Deserialize)]
@@ -266,6 +273,73 @@ async fn save_account_import_mapping(
     Ok(Json(res))
 }
 
+#[derive(serde::Deserialize)]
+struct CheckDuplicatesBody {
+    #[serde(rename = "idempotencyKeys")]
+    idempotency_keys: Vec<String>,
+}
+
+#[derive(serde::Serialize)]
+struct CheckDuplicatesResponse {
+    duplicates: HashMap<String, String>,
+}
+
+async fn check_existing_duplicates(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<CheckDuplicatesBody>,
+) -> ApiResult<Json<CheckDuplicatesResponse>> {
+    let duplicates = state
+        .activity_service
+        .check_existing_duplicates(body.idempotency_keys)?;
+    Ok(Json(CheckDuplicatesResponse { duplicates }))
+}
+
+async fn parse_csv_endpoint(
+    State(state): State<Arc<AppState>>,
+    mut multipart: Multipart,
+) -> ApiResult<Json<ParsedCsvResult>> {
+    let mut file_content: Option<Vec<u8>> = None;
+    let mut config = ParseConfig::default();
+
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        crate::error::ApiError::BadRequest(format!("Failed to read multipart field: {}", e))
+    })? {
+        let name = field.name().unwrap_or("").to_string();
+        match name.as_str() {
+            "file" => {
+                file_content = Some(
+                    field
+                        .bytes()
+                        .await
+                        .map_err(|e| {
+                            crate::error::ApiError::BadRequest(format!(
+                                "Failed to read file content: {}",
+                                e
+                            ))
+                        })?
+                        .to_vec(),
+                );
+            }
+            "config" => {
+                let config_bytes = field.bytes().await.map_err(|e| {
+                    crate::error::ApiError::BadRequest(format!("Failed to read config: {}", e))
+                })?;
+                config = serde_json::from_slice(&config_bytes).map_err(|e| {
+                    crate::error::ApiError::BadRequest(format!("Invalid config JSON: {}", e))
+                })?;
+            }
+            _ => {}
+        }
+    }
+
+    let content = file_content.ok_or_else(|| {
+        crate::error::ApiError::BadRequest("Missing file in multipart request".to_string())
+    })?;
+
+    let result = wealthfolio_core::activities::parse_csv(&content, &config)?;
+    Ok(Json(result))
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/activities/search", post(search_activities))
@@ -274,8 +348,13 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/activities/{id}", delete(delete_activity))
         .route("/activities/import/check", post(check_activities_import))
         .route("/activities/import", post(import_activities))
+        .route("/activities/import/parse", post(parse_csv_endpoint))
         .route(
             "/activities/import/mapping",
             get(get_account_import_mapping).post(save_account_import_mapping),
+        )
+        .route(
+            "/activities/import/check-duplicates",
+            post(check_existing_duplicates),
         )
 }

@@ -1,11 +1,11 @@
+import { SyncStatusIcon } from "@/features/wealthfolio-connect/components/sync-status-icon";
+import { useAggregatedSyncStatus } from "@/features/wealthfolio-connect/hooks";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { cn } from "@wealthfolio/ui/lib/utils";
-import { Link, useLocation } from "react-router-dom";
-import { useAggregatedSyncStatus } from "@/features/wealthfolio-connect/hooks";
-import { SyncStatusIcon } from "@/features/wealthfolio-connect/components/sync-status-icon";
-import { isPathActive } from "./app-navigation";
 import { formatDistanceToNow } from "date-fns";
+import { Link, useLocation } from "react-router-dom";
+import { isPathActive } from "./app-navigation";
 
 interface ConnectNavItemProps {
   collapsed: boolean;
@@ -45,19 +45,12 @@ export function ConnectNavItem({ collapsed }: ConnectNavItemProps) {
                 "block opacity-100": !collapsed,
               })}
             >
-              <span>Connect</span>
-              <span className="text-muted-foreground text-xs font-normal">
-                {lastSyncedText}
-              </span>
+              Connect
             </span>
           </Link>
         </Button>
       </TooltipTrigger>
-      {collapsed && (
-        <TooltipContent side="right">
-          {tooltipContent}
-        </TooltipContent>
-      )}
+      <TooltipContent side="right">{tooltipContent}</TooltipContent>
     </Tooltip>
   );
 }

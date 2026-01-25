@@ -40,6 +40,7 @@ export function ShortTextCell<TData>({
   isSearchMatch,
   isActiveSearchMatch,
   readOnly,
+  cellState,
 }: DataGridCellProps<TData>) {
   const initialValue = cell.getValue() as string;
   const [value, setValue] = React.useState(initialValue);
@@ -156,6 +157,7 @@ export function ShortTextCell<TData>({
       isSearchMatch={isSearchMatch}
       isActiveSearchMatch={isActiveSearchMatch}
       readOnly={readOnly}
+      cellState={cellState}
       onKeyDown={onWrapperKeyDown}
     >
       <div
@@ -189,6 +191,7 @@ export function LongTextCell<TData>({
   isSearchMatch,
   isActiveSearchMatch,
   readOnly,
+  cellState,
 }: DataGridCellProps<TData>) {
   const initialValue = cell.getValue() as string;
   const [value, setValue] = React.useState(initialValue ?? "");
@@ -310,6 +313,7 @@ export function LongTextCell<TData>({
           isSearchMatch={isSearchMatch}
           isActiveSearchMatch={isActiveSearchMatch}
           readOnly={readOnly}
+          cellState={cellState}
         >
           <span data-slot="grid-cell-content">{value}</span>
         </DataGridCellWrapper>
@@ -348,6 +352,7 @@ export function NumberCell<TData>({
   isSearchMatch,
   isActiveSearchMatch,
   readOnly,
+  cellState,
 }: DataGridCellProps<TData>) {
   const initialValue = cell.getValue() as number;
   const [value, setValue] = React.useState(String(initialValue ?? ""));
@@ -467,6 +472,7 @@ export function NumberCell<TData>({
       isSearchMatch={isSearchMatch}
       isActiveSearchMatch={isActiveSearchMatch}
       readOnly={readOnly}
+      cellState={cellState}
       onKeyDown={onWrapperKeyDown}
       className="text-end"
     >
@@ -520,6 +526,7 @@ export function UrlCell<TData>({
   isSearchMatch,
   isActiveSearchMatch,
   readOnly,
+  cellState,
 }: DataGridCellProps<TData>) {
   const initialValue = cell.getValue() as string;
   const [value, setValue] = React.useState(initialValue ?? "");
@@ -665,6 +672,7 @@ export function UrlCell<TData>({
       isSearchMatch={isSearchMatch}
       isActiveSearchMatch={isActiveSearchMatch}
       readOnly={readOnly}
+      cellState={cellState}
       onKeyDown={onWrapperKeyDown}
     >
       {!isEditing && displayValue ? (
@@ -713,10 +721,17 @@ export function CheckboxCell<TData>({
   isSearchMatch,
   isActiveSearchMatch,
   readOnly,
+  cellState,
 }: Omit<DataGridCellProps<TData>, "isEditing">) {
   const initialValue = cell.getValue() as boolean;
   const [value, setValue] = React.useState(Boolean(initialValue));
   const containerRef = React.useRef<HTMLDivElement>(null);
+
+  // Get isDisabled function from cell meta options
+  const cellOpts = cell.column.columnDef.meta?.cell;
+  const isDisabledFn = cellOpts?.variant === "checkbox" ? cellOpts.isDisabled : undefined;
+  const isDisabled = isDisabledFn ? isDisabledFn(cell.row.original) : false;
+  const effectiveReadOnly = readOnly || isDisabled;
 
   const prevInitialValueRef = React.useRef(initialValue);
   if (initialValue !== prevInitialValueRef.current) {
@@ -726,16 +741,16 @@ export function CheckboxCell<TData>({
 
   const onCheckedChange = React.useCallback(
     (checked: boolean) => {
-      if (readOnly) return;
+      if (effectiveReadOnly) return;
       setValue(checked);
       tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: checked });
     },
-    [tableMeta, rowIndex, columnId, readOnly],
+    [tableMeta, rowIndex, columnId, effectiveReadOnly],
   );
 
   const onWrapperKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
-      if (isFocused && !readOnly && (event.key === " " || event.key === "Enter")) {
+      if (isFocused && !effectiveReadOnly && (event.key === " " || event.key === "Enter")) {
         event.preventDefault();
         event.stopPropagation();
         onCheckedChange(!value);
@@ -746,18 +761,18 @@ export function CheckboxCell<TData>({
         });
       }
     },
-    [isFocused, value, onCheckedChange, tableMeta, readOnly],
+    [isFocused, value, onCheckedChange, tableMeta, effectiveReadOnly],
   );
 
   const onWrapperClick = React.useCallback(
     (event: React.MouseEvent) => {
-      if (isFocused && !readOnly) {
+      if (isFocused && !effectiveReadOnly) {
         event.preventDefault();
         event.stopPropagation();
         onCheckedChange(!value);
       }
     },
-    [isFocused, value, onCheckedChange, readOnly],
+    [isFocused, value, onCheckedChange, effectiveReadOnly],
   );
 
   const onCheckboxClick = React.useCallback((event: React.MouseEvent) => {
@@ -786,6 +801,7 @@ export function CheckboxCell<TData>({
       isSearchMatch={isSearchMatch}
       isActiveSearchMatch={isActiveSearchMatch}
       readOnly={readOnly}
+      cellState={cellState}
       className="flex size-full justify-center"
       onClick={onWrapperClick}
       onKeyDown={onWrapperKeyDown}
@@ -793,7 +809,7 @@ export function CheckboxCell<TData>({
       <Checkbox
         checked={value}
         onCheckedChange={onCheckedChange}
-        disabled={readOnly}
+        disabled={effectiveReadOnly}
         className="border-primary"
         onClick={onCheckboxClick}
         onMouseDown={onCheckboxMouseDown}
@@ -802,6 +818,9 @@ export function CheckboxCell<TData>({
     </DataGridCellWrapper>
   );
 }
+
+// Special value for empty selection (Radix Select requires non-empty string values)
+const EMPTY_SELECT_VALUE = "__EMPTY__";
 
 export function SelectCell<TData>({
   cell,
@@ -815,25 +834,39 @@ export function SelectCell<TData>({
   isSearchMatch,
   isActiveSearchMatch,
   readOnly,
+  cellState,
 }: DataGridCellProps<TData>) {
   const initialValue = cell.getValue() as string;
-  const [value, setValue] = React.useState(initialValue);
+  const [value, setValue] = React.useState(initialValue || "");
   const containerRef = React.useRef<HTMLDivElement>(null);
   const cellOpts = cell.column.columnDef.meta?.cell;
-  const options = cellOpts?.variant === "select" ? cellOpts.options : [];
+
+  // Get options - support both static array and dynamic function
+  const rawOptions = cellOpts?.variant === "select" ? cellOpts.options : [];
+  const options = React.useMemo(() => {
+    if (typeof rawOptions === "function") {
+      return rawOptions(cell.row.original);
+    }
+    return rawOptions;
+  }, [rawOptions, cell.row.original]);
+
   const valueRenderer = cellOpts?.variant === "select" ? cellOpts.valueRenderer : undefined;
+  const allowEmpty = cellOpts?.variant === "select" ? cellOpts.allowEmpty : false;
+  const emptyLabel = cellOpts?.variant === "select" ? (cellOpts.emptyLabel ?? "None") : "None";
 
   const prevInitialValueRef = React.useRef(initialValue);
   if (initialValue !== prevInitialValueRef.current) {
     prevInitialValueRef.current = initialValue;
-    setValue(initialValue);
+    setValue(initialValue || "");
   }
 
   const onValueChange = React.useCallback(
     (newValue: string) => {
       if (readOnly) return;
-      setValue(newValue);
-      tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: newValue });
+      // Convert empty placeholder back to empty string
+      const actualValue = newValue === EMPTY_SELECT_VALUE ? "" : newValue;
+      setValue(actualValue);
+      tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: actualValue || undefined });
       tableMeta?.onCellEditingStop?.();
     },
     [tableMeta, rowIndex, columnId, readOnly],
@@ -854,7 +887,7 @@ export function SelectCell<TData>({
     (event: React.KeyboardEvent<HTMLDivElement>) => {
       if (isEditing && event.key === "Escape") {
         event.preventDefault();
-        setValue(initialValue);
+        setValue(initialValue || "");
         tableMeta?.onCellEditingStop?.();
       } else if (!isEditing && isFocused && event.key === "Tab") {
         event.preventDefault();
@@ -886,6 +919,9 @@ export function SelectCell<TData>({
     );
   };
 
+  // Use placeholder value for Radix Select when value is empty
+  const selectValue = value || (allowEmpty ? EMPTY_SELECT_VALUE : "");
+
   return (
     <DataGridCellWrapper<TData>
       ref={containerRef}
@@ -900,10 +936,11 @@ export function SelectCell<TData>({
       isSearchMatch={isSearchMatch}
       isActiveSearchMatch={isActiveSearchMatch}
       readOnly={readOnly}
+      cellState={cellState}
       onKeyDown={onWrapperKeyDown}
     >
       {isEditing ? (
-        <Select value={value} onValueChange={onValueChange} open={isEditing} onOpenChange={onOpenChange}>
+        <Select value={selectValue} onValueChange={onValueChange} open={isEditing} onOpenChange={onOpenChange}>
           <SelectTrigger
             className="size-full h-auto items-start border-none p-0 shadow-none focus-visible:ring-0 dark:bg-transparent [&_svg]:hidden"
           >
@@ -912,7 +949,7 @@ export function SelectCell<TData>({
                 <SelectValue />
               </Badge>
             ) : (
-              <SelectValue />
+              <span className="text-muted-foreground text-xs">{emptyLabel}</span>
             )}
           </SelectTrigger>
           <SelectContent
@@ -923,6 +960,11 @@ export function SelectCell<TData>({
             sideOffset={-8}
             className="min-w-[calc(var(--radix-select-trigger-width)+16px)]"
           >
+            {allowEmpty && (
+              <SelectItem value={EMPTY_SELECT_VALUE} className="text-muted-foreground">
+                {emptyLabel}
+              </SelectItem>
+            )}
             {options.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
@@ -949,6 +991,7 @@ export function MultiSelectCell<TData>({
   isSearchMatch,
   isActiveSearchMatch,
   readOnly,
+  cellState,
 }: DataGridCellProps<TData>) {
   const cellValue = React.useMemo(() => {
     const value = cell.getValue() as string[];
@@ -1095,6 +1138,7 @@ export function MultiSelectCell<TData>({
       isSearchMatch={isSearchMatch}
       isActiveSearchMatch={isActiveSearchMatch}
       readOnly={readOnly}
+      cellState={cellState}
       onKeyDown={onWrapperKeyDown}
     >
       {isEditing ? (
@@ -1212,6 +1256,7 @@ export function DateCell<TData>({
   isSearchMatch,
   isActiveSearchMatch,
   readOnly,
+  cellState,
 }: DataGridCellProps<TData>) {
   const initialValue = cell.getValue() as string;
   const [value, setValue] = React.useState(initialValue ?? "");
@@ -1278,6 +1323,7 @@ export function DateCell<TData>({
       isSearchMatch={isSearchMatch}
       isActiveSearchMatch={isActiveSearchMatch}
       readOnly={readOnly}
+      cellState={cellState}
       onKeyDown={onWrapperKeyDown}
     >
       <Popover open={isEditing} onOpenChange={onOpenChange}>
@@ -1344,6 +1390,7 @@ export function DateInputCell<TData>({
   isSearchMatch,
   isActiveSearchMatch,
   readOnly,
+  cellState,
 }: DataGridCellProps<TData>) {
   const initialValue = cell.getValue() as Date | string | undefined;
   const [value, setValue] = React.useState(() => toDateInputString(initialValue));
@@ -1477,6 +1524,7 @@ export function DateInputCell<TData>({
       isSearchMatch={isSearchMatch}
       isActiveSearchMatch={isActiveSearchMatch}
       readOnly={readOnly}
+      cellState={cellState}
       onKeyDown={onWrapperKeyDown}
     >
       {isEditing ? (
@@ -1544,6 +1592,7 @@ export function DateTimeCell<TData>({
   isSearchMatch,
   isActiveSearchMatch,
   readOnly,
+  cellState,
 }: DataGridCellProps<TData>) {
   const initialValue = cell.getValue() as Date | string | undefined;
   const [value, setValue] = React.useState(() => toDateTimeLocalString(initialValue));
@@ -1669,6 +1718,7 @@ export function DateTimeCell<TData>({
       isSearchMatch={isSearchMatch}
       isActiveSearchMatch={isActiveSearchMatch}
       readOnly={readOnly}
+      cellState={cellState}
       onKeyDown={onWrapperKeyDown}
     >
       {isEditing ? (
@@ -1719,6 +1769,7 @@ export function FileCell<TData>({
   isSearchMatch,
   isActiveSearchMatch,
   readOnly,
+  cellState,
 }: DataGridCellProps<TData>) {
   const cellValue = React.useMemo(() => (cell.getValue() as FileCellData[]) ?? [], [cell]);
 
@@ -2183,6 +2234,7 @@ export function FileCell<TData>({
       isSearchMatch={isSearchMatch}
       isActiveSearchMatch={isActiveSearchMatch}
       readOnly={readOnly}
+      cellState={cellState}
       className={cn({
         "ring-primary/80 ring-1 ring-inset": isDraggingOver,
       })}
@@ -2366,6 +2418,7 @@ export function SymbolCell<TData>({
   isSearchMatch,
   isActiveSearchMatch,
   readOnly,
+  cellState,
 }: DataGridCellProps<TData>) {
   const initialValue = cell.getValue() as string;
   const [value, setValue] = React.useState(initialValue ?? "");
@@ -2529,6 +2582,7 @@ export function SymbolCell<TData>({
       isSearchMatch={isSearchMatch}
       isActiveSearchMatch={isActiveSearchMatch}
       readOnly={readOnly}
+      cellState={cellState}
       onKeyDown={onWrapperKeyDown}
     >
       <Popover open={isEditing} onOpenChange={onOpenChange}>
@@ -2555,25 +2609,6 @@ export function SymbolCell<TData>({
               />
               <CommandList>
                 {isLoading ? <CommandEmpty>Loading...</CommandEmpty> : null}
-                {!isLoading && (isError || options.length === 0) && trimmedQuery.length > 1 ? (
-                  <CommandGroup>
-                    <CommandItem
-                      value={trimmedQuery}
-                      onSelect={handleCustomSymbol}
-                      className="flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Icons.PlusCircle className="text-muted-foreground size-4" />
-                        <div className="flex flex-col">
-                          <span className="font-mono text-xs font-semibold uppercase">
-                            {trimmedQuery.toUpperCase()}
-                          </span>
-                          <span className="text-muted-foreground text-xs font-light">Create custom (manual)</span>
-                        </div>
-                      </div>
-                    </CommandItem>
-                  </CommandGroup>
-                ) : null}
                 {!isLoading && !isError && options.length > 0 ? (
                   <CommandGroup>
                     {options.map((option) => (
@@ -2593,6 +2628,26 @@ export function SymbolCell<TData>({
                         </div>
                       </CommandItem>
                     ))}
+                  </CommandGroup>
+                ) : null}
+                {/* Always show "Create custom asset" option at the bottom when there's a query */}
+                {!isLoading && trimmedQuery.length > 1 ? (
+                  <CommandGroup>
+                    <CommandItem
+                      value={`create-${trimmedQuery}`}
+                      onSelect={handleCustomSymbol}
+                      className="flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Icons.PlusCircle className="text-muted-foreground size-4" />
+                        <div className="flex flex-col">
+                          <span className="font-mono text-xs font-semibold uppercase">
+                            {trimmedQuery.toUpperCase()}
+                          </span>
+                          <span className="text-muted-foreground text-xs font-light">Create custom asset</span>
+                        </div>
+                      </div>
+                    </CommandItem>
                   </CommandGroup>
                 ) : null}
               </CommandList>
@@ -2616,6 +2671,7 @@ export function CurrencyCell<TData>({
   isSearchMatch,
   isActiveSearchMatch,
   readOnly,
+  cellState,
 }: DataGridCellProps<TData>) {
   const initialValue = cell.getValue() as string;
   const [value, setValue] = React.useState(initialValue ?? "");
@@ -2718,6 +2774,7 @@ export function CurrencyCell<TData>({
       isSearchMatch={isSearchMatch}
       isActiveSearchMatch={isActiveSearchMatch}
       readOnly={readOnly}
+      cellState={cellState}
       onKeyDown={onWrapperKeyDown}
     >
       <Popover open={isEditing} onOpenChange={onOpenChange}>

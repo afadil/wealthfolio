@@ -1,0 +1,15 @@
+date,type,symbol,quantity,unit_price,currency,fee,amount,comment,fxRate,subtype
+2024-01-15,BUY,AAPL,10,185.50,USD,4.95,,Initial Apple purchase,,
+2024-01-20,BUY,MSFT,5,380.00,USD,4.95,,Microsoft position,,
+2024-02-01,DIVIDEND,AAPL,10,0.24,USD,,,Q4 2023 Apple dividend,,QUALIFIED
+2024-02-15,SELL,AAPL,5,192.00,USD,4.95,,Partial Apple sale,,
+2024-03-01,DEPOSIT,,,,USD,,5000,Monthly contribution,,
+2024-03-15,WITHDRAWAL,,,,USD,,1000,ATM withdrawal,,
+2024-04-01,INTEREST,,,,USD,,12.50,Savings interest,,COUPON
+2024-04-15,FEE,,,,USD,,25.00,Advisory fee,,MANAGEMENT_FEE
+2024-05-01,TRANSFER_IN,GOOGL,2,140.00,USD,,,Transfer from other account,,
+2024-05-15,SPLIT,NVDA,3,,,,,,3-for-1 stock split,,
+2024-06-01,TAX,,,,USD,,150.00,Withholding tax,,WITHHOLDING
+2024-06-15,CREDIT,,,,USD,,50.00,Rebate credit,,REBATE
+2024-07-01,BUY,TD.TO,20,85.00,CAD,9.99,,Canadian stock purchase,1.36,
+2024-07-15,DIVIDEND,VTI,50,1.25,USD,,,Vanguard dividend,,DRIP

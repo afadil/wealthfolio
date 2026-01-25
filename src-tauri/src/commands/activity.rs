@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use crate::context::ServiceContext;
@@ -7,7 +7,8 @@ use log::debug;
 use tauri::{AppHandle, State};
 use wealthfolio_core::activities::{
     Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityImport,
-    ActivitySearchResponse, ActivityUpdate, ImportMappingData, NewActivity, Sort,
+    ActivitySearchResponse, ActivityUpdate, ImportActivitiesResult, ImportMappingData,
+    NewActivity, ParseConfig, ParsedCsvResult, Sort,
 };
 use serde_json::json;
 
@@ -239,12 +240,17 @@ pub async fn save_account_import_mapping(
 pub async fn check_activities_import(
     account_id: String,
     activities: Vec<ActivityImport>,
+    dry_run: Option<bool>,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<Vec<ActivityImport>, String> {
-    debug!("Checking activities import for account: {}", account_id);
+    let dry_run = dry_run.unwrap_or(false);
+    debug!(
+        "Checking activities import for account: {} (dry_run: {})",
+        account_id, dry_run
+    );
     let result = state
         .activity_service()
-        .check_activities_import(account_id, activities)
+        .check_activities_import(account_id, activities, dry_run)
         .await?;
     Ok(result)
 }
@@ -255,7 +261,7 @@ pub async fn import_activities(
     activities: Vec<ActivityImport>,
     state: State<'_, Arc<ServiceContext>>,
     handle: AppHandle,
-) -> Result<Vec<ActivityImport>, String> {
+) -> Result<ImportActivitiesResult, String> {
     debug!("Importing activities for account: {}", account_id);
     let event_metadata: Vec<_> = activities
         .iter()
@@ -279,12 +285,15 @@ pub async fn import_activities(
             json!({
                 "account_id": account_id,
                 "activities": event_metadata,
+                "import_run_id": result.import_run_id,
+                "summary": result.summary,
             }),
         ),
     );
 
     // Trigger asset enrichment for all assets from imported activities (listener's enrich_assets handles filtering)
     let imported_asset_ids: Vec<String> = result
+        .activities
         .iter()
         .filter(|a| a.is_valid)
         .map(|a| a.symbol.clone())
@@ -302,4 +311,35 @@ pub async fn import_activities(
     }
 
     Ok(result)
+}
+
+#[tauri::command]
+pub async fn check_existing_duplicates(
+    idempotency_keys: Vec<String>,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<HashMap<String, String>, String> {
+    debug!(
+        "Checking for existing duplicates with {} idempotency keys",
+        idempotency_keys.len()
+    );
+    state
+        .activity_service()
+        .check_existing_duplicates(idempotency_keys)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn parse_csv(
+    content: Vec<u8>,
+    config: ParseConfig,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<ParsedCsvResult, String> {
+    debug!("Parsing CSV with {} bytes, config: {:?}", content.len(), config);
+    state
+        .activity_service()
+        .parse_csv(&content, &config)
+        .map_err(|e| {
+            debug!("CSV parse error: {}", e);
+            e.to_string()
+        })
 }

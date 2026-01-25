@@ -97,13 +97,20 @@ pub const ACTIVITY_SUBTYPE_STAKING_REWARD: &str = "STAKING_REWARD";
 /// Expands to: DIVIDEND + TRANSFER_IN (with metadata.flow.is_external=true)
 pub const ACTIVITY_SUBTYPE_DIVIDEND_IN_KIND: &str = "DIVIDEND_IN_KIND";
 
-/// Stock Dividend: Additional shares of the same asset as dividend.
-/// Passes through as SPLIT (adjusts quantity without cash movement).
-pub const ACTIVITY_SUBTYPE_STOCK_DIVIDEND: &str = "STOCK_DIVIDEND";
+/// Bonus: External cash credit (new capital entering portfolio).
+/// Affects net_contribution (like DEPOSIT) and is an external flow for TWR.
+/// Examples: sign-up bonus, referral bonus, promotional credit.
+pub const ACTIVITY_SUBTYPE_BONUS: &str = "BONUS";
 
-/// Opening Position: Initial position for manual/alternative assets (property, vehicle, etc.).
-/// Passes through unchanged as TRANSFER_IN - no expansion needed.
-pub const ACTIVITY_SUBTYPE_OPENING_POSITION: &str = "OPENING_POSITION";
+/// Rebate: Trading rebate (negative fee, internal flow).
+/// Does NOT affect net_contribution - represents reduced trading costs.
+/// Examples: maker rebate, volume rebate.
+pub const ACTIVITY_SUBTYPE_REBATE: &str = "REBATE";
+
+/// Refund: Fee correction/reversal (internal flow).
+/// Does NOT affect net_contribution - represents a fee that was reversed.
+/// Examples: erroneous fee refund, service credit.
+pub const ACTIVITY_SUBTYPE_REFUND: &str = "REFUND";
 
 #[cfg(test)]
 mod tests {
