@@ -161,7 +161,8 @@ export function AlternativeAssetQuickAddModal({
   // Reset form when modal opens
   useEffect(() => {
     if (open) {
-      setStep(1);
+      // Skip step 1 if a defaultKind is provided
+      setStep(defaultKind ? 2 : 1);
       setHasMortgageChecked(false);
       setFormData({
         kind: defaultKind || AlternativeAssetKind.PROPERTY,

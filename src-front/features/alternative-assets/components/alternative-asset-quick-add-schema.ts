@@ -24,6 +24,7 @@ export const LIABILITY_TYPES = [
   { value: "credit_card", label: "Credit Card" },
   { value: "personal_loan", label: "Personal Loan" },
   { value: "heloc", label: "HELOC" },
+  { value: "other", label: "Other" },
 ] as const;
 
 // Asset type options for the type selector
@@ -77,7 +78,7 @@ export const alternativeAssetQuickAddSchema = z
 
     // Liability-specific fields
     liabilityType: z
-      .enum(["mortgage", "auto_loan", "student_loan", "credit_card", "personal_loan", "heloc"])
+      .enum(["mortgage", "auto_loan", "student_loan", "credit_card", "personal_loan", "heloc", "other"])
       .optional(),
     linkedAssetId: z.string().optional(),
   })
