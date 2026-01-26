@@ -698,7 +698,17 @@ pub mod test_env {
 
         async fn fetch_quotes_from_provider(
             &self,
+            _asset_id: &str,
+            _start: NaiveDate,
+            _end: NaiveDate,
+        ) -> CoreResult<Vec<Quote>> {
+            Ok(Vec::new())
+        }
+
+        async fn fetch_quotes_for_symbol(
+            &self,
             _symbol: &str,
+            _currency: &str,
             _start: NaiveDate,
             _end: NaiveDate,
         ) -> CoreResult<Vec<Quote>> {
