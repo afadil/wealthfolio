@@ -25,7 +25,8 @@ use super::sync_state::{QuoteSyncState, SymbolSyncPlan, SyncMode, SyncStateStore
 use super::types::{AssetId, Day};
 use crate::activities::ActivityRepositoryTrait;
 use crate::assets::{
-    is_fx_asset_id, needs_market_quotes, Asset, AssetKind, AssetRepositoryTrait, ProviderProfile,
+    is_fx_asset_id, needs_market_quotes, Asset, AssetKind, AssetRepositoryTrait, PricingMode,
+    ProviderProfile,
 };
 use crate::errors::Result;
 use crate::secrets::SecretStore;
@@ -174,7 +175,17 @@ pub trait QuoteServiceTrait: Send + Sync {
     /// Fetch historical quotes from provider.
     async fn fetch_quotes_from_provider(
         &self,
-        symbol: &str,
+        asset_id: &str,
+        start: NaiveDate,
+        end: NaiveDate,
+    ) -> Result<Vec<Quote>>;
+
+    /// Fetch quotes for an asset ID (canonical format like "SEC:^GSPC:INDEX")
+    /// that may not exist in the database. Used for benchmark indices and external symbols.
+    async fn fetch_quotes_for_symbol(
+        &self,
+        asset_id: &str,
+        currency: &str,
         start: NaiveDate,
         end: NaiveDate,
     ) -> Result<Vec<Quote>>;
@@ -669,11 +680,11 @@ where
 
     async fn fetch_quotes_from_provider(
         &self,
-        symbol: &str,
+        asset_id: &str,
         start: NaiveDate,
         end: NaiveDate,
     ) -> Result<Vec<Quote>> {
-        let asset = self.asset_repo.get_by_id(symbol)?;
+        let asset = self.asset_repo.get_by_id(asset_id)?;
         let start_dt = Utc.from_utc_datetime(&start.and_hms_opt(0, 0, 0).unwrap());
         let end_dt = Utc.from_utc_datetime(&end.and_hms_opt(23, 59, 59).unwrap());
 
@@ -681,6 +692,67 @@ where
             .read()
             .await
             .fetch_historical_quotes(&asset, start_dt, end_dt)
+            .await
+    }
+
+    /// Fetch quotes for an asset ID (canonical format like "SEC:^GSPC:INDEX")
+    /// that may not exist in the user's database.
+    async fn fetch_quotes_for_symbol(
+        &self,
+        asset_id: &str,
+        currency: &str,
+        start: NaiveDate,
+        end: NaiveDate,
+    ) -> Result<Vec<Quote>> {
+        // First try to find an existing asset by ID
+        if let Ok(asset) = self.asset_repo.get_by_id(asset_id) {
+            let start_dt = Utc.from_utc_datetime(&start.and_hms_opt(0, 0, 0).unwrap());
+            let end_dt = Utc.from_utc_datetime(&end.and_hms_opt(23, 59, 59).unwrap());
+            return self
+                .client
+                .read()
+                .await
+                .fetch_historical_quotes(&asset, start_dt, end_dt)
+                .await;
+        }
+
+        // Parse canonical asset ID format: SEC:{symbol}:{mic}
+        // Fall back to treating the whole string as a symbol if not in canonical format
+        let (symbol, exchange_mic) = if asset_id.starts_with("SEC:") {
+            let parts: Vec<&str> = asset_id.split(':').collect();
+            if parts.len() >= 3 {
+                let sym = parts[1].to_string();
+                let mic = if parts[2] == "INDEX" || parts[2] == "UNKNOWN" {
+                    None
+                } else {
+                    Some(parts[2].to_string())
+                };
+                (sym, mic)
+            } else {
+                (asset_id.to_string(), None)
+            }
+        } else {
+            (asset_id.to_string(), None)
+        };
+
+        // Create a minimal temporary Asset for fetching quotes from provider
+        let temp_asset = Asset {
+            id: asset_id.to_string(),
+            symbol,
+            kind: AssetKind::Security,
+            currency: currency.to_string(),
+            exchange_mic,
+            pricing_mode: PricingMode::Market,
+            ..Default::default()
+        };
+
+        let start_dt = Utc.from_utc_datetime(&start.and_hms_opt(0, 0, 0).unwrap());
+        let end_dt = Utc.from_utc_datetime(&end.and_hms_opt(23, 59, 59).unwrap());
+
+        self.client
+            .read()
+            .await
+            .fetch_historical_quotes(&temp_asset, start_dt, end_dt)
             .await
     }
 

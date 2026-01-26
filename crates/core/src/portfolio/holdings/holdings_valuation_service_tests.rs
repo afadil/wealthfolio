@@ -264,7 +264,17 @@ mod tests {
 
         async fn fetch_quotes_from_provider(
             &self,
+            _asset_id: &str,
+            _start: NaiveDate,
+            _end: NaiveDate,
+        ) -> Result<Vec<Quote>> {
+            unimplemented!()
+        }
+
+        async fn fetch_quotes_for_symbol(
+            &self,
             _symbol: &str,
+            _currency: &str,
             _start: NaiveDate,
             _end: NaiveDate,
         ) -> Result<Vec<Quote>> {

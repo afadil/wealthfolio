@@ -325,10 +325,11 @@ impl PerformanceService {
         Ok(result)
     }
 
-    /// Internal function for calculating symbol performance (Full)
+    /// Internal function for calculating symbol/benchmark performance (Full)
+    /// asset_id can be a canonical ID like "SEC:^GSPC:INDEX" or a raw symbol
     async fn calculate_symbol_performance(
         &self,
-        symbol: &str,
+        asset_id: &str,
         start_date_opt: Option<NaiveDate>,
         end_date_opt: Option<NaiveDate>,
     ) -> Result<PerformanceMetrics> {
@@ -345,17 +346,18 @@ impl PerformanceService {
             )));
         }
 
+        // Use fetch_quotes_for_symbol which handles both existing assets and canonical IDs
         let quote_history = self
             .quote_service
-            .fetch_quotes_from_provider(symbol, effective_start_date, effective_end_date)
+            .fetch_quotes_for_symbol(asset_id, "USD", effective_start_date, effective_end_date)
             .await?;
 
         if quote_history.is_empty() {
             warn!(
-                "Symbol '{}': No quote data found between {} and {}. Returning empty response.",
-                symbol, effective_start_date, effective_end_date
+                "Asset '{}': No quote data found between {} and {}. Returning empty response.",
+                asset_id, effective_start_date, effective_end_date
             );
-            return Ok(PerformanceService::empty_response(symbol));
+            return Ok(PerformanceService::empty_response(asset_id));
         }
 
         let actual_start_date = quote_history.first().unwrap().timestamp.date_naive();
@@ -389,8 +391,8 @@ impl PerformanceService {
         }
 
         if !found_start_price {
-            warn!("Symbol '{}': Could not find starting price point within quote map. Returning empty response.", symbol);
-            return Ok(PerformanceService::empty_response(symbol));
+            warn!("Asset '{}': Could not find starting price point within quote map. Returning empty response.", asset_id);
+            return Ok(PerformanceService::empty_response(asset_id));
         }
 
         let capacity = (actual_end_date - actual_start_date).num_days().max(0) as usize + 1;
@@ -434,7 +436,7 @@ impl PerformanceService {
         }
 
         if returns.is_empty() {
-            return Ok(PerformanceService::empty_response(symbol));
+            return Ok(PerformanceService::empty_response(asset_id));
         }
 
         let total_return = returns.last().map_or(Decimal::ZERO, |r| r.value);
@@ -444,7 +446,7 @@ impl PerformanceService {
         let max_drawdown = Self::calculate_max_drawdown(&daily_returns);
 
         let result = PerformanceMetrics {
-            id: symbol.to_string(),
+            id: asset_id.to_string(),
             returns,
             period_start_date: Some(actual_start_date),
             period_end_date: Some(actual_end_date),
