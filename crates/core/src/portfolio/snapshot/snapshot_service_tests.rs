@@ -2128,8 +2128,8 @@ mod tests {
         assert_eq!(pos.quantity, dec!(20));
         assert_eq!(pos.total_cost_basis, dec!(3200));
 
-        // Internal transfer by default - no net contribution change
-        assert_eq!(frame.net_contribution, dec!(0));
+        // Transfers affect account-level net_contribution
+        assert_eq!(frame.net_contribution, dec!(3200));
     }
 
     #[tokio::test]

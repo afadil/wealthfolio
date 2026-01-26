@@ -103,14 +103,14 @@ Wealthfolio uses a closed set of 14 canonical activity types. Each activity type
 | Cash | Increases | Increases |
 | Quantity | Increases (if asset) | Increases (if asset) |
 | Cost Basis | Preserved from source | Set from `unit_price` |
-| Net Contribution | No change | Increases |
+| Net Contribution | Increases (account boundary) | Increases (account boundary) |
 
 **Required Fields**: `amount` (cash) or `asset_id`, `quantity`, `unit_price` (asset), `currency`
 **Optional Fields**: `fee`, `metadata.flow.is_external`
 
 **Behavior**:
-- **Default (internal)**: Transfer between Wealthfolio accounts. No net contribution impact.
-- **External** (`metadata.flow.is_external = true`): Transfer from untracked source. Affects net contribution. Used for:
+- **Default (internal)**: Transfer between Wealthfolio accounts. Affects account net contribution; portfolio net contribution nets to zero across accounts.
+- **External** (`metadata.flow.is_external = true`): Transfer from untracked source. Affects portfolio net contribution. Used for:
   - Adding initial holdings
   - Gifts or inheritance received
   - Transfers from external brokerages
@@ -125,14 +125,14 @@ Wealthfolio uses a closed set of 14 canonical activity types. Each activity type
 | Cash | Decreases | Decreases |
 | Quantity | Decreases (if asset) | Decreases (if asset) |
 | Cost Basis | Exported to destination | Removed (FIFO) |
-| Net Contribution | No change | Decreases |
+| Net Contribution | Decreases (account boundary) | Decreases (account boundary) |
 
 **Required Fields**: `amount` (cash) or `asset_id`, `quantity` (asset), `currency`
 **Optional Fields**: `fee`, `metadata.flow.is_external`
 
 **Behavior**:
-- **Default (internal)**: Transfer between Wealthfolio accounts. No net contribution impact.
-- **External** (`metadata.flow.is_external = true`): Transfer to untracked destination. Affects net contribution. Used for:
+- **Default (internal)**: Transfer between Wealthfolio accounts. Affects account net contribution; portfolio net contribution nets to zero across accounts.
+- **External** (`metadata.flow.is_external = true`): Transfer to untracked destination. Affects portfolio net contribution. Used for:
   - Removing holdings (gifts, donations)
   - Transfers to external brokerages
   - Write-offs
@@ -291,7 +291,7 @@ Activities support a `metadata` JSON field for additional context:
 ```json
 {
   "flow": {
-    "is_external": true  // Marks transfer as external (affects net_contribution)
+    "is_external": true  // Marks transfer as crossing the portfolio boundary
   },
   "received_asset_id": "SPINOFF_CO",  // For DIVIDEND_IN_KIND subtype
   "split_ratio": "2:1",  // For SPLIT activities
@@ -317,7 +317,7 @@ Each activity has a status:
 
 1. **Use DEPOSIT/WITHDRAWAL for external cash flows** - These properly track net contributions for performance calculations.
 
-2. **Use TRANSFER_IN/OUT with `is_external=true` for adding/removing holdings** - This replaces the legacy ADD_HOLDING/REMOVE_HOLDING types and provides consistent semantics.
+2. **Use TRANSFER_IN/OUT with `is_external=true` for adding/removing holdings** - Marks the flow as crossing the portfolio boundary and replaces the legacy ADD_HOLDING/REMOVE_HOLDING types.
 
 3. **Use subtypes for semantic variations** - Instead of creating custom types, use subtypes (e.g., DIVIDEND with subtype DRIP) for rich categorization while maintaining canonical type behavior.
 

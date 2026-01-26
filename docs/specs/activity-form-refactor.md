@@ -127,7 +127,7 @@ If Asset: Symbol: [____]  Quantity: [____]
 
 ### Implementation Notes
 - Keep paired record creation for Account→Account (preserves audit trail per account)
-- `is_external` flag in metadata determines if it affects net_contribution
+- `is_external` flag in metadata marks portfolio-boundary transfers; account net_contribution always changes
 - UI shows as single transfer, backend creates appropriate records
 
 ---

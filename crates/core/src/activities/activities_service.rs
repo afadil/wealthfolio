@@ -5,7 +5,9 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use crate::accounts::{Account, AccountServiceTrait};
-use crate::activities::activities_constants::is_cash_activity;
+use crate::activities::activities_constants::{
+    is_cash_activity, ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT,
+};
 use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
 use crate::activities::csv_parser::{self, ParseConfig, ParsedCsvResult};
@@ -1050,7 +1052,7 @@ impl ActivityServiceTrait for ActivityService {
             });
         }
 
-        let new_activities: Vec<NewActivity> = validated_activities
+        let mut new_activities: Vec<NewActivity> = validated_activities
             .iter()
             .map(|activity| {
                 // Determine currency for canonical ID generation
@@ -1103,6 +1105,8 @@ impl ActivityServiceTrait for ActivityService {
                 }
             })
             .collect();
+
+        self.link_imported_transfer_pairs(&validated_activities, &mut new_activities);
 
         let count = self
             .activity_repository
@@ -1194,5 +1198,84 @@ impl ActivityServiceTrait for ActivityService {
         config: &csv_parser::ParseConfig,
     ) -> Result<csv_parser::ParsedCsvResult> {
         csv_parser::parse_csv(content, config)
+    }
+}
+
+// Private helper methods for ActivityService
+impl ActivityService {
+    /// Links matching TRANSFER_IN and TRANSFER_OUT activities by setting a shared source_group_id.
+    /// Matches are based on same date, currency, symbol, and amount.
+    fn link_imported_transfer_pairs(
+        &self,
+        validated_activities: &[ActivityImport],
+        new_activities: &mut [NewActivity],
+    ) {
+        #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+        struct TransferMatchKey {
+            date: NaiveDate,
+            currency: String,
+            symbol: String,
+            amount: Decimal,
+        }
+
+        fn parse_activity_date(date_str: &str) -> Option<NaiveDate> {
+            if let Ok(dt) = DateTime::parse_from_rfc3339(date_str) {
+                return Some(dt.naive_utc().date());
+            }
+            NaiveDate::parse_from_str(date_str, "%Y-%m-%d").ok()
+        }
+
+        fn transfer_match_key(activity: &ActivityImport) -> Option<TransferMatchKey> {
+            let date = parse_activity_date(&activity.date)?;
+            let amount = activity
+                .amount
+                .unwrap_or(activity.quantity * activity.unit_price);
+            if amount.is_zero() {
+                return None;
+            }
+            Some(TransferMatchKey {
+                date,
+                currency: activity.currency.clone(),
+                symbol: activity.symbol.clone(),
+                amount,
+            })
+        }
+
+        let mut transfer_in: HashMap<TransferMatchKey, Vec<usize>> = HashMap::new();
+        let mut transfer_out: HashMap<TransferMatchKey, Vec<usize>> = HashMap::new();
+
+        for (idx, activity) in validated_activities.iter().enumerate() {
+            let activity_type = activity.activity_type.as_str();
+            if activity_type != ACTIVITY_TYPE_TRANSFER_IN
+                && activity_type != ACTIVITY_TYPE_TRANSFER_OUT
+            {
+                continue;
+            }
+
+            if let Some(key) = transfer_match_key(activity) {
+                if activity_type == ACTIVITY_TYPE_TRANSFER_IN {
+                    transfer_in.entry(key).or_default().push(idx);
+                } else {
+                    transfer_out.entry(key).or_default().push(idx);
+                }
+            }
+        }
+
+        for (key, in_indices) in transfer_in {
+            if let Some(out_indices) = transfer_out.get(&key) {
+                let pair_count = in_indices.len().min(out_indices.len());
+                for i in 0..pair_count {
+                    let group_id = Uuid::new_v4().to_string();
+                    let in_idx = in_indices[i];
+                    let out_idx = out_indices[i];
+                    if let Some(activity) = new_activities.get_mut(in_idx) {
+                        activity.source_group_id = Some(group_id.clone());
+                    }
+                    if let Some(activity) = new_activities.get_mut(out_idx) {
+                        activity.source_group_id = Some(group_id);
+                    }
+                }
+            }
+        }
     }
 }

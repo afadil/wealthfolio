@@ -227,6 +227,8 @@ export interface ActivityCreate {
   activityType: string;
   subtype?: string | null; // Semantic variation (DRIP, STAKING_REWARD, etc.)
   activityDate: string | Date;
+  /** Optional grouping key (links paired transfer legs). */
+  sourceGroupId?: string;
   // Nested asset input (preferred)
   asset?: AssetInput;
   // Legacy flat fields (deprecated - use asset object instead)
@@ -257,6 +259,8 @@ export interface ActivityUpdate {
   activityType: string;
   subtype?: string | null;
   activityDate: string | Date;
+  /** Optional grouping key (links paired transfer legs). */
+  sourceGroupId?: string;
   // Nested asset input (preferred)
   asset?: AssetInput;
   // Legacy flat fields (deprecated - use asset object instead)

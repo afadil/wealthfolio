@@ -1046,8 +1046,7 @@ mod tests {
         previous_snapshot_add.net_contribution = initial_net_contribution;
         previous_snapshot_add.net_contribution_base = initial_net_contribution;
 
-        // --- 1. External TransferIn Activity (replaces AddHolding) ---
-        // External transfers affect net_contribution (metadata.flow.is_external = true)
+        // --- 1. TransferIn Activity (replaces AddHolding) ---
         let add_holding_activity = create_external_transfer_activity(
             "act_add_tsla",
             ActivityType::TransferIn,
@@ -1114,8 +1113,7 @@ mod tests {
         // Position cost basis 2005 USD -> 2005 * 1.30 (snapshot date rate) = 2606.50 CAD
         assert_eq!(state_after_add.cost_basis, added_basis_cad); // 2606.50 CAD
 
-        // --- 2. External TransferOut Activity (replaces RemoveHolding) ---
-        // External transfers affect net_contribution (metadata.flow.is_external = true)
+        // --- 2. TransferOut Activity (replaces RemoveHolding) ---
         let remove_holding_activity = create_external_transfer_activity(
             "act_remove_tsla",
             ActivityType::TransferOut,
@@ -1273,10 +1271,12 @@ mod tests {
             expected_cash_total_asset_tx_in
         );
 
-        // Net Contribution (CAD) - INTERNAL transfer (default), no net_contribution change
+        // Net Contribution (CAD) - Transfers affect account-level net_contribution
+        let expected_net_contribution_after_asset_in =
+            initial_net_contribution + (position_testusd.total_cost_basis * rate_asset_date);
         assert_eq!(
             state_after_asset_tx_in.net_contribution,
-            initial_net_contribution // Unchanged for internal transfer
+            expected_net_contribution_after_asset_in
         );
 
         // Snapshot Cost Basis (CAD)
@@ -1338,10 +1338,15 @@ mod tests {
             expected_cash_total_asset_tx_out
         );
 
-        // Net Contribution (CAD) - INTERNAL transfer (default), no net_contribution change
+        // Net Contribution (CAD) - Transfers affect account-level net_contribution
+        let removed_basis_usd =
+            position_testusd.total_cost_basis - position_testusd_after_out.total_cost_basis;
+        let removed_basis_cad = removed_basis_usd * rate_asset_date;
+        let expected_net_contribution_after_asset_out =
+            expected_net_contribution_after_asset_in - removed_basis_cad;
         assert_eq!(
             state_after_asset_tx_out.net_contribution,
-            initial_net_contribution // Unchanged for internal transfer
+            expected_net_contribution_after_asset_out
         );
 
         // Snapshot Cost Basis (CAD)
@@ -1400,10 +1405,12 @@ mod tests {
             expected_cash_total_cash_tx_in
         );
 
-        // Net Contribution (CAD) - INTERNAL transfer (default), no net_contribution change
+        // Net Contribution (CAD) - Transfers affect account-level net_contribution
+        let expected_net_contribution_after_cash_in = expected_net_contribution_after_asset_out
+            + (transfer_in_cash_activity.amt() * rate_cash_date);
         assert_eq!(
             state_after_cash_tx_in.net_contribution,
-            initial_net_contribution // Unchanged for internal transfer
+            expected_net_contribution_after_cash_in
         );
 
         // Snapshot Cost Basis (CAD) - unchanged from previous step
@@ -1460,10 +1467,12 @@ mod tests {
             expected_cash_total_cash_tx_out
         );
 
-        // Net Contribution (CAD) - INTERNAL transfer (default), no net_contribution change
+        // Net Contribution (CAD) - Transfers affect account-level net_contribution
+        let expected_net_contribution_after_cash_out = expected_net_contribution_after_cash_in
+            - (transfer_out_cash_activity.amt() * rate_cash_date);
         assert_eq!(
             state_after_cash_tx_out.net_contribution,
-            initial_net_contribution // Unchanged for internal transfer
+            expected_net_contribution_after_cash_out
         );
 
         // Snapshot Cost Basis (CAD) - unchanged from previous step
@@ -1471,6 +1480,40 @@ mod tests {
             state_after_cash_tx_out.cost_basis,
             state_after_cash_tx_in.cost_basis
         ); // 4687.8 CAD
+    }
+
+    #[test]
+    fn test_cash_transfer_affects_net_contribution() {
+        let mut mock_fx_service = MockFxService::new();
+        let target_date_str = "2023-01-10";
+        let target_date = NaiveDate::from_str(target_date_str).unwrap();
+
+        add_usd_cad_rates(&mut mock_fx_service, target_date_str);
+        let usd_cad = usd_cad_rate(target_date_str); // 1.30
+
+        let account_currency = "CAD";
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
+
+        let previous_snapshot =
+            create_initial_snapshot("acc_transfer", account_currency, "2023-01-09");
+
+        let transfer_in = create_cash_activity(
+            "act_tx_in",
+            ActivityType::TransferIn,
+            dec!(1000),
+            dec!(0),
+            "USD",
+            target_date_str,
+        );
+
+        let result = calculator.calculate_next_holdings(&previous_snapshot, &[transfer_in], target_date);
+        assert!(result.is_ok(), "TransferIn should succeed: {:?}", result.err());
+        let state = result.unwrap().snapshot;
+
+        // Account-boundary cashflow: transfers affect net_contribution.
+        assert_eq!(state.net_contribution, dec!(1000) * usd_cad);
+        assert_eq!(state.net_contribution_base, dec!(1000) * usd_cad);
     }
 
     #[test]
@@ -3028,12 +3071,12 @@ mod tests {
             "cash_total_account_currency uses FxService rate"
         );
 
-        // Net contribution for INTERNAL transfer is unchanged (default is internal)
-        // This is an internal transfer so net_contribution should NOT change
+        // Net contribution reflects transfer cost basis in account currency (fx_rate provided)
+        let expected_net_contribution = dec!(1510) * activity_fx_rate;
         assert_eq!(
             next_state.net_contribution,
-            dec!(0),
-            "Net contribution should not change for internal transfer"
+            expected_net_contribution,
+            "Net contribution should reflect transfer amount"
         );
     }
 
