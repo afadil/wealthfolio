@@ -28,6 +28,11 @@ export function useCalculatePerformanceHistory({
   selectedItems: TrackedItem[];
   dateRange: DateRange | undefined;
 }) {
+  // Filter out invalid items (defensive: handles stale localStorage data)
+  const validItems = selectedItems.filter(
+    (item) => item && typeof item.id === "string" && item.id && typeof item.type === "string" && item.type,
+  );
+
   // Use a ref to track the effective start date without causing re-renders
   const effectiveStartDateRef = useRef<string | null>(null);
 
@@ -47,7 +52,7 @@ export function useCalculatePerformanceHistory({
   const endDate = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined;
 
   // Check if we need to update our tracking refs
-  const currentSelectionKey = selectedItems.map((item) => item.id).join(",");
+  const currentSelectionKey = validItems.map((item) => item.id).join(",");
   const hasSelectionChanged =
     currentSelectionKey !== processedRef.current.selectedItemIds.join(",");
   const hasDateChanged = startDate !== processedRef.current.dateFrom;
@@ -55,7 +60,7 @@ export function useCalculatePerformanceHistory({
   // If selection or date changed, reset the processed state
   if (hasSelectionChanged || hasDateChanged) {
     processedRef.current = {
-      selectedItemIds: selectedItems.map((item) => item.id),
+      selectedItemIds: validItems.map((item) => item.id),
       dateFrom: startDate || null, // Store startDate or null in ref
       effectiveStartDate: null,
     };
@@ -66,11 +71,11 @@ export function useCalculatePerformanceHistory({
   const startDateToUse = effectiveStartDateRef.current || startDate;
 
   const performanceQueries = useQueries({
-    queries: selectedItems.map((item) => ({
+    queries: validItems.map((item) => ({
       queryKey: [QueryKeys.PERFORMANCE_HISTORY, item.type, item.id, startDateToUse, endDate],
       queryFn: () => calculatePerformanceHistory(item.type, item.id, startDateToUse!, endDate!),
-      // Enable query only if essential item identifiers AND dates are present.
-      enabled: !!item.id && !!item.type && !!startDateToUse && !!endDate,
+      // Enable query only if dates are present (item validation done above).
+      enabled: !!startDateToUse && !!endDate,
       staleTime: 30 * 1000,
       retry: false,
       placeholderData: keepPreviousData,
@@ -90,7 +95,7 @@ export function useCalculatePerformanceHistory({
     .map((query, index) => {
       if (query.isError || !query.data) return null;
 
-      const item = selectedItems[index];
+      const item = validItems[index];
       return {
         ...query.data,
         id: item.id,
@@ -108,7 +113,7 @@ export function useCalculatePerformanceHistory({
     !processedRef.current.effectiveStartDate
   ) {
     // Find the first account in the selected items
-    const firstAccountItem = selectedItems.find((item) => item.type === "account");
+    const firstAccountItem = validItems.find((item) => item.type === "account");
 
     if (firstAccountItem) {
       // Find the performance data for the first account

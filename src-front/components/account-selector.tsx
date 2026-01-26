@@ -402,7 +402,8 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
                         return (
                           <CommandItem
                             key={account.id}
-                            value={`${account.name} ${account.currency} ${account.accountType}`}
+                            value={account.id}
+                            keywords={[account.name, account.currency, account.accountType]}
                             onSelect={() => {
                               setSelectedAccount(account);
                               setOpen(false);
