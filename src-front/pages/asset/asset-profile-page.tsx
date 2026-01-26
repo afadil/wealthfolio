@@ -84,7 +84,11 @@ export const AssetProfilePage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const queryParams = new URLSearchParams(location.search);
-  const defaultTab = (queryParams.get("tab") as AssetTab) ?? "overview";
+  const tabParam = queryParams.get("tab");
+  const defaultTab: AssetTab =
+    tabParam === "overview" || tabParam === "lots" || tabParam === "history"
+      ? tabParam
+      : "overview";
   const [activeTab, setActiveTab] = useState<AssetTab>(defaultTab);
   const [actionPaletteOpen, setActionPaletteOpen] = useState(false);
   const [editSheetOpen, setEditSheetOpen] = useState(false);

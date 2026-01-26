@@ -571,7 +571,7 @@ export const ASSET_SUBCLASS_TYPES = [
  */
 export const HOLDING_CATEGORY_FILTERS = [
   { id: "investments", label: "Investments", assetKinds: ["SECURITY", "CRYPTO", "OPTION", "COMMODITY", "PRIVATE_EQUITY"] },
-  { id: "assets", label: "Assets", assetKinds: ["PROPERTY", "VEHICLE", "COLLECTIBLE", "PHYSICAL_PRECIOUS", "OTHER"] },
+  { id: "assets", label: "Personal Assets", assetKinds: ["PROPERTY", "VEHICLE", "COLLECTIBLE", "PHYSICAL_PRECIOUS", "OTHER"] },
   { id: "liabilities", label: "Liabilities", assetKinds: ["LIABILITY"] },
 ] as const;
 
