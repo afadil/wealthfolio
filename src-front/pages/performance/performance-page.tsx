@@ -298,36 +298,41 @@ export default function PerformancePage() {
   }, [selectedItemId, performanceData, selectedItems]);
 
   const handleAccountSelect = (account: { id: string; name: string }) => {
-    setSelectedItems((prev) => {
-      const exists = prev.some((item) => item.id === account.id);
-      if (exists) {
-        return sortComparisonItems(prev.filter((item) => item.id !== account.id));
+    const accountId = String(account.id);
+    const exists = selectedItems.some((item) => item.id === accountId);
+
+    if (exists) {
+      const nextItems = sortComparisonItems(selectedItems.filter((item) => item.id !== accountId));
+      setSelectedItems(nextItems);
+      if (selectedItemId === accountId) {
+        setSelectedItemId(null);
       }
+      return;
+    }
 
-      // Create a proper ComparisonItem
-      const newItem: TrackedItem = {
-        id: account.id,
-        type: "account",
-        name: account.name,
-      };
+    const newItem: TrackedItem = {
+      id: accountId,
+      type: "account",
+      name: account.name,
+    };
 
-      return sortComparisonItems([...prev, newItem]);
-    });
+    setSelectedItems(sortComparisonItems([...selectedItems, newItem]));
+    setSelectedItemId(accountId);
   };
 
   const handleSymbolSelect = (symbol: { id: string; name: string }) => {
-    setSelectedItems((prev) => {
-      const exists = prev.some((item) => item.id === symbol.id);
-      if (exists) return sortComparisonItems(prev);
+    const symbolId = String(symbol.id);
+    const exists = selectedItems.some((item) => item.id === symbolId);
+    if (exists) return;
 
-      const newSymbol: TrackedItem = {
-        id: symbol.id,
-        type: "symbol",
-        name: symbol.name,
-      };
+    const newSymbol: TrackedItem = {
+      id: symbolId,
+      type: "symbol",
+      name: symbol.name,
+    };
 
-      return sortComparisonItems([...prev, newSymbol]);
-    });
+    setSelectedItems(sortComparisonItems([...selectedItems, newSymbol]));
+    setSelectedItemId(symbolId);
   };
 
   const handleBadgeSelect = (item: TrackedItem) => {

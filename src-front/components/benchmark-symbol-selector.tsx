@@ -13,10 +13,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/compone
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { SymbolSearchResult } from "@/lib/types";
 import { getExchangeDisplayName } from "@/lib/constants";
+import { buildSecurityAssetId } from "@/lib/asset-utils";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
+// Predefined benchmarks with canonical asset IDs
+// exchangeMic is undefined for indices (will use "INDEX" as pseudo-MIC)
+// exchangeMic is set for ETFs that trade on real exchanges
 const BENCHMARKS = [
   {
     group: "US Market Indices",
@@ -55,18 +59,18 @@ const BENCHMARKS = [
   {
     group: "Global & Emerging Markets",
     items: [
-      { symbol: "EEM", name: "MSCI Emerging Markets", description: "Emerging market stocks" },
-      { symbol: "ACWI", name: "MSCI All Country World", description: "Global equity markets" },
-      { symbol: "IEFA", name: "Core MSCI EAFE", description: "Europe, Australasia, Far East" },
+      { symbol: "EEM", name: "MSCI Emerging Markets", description: "Emerging market stocks", exchangeMic: "ARCX" },
+      { symbol: "ACWI", name: "MSCI All Country World", description: "Global equity markets", exchangeMic: "XNAS" },
+      { symbol: "IEFA", name: "Core MSCI EAFE", description: "Europe, Australasia, Far East", exchangeMic: "ARCX" },
     ],
   },
   {
     group: "ETFs",
     items: [
-      { symbol: "VOO", name: "Vanguard S&P 500", description: "S&P 500 index fund" },
-      { symbol: "VTI", name: "Vanguard Total Stock", description: "Total US market" },
-      { symbol: "VEA", name: "Vanguard FTSE Developed", description: "Developed markets ex-US" },
-      { symbol: "VWO", name: "Vanguard FTSE Emerging", description: "Emerging markets" },
+      { symbol: "VOO", name: "Vanguard S&P 500", description: "S&P 500 index fund", exchangeMic: "ARCX" },
+      { symbol: "VTI", name: "Vanguard Total Stock", description: "Total US market", exchangeMic: "ARCX" },
+      { symbol: "VEA", name: "Vanguard FTSE Developed", description: "Developed markets ex-US", exchangeMic: "ARCX" },
+      { symbol: "VWO", name: "Vanguard FTSE Emerging", description: "Emerging markets", exchangeMic: "ARCX" },
     ],
   },
 ];
@@ -106,16 +110,20 @@ export function BenchmarkSymbolSelector({
     (result) => !existingSymbols.includes(result.symbol),
   );
 
-  const handleBenchmarkSelect = (benchmark: { symbol: string; name: string }) => {
+  const handleBenchmarkSelect = (benchmark: { symbol: string; name: string; exchangeMic?: string }) => {
     setValue(benchmark.name);
-    onSelect({ id: benchmark.symbol, name: benchmark.name });
+    // Construct canonical asset ID: SEC:{symbol}:{mic} (uses INDEX for indices without MIC)
+    const assetId = buildSecurityAssetId(benchmark.symbol, benchmark.exchangeMic);
+    onSelect({ id: assetId, name: benchmark.name });
     setOpen(false);
     setSearchQuery(""); // Clear search when selecting
   };
 
   const handleSearchResultSelect = (ticker: SymbolSearchResult) => {
     setValue(ticker.longName || ticker.symbol);
-    onSelect({ id: ticker.symbol, name: ticker.longName || ticker.symbol });
+    // Use existingAssetId if the asset already exists in database, otherwise construct canonical ID
+    const assetId = ticker.existingAssetId || buildSecurityAssetId(ticker.symbol, ticker.exchangeMic);
+    onSelect({ id: assetId, name: ticker.longName || ticker.symbol });
     setOpen(false);
     setSearchQuery(""); // Clear search when selecting
   };
