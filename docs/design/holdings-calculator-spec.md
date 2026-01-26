@@ -29,6 +29,7 @@ The Holdings Calculator is responsible for computing account state snapshots bas
 ---
 
 ## Activity Type Semantics
+Account-level snapshots treat transfers as cashflows. Portfolio-level net_contribution is derived by aggregating accounts; internal transfers net to zero.
 
 ### External Flow Activities (affect net_contribution)
 These represent money/assets entering or leaving the tracked portfolio from external sources.
@@ -52,8 +53,6 @@ These represent activity within the portfolio that doesn't change total portfoli
 | `CREDIT` | +amount in activity.currency | None | None |
 | `FEE` | -amount in activity.currency | None | None |
 | `TAX` | -amount in activity.currency | None | None |
-| `TRANSFER_IN` | See below | See below | Default: None (configurable) |
-| `TRANSFER_OUT` | See below | See below | Default: None (configurable) |
 | `SPLIT` | None | Mutates lot quantities in-place | None |
 
 ---
@@ -96,31 +95,30 @@ add_cash(state, &activity.currency, total_proceeds);
 
 ### 2. Transfer Activity Semantics
 
-**Default Behavior**: TRANSFER_IN/TRANSFER_OUT are **internal** (no net_contribution effect).
+**Default Behavior**: TRANSFER_IN/TRANSFER_OUT **affect account-level net_contribution**.
 
-**Configurable via Metadata**:
+**Portfolio Boundary**:
+- Portfolio net_contribution is derived by aggregating account snapshots; internal transfers net to zero.
+- Use `metadata.flow.is_external = true` to represent transfers that cross the portfolio boundary (single-leg).
+
+**Metadata**:
 ```json
 {
-  "kind": "INTERNAL",     // or "EXTERNAL"
-  "source_group_id": "uuid-linking-both-legs"
+  "flow": { "is_external": true }
 }
 ```
-
-- `kind: "INTERNAL"` (default): No net_contribution change, purely moves assets between tracked accounts
-- `kind: "EXTERNAL"`: Treats as DEPOSIT/WITHDRAWAL equivalent (from/to untracked accounts)
-- `source_group_id`: Required for internal transfers, links the TRANSFER_IN and TRANSFER_OUT legs
 
 **Cash Transfer**:
 ```rust
 // TRANSFER_IN (cash)
 let net = activity.amt() - activity.fee_amt();
 add_cash(state, &activity.currency, net);
-// NO net_contribution change for internal
+// net_contribution increases by activity amount (account boundary)
 
 // TRANSFER_OUT (cash)
 let net = activity.amt() + activity.fee_amt();
 add_cash(state, &activity.currency, -net);
-// NO net_contribution change for internal
+// net_contribution decreases by activity amount (account boundary)
 ```
 
 **Asset Transfer**:
@@ -128,12 +126,12 @@ add_cash(state, &activity.currency, -net);
 // TRANSFER_IN (asset)
 position.add_lot_values(qty, price, fee, currency, date, fx_rate)?;
 add_cash(state, &activity.currency, -fee);  // fee in activity currency
-// NO net_contribution change for internal
+// net_contribution increases by cost basis (account boundary)
 
 // TRANSFER_OUT (asset)
 position.reduce_lots_fifo(qty)?;
 add_cash(state, &activity.currency, -fee);  // fee in activity currency
-// NO net_contribution change for internal
+// net_contribution decreases by removed cost basis (account boundary)
 ```
 
 ---
@@ -211,7 +209,7 @@ pub fn add_lot_values(
 - No cash effect, no net_contribution effect
 
 **Mergers/Spinoffs**:
-- Represented as multiple linked activities via `source_group_id`:
+- Represented as multiple linked activities (grouping is optional and UI/audit-only):
   1. `REMOVE_HOLDING` of old asset (qty out)
   2. `ADD_HOLDING` of new asset(s) (qty in)
   3. Optional cash leg for cash-in-lieu (use `DIVIDEND` or `CREDIT`)
@@ -270,13 +268,13 @@ fn get_position_currency_cached(
 ```
 For each activity in day:
   1. Parse activity_type
-  2. Check transfer "kind" metadata if TRANSFER_*
+  2. For TRANSFER_*: treat as account-boundary cashflow
   3. Route to handler based on activity_type
 
   Handler responsibilities:
   - Book cash in activity.currency (via add_cash helper)
   - Update position (create lot or reduce via FIFO)
-  - Update net_contribution only for external flows
+  - Update net_contribution for deposits/withdrawals/transfers and other external flows (e.g., CREDIT/BONUS)
   - Convert to account/base currency only when needed for contributions
 
 After all activities:
@@ -298,8 +296,6 @@ After all activities:
 - [ ] Compute cash total once at end of `calculate_next_holdings()`
 
 ### Phase 2: Transfer Semantics
-- [ ] Remove net_contribution updates from TRANSFER_IN/TRANSFER_OUT
-- [ ] Add metadata check for `kind: "EXTERNAL"` to optionally enable contribution updates
 - [ ] Update TRANSFER handlers to book cash/positions in activity.currency
 
 ### Phase 3: Performance Optimizations

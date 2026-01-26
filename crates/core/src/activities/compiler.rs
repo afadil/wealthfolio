@@ -155,7 +155,7 @@ impl DefaultActivityCompiler {
     ///
     /// Compiled:
     ///   1. DIVIDEND: income recognition
-    ///   2. TRANSFER_IN (external): receive different asset (with cost basis from FMV)
+    ///   2. TRANSFER_IN (internal): receive different asset (cost basis from FMV, no portfolio-boundary contribution)
     fn compile_dividend_in_kind(&self, activity: &Activity) -> Vec<Activity> {
         // Get the received asset ID from metadata
         let received_asset_id = activity
@@ -169,7 +169,7 @@ impl DefaultActivityCompiler {
         dividend_leg.quantity = None;
         dividend_leg.unit_price = None;
 
-        // Leg 2: TRANSFER_IN with is_external=true (receive the different asset)
+        // Leg 2: TRANSFER_IN (receive the different asset)
         let mut transfer_in_leg = activity.clone();
         transfer_in_leg.id = format!("{}:transfer_in", activity.id);
         transfer_in_leg.activity_type = ACTIVITY_TYPE_TRANSFER_IN.to_string();
@@ -179,12 +179,8 @@ impl DefaultActivityCompiler {
         // quantity and unit_price define the cost basis
         transfer_in_leg.amount = None;
         transfer_in_leg.fee = Some(Decimal::ZERO);
-        // Mark as external transfer so it affects net_contribution
-        transfer_in_leg.metadata = Some(serde_json::json!({
-            "flow": {
-                "is_external": true
-            }
-        }));
+        // Strip metadata from the generated leg: dividend-in-kind is income, not a portfolio-boundary contribution.
+        transfer_in_leg.metadata = None;
 
         vec![dividend_leg, transfer_in_leg]
     }
@@ -392,7 +388,7 @@ mod tests {
         assert_eq!(result[0].asset_id, Some("PARENT_CO".to_string()));
         assert_eq!(result[0].amount, Some(dec!(250)));
 
-        // Second leg: TRANSFER_IN with is_external=true
+        // Second leg: TRANSFER_IN (internal)
         assert_eq!(result[1].id, "test-1:transfer_in");
         assert_eq!(result[1].activity_type, ACTIVITY_TYPE_TRANSFER_IN);
         assert!(result[1].subtype.is_none());
@@ -400,9 +396,7 @@ mod tests {
         assert_eq!(result[1].quantity, Some(dec!(10)));
         assert_eq!(result[1].unit_price, Some(dec!(25)));
         assert!(result[1].amount.is_none());
-        // Verify is_external flag is set
-        let metadata = result[1].metadata.as_ref().unwrap();
-        assert_eq!(metadata["flow"]["is_external"], true);
+        assert!(result[1].metadata.is_none());
     }
 
     #[test]

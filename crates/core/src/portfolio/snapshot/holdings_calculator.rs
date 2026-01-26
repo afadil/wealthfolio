@@ -200,13 +200,11 @@ impl HoldingsCalculator {
                 self.handle_charge(activity, state, &activity_type)
             }
             ActivityType::TransferIn => {
-                // Handles both internal transfers and external transfers (is_external=true)
-                // External transfers affect net_contribution (used for add holding, external deposits)
+                // Transfers always affect account-level net_contribution.
                 self.handle_transfer_in(activity, state, account_currency, asset_currency_cache)
             }
             ActivityType::TransferOut => {
-                // Handles both internal transfers and external transfers (is_external=true)
-                // External transfers affect net_contribution (used for remove holding, external withdrawals)
+                // Transfers always affect account-level net_contribution.
                 self.handle_transfer_out(activity, state, account_currency, asset_currency_cache)
             }
             ActivityType::Split => Ok(()),
@@ -510,8 +508,7 @@ impl HoldingsCalculator {
 
     /// Handle TRANSFER_IN activity.
     /// Books cash/asset inflow in ACTIVITY currency.
-    /// Default: INTERNAL (no net_contribution change).
-    /// If metadata.kind == "EXTERNAL", treats as external deposit.
+    /// Transfers always affect account-level net_contribution; portfolio boundary is handled by aggregation.
     fn handle_transfer_in(
         &self,
         activity: &Activity,
@@ -523,44 +520,38 @@ impl HoldingsCalculator {
         let activity_amount = activity.amt();
         let asset_id = activity.asset_id.as_deref().unwrap_or("");
 
-        // Check if this is an EXTERNAL transfer (affects net_contribution)
-        let is_external = self.is_external_transfer(activity);
-
         if is_cash_asset_id(asset_id) || asset_id.is_empty() {
             // Cash transfer: book in ACTIVITY currency
             let net_amount = activity_amount - activity.fee_amt();
             add_cash(state, activity_currency, net_amount);
 
-            // Only update net_contribution if EXTERNAL
-            if is_external {
-                let activity_date = activity.activity_date.naive_utc().date();
-                let amount_acct = self.convert_to_account_currency(
-                    activity_amount,
-                    activity,
-                    account_currency,
-                    "TransferIn Cash",
-                );
+            let activity_date = activity.activity_date.naive_utc().date();
+            let amount_acct = self.convert_to_account_currency(
+                activity_amount,
+                activity,
+                account_currency,
+                "TransferIn Cash",
+            );
 
-                let base_ccy = self.base_currency.read().unwrap();
-                let amount_base = match self.fx_service.convert_currency_for_date(
-                    activity_amount,
-                    activity_currency,
-                    &base_ccy,
-                    activity_date,
-                ) {
-                    Ok(c) => c,
-                    Err(e) => {
-                        warn!(
-                            "Holdings Calc (NetContrib TransferIn Cash {}): Failed conversion {}: {}.",
-                            activity.id, activity_currency, e
-                        );
-                        Decimal::ZERO
-                    }
-                };
+            let base_ccy = self.base_currency.read().unwrap();
+            let amount_base = match self.fx_service.convert_currency_for_date(
+                activity_amount,
+                activity_currency,
+                &base_ccy,
+                activity_date,
+            ) {
+                Ok(c) => c,
+                Err(e) => {
+                    warn!(
+                        "Holdings Calc (NetContrib TransferIn Cash {}): Failed conversion {}: {}.",
+                        activity.id, activity_currency, e
+                    );
+                    Decimal::ZERO
+                }
+            };
 
-                state.net_contribution += amount_acct;
-                state.net_contribution_base += amount_base;
-            }
+            state.net_contribution += amount_acct;
+            state.net_contribution_base += amount_base;
         } else {
             // Asset transfer
             let activity_date = activity.activity_date.naive_utc().date();
@@ -604,44 +595,40 @@ impl HoldingsCalculator {
             // Book fee in ACTIVITY currency
             add_cash(state, activity_currency, -activity.fee_amt());
 
-            // Only update net_contribution if EXTERNAL
-            if is_external {
-                let cost_basis_acct = self.convert_position_amount_to_account_currency(
-                    cost_basis_asset_curr,
-                    &position_currency,
-                    activity,
-                    account_currency,
-                    "Net Deposit TransferIn Asset",
-                );
+            let cost_basis_acct = self.convert_position_amount_to_account_currency(
+                cost_basis_asset_curr,
+                &position_currency,
+                activity,
+                account_currency,
+                "Net Deposit TransferIn Asset",
+            );
 
-                let base_ccy = self.base_currency.read().unwrap();
-                let cost_basis_base = match self.fx_service.convert_currency_for_date(
-                    cost_basis_asset_curr,
-                    &position_currency,
-                    &base_ccy,
-                    activity_date,
-                ) {
-                    Ok(converted) => converted,
-                    Err(e) => {
-                        warn!(
-                            "Holdings Calc (NetContribBase TransferIn Asset {}): Failed conversion: {}.",
-                            activity.id, e
-                        );
-                        cost_basis_asset_curr
-                    }
-                };
+            let base_ccy = self.base_currency.read().unwrap();
+            let cost_basis_base = match self.fx_service.convert_currency_for_date(
+                cost_basis_asset_curr,
+                &position_currency,
+                &base_ccy,
+                activity_date,
+            ) {
+                Ok(converted) => converted,
+                Err(e) => {
+                    warn!(
+                        "Holdings Calc (NetContribBase TransferIn Asset {}): Failed conversion: {}.",
+                        activity.id, e
+                    );
+                    cost_basis_asset_curr
+                }
+            };
 
-                state.net_contribution += cost_basis_acct;
-                state.net_contribution_base += cost_basis_base;
-            }
+            state.net_contribution += cost_basis_acct;
+            state.net_contribution_base += cost_basis_base;
         }
         Ok(())
     }
 
     /// Handle TRANSFER_OUT activity.
     /// Books cash/asset outflow in ACTIVITY currency.
-    /// Default: INTERNAL (no net_contribution change).
-    /// If metadata.kind == "EXTERNAL", treats as external withdrawal.
+    /// Transfers always affect account-level net_contribution; portfolio boundary is handled by aggregation.
     fn handle_transfer_out(
         &self,
         activity: &Activity,
@@ -653,44 +640,38 @@ impl HoldingsCalculator {
         let activity_amount = activity.amt();
         let asset_id = activity.asset_id.as_deref().unwrap_or("");
 
-        // Check if this is an EXTERNAL transfer (affects net_contribution)
-        let is_external = self.is_external_transfer(activity);
-
         if is_cash_asset_id(asset_id) || asset_id.is_empty() {
             // Cash transfer: book outflow in ACTIVITY currency (amount + fee)
             let net_amount = activity_amount + activity.fee_amt();
             add_cash(state, activity_currency, -net_amount);
 
-            // Only update net_contribution if EXTERNAL
-            if is_external {
-                let activity_date = activity.activity_date.naive_utc().date();
-                let amount_acct = self.convert_to_account_currency(
-                    activity_amount,
-                    activity,
-                    account_currency,
-                    "TransferOut Cash",
-                );
+            let activity_date = activity.activity_date.naive_utc().date();
+            let amount_acct = self.convert_to_account_currency(
+                activity_amount,
+                activity,
+                account_currency,
+                "TransferOut Cash",
+            );
 
-                let base_ccy = self.base_currency.read().unwrap();
-                let amount_base = match self.fx_service.convert_currency_for_date(
-                    activity_amount,
-                    activity_currency,
-                    &base_ccy,
-                    activity_date,
-                ) {
-                    Ok(c) => c,
-                    Err(e) => {
-                        warn!(
-                            "Holdings Calc (NetContrib TransferOut Cash {}): Failed conversion {}: {}.",
-                            activity.id, activity_currency, e
-                        );
-                        Decimal::ZERO
-                    }
-                };
+            let base_ccy = self.base_currency.read().unwrap();
+            let amount_base = match self.fx_service.convert_currency_for_date(
+                activity_amount,
+                activity_currency,
+                &base_ccy,
+                activity_date,
+            ) {
+                Ok(c) => c,
+                Err(e) => {
+                    warn!(
+                        "Holdings Calc (NetContrib TransferOut Cash {}): Failed conversion {}: {}.",
+                        activity.id, activity_currency, e
+                    );
+                    Decimal::ZERO
+                }
+            };
 
-                state.net_contribution -= amount_acct;
-                state.net_contribution_base -= amount_base;
-            }
+            state.net_contribution -= amount_acct;
+            state.net_contribution_base -= amount_base;
         } else {
             // Asset transfer
             let activity_date = activity.activity_date.naive_utc().date();
@@ -710,11 +691,7 @@ impl HoldingsCalculator {
                 let (_qty_reduced, cost_basis_removed) =
                     position.reduce_lots_fifo(activity.qty())?;
 
-                // Only update net_contribution if EXTERNAL
-                if is_external
-                    && !position_currency.is_empty()
-                    && cost_basis_removed != Decimal::ZERO
-                {
+                if !position_currency.is_empty() && cost_basis_removed != Decimal::ZERO {
                     let cost_basis_removed_acct = self.convert_position_amount_to_account_currency(
                         cost_basis_removed,
                         &position_currency,
@@ -978,25 +955,6 @@ impl HoldingsCalculator {
         };
 
         Ok((converted_price, converted_fee, fx_rate_used))
-    }
-
-    /// Checks if a transfer activity is marked as EXTERNAL in metadata.
-    /// EXTERNAL transfers affect net_contribution (like DEPOSIT/WITHDRAWAL).
-    /// Default is INTERNAL (no net_contribution effect).
-    ///
-    /// Metadata structure: `{"flow": {"is_external": true}}`
-    /// - If no `flow` key, or no `is_external` key, or `is_external` is false → INTERNAL
-    /// - If `flow.is_external` is true → EXTERNAL
-    fn is_external_transfer(&self, activity: &Activity) -> bool {
-        if let Some(ref metadata) = activity.metadata {
-            // Check for metadata.flow.is_external == true
-            if let Some(flow) = metadata.get("flow") {
-                if let Some(is_external) = flow.get("is_external").and_then(|v| v.as_bool()) {
-                    return is_external;
-                }
-            }
-        }
-        false // Default to INTERNAL
     }
 
     /// Computes cash totals in account and base currencies.

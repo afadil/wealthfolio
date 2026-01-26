@@ -8,6 +8,16 @@ use crate::activities::{
     ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT, ACTIVITY_TYPE_WITHDRAWAL,
 };
 
+fn is_external_transfer(activity: &Activity) -> bool {
+    activity
+        .metadata
+        .as_ref()
+        .and_then(|m| m.get("flow"))
+        .and_then(|flow| flow.get("is_external"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+}
+
 /// Flow type for performance calculation
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FlowType {
@@ -20,18 +30,16 @@ pub enum FlowType {
     Internal,
 }
 
-/// Scope for performance calculation
+/// Boundary scope for flow classification.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PerformanceScope {
-    /// Portfolio-level: only DEPOSIT/WITHDRAWAL are external
-    /// Transfers between accounts are internal
+    /// Portfolio boundary (external means outside the portfolio)
     Portfolio,
-
-    /// Account-level: TRANSFER_IN/OUT are also external
+    /// Account boundary (external means outside the account)
     Account,
 }
 
-/// Classify flow for portfolio-level performance.
+/// Classify flow for performance by scope.
 ///
 /// External flows:
 /// - DEPOSIT, WITHDRAWAL (money entering/leaving portfolio)
@@ -42,7 +50,7 @@ pub enum PerformanceScope {
 /// - TRANSFER_IN, TRANSFER_OUT (money moving between accounts)
 /// - FEE, TAX (deductions from existing money)
 /// - CREDIT with other subtypes (REBATE, REFUND = not new money)
-pub fn classify_flow(activity: &Activity) -> FlowType {
+pub fn classify_flow_for_scope(activity: &Activity, scope: PerformanceScope) -> FlowType {
     let effective_type = activity.effective_type();
 
     // External flows - money crossing portfolio boundary
@@ -61,41 +69,28 @@ pub fn classify_flow(activity: &Activity) -> FlowType {
         };
     }
 
+    // TRANSFER_*: can be external when explicitly marked as portfolio-boundary flow.
+    if effective_type == ACTIVITY_TYPE_TRANSFER_IN || effective_type == ACTIVITY_TYPE_TRANSFER_OUT {
+        return match scope {
+            PerformanceScope::Portfolio => {
+                if is_external_transfer(activity) {
+                    FlowType::External
+                } else {
+                    FlowType::Internal
+                }
+            }
+            PerformanceScope::Account => FlowType::External,
+        };
+    }
+
     // Everything else is internal
     // BUY, SELL, DIVIDEND, INTEREST, TRANSFER_*, FEE, TAX, SPLIT, ADJUSTMENT
     FlowType::Internal
 }
 
-/// Classify flow for a specific scope.
-///
-/// For portfolio-level: transfers between accounts are internal
-/// For account-level: transfers are external (money leaving/entering that account)
-pub fn classify_flow_for_scope(activity: &Activity, scope: PerformanceScope) -> FlowType {
-    match scope {
-        PerformanceScope::Portfolio => classify_flow(activity),
-        PerformanceScope::Account => {
-            let effective_type = activity.effective_type();
-
-            // For account-level, deposits/withdrawals/transfers are external
-            if effective_type == ACTIVITY_TYPE_DEPOSIT
-                || effective_type == ACTIVITY_TYPE_WITHDRAWAL
-                || effective_type == ACTIVITY_TYPE_TRANSFER_IN
-                || effective_type == ACTIVITY_TYPE_TRANSFER_OUT
-            {
-                return FlowType::External;
-            }
-
-            // CREDIT still follows the same rules
-            if effective_type == ACTIVITY_TYPE_CREDIT {
-                return match activity.subtype.as_deref() {
-                    Some(ACTIVITY_SUBTYPE_BONUS) => FlowType::External,
-                    _ => FlowType::Internal,
-                };
-            }
-
-            FlowType::Internal
-        }
-    }
+/// Classify flow for portfolio-level performance.
+pub fn classify_flow(activity: &Activity) -> FlowType {
+    classify_flow_for_scope(activity, PerformanceScope::Portfolio)
 }
 
 /// Check if an activity is an external flow for portfolio-level calculation
@@ -103,9 +98,19 @@ pub fn is_external_flow(activity: &Activity) -> bool {
     classify_flow(activity) == FlowType::External
 }
 
+/// Check if an activity is an external flow for a given scope
+pub fn is_external_flow_for_scope(activity: &Activity, scope: PerformanceScope) -> bool {
+    classify_flow_for_scope(activity, scope) == FlowType::External
+}
+
 /// Check if an activity affects net contribution
 pub fn affects_net_contribution(activity: &Activity) -> bool {
     is_external_flow(activity)
+}
+
+/// Check if an activity affects net contribution for a given scope
+pub fn affects_net_contribution_for_scope(activity: &Activity, scope: PerformanceScope) -> bool {
+    is_external_flow_for_scope(activity, scope)
 }
 
 #[cfg(test)]
@@ -204,6 +209,42 @@ mod tests {
     }
 
     #[test]
+    fn test_transfer_in_is_external_for_account_scope() {
+        let activity = create_test_activity("TRANSFER_IN");
+        assert_eq!(
+            classify_flow_for_scope(&activity, PerformanceScope::Account),
+            FlowType::External
+        );
+    }
+
+    #[test]
+    fn test_transfer_out_is_external_for_account_scope() {
+        let activity = create_test_activity("TRANSFER_OUT");
+        assert_eq!(
+            classify_flow_for_scope(&activity, PerformanceScope::Account),
+            FlowType::External
+        );
+    }
+
+    #[test]
+    fn test_external_transfer_in_is_external_for_portfolio() {
+        let mut activity = create_test_activity("TRANSFER_IN");
+        activity.metadata = Some(serde_json::json!({
+            "flow": { "is_external": true }
+        }));
+        assert_eq!(classify_flow(&activity), FlowType::External);
+    }
+
+    #[test]
+    fn test_external_transfer_out_is_external_for_portfolio() {
+        let mut activity = create_test_activity("TRANSFER_OUT");
+        activity.metadata = Some(serde_json::json!({
+            "flow": { "is_external": true }
+        }));
+        assert_eq!(classify_flow(&activity), FlowType::External);
+    }
+
+    #[test]
     fn test_fee_is_internal() {
         let activity = create_test_activity("FEE");
         assert_eq!(classify_flow(&activity), FlowType::Internal);
@@ -250,34 +291,6 @@ mod tests {
         assert_eq!(classify_flow(&activity), FlowType::Internal);
     }
 
-    // Account scope tests
-    #[test]
-    fn test_transfer_in_is_external_for_account() {
-        let activity = create_test_activity("TRANSFER_IN");
-        assert_eq!(
-            classify_flow_for_scope(&activity, PerformanceScope::Account),
-            FlowType::External
-        );
-    }
-
-    #[test]
-    fn test_transfer_out_is_external_for_account() {
-        let activity = create_test_activity("TRANSFER_OUT");
-        assert_eq!(
-            classify_flow_for_scope(&activity, PerformanceScope::Account),
-            FlowType::External
-        );
-    }
-
-    #[test]
-    fn test_buy_is_internal_for_account() {
-        let activity = create_test_activity("BUY");
-        assert_eq!(
-            classify_flow_for_scope(&activity, PerformanceScope::Account),
-            FlowType::Internal
-        );
-    }
-
     // Override test
     #[test]
     fn test_respects_activity_type_override() {
@@ -294,6 +307,19 @@ mod tests {
 
         assert!(is_external_flow(&deposit));
         assert!(!is_external_flow(&buy));
+    }
+
+    #[test]
+    fn test_is_external_flow_for_scope() {
+        let transfer_in = create_test_activity("TRANSFER_IN");
+        assert!(!is_external_flow_for_scope(
+            &transfer_in,
+            PerformanceScope::Portfolio
+        ));
+        assert!(is_external_flow_for_scope(
+            &transfer_in,
+            PerformanceScope::Account
+        ));
     }
 
     #[test]

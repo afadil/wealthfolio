@@ -13,6 +13,13 @@ import {
 import { isPureCashActivity } from "../utils/activity-form-utils";
 import { useActivityMutations } from "./use-activity-mutations";
 
+function generateSourceGroupId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `wf-transfer-${crypto.randomUUID()}`;
+  }
+  return `wf-transfer-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 9)}`;
+}
+
 export interface UseActivityFormParams {
   accounts: AccountSelectOption[];
   activity?: Partial<ActivityDetails>;
@@ -80,6 +87,7 @@ export function useActivityForm({
           // Internal transfer: create both TRANSFER_OUT and TRANSFER_IN
           if (!transferData.isExternal && transferData.fromAccountId && transferData.toAccountId) {
             const formPayload = config.toPayload(formData);
+            const sourceGroupId = generateSourceGroupId();
 
             // Get currencies for both accounts
             const fromAccount = accounts.find((a) => a.value === transferData.fromAccountId);
@@ -97,6 +105,7 @@ export function useActivityForm({
               accountId: transferData.fromAccountId,
               activityType: ActivityType.TRANSFER_OUT,
               currency: fromAccount?.currency,
+              sourceGroupId,
               asset: assetId ? { symbol: assetId } : undefined,
             } as ActivityCreate;
 
@@ -106,6 +115,7 @@ export function useActivityForm({
               accountId: transferData.toAccountId,
               activityType: ActivityType.TRANSFER_IN,
               currency: toAccount?.currency,
+              sourceGroupId,
               asset: assetId ? { symbol: assetId } : undefined,
             } as ActivityCreate;
 

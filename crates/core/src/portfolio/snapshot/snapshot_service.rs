@@ -6,6 +6,7 @@ use crate::assets::AssetRepositoryTrait;
 use crate::constants::{DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
 use crate::errors::{CalculatorError, Error, Result};
 use crate::fx::FxServiceTrait;
+use crate::portfolio::performance::{classify_flow_for_scope, FlowType, PerformanceScope};
 use crate::portfolio::snapshot::{AccountStateSnapshot, HoldingsCalculationWarning, Lot, Position};
 use crate::utils::time_utils::get_days_between;
 
@@ -660,6 +661,7 @@ impl SnapshotService {
         // Map of Account ID -> AccountStateSnapshot for all *individual* accounts as of target_date
         individual_snapshots_on_date: &HashMap<String, AccountStateSnapshot>,
         base_portfolio_currency: &str,
+        internal_transfer_adjustment_base_ccy: Decimal,
     ) -> Result<AccountStateSnapshot> {
         let mut aggregated_cash_balances: HashMap<String, Decimal> = HashMap::new();
         let mut aggregated_positions: HashMap<String, Position> = HashMap::new(); // Position struct from crate::portfolio::snapshot::Position
@@ -807,13 +809,115 @@ impl SnapshotService {
             cash_balances: aggregated_cash_balances, // Itemized by account currency holding the cash
             positions: aggregated_positions,
             cost_basis: overall_cost_basis_base_ccy.round_dp(DECIMAL_PRECISION),
-            net_contribution: overall_net_contribution_base_ccy.round_dp(DECIMAL_PRECISION),
-            net_contribution_base: overall_net_contribution_base_ccy.round_dp(DECIMAL_PRECISION),
+            net_contribution: (overall_net_contribution_base_ccy - internal_transfer_adjustment_base_ccy)
+                .round_dp(DECIMAL_PRECISION),
+            net_contribution_base: (overall_net_contribution_base_ccy
+                - internal_transfer_adjustment_base_ccy)
+                .round_dp(DECIMAL_PRECISION),
             // For TOTAL snapshot, account_currency == base_currency
             cash_total_account_currency: cash_total_base.round_dp(DECIMAL_PRECISION),
             cash_total_base_currency: cash_total_base.round_dp(DECIMAL_PRECISION),
             calculated_at: Utc::now().naive_utc(),
         })
+    }
+
+    fn internal_transfer_adjustments_by_date_base(
+        &self,
+        account_ids: &[String],
+        base_currency: &str,
+    ) -> Result<HashMap<NaiveDate, Decimal>> {
+        let activities = self
+            .activity_repository
+            .get_activities_by_account_ids(account_ids)?;
+
+        let mut grouped: HashMap<String, Vec<Activity>> = HashMap::new();
+        for activity in activities {
+            if activity.source_group_id.is_none() {
+                continue;
+            }
+
+            let activity_type = activity.activity_type.as_str();
+            if activity_type != crate::activities::ACTIVITY_TYPE_TRANSFER_IN
+                && activity_type != crate::activities::ACTIVITY_TYPE_TRANSFER_OUT
+            {
+                continue;
+            }
+
+            if classify_flow_for_scope(&activity, PerformanceScope::Portfolio) == FlowType::External
+            {
+                continue;
+            }
+
+            if let Some(group_id) = activity.source_group_id.clone() {
+                grouped.entry(group_id).or_default().push(activity);
+            }
+        }
+
+        let mut adjustments_by_date: HashMap<NaiveDate, Decimal> = HashMap::new();
+
+        for (_group_id, group_activities) in grouped {
+            let has_in = group_activities.iter().any(|a| {
+                a.activity_type == crate::activities::ACTIVITY_TYPE_TRANSFER_IN
+            });
+            let has_out = group_activities.iter().any(|a| {
+                a.activity_type == crate::activities::ACTIVITY_TYPE_TRANSFER_OUT
+            });
+
+            if !(has_in && has_out) {
+                continue;
+            }
+
+            for activity in group_activities {
+                let amount = if let Some(amount) = activity.amount {
+                    amount
+                } else if let (Some(quantity), Some(unit_price)) =
+                    (activity.quantity, activity.unit_price)
+                {
+                    quantity * unit_price
+                } else {
+                    Decimal::ZERO
+                };
+
+                if amount.is_zero() {
+                    continue;
+                }
+
+                let activity_date = activity.activity_date.naive_utc().date();
+                let amount_base = if activity.currency == base_currency {
+                    amount
+                } else {
+                    match self.holdings_calculator.fx_service.convert_currency_for_date(
+                        amount,
+                        &activity.currency,
+                        base_currency,
+                        activity_date,
+                    ) {
+                        Ok(converted) => converted,
+                        Err(e) => {
+                            warn!(
+                                "Failed to convert transfer amount {} {} to base {} on {}: {}. Using unconverted.",
+                                amount, activity.currency, base_currency, activity_date, e
+                            );
+                            amount
+                        }
+                    }
+                };
+
+                let signed_amount = if activity.activity_type
+                    == crate::activities::ACTIVITY_TYPE_TRANSFER_IN
+                {
+                    amount_base
+                } else {
+                    -amount_base
+                };
+
+                *adjustments_by_date
+                    .entry(activity_date)
+                    .or_insert(Decimal::ZERO) += signed_amount;
+            }
+        }
+
+        Ok(adjustments_by_date)
     }
 
     // --- Helpers ---
@@ -1008,7 +1112,20 @@ impl SnapshotService {
         let mut sorted_snapshot_dates: Vec<NaiveDate> = all_snapshot_dates.into_iter().collect();
         sorted_snapshot_dates.sort();
 
+        let account_ids: Vec<String> = active_accounts
+            .iter()
+            .filter(|account| account.id != PORTFOLIO_TOTAL_ACCOUNT_ID)
+            .map(|account| account.id.clone())
+            .collect();
+        let transfer_adjustments_by_date = self
+            .internal_transfer_adjustments_by_date_base(&account_ids, &base_portfolio_currency)?;
+        let mut cumulative_transfer_adjustment = Decimal::ZERO;
+
         for target_date in sorted_snapshot_dates {
+            if let Some(adjustment) = transfer_adjustments_by_date.get(&target_date) {
+                cumulative_transfer_adjustment += *adjustment;
+            }
+
             let mut individual_snapshots_on_or_before_date: HashMap<String, AccountStateSnapshot> =
                 HashMap::new();
 
@@ -1024,6 +1141,7 @@ impl SnapshotService {
                     target_date,
                     &individual_snapshots_on_or_before_date,
                     &base_portfolio_currency,
+                    cumulative_transfer_adjustment,
                 ) {
                     Ok(total_snapshot) => {
                         total_portfolio_snapshots_to_save.push(total_snapshot);
