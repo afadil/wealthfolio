@@ -118,6 +118,24 @@ async fn sync_history_quotes(State(state): State<Arc<AppState>>) -> ApiResult<St
 }
 
 #[derive(serde::Deserialize)]
+struct CheckQuotesBody {
+    content: Vec<u8>,
+    #[serde(rename = "hasHeaderRow")]
+    has_header_row: bool,
+}
+
+async fn check_quotes_import(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<CheckQuotesBody>,
+) -> ApiResult<Json<Vec<QuoteImport>>> {
+    let result = state
+        .quote_service
+        .check_quotes_import(&body.content, body.has_header_row)
+        .await?;
+    Ok(Json(result))
+}
+
+#[derive(serde::Deserialize)]
 struct ImportQuotesBody {
     quotes: Vec<QuoteImport>,
     #[serde(rename = "overwriteExisting")]
@@ -214,6 +232,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/market-data/quotes/latest", post(get_latest_quotes))
         .route("/market-data/quotes/{symbol}", put(update_quote))
         .route("/market-data/quotes/id/{id}", delete(delete_quote))
+        .route("/market-data/quotes/check", post(check_quotes_import))
         .route("/market-data/quotes/import", post(import_quotes_csv))
         .route("/market-data/sync/history", post(sync_history_quotes))
         .route("/market-data/sync", post(sync_market_data))

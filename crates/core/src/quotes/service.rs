@@ -258,6 +258,26 @@ pub trait QuoteServiceTrait: Send + Sync {
     // Quote Import
     // =========================================================================
 
+    /// Parse and validate quotes from CSV content.
+    ///
+    /// This method parses CSV data, validates quote fields, and checks if assets
+    /// exist in the database. Returns quotes with validation status:
+    /// - Valid: quote can be imported (asset exists, data valid)
+    /// - Warning: quote has minor issues but can be imported
+    /// - Error: quote cannot be imported (asset not found, invalid data)
+    ///
+    /// # Arguments
+    /// * `content` - Raw CSV file content as bytes
+    /// * `has_header_row` - Whether the CSV has a header row
+    ///
+    /// # Returns
+    /// The parsed and validated quotes with symbols resolved to asset IDs
+    async fn check_quotes_import(
+        &self,
+        content: &[u8],
+        has_header_row: bool,
+    ) -> Result<Vec<QuoteImport>>;
+
     /// Import quotes from CSV data.
     async fn import_quotes(
         &self,
@@ -988,6 +1008,172 @@ where
     // Quote Import
     // =========================================================================
 
+    async fn check_quotes_import(
+        &self,
+        content: &[u8],
+        has_header_row: bool,
+    ) -> Result<Vec<QuoteImport>> {
+        use rust_decimal::Decimal;
+        use std::str::FromStr;
+
+        // Parse CSV
+        let mut reader = csv::ReaderBuilder::new()
+            .has_headers(has_header_row)
+            .flexible(true)
+            .trim(csv::Trim::All)
+            .from_reader(content);
+
+        // Get headers (lowercase for case-insensitive matching)
+        let headers: Vec<String> = if has_header_row {
+            reader
+                .headers()
+                .map_err(|e| {
+                    crate::errors::ValidationError::InvalidInput(format!(
+                        "Failed to read CSV headers: {}",
+                        e
+                    ))
+                })?
+                .iter()
+                .map(|h| h.to_lowercase())
+                .collect()
+        } else {
+            vec!["symbol".to_string(), "date".to_string(), "close".to_string()]
+        };
+
+        // Validate required headers
+        let required = ["symbol", "date", "close"];
+        let missing: Vec<&str> = required
+            .iter()
+            .filter(|h| !headers.contains(&h.to_string()))
+            .copied()
+            .collect();
+        if !missing.is_empty() {
+            return Err(crate::errors::ValidationError::InvalidInput(format!(
+                "Missing required columns: {}",
+                missing.join(", ")
+            ))
+            .into());
+        }
+
+        // Helper to get column index
+        let get_idx = |name: &str| headers.iter().position(|h| h == name);
+        let symbol_idx = get_idx("symbol").unwrap();
+        let date_idx = get_idx("date").unwrap();
+        let close_idx = get_idx("close").unwrap();
+        let open_idx = get_idx("open");
+        let high_idx = get_idx("high");
+        let low_idx = get_idx("low");
+        let volume_idx = get_idx("volume");
+        let currency_idx = get_idx("currency");
+
+        // Parse rows into QuoteImport
+        let mut quotes: Vec<QuoteImport> = Vec::new();
+        for result in reader.records() {
+            let record = match result {
+                Ok(r) => r,
+                Err(e) => {
+                    debug!("Skipping invalid CSV row: {}", e);
+                    continue;
+                }
+            };
+
+            let get_field = |idx: usize| record.get(idx).map(|s| s.trim()).filter(|s| !s.is_empty());
+            let parse_decimal = |idx: Option<usize>| -> Option<Decimal> {
+                idx.and_then(|i| get_field(i))
+                    .and_then(|s| Decimal::from_str(&s.replace(',', "")).ok())
+            };
+
+            let symbol = get_field(symbol_idx).unwrap_or("").to_string();
+            let date = get_field(date_idx).unwrap_or("").to_string();
+            let close = parse_decimal(Some(close_idx)).unwrap_or(Decimal::ZERO);
+            let currency = get_field(currency_idx.unwrap_or(usize::MAX))
+                .unwrap_or("USD")
+                .to_string();
+
+            quotes.push(QuoteImport {
+                symbol,
+                date,
+                open: parse_decimal(open_idx),
+                high: parse_decimal(high_idx),
+                low: parse_decimal(low_idx),
+                close,
+                volume: parse_decimal(volume_idx),
+                currency,
+                validation_status: ImportValidationStatus::Valid,
+                error_message: None,
+            });
+        }
+
+        if quotes.is_empty() {
+            return Err(crate::errors::ValidationError::InvalidInput(
+                "CSV file must contain at least one data row".to_string(),
+            )
+            .into());
+        }
+
+        info!("Parsed {} quotes from CSV, validating...", quotes.len());
+
+        // Fetch all assets once for efficient lookup
+        let all_assets = self.asset_repo.list()?;
+
+        // Build lookup maps for flexible symbol matching:
+        // 1. By asset ID (e.g., "SEC:VFV:XTSE")
+        // 2. By symbol (e.g., "VFV")
+        // 3. By symbol.exchange suffix (e.g., "VFV.TO" -> symbol "VFV" + exchange suffix "TO")
+        let mut asset_by_id: HashMap<String, &Asset> = HashMap::new();
+        let mut asset_by_symbol: HashMap<String, &Asset> = HashMap::new();
+        let mut asset_by_symbol_exchange: HashMap<String, &Asset> = HashMap::new();
+
+        for asset in &all_assets {
+            asset_by_id.insert(asset.id.to_lowercase(), asset);
+            asset_by_symbol.insert(asset.symbol.to_lowercase(), asset);
+
+            // Build symbol.exchange key if asset has exchange_mic
+            if let Some(ref mic) = asset.exchange_mic {
+                if let Some(suffix) = mic_to_yahoo_suffix(mic) {
+                    let key = format!("{}.{}", asset.symbol.to_lowercase(), suffix.to_lowercase());
+                    asset_by_symbol_exchange.insert(key, asset);
+                }
+            }
+        }
+
+        for quote in &mut quotes {
+            // First validate the quote fields
+            quote.validation_status = QuoteValidator::validate(quote);
+
+            // If already has an error, skip asset matching
+            if !quote.validation_status.is_importable() {
+                if let ImportValidationStatus::Error(msg) = &quote.validation_status {
+                    quote.error_message = Some(msg.clone());
+                }
+                continue;
+            }
+
+            // Try to match the symbol against existing assets
+            // Priority: 1) exact asset ID, 2) exact symbol, 3) symbol.exchange format
+            let symbol_lower = quote.symbol.to_lowercase();
+            let matched_asset = asset_by_id
+                .get(&symbol_lower)
+                .or_else(|| asset_by_symbol.get(&symbol_lower))
+                .or_else(|| asset_by_symbol_exchange.get(&symbol_lower));
+
+            match matched_asset {
+                Some(asset) => {
+                    // Update the symbol to the canonical asset ID
+                    quote.symbol = asset.id.clone();
+                }
+                None => {
+                    // Asset not found - mark as error
+                    let msg = format!("Asset not found: '{}'", quote.symbol);
+                    quote.validation_status = ImportValidationStatus::Error(msg.clone());
+                    quote.error_message = Some(msg);
+                }
+            }
+        }
+
+        Ok(quotes)
+    }
+
     async fn import_quotes(
         &self,
         mut quotes: Vec<QuoteImport>,
@@ -1041,6 +1227,97 @@ where
         }
 
         Ok(quotes)
+    }
+}
+
+// =============================================================================
+// Symbol Resolution Helpers
+// =============================================================================
+
+/// Convert MIC (Market Identifier Code) to Yahoo Finance exchange suffix.
+///
+/// This enables matching symbols like "VFV.TO" against assets with exchange_mic "XTSE".
+///
+/// # Arguments
+/// * `mic` - The ISO 10383 Market Identifier Code (e.g., "XTSE")
+///
+/// # Returns
+/// The Yahoo Finance suffix without the dot (e.g., "TO") if known, or None.
+fn mic_to_yahoo_suffix(mic: &str) -> Option<&'static str> {
+    match mic {
+        // North America
+        "XTSE" => Some("TO"),        // Toronto Stock Exchange
+        "XTSX" => Some("V"),         // TSX Venture
+        "XCNQ" => Some("CN"),        // Canadian Securities Exchange
+        "XMEX" => Some("MX"),        // Mexican Stock Exchange
+        // UK & Ireland
+        "XLON" => Some("L"),         // London Stock Exchange
+        "XDUB" => Some("IR"),        // Dublin
+        // Germany
+        "XETR" => Some("DE"),        // XETRA
+        "XFRA" => Some("F"),         // Frankfurt
+        "XSTU" => Some("SG"),        // Stuttgart
+        "XHAM" => Some("HM"),        // Hamburg
+        "XDUS" => Some("DU"),        // Dusseldorf
+        "XMUN" => Some("MU"),        // Munich
+        "XBER" => Some("BE"),        // Berlin
+        "XHAN" => Some("HA"),        // Hanover
+        // Euronext
+        "XPAR" => Some("PA"),        // Paris
+        "XAMS" => Some("AS"),        // Amsterdam
+        "XBRU" => Some("BR"),        // Brussels
+        "XLIS" => Some("LS"),        // Lisbon
+        // Southern Europe
+        "XMIL" => Some("MI"),        // Milan
+        "XMAD" => Some("MC"),        // Madrid
+        "XATH" => Some("AT"),        // Athens
+        // Nordic
+        "XSTO" => Some("ST"),        // Stockholm
+        "XHEL" => Some("HE"),        // Helsinki
+        "XCSE" => Some("CO"),        // Copenhagen
+        "XOSL" => Some("OL"),        // Oslo
+        "XICE" => Some("IC"),        // Iceland
+        // Central/Eastern Europe
+        "XSWX" => Some("SW"),        // Swiss Exchange
+        "XWBO" => Some("VI"),        // Vienna
+        "XWAR" => Some("WA"),        // Warsaw
+        "XPRA" => Some("PR"),        // Prague
+        "XBUD" => Some("BD"),        // Budapest
+        "XIST" => Some("IS"),        // Istanbul
+        // Asia - China & Hong Kong
+        "XSHG" => Some("SS"),        // Shanghai
+        "XSHE" => Some("SZ"),        // Shenzhen
+        "XHKG" => Some("HK"),        // Hong Kong
+        // Asia - Japan & Korea
+        "XTKS" => Some("T"),         // Tokyo
+        "XKRX" => Some("KS"),        // Korea (KOSPI)
+        "XKOS" => Some("KQ"),        // Korea (KOSDAQ)
+        // Southeast Asia
+        "XSES" => Some("SI"),        // Singapore
+        "XBKK" => Some("BK"),        // Bangkok
+        "XIDX" => Some("JK"),        // Jakarta
+        "XKLS" => Some("KL"),        // Kuala Lumpur
+        // India
+        "XBOM" => Some("BO"),        // Bombay
+        "XNSE" => Some("NS"),        // National Stock Exchange India
+        // Taiwan
+        "XTAI" => Some("TW"),        // Taiwan
+        // Oceania
+        "XASX" => Some("AX"),        // Australia
+        "XNZE" => Some("NZ"),        // New Zealand
+        // South America
+        "BVMF" => Some("SA"),        // Brazil (B3)
+        "XBUE" => Some("BA"),        // Buenos Aires
+        "XSGO" => Some("SN"),        // Santiago
+        // Middle East
+        "XTAE" => Some("TA"),        // Tel Aviv
+        "XSAU" => Some("SAU"),       // Saudi Arabia
+        "XDFM" => Some("AE"),        // Dubai Financial Market
+        "DSMD" => Some("QA"),        // Qatar
+        // Africa
+        "XJSE" => Some("JO"),        // Johannesburg
+        "XCAI" => Some("CA"),        // Cairo
+        _ => None,
     }
 }
 

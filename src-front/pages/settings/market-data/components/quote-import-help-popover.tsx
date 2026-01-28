@@ -11,7 +11,7 @@ export function QuoteImportHelpPopover() {
           How to Import Quotes?
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="m-3 max-h-[min(80vh,520px)] w-[min(90vw,900px)] overflow-y-auto rounded-lg p-4 text-sm sm:m-4 sm:p-6">
+      <PopoverContent className="m-3 max-h-[min(85vh,680px)] w-[min(90vw,900px)] overflow-y-auto rounded-lg p-4 text-sm sm:m-4 sm:p-6">
         <h4 className="text-lg font-semibold">Importing Historical Quotes</h4>
         <div className="mt-4 grid gap-6 sm:grid-cols-2">
           {/* Left Column - Instructions */}
