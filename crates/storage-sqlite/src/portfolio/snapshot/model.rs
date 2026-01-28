@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 use wealthfolio_core::constants::DECIMAL_PRECISION;
-use wealthfolio_core::portfolio::snapshot::AccountStateSnapshot;
+use wealthfolio_core::portfolio::snapshot::{AccountStateSnapshot, SnapshotSource};
 
 /// Database model for account state snapshots
 #[derive(Debug, Clone, Queryable, QueryableByName, Insertable, Serialize, Deserialize)]
@@ -40,6 +40,8 @@ pub struct AccountStateSnapshotDB {
     pub cash_total_account_currency: String,
     #[diesel(sql_type = Text)]
     pub cash_total_base_currency: String,
+    #[diesel(sql_type = Text)]
+    pub source: String,
 }
 
 // Conversion from DB model to Domain model
@@ -72,6 +74,8 @@ impl From<AccountStateSnapshotDB> for AccountStateSnapshot {
                 );
                 Utc::now().naive_utc()
             }),
+            source: serde_json::from_str(&format!("\"{}\"", db.source))
+                .unwrap_or(SnapshotSource::Calculated),
         }
     }
 }
@@ -108,6 +112,10 @@ impl From<AccountStateSnapshot> for AccountStateSnapshotDB {
             calculated_at: domain
                 .calculated_at
                 .format("%Y-%m-%dT%H:%M:%S%.fZ")
+                .to_string(),
+            source: serde_json::to_string(&domain.source)
+                .unwrap_or_else(|_| "\"CALCULATED\"".to_string())
+                .trim_matches('"')
                 .to_string(),
         }
     }

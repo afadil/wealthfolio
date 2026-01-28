@@ -16,7 +16,7 @@ import { parseCellKey } from "./data-grid-utils";
 
 interface DataGridContextMenuProps<TData> {
   tableMeta: TableMeta<TData>;
-  columns: Array<ColumnDef<TData>>;
+  columns: ColumnDef<TData>[];
   contextMenu: ContextMenuState;
 }
 
@@ -65,7 +65,7 @@ interface ContextMenuProps<TData>
     >,
     Required<Pick<TableMeta<TData>, "contextMenu">> {
   tableMeta: TableMeta<TData>;
-  columns: Array<ColumnDef<TData>>;
+  columns: ColumnDef<TData>[];
 }
 
 const ContextMenu = React.memo(ContextMenuImpl, (prev, next) => {
@@ -135,7 +135,7 @@ function ContextMenuImpl<TData>({
     )
       return;
 
-    const updates: Array<UpdateCell> = [];
+    const updates: UpdateCell[] = [];
 
     for (const cellKey of selectionState.selectedCells) {
       const { rowIndex, columnId } = parseCellKey(cellKey);

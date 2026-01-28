@@ -18,9 +18,9 @@ use crate::quotes::QuoteServiceTrait;
 use crate::taxonomies::TaxonomyServiceTrait;
 
 use super::checks::{
-    AssetHoldingInfo, ClassificationCheck, ConsistencyIssueInfo, DataConsistencyCheck,
-    FxIntegrityCheck, FxPairInfo, LegacyMigrationInfo, PriceStalenessCheck, QuoteSyncCheck,
-    QuoteSyncErrorInfo, UnclassifiedAssetInfo,
+    AccountConfigurationCheck, AssetHoldingInfo, ClassificationCheck, ConsistencyIssueInfo,
+    DataConsistencyCheck, FxIntegrityCheck, FxPairInfo, LegacyMigrationInfo, PriceStalenessCheck,
+    QuoteSyncCheck, QuoteSyncErrorInfo, UnconfiguredAccountInfo, UnclassifiedAssetInfo,
 };
 use super::errors::HealthError;
 use super::model::{FixAction, HealthConfig, HealthIssue, HealthStatus, IssueDismissal};
@@ -49,6 +49,7 @@ pub struct HealthService {
     fx_check: FxIntegrityCheck,
     classification_check: ClassificationCheck,
     consistency_check: DataConsistencyCheck,
+    account_config_check: AccountConfigurationCheck,
 }
 
 impl HealthService {
@@ -63,6 +64,7 @@ impl HealthService {
             fx_check: FxIntegrityCheck::new(),
             classification_check: ClassificationCheck::new(),
             consistency_check: DataConsistencyCheck::new(),
+            account_config_check: AccountConfigurationCheck::new(),
         }
     }
 
@@ -80,6 +82,7 @@ impl HealthService {
             fx_check: FxIntegrityCheck::new(),
             classification_check: ClassificationCheck::new(),
             consistency_check: DataConsistencyCheck::new(),
+            account_config_check: AccountConfigurationCheck::new(),
         }
     }
 
@@ -99,6 +102,7 @@ impl HealthService {
         unclassified_assets: &[UnclassifiedAssetInfo],
         consistency_issues: &[ConsistencyIssueInfo],
         legacy_migration_info: &Option<LegacyMigrationInfo>,
+        unconfigured_accounts: &[UnconfiguredAccountInfo],
     ) -> Result<HealthStatus> {
         let config = self.config.read().await.clone();
         let ctx = HealthContext::new(config, base_currency, total_portfolio_value);
@@ -156,6 +160,18 @@ impl HealthService {
             consistency_health_issues.len()
         );
         all_issues.extend(consistency_health_issues);
+
+        // Run account configuration check
+        debug!(
+            "Running account configuration check on {} unconfigured accounts",
+            unconfigured_accounts.len()
+        );
+        let account_config_issues = self.account_config_check.analyze(unconfigured_accounts, &ctx);
+        debug!(
+            "Account configuration check found {} issues",
+            account_config_issues.len()
+        );
+        all_issues.extend(account_config_issues);
 
         // Filter out dismissed issues (unless data has changed)
         let filtered_issues = self.filter_dismissed_issues(all_issues).await?;
@@ -271,6 +287,18 @@ impl HealthService {
         let unclassified_assets: Vec<UnclassifiedAssetInfo> = Vec::new();
         let consistency_issues: Vec<ConsistencyIssueInfo> = Vec::new();
 
+        // Gather accounts without tracking mode set
+        let unconfigured_accounts: Vec<UnconfiguredAccountInfo> = accounts
+            .iter()
+            .filter(|acc| {
+                crate::accounts::get_tracking_mode(acc) == crate::accounts::TrackingMode::NotSet
+            })
+            .map(|acc| UnconfiguredAccountInfo {
+                account_id: acc.id.clone(),
+                account_name: acc.name.clone(),
+            })
+            .collect();
+
         // Run checks with gathered data
         self.run_checks_with_data(
             base_currency,
@@ -282,6 +310,7 @@ impl HealthService {
             &unclassified_assets,
             &consistency_issues,
             &legacy_migration_info,
+            &unconfigured_accounts,
         )
         .await
     }
@@ -347,6 +376,7 @@ impl HealthServiceTrait for HealthService {
         unclassified_assets: &[UnclassifiedAssetInfo],
         consistency_issues: &[ConsistencyIssueInfo],
         legacy_migration_info: &Option<LegacyMigrationInfo>,
+        unconfigured_accounts: &[UnconfiguredAccountInfo],
     ) -> Result<HealthStatus> {
         // Call the inherent method
         HealthService::run_checks_with_data(
@@ -360,6 +390,7 @@ impl HealthServiceTrait for HealthService {
             unclassified_assets,
             consistency_issues,
             legacy_migration_info,
+            unconfigured_accounts,
         )
         .await
     }
@@ -559,7 +590,7 @@ mod tests {
         let service = HealthService::new(store);
 
         let status = service
-            .run_checks_with_data("USD", 0.0, &[], &HashMap::new(), &[], &[], &[], &[], &None)
+            .run_checks_with_data("USD", 0.0, &[], &HashMap::new(), &[], &[], &[], &[], &None, &[])
             .await
             .unwrap();
 
@@ -622,7 +653,7 @@ mod tests {
         let quote_times = HashMap::new();
 
         let status = service
-            .run_checks_with_data("USD", 100_000.0, &holdings, &quote_times, &[], &[], &[], &[], &None)
+            .run_checks_with_data("USD", 100_000.0, &holdings, &quote_times, &[], &[], &[], &[], &None, &[])
             .await
             .unwrap();
 
@@ -646,7 +677,7 @@ mod tests {
         let quote_times = HashMap::new();
 
         let status = service
-            .run_checks_with_data("USD", 100_000.0, &holdings, &quote_times, &[], &[], &[], &[], &None)
+            .run_checks_with_data("USD", 100_000.0, &holdings, &quote_times, &[], &[], &[], &[], &None, &[])
             .await
             .unwrap();
 
@@ -661,7 +692,7 @@ mod tests {
 
         // Run checks again - issue should be filtered out
         let status = service
-            .run_checks_with_data("USD", 100_000.0, &holdings, &quote_times, &[], &[], &[], &[], &None)
+            .run_checks_with_data("USD", 100_000.0, &holdings, &quote_times, &[], &[], &[], &[], &None, &[])
             .await
             .unwrap();
 

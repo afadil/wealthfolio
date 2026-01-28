@@ -192,6 +192,9 @@ pub struct SyncAccountsResponse {
     /// Used to trigger FX rate registration
     #[serde(default)]
     pub created_accounts: Vec<(String, String)>,
+    /// Detailed info about newly created accounts (for tracking mode configuration)
+    #[serde(default)]
+    pub new_accounts_info: Vec<NewAccountInfo>,
 }
 
 /// Response from syncing connections/platforms
@@ -412,6 +415,150 @@ pub struct SyncActivitiesResponse {
     pub new_asset_ids: Vec<String>,
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Broker Holdings API Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Currency information from the holdings API.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HoldingsCurrency {
+    pub id: Option<String>,
+    pub code: Option<String>,
+    pub name: Option<String>,
+}
+
+/// Cash balance from the holdings API.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HoldingsBalance {
+    pub currency: Option<HoldingsCurrency>,
+    pub cash: Option<f64>,
+    pub buying_power: Option<f64>,
+}
+
+/// Symbol type information.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HoldingsSymbolType {
+    pub id: Option<String>,
+    pub code: Option<String>,
+    pub description: Option<String>,
+}
+
+/// Inner symbol information.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HoldingsInnerSymbol {
+    pub id: Option<String>,
+    pub symbol: Option<String>,
+    pub raw_symbol: Option<String>,
+    pub description: Option<String>,
+    pub name: Option<String>,
+    pub currency: Option<HoldingsCurrency>,
+    #[serde(rename = "type")]
+    pub symbol_type: Option<HoldingsSymbolType>,
+}
+
+/// Symbol wrapper from the holdings API.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HoldingsSymbol {
+    pub symbol: Option<HoldingsInnerSymbol>,
+    pub id: Option<String>,
+    pub description: Option<String>,
+}
+
+/// A position (stock/ETF/mutual fund) from the holdings API.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HoldingsPosition {
+    pub symbol: Option<HoldingsSymbol>,
+    pub units: Option<f64>,
+    pub price: Option<f64>,
+    pub open_pnl: Option<f64>,
+    pub average_purchase_price: Option<f64>,
+    pub currency: Option<HoldingsCurrency>,
+    #[serde(default)]
+    pub cash_equivalent: Option<bool>,
+}
+
+/// Underlying symbol for options.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HoldingsUnderlyingSymbol {
+    pub id: Option<String>,
+    pub symbol: Option<String>,
+    pub description: Option<String>,
+}
+
+/// Option symbol information.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HoldingsOptionSymbol {
+    pub id: Option<String>,
+    pub ticker: Option<String>,
+    pub option_type: Option<String>,
+    pub strike_price: Option<f64>,
+    pub expiration_date: Option<String>,
+    #[serde(default)]
+    pub is_mini_option: Option<bool>,
+    pub underlying_symbol: Option<HoldingsUnderlyingSymbol>,
+}
+
+/// An option position from the holdings API.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HoldingsOptionPosition {
+    pub symbol: Option<HoldingsOptionSymbol>,
+    pub units: Option<f64>,
+    pub price: Option<f64>,
+    pub average_purchase_price: Option<f64>,
+    pub currency: Option<HoldingsCurrency>,
+}
+
+/// Account info from holdings response.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HoldingsAccount {
+    pub id: Option<String>,
+    pub name: Option<String>,
+    pub number: Option<String>,
+    pub raw_type: Option<String>,
+}
+
+/// Response from the broker holdings API endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct BrokerHoldingsResponse {
+    pub account: Option<HoldingsAccount>,
+    #[serde(default)]
+    pub balances: Option<Vec<HoldingsBalance>>,
+    #[serde(default)]
+    pub positions: Option<Vec<HoldingsPosition>>,
+    #[serde(default)]
+    pub option_positions: Option<Vec<HoldingsOptionPosition>>,
+}
+
+/// Response from syncing holdings.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncHoldingsResponse {
+    pub accounts_synced: usize,
+    pub snapshots_upserted: usize,
+    pub positions_upserted: usize,
+    pub assets_inserted: usize,
+    pub accounts_failed: usize,
+    /// IDs of newly created assets (for background enrichment)
+    #[serde(default)]
+    pub new_asset_ids: Vec<String>,
+}
+
+/// Information about a newly created account that needs user configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewAccountInfo {
+    /// Local account ID in wealthfolio
+    pub local_account_id: String,
+    /// Provider's account ID (e.g., from SnapTrade)
+    pub provider_account_id: String,
+    /// Default display name from the broker
+    pub default_name: String,
+    /// Currency of the account
+    pub currency: String,
+    /// Name of the brokerage institution
+    pub institution_name: Option<String>,
+}
+
 /// Combined result from a full broker sync operation.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -424,8 +571,12 @@ pub struct SyncResult {
     pub connections_synced: Option<SyncConnectionsResponse>,
     /// Result of syncing accounts
     pub accounts_synced: Option<SyncAccountsResponse>,
-    /// Result of syncing activities
+    /// Result of syncing activities (for TRANSACTIONS mode accounts)
     pub activities_synced: Option<SyncActivitiesResponse>,
+    /// Result of syncing holdings (for HOLDINGS mode accounts)
+    pub holdings_synced: Option<SyncHoldingsResponse>,
+    /// List of newly created accounts that need tracking mode configuration
+    pub new_accounts: Option<Vec<NewAccountInfo>>,
 }
 
 impl BrokerAccount {

@@ -72,6 +72,8 @@ pub enum HealthCategory {
     Classification,
     /// Issues related to data inconsistencies (orphan records, invariant violations)
     DataConsistency,
+    /// Issues related to account configuration (tracking mode, etc.)
+    AccountConfiguration,
 }
 
 impl HealthCategory {
@@ -82,6 +84,7 @@ impl HealthCategory {
             HealthCategory::FxIntegrity => "FX_INTEGRITY",
             HealthCategory::Classification => "CLASSIFICATION",
             HealthCategory::DataConsistency => "DATA_CONSISTENCY",
+            HealthCategory::AccountConfiguration => "ACCOUNT_CONFIGURATION",
         }
     }
 
@@ -92,6 +95,7 @@ impl HealthCategory {
             HealthCategory::FxIntegrity => "Exchange Rates",
             HealthCategory::Classification => "Classifications",
             HealthCategory::DataConsistency => "Data Consistency",
+            HealthCategory::AccountConfiguration => "Account Setup",
         }
     }
 }
@@ -265,6 +269,17 @@ impl AffectedItem {
             route: None,
         }
     }
+
+    /// Creates a new affected item for an account.
+    pub fn account(id: impl Into<String>, name: impl Into<String>) -> Self {
+        let id_str = id.into();
+        Self {
+            route: Some(format!("/accounts/{}", urlencoding::encode(&id_str))),
+            id: id_str,
+            name: name.into(),
+            symbol: None,
+        }
+    }
 }
 
 impl NavigateAction {
@@ -310,6 +325,15 @@ impl NavigateAction {
             route: "/settings/market-data".to_string(),
             query: None,
             label: "View Market Data".to_string(),
+        }
+    }
+
+    /// Creates a navigate action to the connect page.
+    pub fn to_connect() -> Self {
+        Self {
+            route: "/connect".to_string(),
+            query: None,
+            label: "Configure Accounts".to_string(),
         }
     }
 }

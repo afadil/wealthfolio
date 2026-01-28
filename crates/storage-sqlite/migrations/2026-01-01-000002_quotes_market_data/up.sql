@@ -96,10 +96,11 @@ CREATE INDEX idx_quotes_manual ON quotes(asset_id, day DESC) WHERE source = 'MAN
 --   error_count, last_error: health tracking for retry logic
 --   profile_enriched_at: tracks asset profile enrichment
 
+-- Position state is derived from position_closed_date:
+--   NULL = active position, NOT NULL = closed position
 CREATE TABLE quote_sync_state (
     asset_id TEXT PRIMARY KEY,
-    is_active INTEGER NOT NULL DEFAULT 1,
-    position_closed_date TEXT,
+    position_closed_date TEXT,  -- NULL = active, NOT NULL = closed (date when position was closed)
     last_synced_at TEXT,
     data_source TEXT NOT NULL DEFAULT 'YAHOO',
     sync_priority INTEGER NOT NULL DEFAULT 1,
@@ -110,7 +111,6 @@ CREATE TABLE quote_sync_state (
     updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
-CREATE INDEX idx_quote_sync_state_active ON quote_sync_state(is_active);
 CREATE INDEX idx_quote_sync_state_priority ON quote_sync_state(sync_priority DESC);
 
 -- ============================================================================

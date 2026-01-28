@@ -39,7 +39,7 @@ interface FlattenedCategory {
  */
 function flattenTreeWithLevels(
   nodes: TreeNode[],
-  level: number = 0
+  level = 0
 ): FlattenedCategory[] {
   const result: FlattenedCategory[] = [];
 

@@ -52,7 +52,7 @@ export async function generateRootKey(): Promise<string> {
  * Uses HKDF-SHA256 with version for key rotation
  * Returns base64-encoded DEK
  */
-export async function deriveDEK(rootKeyB64: string, version: number = 1): Promise<string> {
+export async function deriveDEK(rootKeyB64: string, version = 1): Promise<string> {
   return syncDeriveDek(rootKeyB64, version);
 }
 
@@ -85,7 +85,7 @@ export async function computeSharedSecret(
  */
 export async function deriveSessionKey(
   sharedSecretB64: string,
-  context: string = "pairing",
+  context = "pairing",
 ): Promise<string> {
   return syncDeriveSessionKey(sharedSecretB64, context);
 }

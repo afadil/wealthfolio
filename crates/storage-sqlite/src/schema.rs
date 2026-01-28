@@ -217,6 +217,7 @@ diesel::table! {
         net_contribution_base -> Text,
         cash_total_account_currency -> Text,
         cash_total_base_currency -> Text,
+        source -> Text,
     }
 }
 
@@ -272,7 +273,6 @@ diesel::table! {
 diesel::table! {
     quote_sync_state (asset_id) {
         asset_id -> Text,
-        is_active -> Integer,
         position_closed_date -> Nullable<Text>,
         last_synced_at -> Nullable<Text>,
         data_source -> Text,

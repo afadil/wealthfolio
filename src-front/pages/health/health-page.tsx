@@ -56,6 +56,7 @@ const CATEGORY_CONFIG: Record<HealthCategory, { label: string; icon: keyof typeo
   FX_INTEGRITY: { label: "FX Rates", icon: "ArrowLeftRight" },
   CLASSIFICATION: { label: "Categories", icon: "Tag" },
   DATA_CONSISTENCY: { label: "Data", icon: "Database" },
+  ACCOUNT_CONFIGURATION: { label: "Accounts", icon: "Settings" },
 };
 
 function SeverityDot({ severity }: { severity: HealthSeverity }) {

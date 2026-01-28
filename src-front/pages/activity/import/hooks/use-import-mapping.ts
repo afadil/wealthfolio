@@ -216,7 +216,7 @@ function normalizeHeader(header: string): string {
   return header
     .toLowerCase()
     .trim()
-    .replace(/[_\-\.]/g, " ") // Replace underscores, hyphens, dots with spaces
+    .replace(/[_\-.]/g, " ") // Replace underscores, hyphens, dots with spaces
     .replace(/\s+/g, " "); // Collapse multiple spaces
 }
 

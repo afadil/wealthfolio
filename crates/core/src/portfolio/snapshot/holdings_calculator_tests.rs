@@ -6,7 +6,7 @@ mod tests {
     use crate::errors::Result;
     use crate::fx::{ExchangeRate, FxError, FxServiceTrait, NewExchangeRate};
     use crate::portfolio::snapshot::holdings_calculator::HoldingsCalculator;
-    use crate::portfolio::snapshot::{AccountStateSnapshot, Lot, Position};
+    use crate::portfolio::snapshot::{AccountStateSnapshot, Lot, Position, SnapshotSource};
     use async_trait;
     use chrono::{DateTime, NaiveDate, TimeZone, Utc};
     use rust_decimal::Decimal;
@@ -438,6 +438,7 @@ mod tests {
             net_contribution_base: Decimal::ZERO,
             cash_total_account_currency: Decimal::ZERO,
             cash_total_base_currency: Decimal::ZERO,
+            source: SnapshotSource::Calculated,
         }
     }
 

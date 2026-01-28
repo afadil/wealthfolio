@@ -1,24 +1,26 @@
-import React, { useState } from "react";
+import { AccountValuation, PerformanceMetrics } from "@/lib/types";
+import { cn, formatDate } from "@/lib/utils";
+import { PerformanceGrid } from "@/pages/account/performance-grid";
 import {
+  Button,
   Card,
   CardContent,
   CardFooter,
   CardHeader,
   CardTitle,
+  GainAmount,
+  GainPercent,
+  Icons,
   MoneyInput,
   PrivacyAmount,
-  Button,
-  Icons,
+  Separator,
+  Skeleton,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-  Separator,
-  Skeleton,
 } from "@wealthfolio/ui";
-import { AccountValuation, PerformanceMetrics } from "@/lib/types";
-import { PerformanceGrid } from "@/pages/account/performance-grid";
-import { formatDate } from "@/lib/utils";
+import React, { useState } from "react";
 
 import { useBalanceUpdate } from "./use-balance-update";
 
@@ -89,6 +91,10 @@ interface AccountMetricsProps {
   performance?: PerformanceMetrics | null;
   className?: string;
   isLoading?: boolean;
+  /** If true, hides the inline balance edit (HOLDINGS mode accounts should use the Update Holdings sheet) */
+  hideBalanceEdit?: boolean;
+  /** If true, shows only Volatility/MaxDrawdown and hides TWR/MWR (HOLDINGS mode doesn't track cash flows) */
+  isHoldingsMode?: boolean;
 }
 
 const AccountMetrics: React.FC<AccountMetricsProps> = ({
@@ -96,6 +102,8 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
   performance,
   className,
   isLoading,
+  hideBalanceEdit = false,
+  isHoldingsMode = false,
 }) => {
   if (isLoading || !performance || !valuation)
     return (
@@ -131,36 +139,80 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
 
   const displayCurrency = valuation?.accountCurrency || valuation?.baseCurrency;
 
-  const rows = [
-    {
-      label: "Investments",
-      value: (
-        <PrivacyAmount value={valuation?.investmentMarketValue || 0} currency={displayCurrency} />
-      ),
-    },
-    {
-      label: "Net Contribution",
-      value: <PrivacyAmount value={valuation?.netContribution || 0} currency={displayCurrency} />,
-    },
-    {
-      label: "Cost Basis",
-      value: <PrivacyAmount value={valuation?.costBasis || 0} currency={displayCurrency} />,
-    },
-  ];
+  // Calculate Unrealized P&L for Holdings mode
+  // Use investmentMarketValue (not totalValue) to exclude cash from P&L calculation
+  const unrealizedPnL = (valuation?.investmentMarketValue || 0) - (valuation?.costBasis || 0);
+  const unrealizedPnLPercent =
+    valuation?.costBasis && valuation.costBasis !== 0
+      ? (unrealizedPnL / valuation.costBasis) * 100
+      : 0;
+
+  // Different rows for Holdings vs Transactions mode
+  const rows = isHoldingsMode
+    ? [
+        {
+          label: "Investments",
+          value: (
+            <PrivacyAmount
+              value={valuation?.investmentMarketValue || 0}
+              currency={displayCurrency}
+            />
+          ),
+        },
+        {
+          label: "Cost Basis",
+          value: <PrivacyAmount value={valuation?.costBasis || 0} currency={displayCurrency} />,
+        },
+        {
+          label: "Unrealized P&L",
+          value: (
+            <span className="flex items-center gap-1">
+              <GainAmount value={unrealizedPnL} currency={displayCurrency} className="text-sm" />
+              <GainPercent value={unrealizedPnLPercent / 100} variant="badge" className="text-xs" />
+            </span>
+          ),
+        },
+      ]
+    : [
+        {
+          label: "Investments",
+          value: (
+            <PrivacyAmount
+              value={valuation?.investmentMarketValue || 0}
+              currency={displayCurrency}
+            />
+          ),
+        },
+        {
+          label: "Net Contribution",
+          value: (
+            <PrivacyAmount value={valuation?.netContribution || 0} currency={displayCurrency} />
+          ),
+        },
+        {
+          label: "Cost Basis",
+          value: <PrivacyAmount value={valuation?.costBasis || 0} currency={displayCurrency} />,
+        },
+      ];
 
   const formattedStartDate = formatDate(performance?.periodStartDate || "");
   const formattedEndDate = formatDate(performance?.periodEndDate || "");
+  const lastUpdated = valuation?.calculatedAt ? formatDate(valuation.calculatedAt) : null;
 
   return (
-    <Card className={className}>
+    <Card className={cn("flex flex-col", className)}>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg font-bold">Cash Balance</CardTitle>
-        {valuation && (
+        {valuation && !hideBalanceEdit ? (
           <EditableBalance
             account={valuation}
             initialBalance={valuation?.cashBalance || 0}
             currency={displayCurrency}
           />
+        ) : (
+          <span className="text-lg font-extrabold">
+            <PrivacyAmount value={valuation?.cashBalance || 0} currency={displayCurrency} />
+          </span>
         )}
       </CardHeader>
       <CardContent className="space-y-6">
@@ -174,12 +226,29 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
           ))}
         </div>
 
-        <PerformanceGrid performance={performance} isLoading={isLoading} />
+        <PerformanceGrid
+          performance={performance}
+          isLoading={isLoading}
+          isHoldingsMode={isHoldingsMode}
+        />
       </CardContent>
-      <CardFooter className="flex justify-end pb-0">
-        <p className="text-muted-foreground m-0 p-0 text-xs">
-          from {formattedStartDate} to {formattedEndDate}
-        </p>
+      <CardFooter className="mt-auto flex flex-col items-start gap-1">
+        {isHoldingsMode ? (
+          <>
+            <p className="text-muted-foreground m-0 p-0 text-xs">
+              TWR/MWR not available. Requires transaction tracking.
+            </p>
+            {lastUpdated && (
+              <p className="text-muted-foreground m-0 p-0 text-xs">
+                Last updated: {lastUpdated}
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="text-muted-foreground m-0 p-0 text-xs">
+            From {formattedStartDate} to {formattedEndDate}
+          </p>
+        )}
       </CardFooter>
     </Card>
   );

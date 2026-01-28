@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{error::ApiResult, main_lib::AppState};
 use axum::{extract::State, routing::post, Json, Router};
 use wealthfolio_core::{
-    accounts::AccountServiceTrait,
+    accounts::{AccountServiceTrait, TrackingMode},
     portfolio::{
         income::IncomeSummary,
         performance::{PerformanceMetrics, SimplePerformanceMetrics},
@@ -49,6 +49,16 @@ struct PerfBody {
     start_date: Option<String>,
     #[serde(rename = "endDate")]
     end_date: Option<String>,
+    #[serde(rename = "trackingMode")]
+    tracking_mode: Option<String>,
+}
+
+fn parse_tracking_mode(mode: Option<String>) -> Option<TrackingMode> {
+    mode.and_then(|m| match m.as_str() {
+        "HOLDINGS" => Some(TrackingMode::Holdings),
+        "TRANSACTIONS" => Some(TrackingMode::Transactions),
+        _ => None,
+    })
 }
 
 async fn calculate_performance_history(
@@ -69,9 +79,10 @@ async fn calculate_performance_history(
         ),
         None => None,
     };
+    let tracking_mode = parse_tracking_mode(body.tracking_mode);
     let metrics = state
         .performance_service
-        .calculate_performance_history(&body.item_type, &body.item_id, start, end)
+        .calculate_performance_history(&body.item_type, &body.item_id, start, end, tracking_mode)
         .await?;
     Ok(Json(metrics))
 }
@@ -94,9 +105,10 @@ async fn calculate_performance_summary(
         ),
         None => None,
     };
+    let tracking_mode = parse_tracking_mode(body.tracking_mode);
     let metrics = state
         .performance_service
-        .calculate_performance_summary(&body.item_type, &body.item_id, start, end)
+        .calculate_performance_summary(&body.item_type, &body.item_id, start, end, tracking_mode)
         .await?;
     Ok(Json(metrics))
 }

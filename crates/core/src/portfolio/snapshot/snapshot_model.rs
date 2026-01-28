@@ -7,6 +7,30 @@ use std::collections::HashMap;
 
 use super::Position;
 
+/// Source of a snapshot - how it was created.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum SnapshotSource {
+    /// Calculated from transaction history
+    #[default]
+    Calculated,
+    /// Manually entered by user
+    ManualEntry,
+    /// Imported from broker connection
+    BrokerImported,
+    /// Imported from CSV file
+    CsvImport,
+    /// Synthetic backfill snapshot (cloned from earliest for history)
+    Synthetic,
+}
+
+impl SnapshotSource {
+    /// Returns true if this is a non-calculated source (manual, broker, csv, or synthetic).
+    pub fn is_non_calculated(&self) -> bool {
+        !matches!(self, SnapshotSource::Calculated)
+    }
+}
+
 /// Represents a warning that occurred during holdings calculation.
 /// These are non-fatal issues where calculation continued but with potential data quality concerns.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -94,6 +118,10 @@ pub struct AccountStateSnapshot {
     pub cash_total_base_currency: Decimal,
 
     pub calculated_at: NaiveDateTime, // When this snapshot was generated
+
+    /// Source of this snapshot (how it was created)
+    #[serde(default)]
+    pub source: SnapshotSource,
 }
 
 impl Default for AccountStateSnapshot {
@@ -111,6 +139,51 @@ impl Default for AccountStateSnapshot {
             cash_total_account_currency: Decimal::ZERO,
             cash_total_base_currency: Decimal::ZERO,
             calculated_at: Utc::now().naive_utc(),
+            source: SnapshotSource::default(),
         }
+    }
+}
+
+impl AccountStateSnapshot {
+    /// Compares the core content of two snapshots (positions and cash_balances).
+    /// Returns true if the holdings are effectively the same, ignoring metadata
+    /// like id, snapshot_date, calculated_at, source, etc.
+    ///
+    /// For positions, compares: asset_id, quantity, average_cost, total_cost_basis.
+    /// Ignores: lots, timestamps, inception_date.
+    pub fn is_content_equal(&self, other: &Self) -> bool {
+        // Compare cash balances
+        if self.cash_balances != other.cash_balances {
+            return false;
+        }
+
+        // Compare positions count
+        if self.positions.len() != other.positions.len() {
+            return false;
+        }
+
+        // Compare each position by key fields
+        for (asset_id, pos) in &self.positions {
+            match other.positions.get(asset_id) {
+                None => return false,
+                Some(other_pos) => {
+                    if !Self::positions_equal(pos, other_pos) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        true
+    }
+
+    /// Compares two positions by their essential financial fields.
+    /// Ignores lots, timestamps, and other metadata.
+    fn positions_equal(a: &Position, b: &Position) -> bool {
+        a.asset_id == b.asset_id
+            && a.quantity == b.quantity
+            && a.average_cost == b.average_cost
+            && a.total_cost_basis == b.total_cost_basis
+            && a.currency == b.currency
     }
 }

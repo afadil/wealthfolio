@@ -4,11 +4,11 @@ use crate::{
     context::ServiceContext,
     events::{emit_resource_changed, ResourceEventPayload},
 };
-use log::{debug, error};
+use log::{debug, error, info};
 use tauri::{AppHandle, State};
 
 use serde_json::json;
-use wealthfolio_core::accounts::{Account, AccountUpdate, NewAccount};
+use wealthfolio_core::accounts::{Account, AccountUpdate, NewAccount, TrackingMode};
 
 #[tauri::command]
 pub async fn get_accounts(state: State<'_, Arc<ServiceContext>>) -> Result<Vec<Account>, String> {
@@ -109,6 +109,70 @@ pub async fn delete_account(
                 "account_id": account_id,
             }),
         ),
+    );
+
+    Ok(())
+}
+
+/// Switches an account's tracking mode with proper handling of snapshot sources.
+/// Updates account meta with the new tracking mode.
+#[tauri::command]
+pub async fn switch_tracking_mode(
+    account_id: String,
+    new_mode: TrackingMode,
+    state: State<'_, Arc<ServiceContext>>,
+    handle: AppHandle,
+) -> Result<(), String> {
+    debug!(
+        "Switching tracking mode for account {} to {:?}",
+        account_id, new_mode
+    );
+
+    // Get the current account for meta update
+    let account = state
+        .account_service()
+        .get_account(&account_id)
+        .map_err(|e| format!("Failed to get account: {}", e))?;
+
+    // Update the account meta with the new tracking mode
+    let new_meta = wealthfolio_core::accounts::set_tracking_mode(account.meta.clone(), new_mode);
+
+    let account_update = AccountUpdate {
+        id: Some(account_id.clone()),
+        name: account.name,
+        account_type: account.account_type,
+        group: account.group,
+        is_default: account.is_default,
+        is_active: account.is_active,
+        platform_id: account.platform_id,
+        account_number: account.account_number,
+        meta: Some(new_meta),
+        provider: account.provider,
+        provider_account_id: account.provider_account_id,
+    };
+
+    let updated_account = state
+        .account_service()
+        .update_account(account_update)
+        .await
+        .map_err(|e| format!("Failed to update account: {}", e))?;
+
+    // Emit resource changed event to trigger recalculation
+    emit_resource_changed(
+        &handle,
+        ResourceEventPayload::new(
+            "account",
+            "updated",
+            json!({
+                "account_id": updated_account.id,
+                "currency": updated_account.currency,
+            }),
+        ),
+    );
+
+    info!(
+        "Successfully switched tracking mode for account {} to {:?}",
+        account_id, new_mode
     );
 
     Ok(())

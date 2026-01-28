@@ -182,7 +182,7 @@ pub trait HealthDismissalStore: Send + Sync {
 
 use super::checks::{
     AssetHoldingInfo, ConsistencyIssueInfo, FxPairInfo, LegacyMigrationInfo, QuoteSyncErrorInfo,
-    UnclassifiedAssetInfo,
+    UnconfiguredAccountInfo, UnclassifiedAssetInfo,
 };
 use super::model::{FixAction, HealthStatus};
 use crate::accounts::AccountServiceTrait;
@@ -226,6 +226,7 @@ pub trait HealthServiceTrait: Send + Sync {
     /// * `unclassified_assets` - Assets missing classification
     /// * `consistency_issues` - Pre-detected data consistency issues
     /// * `legacy_migration_info` - Info about legacy classification data needing migration
+    /// * `unconfigured_accounts` - Accounts without tracking mode set
     ///
     /// # Returns
     ///
@@ -242,6 +243,7 @@ pub trait HealthServiceTrait: Send + Sync {
         unclassified_assets: &[UnclassifiedAssetInfo],
         consistency_issues: &[ConsistencyIssueInfo],
         legacy_migration_info: &Option<LegacyMigrationInfo>,
+        unconfigured_accounts: &[UnconfiguredAccountInfo],
     ) -> Result<HealthStatus>;
 
     /// Gets the cached health status.

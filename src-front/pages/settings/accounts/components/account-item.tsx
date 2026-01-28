@@ -5,6 +5,7 @@ import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import type { Account, AccountType, Platform } from "@/lib/types";
 import { Link } from "react-router-dom";
 import { AccountOperations } from "./account-operations";
+import { TrackingModeBadge } from "@/components/tracking-mode-badge";
 
 // Map account types to icons for visual distinction
 const accountTypeIcons: Record<AccountType, Icon> = {
@@ -69,6 +70,7 @@ export function AccountItem({ account, platform, onEdit, onDelete }: AccountItem
         </div>
       </div>
       <div className="flex items-center space-x-4">
+        <TrackingModeBadge account={account} />
         {!account.isActive && <Badge variant="secondary">Disabled</Badge>}
         <AccountOperations account={account} onEdit={onEdit} onDelete={onDelete} />
       </div>

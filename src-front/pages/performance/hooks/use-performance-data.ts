@@ -13,6 +13,8 @@ import { TrackedItem } from "@/lib/types";
  *
  * @param selectedItems List of comparison items to calculate cumulative returns for.
  * @param dateRange The date range for the calculation period.
+ * @param trackingMode Optional tracking mode for accounts ("HOLDINGS" or "TRANSACTIONS").
+ *                     Used for SOTA performance calculations in HOLDINGS mode.
  *
  * @returns An object containing the calculated cumulative returns data,
  *          a boolean indicating whether the data is loading,
@@ -24,9 +26,11 @@ import { TrackedItem } from "@/lib/types";
 export function useCalculatePerformanceHistory({
   selectedItems,
   dateRange,
+  trackingMode,
 }: {
   selectedItems: TrackedItem[];
   dateRange: DateRange | undefined;
+  trackingMode?: "HOLDINGS" | "TRANSACTIONS";
 }) {
   // Filter out invalid items (defensive: handles stale localStorage data)
   const validItems = selectedItems.filter(
@@ -72,8 +76,16 @@ export function useCalculatePerformanceHistory({
 
   const performanceQueries = useQueries({
     queries: validItems.map((item) => ({
-      queryKey: [QueryKeys.PERFORMANCE_HISTORY, item.type, item.id, startDateToUse, endDate],
-      queryFn: () => calculatePerformanceHistory(item.type, item.id, startDateToUse!, endDate!),
+      queryKey: [QueryKeys.PERFORMANCE_HISTORY, item.type, item.id, startDateToUse, endDate, trackingMode],
+      queryFn: () =>
+        calculatePerformanceHistory(
+          item.type,
+          item.id,
+          startDateToUse!,
+          endDate!,
+          // Only pass trackingMode for accounts, not for symbols
+          item.type === "account" ? trackingMode : undefined,
+        ),
       // Enable query only if dates are present (item validation done above).
       enabled: !!startDateToUse && !!endDate,
       staleTime: 30 * 1000,

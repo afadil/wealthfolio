@@ -11,6 +11,7 @@ import { usePortfolioSyncOptional } from "@/context/portfolio-sync-context";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
   isDesktop,
@@ -29,6 +30,7 @@ const TOAST_IDS = {
 
 const useGlobalEventListener = () => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const hasTriggeredInitialUpdate = useRef(false);
   const isDesktopEnv = isDesktop;
   const isMobileViewport = useIsMobileViewport();
@@ -38,19 +40,15 @@ const useGlobalEventListener = () => {
   const isMobileViewportRef = useRef(isMobileViewport);
   const syncContextRef = useRef(syncContext);
   const queryClientRef = useRef(queryClient);
+  const navigateRef = useRef(navigate);
 
   // Keep refs up to date
   useEffect(() => {
     isMobileViewportRef.current = isMobileViewport;
-  }, [isMobileViewport]);
-
-  useEffect(() => {
     syncContextRef.current = syncContext;
-  }, [syncContext]);
-
-  useEffect(() => {
     queryClientRef.current = queryClient;
-  }, [queryClient]);
+    navigateRef.current = navigate;
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -137,12 +135,21 @@ const useGlobalEventListener = () => {
         message: string;
         accountsSynced?: { created: number; updated: number; skipped: number };
         activitiesSynced?: { activitiesUpserted: number; assetsInserted: number };
+        holdingsSynced?: { accountsSynced: number; snapshotsUpserted: number; positionsUpserted: number; assetsInserted: number; newAssetIds: string[] };
+        newAccounts?: {
+          localAccountId: string;
+          providerAccountId: string;
+          defaultName: string;
+          currency: string;
+          institutionName?: string;
+        }[];
       };
     }) => {
-      const { success, message, accountsSynced, activitiesSynced } = event.payload || {
-        success: false,
-        message: "Unknown error",
-      };
+      const { success, message, accountsSynced, activitiesSynced, holdingsSynced, newAccounts } =
+        event.payload || {
+          success: false,
+          message: "Unknown error",
+        };
 
       // Dismiss the loading toast
       toast.dismiss(TOAST_IDS.brokerSyncStart);
@@ -151,30 +158,54 @@ const useGlobalEventListener = () => {
       queryClientRef.current.invalidateQueries();
 
       if (success) {
-        // Build description with key numbers
-        const accountsCreated = accountsSynced?.created ?? 0;
-        const accountsUpdated = accountsSynced?.updated ?? 0;
-        const activities = activitiesSynced?.activitiesUpserted ?? 0;
-        const newAssets = activitiesSynced?.assetsInserted ?? 0;
-
-        const hasChanges = accountsCreated > 0 || accountsUpdated > 0 || activities > 0 || newAssets > 0;
-
-        let description: string;
-        if (hasChanges) {
-          const parts: string[] = [];
-          if (accountsCreated > 0) parts.push(`${accountsCreated} new accounts`);
-          if (accountsUpdated > 0) parts.push(`${accountsUpdated} accounts updated`);
-          if (activities > 0) parts.push(`${activities} activities`);
-          if (newAssets > 0) parts.push(`${newAssets} new assets`);
-          description = parts.join(" · ");
+        // Check if there are new accounts that need configuration
+        if (newAccounts && newAccounts.length > 0) {
+          toast.info("New accounts found", {
+            description: `${newAccounts.length} new account(s) need to be configured`,
+            action: {
+              label: "Review",
+              onClick: () => {
+                navigateRef.current("/settings/accounts");
+              },
+            },
+            duration: Infinity, // Don't auto-dismiss - user must act or dismiss manually
+          });
         } else {
-          description = "Everything is up to date";
-        }
+          // Build description with key numbers
+          const accountsCreated = accountsSynced?.created ?? 0;
+          const accountsUpdated = accountsSynced?.updated ?? 0;
+          const activities = activitiesSynced?.activitiesUpserted ?? 0;
+          const activityAssets = activitiesSynced?.assetsInserted ?? 0;
+          const positions = holdingsSynced?.positionsUpserted ?? 0;
+          const holdingsAccounts = holdingsSynced?.accountsSynced ?? 0;
+          const holdingsAssets = holdingsSynced?.assetsInserted ?? 0;
+          const totalNewAssets = activityAssets + holdingsAssets;
 
-        toast.success("Broker Sync Complete", {
-          description,
-          duration: 5000,
-        });
+          const hasChanges =
+            accountsCreated > 0 ||
+            accountsUpdated > 0 ||
+            activities > 0 ||
+            totalNewAssets > 0 ||
+            positions > 0;
+
+          let description: string;
+          if (hasChanges) {
+            const parts: string[] = [];
+            if (accountsCreated > 0) parts.push(`${accountsCreated} new accounts`);
+            if (accountsUpdated > 0) parts.push(`${accountsUpdated} accounts updated`);
+            if (activities > 0) parts.push(`${activities} activities`);
+            if (positions > 0) parts.push(`${positions} positions (${holdingsAccounts} accounts)`);
+            if (totalNewAssets > 0) parts.push(`${totalNewAssets} new assets`);
+            description = parts.join(" · ");
+          } else {
+            description = "Everything is up to date";
+          }
+
+          toast.success("Broker Sync Complete", {
+            description,
+            duration: 5000,
+          });
+        }
       } else {
         toast.error("Broker Sync Failed", {
           description: message,

@@ -5,7 +5,7 @@
 use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
 
-use crate::assets::AssetServiceTrait;
+use crate::assets::{AssetServiceTrait, PricingMode};
 use crate::errors::Result;
 use crate::health::model::{AffectedItem, FixAction, HealthCategory, HealthIssue, NavigateAction, Severity};
 use crate::health::traits::{HealthCheck, HealthContext};
@@ -65,33 +65,39 @@ pub fn gather_quote_sync_errors(
         Err(_) => return Vec::new(),
     };
 
-    // Build a map of asset_id -> symbol
-    let asset_map: HashMap<String, String> = all_assets
+    // Build a map of asset_id -> (symbol, pricing_mode)
+    let asset_map: HashMap<String, (String, PricingMode)> = all_assets
         .into_iter()
         .filter(|a| asset_ids_set.contains(&a.id))
-        .map(|a| (a.id.clone(), a.symbol.clone()))
+        .map(|a| (a.id.clone(), (a.symbol.clone(), a.pricing_mode)))
         .collect();
 
-    // Convert to QuoteSyncErrorInfo
+    // Convert to QuoteSyncErrorInfo, filtering out manual pricing assets
     sync_states_with_errors
         .into_iter()
-        .map(|s| {
-            let symbol = asset_map
+        .filter_map(|s| {
+            let (symbol, pricing_mode) = asset_map
                 .get(&s.asset_id)
                 .cloned()
-                .unwrap_or_else(|| s.asset_id.clone());
+                .unwrap_or_else(|| (s.asset_id.clone(), PricingMode::Market));
+
+            // Skip assets with manual pricing - they don't need quote syncing
+            if pricing_mode == PricingMode::Manual {
+                return None;
+            }
+
             let market_value = holding_market_values.get(&s.asset_id).copied().unwrap_or(0.0);
             // Asset has synced before if it has any quotes
             let has_synced_before = latest_quote_times.contains_key(&s.asset_id);
 
-            QuoteSyncErrorInfo {
+            Some(QuoteSyncErrorInfo {
                 asset_id: s.asset_id,
                 symbol,
                 error_count: s.error_count,
                 last_error: s.last_error,
                 market_value,
                 has_synced_before,
-            }
+            })
         })
         .collect()
 }
@@ -221,9 +227,9 @@ impl QuoteSyncCheck {
 
             let count = persistent_errors.len();
             let title = if count == 1 {
-                format!("Sync failing for {}", persistent_errors[0].symbol)
+                format!("Quotes sync failing for {}", persistent_errors[0].symbol)
             } else {
-                format!("Sync failing for {} assets", count)
+                format!("Quotes sync failing for {} assets", count)
             };
 
             // Build details with error messages

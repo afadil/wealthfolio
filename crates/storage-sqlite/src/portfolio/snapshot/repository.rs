@@ -7,7 +7,7 @@ use diesel::sql_types::Text;
 use diesel::sqlite::Sqlite;
 use diesel::SqliteConnection;
 use log::{debug, warn};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use super::model::AccountStateSnapshotDB;
@@ -236,6 +236,8 @@ impl SnapshotRepository {
         Ok(results_map)
     }
 
+    /// Deletes only CALCULATED snapshots for the given account IDs.
+    /// Manual, CSV-imported, and broker-imported snapshots are preserved.
     pub async fn delete_snapshots_by_account_ids(
         &self,
         account_ids_to_delete: &[String],
@@ -250,10 +252,14 @@ impl SnapshotRepository {
 
         self.writer
             .exec(move |conn| {
-                let deleted_count =
-                    diesel::delete(holdings_snapshots.filter(account_id.eq_any(final_ids)))
-                        .execute(conn)
-                        .map_err(StorageError::from)?;
+                // Only delete CALCULATED snapshots - preserve manual/imported snapshots
+                let deleted_count = diesel::delete(
+                    holdings_snapshots
+                        .filter(account_id.eq_any(final_ids))
+                        .filter(source.eq("CALCULATED")),
+                )
+                .execute(conn)
+                .map_err(StorageError::from)?;
                 Ok(deleted_count)
             })
             .await
@@ -335,17 +341,26 @@ impl SnapshotRepository {
         // However, self.writer.exec itself creates a transaction for each call.
         // For now, we rely on sequential execution. A deeper refactor of WriteHandle might be needed for true multi-statement transactions.
 
-        self.delete_snapshots_for_account_in_range(
+        // Only delete CALCULATED snapshots - preserve manual/broker/CSV imported ones
+        self.delete_calculated_snapshots_for_account_in_range(
             target_account_id,
             range_start_date,
             range_end_date,
         )
         .await?;
 
+        let anchor_dates = self
+            .get_anchor_snapshot_dates_for_account_in_range(
+                target_account_id,
+                range_start_date,
+                range_end_date,
+            )
+            .await?;
+
         if !snapshots_to_save.is_empty() {
             // Filter snapshots_to_save to ensure they are indeed for the target_account_id
             // although the caller should guarantee this.
-            let account_specific_snapshots: Vec<AccountStateSnapshot> = snapshots_to_save
+            let mut account_specific_snapshots: Vec<AccountStateSnapshot> = snapshots_to_save
                 .iter()
                 .filter(|s| s.account_id == target_account_id)
                 .cloned()
@@ -358,6 +373,16 @@ impl SnapshotRepository {
                 );
                 // Decide on error handling: proceed with filtered, or error out?
                 // For now, proceed with filtered, but this indicates a caller issue.
+            }
+
+            if !anchor_dates.is_empty() {
+                account_specific_snapshots = account_specific_snapshots
+                    .into_iter()
+                    .filter(|s| {
+                        let date_key = s.snapshot_date.format("%Y-%m-%d").to_string();
+                        !anchor_dates.contains(&date_key)
+                    })
+                    .collect();
             }
 
             if !account_specific_snapshots.is_empty() {
@@ -490,6 +515,71 @@ impl SnapshotRepository {
         }
     }
 
+    /// Update the source field for all snapshots of an account.
+    /// Used when switching tracking modes (e.g., from HOLDINGS to TRANSACTIONS).
+    pub async fn update_snapshots_source(
+        &self,
+        input_account_id: &str,
+        new_source: &str,
+    ) -> Result<usize> {
+        use crate::schema::holdings_snapshots::dsl::*;
+
+        let account_id_owned = input_account_id.to_string();
+        let new_source_owned = new_source.to_string();
+
+        self.writer
+            .exec(move |conn| {
+                let updated_count = diesel::update(
+                    holdings_snapshots.filter(account_id.eq(&account_id_owned)),
+                )
+                .set(source.eq(&new_source_owned))
+                .execute(conn)
+                .map_err(StorageError::from)?;
+
+                debug!(
+                    "Updated {} snapshots for account {} to source {}",
+                    updated_count, account_id_owned, new_source_owned
+                );
+                Ok(updated_count)
+            })
+            .await
+    }
+
+    /// Delete CALCULATED snapshots only for account in a date range.
+    /// Preserves MANUAL_ENTRY, BROKER_IMPORTED, CSV_IMPORT snapshots.
+    pub async fn delete_calculated_snapshots_for_account_in_range(
+        &self,
+        input_account_id: &str,
+        start_date_val: NaiveDate,
+        end_date_val: NaiveDate,
+    ) -> Result<usize> {
+        use crate::schema::holdings_snapshots::dsl::*;
+
+        let account_id_owned = input_account_id.to_string();
+        let start_date_str = start_date_val.format("%Y-%m-%d").to_string();
+        let end_date_str = end_date_val.format("%Y-%m-%d").to_string();
+
+        self.writer
+            .exec(move |conn| {
+                let deleted_count = diesel::delete(
+                    holdings_snapshots
+                        .filter(account_id.eq(&account_id_owned))
+                        .filter(snapshot_date.ge(&start_date_str))
+                        .filter(snapshot_date.le(&end_date_str))
+                        .filter(source.eq(SOURCE_CALCULATED)),
+                )
+                .execute(conn)
+                .map_err(StorageError::from)?;
+
+                debug!(
+                    "Deleted {} CALCULATED snapshots for account {} in range {} to {}",
+                    deleted_count, account_id_owned, start_date_str, end_date_str
+                );
+                Ok(deleted_count)
+            })
+            .await
+    }
+
     pub async fn overwrite_all_snapshots_for_account(
         &self,
         target_account_id: &str,
@@ -497,7 +587,24 @@ impl SnapshotRepository {
     ) -> Result<()> {
         use crate::schema::holdings_snapshots::dsl::*;
         let account_id_owned = target_account_id.to_string();
-        let db_models: Vec<AccountStateSnapshotDB> = snapshots_to_save
+        let anchor_dates = self
+            .get_anchor_snapshot_dates_for_account(target_account_id)
+            .await?;
+
+        let filtered_snapshots: Vec<AccountStateSnapshot> = if anchor_dates.is_empty() {
+            snapshots_to_save.to_vec()
+        } else {
+            snapshots_to_save
+                .iter()
+                .filter(|s| {
+                    let date_key = s.snapshot_date.format("%Y-%m-%d").to_string();
+                    !anchor_dates.contains(&date_key)
+                })
+                .cloned()
+                .collect()
+        };
+
+        let db_models: Vec<AccountStateSnapshotDB> = filtered_snapshots
             .iter()
             .cloned()
             .map(AccountStateSnapshotDB::from)
@@ -505,12 +612,17 @@ impl SnapshotRepository {
 
         self.writer
             .exec(move |conn| {
-                // Delete all for this account
-                diesel::delete(holdings_snapshots.filter(account_id.eq(&account_id_owned)))
-                    .execute(conn)
-                    .map_err(StorageError::from)?;
+                // Delete only CALCULATED snapshots for this account
+                // Preserves MANUAL_ENTRY, BROKER_IMPORTED, CSV_IMPORT snapshots
+                diesel::delete(
+                    holdings_snapshots
+                        .filter(account_id.eq(&account_id_owned))
+                        .filter(source.eq(SOURCE_CALCULATED)),
+                )
+                .execute(conn)
+                .map_err(StorageError::from)?;
 
-                // Save new ones
+                // Save new ones (using replace_into to handle conflicts)
                 if !db_models.is_empty() {
                     diesel::replace_into(holdings_snapshots)
                         .values(&db_models)
@@ -521,7 +633,123 @@ impl SnapshotRepository {
             })
             .await
     }
+
+    async fn get_anchor_snapshot_dates_for_account_in_range(
+        &self,
+        target_account_id: &str,
+        range_start_date: NaiveDate,
+        range_end_date: NaiveDate,
+    ) -> Result<HashSet<String>> {
+        use crate::schema::holdings_snapshots::dsl::*;
+
+        let account_id_owned = target_account_id.to_string();
+        let start_date_str = range_start_date.format("%Y-%m-%d").to_string();
+        let end_date_str = range_end_date.format("%Y-%m-%d").to_string();
+
+        self.writer
+            .exec(move |conn| {
+                let dates = holdings_snapshots
+                    .select(snapshot_date)
+                    .filter(account_id.eq(&account_id_owned))
+                    .filter(snapshot_date.ge(start_date_str))
+                    .filter(snapshot_date.le(end_date_str))
+                    .filter(source.ne(SOURCE_CALCULATED))
+                    .load::<String>(conn)
+                    .map_err(|e| Error::from(StorageError::from(e)))?;
+                Ok(dates.into_iter().collect())
+            })
+            .await
+            .map_err(Error::from)
+    }
+
+    async fn get_anchor_snapshot_dates_for_account(
+        &self,
+        target_account_id: &str,
+    ) -> Result<HashSet<String>> {
+        use crate::schema::holdings_snapshots::dsl::*;
+
+        let account_id_owned = target_account_id.to_string();
+
+        self.writer
+            .exec(move |conn| {
+                let dates = holdings_snapshots
+                    .select(snapshot_date)
+                    .filter(account_id.eq(&account_id_owned))
+                    .filter(source.ne(SOURCE_CALCULATED))
+                    .load::<String>(conn)
+                    .map_err(|e| Error::from(StorageError::from(e)))?;
+                Ok(dates.into_iter().collect())
+            })
+            .await
+            .map_err(Error::from)
+    }
+
+    /// Save or update a single snapshot.
+    /// Uses replace_into to handle both insert and update cases.
+    /// If a snapshot with the same id (account_id + date) exists, it is replaced.
+    pub async fn save_or_update_snapshot_impl(
+        &self,
+        snapshot: &AccountStateSnapshot,
+    ) -> Result<()> {
+        use crate::schema::holdings_snapshots::dsl::*;
+
+        let db_model = AccountStateSnapshotDB::from(snapshot.clone());
+        debug!(
+            "Saving/updating snapshot for account {} on date {}",
+            snapshot.account_id, snapshot.snapshot_date
+        );
+
+        self.writer
+            .exec(move |conn| {
+                diesel::replace_into(holdings_snapshots)
+                    .values(&db_model)
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                Ok(())
+            })
+            .await
+    }
+
+    /// Get count of non-calculated snapshots for an account.
+    pub fn get_non_calculated_snapshot_count_impl(
+        &self,
+        target_account_id: &str,
+    ) -> Result<usize> {
+        use crate::schema::holdings_snapshots::dsl::*;
+
+        let mut conn = get_connection(&self.pool)?;
+        let count: i64 = holdings_snapshots
+            .filter(account_id.eq(target_account_id))
+            .filter(source.ne(SOURCE_CALCULATED))
+            .count()
+            .get_result(&mut conn)
+            .map_err(StorageError::from)?;
+
+        Ok(count as usize)
+    }
+
+    /// Get the earliest non-calculated snapshot for an account.
+    pub fn get_earliest_non_calculated_snapshot_impl(
+        &self,
+        target_account_id: &str,
+    ) -> Result<Option<AccountStateSnapshot>> {
+        use crate::schema::holdings_snapshots::dsl::*;
+
+        let mut conn = get_connection(&self.pool)?;
+        let result = holdings_snapshots
+            .filter(account_id.eq(target_account_id))
+            .filter(source.ne(SOURCE_CALCULATED))
+            .order(snapshot_date.asc())
+            .first::<AccountStateSnapshotDB>(&mut conn)
+            .optional()
+            .map_err(StorageError::from)?;
+
+        Ok(result.map(AccountStateSnapshot::from))
+    }
 }
+
+// --- Constant for CALCULATED source ---
+const SOURCE_CALCULATED: &str = "CALCULATED";
 
 // Implement the trait methods for SnapshotRepository
 #[async_trait]
@@ -642,5 +870,536 @@ impl SnapshotRepositoryTrait for SnapshotRepository {
     ) -> Result<()> {
         self.overwrite_all_snapshots_for_account(account_id, snapshots_to_save)
             .await
+    }
+
+    async fn update_snapshots_source(
+        &self,
+        account_id: &str,
+        new_source: &str,
+    ) -> Result<usize> {
+        self.update_snapshots_source(account_id, new_source).await
+    }
+
+    async fn save_or_update_snapshot(&self, snapshot: &AccountStateSnapshot) -> Result<()> {
+        self.save_or_update_snapshot_impl(snapshot).await
+    }
+
+    fn get_non_calculated_snapshot_count(&self, account_id: &str) -> Result<usize> {
+        self.get_non_calculated_snapshot_count_impl(account_id)
+    }
+
+    fn get_earliest_non_calculated_snapshot(
+        &self,
+        account_id: &str,
+    ) -> Result<Option<AccountStateSnapshot>> {
+        self.get_earliest_non_calculated_snapshot_impl(account_id)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::{create_pool, get_connection, run_migrations, write_actor::spawn_writer};
+    use chrono::NaiveDate;
+    use diesel::RunQueryDsl;
+    use rust_decimal::Decimal;
+    use std::collections::HashMap;
+    use tempfile::tempdir;
+    use wealthfolio_core::portfolio::snapshot::SnapshotSource;
+
+    /// Creates a test repository with an in-memory-like temp database
+    /// Returns the repository, pool (for creating test accounts), and temp dir (to keep it alive)
+    async fn create_test_repository() -> (
+        SnapshotRepository,
+        Arc<Pool<ConnectionManager<SqliteConnection>>>,
+        tempfile::TempDir,
+    ) {
+        let temp_dir = tempdir().expect("Failed to create temp directory");
+        let db_path = temp_dir.path().join("test.db");
+        let db_path_str = db_path.to_string_lossy().to_string();
+
+        // create_pool returns Arc<DbPool>
+        let pool = create_pool(&db_path_str).expect("Failed to create pool");
+        run_migrations(&pool).expect("Failed to run migrations");
+
+        // spawn_writer expects DbPool (not Arc<DbPool>), so we need to clone the inner pool
+        // Since pool is Arc<DbPool>, we dereference to get DbPool, then clone it
+        let writer = spawn_writer((*pool).clone());
+
+        let repo = SnapshotRepository::new(Arc::clone(&pool), writer);
+        (repo, pool, temp_dir)
+    }
+
+    /// Creates a test account in the database to satisfy foreign key constraints
+    fn create_test_account(
+        pool: &Arc<Pool<ConnectionManager<SqliteConnection>>>,
+        account_id: &str,
+    ) {
+        let mut conn = get_connection(pool).expect("Failed to get connection");
+        diesel::sql_query(format!(
+            "INSERT INTO accounts (id, name, account_type, currency, is_default, is_active, created_at, updated_at) \
+             VALUES ('{}', 'Test Account', 'REGULAR', 'USD', false, true, datetime('now'), datetime('now'))",
+            account_id
+        ))
+        .execute(&mut conn)
+        .expect("Failed to create test account");
+    }
+
+    /// Helper to create a test snapshot with specific source
+    fn create_test_snapshot(
+        account_id: &str,
+        date: NaiveDate,
+        source: SnapshotSource,
+    ) -> AccountStateSnapshot {
+        AccountStateSnapshot {
+            id: format!("{}_{}", account_id, date.format("%Y-%m-%d")),
+            account_id: account_id.to_string(),
+            snapshot_date: date,
+            currency: "USD".to_string(),
+            positions: HashMap::new(),
+            cash_balances: HashMap::new(),
+            cost_basis: Decimal::ZERO,
+            net_contribution: Decimal::ZERO,
+            net_contribution_base: Decimal::ZERO,
+            cash_total_account_currency: Decimal::ZERO,
+            cash_total_base_currency: Decimal::ZERO,
+            calculated_at: chrono::Utc::now().naive_utc(),
+            source,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_overwrite_all_preserves_manual_snapshots() {
+        let (repo, pool, _temp_dir) = create_test_repository().await;
+        let account_id = "test-account-1";
+        create_test_account(&pool, account_id);
+
+        // Create initial snapshots with different sources
+        let calculated_snapshot = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
+            SnapshotSource::Calculated,
+        );
+        let manual_snapshot = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(),
+            SnapshotSource::ManualEntry,
+        );
+        let broker_snapshot = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 3).unwrap(),
+            SnapshotSource::BrokerImported,
+        );
+
+        // Save all initial snapshots
+        repo.save_snapshots(&[
+            calculated_snapshot.clone(),
+            manual_snapshot.clone(),
+            broker_snapshot.clone(),
+        ])
+        .await
+        .expect("Failed to save initial snapshots");
+
+        // Verify all 3 are saved
+        let all_snapshots = repo
+            .get_snapshots_by_account(account_id, None, None)
+            .expect("Failed to get snapshots");
+        assert_eq!(all_snapshots.len(), 3, "Should have 3 initial snapshots");
+
+        // Create new calculated snapshot
+        let new_calculated_snapshot = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 4).unwrap(),
+            SnapshotSource::Calculated,
+        );
+
+        // Overwrite - this should only delete CALCULATED, keeping MANUAL_ENTRY and BROKER_IMPORTED
+        repo.overwrite_all_snapshots_for_account(account_id, &[new_calculated_snapshot.clone()])
+            .await
+            .expect("Failed to overwrite snapshots");
+
+        // Verify: should have 3 snapshots (2 preserved + 1 new)
+        let final_snapshots = repo
+            .get_snapshots_by_account(account_id, None, None)
+            .expect("Failed to get final snapshots");
+        assert_eq!(
+            final_snapshots.len(),
+            3,
+            "Should have 3 snapshots after overwrite: manual + broker + new calculated"
+        );
+
+        // Verify the manual and broker snapshots are preserved
+        let sources: Vec<SnapshotSource> = final_snapshots.iter().map(|s| s.source).collect();
+        assert!(
+            sources.contains(&SnapshotSource::ManualEntry),
+            "Manual snapshot should be preserved"
+        );
+        assert!(
+            sources.contains(&SnapshotSource::BrokerImported),
+            "Broker snapshot should be preserved"
+        );
+        assert!(
+            sources.contains(&SnapshotSource::Calculated),
+            "New calculated snapshot should exist"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_overwrite_in_range_preserves_manual_snapshots() {
+        let (repo, pool, _temp_dir) = create_test_repository().await;
+        let account_id = "test-account-2";
+        create_test_account(&pool, account_id);
+
+        let start_date = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
+        let end_date = NaiveDate::from_ymd_opt(2024, 1, 31).unwrap();
+
+        // Create snapshots within range with different sources
+        let calculated_snapshot = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 10).unwrap(),
+            SnapshotSource::Calculated,
+        );
+        let csv_snapshot = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+            SnapshotSource::CsvImport,
+        );
+
+        repo.save_snapshots(&[calculated_snapshot, csv_snapshot.clone()])
+            .await
+            .expect("Failed to save initial snapshots");
+
+        // Overwrite in range with new calculated snapshot
+        let new_snapshot = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 20).unwrap(),
+            SnapshotSource::Calculated,
+        );
+
+        repo.overwrite_snapshots_for_account_in_range(
+            account_id,
+            start_date,
+            end_date,
+            &[new_snapshot.clone()],
+        )
+        .await
+        .expect("Failed to overwrite in range");
+
+        // Should have 2 snapshots: preserved CSV + new calculated
+        let final_snapshots = repo
+            .get_snapshots_by_account(account_id, None, None)
+            .expect("Failed to get final snapshots");
+        assert_eq!(final_snapshots.len(), 2, "Should have 2 snapshots");
+
+        // Verify CSV is preserved
+        let csv_preserved = final_snapshots
+            .iter()
+            .any(|s| s.source == SnapshotSource::CsvImport);
+        assert!(csv_preserved, "CSV import snapshot should be preserved");
+    }
+
+    #[tokio::test]
+    async fn test_update_snapshots_source() {
+        let (repo, pool, _temp_dir) = create_test_repository().await;
+        let account_id = "test-account-3";
+        create_test_account(&pool, account_id);
+
+        // Create calculated snapshots
+        let snapshot1 = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
+            SnapshotSource::Calculated,
+        );
+        let snapshot2 = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(),
+            SnapshotSource::Calculated,
+        );
+
+        repo.save_snapshots(&[snapshot1, snapshot2])
+            .await
+            .expect("Failed to save snapshots");
+
+        // Update source to MANUAL_ENTRY
+        let updated_count = repo
+            .update_snapshots_source(account_id, "MANUAL_ENTRY")
+            .await
+            .expect("Failed to update source");
+
+        assert_eq!(updated_count, 2, "Should update 2 snapshots");
+
+        // Verify source was updated
+        let snapshots = repo
+            .get_snapshots_by_account(account_id, None, None)
+            .expect("Failed to get snapshots");
+
+        for snapshot in &snapshots {
+            assert_eq!(
+                snapshot.source,
+                SnapshotSource::ManualEntry,
+                "Source should be updated to ManualEntry"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_rebuild_only_deletes_calculated_not_broker() {
+        let (repo, pool, _temp_dir) = create_test_repository().await;
+        let account_id = "test-account-4";
+        create_test_account(&pool, account_id);
+
+        // Simulate broker-imported holdings
+        let broker1 = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
+            SnapshotSource::BrokerImported,
+        );
+        let broker2 = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(),
+            SnapshotSource::BrokerImported,
+        );
+        // Old calculated that should be replaced
+        let old_calculated = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 3).unwrap(),
+            SnapshotSource::Calculated,
+        );
+
+        repo.save_snapshots(&[broker1.clone(), broker2.clone(), old_calculated])
+            .await
+            .expect("Failed to save initial");
+
+        // Rebuild with new calculated snapshots
+        let new_calculated = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 3).unwrap(),
+            SnapshotSource::Calculated,
+        );
+
+        repo.overwrite_all_snapshots_for_account(account_id, &[new_calculated.clone()])
+            .await
+            .expect("Failed to rebuild");
+
+        let final_snapshots = repo
+            .get_snapshots_by_account(account_id, None, None)
+            .expect("Failed to get final");
+
+        // Should have 3: broker1, broker2, new_calculated
+        assert_eq!(final_snapshots.len(), 3);
+
+        // Verify broker snapshots preserved
+        let broker_count = final_snapshots
+            .iter()
+            .filter(|s| s.source == SnapshotSource::BrokerImported)
+            .count();
+        assert_eq!(broker_count, 2, "Both broker snapshots should be preserved");
+    }
+
+    #[tokio::test]
+    async fn test_delete_calculated_snapshots_in_range() {
+        let (repo, pool, _temp_dir) = create_test_repository().await;
+        let account_id = "test-account-5";
+        create_test_account(&pool, account_id);
+
+        // Create mix of snapshots
+        let calc1 = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 10).unwrap(),
+            SnapshotSource::Calculated,
+        );
+        let manual = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+            SnapshotSource::ManualEntry,
+        );
+        let calc2 = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 20).unwrap(),
+            SnapshotSource::Calculated,
+        );
+
+        repo.save_snapshots(&[calc1, manual.clone(), calc2])
+            .await
+            .expect("Failed to save");
+
+        // Delete calculated in range
+        let deleted = repo
+            .delete_calculated_snapshots_for_account_in_range(
+                account_id,
+                NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
+                NaiveDate::from_ymd_opt(2024, 1, 31).unwrap(),
+            )
+            .await
+            .expect("Failed to delete");
+
+        assert_eq!(deleted, 2, "Should delete 2 calculated snapshots");
+
+        // Verify only manual remains
+        let remaining = repo
+            .get_snapshots_by_account(account_id, None, None)
+            .expect("Failed to get");
+
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].source, SnapshotSource::ManualEntry);
+    }
+
+    // ==================== Tests for Holdings Mode Snapshot Rules ====================
+
+    #[tokio::test]
+    async fn test_get_non_calculated_snapshot_count_empty() {
+        let (repo, pool, _temp_dir) = create_test_repository().await;
+        let account_id = "test-account-count-1";
+        create_test_account(&pool, account_id);
+
+        let count = repo
+            .get_non_calculated_snapshot_count(account_id)
+            .expect("Failed to get count");
+        assert_eq!(count, 0, "Should have 0 non-calculated snapshots");
+    }
+
+    #[tokio::test]
+    async fn test_get_non_calculated_snapshot_count_only_calculated() {
+        let (repo, pool, _temp_dir) = create_test_repository().await;
+        let account_id = "test-account-count-2";
+        create_test_account(&pool, account_id);
+
+        // Add only calculated snapshots
+        let calc1 = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
+            SnapshotSource::Calculated,
+        );
+        let calc2 = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(),
+            SnapshotSource::Calculated,
+        );
+
+        repo.save_snapshots(&[calc1, calc2])
+            .await
+            .expect("Failed to save");
+
+        let count = repo
+            .get_non_calculated_snapshot_count(account_id)
+            .expect("Failed to get count");
+        assert_eq!(count, 0, "Calculated snapshots should not be counted");
+    }
+
+    #[tokio::test]
+    async fn test_get_non_calculated_snapshot_count_mixed() {
+        let (repo, pool, _temp_dir) = create_test_repository().await;
+        let account_id = "test-account-count-3";
+        create_test_account(&pool, account_id);
+
+        // Add mix of sources
+        let calc = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
+            SnapshotSource::Calculated,
+        );
+        let manual = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(),
+            SnapshotSource::ManualEntry,
+        );
+        let broker = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 3).unwrap(),
+            SnapshotSource::BrokerImported,
+        );
+        let synthetic = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 4).unwrap(),
+            SnapshotSource::Synthetic,
+        );
+
+        repo.save_snapshots(&[calc, manual, broker, synthetic])
+            .await
+            .expect("Failed to save");
+
+        let count = repo
+            .get_non_calculated_snapshot_count(account_id)
+            .expect("Failed to get count");
+        assert_eq!(count, 3, "Should count ManualEntry, BrokerImported, Synthetic");
+    }
+
+    #[tokio::test]
+    async fn test_get_earliest_non_calculated_snapshot_empty() {
+        let (repo, pool, _temp_dir) = create_test_repository().await;
+        let account_id = "test-account-earliest-1";
+        create_test_account(&pool, account_id);
+
+        let earliest = repo
+            .get_earliest_non_calculated_snapshot(account_id)
+            .expect("Failed to get earliest");
+        assert!(earliest.is_none(), "Should return None when no snapshots exist");
+    }
+
+    #[tokio::test]
+    async fn test_get_earliest_non_calculated_snapshot_only_calculated() {
+        let (repo, pool, _temp_dir) = create_test_repository().await;
+        let account_id = "test-account-earliest-2";
+        create_test_account(&pool, account_id);
+
+        let calc = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
+            SnapshotSource::Calculated,
+        );
+
+        repo.save_snapshots(&[calc])
+            .await
+            .expect("Failed to save");
+
+        let earliest = repo
+            .get_earliest_non_calculated_snapshot(account_id)
+            .expect("Failed to get earliest");
+        assert!(earliest.is_none(), "Should return None when only calculated exist");
+    }
+
+    #[tokio::test]
+    async fn test_get_earliest_non_calculated_snapshot_returns_earliest() {
+        let (repo, pool, _temp_dir) = create_test_repository().await;
+        let account_id = "test-account-earliest-3";
+        create_test_account(&pool, account_id);
+
+        // Add snapshots in non-chronological order
+        let later_broker = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 3, 15).unwrap(),
+            SnapshotSource::BrokerImported,
+        );
+        let earliest_manual = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 10).unwrap(),
+            SnapshotSource::ManualEntry,
+        );
+        let middle_synthetic = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 2, 20).unwrap(),
+            SnapshotSource::Synthetic,
+        );
+        let calc = create_test_snapshot(
+            account_id,
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), // Earlier than manual but should be ignored
+            SnapshotSource::Calculated,
+        );
+
+        repo.save_snapshots(&[later_broker, earliest_manual.clone(), middle_synthetic, calc])
+            .await
+            .expect("Failed to save");
+
+        let earliest = repo
+            .get_earliest_non_calculated_snapshot(account_id)
+            .expect("Failed to get earliest")
+            .expect("Should return Some");
+
+        assert_eq!(
+            earliest.snapshot_date,
+            NaiveDate::from_ymd_opt(2024, 1, 10).unwrap(),
+            "Should return the earliest non-calculated snapshot"
+        );
+        assert_eq!(earliest.source, SnapshotSource::ManualEntry);
     }
 }

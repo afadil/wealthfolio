@@ -331,13 +331,20 @@ pub struct SymbolSyncPlan {
 /// This table tracks sync coordination state per asset. It is NOT a cache of
 /// operational data. Activity dates and quote bounds are computed on-the-fly
 /// from the activities and quotes tables at sync planning time.
+///
+/// Note: `is_active` is derived from `position_closed_date`:
+/// - `position_closed_date IS NULL` → active position
+/// - `position_closed_date IS NOT NULL` → closed position
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QuoteSyncState {
     pub asset_id: String,
-    /// Whether this asset has an open position (derived from snapshots)
+    /// Whether this asset has an open position.
+    /// DERIVED: true if position_closed_date is None, false otherwise.
+    /// Not stored in database - computed on read.
     pub is_active: bool,
-    /// When the position was closed (if applicable)
+    /// When the position was closed (if applicable).
+    /// NULL = active position, NOT NULL = closed position.
     pub position_closed_date: Option<NaiveDate>,
     /// When the last sync was attempted
     pub last_synced_at: Option<DateTime<Utc>>,
@@ -402,26 +409,28 @@ impl QuoteSyncState {
     }
 
     /// Mark position as closed.
+    /// Sets position_closed_date which derives is_active = false.
     pub fn mark_closed(&mut self, closed_date: NaiveDate) {
-        self.is_active = false;
         self.position_closed_date = Some(closed_date);
+        self.is_active = false; // Derived from position_closed_date
         self.sync_priority = SyncCategory::RecentlyClosed.default_priority();
         self.updated_at = Utc::now();
     }
 
     /// Mark position as active (reopened or new).
+    /// Clears position_closed_date which derives is_active = true.
     pub fn mark_active(&mut self) {
-        self.is_active = true;
         self.position_closed_date = None;
+        self.is_active = true; // Derived from position_closed_date
         self.sync_priority = SyncCategory::Active.default_priority();
         self.updated_at = Utc::now();
     }
 }
 
 /// Update payload for partial updates to sync state.
+/// Note: is_active is derived from position_closed_date, not directly settable.
 #[derive(Debug, Clone, Default)]
 pub struct QuoteSyncStateUpdate {
-    pub is_active: Option<bool>,
     pub position_closed_date: Option<Option<NaiveDate>>,
     pub last_synced_at: Option<Option<DateTime<Utc>>>,
     pub sync_priority: Option<i32>,

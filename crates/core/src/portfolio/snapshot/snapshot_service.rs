@@ -1,17 +1,19 @@
 use super::holdings_calculator::HoldingsCalculator;
 use super::SnapshotRepositoryTrait;
-use crate::accounts::{Account, AccountRepositoryTrait};
+use crate::accounts::{get_tracking_mode, Account, AccountRepositoryTrait, TrackingMode};
 use crate::activities::{Activity, ActivityCompiler, ActivityRepositoryTrait, DefaultActivityCompiler};
 use crate::assets::AssetRepositoryTrait;
 use crate::constants::{DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
 use crate::errors::{CalculatorError, Error, Result};
 use crate::fx::FxServiceTrait;
 use crate::portfolio::performance::{classify_flow_for_scope, FlowType, PerformanceScope};
-use crate::portfolio::snapshot::{AccountStateSnapshot, HoldingsCalculationWarning, Lot, Position};
-use crate::utils::time_utils::get_days_between;
+use crate::portfolio::snapshot::{
+    AccountStateSnapshot, HoldingsCalculationWarning, Lot, Position, SnapshotSource,
+};
+use crate::utils::time_utils::{get_days_between, valuation_date_today};
 
 use async_trait::async_trait;
-use chrono::{NaiveDate, Utc};
+use chrono::{Months, NaiveDate, Utc};
 use log::{debug, error, info, warn};
 use rust_decimal::Decimal;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
@@ -68,6 +70,27 @@ pub trait SnapshotServiceTrait: Send + Sync {
     /// It iterates through each day from the earliest activity to the present, generating a TOTAL snapshot
     /// by aggregating individual account snapshots for that day.
     async fn calculate_total_portfolio_snapshots(&self) -> Result<usize>;
+
+    /// Saves a manual snapshot for the given account.
+    /// - The snapshot's source is preserved from the input (e.g., ManualEntry or CsvImport).
+    /// - If a snapshot exists for the same date, it is updated in place.
+    /// - If the date is different from existing snapshots, a new snapshot is created.
+    /// - Triggers valuation recalculation for the account after saving.
+    async fn save_manual_snapshot(
+        &self,
+        account_id: &str,
+        snapshot: AccountStateSnapshot,
+    ) -> Result<()>;
+
+    /// Updates the source field for all snapshots of an account.
+    /// Used when switching tracking modes (e.g., from HOLDINGS to TRANSACTIONS).
+    /// Returns the number of snapshots updated.
+    async fn update_snapshots_source(&self, account_id: &str, new_source: &str) -> Result<usize>;
+
+    /// Ensures HOLDINGS mode accounts have at least 2 snapshots for proper history.
+    /// If only 1 non-calculated snapshot exists, creates a synthetic snapshot 3 months prior.
+    /// This enables history charting, valuation engines, and provides an inception boundary.
+    async fn ensure_holdings_history(&self, account_id: &str) -> Result<()>;
 }
 
 // --- Service Implementation ---
@@ -262,6 +285,8 @@ impl SnapshotService {
         let mut account_ids_to_fetch_activities: Vec<String> = Vec::new();
 
         // ── ❷ collect *individual* accounts ──────────────────────────────────────────
+        // Only include TRANSACTIONS mode accounts for snapshot recalculation.
+        // HOLDINGS mode accounts manage their snapshots via manual entry/CSV import.
         match account_ids_param {
             Some(ids) => {
                 for id in ids {
@@ -270,6 +295,14 @@ impl SnapshotService {
                     } // TOTAL is virtual
                     if let Ok(acc) = self.account_repository.get_by_id(id) {
                         if acc.is_active {
+                            // Skip HOLDINGS mode accounts - they don't participate in transaction-based recalculation
+                            if get_tracking_mode(&acc) == TrackingMode::Holdings {
+                                debug!(
+                                    "Skipping account {} for snapshot recalculation: HOLDINGS tracking mode",
+                                    acc.id
+                                );
+                                continue;
+                            }
                             account_ids_to_fetch_activities.push(acc.id.clone());
                             accounts_to_process.insert(acc.id.clone(), acc);
                         }
@@ -278,6 +311,14 @@ impl SnapshotService {
             }
             None => {
                 for acc in self.account_repository.list(Some(true), None)? {
+                    // Skip HOLDINGS mode accounts - they don't participate in transaction-based recalculation
+                    if get_tracking_mode(&acc) == TrackingMode::Holdings {
+                        debug!(
+                            "Skipping account {} for snapshot recalculation: HOLDINGS tracking mode",
+                            acc.id
+                        );
+                        continue;
+                    }
                     account_ids_to_fetch_activities.push(acc.id.clone());
                     accounts_to_process.insert(acc.id.clone(), acc);
                 }
@@ -305,9 +346,9 @@ impl SnapshotService {
             .iter()
             .map(|a| a.activity_date.naive_utc().date())
             .min()
-            .unwrap_or_else(|| Utc::now().naive_utc().date());
+            .unwrap_or_else(valuation_date_today);
 
-        let calculation_end_date = Utc::now().naive_utc().date();
+        let calculation_end_date = valuation_date_today();
 
         Ok((
             accounts_to_process,
@@ -818,6 +859,7 @@ impl SnapshotService {
             cash_total_account_currency: cash_total_base.round_dp(DECIMAL_PRECISION),
             cash_total_base_currency: cash_total_base.round_dp(DECIMAL_PRECISION),
             calculated_at: Utc::now().naive_utc(),
+            source: SnapshotSource::Calculated,
         })
     }
 
@@ -937,6 +979,7 @@ impl SnapshotService {
             cash_total_account_currency: Decimal::ZERO,
             cash_total_base_currency: Decimal::ZERO,
             calculated_at: Utc::now().naive_utc(),
+            source: SnapshotSource::Calculated,
         }
     }
 
@@ -1239,21 +1282,20 @@ impl SnapshotServiceTrait for SnapshotService {
             },
         };
 
-        // Use provided end_date, or latest snapshot date, or UTC now as fallback
+        // Use provided end_date, or latest snapshot date, or today as fallback
         let end_date = match end_date_opt {
             Some(date) => date,
             None => {
                 // Get the latest snapshot to ensure we include all available data
                 // Use a far future date to get the absolute latest snapshot
-                let far_future = Utc::now().date_naive() + chrono::Duration::days(365);
+                let today = valuation_date_today();
+                let far_future = today + chrono::Duration::days(365);
                 match self
                     .snapshot_repository
                     .get_latest_snapshot_before_date(account_id, far_future)?
                 {
-                    Some(latest_snapshot) => {
-                        latest_snapshot.snapshot_date.max(Utc::now().date_naive())
-                    }
-                    None => Utc::now().date_naive(),
+                    Some(latest_snapshot) => latest_snapshot.snapshot_date.max(today),
+                    None => today,
                 }
             }
         };
@@ -1343,7 +1385,7 @@ impl SnapshotServiceTrait for SnapshotService {
         &self,
         account_id: &str,
     ) -> Result<Option<AccountStateSnapshot>> {
-        let today = Utc::now().naive_utc().date();
+        let today = valuation_date_today();
         // The date passed to get_latest_snapshot_before_date is exclusive, so use tomorrow to include today.
         let tomorrow = today.succ_opt().unwrap_or(today);
         match self
@@ -1365,5 +1407,155 @@ impl SnapshotServiceTrait for SnapshotService {
 
     async fn calculate_total_portfolio_snapshots(&self) -> Result<usize> {
         self.calculate_total_portfolio_snapshots_impl().await
+    }
+
+    async fn save_manual_snapshot(
+        &self,
+        account_id: &str,
+        mut snapshot: AccountStateSnapshot,
+    ) -> Result<()> {
+        // Ensure the snapshot has the correct account_id
+        snapshot.account_id = account_id.to_string();
+
+        // Note: snapshot.source is preserved from the caller (ManualEntry or CsvImport)
+
+        // Generate the snapshot ID based on account_id and date
+        snapshot.id = format!(
+            "{}_{}",
+            account_id,
+            snapshot.snapshot_date.format("%Y-%m-%d")
+        );
+
+        // Check if content is unchanged from latest snapshot (skip if identical)
+        let latest = self
+            .snapshot_repository
+            .get_latest_snapshot_before_date(account_id, snapshot.snapshot_date + chrono::Days::new(1))?;
+
+        if let Some(existing) = latest {
+            if existing.is_content_equal(&snapshot) {
+                debug!(
+                    "Snapshot content unchanged for account {} on {}, skipping save",
+                    account_id, snapshot.snapshot_date
+                );
+                return Ok(());
+            }
+        }
+
+        // Update the calculated_at timestamp
+        snapshot.calculated_at = Utc::now().naive_utc();
+
+        // Save or update the snapshot using repository method
+        self.snapshot_repository
+            .save_or_update_snapshot(&snapshot)
+            .await?;
+
+        info!(
+            "Saved manual snapshot for account {} on date {}",
+            account_id, snapshot.snapshot_date
+        );
+
+        // Ensure holdings history has at least 2 snapshots
+        self.ensure_holdings_history(account_id).await?;
+
+        Ok(())
+    }
+
+    async fn update_snapshots_source(&self, account_id: &str, new_source: &str) -> Result<usize> {
+        debug!(
+            "Updating snapshot source for account {} to {}",
+            account_id, new_source
+        );
+
+        let updated_count = self
+            .snapshot_repository
+            .update_snapshots_source(account_id, new_source)
+            .await?;
+
+        info!(
+            "Updated {} snapshots for account {} to source {}",
+            updated_count, account_id, new_source
+        );
+
+        Ok(updated_count)
+    }
+
+    async fn ensure_holdings_history(&self, account_id: &str) -> Result<()> {
+        // Get count of non-calculated snapshots
+        let count = self
+            .snapshot_repository
+            .get_non_calculated_snapshot_count(account_id)?;
+
+        if count >= 2 {
+            debug!(
+                "Account {} already has {} non-calculated snapshots, no synthetic needed",
+                account_id, count
+            );
+            return Ok(());
+        }
+
+        if count == 0 {
+            debug!(
+                "Account {} has no non-calculated snapshots, nothing to backfill from",
+                account_id
+            );
+            return Ok(());
+        }
+
+        // count == 1: Create synthetic snapshot 3 months before the earliest
+        let earliest = self
+            .snapshot_repository
+            .get_earliest_non_calculated_snapshot(account_id)?;
+
+        let earliest = match earliest {
+            Some(s) => s,
+            None => {
+                debug!("No earliest snapshot found for account {}", account_id);
+                return Ok(());
+            }
+        };
+
+        // Calculate synthetic date: 3 months before earliest
+        let synthetic_date = earliest
+            .snapshot_date
+            .checked_sub_months(Months::new(3))
+            .unwrap_or(earliest.snapshot_date);
+
+        // Don't create if synthetic date equals earliest (edge case)
+        if synthetic_date == earliest.snapshot_date {
+            debug!(
+                "Synthetic date equals earliest date for account {}, skipping",
+                account_id
+            );
+            return Ok(());
+        }
+
+        // Clone the earliest snapshot with new date and source
+        let synthetic = AccountStateSnapshot {
+            id: format!("{}_{}", account_id, synthetic_date.format("%Y-%m-%d")),
+            account_id: account_id.to_string(),
+            snapshot_date: synthetic_date,
+            source: SnapshotSource::Synthetic,
+            calculated_at: Utc::now().naive_utc(),
+            // Clone all holdings data from earliest
+            currency: earliest.currency,
+            positions: earliest.positions,
+            cash_balances: earliest.cash_balances,
+            cost_basis: earliest.cost_basis,
+            net_contribution: earliest.net_contribution,
+            net_contribution_base: earliest.net_contribution_base,
+            cash_total_account_currency: earliest.cash_total_account_currency,
+            cash_total_base_currency: earliest.cash_total_base_currency,
+        };
+
+        self.snapshot_repository
+            .save_or_update_snapshot(&synthetic)
+            .await?;
+
+        info!(
+            "Created synthetic snapshot for account {} at {} (3 months before {})",
+            account_id, synthetic_date, earliest.snapshot_date
+        );
+
+        Ok(())
     }
 }

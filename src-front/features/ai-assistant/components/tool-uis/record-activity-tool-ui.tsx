@@ -234,8 +234,8 @@ function normalizeResult(result: unknown): RecordActivityOutput | null {
       (draftRaw.pricing_mode as string) ??
       "MARKET",
     isCustomAsset:
-      Boolean(draftRaw.isCustomAsset) ??
-      Boolean(draftRaw.is_custom_asset) ??
+      draftRaw.isCustomAsset ??
+      draftRaw.is_custom_asset ??
       false,
     assetKind:
       (draftRaw.assetKind as string) ??
@@ -1118,7 +1118,7 @@ function DraftForm({
             )}
 
           {/* Advanced Options (collapsible) */}
-          {(subtypesForType.length > 0 || true) && (
+          {(
             <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
               <CollapsibleTrigger asChild>
                 <Button

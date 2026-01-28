@@ -49,6 +49,8 @@ export const importMappingSchema = z.object({
   parseConfig: parseConfigSchema.optional(),
 });
 
+export const trackingModeSchema = z.enum(["TRANSACTIONS", "HOLDINGS", "NOT_SET"]);
+
 export const newAccountSchema = z.object({
   id: z.string().uuid().optional(),
   name: z
@@ -64,6 +66,8 @@ export const newAccountSchema = z.object({
   isActive: z.boolean().optional(),
   accountType: accountTypeSchema,
   currency: z.string({ required_error: "Please select a currency." }),
+  trackingMode: trackingModeSchema.optional().default("TRANSACTIONS"),
+  meta: z.string().optional(),
 });
 
 export const newGoalSchema = z.object({

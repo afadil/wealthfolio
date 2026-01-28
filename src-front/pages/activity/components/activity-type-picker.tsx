@@ -41,6 +41,8 @@ const ALL_ACTIVITY_TYPES = [...PRIMARY_ACTIVITY_TYPES, ...SECONDARY_ACTIVITY_TYP
 interface ActivityTypePickerProps {
   value?: ActivityType;
   onSelect: (type: ActivityType) => void;
+  /** Optional list of allowed activity types. If not provided, all types are shown. */
+  allowedTypes?: string[];
 }
 
 type ViewMode = "carousel" | "grid";
@@ -99,9 +101,11 @@ function ActivityTypeButton({
 function CarouselView({
   value,
   onSelect,
+  types,
 }: {
   value?: ActivityType;
   onSelect: (type: ActivityType) => void;
+  types: ActivityTypeConfig<ActivityType>[];
 }) {
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(false);
@@ -122,13 +126,13 @@ function CarouselView({
 
       // Scroll to selected item on mount
       if (value) {
-        const selectedIndex = ALL_ACTIVITY_TYPES.findIndex((t) => t.value === value);
+        const selectedIndex = types.findIndex((t) => t.value === value);
         if (selectedIndex >= 0) {
           setTimeout(() => api.scrollTo(selectedIndex), 0);
         }
       }
     },
-    [value],
+    [value, types],
   );
 
   return (
@@ -145,7 +149,7 @@ function CarouselView({
           className="w-full"
         >
           <CarouselContent className="-ml-2">
-            {ALL_ACTIVITY_TYPES.map((type) => (
+            {types.map((type) => (
               <CarouselItem key={type.value} className="basis-auto pl-2">
                 <ActivityTypeButton
                   type={type}
@@ -172,14 +176,16 @@ function CarouselView({
 function GridView({
   value,
   onSelect,
+  types,
 }: {
   value?: ActivityType;
   onSelect: (type: ActivityType) => void;
+  types: ActivityTypeConfig<ActivityType>[];
 }) {
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent, index: number) => {
-    const total = ALL_ACTIVITY_TYPES.length;
+    const total = types.length;
     const cols = 5; // 5 columns in grid
     let newIndex: number | null = null;
 
@@ -213,7 +219,7 @@ function GridView({
     if (newIndex !== null) {
       buttonRefs.current[newIndex]?.focus();
     }
-  }, []);
+  }, [types.length]);
 
   return (
     <div className="p-1">
@@ -222,7 +228,7 @@ function GridView({
         aria-label="All activity types"
         className="grid grid-cols-5 gap-2"
       >
-        {ALL_ACTIVITY_TYPES.map((type, index) => (
+        {types.map((type, index) => (
           <ActivityTypeButton
             key={type.value}
             type={type}
@@ -240,20 +246,25 @@ function GridView({
   );
 }
 
-export function ActivityTypePicker({ value, onSelect }: ActivityTypePickerProps) {
+export function ActivityTypePicker({ value, onSelect, allowedTypes }: ActivityTypePickerProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("carousel");
 
   const toggleViewMode = useCallback(() => {
     setViewMode((prev) => (prev === "carousel" ? "grid" : "carousel"));
   }, []);
 
+  // Filter types if allowedTypes is provided
+  const filteredTypes = allowedTypes
+    ? ALL_ACTIVITY_TYPES.filter((type) => allowedTypes.includes(type.value))
+    : ALL_ACTIVITY_TYPES;
+
   return (
     <div className="space-y-1 overflow-hidden">
       {/* Activity type selector */}
       {viewMode === "carousel" ? (
-        <CarouselView value={value} onSelect={onSelect} />
+        <CarouselView value={value} onSelect={onSelect} types={filteredTypes} />
       ) : (
-        <GridView value={value} onSelect={onSelect} />
+        <GridView value={value} onSelect={onSelect} types={filteredTypes} />
       )}
 
       {/* View toggle at bottom */}

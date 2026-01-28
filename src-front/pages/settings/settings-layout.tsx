@@ -72,16 +72,16 @@ const settingsSections = [
     title: "Connections",
     items: [
       {
-        title: "Market Data",
-        href: "market-data",
-        subtitle: "Providers, sync, and imports",
-        icon: <Icons.BarChart className="size-5" />,
-      },
-      {
         title: "Wealthfolio Connect",
         href: "connect",
         subtitle: "Broker and device linking",
         icon: <Icons.CloudSync2 className="size-6 text-blue-400" />,
+      },
+      {
+        title: "Market Data",
+        href: "market-data",
+        subtitle: "Providers, sync, and imports",
+        icon: <Icons.BarChart className="size-5" />,
       },
       {
         title: "AI Providers",
@@ -139,7 +139,7 @@ export default function SettingsLayout() {
             <div className="space-y-6 p-3 lg:p-4">
               {settingsSections.map((section) => (
                 <div key={section.title} className="space-y-3">
-                  <div className="text-muted-foreground px-2 text-xs font-semibold uppercase tracking-widest">
+                  <div className="text-muted-foreground px-2 text-xs font-semibold tracking-widest uppercase">
                     {section.title}
                   </div>
                   <div className="divide-border bg-card divide-y overflow-hidden rounded-2xl border shadow-sm">
@@ -194,12 +194,12 @@ export default function SettingsLayout() {
               <div className="space-y-6">
                 {settingsSections.map((section) => (
                   <div key={section.title} className="space-y-2">
-                  <div className="text-muted-foreground pl-2.5 text-[11px] font-semibold uppercase tracking-widest">
-                    {section.title}
+                    <div className="text-muted-foreground pl-2.5 text-[11px] font-semibold tracking-widest uppercase">
+                      {section.title}
+                    </div>
+                    <SidebarNav items={section.items} />
                   </div>
-                  <SidebarNav items={section.items} />
-                </div>
-              ))}
+                ))}
               </div>
             </aside>
             <div className="mb-8 min-w-0 flex-1">

@@ -1,7 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
-import { createAccount, updateAccount, deleteAccount, logger } from "@/adapters";
+import { createAccount, updateAccount, deleteAccount, switchTrackingMode, logger } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
+import type { TrackingMode } from "@/lib/types";
 interface UseAccountMutationsProps {
   onSuccess?: () => void;
 }
@@ -60,5 +61,23 @@ export function useAccountMutations({ onSuccess = () => undefined }: UseAccountM
     },
   });
 
-  return { createAccountMutation, updateAccountMutation, deleteAccountMutation };
+  const switchTrackingModeMutation = useMutation({
+    mutationFn: ({ accountId, newMode }: { accountId: string; newMode: TrackingMode }) =>
+      switchTrackingMode(accountId, newMode),
+    onSuccess: () => {
+      handleSuccess("Tracking mode switched successfully.");
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNTS] });
+    },
+    onError: (e) => {
+      logger.error(`Error switching tracking mode: ${e}`);
+      handleError("switching tracking mode for");
+    },
+  });
+
+  return {
+    createAccountMutation,
+    updateAccountMutation,
+    deleteAccountMutation,
+    switchTrackingModeMutation,
+  };
 }

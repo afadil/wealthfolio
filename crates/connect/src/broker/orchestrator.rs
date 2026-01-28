@@ -8,9 +8,10 @@ use std::sync::Arc;
 
 use log::{debug, error, info};
 
-use super::models::{SyncActivitiesResponse, SyncResult};
+use super::models::{NewAccountInfo, SyncActivitiesResponse, SyncHoldingsResponse, SyncResult};
 use super::progress::{SyncProgressPayload, SyncProgressReporter, SyncStatus};
 use super::traits::{BrokerApiClient, BrokerSyncServiceTrait};
+use wealthfolio_core::accounts::{get_tracking_mode, TrackingMode};
 use wealthfolio_core::sync::{ImportRunMode, ImportRunStatus, ImportRunSummary};
 
 /// Configuration for sync operations.
@@ -90,6 +91,8 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
                     connections_synced: None,
                     accounts_synced: None,
                     activities_synced: None,
+                    holdings_synced: None,
+                    new_accounts: None,
                 };
                 self.progress_reporter.report_sync_complete(&failed_result);
             }
@@ -142,22 +145,16 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
             );
         }
 
-        // Filter to sync-enabled accounts and track their broker IDs
+        // Track sync-enabled broker IDs for data sync
         let sync_enabled_broker_ids: HashSet<String> = all_accounts
             .iter()
             .filter(|a| a.sync_enabled)
             .filter_map(|a| a.id.clone())
             .collect();
 
-        let accounts: Vec<_> = all_accounts
-            .into_iter()
-            .filter(|a| a.sync_enabled)
-            .collect();
+        let accounts: Vec<_> = all_accounts.into_iter().collect();
 
-        info!(
-            "Filtered to {} broker accounts with sync_enabled=true",
-            accounts.len()
-        );
+        info!("Syncing {} broker accounts (including sync_disabled)", accounts.len());
 
         let accounts_result = self
             .sync_service
@@ -170,38 +167,81 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
             accounts_result.created, accounts_result.updated, accounts_result.skipped
         );
 
-        // Step 3: Sync activities for all synced accounts
-        let activities_result = self
-            .sync_activities(api_client, &sync_enabled_broker_ids)
+        // Collect new accounts info before moving accounts_result
+        let new_accounts_info = accounts_result.new_accounts_info.clone();
+
+        // Step 3: Sync data for all synced accounts based on their tracking mode
+        // - TRANSACTIONS mode: sync activities
+        // - HOLDINGS mode: sync holdings (positions)
+        // - NOT_SET mode: skip (needs user configuration first)
+        let (activities_result, holdings_result) = self
+            .sync_account_data(api_client, &sync_enabled_broker_ids, &new_accounts_info)
             .await?;
 
+        // Build the accounts_needing_setup list - includes ALL accounts with trackingMode=NOT_SET
+        // This ensures the "review" toast appears on every sync until user configures all accounts
+        let accounts_needing_setup: Vec<NewAccountInfo> = self
+            .sync_service
+            .get_synced_accounts()
+            .map_err(|e| format!("Failed to get synced accounts: {}", e))?
+            .into_iter()
+            .filter(|acc| get_tracking_mode(acc) == TrackingMode::NotSet)
+            .map(|acc| NewAccountInfo {
+                local_account_id: acc.id.clone(),
+                provider_account_id: acc.provider_account_id.unwrap_or_default(),
+                default_name: acc.name.clone(),
+                currency: acc.currency.clone(),
+                institution_name: acc.platform_id.clone(),
+            })
+            .collect();
+
+        let new_accounts: Option<Vec<NewAccountInfo>> = if accounts_needing_setup.is_empty() {
+            None
+        } else {
+            Some(accounts_needing_setup)
+        };
+
+        let total_failed = activities_result.accounts_failed + holdings_result.accounts_failed;
         let result = SyncResult {
-            success: activities_result.accounts_failed == 0,
+            success: total_failed == 0,
             message: format!(
-                "Sync completed. {} accounts created, {} activities synced{}",
+                "Sync completed. {} accounts created, {} activities synced, {} holdings synced{}",
                 accounts_result.created,
                 activities_result.activities_upserted,
-                if activities_result.accounts_failed == 0 {
+                holdings_result.positions_upserted,
+                if total_failed == 0 {
                     ".".to_string()
                 } else {
-                    format!(" ({} failed).", activities_result.accounts_failed)
+                    format!(" ({} failed).", total_failed)
                 }
             ),
             connections_synced: Some(connections_result),
             accounts_synced: Some(accounts_result),
             activities_synced: Some(activities_result),
+            holdings_synced: Some(holdings_result),
+            new_accounts,
         };
 
         Ok(result)
     }
 
-    /// Sync activities for all synced accounts.
-    async fn sync_activities(
+    /// Sync account data for all synced accounts based on their tracking mode.
+    /// - TRANSACTIONS mode: sync activities
+    /// - HOLDINGS mode: sync holdings (positions)
+    /// - NOT_SET mode: skip (needs user configuration first)
+    async fn sync_account_data(
         &self,
         api_client: &dyn BrokerApiClient,
         sync_enabled_broker_ids: &HashSet<String>,
-    ) -> Result<SyncActivitiesResponse, String> {
+        new_accounts_info: &[NewAccountInfo],
+    ) -> Result<(SyncActivitiesResponse, SyncHoldingsResponse), String> {
         let end_date = chrono::Utc::now().date_naive();
+
+        // Build a set of newly created account IDs to skip them (they have trackingMode=NOT_SET)
+        let new_account_ids: HashSet<String> = new_accounts_info
+            .iter()
+            .map(|info| info.local_account_id.clone())
+            .collect();
 
         let synced_accounts = self
             .sync_service
@@ -209,7 +249,7 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
             .map_err(|e| format!("Failed to get synced accounts: {}", e))?;
 
         let mut activities_summary = SyncActivitiesResponse::default();
-        let mut activity_errors: Vec<String> = Vec::new();
+        let mut holdings_summary = SyncHoldingsResponse::default();
 
         for account in synced_accounts {
             let Some(broker_account_id) = account.provider_account_id.clone() else {
@@ -219,10 +259,54 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
             // Skip accounts that are not sync-enabled
             if !sync_enabled_broker_ids.contains(&broker_account_id) {
                 info!(
-                    "Skipping activity sync for account '{}' (sync disabled)",
+                    "Skipping sync for account '{}' (sync disabled)",
                     account.name
                 );
                 continue;
+            }
+
+            // Skip newly created accounts - they have trackingMode=NOT_SET and need user configuration
+            if new_account_ids.contains(&account.id) {
+                info!(
+                    "Skipping sync for new account '{}' (trackingMode=NOT_SET, needs user configuration)",
+                    account.name
+                );
+                continue;
+            }
+
+            // Check tracking mode to determine sync type
+            let tracking_mode = get_tracking_mode(&account);
+            match tracking_mode {
+                TrackingMode::NotSet => {
+                    info!(
+                        "Skipping sync for account '{}' (trackingMode=NOT_SET)",
+                        account.name
+                    );
+                    continue;
+                }
+                TrackingMode::Holdings => {
+                    // Sync holdings for HOLDINGS mode accounts
+                    match self
+                        .sync_account_holdings(api_client, &account.id, &account.name, &broker_account_id)
+                        .await
+                    {
+                        Ok((positions_saved, assets_created, new_asset_ids)) => {
+                            holdings_summary.accounts_synced += 1;
+                            holdings_summary.positions_upserted += positions_saved;
+                            holdings_summary.snapshots_upserted += 1;
+                            holdings_summary.assets_inserted += assets_created;
+                            holdings_summary.new_asset_ids.extend(new_asset_ids);
+                        }
+                        Err(err) => {
+                            error!("Failed to sync holdings for '{}': {}", account.name, err);
+                            holdings_summary.accounts_failed += 1;
+                        }
+                    }
+                    continue;
+                }
+                TrackingMode::Transactions => {
+                    // Continue with activity sync below
+                }
             }
 
             let account_id = account.id.clone();
@@ -235,7 +319,8 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
                 .await
                 .map_err(|e| format!("Failed to mark activity sync attempt: {}", e))
             {
-                activity_errors.push(format!("{}: {}", account_name, err));
+                error!("Failed to mark activity sync attempt for '{}': {}", account_name, err);
+                activities_summary.accounts_failed += 1;
                 continue;
             }
 
@@ -390,13 +475,68 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
                             .with_message(err.clone()),
                     );
 
-                    activity_errors.push(format!("{}: {}", account_name, err));
                     activities_summary.accounts_failed += 1;
                 }
             }
         }
 
-        Ok(activities_summary)
+        Ok((activities_summary, holdings_summary))
+    }
+
+    /// Sync holdings for a single account (HOLDINGS tracking mode).
+    ///
+    /// Fetches current holdings from the broker API and saves as a snapshot.
+    /// Returns (positions_saved, assets_created, new_asset_ids).
+    async fn sync_account_holdings(
+        &self,
+        api_client: &dyn BrokerApiClient,
+        account_id: &str,
+        account_name: &str,
+        broker_account_id: &str,
+    ) -> Result<(usize, usize, Vec<String>), String> {
+        info!("Syncing holdings for account '{}' ({})", account_name, broker_account_id);
+
+        // Emit progress event
+        self.progress_reporter.report_progress(
+            SyncProgressPayload::new(account_id, account_name, SyncStatus::Syncing)
+                .with_message("Fetching holdings from broker...".to_string()),
+        );
+
+        // Fetch holdings from broker API
+        let holdings = api_client
+            .get_account_holdings(broker_account_id)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let positions_count = holdings.positions.as_ref().map(|p| p.len()).unwrap_or(0);
+        let balances_count = holdings.balances.as_ref().map(|b| b.len()).unwrap_or(0);
+
+        info!(
+            "Fetched {} positions and {} balances for '{}'",
+            positions_count, balances_count, account_name
+        );
+
+        // Save holdings as a snapshot
+        let (positions_saved, assets_created, new_asset_ids) = self
+            .sync_service
+            .save_broker_holdings(
+                account_id.to_string(),
+                holdings.balances.unwrap_or_default(),
+                holdings.positions.unwrap_or_default(),
+            )
+            .await
+            .map_err(|e| format!("Failed to save broker holdings: {}", e))?;
+
+        // Emit completion event
+        self.progress_reporter.report_progress(
+            SyncProgressPayload::new(account_id, account_name, SyncStatus::Complete)
+                .with_message(format!(
+                    "Synced {} positions ({} assets created)",
+                    positions_saved, assets_created
+                )),
+        );
+
+        Ok((positions_saved, assets_created, new_asset_ids))
     }
 
     /// Sync activities for a single account with full pagination.

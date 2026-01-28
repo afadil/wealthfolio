@@ -65,7 +65,7 @@ export function ResponsiveSelect({
           variant="outline"
           disabled={disabled}
           className={cn(
-            "w-full justify-between truncate font-normal",
+            "w-full justify-between truncate rounded-md font-normal",
             !selectedOption && "text-muted-foreground",
             triggerClassName,
           )}

@@ -1,4 +1,4 @@
-import { DataGrid, useDataGrid } from "@wealthfolio/ui";
+import { Button, DataGrid, Icons, useDataGrid } from "@wealthfolio/ui";
 import { useCallback, useMemo, useState } from "react";
 import { createColumnHelper } from "@tanstack/react-table";
 import type { Quote } from "@/lib/types";
@@ -118,6 +118,26 @@ export function ValueHistoryDataGrid({
   // Column definitions
   const columnHelper = createColumnHelper<ValueHistoryEntry>();
 
+  // Delete a single row
+  const handleDeleteRow = useCallback(
+    (entry: ValueHistoryEntry) => {
+      if (entry.isNew) {
+        // Remove new entries immediately
+        setLocalEntries((prev) => prev.filter((e) => e.id !== entry.id));
+        setDirtyIds((prev) => {
+          const next = new Set(prev);
+          next.delete(entry.id);
+          return next;
+        });
+      } else {
+        // Mark existing entries for deletion
+        setDeletedIds((prev) => new Set(prev).add(entry.id));
+        setLocalEntries((prev) => prev.filter((e) => e.id !== entry.id));
+      }
+    },
+    [],
+  );
+
   const columns = useMemo(
     () => [
       columnHelper.accessor("date", {
@@ -135,8 +155,29 @@ export function ValueHistoryDataGrid({
         size: 300,
         meta: { cell: { variant: "long-text" } },
       }),
+      // Actions column with delete button
+      columnHelper.display({
+        id: "actions",
+        header: () => null,
+        size: 50,
+        enableSorting: false,
+        enableResizing: false,
+        enableHiding: false,
+        cell: ({ row }) => (
+          <div className="flex size-full items-center justify-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-destructive h-7 w-7"
+              onClick={() => handleDeleteRow(row.original)}
+            >
+              <Icons.X className="h-4 w-4" />
+            </Button>
+          </div>
+        ),
+      }),
     ],
-    [columnHelper, isLiability],
+    [columnHelper, isLiability, handleDeleteRow],
   );
 
   // Handle data changes from the grid

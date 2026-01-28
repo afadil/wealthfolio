@@ -5,8 +5,8 @@ use crate::portfolio::holdings::holdings_model::{
     Holding, HoldingType, Instrument, MonetaryValue,
 };
 use crate::portfolio::snapshot::{self, Position, SnapshotServiceTrait};
+use crate::utils::time_utils::valuation_date_today;
 use async_trait::async_trait;
-use chrono::Utc;
 use log::{debug, error, warn};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
@@ -115,7 +115,7 @@ impl HoldingsServiceTrait for HoldingsService {
             "Getting holdings for account {} in base currency {}",
             account_id, base_currency
         );
-        let today = Utc::now().date_naive();
+        let today = valuation_date_today();
 
         let latest_snapshot = match self
             .snapshot_service
@@ -395,7 +395,7 @@ impl HoldingsServiceTrait for HoldingsService {
             "Getting specific holding for asset {} in account {} (base currency: {})",
             asset_id, account_id, base_currency
         );
-        let today = Utc::now().date_naive();
+        let today = valuation_date_today();
 
         let latest_snapshot = match self
             .snapshot_service
@@ -566,7 +566,7 @@ mod tests {
 
     #[test]
     fn normalize_holding_currency_converts_minor_security_units() {
-        let as_of = Utc::now().date_naive();
+        let as_of = valuation_date_today();
         let mut holding = Holding {
             id: "SEC-TEST-GBp".to_string(),
             account_id: "TEST".to_string(),
@@ -697,7 +697,7 @@ mod tests {
                 base: dec!(10),
             }),
             weight: dec!(1),
-            as_of_date: Utc::now().date_naive(),
+            as_of_date: valuation_date_today(),
             metadata: None,
         };
 

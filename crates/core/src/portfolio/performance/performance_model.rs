@@ -41,15 +41,27 @@ pub struct PerformanceMetrics {
     pub period_start_date: Option<NaiveDate>,
     pub period_end_date: Option<NaiveDate>,
     pub currency: String,
-    pub cumulative_twr: Decimal,
+    /// Period gain in dollars (SOTA: change in unrealized P&L for HOLDINGS mode)
+    pub period_gain: Decimal,
+    /// Period return percentage (SOTA formula for HOLDINGS mode)
+    pub period_return: Decimal,
+    /// Time-weighted return (None for HOLDINGS mode - requires cash flow tracking)
+    pub cumulative_twr: Option<Decimal>,
+    /// Legacy field for backward compatibility
     pub gain_loss_amount: Option<Decimal>,
-    pub annualized_twr: Decimal,
+    /// Annualized TWR (None for HOLDINGS mode)
+    pub annualized_twr: Option<Decimal>,
     pub simple_return: Decimal,
     pub annualized_simple_return: Decimal,
-    pub cumulative_mwr: Decimal,
-    pub annualized_mwr: Decimal,
+    /// Money-weighted return (None for HOLDINGS mode - requires cash flow tracking)
+    pub cumulative_mwr: Option<Decimal>,
+    /// Annualized MWR (None for HOLDINGS mode)
+    pub annualized_mwr: Option<Decimal>,
     pub volatility: Decimal,
     pub max_drawdown: Decimal,
+    /// Indicates if this is a HOLDINGS mode account (no cash flow tracking)
+    #[serde(default)]
+    pub is_holdings_mode: bool,
 }
 
 // This struct now only holds the calculated performance metrics.

@@ -21,6 +21,7 @@ export const COMMANDS: CommandMap = {
   create_account: { method: "POST", path: "/accounts" },
   update_account: { method: "PUT", path: "/accounts" },
   delete_account: { method: "DELETE", path: "/accounts" },
+  switch_tracking_mode: { method: "POST", path: "/accounts" },
   get_settings: { method: "GET", path: "/settings" },
   update_settings: { method: "PUT", path: "/settings" },
   is_auto_update_check_enabled: { method: "GET", path: "/settings/auto-update-enabled" },
@@ -34,6 +35,12 @@ export const COMMANDS: CommandMap = {
   get_historical_valuations: { method: "GET", path: "/valuations/history" },
   get_latest_valuations: { method: "GET", path: "/valuations/latest" },
   get_portfolio_allocations: { method: "GET", path: "/allocations" },
+  // Manual snapshot management
+  get_manual_snapshots: { method: "GET", path: "/snapshots/manual" },
+  get_snapshot_by_date: { method: "GET", path: "/snapshots/by-date" },
+  delete_snapshot: { method: "DELETE", path: "/snapshots" },
+  save_manual_holdings: { method: "POST", path: "/snapshots/manual" },
+  import_holdings_csv: { method: "POST", path: "/snapshots/import" },
   update_portfolio: { method: "POST", path: "/portfolio/update" },
   recalculate_portfolio: { method: "POST", path: "/portfolio/recalculate" },
   // Performance
@@ -264,6 +271,12 @@ export const invoke = async <T>(
       url += `/${data.accountId}`;
       break;
     }
+    case "switch_tracking_mode": {
+      const { accountId, newMode } = payload as { accountId: string; newMode: string };
+      url += `/${accountId}/switch-tracking-mode`;
+      body = JSON.stringify({ newMode });
+      break;
+    }
     case "create_account": {
       const data = payload as { account: Record<string, unknown> };
       body = JSON.stringify(data.account);
@@ -322,6 +335,48 @@ export const invoke = async <T>(
       const params = new URLSearchParams();
       params.set("accountId", accountId);
       url += `?${params.toString()}`;
+      break;
+    }
+    // Manual snapshot management
+    case "get_manual_snapshots": {
+      const { accountId } = payload as { accountId: string };
+      const params = new URLSearchParams();
+      params.set("accountId", accountId);
+      url += `?${params.toString()}`;
+      break;
+    }
+    case "get_snapshot_by_date": {
+      const { accountId, date } = payload as { accountId: string; date: string };
+      const params = new URLSearchParams();
+      params.set("accountId", accountId);
+      params.set("date", date);
+      url += `?${params.toString()}`;
+      break;
+    }
+    case "delete_snapshot": {
+      const { accountId, date } = payload as { accountId: string; date: string };
+      const params = new URLSearchParams();
+      params.set("accountId", accountId);
+      params.set("date", date);
+      url += `?${params.toString()}`;
+      break;
+    }
+    case "save_manual_holdings": {
+      const { accountId, holdings, cashBalances, snapshotDate } = payload as {
+        accountId: string;
+        holdings: unknown[];
+        cashBalances: Record<string, string>;
+        snapshotDate?: string;
+      };
+      body = JSON.stringify({ accountId, holdings, cashBalances, snapshotDate });
+      break;
+    }
+    case "import_holdings_csv": {
+      const { accountId, snapshots } = payload as {
+        accountId: string;
+        snapshots: unknown[];
+      };
+      body = JSON.stringify({ accountId, snapshots });
       break;
     }
     case "calculate_accounts_simple_performance": {

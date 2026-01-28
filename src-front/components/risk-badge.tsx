@@ -8,7 +8,7 @@ import {
 type RiskLevel = "UNKNOWN" | "LOW" | "MEDIUM" | "HIGH";
 
 interface RiskBadgeProps {
-  level: RiskLevel | string | null | undefined;
+  level: RiskLevel | null | undefined;
   size?: "sm" | "md";
   showLabel?: boolean;
   className?: string;
@@ -40,7 +40,7 @@ const RISK_CONFIG: Record<
   },
 };
 
-function normalizeLevel(level: RiskLevel | string | null | undefined): RiskLevel {
+function normalizeLevel(level: RiskLevel | null | undefined): RiskLevel {
   if (!level) return "UNKNOWN";
   const normalized = level.toUpperCase();
   if (normalized in RISK_CONFIG) {

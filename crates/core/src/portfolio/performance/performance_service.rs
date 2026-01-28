@@ -1,7 +1,9 @@
+use crate::accounts::TrackingMode;
 use crate::constants::{DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
 use crate::errors::{self, Result, ValidationError};
 use crate::quotes::QuoteServiceTrait;
 use crate::performance::ReturnData;
+use crate::utils::time_utils::valuation_date_today;
 use crate::valuation::ValuationServiceTrait;
 
 use async_trait::async_trait;
@@ -25,6 +27,7 @@ pub trait PerformanceServiceTrait: Send + Sync {
         item_id: &str,
         start_date: Option<NaiveDate>,
         end_date: Option<NaiveDate>,
+        tracking_mode: Option<TrackingMode>,
     ) -> Result<PerformanceMetrics>;
 
     async fn calculate_performance_summary(
@@ -33,6 +36,7 @@ pub trait PerformanceServiceTrait: Send + Sync {
         item_id: &str,
         start_date: Option<NaiveDate>,
         end_date: Option<NaiveDate>,
+        tracking_mode: Option<TrackingMode>,
     ) -> Result<PerformanceMetrics>;
 
     /// Calculates simple performance metrics (daily returns, cumulative returns, portfolio weights) for multiple accounts.
@@ -114,11 +118,13 @@ impl PerformanceService {
     }
 
     /// Internal function for calculating account performance (Full)
+    /// For HOLDINGS mode accounts, uses SOTA price-based performance calculations
     async fn calculate_account_performance(
         &self,
         account_id: &str,
         start_date_opt: Option<NaiveDate>,
         end_date_opt: Option<NaiveDate>,
+        tracking_mode: Option<TrackingMode>,
     ) -> Result<PerformanceMetrics> {
         if let (Some(start), Some(end)) = (start_date_opt, end_date_opt) {
             if start > end {
@@ -145,9 +151,14 @@ impl PerformanceService {
         let actual_end_date = end_point.valuation_date;
         let currency = start_point.account_currency.clone();
 
+        let is_holdings_mode = matches!(tracking_mode, Some(TrackingMode::Holdings));
+
         let capacity = full_history.len();
         let mut returns = Vec::with_capacity(capacity);
         let mut daily_twr_returns = Vec::with_capacity(capacity - 1);
+        // Separate list for risk metrics that excludes days with holdings changes
+        // (detected via cost_basis changes, which indicate position additions/removals)
+        let mut daily_returns_for_risk = Vec::with_capacity(capacity - 1);
 
         returns.push(ReturnData {
             date: actual_start_date,
@@ -198,6 +209,28 @@ impl PerformanceService {
             };
 
             daily_twr_returns.push(twr_period_return);
+
+            // For risk metrics (volatility, max drawdown), filter logic depends on tracking mode:
+            // - TRANSACTIONS mode: TWR already handles cash flows, use all daily returns
+            // - HOLDINGS mode: exclude days with detected holdings/contribution changes
+            //   (since we can't distinguish market returns from contribution-driven changes)
+            let should_exclude = if is_holdings_mode {
+                // Primary detection: cost_basis change indicates position additions/removals
+                let cost_basis_changed = prev_point.cost_basis != curr_point.cost_basis;
+                // Fallback detection: if cost_basis is zero/missing, check net_contribution
+                // changes which indicate deposits/withdrawals
+                let contribution_changed = prev_point.cost_basis.is_zero()
+                    && prev_point.net_contribution != curr_point.net_contribution;
+                cost_basis_changed || contribution_changed
+            } else {
+                // TRANSACTIONS mode: TWR is already cash-flow adjusted, no filtering needed
+                false
+            };
+
+            if !should_exclude {
+                daily_returns_for_risk.push(twr_period_return);
+            }
+
             cumulative_twr_value *= one + twr_period_return;
             cumulative_mwr_value *= one + mwr_period_return;
 
@@ -212,8 +245,11 @@ impl PerformanceService {
         let cumulative_twr = returns.last().map_or(Decimal::ZERO, |r| r.value);
         let annualized_twr =
             Self::calculate_annualized_return(actual_start_date, actual_end_date, cumulative_twr);
-        let volatility = Self::calculate_volatility(&daily_twr_returns);
-        let max_drawdown = Self::calculate_max_drawdown(&daily_twr_returns);
+        // Risk metrics use filtered returns:
+        // - TRANSACTIONS mode: all returns (TWR handles cash flows)
+        // - HOLDINGS mode: excludes days with detected holdings/contribution changes
+        let volatility = Self::calculate_volatility(&daily_returns_for_risk);
+        let max_drawdown = Self::calculate_max_drawdown(&daily_returns_for_risk);
 
         let start_net_contribution = start_point.net_contribution;
         let end_net_contribution = end_point.net_contribution;
@@ -224,15 +260,9 @@ impl PerformanceService {
         let gain_loss_amount = end_point.total_value - start_value_for_gain_calc - net_cash_flow;
 
         let simple_total_return = if start_value_for_gain_calc.is_zero() {
-            // If the effective start value for gain calculation is zero, simple return is tricky.
-            // If gain_loss_amount is also zero, return 0. Otherwise, it could be infinite or undefined.
-            // For simplicity, returning 0 if gain_loss_amount is also 0, else could be an error or specific value.
             if gain_loss_amount.is_zero() {
                 Decimal::ZERO
             } else {
-                // Consider what to return if start_value_for_gain_calc is zero but gain_loss_amount is not.
-                // This case implies infinite return or an anomaly. For now, returning zero to avoid division by zero error.
-                // A more robust solution might be None or an error.
                 warn!("Simple total return calculation: start_value_for_gain_calc is zero but gain_loss_amount is non-zero for account_id: {}. Returning 0.", account_id);
                 Decimal::ZERO
             }
@@ -250,32 +280,70 @@ impl PerformanceService {
         let annualized_mwr =
             Self::calculate_annualized_return(actual_start_date, actual_end_date, cumulative_mwr);
 
+        // SOTA calculations for HOLDINGS mode
+        // period_gain = Change in Unrealized P&L (excludes contributions)
+        // period_return = period_gain / start_investment_value (rolling) or unrealized_pnl / cost_basis (ALL time)
+        let (period_gain, period_return) = if is_holdings_mode {
+            // Unrealized P&L = Investment Market Value - Cost Basis
+            let start_unrealized_pnl = start_point.investment_market_value - start_point.cost_basis;
+            let end_unrealized_pnl = end_point.investment_market_value - end_point.cost_basis;
+            let period_gain = end_unrealized_pnl - start_unrealized_pnl;
+
+            // Determine if this is ALL time (no start_date specified) or a rolling period
+            let period_return = if start_date_opt.is_none() {
+                // ALL time: return = unrealized_pnl / cost_basis
+                if end_point.cost_basis.is_zero() {
+                    Decimal::ZERO
+                } else {
+                    end_unrealized_pnl / end_point.cost_basis
+                }
+            } else {
+                // Rolling period: return = period_gain / start_investment_value
+                if start_point.investment_market_value.is_zero() {
+                    Decimal::ZERO
+                } else {
+                    period_gain / start_point.investment_market_value
+                }
+            };
+
+            (period_gain, period_return)
+        } else {
+            // TRANSACTIONS mode: use standard calculations
+            (gain_loss_amount, simple_total_return)
+        };
+
         let result = PerformanceMetrics {
             id: account_id.to_string(),
             returns,
             period_start_date: Some(actual_start_date),
             period_end_date: Some(actual_end_date),
             currency,
-            cumulative_twr: cumulative_twr.round_dp(DECIMAL_PRECISION),
+            period_gain: period_gain.round_dp(DECIMAL_PRECISION),
+            period_return: period_return.round_dp(DECIMAL_PRECISION),
+            // For HOLDINGS mode, TWR/MWR are not meaningful (no cash flow tracking)
+            cumulative_twr: if is_holdings_mode { None } else { Some(cumulative_twr.round_dp(DECIMAL_PRECISION)) },
             gain_loss_amount: Some(gain_loss_amount.round_dp(DECIMAL_PRECISION)),
-            annualized_twr: annualized_twr.round_dp(DECIMAL_PRECISION),
+            annualized_twr: if is_holdings_mode { None } else { Some(annualized_twr.round_dp(DECIMAL_PRECISION)) },
             simple_return: simple_total_return.round_dp(DECIMAL_PRECISION),
             annualized_simple_return: annualized_simple_return.round_dp(DECIMAL_PRECISION),
-            cumulative_mwr: cumulative_mwr.round_dp(DECIMAL_PRECISION),
-            annualized_mwr: annualized_mwr.round_dp(DECIMAL_PRECISION),
+            cumulative_mwr: if is_holdings_mode { None } else { Some(cumulative_mwr.round_dp(DECIMAL_PRECISION)) },
+            annualized_mwr: if is_holdings_mode { None } else { Some(annualized_mwr.round_dp(DECIMAL_PRECISION)) },
             volatility: volatility.round_dp(DECIMAL_PRECISION),
             max_drawdown: max_drawdown.round_dp(DECIMAL_PRECISION),
+            is_holdings_mode,
         };
 
         Ok(result)
     }
 
     /// Internal function for calculating account performance (Summary)
+    /// For HOLDINGS mode accounts, uses SOTA price-based performance calculations
     async fn calculate_account_performance_summary(
         &self,
         account_id: &str,
         start_date_opt: Option<NaiveDate>,
         end_date_opt: Option<NaiveDate>,
+        tracking_mode: Option<TrackingMode>,
     ) -> Result<PerformanceMetrics> {
         let (start_point, end_point, actual_start_date, actual_end_date, currency): (
             DailyAccountValuation,
@@ -284,6 +352,8 @@ impl PerformanceService {
             NaiveDate,
             String,
         ) = self.get_account_boundary_data(account_id, start_date_opt, end_date_opt)?;
+
+        let is_holdings_mode = matches!(tracking_mode, Some(TrackingMode::Holdings));
 
         let start_value = start_point.total_value;
         let end_value = end_point.total_value;
@@ -305,21 +375,51 @@ impl PerformanceService {
             simple_total_return,
         );
 
+        // SOTA calculations for HOLDINGS mode
+        let (period_gain, period_return) = if is_holdings_mode {
+            let start_unrealized_pnl = start_point.investment_market_value - start_point.cost_basis;
+            let end_unrealized_pnl = end_point.investment_market_value - end_point.cost_basis;
+            let period_gain = end_unrealized_pnl - start_unrealized_pnl;
+
+            let period_return = if start_date_opt.is_none() {
+                // ALL time: return = unrealized_pnl / cost_basis
+                if end_point.cost_basis.is_zero() {
+                    Decimal::ZERO
+                } else {
+                    end_unrealized_pnl / end_point.cost_basis
+                }
+            } else {
+                // Rolling period: return = period_gain / start_investment_value
+                if start_point.investment_market_value.is_zero() {
+                    Decimal::ZERO
+                } else {
+                    period_gain / start_point.investment_market_value
+                }
+            };
+
+            (period_gain, period_return)
+        } else {
+            (gain_loss_amount, simple_total_return)
+        };
+
         let result = PerformanceMetrics {
             id: account_id.to_string(),
             returns: Vec::new(),
             period_start_date: Some(actual_start_date),
             period_end_date: Some(actual_end_date),
             currency,
-            cumulative_twr: Decimal::ZERO,
+            period_gain: period_gain.round_dp(DECIMAL_PRECISION),
+            period_return: period_return.round_dp(DECIMAL_PRECISION),
+            cumulative_twr: if is_holdings_mode { None } else { Some(Decimal::ZERO) },
             gain_loss_amount: Some(gain_loss_amount.round_dp(DECIMAL_PRECISION)),
-            annualized_twr: Decimal::ZERO,
+            annualized_twr: if is_holdings_mode { None } else { Some(Decimal::ZERO) },
             simple_return: simple_total_return.round_dp(DECIMAL_PRECISION),
             annualized_simple_return: annualized_simple_return.round_dp(DECIMAL_PRECISION),
-            cumulative_mwr: Decimal::ZERO,
-            annualized_mwr: Decimal::ZERO,
+            cumulative_mwr: if is_holdings_mode { None } else { Some(Decimal::ZERO) },
+            annualized_mwr: if is_holdings_mode { None } else { Some(Decimal::ZERO) },
             volatility: Decimal::ZERO,
             max_drawdown: Decimal::ZERO,
+            is_holdings_mode,
         };
 
         Ok(result)
@@ -333,7 +433,7 @@ impl PerformanceService {
         start_date_opt: Option<NaiveDate>,
         end_date_opt: Option<NaiveDate>,
     ) -> Result<PerformanceMetrics> {
-        let effective_end_date = end_date_opt.unwrap_or_else(|| chrono::Utc::now().date_naive());
+        let effective_end_date = end_date_opt.unwrap_or_else(valuation_date_today);
         let effective_start_date =
             start_date_opt.unwrap_or_else(|| effective_end_date - chrono::Duration::days(365));
 
@@ -451,15 +551,18 @@ impl PerformanceService {
             period_start_date: Some(actual_start_date),
             period_end_date: Some(actual_end_date),
             currency,
-            cumulative_twr: total_return.round_dp(DECIMAL_PRECISION),
+            period_gain: Decimal::ZERO, // Not applicable for symbol performance
+            period_return: total_return.round_dp(DECIMAL_PRECISION),
+            cumulative_twr: Some(total_return.round_dp(DECIMAL_PRECISION)),
             gain_loss_amount: None,
-            annualized_twr: annualized_return.round_dp(DECIMAL_PRECISION),
+            annualized_twr: Some(annualized_return.round_dp(DECIMAL_PRECISION)),
             simple_return: Decimal::ZERO,
             annualized_simple_return: Decimal::ZERO,
-            cumulative_mwr: Decimal::ZERO,
-            annualized_mwr: Decimal::ZERO,
+            cumulative_mwr: Some(Decimal::ZERO),
+            annualized_mwr: Some(Decimal::ZERO),
             volatility: volatility.round_dp(DECIMAL_PRECISION),
             max_drawdown: max_drawdown.round_dp(DECIMAL_PRECISION),
+            is_holdings_mode: false,
         };
 
         Ok(result)
@@ -472,15 +575,18 @@ impl PerformanceService {
             period_start_date: None,
             period_end_date: None,
             currency: "".to_string(),
-            cumulative_twr: Decimal::ZERO,
+            period_gain: Decimal::ZERO,
+            period_return: Decimal::ZERO,
+            cumulative_twr: Some(Decimal::ZERO),
             gain_loss_amount: None,
-            annualized_twr: Decimal::ZERO,
+            annualized_twr: Some(Decimal::ZERO),
             simple_return: Decimal::ZERO,
             annualized_simple_return: Decimal::ZERO,
-            cumulative_mwr: Decimal::ZERO,
-            annualized_mwr: Decimal::ZERO,
+            cumulative_mwr: Some(Decimal::ZERO),
+            annualized_mwr: Some(Decimal::ZERO),
             volatility: Decimal::ZERO,
             max_drawdown: Decimal::ZERO,
+            is_holdings_mode: false,
         }
     }
 
@@ -658,10 +764,11 @@ impl PerformanceServiceTrait for PerformanceService {
         item_id: &str,
         start_date: Option<NaiveDate>,
         end_date: Option<NaiveDate>,
+        tracking_mode: Option<TrackingMode>,
     ) -> Result<PerformanceMetrics> {
         match item_type {
             "account" => {
-                self.calculate_account_performance(item_id, start_date, end_date)
+                self.calculate_account_performance(item_id, start_date, end_date, tracking_mode)
                     .await
             }
             "symbol" => {
@@ -682,10 +789,11 @@ impl PerformanceServiceTrait for PerformanceService {
         item_id: &str,
         start_date: Option<NaiveDate>,
         end_date: Option<NaiveDate>,
+        tracking_mode: Option<TrackingMode>,
     ) -> Result<PerformanceMetrics> {
         match item_type {
             "account" => {
-                self.calculate_account_performance_summary(item_id, start_date, end_date)
+                self.calculate_account_performance_summary(item_id, start_date, end_date, tracking_mode)
                     .await
             }
             "symbol" => {

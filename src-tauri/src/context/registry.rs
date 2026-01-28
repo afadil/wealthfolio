@@ -7,6 +7,7 @@ use wealthfolio_core::{
 };
 use wealthfolio_device_sync::DeviceEnrollService;
 use wealthfolio_storage_sqlite::assets::AlternativeAssetRepository;
+use wealthfolio_storage_sqlite::portfolio::snapshot::SnapshotRepository;
 
 use super::TauriAiEnvironment;
 use crate::services::ConnectService;
@@ -27,6 +28,7 @@ pub struct ServiceContext {
     pub performance_service: Arc<dyn portfolio::performance::PerformanceServiceTrait>,
     pub income_service: Arc<dyn portfolio::income::IncomeServiceTrait>,
     pub snapshot_service: Arc<dyn portfolio::snapshot::SnapshotServiceTrait>,
+    pub snapshot_repository: Arc<SnapshotRepository>,
     pub holdings_service: Arc<dyn portfolio::holdings::HoldingsServiceTrait>,
     pub allocation_service: Arc<dyn portfolio::allocation::AllocationServiceTrait>,
     pub valuation_service: Arc<dyn portfolio::valuation::ValuationServiceTrait>,
@@ -92,6 +94,10 @@ impl ServiceContext {
 
     pub fn snapshot_service(&self) -> Arc<dyn portfolio::snapshot::SnapshotServiceTrait> {
         Arc::clone(&self.snapshot_service)
+    }
+
+    pub fn snapshot_repository(&self) -> Arc<SnapshotRepository> {
+        Arc::clone(&self.snapshot_repository)
     }
 
     pub fn holdings_service(&self) -> Arc<dyn portfolio::holdings::HoldingsServiceTrait> {

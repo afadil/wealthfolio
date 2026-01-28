@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use crate::broker::{
     BrokerAccount, BrokerBrokerage, BrokerConnection, BrokerConnectionBrokerage,
-    PaginatedUniversalActivity, PlansResponse, UserInfo, UserTeam,
+    BrokerHoldingsResponse, PaginatedUniversalActivity, PlansResponse, UserInfo, UserTeam,
 };
 use wealthfolio_core::errors::{Error, Result};
 
@@ -284,6 +284,30 @@ impl ConnectApiClient {
         self.parse_response(response).await
     }
 
+    /// Fetch current holdings for a broker account.
+    ///
+    /// # Arguments
+    ///
+    /// * `account_id` - The broker account ID (provider's ID)
+    pub async fn get_account_holdings(&self, account_id: &str) -> Result<BrokerHoldingsResponse> {
+        let url = format!(
+            "{}/api/v1/sync/brokerage/accounts/{}/holdings",
+            self.base_url, account_id
+        );
+
+        debug!("[ConnectApi] Fetching holdings from: {}", url);
+
+        let response = self
+            .client
+            .get(&url)
+            .headers(self.headers())
+            .send()
+            .await
+            .map_err(|e| Error::Unexpected(format!("Failed to fetch holdings: {}", e)))?;
+
+        self.parse_response(response).await
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // User & Subscription Endpoints
     // ─────────────────────────────────────────────────────────────────────────
@@ -515,6 +539,12 @@ impl BrokerApiClient for ConnectApiClient {
     ) -> Result<PaginatedUniversalActivity> {
         // Delegate to the inherent method
         ConnectApiClient::get_account_activities(self, account_id, start_date, end_date, offset, limit).await
+    }
+
+    /// Fetch current holdings for a broker account.
+    async fn get_account_holdings(&self, account_id: &str) -> Result<BrokerHoldingsResponse> {
+        // Delegate to the inherent method
+        ConnectApiClient::get_account_holdings(self, account_id).await
     }
 }
 

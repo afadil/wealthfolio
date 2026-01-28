@@ -4,7 +4,8 @@ use async_trait::async_trait;
 
 use super::models::{
     AccountUniversalActivity, BrokerAccount, BrokerBrokerage, BrokerConnection,
-    PaginatedUniversalActivity, SyncAccountsResponse, SyncConnectionsResponse,
+    BrokerHoldingsResponse, HoldingsBalance, HoldingsPosition, PaginatedUniversalActivity,
+    SyncAccountsResponse, SyncConnectionsResponse,
 };
 use crate::platform::Platform;
 use crate::state::BrokerSyncState;
@@ -44,6 +45,15 @@ pub trait BrokerApiClient: Send + Sync {
         offset: Option<i64>,
         limit: Option<i64>,
     ) -> Result<PaginatedUniversalActivity>;
+
+    /// Fetch current holdings for a broker account.
+    ///
+    /// # Arguments
+    ///
+    /// * `account_id` - The broker account ID (provider's ID)
+    ///
+    /// Returns cash balances, stock/ETF positions, and option positions.
+    async fn get_account_holdings(&self, account_id: &str) -> Result<BrokerHoldingsResponse>;
 }
 
 /// Trait for platform repository operations
@@ -129,4 +139,13 @@ pub trait BrokerSyncServiceTrait: Send + Sync {
         status: ImportRunStatus,
         error: Option<String>,
     ) -> Result<()>;
+
+    /// Save broker holdings as a snapshot with source=BROKER_IMPORTED.
+    /// Returns (positions_saved, assets_created, new_asset_ids).
+    async fn save_broker_holdings(
+        &self,
+        account_id: String,
+        balances: Vec<HoldingsBalance>,
+        positions: Vec<HoldingsPosition>,
+    ) -> Result<(usize, usize, Vec<String>)>;
 }

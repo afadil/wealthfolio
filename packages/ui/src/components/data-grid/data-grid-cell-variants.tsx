@@ -1861,7 +1861,7 @@ export function FileCell<TData>({
         return;
       }
 
-      const rejectedFiles: Array<{ name: string; reason: string }> = [];
+      const rejectedFiles: { name: string; reason: string }[] = [];
       const filesToValidate: File[] = [];
 
       for (const file of newFiles) {
@@ -1908,7 +1908,7 @@ export function FileCell<TData>({
           const filesWithTemp = [...files, ...tempFiles];
           setFiles(filesWithTemp);
 
-          const uploadingIds: Set<string> = new Set(tempFiles.map((f) => f.id));
+          const uploadingIds = new Set<string>(tempFiles.map((f) => f.id));
           setUploadingFiles(uploadingIds);
 
           let uploadedFiles: FileCellData[] = [];

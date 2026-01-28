@@ -700,6 +700,20 @@ where
         let today = Utc::now().date_naive();
         let asset_ids: Vec<String> = states.iter().map(|state| state.asset_id.clone()).collect();
 
+        // Fetch actual assets to check pricing_mode - filter out non-market-priced assets
+        let assets = self.asset_repo.list_by_asset_ids(&asset_ids)?;
+        let syncable_asset_ids: std::collections::HashSet<String> = assets
+            .iter()
+            .filter(|a| self.should_sync_asset(a))
+            .map(|a| a.id.clone())
+            .collect();
+
+        // Filter states to only include syncable assets
+        let states: Vec<_> = states
+            .into_iter()
+            .filter(|s| syncable_asset_ids.contains(&s.asset_id))
+            .collect();
+
         // Compute activity bounds on-the-fly from activities table
         let activity_bounds = self
             .activity_repo
@@ -801,7 +815,8 @@ where
                         .clone()
                         .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string()),
                 );
-                state.is_active = true;
+                // is_active is derived from position_closed_date (None = active)
+                // QuoteSyncState::new() already sets position_closed_date = None
                 state.sync_priority = SyncCategory::New.default_priority();
                 new_states.push(state);
             }
@@ -1054,8 +1069,8 @@ where
                         .preferred_provider
                         .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string()),
                 );
-                // Activity dates are computed on-the-fly, no need to set them here
-                state.is_active = true;
+                // is_active is derived from position_closed_date (None = active)
+                // QuoteSyncState::new() already sets position_closed_date = None
                 state.sync_priority = SyncCategory::New.default_priority();
 
                 self.sync_state_store.upsert(&state).await?;

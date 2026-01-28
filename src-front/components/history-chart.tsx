@@ -3,14 +3,25 @@ import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { formatDate } from "@/lib/utils";
 import { AmountDisplay } from "@wealthfolio/ui";
-import { useState } from "react";
-import { Area, AreaChart, Tooltip, YAxis } from "recharts";
+import { useState, useMemo } from "react";
+import { Area, AreaChart, ReferenceDot, Tooltip, XAxis, YAxis } from "recharts";
 
-interface HistoryChartData {
+export interface HistoryChartData {
   date: string;
   totalValue: number;
   netContribution: number;
   currency: string;
+}
+
+interface HistoryChartProps {
+  data: HistoryChartData[];
+  isLoading?: boolean;
+  /** Dates with manual snapshots (YYYY-MM-DD format) */
+  snapshotDates?: string[];
+  /** Toggle visibility of snapshot markers */
+  showMarkers?: boolean;
+  /** Callback when a marker is clicked */
+  onMarkerClick?: (date: string) => void;
 }
 
 interface TooltipEntry {
@@ -94,10 +105,10 @@ const CustomTooltip = ({
 export function HistoryChart({
   data,
   isLoading,
-}: {
-  data: HistoryChartData[];
-  isLoading?: boolean;
-}) {
+  snapshotDates,
+  showMarkers,
+  onMarkerClick,
+}: HistoryChartProps) {
   const { isBalanceHidden } = useBalancePrivacy();
   const [isChartHovered, setIsChartHovered] = useState(false);
   const isMobile = useIsMobileViewport();
@@ -110,6 +121,35 @@ export function HistoryChart({
       label: "Net Contribution",
     },
   } satisfies ChartConfig;
+
+  // Build a map of date -> index for efficient lookup
+  const dateToIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    data.forEach((item, index) => {
+      map.set(item.date, index);
+    });
+    return map;
+  }, [data]);
+
+  // Get marker data points (snapshot dates that exist in the chart data)
+  const markerDataPoints = useMemo(() => {
+    if (!showMarkers || !snapshotDates || snapshotDates.length === 0) {
+      return [];
+    }
+    return snapshotDates
+      .map((date) => {
+        const index = dateToIndexMap.get(date);
+        if (index !== undefined && data[index]) {
+          return {
+            date,
+            index,
+            value: data[index].totalValue,
+          };
+        }
+        return null;
+      })
+      .filter((item): item is { date: string; index: number; value: number } => item !== null);
+  }, [showMarkers, snapshotDates, dateToIndexMap, data]);
 
   if (isLoading && data.length === 0) {
     return null;
@@ -145,6 +185,7 @@ export function HistoryChart({
             />
           )}
         />
+        <XAxis hide dataKey="date" type="category" />
         <YAxis hide type="number" domain={["auto", "auto"]} />
         <Area
           isAnimationActive={true}
@@ -169,6 +210,37 @@ export function HistoryChart({
           strokeDasharray="5 5"
           strokeOpacity={isChartHovered ? 0.8 : 0}
         />
+        {/* Snapshot markers - diamond shape */}
+        {showMarkers &&
+          markerDataPoints.map((point) => (
+            <ReferenceDot
+              key={`marker-${point.date}`}
+              x={point.date}
+              y={point.value}
+              shape={(props: { cx?: number; cy?: number }) => {
+                const cx = props.cx ?? 0;
+                const cy = props.cy ?? 0;
+                const size = 8;
+                const hitAreaSize = 16;
+                return (
+                  <g
+                    style={{ cursor: "pointer" }}
+                    onClick={() => onMarkerClick?.(point.date)}
+                  >
+                    {/* Invisible larger hit area for easier clicking */}
+                    <circle cx={cx} cy={cy} r={hitAreaSize} fill="transparent" />
+                    {/* Diamond shape */}
+                    <polygon
+                      points={`${cx},${cy - size} ${cx + size},${cy} ${cx},${cy + size} ${cx - size},${cy}`}
+                      fill="var(--success)"
+                      stroke="hsl(var(--background))"
+                      strokeWidth={2}
+                    />
+                  </g>
+                );
+              }}
+            />
+          ))}
       </AreaChart>
     </ChartContainer>
   );
