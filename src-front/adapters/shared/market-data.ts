@@ -155,6 +155,20 @@ export const updateMarketDataProviderSettings = async (payload: {
   }
 };
 
+export const checkQuotesImport = async (
+  file: File,
+  hasHeaderRow = true,
+): Promise<QuoteImport[]> => {
+  try {
+    const buffer = await file.arrayBuffer();
+    const content = Array.from(new Uint8Array(buffer));
+    return await invoke<QuoteImport[]>("check_quotes_import", { content, hasHeaderRow });
+  } catch (error) {
+    logger.error("Error checking quotes import.");
+    throw error;
+  }
+};
+
 export const importManualQuotes = async (quotes: QuoteImport[]): Promise<QuoteImport[]> => {
   try {
     // Internal transformation: hardcode overwriteExisting flag

@@ -233,10 +233,9 @@ function normalizeResult(result: unknown): RecordActivityOutput | null {
       (draftRaw.pricingMode as string) ??
       (draftRaw.pricing_mode as string) ??
       "MARKET",
-    isCustomAsset:
-      draftRaw.isCustomAsset ??
-      draftRaw.is_custom_asset ??
-      false,
+    isCustomAsset: Boolean(
+      draftRaw.isCustomAsset ?? draftRaw.is_custom_asset ?? false,
+    ),
     assetKind:
       (draftRaw.assetKind as string) ??
       (draftRaw.asset_kind as string) ??

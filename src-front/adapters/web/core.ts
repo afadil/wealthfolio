@@ -93,6 +93,7 @@ export const COMMANDS: CommandMap = {
   get_latest_quotes: { method: "POST", path: "/market-data/quotes/latest" },
   update_quote: { method: "PUT", path: "/market-data/quotes" },
   delete_quote: { method: "DELETE", path: "/market-data/quotes/id" },
+  check_quotes_import: { method: "POST", path: "/market-data/quotes/check" },
   import_quotes_csv: { method: "POST", path: "/market-data/quotes/import" },
   synch_quotes: { method: "POST", path: "/market-data/sync/history" },
   sync_market_data: { method: "POST", path: "/market-data/sync" },
@@ -580,6 +581,11 @@ export const invoke = async <T>(
     case "delete_quote": {
       const { id } = payload as { id: string };
       url += `/${encodeURIComponent(id)}`;
+      break;
+    }
+    case "check_quotes_import": {
+      const { content, hasHeaderRow } = payload as { content: number[]; hasHeaderRow: boolean };
+      body = JSON.stringify({ content, hasHeaderRow });
       break;
     }
     case "import_quotes_csv": {

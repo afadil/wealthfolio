@@ -1,15 +1,11 @@
 import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import { useQuoteImport } from "@/hooks/use-quote-import";
+import type { QuoteImportActions, QuoteImportState } from "@/lib/types/quote-import";
 import { cn } from "@/lib/utils";
 import { StepIndicator } from "@/pages/activity/import/components/step-indicator";
+import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { Button } from "@wealthfolio/ui/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wealthfolio/ui/components/ui/card";
+import { Card, CardContent, CardHeader } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
@@ -27,9 +23,22 @@ const STEPS = [
 
 interface ImportQuotesSectionProps {
   showTitle?: boolean;
+  /** When provided externally, uses these instead of internal hook */
+  quoteImport?: QuoteImportState & QuoteImportActions;
+  currentStep?: number;
+  onStepChange?: (step: number) => void;
 }
 
-export function ImportQuotesSection({ showTitle = true }: ImportQuotesSectionProps) {
+export function ImportQuotesSection({
+  showTitle = true,
+  quoteImport: externalQuoteImport,
+  currentStep: externalCurrentStep,
+  onStepChange,
+}: ImportQuotesSectionProps) {
+  // Use internal hook if not provided externally
+  const internalQuoteImport = useQuoteImport();
+  const quoteImport = externalQuoteImport ?? internalQuoteImport;
+
   const {
     file,
     preview,
@@ -41,16 +50,18 @@ export function ImportQuotesSection({ showTitle = true }: ImportQuotesSectionPro
     validateFile,
     importQuotes,
     reset,
-  } = useQuoteImport();
+  } = quoteImport;
 
-  const [currentStep, setCurrentStep] = useState(1);
+  const [internalCurrentStep, setInternalCurrentStep] = useState(1);
+  const currentStep = externalCurrentStep ?? internalCurrentStep;
+  const setCurrentStep = onStepChange ?? setInternalCurrentStep;
 
-  // Automatically switch to preview step when preview is created
+  // Automatically switch to preview step when preview is created (only for internal state)
   useEffect(() => {
-    if (preview && currentStep === 1) {
+    if (!externalQuoteImport && preview && currentStep === 1) {
       setCurrentStep(2);
     }
-  }, [preview, currentStep]);
+  }, [externalQuoteImport, preview, currentStep, setCurrentStep]);
 
   const handleImportComplete = () => {
     setCurrentStep(3);
@@ -77,57 +88,64 @@ export function ImportQuotesSection({ showTitle = true }: ImportQuotesSectionPro
       case 2:
         return (
           preview && (
-            <>
+            <div className="space-y-4">
               <QuotePreviewTable quotes={preview.sampleQuotes} />
 
+              {error && (
+                <Alert variant="destructive">
+                  <Icons.AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
               <Card>
-                <CardHeader>
-                  <CardTitle>Import Summary</CardTitle>
-                  <CardDescription>
-                    Review the validation results before proceeding with the import
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="mb-4 grid grid-cols-4 gap-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold">{preview.totalRows}</div>
-                      <div className="text-muted-foreground text-sm">Total Rows</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">{preview.validRows}</div>
-                      <div className="text-muted-foreground text-sm">Valid</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-red-600">{preview.invalidRows}</div>
-                      <div className="text-muted-foreground text-sm">Invalid</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-yellow-600">
-                        {preview.duplicateCount}
+                <CardContent className="py-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-6 text-sm">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-muted-foreground">Total:</span>
+                        <span className="font-semibold">{preview.totalRows}</span>
                       </div>
-                      <div className="text-muted-foreground text-sm">Duplicates</div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-muted-foreground">Valid:</span>
+                        <span className="font-semibold text-green-600">{preview.validRows}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-muted-foreground">Invalid:</span>
+                        <span className="font-semibold text-red-600">{preview.invalidRows}</span>
+                      </div>
+                      {preview.duplicateCount > 0 && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-muted-foreground">Duplicates:</span>
+                          <span className="font-semibold text-yellow-600">
+                            {preview.duplicateCount}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" onClick={handleStartOver}>
+                        <Icons.ArrowLeft className="mr-2 h-4 w-4" />
+                        Back
+                      </Button>
+                      <Button
+                        onClick={async () => {
+                          const success = await importQuotes();
+                          if (success) {
+                            handleImportComplete();
+                          }
+                        }}
+                        disabled={preview.validRows === 0 || isImporting}
+                      >
+                        <Icons.Import className="mr-2 h-4 w-4" />
+                        Import {preview.validRows} Quotes
+                      </Button>
                     </div>
                   </div>
-
-                  <Button
-                    onClick={async () => {
-                      try {
-                        await importQuotes();
-                        handleImportComplete();
-                      } catch (error) {
-                        console.error("Import failed:", error);
-                        // Error is handled by the hook, just don't switch steps
-                      }
-                    }}
-                    disabled={preview.validRows === 0 || isImporting}
-                    className="w-full"
-                  >
-                    <Icons.Import className="mr-2 h-4 w-4" />
-                    Import {preview.validRows} Valid Quotes
-                  </Button>
                 </CardContent>
               </Card>
-            </>
+            </div>
           )
         );
       case 3:
@@ -145,27 +163,37 @@ export function ImportQuotesSection({ showTitle = true }: ImportQuotesSectionPro
     }
   };
 
+  // When state is managed externally, don't render the header buttons
+  const showHeaderButtons = !externalQuoteImport;
+
   return (
     <div className="space-y-6">
-      <div
-        className={cn("flex items-center justify-between", showTitle ? undefined : "justify-end")}
-      >
-        {showTitle && (
-          <div>
-            <h3 className="text-lg font-semibold">Import Historical Quotes</h3>
-            <p className="text-muted-foreground text-sm">
-              Import historical market data from CSV files to fill gaps in your portfolio data
-            </p>
-          </div>
-        )}
-        <div className="flex items-center gap-2">
-          <QuoteImportHelpPopover />
-          <Button variant="outline" size="sm" onClick={handleStartOver}>
-            <Icons.Refresh className="mr-2 h-4 w-4" />
-            Start Over
-          </Button>
+      {(showTitle || showHeaderButtons) && (
+        <div
+          className={cn(
+            "flex items-center justify-between",
+            showTitle ? undefined : "justify-end",
+          )}
+        >
+          {showTitle && (
+            <div>
+              <h3 className="text-lg font-semibold">Import Historical Quotes</h3>
+              <p className="text-muted-foreground text-sm">
+                Import historical market data from CSV files to fill gaps in your portfolio data
+              </p>
+            </div>
+          )}
+          {showHeaderButtons && (
+            <div className="flex items-center gap-2">
+              <QuoteImportHelpPopover />
+              <Button variant="outline" size="sm" onClick={handleStartOver}>
+                <Icons.Refresh className="mr-2 h-4 w-4" />
+                Start Over
+              </Button>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       {showTitle && <Separator />}
 

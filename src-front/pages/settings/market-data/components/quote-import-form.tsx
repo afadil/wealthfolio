@@ -1,12 +1,6 @@
 import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { Button } from "@wealthfolio/ui/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wealthfolio/ui/components/ui/card";
+import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { AnimatePresence, motion } from "motion/react";
@@ -133,13 +127,7 @@ export function QuoteImportForm({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">Select CSV File</CardTitle>
-        <CardDescription>
-          Choose a CSV file containing historical quote data to import
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 pt-6">
         {/* File Drop Zone */}
         <div
           className={`group relative flex h-full flex-col justify-center rounded-lg border border-dashed p-4 transition-colors ${getBorderClasses()} ${!file && !isValidating ? "cursor-pointer" : ""}`}
@@ -300,18 +288,15 @@ export function QuoteImportForm({
           </Alert>
         )}
 
-        <Alert>
-          <Icons.Info className="h-4 w-4" />
-          <AlertDescription className="text-xs sm:text-sm">
-            Quotes with the same symbol and date in your CSV will overwrite existing data during
-            import.
-          </AlertDescription>
-        </Alert>
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-muted-foreground text-xs">
+            Quotes with the same symbol and date will overwrite existing data.
+          </p>
 
-        {/* Validate Button */}
-        <Button onClick={onValidate} disabled={!file || isValidating} className="w-full">
-          {isValidating ? "Validating..." : "Validate File"}
-        </Button>
+          <Button onClick={onValidate} disabled={!file || isValidating}>
+            {isValidating ? "Validating..." : "Validate File"}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

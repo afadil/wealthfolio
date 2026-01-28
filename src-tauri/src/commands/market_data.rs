@@ -139,6 +139,27 @@ pub async fn get_market_data_providers(
 }
 
 #[tauri::command]
+pub async fn check_quotes_import(
+    content: Vec<u8>,
+    has_header_row: bool,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<QuoteImport>, String> {
+    debug!(
+        "Checking quotes import from {} bytes CSV (has_header={})",
+        content.len(),
+        has_header_row
+    );
+    state
+        .quote_service()
+        .check_quotes_import(&content, has_header_row)
+        .await
+        .map_err(|e| {
+            error!("Failed to check quotes import: {}", e);
+            format!("Failed to check quotes import: {}", e)
+        })
+}
+
+#[tauri::command]
 pub async fn import_quotes_csv(
     quotes: Vec<QuoteImport>,
     overwrite_existing: bool,
