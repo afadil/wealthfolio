@@ -13,8 +13,9 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
+import { Alert } from "@wealthfolio/ui/components/ui/alert";
 import { formatDistanceToNow } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { QueryKeys } from "@/lib/query-keys";
@@ -22,6 +23,9 @@ import { listBrokerConnections } from "../services/broker-service";
 import type { AggregatedSyncStatus, BrokerConnection, BrokerAccount, ImportRun } from "../types";
 import { Link } from "react-router-dom";
 import { useAccounts } from "@/hooks/use-accounts";
+import { TrackingModeBadge } from "@/components/tracking-mode-badge";
+import { NewAccountsFoundModal } from "../components/new-accounts-found-modal";
+import { getTrackingMode, type Account } from "@/lib/types";
 
 // Status dot component
 function StatusDot({ status }: { status: "healthy" | "warning" | "error" }) {
@@ -58,6 +62,36 @@ export default function ConnectPage() {
     enabled: isConnected,
     staleTime: 30000,
   });
+
+  // State for the new accounts modal
+  const [showNewAccountsModal, setShowNewAccountsModal] = useState(false);
+  const [pendingNewAccounts, setPendingNewAccounts] = useState<Account[]>([]);
+
+  // Listen for open-new-accounts-modal event (from broker sync toast action)
+  // The event contains NewAccountInfo[] with localAccountId, so we need to look up the full Account objects
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ localAccountId: string }[]>) => {
+      // Look up full Account objects from localAccounts by their IDs
+      const accountIds = new Set(e.detail.map((info) => info.localAccountId));
+      const matchingAccounts = localAccounts.filter((acc) => accountIds.has(acc.id));
+      if (matchingAccounts.length > 0) {
+        setPendingNewAccounts(matchingAccounts);
+        setShowNewAccountsModal(true);
+      }
+    };
+    window.addEventListener("open-new-accounts-modal", handler as EventListener);
+    return () => window.removeEventListener("open-new-accounts-modal", handler as EventListener);
+  }, [localAccounts]);
+
+  // Check if any connected accounts need tracking mode setup
+  const accountsNeedingSetup = useMemo(() => {
+    return localAccounts.filter((acc) => {
+      if (!acc.providerAccountId) return false; // Only connected accounts
+      return getTrackingMode(acc) === "NOT_SET";
+    });
+  }, [localAccounts]);
+
+  const hasAccountsNeedingSetup = accountsNeedingSetup.length > 0;
 
   // Flatten import runs
   const recentActivity = useMemo(() => {
@@ -231,6 +265,31 @@ export default function ConnectPage() {
       />
       <PageContent>
         <div className="mx-auto max-w-5xl space-y-6">
+          {/* Warning banner for accounts needing tracking mode setup */}
+          {hasAccountsNeedingSetup && (
+            <Alert variant="warning" className="mb-4">
+              <Icons.AlertTriangle className="h-4 w-4" />
+              <div className="flex flex-1 items-center justify-between">
+                <div>
+                  <p className="font-medium">Action needed: choose a tracking mode</p>
+                  <p className="text-muted-foreground text-sm">
+                    {accountsNeedingSetup.length} account(s) need configuration before importing data.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setPendingNewAccounts(accountsNeedingSetup);
+                    setShowNewAccountsModal(true);
+                  }}
+                >
+                  Review accounts
+                </Button>
+              </div>
+            </Alert>
+          )}
+
           {/* Stats Cards Row */}
           <Card>
             <CardContent className="p-0">
@@ -336,9 +395,19 @@ export default function ConnectPage() {
                   <div className="divide-y divide-border">
                     {brokerAccounts
                       .filter((a) => a.sync_enabled)
-                      .map((account) => (
-                        <AccountItem key={account.id} account={account} />
-                      ))}
+                      .map((account) => {
+                        // Find the matching local account to get trackingMode
+                        const localAccount = localAccounts.find(
+                          (la) => la.providerAccountId === account.id
+                        );
+                        return (
+                          <AccountItem
+                            key={account.id}
+                            account={account}
+                            localAccount={localAccount}
+                          />
+                        );
+                      })}
                   </div>
                 )}
               </CardContent>
@@ -378,6 +447,16 @@ export default function ConnectPage() {
           </Card>
         </div>
       </PageContent>
+
+      {/* New Accounts Found Modal */}
+      <NewAccountsFoundModal
+        open={showNewAccountsModal}
+        onOpenChange={setShowNewAccountsModal}
+        accounts={pendingNewAccounts}
+        onComplete={() => {
+          setPendingNewAccounts([]);
+        }}
+      />
     </Page>
   );
 }
@@ -434,7 +513,13 @@ function BrokerConnectionItem({
 }
 
 // Account Item
-function AccountItem({ account }: { account: BrokerAccount }) {
+function AccountItem({
+  account,
+  localAccount,
+}: {
+  account: BrokerAccount;
+  localAccount?: Account;
+}) {
   const name = account.name || "Account";
   const institution = account.institution_name || "Unknown";
 
@@ -456,6 +541,9 @@ function AccountItem({ account }: { account: BrokerAccount }) {
         </div>
         <p className="text-muted-foreground text-xs">{institution}</p>
       </div>
+      {localAccount && (
+        <TrackingModeBadge account={localAccount} syncEnabled={account.sync_enabled} />
+      )}
     </div>
   );
 }

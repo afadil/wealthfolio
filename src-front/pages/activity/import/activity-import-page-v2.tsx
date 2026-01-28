@@ -5,8 +5,12 @@ import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { AlertFeedback, Page, PageContent, PageHeader } from "@wealthfolio/ui";
 import { AnimatePresence, motion } from "motion/react";
-import { logger } from "@/adapters";
+import { logger, getAccounts } from "@/adapters";
 import { usePlatform } from "@/hooks/use-platform";
+import { useQuery } from "@tanstack/react-query";
+import { QueryKeys } from "@/lib/query-keys";
+import type { Account, TrackingMode } from "@/lib/types";
+import { canImportCSV } from "@/lib/activity-restrictions";
 
 // Context
 import {
@@ -29,6 +33,11 @@ import { MappingStepUnified } from "./steps/mapping-step-unified";
 import { ReviewStep } from "./steps/review-step";
 import { ConfirmStep } from "./steps/confirm-step";
 import { ContextResultStep } from "./steps/context-result-step";
+
+// Holdings Import Steps
+import { HoldingsMappingStep, HoldingsFormat } from "./steps/holdings-mapping-step";
+import { HoldingsReviewStep } from "./steps/holdings-review-step";
+import { HoldingsConfirmStep } from "./steps/holdings-confirm-step";
 
 // Constants
 import { IMPORT_REQUIRED_FIELDS, ImportFormat, ActivityType } from "@/lib/constants";
@@ -87,6 +96,30 @@ const STEP_COMPONENTS: Record<ImportStep, React.ComponentType> = {
   confirm: ConfirmStep,
   result: ContextResultStep,
 };
+
+// Holdings import steps (for HOLDINGS-mode accounts)
+const HOLDINGS_STEP_COMPONENTS: Record<ImportStep, React.ComponentType> = {
+  upload: UploadStep, // Same upload step
+  mapping: HoldingsMappingStep,
+  review: HoldingsReviewStep,
+  confirm: HoldingsConfirmStep,
+  result: ContextResultStep, // Same result step
+};
+
+const HOLDINGS_STEPS: WizardStep[] = [
+  { id: "upload", label: "Upload" },
+  { id: "mapping", label: "Mapping" },
+  { id: "review", label: "Review" },
+  { id: "confirm", label: "Confirm" },
+  { id: "result", label: "Result" },
+];
+
+// Holdings import required fields
+const HOLDINGS_REQUIRED_FIELDS: HoldingsFormat[] = [
+  HoldingsFormat.DATE,
+  HoldingsFormat.SYMBOL,
+  HoldingsFormat.QUANTITY,
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Validation Helpers
@@ -148,9 +181,9 @@ function isSymbolResolved(csvSymbol: string, symbolMappings: Record<string, stri
 }
 
 /**
- * Check if a step can proceed to the next step
+ * Check if a step can proceed to the next step (for activity import)
  */
-function useStepValidation() {
+function useStepValidation(isHoldingsMode: boolean) {
   const { state } = useImportContext();
 
   return useMemo(() => {
@@ -162,7 +195,16 @@ function useStepValidation() {
         return file !== null && headers.length > 0 && parsedRows.length > 0;
 
       case "mapping": {
-        // Can proceed if all required fields are mapped
+        if (isHoldingsMode) {
+          // Holdings mode: check if required holdings fields are mapped
+          if (!mapping) return false;
+          const requiredFieldsMapped = HOLDINGS_REQUIRED_FIELDS.every(
+            (field) => mapping.fieldMappings[field] && headers.includes(mapping.fieldMappings[field])
+          );
+          return requiredFieldsMapped;
+        }
+
+        // Activity mode: existing validation logic
         if (!mapping) return false;
         const requiredFieldsMapped = IMPORT_REQUIRED_FIELDS.every(
           (field) => mapping.fieldMappings[field]
@@ -238,7 +280,11 @@ function useStepValidation() {
       }
 
       case "review":
-        // Can proceed if there are activities to review
+        if (isHoldingsMode) {
+          // Holdings mode: can proceed if we have parsed rows
+          return parsedRows.length > 0;
+        }
+        // Activity mode: can proceed if there are activities to review
         return draftActivities.length > 0;
 
       case "confirm":
@@ -252,7 +298,7 @@ function useStepValidation() {
       default:
         return false;
     }
-  }, [state]);
+  }, [state, isHoldingsMode]);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -266,12 +312,35 @@ function ImportWizardContent() {
 
   const [showCancelDialog, setShowCancelDialog] = useState(false);
 
-  const canProceed = useStepValidation();
+  // Fetch accounts to determine tracking mode based on selected account
+  const { data: accounts } = useQuery<Account[], Error>({
+    queryKey: [QueryKeys.ACCOUNTS],
+    queryFn: getAccounts,
+  });
+
+  // Determine if the selected account is in HOLDINGS mode
+  const selectedAccount = useMemo(() => {
+    if (!state.accountId || !accounts) return undefined;
+    return accounts.find((a) => a.id === state.accountId);
+  }, [state.accountId, accounts]);
+
+  const isHoldingsMode = useMemo(() => {
+    const trackingMode = getAccountTrackingMode(selectedAccount);
+    return trackingMode === "HOLDINGS";
+  }, [selectedAccount]);
+
+  const isCsvImportAllowed = canImportCSV(selectedAccount);
+
+  const canProceed = useStepValidation(isHoldingsMode);
+
+  // Select the appropriate steps and components based on mode
+  const steps = isHoldingsMode ? HOLDINGS_STEPS : STEPS;
+  const stepComponents = isHoldingsMode ? HOLDINGS_STEP_COMPONENTS : STEP_COMPONENTS;
 
   // Step navigation
   const currentStepIndex = useMemo(
-    () => STEPS.findIndex((s) => s.id === state.step),
-    [state.step]
+    () => steps.findIndex((s) => s.id === state.step),
+    [state.step, steps]
   );
 
   const canGoBack = currentStepIndex > 0 && state.step !== "result";
@@ -282,7 +351,7 @@ function ImportWizardContent() {
   const showNavigation = !["confirm", "result"].includes(state.step);
 
   // Get current step component
-  const CurrentStepComponent = STEP_COMPONENTS[state.step];
+  const CurrentStepComponent = stepComponents[state.step];
 
   // Handlers
   const handleNext = useCallback(() => {
@@ -317,22 +386,43 @@ function ImportWizardContent() {
       case "upload":
         return "Configure Mapping";
       case "mapping":
-        return "Review Activities";
+        return isHoldingsMode ? "Review Holdings" : "Review Activities";
       case "review":
         return "Continue to Import";
       default:
         return "Continue";
     }
-  }, [state.step]);
+  }, [state.step, isHoldingsMode]);
+
+  // Page title
+  const pageTitle = isHoldingsMode ? "Import Holdings" : "Import Activities";
+
+  if (selectedAccount && !isCsvImportAllowed) {
+    return (
+      <Page>
+        <PageHeader heading={pageTitle} onBack={() => navigate(-1)} />
+        <PageContent>
+          <div className="mx-auto max-w-3xl space-y-4 py-6">
+            <AlertFeedback variant="warning" title="CSV import disabled">
+              Holdings CSV import is disabled for connected accounts using Holdings tracking.
+            </AlertFeedback>
+            <Button variant="outline" onClick={() => navigate(`/account/${selectedAccount.id}`)}>
+              Go to Account
+            </Button>
+          </div>
+        </PageContent>
+      </Page>
+    );
+  }
 
   return (
     <Page>
       <PageHeader
-        heading="Import Activities"
+        heading={pageTitle}
         onBack={isMobile ? handleCancelClick : undefined}
         actions={
           <div className="flex items-center gap-2">
-            <ImportHelpPopover />
+            {!isHoldingsMode && <ImportHelpPopover />}
             {!isMobile && (
               <Button variant="ghost" size="sm" onClick={handleCancelClick}>
                 <Icons.X className="mr-2 h-4 w-4" />
@@ -349,7 +439,7 @@ function ImportWizardContent() {
             <Card className="w-full">
               {/* Step indicator */}
               <CardHeader className="border-b px-3 py-3 sm:px-6 sm:py-4">
-                <WizardStepIndicator steps={STEPS} currentStep={state.step} />
+                <WizardStepIndicator steps={steps} currentStep={state.step} />
               </CardHeader>
 
               {/* Step content */}
@@ -427,6 +517,19 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, Error
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Export
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Get the tracking mode for an account from its meta field
+ */
+function getAccountTrackingMode(account: Account | undefined): TrackingMode {
+  if (!account?.meta) return "TRANSACTIONS";
+  try {
+    const meta = typeof account.meta === "string" ? JSON.parse(account.meta) : account.meta;
+    return meta?.wealthfolio?.trackingMode || "TRANSACTIONS";
+  } catch {
+    return "TRANSACTIONS";
+  }
+}
 
 export function ActivityImportPageV2() {
   const [searchParams] = useSearchParams();

@@ -76,7 +76,7 @@ interface AssetDetailsSheetProps {
   /** Optional: For liabilities, list of assets that can be linked */
   linkableAssets?: Holding[];
   /** Optional: For properties, list of liabilities linked to this asset */
-  linkedLiabilities?: Array<{ id: string; name: string; balance?: string }>;
+  linkedLiabilities?: { id: string; name: string; balance?: string }[];
   /** Whether the save operation is in progress */
   isSaving?: boolean;
 }
@@ -137,7 +137,7 @@ export function AssetDetailsSheet({
         variant: "success",
       });
       onOpenChange(false);
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: "Failed to save details",
         description: "Please try again or report an issue if the problem persists.",

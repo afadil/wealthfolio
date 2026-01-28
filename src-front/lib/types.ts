@@ -748,19 +748,30 @@ export interface ReturnData {
 // Renamed from PerformanceData to match Rust struct
 export interface PerformanceMetrics {
   id: string;
-  returns: ReturnData[]; // Changed from CumulativeReturn[]
-  periodStartDate?: string | null; // Changed from periodStartDate?
-  periodEndDate?: string | null; // Changed from periodEndDate?
+  returns: ReturnData[];
+  periodStartDate?: string | null;
+  periodEndDate?: string | null;
   currency: string;
-  cumulativeTwr: number; // Added field, corresponds to TWR
-  gainLossAmount?: number | null; // Made explicitly nullable
-  annualizedTwr: number; // Added field, corresponds to TWR
-  simpleReturn: number; // Added field
-  annualizedSimpleReturn: number; // Added field
-  cumulativeMwr: number; // Added field, corresponds to MWR
-  annualizedMwr: number; // Added field, corresponds to MWR
+  /** Period gain in dollars (SOTA: change in unrealized P&L for HOLDINGS mode) */
+  periodGain: number;
+  /** Period return percentage (SOTA formula for HOLDINGS mode) */
+  periodReturn: number;
+  /** Time-weighted return (null for HOLDINGS mode - requires cash flow tracking) */
+  cumulativeTwr?: number | null;
+  /** Legacy field for backward compatibility */
+  gainLossAmount?: number | null;
+  /** Annualized TWR (null for HOLDINGS mode) */
+  annualizedTwr?: number | null;
+  simpleReturn: number;
+  annualizedSimpleReturn: number;
+  /** Money-weighted return (null for HOLDINGS mode - requires cash flow tracking) */
+  cumulativeMwr?: number | null;
+  /** Annualized MWR (null for HOLDINGS mode) */
+  annualizedMwr?: number | null;
   volatility: number;
   maxDrawdown: number;
+  /** Indicates if this is a HOLDINGS mode account (no cash flow tracking) */
+  isHoldingsMode?: boolean;
 }
 
 export interface UpdateAssetProfile {
@@ -1347,6 +1358,69 @@ export interface MigrationResult {
 }
 
 // ============================================================================
+// Tracking Mode Types
+// ============================================================================
+
+/**
+ * Tracking mode for an account - determines how holdings are tracked.
+ * Matches the backend TrackingMode enum.
+ */
+export type TrackingMode = "TRANSACTIONS" | "HOLDINGS" | "NOT_SET";
+
+/**
+ * Gets the tracking mode from an account's meta JSON field.
+ * The tracking mode is stored at: meta.wealthfolio.trackingMode
+ *
+ * Returns "NOT_SET" if:
+ * - meta is undefined or empty
+ * - meta is invalid JSON
+ * - wealthfolio.trackingMode field is missing or invalid
+ */
+export function getTrackingMode(account: Account): TrackingMode {
+  if (!account.meta) {
+    return "NOT_SET";
+  }
+  try {
+    const parsed = JSON.parse(account.meta) as Record<string, unknown> | null;
+    const wealthfolio = parsed?.wealthfolio as Record<string, unknown> | undefined;
+    const mode = wealthfolio?.trackingMode;
+    if (mode === "TRANSACTIONS" || mode === "HOLDINGS" || mode === "NOT_SET") {
+      return mode;
+    }
+    return "NOT_SET";
+  } catch {
+    return "NOT_SET";
+  }
+}
+
+/**
+ * Sets the tracking mode in an account's meta JSON, preserving other fields.
+ * The tracking mode is stored at: meta.wealthfolio.trackingMode
+ *
+ * Returns a JSON string with the trackingMode field set under wealthfolio namespace.
+ * If meta is undefined, empty, or invalid JSON, creates a new JSON object.
+ */
+export function setTrackingMode(meta: string | undefined, mode: TrackingMode): string {
+  let existing: Record<string, unknown> = {};
+  if (meta) {
+    try {
+      const parsed: unknown = JSON.parse(meta);
+      if (typeof parsed === "object" && parsed !== null) {
+        existing = parsed as Record<string, unknown>;
+      }
+    } catch {
+      // Invalid JSON, start with empty object
+    }
+  }
+  // Ensure wealthfolio namespace exists
+  if (!existing.wealthfolio || typeof existing.wealthfolio !== "object") {
+    existing.wealthfolio = {};
+  }
+  (existing.wealthfolio as Record<string, unknown>).trackingMode = mode;
+  return JSON.stringify(existing);
+}
+
+// ============================================================================
 // AI Provider Types
 // ============================================================================
 
@@ -1522,7 +1596,8 @@ export type HealthCategory =
   | "PRICE_STALENESS"
   | "FX_INTEGRITY"
   | "CLASSIFICATION"
-  | "DATA_CONSISTENCY";
+  | "DATA_CONSISTENCY"
+  | "ACCOUNT_CONFIGURATION";
 
 /**
  * Navigation action for health issue resolution.
@@ -1591,4 +1666,66 @@ export interface HealthConfig {
   stalePriceErrorDays: number;
   criticalMvThresholdPercent: number;
   enabled: boolean;
+}
+
+// ============================================================================
+// Snapshot Info Types
+// ============================================================================
+
+/**
+ * Information about a manual/imported snapshot for UI display
+ */
+export interface SnapshotInfo {
+  /** Snapshot ID */
+  id: string;
+  /** Date of the snapshot (YYYY-MM-DD) */
+  snapshotDate: string;
+  /** Source of the snapshot (MANUAL_ENTRY, CSV_IMPORT, BROKER_IMPORTED) */
+  source: string;
+  /** Number of positions in this snapshot */
+  positionCount: number;
+  /** Number of cash currencies in this snapshot */
+  cashCurrencyCount: number;
+}
+
+// ============================================================================
+// Holdings CSV Import Types
+// ============================================================================
+
+/**
+ * A single position in a holdings snapshot for CSV import
+ */
+export interface HoldingsPositionInput {
+  /** Symbol from CSV (e.g., "AAPL", "GOOGL") */
+  symbol: string;
+  /** Quantity held as string to preserve precision */
+  quantity: string;
+  /** Optional price per unit at snapshot date */
+  price?: string;
+  /** Currency for this position */
+  currency: string;
+}
+
+/**
+ * A single snapshot from CSV import (one date's worth of holdings)
+ */
+export interface HoldingsSnapshotInput {
+  /** The date of this snapshot (YYYY-MM-DD) */
+  date: string;
+  /** Securities held on this date */
+  positions: HoldingsPositionInput[];
+  /** Cash balances by currency (e.g., {"USD": "10000", "EUR": "5000"}) */
+  cashBalances: Record<string, string>;
+}
+
+/**
+ * Result of importing holdings CSV
+ */
+export interface ImportHoldingsCsvResult {
+  /** Number of snapshots successfully imported */
+  snapshotsImported: number;
+  /** Number of snapshots that failed to import */
+  snapshotsFailed: number;
+  /** Error messages for failed snapshots */
+  errors: string[];
 }

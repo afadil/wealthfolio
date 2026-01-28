@@ -15,9 +15,8 @@ const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
 export function getCookieValue(name: string): string | null {
   if (typeof document === 'undefined') return null;
 
-  const matches = document.cookie.match(
-    new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()[\]\\/+^])/g, '\\$1') + '=([^;]*)'),
-  );
+  const regex = new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()[\]\\/+^])/g, '\\$1') + '=([^;]*)');
+  const matches = regex.exec(document.cookie);
   return matches ? decodeURIComponent(matches[1]) : null;
 }
 

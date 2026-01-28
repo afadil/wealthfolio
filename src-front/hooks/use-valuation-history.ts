@@ -15,7 +15,7 @@ export function useValuationHistory(
     isFetching,
   } = useQuery<AccountValuation[], Error>({
     queryKey: [
-      QueryKeys.valuationHistory(accountId),
+      ...QueryKeys.valuationHistory(accountId),
       dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : null,
       dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : null,
     ],

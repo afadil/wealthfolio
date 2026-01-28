@@ -135,7 +135,7 @@ interface UseDataGridProps<TData>
   ) => Partial<CellPosition> | Promise<Partial<CellPosition> | null> | null;
   onRowsAdd?: (count: number) => void | Promise<void>;
   onRowsDelete?: (rows: TData[], rowIndices: number[]) => void | Promise<void>;
-  onPaste?: (updates: Array<UpdateCell>) => void | Promise<void>;
+  onPaste?: (updates: UpdateCell[]) => void | Promise<void>;
   onFilesUpload?: (params: {
     files: File[];
     rowIndex: number;
@@ -345,7 +345,7 @@ function useDataGrid<TData>({
   }, [columnIds]);
 
   const onDataUpdate = React.useCallback(
-    (updates: UpdateCell | Array<UpdateCell>) => {
+    (updates: UpdateCell | UpdateCell[]) => {
       if (propsRef.current.readOnly) return;
 
       const updateArray = Array.isArray(updates) ? updates : [updates];
@@ -358,7 +358,7 @@ function useDataGrid<TData>({
 
       const rowUpdatesMap = new Map<
         number,
-        Array<Omit<UpdateCell, "rowIndex">>
+        Omit<UpdateCell, "rowIndex">[]
       >();
 
       for (const update of updateArray) {
@@ -566,6 +566,7 @@ function useDataGrid<TData>({
           } else if (value instanceof Date) {
             serializedValue = value.toISOString();
           } else {
+            // eslint-disable-next-line @typescript-eslint/no-base-to-string
             serializedValue = String(value ?? "");
           }
 
@@ -665,6 +666,7 @@ function useDataGrid<TData>({
           } else if (value instanceof Date) {
             serializedValue = value.toISOString();
           } else {
+            // eslint-disable-next-line @typescript-eslint/no-base-to-string
             serializedValue = String(value ?? "");
           }
 
@@ -746,11 +748,11 @@ function useDataGrid<TData>({
 
         // Fill selected cells with single value
         if (selectedCells.size > 1 && isSingleValue) {
-          const updates: Array<UpdateCell> = [];
+          const updates: UpdateCell[] = [];
           const tableColumns = currentTable?.getAllColumns() ?? [];
           const columnMap = new Map(tableColumns.map((c) => [c.id, c]));
-          let cellsUpdated = 0;
-          let cellsSkipped = 0;
+          let _cellsUpdated = 0;
+          let _cellsSkipped = 0;
 
           for (const cellKey of selectedCells) {
             const { rowIndex, columnId } = parseCellKey(cellKey);
@@ -796,7 +798,9 @@ function useDataGrid<TData>({
                 break;
               }
               case "select": {
-                const options = cellOpts?.options ?? [];
+                const rawOptions = cellOpts?.options ?? [];
+                const rowData = rows[rowIndex]?.original;
+                const options = typeof rawOptions === "function" ? rawOptions(rowData) : rawOptions;
                 if (!trimmedClipboard) {
                   processedValue = "";
                 } else {
@@ -812,12 +816,12 @@ function useDataGrid<TData>({
             }
 
             if (shouldSkip) {
-              cellsSkipped++;
+              _cellsSkipped++;
               continue;
             }
 
             updates.push({ rowIndex, columnId, value: processedValue });
-            cellsUpdated++;
+            _cellsUpdated++;
           }
 
           if (updates.length > 0) {
@@ -895,9 +899,9 @@ function useDataGrid<TData>({
           }
         }
 
-        const updates: Array<UpdateCell> = [];
+        const updates: UpdateCell[] = [];
         const tableColumns = currentTable?.getAllColumns() ?? [];
-        let cellsUpdated = 0;
+        let _cellsUpdated = 0;
         let endRowIndex = startRowIndex;
         let endColIndex = startColIndex;
 
@@ -977,7 +981,9 @@ function useDataGrid<TData>({
               }
 
               case "select": {
-                const options = cellOpts?.options ?? [];
+                const rawOptions = cellOpts?.options ?? [];
+                const rowData = updatedRows?.[targetRowIndex]?.original;
+                const options = typeof rawOptions === "function" ? rawOptions(rowData) : rawOptions;
                 if (!pastedValue) {
                   processedValue = "";
                 } else {
@@ -1121,7 +1127,7 @@ function useDataGrid<TData>({
               columnId: targetColumnId,
               value: processedValue,
             });
-            cellsUpdated++;
+            _cellsUpdated++;
 
             endRowIndex = Math.max(endRowIndex, targetRowIndex);
             endColIndex = Math.max(endColIndex, targetColIndex);
@@ -1663,6 +1669,7 @@ function useDataGrid<TData>({
           if (!cell) continue;
 
           const value = cell.getValue();
+          // eslint-disable-next-line @typescript-eslint/no-base-to-string
           const stringValue = String(value ?? "").toLowerCase();
 
           if (stringValue.includes(lowerQuery)) {
@@ -2308,7 +2315,7 @@ function useDataGrid<TData>({
   // biome-ignore lint/correctness/useExhaustiveDependencies: columnSizingInfo and columnSizing are used for calculating the column size vars
   const columnSizeVars = React.useMemo(() => {
     const headers = table.getFlatHeaders();
-    const colSizes: { [key: string]: number } = {};
+    const colSizes: Record<string, number> = {};
     for (const header of headers) {
       colSizes[`--header-${header.id}-size`] = header.getSize();
       colSizes[`--col-${header.column.id}-size`] = header.column.getSize();
@@ -2324,7 +2331,7 @@ function useDataGrid<TData>({
     isScrollingResetDelay: 150,
     measureElement:
       typeof window !== "undefined" &&
-      navigator.userAgent.indexOf("Firefox") === -1
+      !navigator.userAgent.includes("Firefox")
         ? (element) => element?.getBoundingClientRect().height
         : undefined,
   });
@@ -2611,11 +2618,11 @@ function useDataGrid<TData>({
         if (cellsToClear.length > 0) {
           event.preventDefault();
 
-          const updates: Array<{
+          const updates: {
             rowIndex: number;
             columnId: string;
             value: unknown;
-          }> = [];
+          }[] = [];
 
           const currentTable = tableRef.current;
           const tableColumns = currentTable?.getAllColumns() ?? [];

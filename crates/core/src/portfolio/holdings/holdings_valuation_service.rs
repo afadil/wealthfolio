@@ -4,8 +4,8 @@ use crate::fx::currency::{normalize_amount, normalize_currency_code};
 use crate::fx::FxServiceTrait;
 use crate::quotes::{LatestQuotePair, QuoteServiceTrait};
 use crate::portfolio::holdings::{Holding, HoldingType, MonetaryValue};
+use crate::utils::time_utils::valuation_date_today;
 use async_trait::async_trait;
-use chrono::Utc;
 use log::{debug, warn};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
@@ -99,7 +99,7 @@ impl HoldingsValuationServiceTrait for HoldingsValuationService {
         let latest_quote_pairs: HashMap<String, LatestQuotePair> =
             self.fetch_batch_quote_data(holdings).await?;
 
-        let today = Utc::now().date_naive();
+        let today = valuation_date_today();
 
         for holding in holdings.iter_mut() {
             match holding.holding_type {

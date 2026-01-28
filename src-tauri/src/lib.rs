@@ -209,6 +209,7 @@ pub fn run() {
             commands::account::create_account,
             commands::account::update_account,
             commands::account::delete_account,
+            commands::account::switch_tracking_mode,
             // Activity commands
             commands::activity::search_activities,
             commands::activity::create_activity,
@@ -248,6 +249,11 @@ pub fn run() {
             commands::portfolio::recalculate_portfolio,
             commands::portfolio::calculate_performance_summary,
             commands::portfolio::calculate_performance_history,
+            commands::portfolio::save_manual_holdings,
+            commands::portfolio::import_holdings_csv,
+            commands::portfolio::get_manual_snapshots,
+            commands::portfolio::get_snapshot_by_date,
+            commands::portfolio::delete_snapshot,
             // Contribution limit commands
             commands::limits::get_contribution_limits,
             commands::limits::create_contribution_limit,

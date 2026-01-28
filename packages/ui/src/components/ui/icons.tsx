@@ -139,6 +139,7 @@ import {
 import type { ComponentType, CSSProperties } from "react";
 
 // Phosphor icons - deep imports for optimal tree shaking with Vite
+import { ClockCounterClockwiseIcon } from "@phosphor-icons/react/dist/csr/ClockCounterClockwise";
 import { DevicesIcon } from "@phosphor-icons/react/dist/csr/Devices";
 import { DotsThreeOutlineIcon } from "@phosphor-icons/react/dist/csr/DotsThreeOutline";
 import { DotsThreeOutlineVerticalIcon } from "@phosphor-icons/react/dist/csr/DotsThreeOutlineVertical";
@@ -683,6 +684,9 @@ const IconsInternal = {
   UploadSimple: ({ size, className, style, color }: IconProps) => (
     <UploadSimpleIcon size={size} weight="duotone" className={className} style={style} color={color} />
   ),
+  ClockCounterClockwise: ({ size, className, style, color }: IconProps) => (
+    <ClockCounterClockwiseIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
 };
 
 /**
@@ -855,12 +859,12 @@ export type IconName =
   | "CircleGauge"
   | "X"
   | "Upload"
-  | "DotsThreeVertical"
   | "DotsThree"
   | "House"
-  | "UploadSimple";
+  | "UploadSimple"
+  | "ClockCounterClockwise";
 
 /**
  * Icons object with unified typing - all icons have the same Icon type
  */
-export const Icons: { [K in IconName]: Icon } = IconsInternal as { [K in IconName]: Icon };
+export const Icons: Record<IconName, Icon> = IconsInternal as Record<IconName, Icon>;

@@ -265,6 +265,7 @@ pub async fn initialize_context(
         performance_service,
         income_service,
         snapshot_service,
+        snapshot_repository,
         holdings_service,
         allocation_service,
         valuation_service,

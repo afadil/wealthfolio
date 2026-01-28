@@ -182,7 +182,7 @@ export type SyncStatus = "IDLE" | "RUNNING" | "NEEDS_REVIEW" | "FAILED";
 export interface BrokerSyncState {
   accountId: string;
   provider: string;
-  checkpointJson: unknown | null;
+  checkpointJson: unknown;
   lastAttemptedAt: string | null;
   lastSuccessfulAt: string | null;
   lastError: string | null;
@@ -223,8 +223,8 @@ export interface ImportRun {
   finishedAt: string | null;
   reviewMode: ReviewMode;
   appliedAt: string | null;
-  checkpointIn: unknown | null;
-  checkpointOut: unknown | null;
+  checkpointIn: unknown;
+  checkpointOut: unknown;
   summary: ImportRunSummary | null;
   warnings: string[] | null;
   error: string | null;

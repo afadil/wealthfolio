@@ -75,21 +75,21 @@ interface ParsedNetWorth {
   netWorth: number;
   assets: {
     total: number;
-    breakdown: Array<{
+    breakdown: {
       category: string;
       name: string;
       value: number;
       assetId?: string;
-    }>;
+    }[];
   };
   liabilities: {
     total: number;
-    breakdown: Array<{
+    breakdown: {
       category: string;
       name: string;
       value: number;
       assetId?: string;
-    }>;
+    }[];
   };
 }
 

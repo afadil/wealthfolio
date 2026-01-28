@@ -6,7 +6,7 @@ use crate::assets::{Asset, AssetKind, AssetRepositoryTrait, NewAsset, PricingMod
 use crate::errors::Result;
 use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
 use crate::quotes::DataSource;
-use crate::portfolio::snapshot::{AccountStateSnapshot, Position, SnapshotRepositoryTrait};
+use crate::portfolio::snapshot::{AccountStateSnapshot, Position, SnapshotRepositoryTrait, SnapshotSource};
 use crate::portfolio::valuation::{DailyAccountValuation, ValuationRepositoryTrait};
 use crate::quotes::{
     LatestQuotePair, ProviderInfo, Quote, QuoteImport, QuoteServiceTrait, SymbolSearchResult,
@@ -260,6 +260,25 @@ impl SnapshotRepositoryTrait for MockSnapshotRepository {
         _snapshots_to_save: &[AccountStateSnapshot],
     ) -> Result<()> {
         unimplemented!()
+    }
+
+    async fn update_snapshots_source(&self, _account_id: &str, _new_source: &str) -> Result<usize> {
+        unimplemented!()
+    }
+
+    async fn save_or_update_snapshot(&self, _snapshot: &AccountStateSnapshot) -> Result<()> {
+        unimplemented!()
+    }
+
+    fn get_non_calculated_snapshot_count(&self, _account_id: &str) -> Result<usize> {
+        Ok(0)
+    }
+
+    fn get_earliest_non_calculated_snapshot(
+        &self,
+        _account_id: &str,
+    ) -> Result<Option<AccountStateSnapshot>> {
+        Ok(None)
     }
 }
 
@@ -787,6 +806,7 @@ fn create_test_snapshot(account_id: &str, positions: Vec<Position>, cash: HashMa
         cash_total_account_currency: Decimal::ZERO,
         cash_total_base_currency: Decimal::ZERO,
         calculated_at: Utc::now().naive_utc(),
+        source: SnapshotSource::Calculated,
     }
 }
 

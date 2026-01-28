@@ -3,6 +3,7 @@ import { useIsMobileViewport } from "@/hooks/use-platform";
 import { ActivityType } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, ActivityDetails } from "@/lib/types";
+import { getAllowedActivityTypes, getActivityRestrictionLevel } from "@/lib/activity-restrictions";
 import { useQuery } from "@tanstack/react-query";
 import {
   Alert,
@@ -65,14 +66,25 @@ const ActivityManagerPage = () => {
     navigate(-1);
   }, [navigate, redirectTo]);
 
-  // Get the account name if pre-selected
-  const selectedAccountName = useMemo(() => {
+  // Get the selected account if pre-selected
+  const selectedAccount = useMemo(() => {
     if (accountParam && accountsData) {
-      const account = accountsData.find((acc) => acc.id === accountParam);
-      return account?.name;
+      return accountsData.find((acc) => acc.id === accountParam);
     }
-    return null;
+    return undefined;
   }, [accountParam, accountsData]);
+
+  const selectedAccountName = selectedAccount?.name ?? null;
+
+  // Get allowed activity types based on account tracking mode
+  const allowedActivityTypes = useMemo(() => {
+    return getAllowedActivityTypes(selectedAccount);
+  }, [selectedAccount]);
+
+  // Get restriction level for alert display
+  const restrictionLevel = useMemo(() => {
+    return getActivityRestrictionLevel(selectedAccount);
+  }, [selectedAccount]);
 
   // Build initial activity from URL params
   const initialActivity: Partial<ActivityDetails> = useMemo(() => {
@@ -165,9 +177,48 @@ const ActivityManagerPage = () => {
         <div className="mx-auto max-w-5xl">
           <Card>
             <CardContent className="space-y-6 p-6">
-              {/* Activity Type Picker */}
-              {!isEditing && (
-                <ActivityTypePicker value={selectedType} onSelect={setSelectedType} />
+              {/* Alert for connected HOLDINGS accounts (no manual entry) */}
+              {restrictionLevel === "blocked" && (
+                <Alert>
+                  <Icons.Info className="h-4 w-4" />
+                  <AlertTitle>Synced Account</AlertTitle>
+                  <AlertDescription>
+                    This account uses Holdings tracking with broker sync. Holdings are updated
+                    automatically when you sync.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Alert for manual HOLDINGS accounts (limited activity types) */}
+              {restrictionLevel === "limited" && selectedAccount && (
+                <Alert>
+                  <Icons.Info className="h-4 w-4" />
+                  <AlertTitle>Holdings Tracking Mode</AlertTitle>
+                  <AlertDescription className="flex flex-col gap-2">
+                    <span>
+                      This account uses Holdings tracking. To modify positions, use the Update
+                      button on the account page.
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-fit"
+                      onClick={() => navigate(`/account/${selectedAccount.id}`)}
+                    >
+                      <Icons.ExternalLink className="mr-2 h-3 w-3" />
+                      Go to Account
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Activity Type Picker - only show if not blocked */}
+              {!isEditing && restrictionLevel !== "blocked" && (
+                <ActivityTypePicker
+                  value={selectedType}
+                  onSelect={setSelectedType}
+                  allowedTypes={allowedActivityTypes}
+                />
               )}
 
               {/* When editing, show the activity type as a badge */}
@@ -180,16 +231,18 @@ const ActivityManagerPage = () => {
                 </div>
               )}
 
-              {/* Render the appropriate form */}
-              <ActivityFormRenderer
-                selectedType={selectedType}
-                accounts={accountOptions}
-                defaultValues={defaultValues}
-                onSubmit={handleSubmit}
-                onCancel={handleClose}
-                isLoading={isLoading}
-                isEditing={isEditing}
-              />
+              {/* Render the appropriate form - only show if not blocked */}
+              {restrictionLevel !== "blocked" && (
+                <ActivityFormRenderer
+                  selectedType={selectedType}
+                  accounts={accountOptions}
+                  defaultValues={defaultValues}
+                  onSubmit={handleSubmit}
+                  onCancel={handleClose}
+                  isLoading={isLoading}
+                  isEditing={isEditing}
+                />
+              )}
 
               {/* Display mutation error */}
               {isError && (

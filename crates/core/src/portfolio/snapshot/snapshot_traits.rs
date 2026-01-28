@@ -97,4 +97,24 @@ pub trait SnapshotRepositoryTrait: Send + Sync {
         account_id: &str,
         snapshots_to_save: &[AccountStateSnapshot],
     ) -> Result<()>;
+
+    /// Update the source field of all snapshots for an account.
+    /// Returns the number of rows updated.
+    async fn update_snapshots_source(&self, account_id: &str, new_source: &str) -> Result<usize>;
+
+    /// Save or update a snapshot for a specific date.
+    /// If a snapshot exists for the same date, it is replaced.
+    /// If the date is different from existing snapshots, a new one is created.
+    async fn save_or_update_snapshot(&self, snapshot: &AccountStateSnapshot) -> Result<()>;
+
+    /// Get the count of non-calculated snapshots for an account.
+    /// Non-calculated sources include: ManualEntry, BrokerImported, CsvImport, Synthetic.
+    fn get_non_calculated_snapshot_count(&self, account_id: &str) -> Result<usize>;
+
+    /// Get the earliest non-calculated snapshot for an account.
+    /// Used for creating synthetic backfill snapshots.
+    fn get_earliest_non_calculated_snapshot(
+        &self,
+        account_id: &str,
+    ) -> Result<Option<AccountStateSnapshot>>;
 }

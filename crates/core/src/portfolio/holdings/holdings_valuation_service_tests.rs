@@ -15,6 +15,7 @@ mod tests {
         LatestQuotePair, ProviderInfo, Quote, QuoteImport, SymbolSearchResult, QuoteServiceTrait,
         QuoteSyncState, SymbolSyncPlan, SyncResult,
     };
+    use crate::utils::time_utils::valuation_date_today;
     use async_trait::async_trait;
     use chrono::{NaiveDate, Utc};
     use rust_decimal::Decimal;
@@ -890,7 +891,7 @@ mod tests {
 
         let expected_value = dec!(1000.0);
 
-        assert_eq!(holding.as_of_date, Utc::now().date_naive());
+        assert_eq!(holding.as_of_date, valuation_date_today());
         assert_decimal_approx(holding.price, dec!(1.0), TOLERANCE, "Price");
         assert_decimal_approx(holding.fx_rate, dec!(1.0), TOLERANCE, "FX Rate");
         assert_monetary_value_approx(
@@ -993,7 +994,7 @@ mod tests {
         let expected_local_value = dec!(500.0);
         let expected_base_value = expected_local_value * usd_cad_rate; // 500 * 1.3 = 650 CAD
 
-        assert_eq!(holding.as_of_date, Utc::now().date_naive());
+        assert_eq!(holding.as_of_date, valuation_date_today());
         assert_decimal_approx(holding.price, dec!(1.0), TOLERANCE, "Price");
         assert_decimal_approx(holding.fx_rate, usd_cad_rate, TOLERANCE, "FX Rate");
         assert_monetary_value_approx(

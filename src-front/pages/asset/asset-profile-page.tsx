@@ -152,7 +152,7 @@ export const AssetProfilePage = () => {
   // Build category badges from assignments and taxonomy data
   // Order: Class, Type, Risk
   const categoryBadges = useMemo(() => {
-    const badges: Array<{ id: string; categoryName: string; categoryColor: string; taxonomyName: string }> = [];
+    const badges: { id: string; categoryName: string; categoryColor: string; taxonomyName: string }[] = [];
 
     // Asset Class badge (first)
     const assetClassAssignment = assignments.find((a) => a.taxonomyId === "asset_classes");

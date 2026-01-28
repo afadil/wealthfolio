@@ -98,12 +98,14 @@ export interface UpdateCell {
 
 declare module "@tanstack/react-table" {
   // biome-ignore lint/correctness/noUnusedVariables: TData and TValue are used in the ColumnMeta interface
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface ColumnMeta<TData extends RowData, TValue> {
     label?: string;
     cell?: CellOpts;
   }
 
   // biome-ignore lint/correctness/noUnusedVariables: TData is used in the TableMeta interface
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface TableMeta<TData extends RowData> {
     dataGridRef?: React.RefObject<HTMLElement | null>;
     cellMapRef?: React.RefObject<Map<string, HTMLDivElement>>;
@@ -120,7 +122,7 @@ declare module "@tanstack/react-table" {
     rowHeight?: RowHeightValue;
     onRowHeightChange?: (value: RowHeightValue) => void;
     onRowSelect?: (rowIndex: number, checked: boolean, shiftKey: boolean) => void;
-    onDataUpdate?: (params: UpdateCell | Array<UpdateCell>) => void;
+    onDataUpdate?: (params: UpdateCell | UpdateCell[]) => void;
     onRowsDelete?: (rowIndices: number[]) => void | Promise<void>;
     onColumnClick?: (columnId: string) => void;
     onCellClick?: (rowIndex: number, columnId: string, event?: React.MouseEvent) => void;

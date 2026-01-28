@@ -1,0 +1,687 @@
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Input } from "@wealthfolio/ui/components/ui/input";
+import { Label } from "@wealthfolio/ui/components/ui/label";
+import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
+import { CurrencyInput, DatePickerInput } from "@wealthfolio/ui";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@wealthfolio/ui/components/ui/alert-dialog";
+import { ScrollArea } from "@wealthfolio/ui/components/ui/scroll-area";
+import { toast } from "sonner";
+import { format, parseISO } from "date-fns";
+
+import { TickerAvatar } from "@/components/ticker-avatar";
+import TickerSearchInput from "@/components/ticker-search";
+import { saveManualHoldings, getSnapshotByDate, deleteSnapshot, type HoldingInput } from "@/adapters";
+import { Holding, Account, SymbolSearchResult } from "@/lib/types";
+import { buildCanonicalAssetId } from "@/lib/asset-utils";
+import { HoldingType } from "@/lib/constants";
+import { cn } from "@/lib/utils";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { QueryKeys } from "@/lib/query-keys";
+
+interface EditableHolding {
+  assetId: string;
+  symbol: string;
+  name?: string;
+  quantity: string;
+  averageCost: string;
+  currency: string;
+  isNew?: boolean;
+}
+
+interface EditableCashBalance {
+  currency: string;
+  amount: string;
+}
+
+interface HoldingsEditModeProps {
+  holdings: Holding[];
+  account: Account;
+  isLoading: boolean;
+  onClose: () => void;
+  /** When provided, edits an existing snapshot. Date picker is locked. */
+  existingSnapshotDate?: string | null;
+}
+
+export const HoldingsEditMode = ({
+  holdings,
+  account,
+  isLoading,
+  onClose,
+  existingSnapshotDate,
+}: HoldingsEditModeProps) => {
+  const queryClient = useQueryClient();
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showAddHolding, setShowAddHolding] = useState(false);
+  const [showDiscardDialog, setShowDiscardDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showAddCurrency, setShowAddCurrency] = useState(false);
+  const [newCurrency, setNewCurrency] = useState("");
+
+  // When editing an existing snapshot, the date is locked
+  const isEditingExistingSnapshot = !!existingSnapshotDate;
+  const [snapshotDate, setSnapshotDate] = useState<Date>(
+    existingSnapshotDate ? parseISO(existingSnapshotDate) : new Date()
+  );
+
+  // Fetch holdings for existing snapshot date
+  const { data: snapshotHoldings, isLoading: isLoadingSnapshot } = useQuery({
+    queryKey: QueryKeys.snapshotHoldings(account.id, existingSnapshotDate ?? ""),
+    queryFn: () => getSnapshotByDate(account.id, existingSnapshotDate!),
+    enabled: isEditingExistingSnapshot,
+  });
+
+  // Use snapshot holdings when editing existing, otherwise use current holdings
+  const effectiveHoldings = isEditingExistingSnapshot && snapshotHoldings ? snapshotHoldings : holdings;
+
+  // Convert holdings to editable format
+  const convertToEditableHoldings = useCallback((holdingsList: Holding[]): EditableHolding[] => {
+    return holdingsList
+      .filter((h) => h.holdingType?.toLowerCase() !== HoldingType.CASH)
+      .map((h) => {
+        let averageCost = "";
+        if (h.costBasis?.local && h.quantity > 0) {
+          const avgCostValue = h.costBasis.local / h.quantity;
+          averageCost = avgCostValue.toFixed(4).replace(/\.?0+$/, "");
+        }
+        return {
+          assetId: h.instrument?.id ?? h.id,
+          symbol: h.instrument?.symbol ?? h.id,
+          name: h.instrument?.name ?? undefined,
+          quantity: String(h.quantity),
+          averageCost,
+          currency: h.localCurrency,
+          isNew: false,
+        };
+      });
+  }, []);
+
+  // Convert holdings to editable cash balances
+  const convertToCashBalances = useCallback((holdingsList: Holding[]): EditableCashBalance[] => {
+    return holdingsList
+      .filter((h) => h.holdingType?.toLowerCase() === HoldingType.CASH)
+      .map((h) => ({
+        currency: h.localCurrency,
+        amount: String(h.marketValue?.local ?? 0),
+      }));
+  }, []);
+
+  // Initialize editable holdings from effective holdings (excluding cash)
+  const initialHoldings = useMemo(() => {
+    return convertToEditableHoldings(effectiveHoldings);
+  }, [effectiveHoldings, convertToEditableHoldings]);
+
+  // Initialize cash balances from effective holdings
+  const initialCashBalances = useMemo(() => {
+    return convertToCashBalances(effectiveHoldings);
+  }, [effectiveHoldings, convertToCashBalances]);
+
+  const [editableHoldings, setEditableHoldings] =
+    useState<EditableHolding[]>(initialHoldings);
+  const [cashBalances, setCashBalances] =
+    useState<EditableCashBalance[]>(initialCashBalances);
+
+  // Update editable holdings when snapshot holdings are loaded
+  useEffect(() => {
+    if (isEditingExistingSnapshot && snapshotHoldings) {
+      setEditableHoldings(convertToEditableHoldings(snapshotHoldings));
+      setCashBalances(convertToCashBalances(snapshotHoldings));
+    }
+  }, [isEditingExistingSnapshot, snapshotHoldings, convertToEditableHoldings, convertToCashBalances]);
+
+  // Track if there are unsaved changes
+  const hasChanges = useMemo(() => {
+    if (editableHoldings.length !== initialHoldings.length) return true;
+    for (const holding of editableHoldings) {
+      const original = initialHoldings.find((h) => h.assetId === holding.assetId);
+      if (!original) return true;
+      if (original.quantity !== holding.quantity) return true;
+      if (original.averageCost !== holding.averageCost) return true;
+    }
+    if (cashBalances.length !== initialCashBalances.length) return true;
+    for (const cash of cashBalances) {
+      const original = initialCashBalances.find((c) => c.currency === cash.currency);
+      if (!original) return true;
+      if (original.amount !== cash.amount) return true;
+    }
+    return false;
+  }, [editableHoldings, initialHoldings, cashBalances, initialCashBalances]);
+
+  const handleQuantityChange = useCallback((assetId: string, quantity: string) => {
+    if (quantity !== "" && !/^-?\d*\.?\d*$/.test(quantity)) return;
+    setEditableHoldings((prev) =>
+      prev.map((h) => (h.assetId === assetId ? { ...h, quantity } : h)),
+    );
+  }, []);
+
+  const handleAverageCostChange = useCallback((assetId: string, averageCost: string) => {
+    if (averageCost !== "" && !/^-?\d*\.?\d*$/.test(averageCost)) return;
+    setEditableHoldings((prev) =>
+      prev.map((h) => (h.assetId === assetId ? { ...h, averageCost } : h)),
+    );
+  }, []);
+
+  const handleCashAmountChange = useCallback((currency: string, amount: string) => {
+    if (amount !== "" && !/^-?\d*\.?\d*$/.test(amount)) return;
+    setCashBalances((prev) =>
+      prev.map((c) => (c.currency === currency ? { ...c, amount } : c)),
+    );
+  }, []);
+
+  const handleRemoveHolding = useCallback((assetId: string) => {
+    setEditableHoldings((prev) => prev.filter((h) => h.assetId !== assetId));
+  }, []);
+
+  const handleAddHolding = useCallback(
+    (_symbol: string, searchResult?: SymbolSearchResult) => {
+      if (!searchResult) return;
+
+      // Build the canonical asset ID using the same format as the backend
+      const assetId = buildCanonicalAssetId(searchResult, account.currency);
+
+      // Check for duplicates
+      if (editableHoldings.some((h) => h.assetId === assetId)) {
+        toast.error("This holding already exists");
+        return;
+      }
+
+      const newHolding: EditableHolding = {
+        assetId,
+        symbol: searchResult.symbol,
+        name: searchResult.longName || searchResult.shortName,
+        quantity: "",
+        averageCost: "",
+        currency: searchResult.currency ?? account.currency,
+        isNew: true,
+      };
+      setEditableHoldings((prev) => [...prev, newHolding]);
+      setShowAddHolding(false);
+    },
+    [editableHoldings, account.currency],
+  );
+
+  const handleAddCashBalance = useCallback(() => {
+    if (!newCurrency) return;
+    if (cashBalances.some((c) => c.currency === newCurrency)) {
+      toast.error("This currency already exists");
+      return;
+    }
+    setCashBalances((prev) => [...prev, { currency: newCurrency, amount: "" }]);
+    setNewCurrency("");
+    setShowAddCurrency(false);
+  }, [cashBalances, newCurrency]);
+
+  const handleRemoveCashBalance = useCallback((currency: string) => {
+    setCashBalances((prev) => prev.filter((c) => c.currency !== currency));
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    setIsSaving(true);
+    try {
+      const holdingsInput: HoldingInput[] = editableHoldings
+        .filter((h) => h.quantity !== "" && parseFloat(h.quantity) !== 0)
+        .map((h) => ({
+          assetId: h.assetId,
+          quantity: h.quantity,
+          currency: h.currency,
+          averageCost: h.averageCost || undefined,
+        }));
+      const cashBalancesInput: Record<string, string> = {};
+      for (const cash of cashBalances) {
+        if (cash.amount !== "" && parseFloat(cash.amount) !== 0) {
+          cashBalancesInput[cash.currency] = cash.amount;
+        }
+      }
+      const formattedDate = format(snapshotDate, "yyyy-MM-dd");
+      await saveManualHoldings(account.id, holdingsInput, cashBalancesInput, formattedDate);
+      // Invalidate holdings queries
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS, account.id] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS] });
+      // Invalidate performance queries
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNTS_SIMPLE_PERFORMANCE] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.PERFORMANCE_HISTORY] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.PERFORMANCE_SUMMARY] });
+      // Invalidate valuation queries - use spread to match the query key structure
+      queryClient.invalidateQueries({ queryKey: QueryKeys.valuationHistory(account.id) });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.HISTORY_VALUATION] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.latestValuations] });
+      // Invalidate manual snapshots query
+      queryClient.invalidateQueries({ queryKey: QueryKeys.manualSnapshots(account.id) });
+      toast.success("Holdings updated successfully");
+      onClose();
+    } catch (error) {
+      console.error("Failed to save holdings:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to save holdings");
+    } finally {
+      setIsSaving(false);
+    }
+  }, [editableHoldings, cashBalances, account.id, snapshotDate, queryClient, onClose]);
+
+  const handleDeleteSnapshot = useCallback(async () => {
+    if (!existingSnapshotDate) return;
+    setIsDeleting(true);
+    try {
+      await deleteSnapshot(account.id, existingSnapshotDate);
+      // Invalidate all relevant queries
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS, account.id] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNTS_SIMPLE_PERFORMANCE] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.PERFORMANCE_HISTORY] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.PERFORMANCE_SUMMARY] });
+      queryClient.invalidateQueries({ queryKey: QueryKeys.valuationHistory(account.id) });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.HISTORY_VALUATION] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.latestValuations] });
+      queryClient.invalidateQueries({ queryKey: QueryKeys.manualSnapshots(account.id) });
+      toast.success("Snapshot deleted successfully");
+      onClose();
+    } catch (error) {
+      console.error("Failed to delete snapshot:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to delete snapshot");
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+    }
+  }, [existingSnapshotDate, account.id, queryClient, onClose]);
+
+  const handleCancel = useCallback(() => {
+    if (hasChanges) {
+      setShowDiscardDialog(true);
+    } else {
+      onClose();
+    }
+  }, [hasChanges, onClose]);
+
+  // Calculate total value for a holding
+  const getTotalValue = (holding: EditableHolding) => {
+    const qty = parseFloat(holding.quantity) || 0;
+    const cost = parseFloat(holding.averageCost) || 0;
+    return qty * cost;
+  };
+
+  if (isLoading || (isEditingExistingSnapshot && isLoadingSnapshot)) {
+    return (
+      <div className="space-y-4 p-4">
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-12 w-full" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full flex-col">
+      {/* Scrollable Content */}
+      <ScrollArea className="flex-1">
+        <div className="space-y-6 py-4">
+          {/* Holdings Card */}
+          <Card>
+            <CardContent className="space-y-4 pt-4">
+              {/* Snapshot Date */}
+              <div className="pb-2">
+                <Label className="text-sm font-medium">Snapshot Date</Label>
+                <p className="text-muted-foreground mb-2 text-xs">
+                  {isEditingExistingSnapshot
+                    ? "Editing snapshot from this date (date cannot be changed)"
+                    : "The date these holdings represent"}
+                </p>
+                <DatePickerInput
+                  value={snapshotDate}
+                  onChange={(date) => date && setSnapshotDate(date)}
+                  disabled={isEditingExistingSnapshot}
+                />
+              </div>
+
+              {/* Table Header */}
+              <div className="text-muted-foreground grid grid-cols-12 gap-2 border-b pb-2 text-xs font-medium">
+                <div className="col-span-5">Symbol</div>
+                <div className="col-span-2 text-right">Shares</div>
+                <div className="col-span-2 text-right">Avg Cost</div>
+                <div className="col-span-2 text-right">Total</div>
+                <div className="col-span-1"></div>
+              </div>
+
+              {/* Holdings Rows */}
+              <div className="space-y-1">
+                {editableHoldings.length === 0 && !showAddHolding ? (
+                  <div className="text-muted-foreground py-8 text-center text-sm">
+                    No holdings yet. Click below to add your first position.
+                  </div>
+                ) : (
+                  editableHoldings.map((holding) => {
+                    const totalValue = getTotalValue(holding);
+                    return (
+                      <div
+                        key={holding.assetId}
+                        className="border-border/50 hover:bg-muted/50 grid grid-cols-12 items-center gap-2 rounded-lg border-b py-2 transition-colors last:border-b-0"
+                      >
+                        {/* Symbol */}
+                        <div className="col-span-5">
+                          <div className="flex items-center gap-2">
+                            <TickerAvatar symbol={holding.symbol} className="h-7 w-7 shrink-0" />
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-medium">{holding.symbol}</div>
+                              {holding.name && (
+                                <div className="text-muted-foreground truncate text-xs">
+                                  {holding.name}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Shares */}
+                        <div className="col-span-2">
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            value={holding.quantity}
+                            onChange={(e) => handleQuantityChange(holding.assetId, e.target.value)}
+                            placeholder="0"
+                            className="h-8 text-right text-sm"
+                          />
+                        </div>
+
+                        {/* Avg Cost */}
+                        <div className="col-span-2">
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            value={holding.averageCost}
+                            onChange={(e) => handleAverageCostChange(holding.assetId, e.target.value)}
+                            placeholder="0.00"
+                            className="h-8 text-right text-sm"
+                          />
+                        </div>
+
+                        {/* Total */}
+                        <div className="col-span-2 text-right">
+                          <span
+                            className={cn(
+                              "text-sm font-medium",
+                              totalValue > 0 ? "text-foreground" : "text-muted-foreground",
+                            )}
+                          >
+                            {totalValue.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                        </div>
+
+                        {/* Delete */}
+                        <div className="col-span-1 flex justify-end">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveHolding(holding.assetId)}
+                            className="hover:bg-destructive/20 hover:text-destructive h-7 w-7 p-0"
+                          >
+                            <Icons.Trash className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+
+                {/* Add Holding Input */}
+                {showAddHolding && (
+                  <div className="flex items-center gap-2 py-2">
+                    <div className="flex-1">
+                      <TickerSearchInput
+                        onSelectResult={handleAddHolding}
+                        placeholder="Search for symbol..."
+                        defaultCurrency={account.currency}
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowAddHolding(false)}
+                      className="h-8"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Add Row Button */}
+              {!showAddHolding && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAddHolding(true)}
+                  className="border-muted-foreground/25 text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground h-10 w-full border border-dashed"
+                >
+                  <Icons.PlusCircle className="mr-2 h-4 w-4" />
+                  Add Another Holding
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Cash Balances Card */}
+          <Card>
+            <CardContent className="space-y-4 pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-medium">Cash Balances</h4>
+                  <p className="text-muted-foreground text-xs">Add cash holdings by currency</p>
+                </div>
+              </div>
+
+              {/* Cash Table Header */}
+              {cashBalances.length > 0 && (
+                <div className="text-muted-foreground grid grid-cols-12 gap-2 border-b pb-2 text-xs font-medium">
+                  <div className="col-span-6">Currency</div>
+                  <div className="col-span-5 text-right">Amount</div>
+                  <div className="col-span-1"></div>
+                </div>
+              )}
+
+              {/* Cash Rows */}
+              <div className="space-y-1">
+                {cashBalances.length === 0 && !showAddCurrency ? (
+                  <div className="text-muted-foreground py-4 text-center text-sm">
+                    No cash balances. Click below to add cash holdings.
+                  </div>
+                ) : (
+                  cashBalances.map((cash) => (
+                    <div
+                      key={cash.currency}
+                      className="border-border/50 hover:bg-muted/50 grid grid-cols-12 items-center gap-2 rounded-lg border-b py-2 transition-colors last:border-b-0"
+                    >
+                      {/* Currency */}
+                      <div className="col-span-6">
+                        <div className="flex items-center gap-2">
+                          <div className="bg-muted flex h-7 w-7 items-center justify-center rounded-full">
+                            <Icons.DollarSign className="h-3.5 w-3.5" />
+                          </div>
+                          <span className="text-sm font-medium">{cash.currency}</span>
+                        </div>
+                      </div>
+
+                      {/* Amount */}
+                      <div className="col-span-5">
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          value={cash.amount}
+                          onChange={(e) => handleCashAmountChange(cash.currency, e.target.value)}
+                          placeholder="0.00"
+                          className="h-8 text-right text-sm"
+                        />
+                      </div>
+
+                      {/* Delete */}
+                      <div className="col-span-1 flex justify-end">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveCashBalance(cash.currency)}
+                          className="hover:bg-destructive/20 hover:text-destructive h-7 w-7 p-0"
+                        >
+                          <Icons.Trash className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+
+                {/* Add Currency Input */}
+                {showAddCurrency && (
+                  <div className="flex items-center gap-2 py-2">
+                    <div className="w-[160px]">
+                      <CurrencyInput
+                        value={newCurrency}
+                        onChange={setNewCurrency}
+                        placeholder="Select currency"
+                      />
+                    </div>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleAddCashBalance}
+                      disabled={!newCurrency}
+                      className="h-8"
+                    >
+                      Add
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setShowAddCurrency(false);
+                        setNewCurrency("");
+                      }}
+                      className="h-8"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Add Currency Button */}
+              {!showAddCurrency && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAddCurrency(true)}
+                  className="border-muted-foreground/25 text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground h-10 w-full border border-dashed"
+                >
+                  <Icons.PlusCircle className="mr-2 h-4 w-4" />
+                  Add Cash Balance
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </ScrollArea>
+
+      {/* Footer with Save/Cancel buttons */}
+      <div className="border-t bg-background py-4">
+        <div className="flex items-center justify-between">
+          {/* Delete button (only when editing existing snapshot) */}
+          <div>
+            {isEditingExistingSnapshot && (
+              <Button
+                variant="outline"
+                onClick={() => setShowDeleteDialog(true)}
+                disabled={isSaving || isDeleting}
+                className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
+              >
+                <Icons.Trash className="mr-2 h-4 w-4" />
+                Delete Snapshot
+              </Button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleCancel} disabled={isSaving || isDeleting}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={isSaving || isDeleting || !hasChanges}>
+              {isSaving ? (
+                <>
+                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Icons.Check className="mr-2 h-4 w-4" />
+                  Save Changes
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Discard Changes Dialog */}
+      <AlertDialog open={showDiscardDialog} onOpenChange={setShowDiscardDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes. Are you sure you want to discard them?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Editing</AlertDialogCancel>
+            <AlertDialogAction onClick={onClose}>Discard</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Snapshot Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete snapshot?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the holdings snapshot from{" "}
+              <strong>{existingSnapshotDate}</strong>. The portfolio valuations will be
+              recalculated without this data point. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSnapshot}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Snapshot"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+};
+
+export default HoldingsEditMode;

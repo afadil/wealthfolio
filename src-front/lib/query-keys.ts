@@ -116,4 +116,10 @@ export const QueryKeys = {
   HEALTH_STATUS: "healthStatus",
   HEALTH_CONFIG: "healthConfig",
   DISMISSED_HEALTH_ISSUES: "dismissedHealthIssues",
+
+  // Snapshot Management
+  MANUAL_SNAPSHOTS: "manualSnapshots",
+  manualSnapshots: (accountId: string) => [QueryKeys.MANUAL_SNAPSHOTS, accountId],
+  SNAPSHOT_HOLDINGS: "snapshotHoldings",
+  snapshotHoldings: (accountId: string, date: string) => [QueryKeys.SNAPSHOT_HOLDINGS, accountId, date],
 } as const;

@@ -154,8 +154,9 @@ impl SyncStateStore for QuoteSyncStateRepository {
     fn get_active_assets(&self) -> Result<Vec<QuoteSyncState>> {
         let mut conn = get_connection(&self.pool)?;
 
+        // Active = position_closed_date IS NULL
         let results = qss_dsl::quote_sync_state
-            .filter(qss_dsl::is_active.eq(1))
+            .filter(qss_dsl::position_closed_date.is_null())
             .order(qss_dsl::sync_priority.desc())
             .load::<QuoteSyncStateDB>(&mut conn)
             .map_err(StorageError::from)?;
@@ -169,12 +170,12 @@ impl SyncStateStore for QuoteSyncStateRepository {
         let grace_cutoff = today - chrono::Duration::days(grace_period_days);
         let grace_cutoff_str = grace_cutoff.format("%Y-%m-%d").to_string();
 
-        // Get active assets OR recently closed assets (within grace period)
+        // Get active assets (position_closed_date IS NULL) OR recently closed assets (within grace period)
         let results = qss_dsl::quote_sync_state
             .filter(
-                qss_dsl::is_active.eq(1).or(qss_dsl::is_active
-                    .eq(0)
-                    .and(qss_dsl::position_closed_date.gt(&grace_cutoff_str))),
+                qss_dsl::position_closed_date
+                    .is_null()
+                    .or(qss_dsl::position_closed_date.gt(&grace_cutoff_str)),
             )
             .order(qss_dsl::sync_priority.desc())
             .load::<QuoteSyncStateDB>(&mut conn)
@@ -299,8 +300,8 @@ impl SyncStateStore for QuoteSyncStateRepository {
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                // Setting position_closed_date marks the asset as inactive
                 let update = QuoteSyncStateUpdateDB {
-                    is_active: Some(0),
                     position_closed_date: Some(Some(closed_date_str)),
                     sync_priority: Some(50), // RecentlyClosed priority
                     updated_at: Some(now),
@@ -327,8 +328,8 @@ impl SyncStateStore for QuoteSyncStateRepository {
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                // Clearing position_closed_date marks the asset as active
                 let update = QuoteSyncStateUpdateDB {
-                    is_active: Some(1),
                     position_closed_date: Some(None),
                     sync_priority: Some(100), // Active priority
                     updated_at: Some(now),

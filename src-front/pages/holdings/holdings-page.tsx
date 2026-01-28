@@ -20,10 +20,12 @@ import {
   AlternativeAssetHolding,
   AlternativeAssetKind,
 } from "@/lib/types";
+import { canAddHoldings } from "@/lib/activity-restrictions";
 import { HoldingsMobileFilterSheet } from "./components/holdings-mobile-filter-sheet";
 import { HoldingsTable } from "./components/holdings-table";
 import { HoldingsTableMobile } from "./components/holdings-table-mobile";
 import { AlternativeHoldingsTable } from "./components/alternative-holdings-table";
+import { HoldingsEditMode } from "./components/holdings-edit-mode";
 import {
   AlternativeAssetQuickAddModal,
   AssetDetailsSheet,
@@ -79,9 +81,22 @@ export const HoldingsPage = () => {
   // Classification sheet state
   const [classifyAsset, setClassifyAsset] = useState<{id: string, symbol: string, name?: string} | null>(null);
 
+  // Edit mode state for HOLDINGS-mode accounts
+  const [isEditMode, setIsEditMode] = useState(false);
+
   const handleAccountSelect = (account: Account) => {
     setSelectedAccount(account);
+    // Exit edit mode when switching accounts
+    setIsEditMode(false);
   };
+
+  // Check if the selected account supports manual holdings editing
+  const canEditHoldings = useMemo(() => {
+    if (!selectedAccount || selectedAccount.id === PORTFOLIO_ACCOUNT_ID) {
+      return false;
+    }
+    return canAddHoldings(selectedAccount);
+  }, [selectedAccount]);
 
   // Handler to convert AlternativeAssetHolding to AssetDetailsSheetAsset for editing
   const handleEditAsset = useCallback((holding: AlternativeAssetHolding) => {
@@ -175,22 +190,49 @@ export const HoldingsPage = () => {
   // Investments content
   const investmentsContent = (
     <>
-      {hasNoInvestments ? (
+      {/* Edit Mode for HOLDINGS-mode accounts */}
+      {isEditMode && selectedAccount && canEditHoldings ? (
+        <HoldingsEditMode
+          holdings={holdings ?? []}
+          account={selectedAccount}
+          isLoading={isDataLoading}
+          onClose={() => setIsEditMode(false)}
+        />
+      ) : hasNoInvestments ? (
         <div className="flex items-center justify-center py-16">
           <EmptyPlaceholder
             icon={<Icons.TrendingUp className="text-muted-foreground h-10 w-10" />}
             title="No holdings yet"
-            description="Get started by adding your first transaction or quickly import your existing holdings from a CSV file."
+            description={
+              canEditHoldings
+                ? "Get started by updating your holdings or importing from a CSV file."
+                : "Get started by adding your first transaction or quickly import your existing holdings from a CSV file."
+            }
           >
             <div className="flex flex-col items-center gap-3 sm:flex-row">
-              <Button size="default" onClick={() => navigate("/activities/manage")}>
-                <Icons.Plus className="mr-2 h-4 w-4" />
-                Add Transaction
-              </Button>
-              <Button size="default" variant="outline" onClick={() => navigate("/import")}>
-                <Icons.Import className="mr-2 h-4 w-4" />
-                Import from CSV
-              </Button>
+              {canEditHoldings ? (
+                <>
+                  <Button size="default" onClick={() => setIsEditMode(true)}>
+                    <Icons.Pencil className="mr-2 h-4 w-4" />
+                    Update Holdings
+                  </Button>
+                  <Button size="default" variant="outline" onClick={() => navigate("/import")}>
+                    <Icons.Import className="mr-2 h-4 w-4" />
+                    Import from CSV
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button size="default" onClick={() => navigate("/activities/manage")}>
+                    <Icons.Plus className="mr-2 h-4 w-4" />
+                    Add Transaction
+                  </Button>
+                  <Button size="default" variant="outline" onClick={() => navigate("/import")}>
+                    <Icons.Import className="mr-2 h-4 w-4" />
+                    Import from CSV
+                  </Button>
+                </>
+              )}
             </div>
           </EmptyPlaceholder>
         </div>
@@ -297,20 +339,30 @@ export const HoldingsPage = () => {
   );
 
   // Shared actions for header
-  const sharedActions = (
-    <>
-      <AccountSelector
-        selectedAccount={selectedAccount}
-        setSelectedAccount={handleAccountSelect}
-        variant="dropdown"
-        includePortfolio={true}
-        className="h-9"
-      />
-      <Button size="sm" onClick={() => setIsAlternativeAssetModalOpen(true)}>
-        <Icons.Plus className="mr-2 h-4 w-4" />
-        Add Asset
-      </Button>
-    </>
+  const sharedActions = useMemo(
+    () => (
+      <>
+        <AccountSelector
+          selectedAccount={selectedAccount}
+          setSelectedAccount={handleAccountSelect}
+          variant="dropdown"
+          includePortfolio={true}
+          className="h-9"
+        />
+        {/* Show Update button for HOLDINGS-mode manual accounts (only on investments tab) */}
+        {canEditHoldings && !isEditMode && currentTab === "investments" && (
+          <Button size="sm" variant="outline" onClick={() => setIsEditMode(true)}>
+            <Icons.Pencil className="mr-2 h-4 w-4" />
+            Update
+          </Button>
+        )}
+        <Button size="sm" onClick={() => setIsAlternativeAssetModalOpen(true)}>
+          <Icons.Plus className="mr-2 h-4 w-4" />
+          Add Asset
+        </Button>
+      </>
+    ),
+    [selectedAccount, handleAccountSelect, canEditHoldings, isEditMode, currentTab],
   );
 
   // Define the swipeable views

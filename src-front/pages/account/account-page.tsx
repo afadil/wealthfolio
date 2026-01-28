@@ -1,4 +1,4 @@
-import { getHoldings } from "@/adapters";
+import { getHoldings, getManualSnapshots } from "@/adapters";
 import { HistoryChart } from "@/components/history-chart";
 import {
   Card,
@@ -12,6 +12,10 @@ import {
   PageContent,
   PageHeader,
   PrivacyAmount,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
 } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
 
@@ -44,11 +48,14 @@ import {
   Account,
   AccountValuation,
   DateRange,
+  getTrackingMode,
   Holding,
+  SnapshotInfo,
   TimePeriod,
   TrackedItem,
 } from "@/lib/types";
-import { calculatePerformanceMetrics, cn } from "@/lib/utils";
+import { canAddHoldings } from "@/lib/activity-restrictions";
+import { cn } from "@/lib/utils";
 import { PortfolioUpdateTrigger } from "@/pages/dashboard/portfolio-update-trigger";
 import { useCalculatePerformanceHistory } from "@/pages/performance/hooks/use-performance-data";
 import { useQuery } from "@tanstack/react-query";
@@ -58,6 +65,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { AccountContributionLimit } from "./account-contribution-limit";
 import AccountHoldings from "./account-holdings";
 import AccountMetrics from "./account-metrics";
+import { HoldingsEditMode } from "@/pages/holdings/components/holdings-edit-mode";
 
 interface HistoryChartData {
   date: string;
@@ -97,9 +105,23 @@ const AccountPage = () => {
   const [desktopSelectorOpen, setDesktopSelectorOpen] = useState(false);
   const [mobileSelectorOpen, setMobileSelectorOpen] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
+  const [isEditingHoldings, setIsEditingHoldings] = useState(false);
+  const [showSnapshotMarkers, setShowSnapshotMarkers] = useState(false);
+  const [editingSnapshotDate, setEditingSnapshotDate] = useState<string | null>(null);
 
   const { accounts, isLoading: isAccountsLoading } = useAccounts();
   const account = useMemo(() => accounts?.find((acc) => acc.id === id), [accounts, id]);
+
+  // Check if this account is in HOLDINGS tracking mode
+  const isHoldingsMode = useMemo(() => {
+    if (!account) return false;
+    return getTrackingMode(account) === "HOLDINGS";
+  }, [account]);
+
+  // Check if user can directly edit holdings (manual HOLDINGS-mode accounts only)
+  const canEditHoldingsDirectly = useMemo(() => {
+    return canAddHoldings(account);
+  }, [account]);
 
   // Query holdings to check if account has any assets
   const { data: holdings, isLoading: isHoldingsLoading } = useQuery<Holding[], Error>({
@@ -112,6 +134,19 @@ const AccountPage = () => {
     if (!holdings) return false;
     return holdings.length > 0;
   }, [holdings]);
+
+  // Query manual snapshots for HOLDINGS mode accounts (only when toggle is on)
+  const { data: manualSnapshots } = useQuery<SnapshotInfo[], Error>({
+    queryKey: QueryKeys.manualSnapshots(id),
+    queryFn: () => getManualSnapshots(id),
+    enabled: isHoldingsMode && showSnapshotMarkers,
+  });
+
+  // Extract snapshot dates for chart markers
+  const snapshotDates = useMemo(() => {
+    if (!manualSnapshots) return [];
+    return manualSnapshots.map((s) => s.snapshotDate);
+  }, [manualSnapshots]);
 
   // Group accounts by type for the selector
   const accountsByType = useMemo(() => {
@@ -132,10 +167,12 @@ const AccountPage = () => {
     return undefined;
   }, [account]);
 
+  // Pass tracking mode to the performance hook for SOTA calculations
   const { data: performanceResponse, isLoading: isPerformanceHistoryLoading } =
     useCalculatePerformanceHistory({
       selectedItems: accountTrackedItem ? [accountTrackedItem] : [],
       dateRange: dateRange,
+      trackingMode: isHoldingsMode ? "HOLDINGS" : "TRANSACTIONS",
     });
 
   const accountPerformance = performanceResponse?.[0] || null;
@@ -145,11 +182,11 @@ const AccountPage = () => {
     id,
   );
 
-  // Calculate gainLossAmount and simpleReturn from valuationHistory
-  const { gainLossAmount: frontendGainLossAmount, simpleReturn: frontendSimpleReturn } =
-    useMemo(() => {
-      return calculatePerformanceMetrics(valuationHistory, false);
-    }, [valuationHistory, id]);
+  const currentValuation = valuationHistory?.[valuationHistory.length - 1];
+
+  // Use period gain and return from backend (SOTA calculations for HOLDINGS mode)
+  const frontendGainLossAmount = accountPerformance?.periodGain ?? 0;
+  const frontendSimpleReturn = accountPerformance?.periodReturn ?? 0;
 
   const chartData: HistoryChartData[] = useMemo(() => {
     if (!valuationHistory) return [];
@@ -160,8 +197,6 @@ const AccountPage = () => {
       currency: valuation.accountCurrency,
     }));
   }, [valuationHistory]);
-
-  const currentValuation = valuationHistory?.[valuationHistory.length - 1];
 
   const isLoading = isAccountsLoading || isValuationHistoryLoading;
   const isDetailsLoading = isLoading || isPerformanceHistoryLoading;
@@ -177,6 +212,11 @@ const AccountPage = () => {
   };
 
   const percentageToDisplay = useMemo(() => {
+    // For HOLDINGS mode, always use simple return since TWR/MWR are not meaningful
+    // (they require transaction history to track cash flows)
+    if (isHoldingsMode) {
+      return frontendSimpleReturn;
+    }
     if (selectedIntervalCode === "ALL") {
       return frontendSimpleReturn;
     }
@@ -185,7 +225,7 @@ const AccountPage = () => {
       return accountPerformance.cumulativeMwr ?? 0;
     }
     return 0; // Default if no specific logic matches or data is unavailable
-  }, [accountPerformance, selectedIntervalCode, frontendSimpleReturn]);
+  }, [accountPerformance, selectedIntervalCode, frontendSimpleReturn, isHoldingsMode]);
 
   const handleAccountSwitch = (selectedAccount: Account) => {
     navigate(`/accounts/${selectedAccount.id}`);
@@ -200,22 +240,76 @@ const AccountPage = () => {
         actions={
           <>
             <div className="hidden items-center gap-2 sm:flex">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => navigate(`/import?account=${id}`)}
-                title="Import CSV"
-              >
-                <Icons.Import className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => navigate(`/activities/manage?account=${id}`)}
-                title="Record Transaction"
-              >
-                <Icons.Plus className="h-4 w-4" />
-              </Button>
+              <TooltipProvider>
+                {canEditHoldingsDirectly ? (
+                  // HOLDINGS mode (manual): Import and Update Holdings buttons
+                  <>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => navigate(`/import?account=${id}`)}
+                        >
+                          <Icons.Import className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Import holdings CSV</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            setEditingSnapshotDate(null);
+                            setIsEditingHoldings(true);
+                          }}
+                        >
+                          <Icons.Pencil className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Update holdings</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </>
+                ) : (
+                  // TRANSACTIONS mode: Import and Record transaction buttons
+                  <>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => navigate(`/import?account=${id}`)}
+                        >
+                          <Icons.Import className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Import CSV</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => navigate(`/activities/manage?account=${id}`)}
+                        >
+                          <Icons.Plus className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Record transaction</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </>
+                )}
+              </TooltipProvider>
             </div>
 
             <div className="sm:hidden">
@@ -224,29 +318,62 @@ const AccountPage = () => {
                 onOpenChange={setMobileActionsOpen}
                 title="Account Actions"
                 description="Manage this account"
-                actions={[
-                  {
-                    icon: "Import",
-                    label: "Import CSV",
-                    description: "Import transactions from file",
-                    onClick: () => navigate(`/import?account=${id}`),
-                  },
-                  {
-                    icon: "Plus",
-                    label: "Record Transaction",
-                    description: "Add a new activity manually",
-                    onClick: () => navigate(`/activities/manage?account=${id}`),
-                  },
-                ]}
+                actions={
+                  canEditHoldingsDirectly
+                    ? [
+                        {
+                          icon: "Import",
+                          label: "Import Holdings",
+                          description: "Import holdings from CSV file",
+                          onClick: () => navigate(`/import?account=${id}`),
+                        },
+                        {
+                          icon: "Pencil",
+                          label: "Update Holdings",
+                          description: "Edit positions and cash balances",
+                          onClick: () => {
+                            setEditingSnapshotDate(null);
+                            setIsEditingHoldings(true);
+                          },
+                        },
+                      ]
+                    : [
+                        {
+                          icon: "Import",
+                          label: "Import CSV",
+                          description: "Import transactions from file",
+                          onClick: () => navigate(`/import?account=${id}`),
+                        },
+                        {
+                          icon: "Plus",
+                          label: "Record Transaction",
+                          description: "Add a new activity manually",
+                          onClick: () => navigate(`/activities/manage?account=${id}`),
+                        },
+                      ]
+                }
               />
             </div>
           </>
         }
       >
-        <div className="flex flex-col" data-tauri-drag-region="true">
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold md:text-xl">{account?.name ?? "Account"}</h1>
-            {/* Desktop account selector */}
+        <div className="flex items-center gap-2" data-tauri-drag-region="true">
+          {/* Tracking mode avatar */}
+          {account && (
+            <div className="bg-primary/10 dark:bg-primary/20 flex size-9 shrink-0 items-center justify-center rounded-full">
+              {getTrackingMode(account) === "HOLDINGS" ? (
+                <Icons.Holdings className="text-primary h-5 w-5" />
+              ) : (
+                <Icons.Activity className="text-primary h-5 w-5" />
+              )}
+            </div>
+          )}
+          <div className="flex min-w-0 flex-col justify-center">
+            <div className="flex items-center gap-1">
+              <h1 className="truncate text-base font-semibold leading-tight md:text-lg">
+                {account?.name ?? "Account"}
+              </h1>
+              {/* Desktop account selector */}
             <div className="hidden sm:block">
               <Popover open={desktopSelectorOpen} onOpenChange={setDesktopSelectorOpen}>
                 <PopoverTrigger asChild>
@@ -360,10 +487,11 @@ const AccountPage = () => {
                 </SheetContent>
               </Sheet>
             </div>
+            </div>
+            <p className="text-muted-foreground text-xs leading-tight md:text-sm">
+              {account?.group ?? account?.currency}
+            </p>
           </div>
-          <p className="text-muted-foreground text-sm md:text-base">
-            {account?.group ?? account?.currency}
-          </p>
         </div>
       </PageHeader>
       <PageContent>
@@ -382,31 +510,63 @@ const AccountPage = () => {
                               currency={account?.currency ?? "USD"}
                             />
                           </p>
-                          <div className="flex space-x-3 text-sm">
+                          <div className="flex items-center gap-2 text-sm">
                             <GainAmount
                               className="text-sm font-light"
                               value={frontendGainLossAmount}
                               currency={account?.currency ?? "USD"}
                               displayCurrency={false}
                             />
-                            <div className="border-muted-foreground my-1 border-r pr-2" />
                             <GainPercent
-                              className="text-sm font-light"
                               value={percentageToDisplay}
-                              animated={true}
+                              variant="badge"
+                              className="text-xs"
                             />
                           </div>
                         </div>
-                        <PrivacyToggle className="mt-3" />
                       </div>
                     </PortfolioUpdateTrigger>
                   </CardTitle>
+                  <div className="-mt-3 flex items-center gap-1 self-start">
+                    <PrivacyToggle />
+                    {isHoldingsMode && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant={showSnapshotMarkers ? "default" : "secondary"}
+                              size="icon-xs"
+                              className={cn(
+                                "rounded-full",
+                                !showSnapshotMarkers && "bg-secondary/50",
+                              )}
+                              onClick={() => setShowSnapshotMarkers(!showSnapshotMarkers)}
+                            >
+                              <Icons.History className="size-5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{showSnapshotMarkers ? "Hide" : "Show"} snapshot markers</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="w-full p-0">
                     <div className="flex w-full flex-col">
                       <div className="h-[480px] w-full">
-                        <HistoryChart data={chartData} isLoading={false} />
+                        <HistoryChart
+                          data={chartData}
+                          isLoading={false}
+                          showMarkers={isHoldingsMode && showSnapshotMarkers}
+                          snapshotDates={snapshotDates}
+                          onMarkerClick={(date) => {
+                            setEditingSnapshotDate(date);
+                            setIsEditingHoldings(true);
+                          }}
+                        />
                         <IntervalSelector
                           className="relative right-0 bottom-10 left-0 z-10"
                           onIntervalSelect={handleIntervalSelect}
@@ -425,17 +585,52 @@ const AccountPage = () => {
                   performance={accountPerformance}
                   className="grow"
                   isLoading={isDetailsLoading || isPerformanceHistoryLoading}
+                  hideBalanceEdit={isHoldingsMode}
+                  isHoldingsMode={isHoldingsMode}
                 />
                 <AccountContributionLimit accountId={id} />
               </div>
             </div>
 
-            <AccountHoldings accountId={id} />
+            <AccountHoldings
+              accountId={id}
+              onAddHoldings={() => setIsEditingHoldings(true)}
+            />
           </>
         ) : (
-          <AccountHoldings accountId={id} showEmptyState={true} />
+          <AccountHoldings
+            accountId={id}
+            showEmptyState={true}
+            onAddHoldings={() => setIsEditingHoldings(true)}
+          />
         )}
       </PageContent>
+
+      {/* Holdings Edit Mode Sheet for manual HOLDINGS-mode accounts */}
+      {account && canEditHoldingsDirectly && (
+        <Sheet open={isEditingHoldings} onOpenChange={setIsEditingHoldings}>
+          <SheetContent side="right" className="flex h-full w-full flex-col p-0 sm:max-w-2xl">
+            <SheetHeader className="border-b px-6 py-4">
+              <SheetTitle>Update Holdings</SheetTitle>
+              <SheetDescription>
+                Edit positions and cash balances for {account.name}
+              </SheetDescription>
+            </SheetHeader>
+            <div className="flex-1 overflow-hidden px-6">
+              <HoldingsEditMode
+                holdings={holdings ?? []}
+                account={account}
+                isLoading={isHoldingsLoading}
+                onClose={() => {
+                  setIsEditingHoldings(false);
+                  setEditingSnapshotDate(null);
+                }}
+                existingSnapshotDate={editingSnapshotDate}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
     </Page>
   );
 };

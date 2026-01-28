@@ -1,9 +1,10 @@
 use crate::constants::DISPLAY_DECIMAL_PRECISION;
+use crate::utils::time_utils::valuation_date_today;
 use crate::{
     activities::{ActivityError, ActivityRepositoryTrait, IncomeData},
     Error, Result,
 };
-use chrono::{Datelike, NaiveDate, Utc};
+use chrono::{Datelike, NaiveDate};
 
 use super::IncomeSummary;
 use crate::fx::FxServiceTrait;
@@ -62,7 +63,7 @@ impl IncomeServiceTrait for IncomeService {
         }
 
         let base_currency = self.base_currency.read().unwrap().clone();
-        let current_date = Utc::now().naive_utc().date();
+        let current_date = valuation_date_today();
         let current_year = current_date.year();
         let last_year = current_year - 1;
         let two_years_ago = current_year - 2;

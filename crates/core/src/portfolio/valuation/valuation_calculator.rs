@@ -7,7 +7,7 @@ use crate::portfolio::valuation::DailyAccountValuation;
 use crate::quotes::Quote;
 
 use chrono::{NaiveDate, Utc};
-use log::{debug, error, warn};
+use log::{error, warn};
 use rust_decimal::Decimal;
 use std::collections::HashMap;
 
@@ -151,7 +151,7 @@ fn calculate_investment_market_value_acct(
                 performance_eligible_market_value += market_value;
             }
         } else {
-            debug!(
+            warn!(
                 "Missing quote for asset {} on date {}. Position market value treated as ZERO.",
                 asset_id, target_date
             );

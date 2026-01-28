@@ -7,28 +7,33 @@ use std::sync::Arc;
 
 use super::mapping;
 use super::models::{
-    AccountUniversalActivity, BrokerAccount, BrokerConnection, SyncAccountsResponse,
-    SyncConnectionsResponse,
+    AccountUniversalActivity, BrokerAccount, BrokerConnection, HoldingsBalance, HoldingsPosition,
+    NewAccountInfo, SyncAccountsResponse, SyncConnectionsResponse,
 };
 use super::traits::BrokerSyncServiceTrait;
 use crate::platform::{Platform, PlatformRepository};
 use crate::state::BrokerSyncState;
 use crate::state::BrokerSyncStateRepository;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Months, Utc};
 use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 use std::collections::HashSet;
-use wealthfolio_core::accounts::{Account, AccountServiceTrait, NewAccount};
+use wealthfolio_core::accounts::{
+    set_tracking_mode, Account, AccountServiceTrait, AccountUpdate, NewAccount, TrackingMode,
+};
 use wealthfolio_core::activities::{self, compute_idempotency_key, AssetInput, NewActivity};
 use wealthfolio_core::fx::currency::{get_normalization_rule, normalize_amount};
 use wealthfolio_core::assets::{canonical_asset_id, AssetKind, NewAsset};
 use wealthfolio_core::errors::Result;
+use wealthfolio_core::portfolio::snapshot::{AccountStateSnapshot, Position, SnapshotRepositoryTrait, SnapshotSource};
 use wealthfolio_core::quotes::DataSource;
+use wealthfolio_core::utils::time_utils::valuation_date_today;
 use wealthfolio_core::sync::{
     ImportRun, ImportRunMode, ImportRunStatus, ImportRunSummary, ImportRunType, ReviewMode,
 };
 use wealthfolio_storage_sqlite::activities::ActivityDB;
 use wealthfolio_storage_sqlite::assets::AssetDB;
+use wealthfolio_storage_sqlite::portfolio::snapshot::AccountStateSnapshotDB;
 use wealthfolio_storage_sqlite::db::{DbPool, WriteHandle};
 use wealthfolio_storage_sqlite::errors::StorageError;
 use wealthfolio_storage_sqlite::schema;
@@ -42,6 +47,7 @@ pub struct BrokerSyncService {
     platform_repository: Arc<PlatformRepository>,
     brokers_sync_state_repository: Arc<BrokerSyncStateRepository>,
     import_run_repository: Arc<ImportRunRepository>,
+    snapshot_repository: Arc<wealthfolio_storage_sqlite::portfolio::snapshot::SnapshotRepository>,
     writer: WriteHandle,
 }
 
@@ -59,7 +65,13 @@ impl BrokerSyncService {
                 pool.clone(),
                 writer.clone(),
             )),
-            import_run_repository: Arc::new(ImportRunRepository::new(pool, writer.clone())),
+            import_run_repository: Arc::new(ImportRunRepository::new(pool.clone(), writer.clone())),
+            snapshot_repository: Arc::new(
+                wealthfolio_storage_sqlite::portfolio::snapshot::SnapshotRepository::new(
+                    pool,
+                    writer.clone(),
+                ),
+            ),
             writer,
         }
     }
@@ -138,6 +150,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
         let updated = 0; // Reserved for future use when we implement account updates
         let mut skipped = 0;
         let mut created_accounts: Vec<(String, String)> = Vec::new();
+        let mut new_accounts_info: Vec<NewAccountInfo> = Vec::new();
 
         // Get all existing accounts with provider_account_id to check for updates
         let existing_accounts = self.account_service.get_all_accounts()?;
@@ -195,6 +208,42 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
 
             // Create the account via AccountService (handles FX rate registration)
             let account = self.account_service.create_account(new_account).await?;
+
+            // Set trackingMode=NOT_SET for new connected accounts (requires user to choose before sync)
+            let meta_with_tracking_mode =
+                set_tracking_mode(account.meta.clone(), TrackingMode::NotSet);
+            if let Err(e) = self
+                .account_service
+                .update_account(AccountUpdate {
+                    id: Some(account.id.clone()),
+                    name: account.name.clone(),
+                    account_type: account.account_type.clone(),
+                    group: account.group.clone(),
+                    is_default: account.is_default,
+                    is_active: account.is_active,
+                    platform_id: account.platform_id.clone(),
+                    account_number: account.account_number.clone(),
+                    meta: Some(meta_with_tracking_mode),
+                    provider: account.provider.clone(),
+                    provider_account_id: account.provider_account_id.clone(),
+                })
+                .await
+            {
+                error!(
+                    "Failed to set trackingMode for new account {}: {}",
+                    account.id, e
+                );
+            }
+
+            // Collect info for NewAccountInfo
+            new_accounts_info.push(NewAccountInfo {
+                local_account_id: account.id.clone(),
+                provider_account_id: provider_account_id.clone(),
+                default_name: broker_account.display_name(),
+                currency: account.currency.clone(),
+                institution_name: broker_account.institution_name.clone(),
+            });
+
             created_accounts.push((account.id.clone(), account.currency.clone()));
 
             created += 1;
@@ -212,6 +261,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             updated,
             skipped,
             created_accounts,
+            new_accounts_info,
         })
     }
 
@@ -868,9 +918,340 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
 
         Ok(())
     }
+
+    async fn save_broker_holdings(
+        &self,
+        account_id: String,
+        balances: Vec<HoldingsBalance>,
+        positions: Vec<HoldingsPosition>,
+    ) -> Result<(usize, usize, Vec<String>)> {
+        use diesel::prelude::*;
+        use std::collections::{HashMap, VecDeque};
+
+        // Get the account to determine its currency
+        let account = self.account_service.get_account(&account_id)?;
+        let account_currency = account.currency.clone();
+
+        // Use canonical valuation date (America/New_York by default)
+        // This ensures "today" matches the user's expectation regardless of server timezone
+        let today = valuation_date_today();
+        let now = chrono::Utc::now();
+
+        // Build cash balances HashMap
+        let mut cash_balances: HashMap<String, Decimal> = HashMap::new();
+        for balance in &balances {
+            if let (Some(currency), Some(cash)) = (
+                balance.currency.as_ref().and_then(|c| c.code.clone()),
+                balance.cash,
+            ) {
+                let cash_decimal = Decimal::from_f64(cash).unwrap_or(Decimal::ZERO);
+                *cash_balances.entry(currency).or_insert(Decimal::ZERO) += cash_decimal;
+            }
+        }
+
+        // Build assets and positions
+        let mut asset_rows: Vec<AssetDB> = Vec::new();
+        let mut positions_map: HashMap<String, Position> = HashMap::new();
+        let mut total_cost_basis = Decimal::ZERO;
+
+        for pos in &positions {
+            // Extract symbol info
+            let symbol_info = pos.symbol.as_ref().and_then(|s| s.symbol.as_ref());
+            let symbol = symbol_info
+                .and_then(|s| s.symbol.clone())
+                .or_else(|| symbol_info.and_then(|s| s.raw_symbol.clone()));
+
+            let symbol = match symbol {
+                Some(s) if !s.is_empty() => s,
+                _ => {
+                    debug!("Skipping position without symbol");
+                    continue;
+                }
+            };
+
+            let units = pos.units.unwrap_or(0.0);
+            if units == 0.0 {
+                debug!("Skipping position {} with zero units", symbol);
+                continue;
+            }
+
+            // Get currency
+            let currency = pos
+                .currency
+                .as_ref()
+                .and_then(|c| c.code.clone())
+                .unwrap_or_else(|| account_currency.clone());
+
+            // Determine asset kind from symbol type
+            let symbol_type_code = symbol_info
+                .and_then(|s| s.symbol_type.as_ref())
+                .and_then(|t| t.code.clone());
+            let kind = broker_symbol_type_to_kind(symbol_type_code.as_deref());
+
+            // Generate asset ID
+            let asset_id = canonical_asset_id(&kind, &symbol, None, &currency);
+
+            // Create asset if needed (same fields as activity sync for consistency)
+            let asset_name = symbol_info.and_then(|s| s.name.clone().or(s.description.clone()));
+            let asset = AssetDB {
+                id: asset_id.clone(),
+                kind: asset_kind_to_string(&kind),
+                name: asset_name,
+                symbol: symbol.clone(),
+                exchange_mic: None,
+                currency: currency.clone(),
+                pricing_mode: "MARKET".to_string(),
+                preferred_provider: Some(DataSource::Yahoo.as_str().to_string()),
+                provider_overrides: None,
+                notes: None,
+                metadata: None,
+                is_active: 1,
+                created_at: now.to_rfc3339(),
+                updated_at: now.to_rfc3339(),
+            };
+            asset_rows.push(asset);
+
+            // Build position
+            let quantity = Decimal::from_f64(units).unwrap_or(Decimal::ZERO);
+            let price = Decimal::from_f64(pos.price.unwrap_or(0.0)).unwrap_or(Decimal::ZERO);
+            let avg_cost =
+                Decimal::from_f64(pos.average_purchase_price.unwrap_or(0.0)).unwrap_or(price);
+            let position_cost_basis = quantity * avg_cost;
+
+            total_cost_basis += position_cost_basis;
+
+            let position = Position {
+                id: format!("{}_{}", account_id, asset_id),
+                account_id: account_id.clone(),
+                asset_id: asset_id.clone(),
+                quantity,
+                average_cost: avg_cost,
+                total_cost_basis: position_cost_basis,
+                currency: currency.clone(),
+                inception_date: now,
+                lots: VecDeque::new(),
+                created_at: now,
+                last_updated: now,
+                is_alternative: false,
+            };
+            positions_map.insert(asset_id, position);
+        }
+
+        // Calculate cash totals
+        let cash_total = cash_balances
+            .get(&account_currency)
+            .copied()
+            .unwrap_or(Decimal::ZERO);
+
+        // Build the snapshot
+        let snapshot = AccountStateSnapshot {
+            id: format!("{}_{}", account_id, today.format("%Y-%m-%d")),
+            account_id: account_id.clone(),
+            snapshot_date: today,
+            currency: account_currency,
+            positions: positions_map.clone(),
+            cash_balances,
+            cost_basis: total_cost_basis,
+            net_contribution: Decimal::ZERO, // Not available from broker
+            net_contribution_base: Decimal::ZERO,
+            cash_total_account_currency: cash_total,
+            cash_total_base_currency: Decimal::ZERO, // Would need FX conversion
+            calculated_at: now.naive_utc(),
+            source: SnapshotSource::BrokerImported,
+        };
+
+        let positions_count = positions_map.len();
+
+        // Check if content is unchanged from latest snapshot (skip if identical)
+        let tomorrow = today + chrono::Days::new(1);
+        let latest = self
+            .snapshot_repository
+            .get_latest_snapshot_before_date(&account_id, tomorrow)?;
+
+        if let Some(existing) = latest {
+            if existing.is_content_equal(&snapshot) {
+                debug!(
+                    "Broker holdings unchanged for account {}, skipping save",
+                    account_id
+                );
+                // Still insert assets (they might be new)
+                let writer = self.writer.clone();
+                let _ = writer
+                    .exec(move |conn| {
+                        for asset in asset_rows {
+                            let _ = diesel::insert_into(schema::assets::table)
+                                .values(&asset)
+                                .on_conflict(schema::assets::id)
+                                .do_nothing()
+                                .execute(conn);
+                        }
+                        Ok::<_, wealthfolio_core::errors::Error>(0usize)
+                    })
+                    .await?;
+
+                return Ok((positions_count, 0, vec![]));
+            }
+        }
+
+        // Convert to DB model
+        let snapshot_db: AccountStateSnapshotDB = snapshot.into();
+
+        // Collect new asset IDs before the closure moves asset_rows
+        // Filter out cash and unknown placeholders - they don't need enrichment (same as activity sync)
+        let new_asset_ids: Vec<String> = asset_rows
+            .iter()
+            .map(|a| a.id.clone())
+            .filter(|id| !id.starts_with("CASH:") && !id.contains(":UNKNOWN:"))
+            .collect();
+
+        // Save to database
+        let writer = self.writer.clone();
+
+        let assets_inserted = writer
+            .exec(move |conn| {
+                // Insert assets (ignore conflicts)
+                let mut inserted = 0usize;
+                for asset in asset_rows {
+                    match diesel::insert_into(schema::assets::table)
+                        .values(&asset)
+                        .on_conflict(schema::assets::id)
+                        .do_nothing()
+                        .execute(conn)
+                    {
+                        Ok(count) => inserted += count,
+                        Err(e) => {
+                            warn!("Failed to insert asset {}: {:?}", asset.id, e);
+                        }
+                    }
+                }
+
+                // Upsert snapshot
+                diesel::insert_into(schema::holdings_snapshots::table)
+                    .values(&snapshot_db)
+                    .on_conflict(schema::holdings_snapshots::id)
+                    .do_update()
+                    .set((
+                        schema::holdings_snapshots::positions
+                            .eq(&snapshot_db.positions),
+                        schema::holdings_snapshots::cash_balances
+                            .eq(&snapshot_db.cash_balances),
+                        schema::holdings_snapshots::cost_basis
+                            .eq(&snapshot_db.cost_basis),
+                        schema::holdings_snapshots::net_contribution
+                            .eq(&snapshot_db.net_contribution),
+                        schema::holdings_snapshots::net_contribution_base
+                            .eq(&snapshot_db.net_contribution_base),
+                        schema::holdings_snapshots::cash_total_account_currency
+                            .eq(&snapshot_db.cash_total_account_currency),
+                        schema::holdings_snapshots::cash_total_base_currency
+                            .eq(&snapshot_db.cash_total_base_currency),
+                        schema::holdings_snapshots::calculated_at
+                            .eq(&snapshot_db.calculated_at),
+                        schema::holdings_snapshots::source
+                            .eq(&snapshot_db.source),
+                    ))
+                    .execute(conn)
+                    .map_err(|e| StorageError::from(e))?;
+
+                Ok::<_, wealthfolio_core::errors::Error>(inserted)
+            })
+            .await?;
+
+        info!(
+            "Saved broker holdings for account {}: {} positions, {} assets inserted, {} new asset IDs",
+            account_id, positions_count, assets_inserted, new_asset_ids.len()
+        );
+
+        // Ensure holdings history has at least 2 snapshots (create synthetic if needed)
+        self.ensure_holdings_history(&account_id).await?;
+
+        Ok((positions_count, assets_inserted, new_asset_ids))
+    }
 }
 
 impl BrokerSyncService {
+    /// Ensures HOLDINGS mode accounts have at least 2 snapshots for proper history.
+    /// If only 1 non-calculated snapshot exists, creates a synthetic snapshot 3 months prior.
+    async fn ensure_holdings_history(&self, account_id: &str) -> Result<()> {
+        // Get count of non-calculated snapshots
+        let count = self
+            .snapshot_repository
+            .get_non_calculated_snapshot_count(account_id)?;
+
+        if count >= 2 {
+            debug!(
+                "Account {} already has {} non-calculated snapshots, no synthetic needed",
+                account_id, count
+            );
+            return Ok(());
+        }
+
+        if count == 0 {
+            debug!(
+                "Account {} has no non-calculated snapshots, nothing to backfill from",
+                account_id
+            );
+            return Ok(());
+        }
+
+        // count == 1: Create synthetic snapshot 3 months before the earliest
+        let earliest = self
+            .snapshot_repository
+            .get_earliest_non_calculated_snapshot(account_id)?;
+
+        let earliest = match earliest {
+            Some(s) => s,
+            None => {
+                debug!("No earliest snapshot found for account {}", account_id);
+                return Ok(());
+            }
+        };
+
+        // Calculate synthetic date: 3 months before earliest
+        let synthetic_date = earliest
+            .snapshot_date
+            .checked_sub_months(Months::new(3))
+            .unwrap_or(earliest.snapshot_date);
+
+        // Don't create if synthetic date equals earliest (edge case)
+        if synthetic_date == earliest.snapshot_date {
+            debug!(
+                "Synthetic date equals earliest date for account {}, skipping",
+                account_id
+            );
+            return Ok(());
+        }
+
+        // Clone the earliest snapshot with new date and source
+        let synthetic = AccountStateSnapshot {
+            id: format!("{}_{}", account_id, synthetic_date.format("%Y-%m-%d")),
+            account_id: account_id.to_string(),
+            snapshot_date: synthetic_date,
+            source: SnapshotSource::Synthetic,
+            calculated_at: chrono::Utc::now().naive_utc(),
+            // Clone all holdings data from earliest
+            currency: earliest.currency,
+            positions: earliest.positions,
+            cash_balances: earliest.cash_balances,
+            cost_basis: earliest.cost_basis,
+            net_contribution: earliest.net_contribution,
+            net_contribution_base: earliest.net_contribution_base,
+            cash_total_account_currency: earliest.cash_total_account_currency,
+            cash_total_base_currency: earliest.cash_total_base_currency,
+        };
+
+        self.snapshot_repository
+            .save_or_update_snapshot(&synthetic)
+            .await?;
+
+        info!(
+            "Created synthetic snapshot for account {} at {} (3 months before {})",
+            account_id, synthetic_date, earliest.snapshot_date
+        );
+
+        Ok(())
+    }
+
     /// Find the platform ID for a broker account based on its institution name
     fn find_platform_for_account(&self, broker_account: &BrokerAccount) -> Result<Option<String>> {
         // First, try to find platform by matching institution name

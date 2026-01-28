@@ -20,7 +20,7 @@ export function MigrationBanner() {
       if (result.errors.length > 0) {
         toast.warning(`${result.errors.length} items could not be matched and were skipped.`);
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error("Migration failed. Please try again.");
     }
   };

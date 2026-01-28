@@ -43,13 +43,13 @@ function deriveInitialThreadTitle(firstUserMessage: string): string {
  */
 function extractErrorMessage(error: string): string {
   // Try to extract from "with message:" format first
-  const messageMatch = error.match(/with message:\s*(.+)$/i);
+  const messageMatch = /with message:\s*(.+)$/i.exec(error);
   const jsonStr = messageMatch?.[1] || error;
 
   // Try to parse as JSON
   try {
     // Find JSON object in the string
-    const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+    const jsonMatch = /\{[\s\S]*\}/.exec(jsonStr);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
       // Handle {"error":{"message":"..."}} format
@@ -70,13 +70,13 @@ function extractErrorMessage(error: string): string {
   }
 
   // Fallback: try simple regex for {"error":"..."}
-  const simpleMatch = error.match(/"error":\s*"([^"]+)"/);
+  const simpleMatch = /"error":\s*"([^"]+)"/.exec(error);
   if (simpleMatch?.[1]) {
     return simpleMatch[1];
   }
 
   // Fallback: try regex for "message":"..."
-  const msgMatch = error.match(/"message":\s*"([^"]+)"/);
+  const msgMatch = /"message":\s*"([^"]+)"/.exec(error);
   if (msgMatch?.[1]) {
     return msgMatch[1];
   }
@@ -95,14 +95,14 @@ function formatErrorMessage(error: string): string {
 
   // Model doesn't support thinking (Ollama)
   if (extractedError.includes("does not support thinking")) {
-    const modelMatch = extractedError.match(/"([^"]+)"/);
+    const modelMatch = /"([^"]+)"/.exec(extractedError);
     const modelName = modelMatch?.[1] || "This model";
     return `**Thinking not supported**\n\n${modelName} doesn't support the thinking/reasoning feature.\n\nTry a different model that supports thinking, or check your ${settingsLink}.`;
   }
 
   // Model not found errors
   if (extractedError.includes("not found") && extractedError.includes("model")) {
-    const modelMatch = extractedError.match(/model ['"]([^'"]+)['"]/i);
+    const modelMatch = /model ['"]([^'"]+)['"]/i.exec(extractedError);
     const modelName = modelMatch?.[1] || "selected model";
     return `**Model not available**\n\nThe model "${modelName}" could not be found. This usually means:\n- The model hasn't been downloaded yet\n- The model name is incorrect\n- The AI provider service isn't running\n\nPlease check your ${settingsLink} to select a different model or verify your provider configuration.`;
   }
@@ -167,7 +167,7 @@ export interface ExternalMessage {
  * JSON value types for tool arguments.
  */
 type JSONValue = string | number | boolean | null | JSONValue[] | { [key: string]: JSONValue };
-type JSONObject = { readonly [key: string]: JSONValue };
+type JSONObject = Readonly<Record<string, JSONValue>>;
 
 /**
  * Content part types for the runtime.

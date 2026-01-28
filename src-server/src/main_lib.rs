@@ -62,6 +62,7 @@ pub struct AppState {
     pub quote_service: Arc<dyn QuoteServiceTrait + Send + Sync>,
     pub base_currency: Arc<RwLock<String>>,
     pub snapshot_service: Arc<dyn SnapshotServiceTrait + Send + Sync>,
+    pub snapshot_repository: Arc<SnapshotRepository>,
     pub performance_service:
         Arc<dyn wealthfolio_core::portfolio::performance::PerformanceServiceTrait + Send + Sync>,
     pub income_service: Arc<dyn IncomeServiceTrait + Send + Sync>,
@@ -346,6 +347,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         quote_service,
         base_currency,
         snapshot_service,
+        snapshot_repository,
         performance_service,
         income_service,
         goal_service,

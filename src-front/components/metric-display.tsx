@@ -18,6 +18,12 @@ export const MAX_DRAWDOWN_INFO =
 export const ANNUALIZED_RETURN_INFO =
   "Annualized Return shows the geometric average amount of money earned by an investment each year over the selected period, as if the returns were compounded annually.";
 
+// Holdings mode specific info texts (value-based, not cash-flow adjusted)
+export const HOLDINGS_MODE_VOLATILITY_INFO =
+  "Volatility of account value changes. Based on daily valuations without adjusting for deposits or withdrawals. Reflects how much the market value fluctuates.";
+export const HOLDINGS_MODE_MAX_DRAWDOWN_INFO =
+  "Largest peak-to-trough decline in account value. Based on daily valuations without adjusting for deposits or withdrawals.";
+
 export interface MetricDisplayProps {
   label: string;
   value?: number; // Made optional as performance-page might only need label and info

@@ -211,10 +211,10 @@ export function MultiSelectTaxonomy({
         const category = categoryMap.get(assignment.categoryId);
         return category ? { assignment, category } : null;
       })
-      .filter(Boolean) as Array<{
+      .filter(Boolean) as {
       assignment: AssetTaxonomyAssignment;
       category: TaxonomyCategory;
-    }>;
+    }[];
   }, [assignments, categoryMap]);
 
   if (isLoading) {

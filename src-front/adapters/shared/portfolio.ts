@@ -6,6 +6,9 @@ import type {
   PerformanceMetrics,
   PortfolioAllocations,
   SimplePerformanceMetrics,
+  HoldingsSnapshotInput,
+  ImportHoldingsCsvResult,
+  SnapshotInfo,
 } from "@/lib/types";
 
 import { invoke, logger } from "./platform";
@@ -51,12 +54,14 @@ export const calculatePerformanceHistory = async (
   itemId: string,
   startDate: string,
   endDate: string,
+  trackingMode?: "HOLDINGS" | "TRANSACTIONS",
 ): Promise<PerformanceMetrics> => {
   const response = await invoke<PerformanceMetrics>("calculate_performance_history", {
     itemType,
     itemId,
     startDate,
     endDate,
+    trackingMode,
   });
 
   if (typeof response === "string" || !response || Object.keys(response).length === 0) {
@@ -73,6 +78,7 @@ interface CalculatePerformanceSummaryArgs {
   itemId: string;
   startDate?: string | null;
   endDate?: string | null;
+  trackingMode?: "HOLDINGS" | "TRANSACTIONS";
 }
 
 export const calculatePerformanceSummary = async ({
@@ -80,8 +86,9 @@ export const calculatePerformanceSummary = async ({
   itemId,
   startDate,
   endDate,
+  trackingMode,
 }: CalculatePerformanceSummaryArgs): Promise<PerformanceMetrics> => {
-  const args: CalculatePerformanceSummaryArgs = {
+  const args: Record<string, unknown> = {
     itemType,
     itemId,
   };
@@ -91,11 +98,11 @@ export const calculatePerformanceSummary = async ({
   if (endDate) {
     args.endDate = endDate;
   }
+  if (trackingMode) {
+    args.trackingMode = trackingMode;
+  }
 
-  const response = await invoke<PerformanceMetrics>(
-    "calculate_performance_summary",
-    args as unknown as Record<string, unknown>,
-  );
+  const response = await invoke<PerformanceMetrics>("calculate_performance_summary", args);
 
   if (!response || typeof response !== "object" || !response.id) {
     logger.error(
@@ -119,4 +126,91 @@ export const getHolding = async (accountId: string, assetId: string): Promise<Ho
 
 export const getPortfolioAllocations = async (accountId: string): Promise<PortfolioAllocations> => {
   return invoke<PortfolioAllocations>("get_portfolio_allocations", { accountId });
+};
+
+/**
+ * Input for a single holding when saving manual holdings
+ */
+export interface HoldingInput {
+  assetId: string;
+  quantity: string;
+  currency: string;
+  averageCost?: string;
+}
+
+/**
+ * Saves manual holdings for a HOLDINGS-mode account.
+ * Creates or updates a snapshot for the specified date with the given holdings and cash balances.
+ */
+export const saveManualHoldings = async (
+  accountId: string,
+  holdings: HoldingInput[],
+  cashBalances: Record<string, string>,
+  snapshotDate?: string,
+): Promise<void> => {
+  return invoke<void>("save_manual_holdings", {
+    accountId,
+    holdings,
+    cashBalances,
+    snapshotDate,
+  });
+};
+
+/**
+ * Imports holdings snapshots from CSV data for a HOLDINGS-mode account.
+ * Each snapshot represents the holdings state at a specific date.
+ *
+ * CSV format:
+ * ```csv
+ * date,symbol,quantity,price,currency
+ * 2024-01-15,AAPL,100,185.50,USD
+ * 2024-01-15,GOOGL,50,142.30,USD
+ * 2024-01-15,$CASH,10000,,USD
+ * ```
+ *
+ * - `$CASH` is a reserved symbol for cash balances (price is ignored)
+ * - Rows with the same date form one snapshot
+ * - Multiple dates create multiple snapshots
+ */
+export const importHoldingsCsv = async (
+  accountId: string,
+  snapshots: HoldingsSnapshotInput[],
+): Promise<ImportHoldingsCsvResult> => {
+  try {
+    return await invoke<ImportHoldingsCsvResult>("import_holdings_csv", {
+      accountId,
+      snapshots,
+    });
+  } catch (error) {
+    logger.error(`Error importing holdings CSV: ${String(error)}`);
+    throw error;
+  }
+};
+
+// ============================================================================
+// Manual Snapshot Management
+// ============================================================================
+
+/**
+ * Gets all manual/imported snapshots for an account (non-CALCULATED).
+ * Returns snapshot metadata without full position details.
+ */
+export const getManualSnapshots = async (accountId: string): Promise<SnapshotInfo[]> => {
+  return invoke<SnapshotInfo[]>("get_manual_snapshots", { accountId });
+};
+
+/**
+ * Gets the full snapshot data for a specific date.
+ * Returns holdings in the same format as getHoldings (without live valuation).
+ */
+export const getSnapshotByDate = async (accountId: string, date: string): Promise<Holding[]> => {
+  return invoke<Holding[]>("get_snapshot_by_date", { accountId, date });
+};
+
+/**
+ * Deletes a manual/imported snapshot for a specific date.
+ * Only non-CALCULATED snapshots can be deleted.
+ */
+export const deleteSnapshot = async (accountId: string, date: string): Promise<void> => {
+  return invoke<void>("delete_snapshot", { accountId, date });
 };

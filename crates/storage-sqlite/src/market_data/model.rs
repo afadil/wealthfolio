@@ -101,6 +101,7 @@ pub struct UpdateMarketDataProviderSettingDB {
 }
 
 /// Database model for quote sync state
+/// Note: is_active is derived from position_closed_date (NULL = active, NOT NULL = closed)
 #[derive(
     Debug, Clone, Queryable, Identifiable, Selectable, Insertable, AsChangeset, QueryableByName,
 )]
@@ -110,8 +111,6 @@ pub struct UpdateMarketDataProviderSettingDB {
 pub struct QuoteSyncStateDB {
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub asset_id: String,
-    #[diesel(sql_type = diesel::sql_types::Integer)]
-    pub is_active: i32,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub position_closed_date: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
@@ -136,7 +135,6 @@ pub struct QuoteSyncStateDB {
 #[derive(Debug, Clone, Default, AsChangeset)]
 #[diesel(table_name = crate::schema::quote_sync_state)]
 pub struct QuoteSyncStateUpdateDB {
-    pub is_active: Option<i32>,
     pub position_closed_date: Option<Option<String>>,
     pub last_synced_at: Option<Option<String>>,
     pub data_source: Option<String>,
@@ -261,10 +259,13 @@ impl From<QuoteSyncStateDB> for QuoteSyncState {
         let parse_date =
             |s: &str| -> Option<NaiveDate> { NaiveDate::parse_from_str(s, "%Y-%m-%d").ok() };
 
+        let position_closed_date = db.position_closed_date.as_deref().and_then(parse_date);
+
         QuoteSyncState {
             asset_id: db.asset_id,
-            is_active: db.is_active != 0,
-            position_closed_date: db.position_closed_date.as_deref().and_then(parse_date),
+            // Derive is_active from position_closed_date: NULL = active, NOT NULL = closed
+            is_active: position_closed_date.is_none(),
+            position_closed_date,
             last_synced_at: db.last_synced_at.as_deref().map(parse_datetime),
             data_source: db.data_source,
             sync_priority: db.sync_priority,
@@ -281,7 +282,7 @@ impl From<&QuoteSyncState> for QuoteSyncStateDB {
     fn from(state: &QuoteSyncState) -> Self {
         QuoteSyncStateDB {
             asset_id: state.asset_id.clone(),
-            is_active: if state.is_active { 1 } else { 0 },
+            // is_active is derived from position_closed_date, not stored
             position_closed_date: state
                 .position_closed_date
                 .map(|d| d.format("%Y-%m-%d").to_string()),

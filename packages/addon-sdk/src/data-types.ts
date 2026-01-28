@@ -743,15 +743,26 @@ export interface PerformanceMetrics {
   periodStartDate?: string | null;
   periodEndDate?: string | null;
   currency: string;
-  cumulativeTwr: number;
+  /** Period gain in dollars (SOTA: change in unrealized P&L for HOLDINGS mode) */
+  periodGain: number;
+  /** Period return percentage (SOTA formula for HOLDINGS mode) */
+  periodReturn: number;
+  /** Time-weighted return (null for HOLDINGS mode - requires cash flow tracking) */
+  cumulativeTwr?: number | null;
+  /** Legacy field for backward compatibility */
   gainLossAmount?: number | null;
-  annualizedTwr: number;
+  /** Annualized TWR (null for HOLDINGS mode) */
+  annualizedTwr?: number | null;
   simpleReturn: number;
   annualizedSimpleReturn: number;
-  cumulativeMwr: number;
-  annualizedMwr: number;
+  /** Money-weighted return (null for HOLDINGS mode - requires cash flow tracking) */
+  cumulativeMwr?: number | null;
+  /** Annualized MWR (null for HOLDINGS mode) */
+  annualizedMwr?: number | null;
   volatility: number;
   maxDrawdown: number;
+  /** Indicates if this is a HOLDINGS mode account (no cash flow tracking) */
+  isHoldingsMode?: boolean;
 }
 
 export interface UpdateAssetProfile {

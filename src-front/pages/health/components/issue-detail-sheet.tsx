@@ -50,6 +50,10 @@ const CATEGORY_LABELS: Record<HealthCategory, { label: string; description: stri
     label: "Data Consistency",
     description: "Inconsistencies detected in portfolio data. This may cause inaccurate reporting or calculations.",
   },
+  ACCOUNT_CONFIGURATION: {
+    label: "Account Setup",
+    description: "Some accounts need configuration before data can be synced. Set tracking mode to start importing data.",
+  },
 };
 
 export function IssueDetailSheet({

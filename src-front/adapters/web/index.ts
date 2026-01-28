@@ -67,6 +67,7 @@ export {
   createAccount,
   updateAccount,
   deleteAccount,
+  switchTrackingMode,
 } from "../shared/accounts";
 
 // Activity Commands
@@ -131,6 +132,11 @@ export {
   calculateAccountsSimplePerformance,
   getHolding,
   getPortfolioAllocations,
+  saveManualHoldings,
+  importHoldingsCsv,
+  getManualSnapshots,
+  getSnapshotByDate,
+  deleteSnapshot,
 } from "../shared/portfolio";
 
 // Market Data Commands

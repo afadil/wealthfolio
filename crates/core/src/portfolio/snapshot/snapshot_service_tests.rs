@@ -21,6 +21,7 @@ mod tests {
         AccountStateSnapshot, Lot, Position, SnapshotRepositoryTrait, SnapshotService,
         SnapshotServiceTrait,
     };
+    use crate::utils::time_utils::valuation_date_today;
 
     #[derive(Clone, Debug)]
     struct MockFxService {
@@ -773,6 +774,64 @@ mod tests {
             saved_store.extend(snapshots_to_save.iter().cloned());
             Ok(())
         }
+
+        async fn update_snapshots_source(
+            &self,
+            _account_id: &str,
+            _new_source: &str,
+        ) -> AppResult<usize> {
+            // Mock implementation - just return 0 for tests that don't need this
+            Ok(0)
+        }
+
+        async fn save_or_update_snapshot(
+            &self,
+            snapshot: &AccountStateSnapshot,
+        ) -> AppResult<()> {
+            let mut store = self.snapshots.write().unwrap();
+            let account_snaps = store.entry(snapshot.account_id.clone()).or_default();
+
+            // Remove any existing snapshot for the same date
+            account_snaps.retain(|s| s.snapshot_date != snapshot.snapshot_date);
+
+            // Add the new/updated snapshot
+            account_snaps.push(snapshot.clone());
+            account_snaps.sort_by_key(|k| k.snapshot_date);
+
+            // Also update saved_snapshots for assertion purposes
+            let mut saved_store = self.saved_snapshots.write().unwrap();
+            saved_store.clear();
+            saved_store.push(snapshot.clone());
+
+            Ok(())
+        }
+
+        fn get_non_calculated_snapshot_count(&self, account_id: &str) -> AppResult<usize> {
+            let store = self.snapshots.read().unwrap();
+            if let Some(account_snapshots) = store.get(account_id) {
+                let count = account_snapshots
+                    .iter()
+                    .filter(|s| s.source.is_non_calculated())
+                    .count();
+                return Ok(count);
+            }
+            Ok(0)
+        }
+
+        fn get_earliest_non_calculated_snapshot(
+            &self,
+            account_id: &str,
+        ) -> AppResult<Option<AccountStateSnapshot>> {
+            let store = self.snapshots.read().unwrap();
+            if let Some(account_snapshots) = store.get(account_id) {
+                return Ok(account_snapshots
+                    .iter()
+                    .filter(|s| s.source.is_non_calculated())
+                    .min_by_key(|s| s.snapshot_date)
+                    .cloned());
+            }
+            Ok(None)
+        }
     }
 
     fn create_test_account(id: &str, currency: &str, name: &str) -> Account {
@@ -1248,7 +1307,7 @@ mod tests {
         account_repo.add_account(acc.clone());
         let account_repo = Arc::new(account_repo);
 
-        let today = Utc::now().date_naive();
+        let today = valuation_date_today();
         let activity_date = today.pred_opt().unwrap_or(today);
         let act = create_test_activity(
             "act1",
@@ -3271,5 +3330,407 @@ mod tests {
         let pos = frame_d2.positions.get("AAPL").unwrap();
         assert_eq!(pos.quantity, dec!(30)); // 10 + 20
         assert_eq!(pos.total_cost_basis, dec!(3500)); // 1500 + 2000
+    }
+
+    // ==================== MANUAL SNAPSHOT TESTS ====================
+
+    use crate::portfolio::snapshot::SnapshotSource;
+
+    #[tokio::test]
+    async fn test_save_manual_snapshot_creates_new_snapshot() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let activity_repo = Arc::new(MockActivityRepository::new());
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let snapshot_date = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+        let mut manual_snapshot = create_blank_snapshot("acc1", "USD", "2025-01-15");
+        manual_snapshot.source = SnapshotSource::ManualEntry; // Caller sets the source
+        manual_snapshot.cash_balances.insert("USD".to_string(), dec!(5000));
+        manual_snapshot.net_contribution = dec!(5000);
+        manual_snapshot.net_contribution_base = dec!(5000);
+
+        // Save the manual snapshot
+        let result = svc.save_manual_snapshot("acc1", manual_snapshot.clone()).await;
+        assert!(result.is_ok(), "save_manual_snapshot should succeed");
+
+        // Verify snapshots were saved (manual + synthetic for performance history)
+        let saved = snapshot_repo.get_snapshots_by_account("acc1", None, None).unwrap();
+        assert_eq!(saved.len(), 2, "Should have two snapshots: manual + synthetic for holdings history");
+
+        // Find and verify the manual snapshot
+        let saved_snapshot = saved.iter().find(|s| s.snapshot_date == snapshot_date).unwrap();
+        assert_eq!(saved_snapshot.source, SnapshotSource::ManualEntry, "Source should be ManualEntry");
+        assert_eq!(saved_snapshot.cash_balances.get("USD"), Some(&dec!(5000)));
+
+        // Verify synthetic snapshot was created 3 months before
+        let synthetic = saved.iter().find(|s| s.source == SnapshotSource::Synthetic).unwrap();
+        let expected_synthetic_date = snapshot_date.checked_sub_months(chrono::Months::new(3)).unwrap();
+        assert_eq!(synthetic.snapshot_date, expected_synthetic_date, "Synthetic should be 3 months before");
+    }
+
+    #[tokio::test]
+    async fn test_save_manual_snapshot_updates_existing_same_date() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let activity_repo = Arc::new(MockActivityRepository::new());
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        // Pre-populate with an existing snapshot for the same date
+        let mut existing_snapshot = create_blank_snapshot("acc1", "USD", "2025-01-15");
+        existing_snapshot.cash_balances.insert("USD".to_string(), dec!(3000));
+        existing_snapshot.source = SnapshotSource::ManualEntry;
+        snapshot_repo.add_snapshots(vec![existing_snapshot]);
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        // Create updated snapshot for same date with different values
+        let mut updated_snapshot = create_blank_snapshot("acc1", "USD", "2025-01-15");
+        updated_snapshot.source = SnapshotSource::ManualEntry; // Caller sets the source
+        updated_snapshot.cash_balances.insert("USD".to_string(), dec!(7500));
+        updated_snapshot.net_contribution = dec!(7500);
+
+        let result = svc.save_manual_snapshot("acc1", updated_snapshot).await;
+        assert!(result.is_ok(), "save_manual_snapshot should succeed for update");
+
+        // Verify: 1 updated manual snapshot + 1 synthetic for holdings history
+        // Note: Pre-existing snapshot had count=1, but after first save synthetic is created.
+        // After update on same date, still 2 total (synthetic + updated manual).
+        let saved = snapshot_repo.get_snapshots_by_account("acc1", None, None).unwrap();
+        assert_eq!(saved.len(), 2, "Should have 2 snapshots: updated manual + synthetic");
+
+        // Find and verify the manual snapshot was updated
+        let manual_date = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+        let saved_snapshot = saved.iter().find(|s| s.snapshot_date == manual_date).unwrap();
+        assert_eq!(saved_snapshot.source, SnapshotSource::ManualEntry);
+        assert_eq!(saved_snapshot.cash_balances.get("USD"), Some(&dec!(7500)), "Cash should be updated");
+    }
+
+    #[tokio::test]
+    async fn test_save_manual_snapshot_creates_new_for_different_date() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let activity_repo = Arc::new(MockActivityRepository::new());
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        // Pre-populate with an existing snapshot
+        let mut existing_snapshot = create_blank_snapshot("acc1", "USD", "2025-01-10");
+        existing_snapshot.cash_balances.insert("USD".to_string(), dec!(3000));
+        existing_snapshot.source = SnapshotSource::ManualEntry;
+        snapshot_repo.add_snapshots(vec![existing_snapshot]);
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        // Create new snapshot for a different date
+        let mut new_snapshot = create_blank_snapshot("acc1", "USD", "2025-01-20");
+        new_snapshot.source = SnapshotSource::ManualEntry; // Caller sets the source
+        new_snapshot.cash_balances.insert("USD".to_string(), dec!(8000));
+        new_snapshot.net_contribution = dec!(8000);
+
+        let result = svc.save_manual_snapshot("acc1", new_snapshot).await;
+        assert!(result.is_ok(), "save_manual_snapshot should succeed for new date");
+
+        // Verify two snapshots exist
+        let saved = snapshot_repo.get_snapshots_by_account("acc1", None, None).unwrap();
+        assert_eq!(saved.len(), 2, "Should have two snapshots");
+
+        // Verify dates and sources
+        let mut sorted = saved.clone();
+        sorted.sort_by_key(|s| s.snapshot_date);
+
+        assert_eq!(sorted[0].snapshot_date, NaiveDate::from_ymd_opt(2025, 1, 10).unwrap());
+        assert_eq!(sorted[0].source, SnapshotSource::ManualEntry);
+        assert_eq!(sorted[0].cash_balances.get("USD"), Some(&dec!(3000)));
+
+        assert_eq!(sorted[1].snapshot_date, NaiveDate::from_ymd_opt(2025, 1, 20).unwrap());
+        assert_eq!(sorted[1].source, SnapshotSource::ManualEntry);
+        assert_eq!(sorted[1].cash_balances.get("USD"), Some(&dec!(8000)));
+    }
+
+    #[tokio::test]
+    async fn test_save_manual_snapshot_preserves_source_from_input() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let activity_repo = Arc::new(MockActivityRepository::new());
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        // Create a snapshot with CsvImport source (caller sets source appropriately)
+        let mut snapshot = create_blank_snapshot("acc1", "USD", "2025-01-15");
+        snapshot.source = SnapshotSource::CsvImport; // Caller sets source for CSV imports
+        snapshot.cash_balances.insert("USD".to_string(), dec!(5000));
+
+        let result = svc.save_manual_snapshot("acc1", snapshot).await;
+        assert!(result.is_ok());
+
+        // Verify: CsvImport snapshot + synthetic for holdings history
+        let saved = snapshot_repo.get_snapshots_by_account("acc1", None, None).unwrap();
+        assert_eq!(saved.len(), 2, "Should have 2 snapshots: CSV import + synthetic");
+
+        // Find and verify the CSV import snapshot preserves source
+        let csv_date = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+        let csv_snapshot = saved.iter().find(|s| s.snapshot_date == csv_date).unwrap();
+        assert_eq!(csv_snapshot.source, SnapshotSource::CsvImport, "Source should be preserved from input");
+    }
+
+    // ==================== ensure_holdings_history Tests ====================
+
+    #[tokio::test]
+    async fn test_ensure_holdings_history_no_synthetic_when_two_snapshots_exist() {
+        // When 2+ non-calculated snapshots exist, no synthetic should be created
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let activity_repo = Arc::new(MockActivityRepository::new());
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        // Pre-populate with 2 manual snapshots (enough for performance calculation)
+        let mut snap1 = create_blank_snapshot("acc1", "USD", "2025-01-01");
+        snap1.source = SnapshotSource::ManualEntry;
+        let mut snap2 = create_blank_snapshot("acc1", "USD", "2025-01-15");
+        snap2.source = SnapshotSource::ManualEntry;
+        snapshot_repo.add_snapshots(vec![snap1, snap2]);
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        // Save another snapshot
+        let mut new_snapshot = create_blank_snapshot("acc1", "USD", "2025-02-01");
+        new_snapshot.source = SnapshotSource::ManualEntry;
+        new_snapshot.cash_balances.insert("USD".to_string(), dec!(10000));
+
+        let result = svc.save_manual_snapshot("acc1", new_snapshot).await;
+        assert!(result.is_ok());
+
+        // Should have 3 snapshots total, no synthetic created
+        let saved = snapshot_repo.get_snapshots_by_account("acc1", None, None).unwrap();
+        assert_eq!(saved.len(), 3, "Should have 3 manual snapshots, no synthetic");
+
+        let synthetic_count = saved.iter().filter(|s| s.source == SnapshotSource::Synthetic).count();
+        assert_eq!(synthetic_count, 0, "No synthetic snapshots should exist");
+    }
+
+    #[tokio::test]
+    async fn test_synthetic_snapshot_copies_holdings_from_earliest() {
+        // Synthetic snapshot should copy all holdings data from the earliest manual snapshot
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let activity_repo = Arc::new(MockActivityRepository::new());
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        // Create snapshot with specific holdings data
+        let manual_date = NaiveDate::from_ymd_opt(2025, 6, 15).unwrap();
+        let mut manual_snapshot = create_blank_snapshot("acc1", "USD", "2025-06-15");
+        manual_snapshot.source = SnapshotSource::ManualEntry;
+        manual_snapshot.cash_balances.insert("USD".to_string(), dec!(5000));
+        manual_snapshot.cost_basis = dec!(10000);
+        manual_snapshot.net_contribution = dec!(15000);
+
+        // Add a position with required fields
+        let position = Position {
+            id: "pos1".to_string(),
+            account_id: "acc1".to_string(),
+            asset_id: "asset1".to_string(),
+            quantity: dec!(100),
+            average_cost: dec!(100),
+            total_cost_basis: dec!(10000),
+            currency: "USD".to_string(),
+            inception_date: Utc::now(),
+            lots: VecDeque::new(),
+            created_at: Utc::now(),
+            last_updated: Utc::now(),
+            is_alternative: false,
+        };
+        manual_snapshot.positions.insert("asset1".to_string(), position);
+
+        let result = svc.save_manual_snapshot("acc1", manual_snapshot).await;
+        assert!(result.is_ok());
+
+        // Verify synthetic was created with same holdings data
+        let saved = snapshot_repo.get_snapshots_by_account("acc1", None, None).unwrap();
+        let synthetic = saved.iter().find(|s| s.source == SnapshotSource::Synthetic).unwrap();
+
+        // Synthetic should be 3 months before manual
+        let expected_synthetic_date = manual_date.checked_sub_months(chrono::Months::new(3)).unwrap();
+        assert_eq!(synthetic.snapshot_date, expected_synthetic_date);
+
+        // Synthetic should have same holdings data
+        assert_eq!(synthetic.cash_balances.get("USD"), Some(&dec!(5000)));
+        assert_eq!(synthetic.cost_basis, dec!(10000));
+        assert_eq!(synthetic.net_contribution, dec!(15000));
+        assert!(synthetic.positions.contains_key("asset1"));
+        assert_eq!(synthetic.positions.get("asset1").unwrap().quantity, dec!(100));
+    }
+
+    #[tokio::test]
+    async fn test_broker_imported_snapshot_also_triggers_synthetic() {
+        // Broker imported snapshots should also trigger synthetic creation
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let activity_repo = Arc::new(MockActivityRepository::new());
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        // Create broker imported snapshot
+        let mut broker_snapshot = create_blank_snapshot("acc1", "USD", "2025-03-15");
+        broker_snapshot.source = SnapshotSource::BrokerImported;
+        broker_snapshot.cash_balances.insert("USD".to_string(), dec!(8000));
+
+        let result = svc.save_manual_snapshot("acc1", broker_snapshot).await;
+        assert!(result.is_ok());
+
+        // Should have 2 snapshots: broker + synthetic
+        let saved = snapshot_repo.get_snapshots_by_account("acc1", None, None).unwrap();
+        assert_eq!(saved.len(), 2);
+
+        let broker = saved.iter().find(|s| s.source == SnapshotSource::BrokerImported);
+        let synthetic = saved.iter().find(|s| s.source == SnapshotSource::Synthetic);
+
+        assert!(broker.is_some(), "Broker snapshot should exist");
+        assert!(synthetic.is_some(), "Synthetic snapshot should exist");
+    }
+
+    // ==================== Snapshot Source Filtering Tests ====================
+
+    #[tokio::test]
+    async fn test_calculated_snapshots_not_counted_for_holdings_history() {
+        // Only non-calculated snapshots should count for ensure_holdings_history
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let activity_repo = Arc::new(MockActivityRepository::new());
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        // Pre-populate with CALCULATED snapshots (should be ignored)
+        let mut calc1 = create_blank_snapshot("acc1", "USD", "2025-01-01");
+        calc1.source = SnapshotSource::Calculated;
+        let mut calc2 = create_blank_snapshot("acc1", "USD", "2025-01-05");
+        calc2.source = SnapshotSource::Calculated;
+        snapshot_repo.add_snapshots(vec![calc1, calc2]);
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        // Save a manual snapshot
+        let mut manual = create_blank_snapshot("acc1", "USD", "2025-01-15");
+        manual.source = SnapshotSource::ManualEntry;
+        manual.cash_balances.insert("USD".to_string(), dec!(5000));
+
+        let result = svc.save_manual_snapshot("acc1", manual).await;
+        assert!(result.is_ok());
+
+        // Should have: 2 calculated + 1 manual + 1 synthetic = 4 total
+        let saved = snapshot_repo.get_snapshots_by_account("acc1", None, None).unwrap();
+        assert_eq!(saved.len(), 4);
+
+        // Synthetic should be created because only 1 non-calculated existed before
+        let synthetic_count = saved.iter().filter(|s| s.source == SnapshotSource::Synthetic).count();
+        assert_eq!(synthetic_count, 1, "Synthetic should be created when only 1 non-calculated exists");
     }
 }

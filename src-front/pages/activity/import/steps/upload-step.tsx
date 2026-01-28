@@ -376,7 +376,7 @@ export function UploadStep() {
       dispatch(setAccountId(account.id));
 
       // Start with account's currency as default
-      let parseConfigUpdates: Partial<ParseConfig> = {
+      const parseConfigUpdates: Partial<ParseConfig> = {
         defaultCurrency: account.currency,
       };
 

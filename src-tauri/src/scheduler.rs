@@ -73,10 +73,10 @@ pub async fn run_startup_sync(handle: &AppHandle, context: &Arc<ServiceContext>)
                         );
                     }
 
-                    // Trigger asset enrichment for new assets
+                    // Trigger asset enrichment for new assets from activities
                     if !activities.new_asset_ids.is_empty() {
                         info!(
-                            "Triggering asset enrichment for {} new assets",
+                            "Triggering asset enrichment for {} new assets from activities",
                             activities.new_asset_ids.len()
                         );
                         emit_assets_enrich_requested(
@@ -84,6 +84,36 @@ pub async fn run_startup_sync(handle: &AppHandle, context: &Arc<ServiceContext>)
                             AssetsEnrichPayload {
                                 asset_ids: activities.new_asset_ids.clone(),
                             },
+                        );
+                    }
+                }
+
+                // Also trigger enrichment for new assets from holdings sync
+                if let Some(ref holdings) = result.holdings_synced {
+                    if !holdings.new_asset_ids.is_empty() {
+                        info!(
+                            "Triggering asset enrichment for {} new assets from holdings",
+                            holdings.new_asset_ids.len()
+                        );
+                        emit_assets_enrich_requested(
+                            handle,
+                            AssetsEnrichPayload {
+                                asset_ids: holdings.new_asset_ids.clone(),
+                            },
+                        );
+                    }
+
+                    // Also trigger portfolio update if holdings were synced
+                    if holdings.positions_upserted > 0 {
+                        info!(
+                            "Triggering portfolio update after holdings sync ({} positions synced)",
+                            holdings.positions_upserted
+                        );
+                        crate::events::emit_portfolio_trigger_recalculate(
+                            handle,
+                            crate::events::PortfolioRequestPayload::builder()
+                                .market_sync_mode(MarketSyncMode::Incremental { asset_ids: None })
+                                .build(),
                         );
                     }
                 }
