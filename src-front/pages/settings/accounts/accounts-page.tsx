@@ -1,5 +1,5 @@
-import { getAccounts } from "@/adapters";
 import { getPlatforms } from "@/features/wealthfolio-connect";
+import { useAccounts } from "@/hooks/use-accounts";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, Platform } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
@@ -11,10 +11,7 @@ import { AccountItem } from "./components/account-item";
 import { useAccountMutations } from "./components/use-account-mutations";
 
 const SettingsAccountsPage = () => {
-  const { data: accounts, isLoading } = useQuery<Account[], Error>({
-    queryKey: [QueryKeys.ACCOUNTS],
-    queryFn: getAccounts,
-  });
+  const { accounts, isLoading } = useAccounts({ filterActive: false, includeArchived: true });
 
   const { data: platforms } = useQuery<Platform[], Error>({
     queryKey: [QueryKeys.PLATFORMS],
@@ -35,7 +32,7 @@ const SettingsAccountsPage = () => {
     setVisibleModal(true);
   };
 
-  const { deleteAccountMutation } = useAccountMutations({});
+  const { deleteAccountMutation, updateAccountMutation } = useAccountMutations({});
 
   const handleEditAccount = (account: Account) => {
     setSelectedAccount(account);
@@ -44,6 +41,13 @@ const SettingsAccountsPage = () => {
 
   const handleDeleteAccount = (account: Account) => {
     deleteAccountMutation.mutate(account.id);
+  };
+
+  const handleArchiveAccount = (account: Account, archive: boolean) => {
+    updateAccountMutation.mutate({
+      ...account,
+      isArchived: archive,
+    });
   };
 
   if (isLoading) {
@@ -77,7 +81,7 @@ const SettingsAccountsPage = () => {
         </SettingsHeader>
         <Separator />
         <div className="w-full pt-8">
-          {accounts?.length ? (
+          {accounts.length ? (
             <div className="divide-border bg-card divide-y rounded-md border">
               {accounts.map((account: Account) => (
                 <AccountItem
@@ -86,6 +90,7 @@ const SettingsAccountsPage = () => {
                   platform={account.platformId ? platformMap.get(account.platformId) : undefined}
                   onEdit={handleEditAccount}
                   onDelete={handleDeleteAccount}
+                  onArchive={handleArchiveAccount}
                 />
               ))}
             </div>

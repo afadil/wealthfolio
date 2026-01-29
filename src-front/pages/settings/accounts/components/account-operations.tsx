@@ -25,15 +25,30 @@ export interface AccountOperationsProps {
   account: Account;
   onEdit: (account: Account) => void | undefined;
   onDelete: (account: Account) => void | undefined;
+  onArchive: (account: Account, archive: boolean) => void | undefined;
 }
 
-export function AccountOperations({ account, onEdit, onDelete }: AccountOperationsProps) {
+export function AccountOperations({
+  account,
+  onEdit,
+  onDelete,
+  onArchive,
+}: AccountOperationsProps) {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
-  //const navigation = useNavigation();
-  const isDeleting = false; //navigation?.formData?.get('intent') === 'delete';
+  const [showArchiveAlert, setShowArchiveAlert] = useState(false);
+
   const handleDelete = () => {
     onDelete(account);
     setShowDeleteAlert(false);
+  };
+
+  const handleArchive = () => {
+    onArchive(account, true);
+    setShowArchiveAlert(false);
+  };
+
+  const handleRestore = () => {
+    onArchive(account, false);
   };
 
   return (
@@ -46,6 +61,11 @@ export function AccountOperations({ account, onEdit, onDelete }: AccountOperatio
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => onEdit(account)}>Edit</DropdownMenuItem>
           <DropdownMenuSeparator />
+          {account.isArchived ? (
+            <DropdownMenuItem onClick={handleRestore}>Restore</DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem onSelect={() => setShowArchiveAlert(true)}>Archive</DropdownMenuItem>
+          )}
           <DropdownMenuItem
             className="text-destructive focus:text-destructive flex cursor-pointer items-center"
             onSelect={() => setShowDeleteAlert(true)}
@@ -54,6 +74,7 @@ export function AccountOperations({ account, onEdit, onDelete }: AccountOperatio
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -62,23 +83,33 @@ export function AccountOperations({ account, onEdit, onDelete }: AccountOperatio
             </AlertDialogTitle>
             <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
           </AlertDialogHeader>
-
           <AlertDialogFooter>
-            <input type="hidden" name="id" value={account.id} />
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-
-            <Button
-              disabled={isDeleting}
-              onClick={() => handleDelete()}
-              className="bg-red-600 focus:ring-red-600"
-            >
-              {isDeleting ? (
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Icons.Trash className="mr-2 h-4 w-4" />
-              )}
+            <Button onClick={handleDelete} className="bg-red-600 focus:ring-red-600">
+              <Icons.Trash className="mr-2 h-4 w-4" />
               <span>Delete</span>
             </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Archive Confirmation Dialog */}
+      <AlertDialog open={showArchiveAlert} onOpenChange={setShowArchiveAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Icons.AlertTriangle className="h-5 w-5 text-amber-500" />
+              Archive this account?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Archiving will remove this account from your Total Portfolio history and net worth
+              calculations. Historical charts will be recalculated without this account's data. You
+              can restore it later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button onClick={handleArchive}>Archive</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

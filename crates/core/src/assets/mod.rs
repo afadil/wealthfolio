@@ -28,6 +28,10 @@ pub use asset_id::{
     alternative_id,
     // Canonical ID Generation
     canonical_asset_id,
+    // Yahoo symbol parsing helpers
+    parse_symbol_with_exchange_suffix,
+    security_id_from_symbol,
+    security_id_from_symbol_with_mic,
     // Alternative Asset ID Generation
     generate_asset_id,
     get_asset_id_prefix,

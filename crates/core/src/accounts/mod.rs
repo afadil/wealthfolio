@@ -7,9 +7,7 @@ mod accounts_traits;
 
 // Re-export the public interface
 pub use accounts_constants::*;
-pub use accounts_model::{
-    get_tracking_mode, set_tracking_mode, Account, AccountUpdate, NewAccount, TrackingMode,
-};
+pub use accounts_model::{Account, AccountUpdate, NewAccount, TrackingMode};
 pub use accounts_service::AccountService;
 pub use accounts_traits::{AccountRepositoryTrait, AccountServiceTrait};
 

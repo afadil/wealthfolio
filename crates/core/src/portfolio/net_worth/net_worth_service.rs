@@ -260,11 +260,11 @@ impl NetWorthServiceTrait for NetWorthService {
 
         debug!("Calculating net worth as of {} in {}", date, base_currency);
 
-        // Get all active accounts
-        let accounts = self.account_repository.list(Some(true), None)?;
+        // Get all non-archived accounts (includes closed accounts for historical net worth)
+        let accounts = self.account_repository.list(None, Some(false), None)?;
 
         if accounts.is_empty() {
-            debug!("No active accounts found. Returning empty net worth.");
+            debug!("No non-archived accounts found. Returning empty net worth.");
             return Ok(NetWorthResponse::empty(date, base_currency));
         }
 

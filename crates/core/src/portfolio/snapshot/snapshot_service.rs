@@ -1,6 +1,6 @@
 use super::holdings_calculator::HoldingsCalculator;
 use super::SnapshotRepositoryTrait;
-use crate::accounts::{get_tracking_mode, Account, AccountRepositoryTrait, TrackingMode};
+use crate::accounts::{Account, AccountRepositoryTrait, TrackingMode};
 use crate::activities::{
     Activity, ActivityCompiler, ActivityRepositoryTrait, DefaultActivityCompiler,
 };
@@ -177,6 +177,8 @@ impl SnapshotService {
             meta: None,
             provider: None,
             provider_account_id: None,
+            is_archived: false,
+            tracking_mode: crate::accounts::TrackingMode::NotSet,
         }
     }
 
@@ -314,30 +316,30 @@ impl SnapshotService {
         // HOLDINGS mode accounts manage their snapshots via manual entry/CSV import.
         match account_ids_param {
             Some(ids) => {
+                // When specific account_ids are provided, process them regardless of is_active status
+                // (per spec: "process exactly ids even inactive/archived for per-account rebuild")
                 for id in ids {
                     if id == PORTFOLIO_TOTAL_ACCOUNT_ID {
                         continue;
                     } // TOTAL is virtual
                     if let Ok(acc) = self.account_repository.get_by_id(id) {
-                        if acc.is_active {
-                            // Skip HOLDINGS mode accounts - they don't participate in transaction-based recalculation
-                            if get_tracking_mode(&acc) == TrackingMode::Holdings {
-                                debug!(
-                                    "Skipping account {} for snapshot recalculation: HOLDINGS tracking mode",
-                                    acc.id
-                                );
-                                continue;
-                            }
-                            account_ids_to_fetch_activities.push(acc.id.clone());
-                            accounts_to_process.insert(acc.id.clone(), acc);
+                        // Skip HOLDINGS mode accounts - they don't participate in transaction-based recalculation
+                        if acc.tracking_mode == TrackingMode::Holdings {
+                            debug!(
+                                "Skipping account {} for snapshot recalculation: HOLDINGS tracking mode",
+                                acc.id
+                            );
+                            continue;
                         }
+                        account_ids_to_fetch_activities.push(acc.id.clone());
+                        accounts_to_process.insert(acc.id.clone(), acc);
                     }
                 }
             }
             None => {
-                for acc in self.account_repository.list(Some(true), None)? {
+                for acc in self.account_repository.list(Some(true), None, None)? {
                     // Skip HOLDINGS mode accounts - they don't participate in transaction-based recalculation
-                    if get_tracking_mode(&acc) == TrackingMode::Holdings {
+                    if acc.tracking_mode == TrackingMode::Holdings {
                         debug!(
                             "Skipping account {} for snapshot recalculation: HOLDINGS tracking mode",
                             acc.id
@@ -1145,9 +1147,10 @@ impl SnapshotService {
             force_full_calculation
         );
 
-        let active_accounts = self.account_repository.list(Some(true), None)?;
-        if active_accounts.is_empty() {
-            warn!("No active accounts found. Cannot generate TOTAL snapshots.");
+        // Use non-archived accounts for TOTAL calculation (includes closed but not archived accounts)
+        let non_archived_accounts = self.account_repository.list(None, Some(false), None)?;
+        if non_archived_accounts.is_empty() {
+            warn!("No non-archived accounts found. Cannot generate TOTAL snapshots.");
             self.snapshot_repository
                 .overwrite_all_snapshots_for_account(PORTFOLIO_TOTAL_ACCOUNT_ID, &[])
                 .await?;
@@ -1156,10 +1159,10 @@ impl SnapshotService {
 
         let all_individual_keyframes = self
             .snapshot_repository
-            .get_all_active_account_snapshots(None, None)?;
+            .get_all_non_archived_account_snapshots(None, None)?;
 
         if all_individual_keyframes.is_empty() {
-            warn!("No keyframes found for any active individual accounts. Cannot generate TOTAL snapshots.");
+            warn!("No keyframes found for any non-archived individual accounts. Cannot generate TOTAL snapshots.");
             self.snapshot_repository
                 .overwrite_all_snapshots_for_account(PORTFOLIO_TOTAL_ACCOUNT_ID, &[])
                 .await?;
@@ -1256,7 +1259,7 @@ impl SnapshotService {
             return Ok(0);
         }
 
-        let account_ids: Vec<String> = active_accounts
+        let account_ids: Vec<String> = non_archived_accounts
             .iter()
             .filter(|account| account.id != PORTFOLIO_TOTAL_ACCOUNT_ID)
             .map(|account| account.id.clone())

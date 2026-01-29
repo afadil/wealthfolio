@@ -193,7 +193,7 @@ fn handle_portfolio_calculation(
         // This list might be empty if account_ids_input is None and no accounts are active,
         // or if account_ids_input specified accounts that are now all inactive.
         let initially_targeted_active_accounts: Vec<String> =
-            match account_service.list_accounts(Some(true), account_ids_input.as_deref()) {
+            match account_service.list_accounts(Some(true), None, account_ids_input.as_deref()) {
                 Ok(accounts) => accounts.iter().map(|a| a.id.clone()).collect(),
                 Err(e) => {
                     let err_msg = format!("Failed to list active accounts: {}", e);

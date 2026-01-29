@@ -41,7 +41,7 @@ export function useExportData() {
 
   const { refetch: fetchAccounts } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
-    queryFn: getAccounts,
+    queryFn: () => getAccounts(),
     enabled: false,
   });
   const { refetch: fetchActivities } = useQuery<ActivityDetails[], Error>({

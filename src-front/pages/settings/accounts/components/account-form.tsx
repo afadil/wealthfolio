@@ -43,7 +43,6 @@ import {
 import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 
 import { useAccountMutations } from "./use-account-mutations";
-import { setTrackingMode } from "@/lib/types";
 
 const accountTypes: ResponsiveSelectOption[] = [
   { label: "Securities", value: "SECURITIES" },
@@ -62,8 +61,7 @@ interface AccountFormlProps {
 }
 
 export function AccountForm({ defaultValues, onSuccess = () => undefined }: AccountFormlProps) {
-  const { createAccountMutation, updateAccountMutation, switchTrackingModeMutation } =
-    useAccountMutations({ onSuccess });
+  const { createAccountMutation, updateAccountMutation } = useAccountMutations({ onSuccess });
 
   // Track initial tracking mode to detect changes
   const initialTrackingMode = defaultValues?.trackingMode;
@@ -88,9 +86,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
   // Returns a promise when updating so it can be chained with other operations
   const doSubmit = useCallback(
     (data: AccountFormOutput, options?: { async?: boolean }) => {
-      const { id, trackingMode, meta, ...rest } = data;
-      // Merge trackingMode into the meta JSON field
-      const updatedMeta = setTrackingMode(meta, trackingMode);
+      const { id, trackingMode, ...rest } = data;
 
       if (id) {
         if (options?.async) {
@@ -98,12 +94,11 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
             id,
             trackingMode,
             ...rest,
-            meta: updatedMeta,
           });
         }
-        return updateAccountMutation.mutate({ id, trackingMode, ...rest, meta: updatedMeta });
+        return updateAccountMutation.mutate({ id, trackingMode, ...rest });
       }
-      return createAccountMutation.mutate({ trackingMode, ...rest, meta: updatedMeta });
+      return createAccountMutation.mutate({ trackingMode, ...rest });
     },
     [createAccountMutation, updateAccountMutation],
   );
@@ -130,13 +125,8 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
     setShowModeConfirmation(false);
     if (pendingFormData?.id) {
       try {
-        // First save all account details (name, group, type, etc.)
+        // Save all account details including tracking mode
         await doSubmit(pendingFormData, { async: true });
-        // Then switch tracking mode (which updates snapshot sources)
-        await switchTrackingModeMutation.mutateAsync({
-          accountId: pendingFormData.id,
-          newMode: pendingFormData.trackingMode,
-        });
       } finally {
         setPendingFormData(null);
       }
@@ -321,15 +311,41 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
             control={form.control}
             name="isActive"
             render={({ field }) => (
-              <FormItem className="flex items-center">
+              <FormItem className="bg-muted/40 flex items-center justify-between rounded-lg border p-3">
+                <div className="space-y-0.5">
+                  <FormLabel className="text-sm font-medium">Active</FormLabel>
+                  <p className="text-muted-foreground text-xs">
+                    Visible and usable. If turned off, the account is hidden but still included in
+                    historical totals.
+                  </p>
+                </div>
                 <FormControl>
                   <Switch checked={field.value} onCheckedChange={field.onChange} />
                 </FormControl>
-                <FormLabel className="space-y-0 pl-2"> Is Active</FormLabel>
                 <FormMessage />
               </FormItem>
             )}
           />
+
+          {/* Archived callout - only shown when account is archived */}
+          {defaultValues?.id && defaultValues?.isArchived && (
+            <Alert variant="warning">
+              <Icons.FileArchive className="h-4 w-4" />
+              <AlertDescription className="flex items-center justify-between">
+                <span className="text-sm">
+                  This account is archived and excluded from all calculations.
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => form.setValue("isArchived", false)}
+                >
+                  Restore
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
         <DialogFooter className="gap-2">
           <DialogTrigger asChild>

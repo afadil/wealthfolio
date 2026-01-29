@@ -14,10 +14,10 @@ import {
 } from "@wealthfolio/ui/components/ui/sheet";
 import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { ScrollArea } from "@wealthfolio/ui/components/ui/scroll-area";
-import { updateAccount, switchTrackingMode } from "@/adapters";
+import { updateAccount } from "@/adapters";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { setTrackingMode, type Account, type TrackingMode } from "@/lib/types";
+import type { Account, TrackingMode } from "@/lib/types";
 import { syncBrokerData } from "../services/broker-service";
 
 export interface NewAccountInfo {
@@ -83,25 +83,17 @@ export function NewAccountsFoundModal({
         if (!setup) continue;
 
         // Update account name, group, and tracking mode
-        // We include trackingMode in the update and also call switchTrackingMode
-        // The latter handles snapshot source updates for mode switches
-        if (setup.name !== acc.name || setup.group !== (acc.group ?? "")) {
-          const updatedMeta = setTrackingMode(acc.meta, setup.trackingMode);
-          await updateAccount({
-            id: acc.id,
-            name: setup.name,
-            accountType: acc.accountType,
-            currency: acc.currency,
-            group: setup.group || undefined,
-            isDefault: acc.isDefault,
-            isActive: acc.isActive,
-            trackingMode: setup.trackingMode,
-            meta: updatedMeta,
-          });
-        }
-
-        // Set tracking mode using the dedicated function (handles snapshot sources)
-        await switchTrackingMode(acc.id, setup.trackingMode);
+        await updateAccount({
+          id: acc.id,
+          name: setup.name,
+          accountType: acc.accountType,
+          currency: acc.currency,
+          group: setup.group || undefined,
+          isDefault: acc.isDefault,
+          isActive: acc.isActive,
+          isArchived: acc.isArchived,
+          trackingMode: setup.trackingMode,
+        });
       }
 
       // Invalidate queries and trigger sync

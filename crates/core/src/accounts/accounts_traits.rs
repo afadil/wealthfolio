@@ -35,10 +35,12 @@ pub trait AccountRepositoryTrait: Send + Sync {
     ///
     /// # Arguments
     /// * `is_active_filter` - If Some, filter by active status
+    /// * `is_archived_filter` - If Some, filter by archived status
     /// * `account_ids` - If Some, filter to only these account IDs
     fn list(
         &self,
         is_active_filter: Option<bool>,
+        is_archived_filter: Option<bool>,
         account_ids: Option<&[String]>,
     ) -> Result<Vec<Account>>;
 }
@@ -65,6 +67,7 @@ pub trait AccountServiceTrait: Send + Sync {
     fn list_accounts(
         &self,
         is_active_filter: Option<bool>,
+        is_archived_filter: Option<bool>,
         account_ids: Option<&[String]>,
     ) -> Result<Vec<Account>>;
 
@@ -76,4 +79,10 @@ pub trait AccountServiceTrait: Send + Sync {
 
     /// Gets accounts by a list of IDs.
     fn get_accounts_by_ids(&self, account_ids: &[String]) -> Result<Vec<Account>>;
+
+    /// Returns all non-archived accounts (for aggregates/history)
+    fn get_non_archived_accounts(&self) -> Result<Vec<Account>>;
+
+    /// Returns active, non-archived accounts (for UI selectors)
+    fn get_active_non_archived_accounts(&self) -> Result<Vec<Account>>;
 }

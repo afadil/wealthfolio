@@ -3,7 +3,11 @@ import { useIsMobileViewport } from "@/hooks/use-platform";
 import { ActivityType } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, ActivityDetails } from "@/lib/types";
-import { getAllowedActivityTypes, getActivityRestrictionLevel } from "@/lib/activity-restrictions";
+import {
+  accountSupportsActivityType,
+  getAllowedActivityTypes,
+  getActivityRestrictionLevel,
+} from "@/lib/activity-restrictions";
 import { useQuery } from "@tanstack/react-query";
 import {
   Alert,
@@ -40,23 +44,13 @@ const ActivityManagerPage = () => {
   const symbolParam = searchParams.get("symbol");
   const redirectTo = searchParams.get("redirect-to");
 
-  const { data: accountsData } = useQuery<Account[], Error>({
+  const { data: accounts = [] } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
-    queryFn: getAccounts,
+    queryFn: () => getAccounts(),
   });
 
-  // Prepare account options for the form
-  const accountOptions: AccountSelectOption[] = useMemo(
-    () =>
-      (accountsData ?? [])
-        .filter((acc) => acc.isActive)
-        .map((account) => ({
-          value: account.id,
-          label: account.name,
-          currency: account.currency,
-        })),
-    [accountsData],
-  );
+  // Non-archived accounts for filtering
+  const activeAccounts = useMemo(() => accounts.filter((acc) => !acc.isArchived), [accounts]);
 
   const handleClose = useCallback(() => {
     if (redirectTo) {
@@ -68,11 +62,11 @@ const ActivityManagerPage = () => {
 
   // Get the selected account if pre-selected
   const selectedAccount = useMemo(() => {
-    if (accountParam && accountsData) {
-      return accountsData.find((acc) => acc.id === accountParam);
+    if (accountParam && accounts.length > 0) {
+      return accounts.find((acc) => acc.id === accountParam);
     }
     return undefined;
-  }, [accountParam, accountsData]);
+  }, [accountParam, accounts]);
 
   const selectedAccountName = selectedAccount?.name ?? null;
 
@@ -113,6 +107,19 @@ const ActivityManagerPage = () => {
   useEffect(() => {
     setSelectedType(mapActivityTypeToPicker(typeParam));
   }, [typeParam]);
+
+  // Filter accounts by selected activity type and map to options
+  const accountOptions: AccountSelectOption[] = useMemo(() => {
+    const filtered = selectedType
+      ? activeAccounts.filter((acc) => accountSupportsActivityType(acc, selectedType))
+      : activeAccounts;
+
+    return filtered.map((account) => ({
+      value: account.id,
+      label: account.name,
+      currency: account.currency,
+    }));
+  }, [activeAccounts, selectedType]);
 
   // Use the activity form hook
   const { defaultValues, isEditing, isLoading, isError, error, handleSubmit } = useActivityForm({

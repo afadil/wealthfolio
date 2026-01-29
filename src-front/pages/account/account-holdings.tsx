@@ -2,7 +2,7 @@ import { getHoldings } from "@/adapters";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { QueryKeys } from "@/lib/query-keys";
-import { Account, Holding, HoldingType, getTrackingMode } from "@/lib/types";
+import { Account, Holding, HoldingType } from "@/lib/types";
 import { canAddHoldings } from "@/lib/activity-restrictions";
 import { HoldingsTable } from "@/pages/holdings/components/holdings-table";
 import { HoldingsTableMobile } from "@/pages/holdings/components/holdings-table-mobile";
@@ -48,7 +48,7 @@ const AccountHoldings = ({
   // Check if this is a HOLDINGS mode account
   const isHoldingsMode = useMemo(() => {
     if (!selectedAccount) return false;
-    return getTrackingMode(selectedAccount) === "HOLDINGS";
+    return selectedAccount.trackingMode === "HOLDINGS";
   }, [selectedAccount]);
 
   // Check if user can directly edit holdings (manual HOLDINGS-mode accounts only)

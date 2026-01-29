@@ -44,6 +44,7 @@ use super::AssetKind;
 use rand::Rng;
 use regex::Regex;
 use std::sync::LazyLock;
+use wealthfolio_market_data::{strip_yahoo_suffix, yahoo_suffix_to_mic, YAHOO_EXCHANGE_SUFFIXES};
 
 // ============================================================================
 // CONSTANTS
@@ -293,6 +294,142 @@ pub fn canonical_asset_id(
         AssetKind::Liability => format!("{}:{}", LIABILITY_PREFIX, random_suffix()),
         AssetKind::Other => format!("{}:{}", OTHER_PREFIX, random_suffix()),
     }
+}
+
+/// Parses a symbol that may contain a Yahoo Finance exchange suffix and extracts
+/// the base symbol and exchange MIC.
+///
+/// Yahoo Finance uses suffixes like `.TO` (Toronto), `.L` (London), `.DE` (XETRA)
+/// to indicate the exchange. This function strips the suffix and maps it to the
+/// canonical MIC (Market Identifier Code).
+///
+/// # Arguments
+///
+/// * `symbol` - The symbol potentially with a Yahoo suffix (e.g., "SHOP.TO", "VOD.L", "AAPL")
+///
+/// # Returns
+///
+/// A tuple of (base_symbol, Option<mic>):
+/// - `base_symbol`: The symbol without the suffix (e.g., "SHOP", "VOD", "AAPL")
+/// - `mic`: The exchange MIC if a known suffix was found (e.g., Some("XTSE"), Some("XLON"), None)
+///
+/// # Examples
+///
+/// ```
+/// use wealthfolio_core::assets::parse_symbol_with_exchange_suffix;
+///
+/// // Toronto Stock Exchange
+/// let (symbol, mic) = parse_symbol_with_exchange_suffix("SHOP.TO");
+/// assert_eq!(symbol, "SHOP");
+/// assert_eq!(mic, Some("XTSE"));
+///
+/// // London Stock Exchange
+/// let (symbol, mic) = parse_symbol_with_exchange_suffix("VOD.L");
+/// assert_eq!(symbol, "VOD");
+/// assert_eq!(mic, Some("XLON"));
+///
+/// // US stocks (no suffix)
+/// let (symbol, mic) = parse_symbol_with_exchange_suffix("AAPL");
+/// assert_eq!(symbol, "AAPL");
+/// assert_eq!(mic, None);
+///
+/// // Share class suffixes (not exchange suffixes) are preserved
+/// let (symbol, mic) = parse_symbol_with_exchange_suffix("BRK.B");
+/// assert_eq!(symbol, "BRK.B");
+/// assert_eq!(mic, None);
+/// ```
+pub fn parse_symbol_with_exchange_suffix(symbol: &str) -> (&str, Option<&'static str>) {
+    let base_symbol = strip_yahoo_suffix(symbol);
+
+    // Find the suffix and map to MIC
+    let mic = YAHOO_EXCHANGE_SUFFIXES
+        .iter()
+        .find(|suffix| symbol.ends_with(*suffix))
+        .and_then(|suffix| {
+            // Extract suffix without the dot (e.g., ".TO" → "TO")
+            let suffix_without_dot = &suffix[1..];
+            yahoo_suffix_to_mic(suffix_without_dot)
+        });
+
+    (base_symbol, mic)
+}
+
+/// Generates a canonical security asset ID from a symbol that may contain
+/// a Yahoo Finance exchange suffix.
+///
+/// This is a convenience function that combines `parse_symbol_with_exchange_suffix`
+/// and `canonical_asset_id` for the common case of creating a security asset ID
+/// from a user-provided symbol.
+///
+/// # Arguments
+///
+/// * `symbol` - The symbol potentially with a Yahoo suffix (e.g., "SHOP.TO", "AAPL")
+/// * `currency` - The currency for the asset
+///
+/// # Returns
+///
+/// A canonical asset ID string (e.g., "SEC:SHOP:XTSE", "SEC:AAPL:UNKNOWN")
+///
+/// # Examples
+///
+/// ```
+/// use wealthfolio_core::assets::security_id_from_symbol;
+///
+/// // With exchange suffix
+/// let id = security_id_from_symbol("META.TO", "CAD");
+/// assert_eq!(id, "SEC:META:XTSE");
+///
+/// // Without exchange suffix (uses UNKNOWN)
+/// let id = security_id_from_symbol("AAPL", "USD");
+/// assert_eq!(id, "SEC:AAPL:UNKNOWN");
+/// ```
+pub fn security_id_from_symbol(symbol: &str, currency: &str) -> String {
+    let (base_symbol, mic) = parse_symbol_with_exchange_suffix(symbol);
+    canonical_asset_id(&AssetKind::Security, base_symbol, mic, currency)
+}
+
+/// Generates a canonical security asset ID from a symbol, with an optional explicit MIC.
+///
+/// This function prefers the explicit MIC if provided. If not provided, it attempts
+/// to extract the MIC from a Yahoo Finance suffix in the symbol. If neither is available,
+/// it uses "UNKNOWN".
+///
+/// # Arguments
+///
+/// * `symbol` - The symbol potentially with a Yahoo suffix (e.g., "SHOP.TO", "AAPL", "META")
+/// * `explicit_mic` - Optional explicit MIC code (e.g., "XNAS", "XTSE")
+/// * `currency` - The currency for the asset
+///
+/// # Returns
+///
+/// A canonical asset ID string (e.g., "SEC:META:XNAS", "SEC:SHOP:XTSE")
+///
+/// # Examples
+///
+/// ```
+/// use wealthfolio_core::assets::security_id_from_symbol_with_mic;
+///
+/// // With explicit MIC (preferred)
+/// let id = security_id_from_symbol_with_mic("META", Some("XNAS"), "USD");
+/// assert_eq!(id, "SEC:META:XNAS");
+///
+/// // With Yahoo suffix (fallback when no explicit MIC)
+/// let id = security_id_from_symbol_with_mic("META.TO", None, "CAD");
+/// assert_eq!(id, "SEC:META:XTSE");
+///
+/// // Neither explicit MIC nor suffix (uses UNKNOWN)
+/// let id = security_id_from_symbol_with_mic("AAPL", None, "USD");
+/// assert_eq!(id, "SEC:AAPL:UNKNOWN");
+/// ```
+pub fn security_id_from_symbol_with_mic(
+    symbol: &str,
+    explicit_mic: Option<&str>,
+    currency: &str,
+) -> String {
+    let (base_symbol, suffix_mic) = parse_symbol_with_exchange_suffix(symbol);
+    // Prefer explicit MIC, then suffix-derived MIC
+    let mic = explicit_mic.or(suffix_mic);
+    canonical_asset_id(&AssetKind::Security, base_symbol, mic, currency)
 }
 
 /// Parse asset kind from ID prefix (trivial with typed prefixes).

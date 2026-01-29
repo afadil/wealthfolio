@@ -81,11 +81,10 @@ const ActivityPage = () => {
     };
   }, [debouncedUpdateSearch]);
 
-  const { data: accountsData } = useQuery<Account[], Error>({
+  const { data: accounts = [] } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
-    queryFn: getAccounts,
+    queryFn: () => getAccounts(),
   });
-  const accounts = accountsData ?? [];
 
   const { deleteActivityMutation, duplicateActivityMutation } = useActivityMutations();
 
@@ -178,7 +177,7 @@ const ActivityPage = () => {
           },
           {
             icon: Icons.Holdings,
-            label: "Add Holdings",
+            label: "Transfer Holdings",
             onClick: () => setShowBulkHoldingsForm(true),
           },
           {
@@ -313,8 +312,8 @@ const ActivityPage = () => {
             key={selectedActivity?.id ?? "new"}
             accounts={
               accounts
-                ?.filter((acc) => acc.isActive)
-                .map((account) => ({
+                ?.filter((acc: Account) => !acc.isArchived)
+                .map((account: Account) => ({
                   value: account.id,
                   label: account.name,
                   currency: account.currency,
@@ -328,8 +327,8 @@ const ActivityPage = () => {
           <ActivityForm
             accounts={
               accounts
-                ?.filter((acc) => acc.isActive)
-                .map((account) => ({
+                ?.filter((acc: Account) => !acc.isArchived)
+                .map((account: Account) => ({
                   value: account.id,
                   label: account.name,
                   currency: account.currency,

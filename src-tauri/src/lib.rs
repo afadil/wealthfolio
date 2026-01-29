@@ -232,7 +232,6 @@ pub fn run() {
             commands::account::create_account,
             commands::account::update_account,
             commands::account::delete_account,
-            commands::account::switch_tracking_mode,
             // Activity commands
             commands::activity::search_activities,
             commands::activity::create_activity,

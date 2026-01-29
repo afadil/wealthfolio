@@ -145,6 +145,7 @@ pub mod test_env {
         fn list_accounts(
             &self,
             is_active_filter: Option<bool>,
+            _is_archived_filter: Option<bool>,
             _account_ids: Option<&[String]>,
         ) -> CoreResult<Vec<Account>> {
             let accounts = match is_active_filter {
@@ -170,6 +171,19 @@ pub mod test_env {
                 .accounts
                 .iter()
                 .filter(|a| account_ids.contains(&a.id))
+                .cloned()
+                .collect())
+        }
+
+        fn get_non_archived_accounts(&self) -> CoreResult<Vec<Account>> {
+            Ok(self.accounts.clone())
+        }
+
+        fn get_active_non_archived_accounts(&self) -> CoreResult<Vec<Account>> {
+            Ok(self
+                .accounts
+                .iter()
+                .filter(|a| a.is_active)
                 .cloned()
                 .collect())
         }

@@ -282,7 +282,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
     getDefaults: (activity, accounts) => ({
       ...getBaseDefaults(activity, accounts),
       symbol: activity?.assetSymbol ?? activity?.assetId ?? "",
-      splitRatio: activity?.quantity,
+      splitRatio: activity?.amount,
       // Advanced options
       currency: activity?.currency,
       subtype: activity?.subtype ?? null,
@@ -294,7 +294,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
         accountId: d.accountId,
         activityDate: d.activityDate,
         assetId: d.symbol,
-        quantity: d.splitRatio,
+        amount: d.splitRatio,
         comment: d.comment,
         subtype: d.subtype,
         currency: d.currency,

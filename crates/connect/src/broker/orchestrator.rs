@@ -11,7 +11,7 @@ use log::{debug, error, info};
 use super::models::{NewAccountInfo, SyncActivitiesResponse, SyncHoldingsResponse, SyncResult};
 use super::progress::{SyncProgressPayload, SyncProgressReporter, SyncStatus};
 use super::traits::{BrokerApiClient, BrokerSyncServiceTrait};
-use wealthfolio_core::accounts::{get_tracking_mode, TrackingMode};
+use wealthfolio_core::accounts::TrackingMode;
 use wealthfolio_core::sync::{ImportRunMode, ImportRunStatus, ImportRunSummary};
 
 /// Configuration for sync operations.
@@ -194,7 +194,7 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
             .get_synced_accounts()
             .map_err(|e| format!("Failed to get synced accounts: {}", e))?
             .into_iter()
-            .filter(|acc| get_tracking_mode(acc) == TrackingMode::NotSet)
+            .filter(|acc| acc.tracking_mode == TrackingMode::NotSet)
             .map(|acc| NewAccountInfo {
                 local_account_id: acc.id.clone(),
                 provider_account_id: acc.provider_account_id.unwrap_or_default(),
@@ -284,8 +284,7 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
             }
 
             // Check tracking mode to determine sync type
-            let tracking_mode = get_tracking_mode(&account);
-            match tracking_mode {
+            match account.tracking_mode {
                 TrackingMode::NotSet => {
                     info!(
                         "Skipping sync for account '{}' (trackingMode=NOT_SET)",

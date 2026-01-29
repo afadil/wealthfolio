@@ -21,7 +21,6 @@ export const COMMANDS: CommandMap = {
   create_account: { method: "POST", path: "/accounts" },
   update_account: { method: "PUT", path: "/accounts" },
   delete_account: { method: "DELETE", path: "/accounts" },
-  switch_tracking_mode: { method: "POST", path: "/accounts" },
   get_settings: { method: "GET", path: "/settings" },
   update_settings: { method: "PUT", path: "/settings" },
   is_auto_update_check_enabled: { method: "GET", path: "/settings/auto-update-enabled" },
@@ -269,12 +268,6 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       url += `/${data.accountId}`;
       break;
     }
-    case "switch_tracking_mode": {
-      const { accountId, newMode } = payload as { accountId: string; newMode: string };
-      url += `/${accountId}/switch-tracking-mode`;
-      body = JSON.stringify({ newMode });
-      break;
-    }
     case "create_account": {
       const data = payload as { account: Record<string, unknown> };
       body = JSON.stringify(data.account);
@@ -388,8 +381,15 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       body = JSON.stringify({ accountIds });
       break;
     }
-    case "get_accounts":
+    case "get_accounts": {
+      const { includeArchived } = (payload ?? {}) as { includeArchived?: boolean };
+      if (includeArchived) {
+        const params = new URLSearchParams();
+        params.set("includeArchived", "true");
+        url += `?${params.toString()}`;
+      }
       break;
+    }
     case "calculate_performance_history": {
       const { itemType, itemId, startDate, endDate } = payload as {
         itemType: string;

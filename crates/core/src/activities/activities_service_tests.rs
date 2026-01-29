@@ -62,6 +62,7 @@ mod tests {
         fn list_accounts(
             &self,
             _active_only: Option<bool>,
+            _is_archived_filter: Option<bool>,
             _account_ids: Option<&[String]>,
         ) -> Result<Vec<Account>> {
             Ok(self.accounts.lock().unwrap().clone())
@@ -77,6 +78,14 @@ mod tests {
 
         fn get_accounts_by_ids(&self, _account_ids: &[String]) -> Result<Vec<Account>> {
             unimplemented!()
+        }
+
+        fn get_non_archived_accounts(&self) -> Result<Vec<Account>> {
+            Ok(self.accounts.lock().unwrap().clone())
+        }
+
+        fn get_active_non_archived_accounts(&self) -> Result<Vec<Account>> {
+            Ok(self.accounts.lock().unwrap().clone())
         }
     }
 
@@ -683,6 +692,8 @@ mod tests {
             meta: None,
             provider: None,
             provider_account_id: None,
+            is_archived: false,
+            tracking_mode: crate::accounts::TrackingMode::NotSet,
         }
     }
 
@@ -767,10 +778,11 @@ mod tests {
         // Check that FX pair was registered for asset currency
         let registered_pairs = fx_service.get_registered_pairs();
 
-        // Should have registered USD/EUR for the asset's currency
+        // Should have registered EUR/USD (from=EUR asset currency, to=USD account currency)
+        // This creates FX:EUR:USD for converting EUR values to account's USD
         assert!(
-            registered_pairs.contains(&("USD".to_string(), "EUR".to_string())),
-            "Expected FX pair USD/EUR to be registered for asset currency. Registered pairs: {:?}",
+            registered_pairs.contains(&("EUR".to_string(), "USD".to_string())),
+            "Expected FX pair EUR/USD to be registered for asset currency. Registered pairs: {:?}",
             registered_pairs
         );
     }
@@ -837,9 +849,11 @@ mod tests {
         // Check that FX pair was registered
         let registered_pairs = fx_service.get_registered_pairs();
 
+        // Should have registered EUR/USD (from=EUR activity currency, to=USD account currency)
+        // This creates FX:EUR:USD for converting EUR values to account's USD
         assert!(
-            registered_pairs.contains(&("USD".to_string(), "EUR".to_string())),
-            "Expected FX pair USD/EUR to be registered. Registered pairs: {:?}",
+            registered_pairs.contains(&("EUR".to_string(), "USD".to_string())),
+            "Expected FX pair EUR/USD to be registered. Registered pairs: {:?}",
             registered_pairs
         );
     }
@@ -1651,9 +1665,11 @@ mod tests {
         // Check that FX pair was registered for asset currency
         let registered_pairs = fx_service.get_registered_pairs();
 
+        // Should have registered CHF/USD (from=CHF asset currency, to=USD account currency)
+        // This creates FX:CHF:USD for converting CHF values to account's USD
         assert!(
-            registered_pairs.contains(&("USD".to_string(), "CHF".to_string())),
-            "Expected FX pair USD/CHF to be registered. Registered pairs: {:?}",
+            registered_pairs.contains(&("CHF".to_string(), "USD".to_string())),
+            "Expected FX pair CHF/USD to be registered. Registered pairs: {:?}",
             registered_pairs
         );
     }

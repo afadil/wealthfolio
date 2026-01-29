@@ -25,7 +25,7 @@ import { Link } from "react-router-dom";
 import { useAccounts } from "@/hooks/use-accounts";
 import { TrackingModeBadge } from "@/components/tracking-mode-badge";
 import { NewAccountsFoundModal } from "../components/new-accounts-found-modal";
-import { getTrackingMode, type Account } from "@/lib/types";
+import type { Account } from "@/lib/types";
 
 // Status dot component
 function StatusDot({ status }: { status: "healthy" | "warning" | "error" }) {
@@ -53,7 +53,7 @@ export default function ConnectPage() {
   const { data: brokerAccounts = [], isLoading: isLoadingAccounts } = useBrokerAccounts();
   const { mutate: syncBrokerData, isPending: isSyncing } = useSyncBrokerData();
   const { data: importRunsData } = useImportRunsInfinite({ pageSize: 10 });
-  const { accounts: localAccounts } = useAccounts(false); // Get all accounts including inactive
+  const { accounts: localAccounts } = useAccounts({ filterActive: false, includeArchived: false }); // Get all accounts including inactive
 
   // Fetch broker connections for stats
   const { data: brokerConnections = [] } = useQuery({
@@ -87,7 +87,7 @@ export default function ConnectPage() {
   const accountsNeedingSetup = useMemo(() => {
     return localAccounts.filter((acc) => {
       if (!acc.providerAccountId) return false; // Only connected accounts
-      return getTrackingMode(acc) === "NOT_SET";
+      return acc.trackingMode === "NOT_SET";
     });
   }, [localAccounts]);
 

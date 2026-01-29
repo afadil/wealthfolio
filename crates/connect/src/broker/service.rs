@@ -18,9 +18,7 @@ use chrono::{DateTime, Months, Utc};
 use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 use std::collections::HashSet;
-use wealthfolio_core::accounts::{
-    set_tracking_mode, Account, AccountServiceTrait, AccountUpdate, NewAccount, TrackingMode,
-};
+use wealthfolio_core::accounts::{Account, AccountServiceTrait, NewAccount, TrackingMode};
 use wealthfolio_core::activities::{self, compute_idempotency_key, AssetInput, NewActivity};
 use wealthfolio_core::assets::{canonical_asset_id, AssetKind, NewAsset};
 use wealthfolio_core::errors::Result;
@@ -212,7 +210,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             // We need to find the platform that matches this broker account's connection
             let platform_id = self.find_platform_for_account(broker_account)?;
 
-            // Create new account
+            // Create new account with trackingMode=NOT_SET (requires user to choose before sync)
             let new_account = NewAccount {
                 id: None, // Let the repository generate a UUID
                 name: broker_account.display_name(),
@@ -226,36 +224,12 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 meta: broker_account.to_meta_json(),
                 provider: Some("SNAPTRADE".to_string()),
                 provider_account_id: Some(provider_account_id.clone()),
+                is_archived: false,
+                tracking_mode: TrackingMode::NotSet,
             };
 
             // Create the account via AccountService (handles FX rate registration)
             let account = self.account_service.create_account(new_account).await?;
-
-            // Set trackingMode=NOT_SET for new connected accounts (requires user to choose before sync)
-            let meta_with_tracking_mode =
-                set_tracking_mode(account.meta.clone(), TrackingMode::NotSet);
-            if let Err(e) = self
-                .account_service
-                .update_account(AccountUpdate {
-                    id: Some(account.id.clone()),
-                    name: account.name.clone(),
-                    account_type: account.account_type.clone(),
-                    group: account.group.clone(),
-                    is_default: account.is_default,
-                    is_active: account.is_active,
-                    platform_id: account.platform_id.clone(),
-                    account_number: account.account_number.clone(),
-                    meta: Some(meta_with_tracking_mode),
-                    provider: account.provider.clone(),
-                    provider_account_id: account.provider_account_id.clone(),
-                })
-                .await
-            {
-                error!(
-                    "Failed to set trackingMode for new account {}: {}",
-                    account.id, e
-                );
-            }
 
             // Collect info for NewAccountInfo
             new_accounts_info.push(NewAccountInfo {

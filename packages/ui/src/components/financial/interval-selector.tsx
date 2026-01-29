@@ -100,10 +100,10 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
   }));
 
   return (
-    <div className={cn("relative w-full min-w-0", className)}>
+    <div className={cn("pointer-events-none relative w-full min-w-0", className)}>
       <div
         className={cn(
-          "relative z-30 flex w-full justify-center overflow-x-auto overflow-y-hidden",
+          "pointer-events-none relative z-30 flex w-full justify-center overflow-x-auto overflow-y-hidden",
           "touch-pan-x snap-x snap-mandatory overscroll-x-contain scroll-smooth",
           "px-2 md:px-0",
           "[&::-webkit-scrollbar]:hidden",
@@ -117,7 +117,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
           onValueChange={handleValueChange}
           size="sm"
           variant="default"
-          className="bg-transparent"
+          className="pointer-events-auto bg-transparent"
         />
       </div>
     </div>

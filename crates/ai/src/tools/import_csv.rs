@@ -793,10 +793,10 @@ impl<E: AiEnvironment> ImportCsvTool<E> {
                         .errors
                         .push("Symbol is required for SPLIT".to_string());
                 }
-                if draft.quantity.is_none() {
+                if draft.amount.is_none() {
                     draft
                         .errors
-                        .push("Quantity is required for SPLIT".to_string());
+                        .push("Amount (split ratio) is required for SPLIT".to_string());
                 }
             }
             "" => {
