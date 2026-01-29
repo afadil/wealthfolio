@@ -7,7 +7,9 @@ use std::collections::{HashMap, HashSet};
 
 use crate::assets::{AssetServiceTrait, PricingMode};
 use crate::errors::Result;
-use crate::health::model::{AffectedItem, FixAction, HealthCategory, HealthIssue, NavigateAction, Severity};
+use crate::health::model::{
+    AffectedItem, FixAction, HealthCategory, HealthIssue, NavigateAction, Severity,
+};
 use crate::health::traits::{HealthCheck, HealthContext};
 use crate::quotes::QuoteServiceTrait;
 
@@ -86,7 +88,10 @@ pub fn gather_quote_sync_errors(
                 return None;
             }
 
-            let market_value = holding_market_values.get(&s.asset_id).copied().unwrap_or(0.0);
+            let market_value = holding_market_values
+                .get(&s.asset_id)
+                .copied()
+                .unwrap_or(0.0);
             // Asset has synced before if it has any quotes
             let has_synced_before = latest_quote_times.contains_key(&s.asset_id);
 
@@ -117,7 +122,11 @@ impl QuoteSyncCheck {
     /// Analyzes sync states for recurring errors.
     ///
     /// This is the core logic, exposed for testing and direct use.
-    pub fn analyze(&self, sync_errors: &[QuoteSyncErrorInfo], ctx: &HealthContext) -> Vec<HealthIssue> {
+    pub fn analyze(
+        &self,
+        sync_errors: &[QuoteSyncErrorInfo],
+        ctx: &HealthContext,
+    ) -> Vec<HealthIssue> {
         let mut issues = Vec::new();
 
         if sync_errors.is_empty() {
@@ -234,7 +243,10 @@ impl QuoteSyncCheck {
 
             // Build details with error messages
             let details = build_error_details(&persistent_errors);
-            let asset_ids: Vec<String> = persistent_errors.iter().map(|e| e.asset_id.clone()).collect();
+            let asset_ids: Vec<String> = persistent_errors
+                .iter()
+                .map(|e| e.asset_id.clone())
+                .collect();
             let affected_items: Vec<AffectedItem> = persistent_errors
                 .iter()
                 .map(|e| AffectedItem::asset(&e.asset_id, &e.symbol))
@@ -277,7 +289,8 @@ impl QuoteSyncCheck {
             };
 
             let details = build_error_details(&warning_errors);
-            let asset_ids: Vec<String> = warning_errors.iter().map(|e| e.asset_id.clone()).collect();
+            let asset_ids: Vec<String> =
+                warning_errors.iter().map(|e| e.asset_id.clone()).collect();
             let affected_items: Vec<AffectedItem> = warning_errors
                 .iter()
                 .map(|e| AffectedItem::asset(&e.asset_id, &e.symbol))
@@ -333,10 +346,7 @@ impl HealthCheck for QuoteSyncCheck {
 fn build_error_details(errors: &[&QuoteSyncErrorInfo]) -> String {
     let mut lines = Vec::new();
     for (i, error) in errors.iter().take(5).enumerate() {
-        let error_msg = error
-            .last_error
-            .as_deref()
-            .unwrap_or("Unknown error");
+        let error_msg = error.last_error.as_deref().unwrap_or("Unknown error");
         lines.push(format!(
             "{}. {} - {} failures: {}",
             i + 1,

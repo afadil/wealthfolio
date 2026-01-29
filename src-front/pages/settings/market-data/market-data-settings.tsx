@@ -2,11 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@wealthfolio/ui/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useEffect, useState } from "react";
@@ -172,7 +168,7 @@ function ProviderSettings({
                   <PopoverTrigger asChild>
                     <Badge
                       variant="outline"
-                      className="border-destructive/20 bg-destructive/10 text-destructive shrink-0 cursor-pointer text-xs hover:bg-destructive/20"
+                      className="border-destructive/20 bg-destructive/10 text-destructive hover:bg-destructive/20 shrink-0 cursor-pointer text-xs"
                     >
                       <Icons.XCircle className="mr-1 h-3 w-3" />
                       {provider.errorCount} {provider.errorCount === 1 ? "error" : "errors"}
@@ -182,8 +178,8 @@ function ProviderSettings({
                     <div className="border-b px-3 py-2">
                       <h4 className="text-sm font-medium">Sync Errors</h4>
                       <p className="text-muted-foreground text-xs">
-                        {provider.errorCount} {provider.errorCount === 1 ? "asset" : "assets"} failed
-                        to sync
+                        {provider.errorCount} {provider.errorCount === 1 ? "asset" : "assets"}{" "}
+                        failed to sync
                       </p>
                     </div>
                     <div className="max-h-60 overflow-auto p-2">
@@ -199,7 +195,9 @@ function ProviderSettings({
                           ))}
                         </ul>
                       ) : (
-                        <p className="text-muted-foreground p-2 text-xs">No error details available</p>
+                        <p className="text-muted-foreground p-2 text-xs">
+                          No error details available
+                        </p>
                       )}
                     </div>
                   </PopoverContent>
@@ -334,7 +332,13 @@ function ProviderSettings({
                         <Input
                           id={`apikey-${provider.id}`}
                           type={showApiKey ? "text" : "password"}
-                          value={hasLoadedKey ? apiKeyValue : (provider.hasApiKey ? "••••••••••••••••••••••••" : "")}
+                          value={
+                            hasLoadedKey
+                              ? apiKeyValue
+                              : provider.hasApiKey
+                                ? "••••••••••••••••••••••••"
+                                : ""
+                          }
                           onChange={(e) => setApiKeyValue(e.target.value)}
                           placeholder={provider.hasApiKey ? "" : "Enter API key"}
                           className="grow font-mono text-xs"
@@ -538,7 +542,7 @@ export default function MarketDataSettingsPage() {
       <div className="text-foreground space-y-6">
         <SettingsHeader heading="Market Data" text="Configure your market data providers." />
         <Separator />
-        <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-6">
+        <div className="border-destructive/20 bg-destructive/5 rounded-lg border p-6">
           <div className="flex items-start gap-3">
             <Icons.XCircle className="text-destructive mt-0.5 h-5 w-5 shrink-0" />
             <div className="space-y-2">

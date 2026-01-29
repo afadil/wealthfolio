@@ -37,11 +37,7 @@ import { TickerAvatar } from "@/components/ticker-avatar";
 import { SingleSelectTaxonomy } from "@/components/classification/single-select-taxonomy";
 import { MultiSelectTaxonomy } from "@/components/classification/multi-select-taxonomy";
 import { useTaxonomies } from "@/hooks/use-taxonomies";
-import {
-  EDITABLE_ASSET_KINDS,
-  ASSET_KIND_DISPLAY_NAMES,
-  type AssetKind,
-} from "@/lib/constants";
+import { EDITABLE_ASSET_KINDS, ASSET_KIND_DISPLAY_NAMES, type AssetKind } from "@/lib/constants";
 import type { Asset, Quote } from "@/lib/types";
 import { formatAmount } from "@/lib/utils";
 import { useAssetProfileMutations } from "./hooks/use-asset-profile-mutations";
@@ -101,7 +97,7 @@ const kindOptions: ResponsiveSelectOption[] = EDITABLE_ASSET_KINDS.map((kind) =>
 
 // Helper to convert provider_overrides JSON to array format for the form
 function parseProviderOverrides(
-  overrides: Record<string, unknown> | null | undefined
+  overrides: Record<string, unknown> | null | undefined,
 ): ProviderOverride[] {
   if (!overrides) return [];
   const result: ProviderOverride[] = [];
@@ -120,7 +116,7 @@ function parseProviderOverrides(
 // Helper to convert form array back to JSON format (type is derived from asset kind)
 function serializeProviderOverrides(
   overrides: ProviderOverride[],
-  assetKind: string
+  assetKind: string,
 ): Record<string, unknown> | null {
   if (!overrides || overrides.length === 0) return null;
   const overrideType = getOverrideTypeForKind(assetKind);
@@ -251,12 +247,18 @@ export function AssetEditSheet({
       notes: asset?.notes ?? "",
       kind: asset?.kind ?? "SECURITY",
       exchangeMic: asset?.exchangeMic ?? "",
-      pricingMode: (asset?.pricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET),
-      providerOverrides: parseProviderOverrides(asset?.providerOverrides as Record<string, unknown> | null),
+      pricingMode: asset?.pricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET,
+      providerOverrides: parseProviderOverrides(
+        asset?.providerOverrides as Record<string, unknown> | null,
+      ),
     },
   });
 
-  const { fields: overrideFields, append: appendOverride, remove: removeOverride } = useFieldArray({
+  const {
+    fields: overrideFields,
+    append: appendOverride,
+    remove: removeOverride,
+  } = useFieldArray({
     control: form.control,
     name: "providerOverrides",
   });
@@ -269,8 +271,10 @@ export function AssetEditSheet({
         notes: asset.notes ?? "",
         kind: asset.kind ?? "SECURITY",
         exchangeMic: asset.exchangeMic ?? "",
-        pricingMode: (asset.pricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET),
-        providerOverrides: parseProviderOverrides(asset.providerOverrides as Record<string, unknown> | null),
+        pricingMode: asset.pricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET,
+        providerOverrides: parseProviderOverrides(
+          asset.providerOverrides as Record<string, unknown> | null,
+        ),
       });
     }
   }, [asset, form]);
@@ -288,7 +292,10 @@ export function AssetEditSheet({
 
       // Serialize provider overrides back to JSON format (type derived from asset kind)
       const assetKind = values.kind ?? asset.kind ?? "SECURITY";
-      const serializedOverrides = serializeProviderOverrides(values.providerOverrides ?? [], assetKind);
+      const serializedOverrides = serializeProviderOverrides(
+        values.providerOverrides ?? [],
+        assetKind,
+      );
 
       // Update profile with all fields including pricing mode
       await updateAssetProfileMutation.mutateAsync({
@@ -460,13 +467,15 @@ export function AssetEditSheet({
               <div className="space-y-8 pb-8">
                 {isTaxonomiesLoading && <ClassificationSkeleton />}
 
-                {!isTaxonomiesLoading && singleSelectTaxonomies.length === 0 && multiSelectTaxonomies.length === 0 && (
-                  <div className="py-8 text-center">
-                    <p className="text-muted-foreground text-sm">
-                      No taxonomies configured. Create taxonomies in Settings to classify assets.
-                    </p>
-                  </div>
-                )}
+                {!isTaxonomiesLoading &&
+                  singleSelectTaxonomies.length === 0 &&
+                  multiSelectTaxonomies.length === 0 && (
+                    <div className="py-8 text-center">
+                      <p className="text-muted-foreground text-sm">
+                        No taxonomies configured. Create taxonomies in Settings to classify assets.
+                      </p>
+                    </div>
+                  )}
 
                 {!isTaxonomiesLoading &&
                   singleSelectTaxonomies.map((taxonomy) => (
@@ -496,7 +505,7 @@ export function AssetEditSheet({
                 <Form {...form}>
                   <div className="space-y-6">
                     {/* Latest Quote Card - First */}
-                    <div className="rounded-lg border bg-muted/30 p-4">
+                    <div className="bg-muted/30 rounded-lg border p-4">
                       {latestQuote ? (
                         <div className="grid grid-cols-3 gap-4 text-center">
                           <div>
@@ -510,7 +519,10 @@ export function AssetEditSheet({
                               {new Date(latestQuote.timestamp).toLocaleDateString()}
                             </p>
                             <p className="text-muted-foreground text-xs">
-                              {new Date(latestQuote.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {new Date(latestQuote.timestamp).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
                             </p>
                           </div>
                           <div>
@@ -524,7 +536,8 @@ export function AssetEditSheet({
                         <Alert variant="destructive" className="border-0 bg-transparent p-0">
                           <Icons.AlertCircle className="h-4 w-4" />
                           <AlertDescription>
-                            Unable to fetch price data for this asset. Check if the symbol is correct or try adding a symbol mapping below.
+                            Unable to fetch price data for this asset. Check if the symbol is
+                            correct or try adding a symbol mapping below.
                           </AlertDescription>
                         </Alert>
                       )}
@@ -534,7 +547,10 @@ export function AssetEditSheet({
                     <PricingModeToggle
                       isManualMode={isManualMode}
                       onConfirm={() => {
-                        form.setValue("pricingMode", isManualMode ? PricingMode.MARKET : PricingMode.MANUAL);
+                        form.setValue(
+                          "pricingMode",
+                          isManualMode ? PricingMode.MARKET : PricingMode.MANUAL,
+                        );
                       }}
                     />
 
@@ -545,7 +561,8 @@ export function AssetEditSheet({
                           <div>
                             <label className="text-sm font-medium">Symbol Mapping</label>
                             <p className="text-muted-foreground text-xs">
-                              Use a different ticker for specific providers if the default doesn't work.
+                              Use a different ticker for specific providers if the default doesn't
+                              work.
                             </p>
                           </div>
                           <Button
@@ -561,7 +578,7 @@ export function AssetEditSheet({
 
                         {overrideFields.length === 0 ? (
                           <div className="rounded-lg border border-dashed p-6 text-center">
-                            <Icons.Link className="mx-auto h-8 w-8 text-muted-foreground/50" />
+                            <Icons.Link className="text-muted-foreground/50 mx-auto h-8 w-8" />
                             <p className="text-muted-foreground mt-2 text-sm">
                               No symbol mappings configured
                             </p>
@@ -573,11 +590,11 @@ export function AssetEditSheet({
                           <div className="rounded-lg border">
                             <table className="w-full">
                               <thead>
-                                <tr className="border-b bg-muted/50">
-                                  <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">
+                                <tr className="bg-muted/50 border-b">
+                                  <th className="text-muted-foreground px-4 py-2 text-left text-xs font-medium">
                                     Provider
                                   </th>
-                                  <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">
+                                  <th className="text-muted-foreground px-4 py-2 text-left text-xs font-medium">
                                     Symbol
                                   </th>
                                   <th className="w-10"></th>
@@ -647,7 +664,7 @@ export function AssetEditSheet({
                     )}
 
                     {/* Save Actions */}
-                    <div className="flex justify-end gap-3 pt-4 border-t">
+                    <div className="flex justify-end gap-3 border-t pt-4">
                       <Button
                         type="button"
                         variant="ghost"

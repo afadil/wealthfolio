@@ -11,18 +11,11 @@ import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { Checkbox } from "@wealthfolio/ui/components/ui/checkbox";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import {
-  CurrencyInput,
-  DatePickerInput,
-  ResponsiveSelect,
-} from "@wealthfolio/ui";
+import { CurrencyInput, DatePickerInput, ResponsiveSelect } from "@wealthfolio/ui";
 import { cn } from "@/lib/utils";
 import { useSettingsContext } from "@/lib/settings-provider";
 
-import {
-  METAL_TYPES,
-  LIABILITY_TYPES,
-} from "./alternative-asset-quick-add-schema";
+import { METAL_TYPES, LIABILITY_TYPES } from "./alternative-asset-quick-add-schema";
 import { useAlternativeAssetMutations } from "../hooks/use-alternative-asset-mutations";
 import {
   AlternativeAssetKind,
@@ -177,7 +170,7 @@ export function AlternativeAssetQuickAddModal({
 
   const selectedAssetType = useMemo(
     () => ASSET_TYPES.find((t) => t.kind === formData.kind),
-    [formData.kind]
+    [formData.kind],
   );
 
   const handleAssetTypeSelect = useCallback((kind: AlternativeAssetKind) => {
@@ -187,12 +180,9 @@ export function AlternativeAssetQuickAddModal({
     }));
   }, []);
 
-  const updateFormData = useCallback(
-    (field: keyof FormData, value: string | boolean | Date) => {
-      setFormData((prev) => ({ ...prev, [field]: value }));
-    },
-    []
-  );
+  const updateFormData = useCallback((field: keyof FormData, value: string | boolean | Date) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  }, []);
 
   const canProceed = useMemo(() => {
     if (step === 1) return true;
@@ -208,10 +198,7 @@ export function AlternativeAssetQuickAddModal({
       if (formData.metalType) metadata.metal_type = formData.metalType;
     }
 
-    if (
-      formData.kind === AlternativeAssetKind.LIABILITY &&
-      formData.liabilityType
-    ) {
+    if (formData.kind === AlternativeAssetKind.LIABILITY && formData.liabilityType) {
       metadata.liability_type = formData.liabilityType;
     }
 
@@ -222,9 +209,7 @@ export function AlternativeAssetQuickAddModal({
       currentValue: formData.currentValue,
       valueDate: formatDateToISO(formData.valueDate),
       purchasePrice: formData.purchasePrice || undefined,
-      purchaseDate: formData.purchaseDate
-        ? formatDateToISO(formData.purchaseDate)
-        : undefined,
+      purchaseDate: formData.purchaseDate ? formatDateToISO(formData.purchaseDate) : undefined,
       metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
       linkedAssetId: formData.linkedAssetId || undefined,
     };
@@ -246,8 +231,7 @@ export function AlternativeAssetQuickAddModal({
   }, [linkableAssets]);
 
   const getValueLabel = () => {
-    if (formData.kind === AlternativeAssetKind.LIABILITY)
-      return "Current Balance";
+    if (formData.kind === AlternativeAssetKind.LIABILITY) return "Current Balance";
     return "Current Value";
   };
 
@@ -272,24 +256,24 @@ export function AlternativeAssetQuickAddModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="gap-0 overflow-hidden border-border/50 bg-card p-0 shadow-2xl sm:max-w-[560px]">
+      <DialogContent className="border-border/50 bg-card gap-0 overflow-hidden p-0 shadow-2xl sm:max-w-[560px]">
         {/* Header with progress indicator */}
-        <DialogHeader className="border-b border-border/50 px-6 pb-4 pt-6">
+        <DialogHeader className="border-border/50 border-b px-6 pt-6 pb-4">
           <div className="flex items-center justify-between">
-            <DialogTitle className="text-xl font-semibold tracking-tight text-foreground">
+            <DialogTitle className="text-foreground text-xl font-semibold tracking-tight">
               {step === 1 ? "Add New Asset" : selectedAssetType?.label}
             </DialogTitle>
             <div className="flex items-center gap-2">
               <div
                 className={cn(
                   "h-2 w-8 rounded-full transition-colors duration-300",
-                  step >= 1 ? "bg-primary" : "bg-muted"
+                  step >= 1 ? "bg-primary" : "bg-muted",
                 )}
               />
               <div
                 className={cn(
                   "h-2 w-8 rounded-full transition-colors duration-300",
-                  step >= 2 ? "bg-primary" : "bg-muted"
+                  step >= 2 ? "bg-primary" : "bg-muted",
                 )}
               />
             </div>
@@ -333,24 +317,24 @@ export function AlternativeAssetQuickAddModal({
                           "hover:shadow-md",
                           isSelected
                             ? cn(type.borderColor, type.selectedBg)
-                            : "border-border/50 bg-secondary/30 hover:border-border hover:bg-secondary/50"
+                            : "border-border/50 bg-secondary/30 hover:border-border hover:bg-secondary/50",
                         )}
                       >
                         {isSelected && (
                           <motion.div
                             initial={{ scale: 0 }}
                             animate={{ scale: 1 }}
-                            className="absolute right-2 top-2"
+                            className="absolute top-2 right-2"
                           >
-                            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary">
-                              <Icons.Check className="h-3 w-3 text-primary-foreground" />
+                            <div className="bg-primary flex h-5 w-5 items-center justify-center rounded-full">
+                              <Icons.Check className="text-primary-foreground h-3 w-3" />
                             </div>
                           </motion.div>
                         )}
                         <div
                           className={cn(
                             "mb-3 flex h-10 w-10 items-center justify-center rounded-lg",
-                            isSelected ? type.selectedBg : "bg-muted"
+                            isSelected ? type.selectedBg : "bg-muted",
                           )}
                         >
                           <Icon className={cn("h-5 w-5", type.iconColor)} />
@@ -358,7 +342,7 @@ export function AlternativeAssetQuickAddModal({
                         <span
                           className={cn(
                             "text-sm font-medium",
-                            isSelected ? "text-foreground" : "text-foreground/80"
+                            isSelected ? "text-foreground" : "text-foreground/80",
                           )}
                         >
                           {type.label}
@@ -383,9 +367,7 @@ export function AlternativeAssetQuickAddModal({
                 {/* Type-specific fields */}
                 {formData.kind === AlternativeAssetKind.PHYSICAL_PRECIOUS && (
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-foreground">
-                      Metal Type
-                    </Label>
+                    <Label className="text-foreground text-sm font-medium">Metal Type</Label>
                     <ResponsiveSelect
                       value={formData.metalType || "gold"}
                       onValueChange={(v) => updateFormData("metalType", v)}
@@ -401,9 +383,7 @@ export function AlternativeAssetQuickAddModal({
 
                 {formData.kind === AlternativeAssetKind.LIABILITY && (
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-foreground">
-                      Liability Type
-                    </Label>
+                    <Label className="text-foreground text-sm font-medium">Liability Type</Label>
                     <ResponsiveSelect
                       value={formData.liabilityType || "mortgage"}
                       onValueChange={(v) => updateFormData("liabilityType", v)}
@@ -419,9 +399,7 @@ export function AlternativeAssetQuickAddModal({
 
                 {/* Name field */}
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-foreground">
-                    Name
-                  </Label>
+                  <Label className="text-foreground text-sm font-medium">Name</Label>
                   <Input
                     value={formData.name}
                     onChange={(e) => updateFormData("name", e.target.value)}
@@ -432,9 +410,7 @@ export function AlternativeAssetQuickAddModal({
 
                 {/* Currency row */}
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-foreground">
-                    Currency
-                  </Label>
+                  <Label className="text-foreground text-sm font-medium">Currency</Label>
                   <CurrencyInput
                     value={formData.currency}
                     onChange={(v) => updateFormData("currency", v)}
@@ -445,16 +421,12 @@ export function AlternativeAssetQuickAddModal({
                 {/* Value and Date row */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-foreground">
-                      {getValueLabel()}
-                    </Label>
+                    <Label className="text-foreground text-sm font-medium">{getValueLabel()}</Label>
                     <div className="relative">
                       <Input
                         type="number"
                         value={formData.currentValue}
-                        onChange={(e) =>
-                          updateFormData("currentValue", e.target.value)
-                        }
+                        onChange={(e) => updateFormData("currentValue", e.target.value)}
                         placeholder="0.00"
                         min="0"
                         step="any"
@@ -463,16 +435,14 @@ export function AlternativeAssetQuickAddModal({
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-foreground">
+                    <Label className="text-foreground text-sm font-medium">
                       {formData.kind === AlternativeAssetKind.LIABILITY
                         ? "Balance Date"
                         : "Value Date"}
                     </Label>
                     <DatePickerInput
                       value={formData.valueDate}
-                      onChange={(date) =>
-                        date && updateFormData("valueDate", date)
-                      }
+                      onChange={(date) => date && updateFormData("valueDate", date)}
                     />
                   </div>
                 </div>
@@ -481,7 +451,7 @@ export function AlternativeAssetQuickAddModal({
                 {formData.kind !== AlternativeAssetKind.LIABILITY && (
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium text-foreground">
+                      <Label className="text-foreground text-sm font-medium">
                         Purchase Price
                         <span className="text-muted-foreground ml-1 text-xs font-normal">
                           (optional)
@@ -491,9 +461,7 @@ export function AlternativeAssetQuickAddModal({
                         <Input
                           type="number"
                           value={formData.purchasePrice || ""}
-                          onChange={(e) =>
-                            updateFormData("purchasePrice", e.target.value)
-                          }
+                          onChange={(e) => updateFormData("purchasePrice", e.target.value)}
                           placeholder="0.00"
                           min="0"
                           step="any"
@@ -505,7 +473,7 @@ export function AlternativeAssetQuickAddModal({
                       </p>
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium text-foreground">
+                      <Label className="text-foreground text-sm font-medium">
                         Purchase Date
                         <span className="text-muted-foreground ml-1 text-xs font-normal">
                           (optional)
@@ -513,9 +481,7 @@ export function AlternativeAssetQuickAddModal({
                       </Label>
                       <DatePickerInput
                         value={formData.purchaseDate}
-                        onChange={(date) =>
-                          date && updateFormData("purchaseDate", date)
-                        }
+                        onChange={(date) => date && updateFormData("purchaseDate", date)}
                       />
                     </div>
                   </div>
@@ -531,41 +497,35 @@ export function AlternativeAssetQuickAddModal({
                         updateFormData("hasMortgage", checked as boolean)
                       }
                     />
-                    <label
-                      htmlFor="hasMortgage"
-                      className="cursor-pointer text-sm text-foreground"
-                    >
+                    <label htmlFor="hasMortgage" className="text-foreground cursor-pointer text-sm">
                       I have a mortgage/loan on this property
                     </label>
                   </div>
                 )}
 
                 {/* Link to asset for liability */}
-                {formData.kind === AlternativeAssetKind.LIABILITY &&
-                  linkableAssets.length > 0 && (
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-foreground">
-                        Link to Asset (optional)
-                      </Label>
-                      <ResponsiveSelect
-                        value={formData.linkedAssetId || ""}
-                        onValueChange={(v) =>
-                          updateFormData("linkedAssetId", v === "" ? "" : v)
-                        }
-                        options={linkableAssetOptions}
-                        placeholder="None (standalone liability)"
-                        sheetTitle="Link to Asset"
-                        sheetDescription="Link this liability to a property or vehicle for grouped display"
-                      />
-                    </div>
-                  )}
+                {formData.kind === AlternativeAssetKind.LIABILITY && linkableAssets.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-foreground text-sm font-medium">
+                      Link to Asset (optional)
+                    </Label>
+                    <ResponsiveSelect
+                      value={formData.linkedAssetId || ""}
+                      onValueChange={(v) => updateFormData("linkedAssetId", v === "" ? "" : v)}
+                      options={linkableAssetOptions}
+                      placeholder="None (standalone liability)"
+                      sheetTitle="Link to Asset"
+                      sheetDescription="Link this liability to a property or vehicle for grouped display"
+                    />
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
         {/* Footer with navigation */}
-        <div className="border-t border-border/50 bg-muted/30 px-6 py-4">
+        <div className="border-border/50 bg-muted/30 border-t px-6 py-4">
           <div className="flex items-center justify-between">
             <Button
               type="button"

@@ -7,7 +7,10 @@ use std::sync::Arc;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tauri::{ipc::Channel, State};
-use wealthfolio_ai::{AiError, AiStreamEvent, ChatMessage, ChatThread, ListThreadsRequest, SendMessageRequest, ThreadPage};
+use wealthfolio_ai::{
+    AiError, AiStreamEvent, ChatMessage, ChatThread, ListThreadsRequest, SendMessageRequest,
+    ThreadPage,
+};
 
 use crate::context::ServiceContext;
 
@@ -70,7 +73,11 @@ pub async fn list_ai_threads(
     search: Option<String>,
 ) -> CommandResult<ThreadPage> {
     let service = context.ai_chat_service();
-    let request = ListThreadsRequest { cursor, limit, search };
+    let request = ListThreadsRequest {
+        cursor,
+        limit,
+        search,
+    };
     let page = service.list_threads_paginated(&request)?;
     Ok(page)
 }
@@ -201,7 +208,11 @@ pub async fn update_tool_result(
 ) -> CommandResult<ChatMessage> {
     let service = context.ai_chat_service();
     let message = service
-        .update_tool_result(&request.thread_id, &request.tool_call_id, request.result_patch)
+        .update_tool_result(
+            &request.thread_id,
+            &request.tool_call_id,
+            request.result_patch,
+        )
         .await?;
     Ok(message)
 }

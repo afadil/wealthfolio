@@ -113,7 +113,11 @@ function formatErrorMessage(error: string): string {
   }
 
   // API key errors
-  if (extractedError.includes("401") || extractedError.includes("unauthorized") || extractedError.includes("API key")) {
+  if (
+    extractedError.includes("401") ||
+    extractedError.includes("unauthorized") ||
+    extractedError.includes("API key")
+  ) {
     return `**Authentication failed**\n\nYour API key appears to be invalid or missing. Please check your ${settingsLink} and ensure your API key is correctly configured.`;
   }
 
@@ -128,7 +132,11 @@ function formatErrorMessage(error: string): string {
   }
 
   // Generic provider error - use extracted message
-  if (error.includes("Provider error") || error.includes("CompletionError") || error.includes("HttpError")) {
+  if (
+    error.includes("Provider error") ||
+    error.includes("CompletionError") ||
+    error.includes("HttpError")
+  ) {
     return `**Provider error**\n\n${extractedError}\n\nCheck your ${settingsLink} if this persists.`;
   }
 
@@ -460,7 +468,9 @@ export function useChatRuntime(config?: ChatModelConfig) {
       }
 
       if (!contentForAi.trim()) return;
-      const initialThreadTitle = deriveInitialThreadTitle(textContent || attachmentNames[0] || "New chat");
+      const initialThreadTitle = deriveInitialThreadTitle(
+        textContent || attachmentNames[0] || "New chat",
+      );
 
       // Build user message parts - show text and attachment indicator separately
       const userMessageParts: ExternalMessagePart[] = [];
@@ -476,7 +486,8 @@ export function useChatRuntime(config?: ChatModelConfig) {
       const userMessage: ExternalMessage = {
         id: crypto.randomUUID(),
         role: "user",
-        parts: userMessageParts.length > 0 ? userMessageParts : [{ type: "text", content: "(empty)" }],
+        parts:
+          userMessageParts.length > 0 ? userMessageParts : [{ type: "text", content: "(empty)" }],
         createdAt: new Date(),
       };
 
@@ -554,51 +565,48 @@ export function useChatRuntime(config?: ChatModelConfig) {
 
                 // Optimistically add the new thread to the cache immediately
                 // This ensures the thread appears in the sidebar right away
-                queryClient.setQueryData<InfiniteData<ThreadPage>>(
-                  AI_THREADS_KEY,
-                  (old) => {
-                    // Create placeholder thread - title will be updated when title generation completes
-                    const placeholderThread: AiThread = {
-                      id: newThreadId,
-                      title: initialThreadTitle,
-                      createdAt: new Date().toISOString(),
-                      updatedAt: new Date().toISOString(),
-                      isPinned: false,
-                      tags: [],
+                queryClient.setQueryData<InfiniteData<ThreadPage>>(AI_THREADS_KEY, (old) => {
+                  // Create placeholder thread - title will be updated when title generation completes
+                  const placeholderThread: AiThread = {
+                    id: newThreadId,
+                    title: initialThreadTitle,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    isPinned: false,
+                    tags: [],
+                  };
+
+                  if (!old?.pages?.length) {
+                    // No existing data - create initial structure with the new thread
+                    return {
+                      pages: [
+                        {
+                          threads: [placeholderThread],
+                          nextCursor: null,
+                          hasMore: false,
+                        },
+                      ],
+                      pageParams: [undefined],
                     };
+                  }
 
-                    if (!old?.pages?.length) {
-                      // No existing data - create initial structure with the new thread
-                      return {
-                        pages: [
-                          {
-                            threads: [placeholderThread],
-                            nextCursor: null,
-                            hasMore: false,
-                          },
-                        ],
-                        pageParams: [undefined],
-                      };
-                    }
+                  // Check if thread already exists in any page
+                  const threadExists = old.pages.some((page) =>
+                    page.threads.some((t) => t.id === newThreadId),
+                  );
+                  if (threadExists) return old;
 
-                    // Check if thread already exists in any page
-                    const threadExists = old.pages.some((page) =>
-                      page.threads.some((t) => t.id === newThreadId),
-                    );
-                    if (threadExists) return old;
+                  // Add new thread to the beginning of the first page
+                  const newPages = [...old.pages];
+                  if (newPages[0]) {
+                    newPages[0] = {
+                      ...newPages[0],
+                      threads: [placeholderThread, ...newPages[0].threads],
+                    };
+                  }
 
-                    // Add new thread to the beginning of the first page
-                    const newPages = [...old.pages];
-                    if (newPages[0]) {
-                      newPages[0] = {
-                        ...newPages[0],
-                        threads: [placeholderThread, ...newPages[0].threads],
-                      };
-                    }
-
-                    return { ...old, pages: newPages };
-                  },
-                );
+                  return { ...old, pages: newPages };
+                });
                 // Don't invalidate here - it would overwrite optimistic update with stale data
                 // The title will be updated when the stream completes via invalidation in "done" handler
               }
@@ -787,12 +795,9 @@ export function useChatRuntime(config?: ChatModelConfig) {
   );
 
   // Wrapper for setMessages that accepts readonly arrays
-  const handleSetMessages = useCallback(
-    (newMessages: readonly ExternalMessage[]) => {
-      setMessages([...newMessages]);
-    },
-    [],
-  );
+  const handleSetMessages = useCallback((newMessages: readonly ExternalMessage[]) => {
+    setMessages([...newMessages]);
+  }, []);
 
   // Build the external store adapter
   const adapter = useMemo<ExternalStoreAdapter<ExternalMessage>>(

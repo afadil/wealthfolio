@@ -236,7 +236,11 @@ impl<E: AiEnvironment + 'static> Tool for GetAssetAllocationTool<E> {
             .collect();
 
         // Sort by value descending
-        allocations.sort_by(|a, b| b.value.partial_cmp(&a.value).unwrap_or(std::cmp::Ordering::Equal));
+        allocations.sort_by(|a, b| {
+            b.value
+                .partial_cmp(&a.value)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         Ok(GetAssetAllocationOutput {
             allocations,

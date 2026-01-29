@@ -10,6 +10,7 @@ pub mod addons;
 pub mod assets;
 pub mod constants;
 pub mod errors;
+pub mod events;
 pub mod fx;
 pub mod goals;
 pub mod health;

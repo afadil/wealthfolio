@@ -2,12 +2,8 @@ use std::sync::Arc;
 
 use crate::{
     context::ServiceContext,
-    events::{
-        emit_portfolio_trigger_recalculate, emit_resource_changed, PortfolioRequestPayload,
-        ResourceEventPayload,
-    },
+    events::{emit_portfolio_trigger_recalculate, PortfolioRequestPayload},
 };
-use serde_json::json;
 use tauri::{AppHandle, State};
 use wealthfolio_core::{
     assets::{Asset, UpdateAssetProfile},
@@ -75,28 +71,11 @@ pub async fn update_pricing_mode(
 }
 
 #[tauri::command]
-pub async fn delete_asset(
-    id: String,
-    state: State<'_, Arc<ServiceContext>>,
-    handle: AppHandle,
-) -> Result<(), String> {
+pub async fn delete_asset(id: String, state: State<'_, Arc<ServiceContext>>) -> Result<(), String> {
+    // Domain events handle quote sync state cleanup automatically
     state
         .asset_service()
         .delete_asset(&id)
         .await
-        .map_err(|e| e.to_string())?;
-
-    // Emit resource change event to update quote sync state
-    emit_resource_changed(
-        &handle,
-        ResourceEventPayload::new(
-            "asset",
-            "deleted",
-            json!({
-                "asset_id": id,
-            }),
-        ),
-    );
-
-    Ok(())
+        .map_err(|e| e.to_string())
 }

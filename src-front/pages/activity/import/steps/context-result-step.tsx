@@ -78,9 +78,7 @@ function StatItem({ label, value, variant = "default" }: StatItemProps) {
 
   return (
     <div className="text-center">
-      <div className={`text-3xl font-semibold tabular-nums ${colorClasses[variant]}`}>
-        {value}
-      </div>
+      <div className={`text-3xl font-semibold tabular-nums ${colorClasses[variant]}`}>{value}</div>
       <div className="text-muted-foreground mt-1 text-sm">{label}</div>
     </div>
   );
@@ -155,10 +153,7 @@ export function ContextResultStep() {
       animate="visible"
     >
       {/* Success icon with animated checkmark */}
-      <motion.div
-        className="relative mb-8"
-        variants={checkmarkVariants}
-      >
+      <motion.div className="relative mb-8" variants={checkmarkVariants}>
         {/* Outer glow ring */}
         <div className="absolute inset-0 rounded-full bg-green-500/20 blur-xl" />
 
@@ -173,10 +168,7 @@ export function ContextResultStep() {
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <motion.path
-              d="M5 13l4 4L19 7"
-              variants={checkIconVariants}
-            />
+            <motion.path d="M5 13l4 4L19 7" variants={checkIconVariants} />
           </motion.svg>
         </div>
       </motion.div>
@@ -190,10 +182,7 @@ export function ContextResultStep() {
       </motion.div>
 
       {/* Stats row */}
-      <motion.div
-        className="mb-10 flex items-center justify-center gap-12"
-        variants={itemVariants}
-      >
+      <motion.div className="mb-10 flex items-center justify-center gap-12" variants={itemVariants}>
         <StatItem label="Imported" value={stats.imported} variant="success" />
 
         <div className="bg-border h-12 w-px" />

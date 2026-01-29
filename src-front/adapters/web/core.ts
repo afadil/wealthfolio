@@ -35,11 +35,11 @@ export const COMMANDS: CommandMap = {
   get_historical_valuations: { method: "GET", path: "/valuations/history" },
   get_latest_valuations: { method: "GET", path: "/valuations/latest" },
   get_portfolio_allocations: { method: "GET", path: "/allocations" },
-  // Manual snapshot management
-  get_manual_snapshots: { method: "GET", path: "/snapshots/manual" },
-  get_snapshot_by_date: { method: "GET", path: "/snapshots/by-date" },
+  // Snapshot management
+  get_snapshots: { method: "GET", path: "/snapshots" },
+  get_snapshot_by_date: { method: "GET", path: "/snapshots/holdings" },
   delete_snapshot: { method: "DELETE", path: "/snapshots" },
-  save_manual_holdings: { method: "POST", path: "/snapshots/manual" },
+  save_manual_holdings: { method: "POST", path: "/snapshots" },
   import_holdings_csv: { method: "POST", path: "/snapshots/import" },
   update_portfolio: { method: "POST", path: "/portfolio/update" },
   recalculate_portfolio: { method: "POST", path: "/portfolio/recalculate" },
@@ -251,10 +251,7 @@ export function fromBase64(value: string): Uint8Array {
 /**
  * Invoke a command via REST API (internal - use typed adapter functions instead)
  */
-export const invoke = async <T>(
-  command: string,
-  payload?: Record<string, unknown>,
-): Promise<T> => {
+export const invoke = async <T>(command: string, payload?: Record<string, unknown>): Promise<T> => {
   const config = COMMANDS[command];
   if (!config) throw new Error(`Unsupported command ${command}`);
   let url = `${API_PREFIX}${config.path}`;
@@ -338,11 +335,17 @@ export const invoke = async <T>(
       url += `?${params.toString()}`;
       break;
     }
-    // Manual snapshot management
-    case "get_manual_snapshots": {
-      const { accountId } = payload as { accountId: string };
+    // Snapshot management
+    case "get_snapshots": {
+      const { accountId, dateFrom, dateTo } = payload as {
+        accountId: string;
+        dateFrom?: string;
+        dateTo?: string;
+      };
       const params = new URLSearchParams();
       params.set("accountId", accountId);
+      if (dateFrom) params.set("dateFrom", dateFrom);
+      if (dateTo) params.set("dateTo", dateTo);
       url += `?${params.toString()}`;
       break;
     }
@@ -819,14 +822,21 @@ export const invoke = async <T>(
     }
     // Device Sync commands - Team keys (E2EE)
     case "commit_initialize_team_keys": {
-      const { keyVersion, deviceKeyEnvelope, signature, challengeResponse, recoveryEnvelope } = payload as {
-        keyVersion: number;
-        deviceKeyEnvelope: string;
-        signature: string;
-        challengeResponse?: string;
-        recoveryEnvelope?: string;
-      };
-      body = JSON.stringify({ keyVersion, deviceKeyEnvelope, signature, challengeResponse, recoveryEnvelope });
+      const { keyVersion, deviceKeyEnvelope, signature, challengeResponse, recoveryEnvelope } =
+        payload as {
+          keyVersion: number;
+          deviceKeyEnvelope: string;
+          signature: string;
+          challengeResponse?: string;
+          recoveryEnvelope?: string;
+        };
+      body = JSON.stringify({
+        keyVersion,
+        deviceKeyEnvelope,
+        signature,
+        challengeResponse,
+        recoveryEnvelope,
+      });
       break;
     }
     case "commit_rotate_team_keys": {
@@ -935,7 +945,11 @@ export const invoke = async <T>(
     case "reinitialize_device_sync":
       break;
     case "get_import_runs": {
-      const { runType, limit, offset } = (payload ?? {}) as { runType?: string; limit?: number; offset?: number };
+      const { runType, limit, offset } = (payload ?? {}) as {
+        runType?: string;
+        limit?: number;
+        offset?: number;
+      };
       const params = new URLSearchParams();
       if (runType) params.set("runType", runType);
       if (limit !== undefined) params.set("limit", String(limit));
@@ -980,7 +994,10 @@ export const invoke = async <T>(
       break;
     }
     case "link_liability": {
-      const { liabilityId, request } = payload as { liabilityId: string; request: Record<string, unknown> };
+      const { liabilityId, request } = payload as {
+        liabilityId: string;
+        request: Record<string, unknown>;
+      };
       url += `/${encodeURIComponent(liabilityId)}/link`;
       body = JSON.stringify(request);
       break;
@@ -991,7 +1008,10 @@ export const invoke = async <T>(
       break;
     }
     case "update_alternative_asset_metadata": {
-      const { assetId, metadata } = payload as { assetId: string; metadata: Record<string, string> };
+      const { assetId, metadata } = payload as {
+        assetId: string;
+        metadata: Record<string, string>;
+      };
       url += `/${encodeURIComponent(assetId)}/metadata`;
       body = JSON.stringify(metadata);
       break;
@@ -1053,7 +1073,9 @@ export const invoke = async <T>(
       break;
     }
     case "update_ai_thread": {
-      const { request } = payload as { request: { id: string; title?: string; isPinned?: boolean } };
+      const { request } = payload as {
+        request: { id: string; title?: string; isPinned?: boolean };
+      };
       url += `/${encodeURIComponent(request.id)}`;
       body = JSON.stringify({ title: request.title, isPinned: request.isPinned });
       break;

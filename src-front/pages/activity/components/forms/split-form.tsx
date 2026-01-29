@@ -65,12 +65,11 @@ export function SplitForm({
   const baseCurrency = settings?.baseCurrency;
 
   // Compute initial account and currency for defaultValues
-  const initialAccountId = defaultValues?.accountId ?? (accounts.length === 1 ? accounts[0].value : "");
+  const initialAccountId =
+    defaultValues?.accountId ?? (accounts.length === 1 ? accounts[0].value : "");
   const initialAccount = accounts.find((a) => a.value === initialAccountId);
   const initialCurrency =
-    defaultValues?.currency ??
-    normalizeCurrency(assetCurrency) ??
-    initialAccount?.currency;
+    defaultValues?.currency ?? normalizeCurrency(assetCurrency) ?? initialAccount?.currency;
 
   const form = useForm<SplitFormValues>({
     resolver: zodResolver(splitFormSchema) as Resolver<SplitFormValues>,

@@ -149,4 +149,3 @@ export async function computeSAS(sharedSecretB64: string): Promise<string> {
 export async function generateDeviceId(): Promise<string> {
   return syncGenerateDeviceId();
 }
-

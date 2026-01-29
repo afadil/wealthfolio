@@ -7,10 +7,10 @@
  * Uses multiple detection methods for reliability
  */
 export function isAppleDevice(): boolean {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === "undefined") return false;
 
   const userAgent = window.navigator.userAgent.toLowerCase();
-  const platform = window.navigator.platform?.toLowerCase() || '';
+  const platform = window.navigator.platform?.toLowerCase() || "";
 
   // Check for Apple platforms
   const isApplePlatform = /mac|darwin|iphone|ipad|ipod/.test(platform);

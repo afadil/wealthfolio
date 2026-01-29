@@ -157,7 +157,10 @@ fn calculate_investment_market_value_acct(
             );
         }
     }
-    Ok((total_position_market_value, performance_eligible_market_value))
+    Ok((
+        total_position_market_value,
+        performance_eligible_market_value,
+    ))
 }
 
 /// Helper to calculate the total value of cash balances in the account currency.

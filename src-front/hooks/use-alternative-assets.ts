@@ -156,8 +156,7 @@ export function useLinkLiability(options?: UseAlternativeAssetMutationsOptions) 
   const { onSuccess } = options ?? {};
 
   return useMutation<void, Error, LinkLiabilityParams>({
-    mutationFn: ({ liabilityId, targetAssetId }) =>
-      linkLiability(liabilityId, { targetAssetId }),
+    mutationFn: ({ liabilityId, targetAssetId }) => linkLiability(liabilityId, { targetAssetId }),
     onSuccess: () => {
       // Invalidate queries to reflect the link change
       queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS] });

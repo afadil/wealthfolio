@@ -70,8 +70,8 @@ test.describe("Activity Creation Tests", () => {
         currency: "USD",
         symbol: "MSFT",
         amount: 15,
-        notes: "Qualified dividend",
-        subtype: "Qualified Dividend",
+        notes: "Dividend with no subtype",
+        subtype: "None",
       },
       transfer: {
         fromAccount: "Test USD Account",
@@ -104,13 +104,6 @@ test.describe("Activity Creation Tests", () => {
         amount: 25,
         notes: "Management fee",
       },
-      feeWithSubtype: {
-        account: "Test USD Account",
-        currency: "USD",
-        amount: 10,
-        notes: "ADR fee",
-        subtype: "ADR Fee",
-      },
       interest: {
         account: "Test USD Account",
         currency: "USD",
@@ -122,13 +115,6 @@ test.describe("Activity Creation Tests", () => {
         currency: "USD",
         amount: 100,
         notes: "Withholding tax",
-      },
-      taxWithSubtype: {
-        account: "Test USD Account",
-        currency: "USD",
-        amount: 30,
-        notes: "NRA withholding",
-        subtype: "NRA Withholding Tax",
       },
       split: {
         account: "Test USD Account",
@@ -166,7 +152,7 @@ test.describe("Activity Creation Tests", () => {
   async function openAddActivitySheet() {
     await waitForOverlayClose();
     await page.getByRole("button", { name: "Add Activities" }).click();
-    await page.getByRole("menuitem", { name: "Add Transaction" }).click();
+    await page.getByRole("button", { name: "Add Transaction" }).click();
     await expect(page.getByRole("heading", { name: "Add Activity" })).toBeVisible();
   }
 
@@ -304,7 +290,10 @@ test.describe("Activity Creation Tests", () => {
 
     // Find a row containing both the type badge and symbol/Cash
     const displaySymbol = symbol || "Cash";
-    const row = page.locator("tr").filter({ hasText: displayType }).filter({ hasText: displaySymbol });
+    const row = page
+      .locator("tr")
+      .filter({ hasText: displayType })
+      .filter({ hasText: displaySymbol });
     await expect(row.first()).toBeVisible({ timeout: 10000 });
   }
 
@@ -407,6 +396,11 @@ test.describe("Activity Creation Tests", () => {
         await expect(option).toBeVisible({ timeout: 5000 });
         await option.click();
       }
+
+      // Select Transactions tracking mode
+      const transactionsRadio = page.getByRole("radio", { name: /Transactions/i });
+      await expect(transactionsRadio).toBeVisible();
+      await transactionsRadio.click();
 
       const submitButton = page.getByRole("button", { name: /Add Account/i }).last();
       await submitButton.click();
@@ -737,29 +731,7 @@ test.describe("Activity Creation Tests", () => {
     await verifyActivityInTable("FEE", null, { amount: fee.amount });
   });
 
-  test("15. Create FEE activity with subtype", async () => {
-    await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
-
-    await openAddActivitySheet();
-    await selectActivityType("Fee");
-
-    const fee = TEST_DATA.activities.feeWithSubtype;
-    await selectAccount(fee.account, fee.currency);
-    await selectDate();
-    await fillAmount(fee.amount);
-
-    // Expand advanced options and select subtype
-    await expandAdvancedOptions();
-    await selectSubtype(fee.subtype);
-
-    await fillNotes(fee.notes);
-
-    await submitActivity("Fee");
-    await verifyActivityInTable("FEE", null, { amount: fee.amount });
-  });
-
-  test("16. Create INTEREST activity", async () => {
+  test("15. Create INTEREST activity", async () => {
     await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
 
@@ -776,7 +748,7 @@ test.describe("Activity Creation Tests", () => {
     await verifyActivityInTable("INTEREST", null, { amount: interest.amount });
   });
 
-  test("17. Create TAX activity", async () => {
+  test("16. Create TAX activity", async () => {
     await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
 
@@ -793,29 +765,7 @@ test.describe("Activity Creation Tests", () => {
     await verifyActivityInTable("TAX", null, { amount: tax.amount });
   });
 
-  test("18. Create TAX activity with subtype", async () => {
-    await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
-
-    await openAddActivitySheet();
-    await selectActivityType("Tax");
-
-    const tax = TEST_DATA.activities.taxWithSubtype;
-    await selectAccount(tax.account, tax.currency);
-    await selectDate();
-    await fillAmount(tax.amount);
-
-    // Expand advanced options and select subtype
-    await expandAdvancedOptions();
-    await selectSubtype(tax.subtype);
-
-    await fillNotes(tax.notes);
-
-    await submitActivity("Tax");
-    await verifyActivityInTable("TAX", null, { amount: tax.amount });
-  });
-
-  test("19. Create SPLIT activity", async () => {
+  test("17. Create SPLIT activity", async () => {
     await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
 
@@ -838,7 +788,7 @@ test.describe("Activity Creation Tests", () => {
     await verifyActivityInTable("SPLIT", split.symbol);
   });
 
-  test("20. Create BUY activity with custom asset", async () => {
+  test("18. Create BUY activity with custom asset", async () => {
     await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
 
@@ -857,9 +807,9 @@ test.describe("Activity Creation Tests", () => {
     await searchInput.fill(customBuy.customAsset.symbol);
     await page.waitForTimeout(500);
 
-    // Click "Create custom asset" option
+    // Click "Create custom" option (shows symbol + "Create custom (manual)")
     const createCustomOption = page.getByRole("option", {
-      name: new RegExp(`Create custom asset.*${customBuy.customAsset.symbol}`, "i"),
+      name: new RegExp(`${customBuy.customAsset.symbol}.*Create custom`, "i"),
     });
     await expect(createCustomOption).toBeVisible({ timeout: 5000 });
     await createCustomOption.click();
@@ -876,7 +826,10 @@ test.describe("Activity Creation Tests", () => {
     await nameInput.fill(customBuy.customAsset.name);
 
     // Select asset type
-    const assetTypeSelect = page.locator("button").filter({ hasText: /Security|Cryptocurrency|Other/i }).first();
+    const assetTypeSelect = page
+      .locator("button")
+      .filter({ hasText: /Security|Cryptocurrency|Other/i })
+      .first();
     await assetTypeSelect.click();
     await page.getByRole("option", { name: customBuy.customAsset.assetType }).click();
 
@@ -897,10 +850,12 @@ test.describe("Activity Creation Tests", () => {
     await fillNotes(customBuy.notes);
 
     await submitActivity("Buy");
-    await verifyActivityInTable("BUY", customBuy.customAsset.symbol, { quantity: customBuy.quantity });
+    await verifyActivityInTable("BUY", customBuy.customAsset.symbol, {
+      quantity: customBuy.quantity,
+    });
   });
 
-  test("21. Verify all created assets in Securities page", async () => {
+  test("19. Verify all created assets in Securities page", async () => {
     await page.goto(`${BASE_URL}/settings/securities`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Securities" })).toBeVisible({ timeout: 10000 });
 
@@ -922,7 +877,7 @@ test.describe("Activity Creation Tests", () => {
     await expect(customAssetRow.first()).toBeVisible({ timeout: 10000 });
   });
 
-  test("22. Verify custom asset has manual pricing", async () => {
+  test("20. Verify custom asset has manual pricing", async () => {
     const customSymbol = TEST_DATA.activities.customAssetBuy.customAsset.symbol;
 
     // Navigate to the custom asset's profile page
@@ -957,7 +912,9 @@ test.describe("Activity Creation Tests", () => {
     }
 
     // Close the sheet
-    const closeButton = page.getByRole("button", { name: /close/i }).or(page.locator('[aria-label="Close"]'));
+    const closeButton = page
+      .getByRole("button", { name: /close/i })
+      .or(page.locator('[aria-label="Close"]'));
     if (await closeButton.isVisible()) {
       await closeButton.click();
     } else {
@@ -965,7 +922,7 @@ test.describe("Activity Creation Tests", () => {
     }
   });
 
-  test("23. Verify activity count in activities page", async () => {
+  test("21. Verify activity count in activities page", async () => {
     await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
 
@@ -975,12 +932,12 @@ test.describe("Activity Creation Tests", () => {
     // Count activity rows - we created activities:
     // deposit, withdrawal, 2 buys, sell, 2 dividends,
     // internal transfer (creates 2), external transfer in, external transfer out, securities transfer (creates 2),
-    // 2 fees, interest, 2 taxes, split, custom buy
-    // Total: 1 + 1 + 2 + 1 + 2 + 2 + 1 + 1 + 2 + 2 + 1 + 2 + 1 + 1 = 20
+    // 1 fee, interest, 1 tax, split, custom buy
+    // Total: 1 + 1 + 2 + 1 + 2 + 2 + 1 + 1 + 2 + 1 + 1 + 1 + 1 + 1 = 18
     const activityRows = page.locator("tbody tr");
     const rowCount = await activityRows.count();
 
-    // We should have at least 20 activities
-    expect(rowCount).toBeGreaterThanOrEqual(20);
+    // We should have at least 18 activities
+    expect(rowCount).toBeGreaterThanOrEqual(18);
   });
 });

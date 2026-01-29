@@ -1,4 +1,4 @@
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use crate::{
     error::ApiResult,
@@ -11,8 +11,7 @@ use crate::{
 use anyhow::anyhow;
 use serde_json::json;
 use wealthfolio_core::{
-    accounts::AccountServiceTrait, activities::Activity, constants::PORTFOLIO_TOTAL_ACCOUNT_ID,
-    quotes::MarketSyncMode,
+    accounts::AccountServiceTrait, constants::PORTFOLIO_TOTAL_ACCOUNT_ID, quotes::MarketSyncMode,
 };
 
 /// Normalize file paths by stripping file:// prefix
@@ -53,46 +52,6 @@ pub fn enqueue_portfolio_job(state: Arc<AppState>, config: PortfolioJobConfig) {
     });
 }
 
-#[derive(Clone)]
-pub enum AccountPortfolioImpact {
-    CreatedOrUpdated {
-        account_id: String,
-        currency: String,
-    },
-    Deleted,
-}
-
-/// Mirror the Tauri account resource change logic to keep web mode in sync.
-pub fn trigger_account_portfolio_job(state: Arc<AppState>, impact: AccountPortfolioImpact) {
-    let base_currency = state.base_currency.read().unwrap().clone();
-
-    let (account_ids, account_currency) = match impact {
-        AccountPortfolioImpact::CreatedOrUpdated {
-            account_id,
-            currency,
-        } => (Some(vec![account_id]), Some(currency)),
-        AccountPortfolioImpact::Deleted => (None, None),
-    };
-
-    let mut asset_ids = None;
-    if let Some(currency) = account_currency {
-        if !base_currency.is_empty() && base_currency != currency {
-            // Use canonical FX asset ID format: FX:{base}:{quote}
-            let fx_asset_id = format!("FX:{}:{}", currency, base_currency);
-            asset_ids = Some(vec![fx_asset_id]);
-        }
-    }
-
-    enqueue_portfolio_job(
-        state,
-        PortfolioJobConfig {
-            account_ids,
-            market_sync_mode: MarketSyncMode::Incremental { asset_ids },
-            force_full_recalculation: true,
-        },
-    );
-}
-
 /// Trigger a lightweight portfolio update (no full recalculation) similar to Tauri defaults.
 /// Uses MarketSyncMode::None - no market sync, just recalculation.
 pub fn trigger_lightweight_portfolio_update(state: Arc<AppState>) {
@@ -119,35 +78,6 @@ pub fn trigger_full_portfolio_recalc(state: Arc<AppState>) {
     );
 }
 
-#[derive(Clone)]
-pub struct ActivityImpact {
-    pub account_id: String,
-    pub currency: Option<String>,
-    pub asset_id: Option<String>,
-}
-
-impl ActivityImpact {
-    pub fn from_activity(activity: &Activity) -> Self {
-        Self {
-            account_id: activity.account_id.clone(),
-            currency: Some(activity.currency.clone()),
-            asset_id: activity.asset_id.clone(),
-        }
-    }
-
-    pub fn from_parts(
-        account_id: String,
-        currency: Option<String>,
-        asset_id: Option<String>,
-    ) -> Self {
-        Self {
-            account_id,
-            currency,
-            asset_id,
-        }
-    }
-}
-
 pub async fn process_portfolio_job(
     state: Arc<AppState>,
     config: PortfolioJobConfig,
@@ -163,12 +93,7 @@ pub async fn process_portfolio_job(
 
         // Convert MarketSyncMode to SyncMode for the quote service
         let sync_result = match config.market_sync_mode.to_sync_mode() {
-            Some(sync_mode) => {
-                state
-                    .quote_service
-                    .sync(sync_mode, asset_ids)
-                    .await
-            }
+            Some(sync_mode) => state.quote_service.sync(sync_mode, asset_ids).await,
             None => {
                 // This shouldn't happen since we checked requires_sync(), but handle gracefully
                 tracing::warn!("MarketSyncMode requires sync but returned None for SyncMode");
@@ -244,11 +169,18 @@ pub async fn process_portfolio_job(
         }
     }
 
-    if let Err(err) = state
-        .snapshot_service
-        .calculate_total_portfolio_snapshots()
-        .await
-    {
+    let total_result = if config.force_full_recalculation {
+        state
+            .snapshot_service
+            .force_recalculate_total_portfolio_snapshots()
+            .await
+    } else {
+        state
+            .snapshot_service
+            .calculate_total_portfolio_snapshots()
+            .await
+    };
+    if let Err(err) = total_result {
         let err_msg = format!("Failed to calculate TOTAL portfolio snapshot: {}", err);
         tracing::error!("{}", err_msg);
         event_bus.publish(ServerEvent::with_payload(
@@ -311,60 +243,4 @@ pub async fn process_portfolio_job(
 
     event_bus.publish(ServerEvent::new(PORTFOLIO_UPDATE_COMPLETE));
     Ok(())
-}
-
-pub fn trigger_activity_portfolio_job(state: Arc<AppState>, impacts: Vec<ActivityImpact>) {
-    if impacts.is_empty() {
-        return;
-    }
-
-    let mut account_ids: HashSet<String> = HashSet::new();
-    let mut asset_ids: HashSet<String> = HashSet::new();
-
-    for impact in impacts {
-        if impact.account_id.is_empty() {
-            continue;
-        }
-        account_ids.insert(impact.account_id.clone());
-
-        if let Some(asset_id) = impact.asset_id.as_deref() {
-            if !asset_id.is_empty() {
-                asset_ids.insert(asset_id.to_string());
-            }
-        }
-
-        if let Some(currency) = impact.currency.as_deref() {
-            match state.account_service.get_account(&impact.account_id) {
-                Ok(account) => {
-                    if currency != account.currency {
-                        // Use canonical FX asset ID format: FX:{base}:{quote}
-                        asset_ids.insert(format!("FX:{}:{}", account.currency, currency));
-                    }
-                }
-                Err(err) => tracing::warn!(
-                    "Unable to resolve account {} for activity-triggered recalculation: {}",
-                    impact.account_id,
-                    err
-                ),
-            }
-        }
-    }
-
-    let config = PortfolioJobConfig {
-        account_ids: if account_ids.is_empty() {
-            None
-        } else {
-            Some(account_ids.into_iter().collect())
-        },
-        market_sync_mode: MarketSyncMode::Incremental {
-            asset_ids: if asset_ids.is_empty() {
-                None
-            } else {
-                Some(asset_ids.into_iter().collect())
-            },
-        },
-        force_full_recalculation: true,
-    };
-
-    enqueue_portfolio_job(state, config);
 }

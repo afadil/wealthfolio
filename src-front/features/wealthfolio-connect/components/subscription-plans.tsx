@@ -11,18 +11,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@wealthfolio/ui/components/ui/card";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@wealthfolio/ui/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@wealthfolio/ui/components/ui/toggle-group";
+import { ToggleGroup, ToggleGroupItem } from "@wealthfolio/ui/components/ui/toggle-group";
 import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { useQuery } from "@tanstack/react-query";
@@ -60,7 +53,7 @@ function useSubscriptionPlans(enabled: boolean) {
 
 function PlanCardSkeleton() {
   return (
-    <div className="flex flex-col rounded-lg border border-border bg-muted/30 p-4">
+    <div className="border-border bg-muted/30 flex flex-col rounded-lg border p-4">
       {/* Title and description */}
       <div className="mb-3">
         <Skeleton className="h-5 w-28" />
@@ -100,7 +93,8 @@ function PlanCard({ plan, billingPeriod, isDefault, isComingSoon }: PlanCardProp
   // Use yearlyDiscountPercent from API if available, otherwise calculate
   const yearlySavings =
     billingPeriod === "yearly"
-      ? plan.yearlyDiscountPercent ?? Math.round(((monthlyPricing * 12 - yearlyPricing) / (monthlyPricing * 12)) * 100)
+      ? (plan.yearlyDiscountPercent ??
+        Math.round(((monthlyPricing * 12 - yearlyPricing) / (monthlyPricing * 12)) * 100))
       : 0;
 
   const formatPrice = (amount: number) => {
@@ -121,15 +115,12 @@ function PlanCard({ plan, billingPeriod, isDefault, isComingSoon }: PlanCardProp
 
   return (
     <div
-      className={`relative flex flex-col rounded-lg border bg-muted/30 p-4 ${
+      className={`bg-muted/30 relative flex flex-col rounded-lg border p-4 ${
         isDefault ? "border-primary" : "border-border"
       } ${showComingSoon ? "opacity-60" : ""}`}
     >
       {showComingSoon && (
-        <Badge
-          className="absolute -top-2.5 left-1/2 -translate-x-1/2"
-          variant="secondary"
-        >
+        <Badge className="absolute -top-2.5 left-1/2 -translate-x-1/2" variant="secondary">
           Coming Soon
         </Badge>
       )}
@@ -141,9 +132,7 @@ function PlanCard({ plan, billingPeriod, isDefault, isComingSoon }: PlanCardProp
 
       <div className="mb-4">
         <div className="flex items-baseline gap-1">
-          <span className="text-2xl font-bold">
-            {formatPrice(priceAmount)}
-          </span>
+          <span className="text-2xl font-bold">{formatPrice(priceAmount)}</span>
           <span className="text-muted-foreground text-xs">
             /{billingPeriod === "monthly" ? "mo" : "yr"}
           </span>
@@ -187,7 +176,11 @@ interface SubscriptionPlansProps {
   isRefreshing?: boolean;
 }
 
-export function SubscriptionPlans({ enabled = true, onRefresh, isRefreshing }: SubscriptionPlansProps) {
+export function SubscriptionPlans({
+  enabled = true,
+  onRefresh,
+  isRefreshing,
+}: SubscriptionPlansProps) {
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("monthly");
   const { data, isLoading, error } = useSubscriptionPlans(enabled);
   const { signOut, isLoading: isSigningOut } = useWealthfolioConnect();
@@ -210,11 +203,10 @@ export function SubscriptionPlans({ enabled = true, onRefresh, isRefreshing }: S
             <div className="bg-warning/15 mb-4 rounded-full p-4">
               <Icons.AlertCircle className="text-warning h-8 w-8" />
             </div>
-            <h3 className="text-foreground mb-2 text-base font-medium">
-              Connection Issue
-            </h3>
+            <h3 className="text-foreground mb-2 text-base font-medium">Connection Issue</h3>
             <p className="text-muted-foreground mb-4 max-w-sm text-sm">
-              We're having trouble connecting to your account. This can happen if your session has expired.{" "}
+              We're having trouble connecting to your account. This can happen if your session has
+              expired.{" "}
               <Popover>
                 <PopoverTrigger asChild>
                   <button className="text-muted-foreground hover:text-foreground underline underline-offset-2">
@@ -273,9 +265,7 @@ export function SubscriptionPlans({ enabled = true, onRefresh, isRefreshing }: S
             <div className="bg-warning/15 mb-4 rounded-full p-4">
               <Icons.CloudOff className="text-warning h-8 w-8" />
             </div>
-            <h3 className="text-foreground mb-2 text-base font-medium">
-              Unable to Load Plans
-            </h3>
+            <h3 className="text-foreground mb-2 text-base font-medium">Unable to Load Plans</h3>
             <p className="text-muted-foreground mb-4 max-w-sm text-sm">
               We couldn't retrieve subscription plans right now. This is usually a temporary issue.{" "}
               <Popover>
@@ -368,9 +358,7 @@ export function SubscriptionPlans({ enabled = true, onRefresh, isRefreshing }: S
         {/* Refresh hint after subscribing */}
         {onRefresh && (
           <div className="mt-4 flex items-center justify-center gap-2 rounded-md border border-dashed p-3">
-            <p className="text-muted-foreground text-xs">
-              Already subscribed?
-            </p>
+            <p className="text-muted-foreground text-xs">Already subscribed?</p>
             <Button
               variant="ghost"
               size="sm"

@@ -5,4 +5,5 @@ mod registry;
 
 pub use ai_environment::TauriAiEnvironment;
 pub use providers::initialize_context;
+// ContextInitResult is used internally but not exported
 pub use registry::ServiceContext;

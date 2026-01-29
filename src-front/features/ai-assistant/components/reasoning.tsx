@@ -81,12 +81,16 @@ const ReasoningGroupImpl: ReasoningGroupComponent = ({ children, startIndex, end
     >
       {/* Header */}
       <div
-        className="flex cursor-pointer select-none items-center justify-between px-3 py-2 transition-colors hover:bg-muted/80"
+        className="hover:bg-muted/80 flex cursor-pointer items-center justify-between px-3 py-2 transition-colors select-none"
         onClick={toggleExpanded}
       >
         <div className="flex items-center gap-2">
-          <Icons.Brain className={`size-4 ${!hasFinishedThinking ? "shimmer text-muted-foreground" : "text-muted-foreground"}`} />
-          <span className={`text-sm ${!hasFinishedThinking ? "shimmer text-muted-foreground" : "text-muted-foreground"}`}>
+          <Icons.Brain
+            className={`size-4 ${!hasFinishedThinking ? "shimmer text-muted-foreground" : "text-muted-foreground"}`}
+          />
+          <span
+            className={`text-sm ${!hasFinishedThinking ? "shimmer text-muted-foreground" : "text-muted-foreground"}`}
+          >
             {headerText}
           </span>
         </div>

@@ -170,10 +170,7 @@ export function ImportQuotesSection({
     <div className="space-y-6">
       {(showTitle || showHeaderButtons) && (
         <div
-          className={cn(
-            "flex items-center justify-between",
-            showTitle ? undefined : "justify-end",
-          )}
+          className={cn("flex items-center justify-between", showTitle ? undefined : "justify-end")}
         >
           {showTitle && (
             <div>

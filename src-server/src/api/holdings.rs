@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use crate::{error::ApiResult, main_lib::AppState};
 use axum::{
     extract::{Query, State},
-    routing::{delete, get, post},
+    routing::{get, post},
     Json, Router,
 };
 use chrono::{NaiveDate, Utc};
@@ -141,7 +141,7 @@ async fn get_portfolio_allocations(
 // Manual Snapshot Management
 // ============================================================================
 
-/// Information about a manual/imported snapshot for UI display
+/// Information about a snapshot for UI display
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SnapshotInfo {
@@ -152,18 +152,40 @@ pub struct SnapshotInfo {
     pub cash_currency_count: usize,
 }
 
-async fn get_manual_snapshots(
+#[derive(serde::Deserialize)]
+struct SnapshotsQuery {
+    #[serde(rename = "accountId")]
+    account_id: String,
+    #[serde(rename = "dateFrom")]
+    date_from: Option<String>, // YYYY-MM-DD, inclusive
+    #[serde(rename = "dateTo")]
+    date_to: Option<String>, // YYYY-MM-DD, inclusive
+}
+
+/// Gets snapshots for an account (all sources: CALCULATED, MANUAL_ENTRY, etc.)
+/// Optionally filtered by date range.
+async fn get_snapshots(
     State(state): State<Arc<AppState>>,
-    Query(q): Query<HoldingsQuery>,
+    Query(q): Query<SnapshotsQuery>,
 ) -> ApiResult<Json<Vec<SnapshotInfo>>> {
+    // Parse date strings to NaiveDate
+    let start_date = q
+        .date_from
+        .map(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d"))
+        .transpose()
+        .map_err(|e| crate::error::ApiError::BadRequest(format!("Invalid dateFrom: {}", e)))?;
+    let end_date = q
+        .date_to
+        .map(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d"))
+        .transpose()
+        .map_err(|e| crate::error::ApiError::BadRequest(format!("Invalid dateTo: {}", e)))?;
+
     let snapshots = state
         .snapshot_service
-        .get_holdings_keyframes(&q.account_id, None, None)?;
+        .get_holdings_keyframes(&q.account_id, start_date, end_date)?;
 
-    // Filter for non-CALCULATED snapshots and convert to SnapshotInfo
-    let manual_snapshots: Vec<SnapshotInfo> = snapshots
+    let result: Vec<SnapshotInfo> = snapshots
         .into_iter()
-        .filter(|s| s.source != SnapshotSource::Calculated)
         .map(|s| SnapshotInfo {
             id: s.id,
             snapshot_date: s.snapshot_date.format("%Y-%m-%d").to_string(),
@@ -173,7 +195,7 @@ async fn get_manual_snapshots(
         })
         .collect();
 
-    Ok(Json(manual_snapshots))
+    Ok(Json(result))
 }
 
 fn snapshot_source_to_string(source: SnapshotSource) -> String {
@@ -198,9 +220,11 @@ async fn get_snapshot_by_date(
         .map_err(|e| anyhow::anyhow!("Invalid date format: {}", e))?;
 
     // Get keyframes for this specific date
-    let snapshots = state
-        .snapshot_service
-        .get_holdings_keyframes(&q.account_id, Some(target_date), Some(target_date))?;
+    let snapshots = state.snapshot_service.get_holdings_keyframes(
+        &q.account_id,
+        Some(target_date),
+        Some(target_date),
+    )?;
 
     let snapshot = snapshots
         .into_iter()
@@ -375,9 +399,11 @@ async fn delete_snapshot_handler(
         .map_err(|e| anyhow::anyhow!("Invalid date format: {}", e))?;
 
     // First verify the snapshot exists and is not CALCULATED
-    let snapshots = state
-        .snapshot_service
-        .get_holdings_keyframes(&q.account_id, Some(target_date), Some(target_date))?;
+    let snapshots = state.snapshot_service.get_holdings_keyframes(
+        &q.account_id,
+        Some(target_date),
+        Some(target_date),
+    )?;
 
     let snapshot = snapshots
         .into_iter()
@@ -387,7 +413,8 @@ async fn delete_snapshot_handler(
     if snapshot.source == SnapshotSource::Calculated {
         return Err(anyhow::anyhow!(
             "Cannot delete calculated snapshots. Only manual or imported snapshots can be deleted."
-        ).into());
+        )
+        .into());
     }
 
     // Delete the snapshot
@@ -415,10 +442,10 @@ async fn delete_snapshot_handler(
         );
     }
 
-    // Recalculate TOTAL portfolio snapshots
+    // Force recalculate TOTAL portfolio snapshots (force needed because deletion invalidates existing TOTAL)
     if let Err(e) = state
         .snapshot_service
-        .calculate_total_portfolio_snapshots()
+        .force_recalculate_total_portfolio_snapshots()
         .await
     {
         tracing::warn!("Failed to recalculate TOTAL snapshots after delete: {}", e);
@@ -529,9 +556,9 @@ async fn save_manual_holdings_handler(
 
         // Parse average cost if provided
         let average_cost = match &holding.average_cost {
-            Some(cost_str) if !cost_str.is_empty() => cost_str
-                .parse::<Decimal>()
-                .map_err(|e| anyhow::anyhow!("Invalid average cost for {}: {}", holding.asset_id, e))?,
+            Some(cost_str) if !cost_str.is_empty() => cost_str.parse::<Decimal>().map_err(|e| {
+                anyhow::anyhow!("Invalid average cost for {}: {}", holding.asset_id, e)
+            })?,
             _ => Decimal::ZERO,
         };
 
@@ -614,10 +641,7 @@ async fn save_manual_holdings_handler(
         .calculate_valuation_history(&req.account_id, false)
         .await
     {
-        tracing::warn!(
-            "Failed to recalculate valuations after manual save: {}",
-            e
-        );
+        tracing::warn!("Failed to recalculate valuations after manual save: {}", e);
     }
 
     // Then recalculate TOTAL portfolio snapshots
@@ -760,10 +784,7 @@ async fn import_holdings_csv_handler(
             .calculate_valuation_history(&req.account_id, false)
             .await
         {
-            tracing::warn!(
-                "Failed to recalculate valuations after CSV import: {}",
-                e
-            );
+            tracing::warn!("Failed to recalculate valuations after CSV import: {}", e);
         }
 
         // Recalculate TOTAL portfolio snapshots
@@ -772,7 +793,10 @@ async fn import_holdings_csv_handler(
             .calculate_total_portfolio_snapshots()
             .await
         {
-            tracing::warn!("Failed to recalculate TOTAL snapshots after CSV import: {}", e);
+            tracing::warn!(
+                "Failed to recalculate TOTAL snapshots after CSV import: {}",
+                e
+            );
         }
 
         // Recalculate valuations for the TOTAL portfolio
@@ -838,12 +862,7 @@ async fn import_single_snapshot_impl(
         // Ensure the asset exists in the database
         let asset = state
             .asset_service
-            .get_or_create_minimal_asset(
-                &asset_id,
-                Some(pos_input.currency.clone()),
-                None,
-                None,
-            )
+            .get_or_create_minimal_asset(&asset_id, Some(pos_input.currency.clone()), None, None)
             .await?;
 
         // Register FX pair for position currency if different from account currency
@@ -945,10 +964,11 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/valuations/latest", get(get_latest_valuations))
         .route("/allocations", get(get_portfolio_allocations))
         .route(
-            "/snapshots/manual",
-            get(get_manual_snapshots).post(save_manual_holdings_handler),
+            "/snapshots",
+            get(get_snapshots)
+                .post(save_manual_holdings_handler)
+                .delete(delete_snapshot_handler),
         )
-        .route("/snapshots/by-date", get(get_snapshot_by_date))
-        .route("/snapshots", delete(delete_snapshot_handler))
+        .route("/snapshots/holdings", get(get_snapshot_by_date))
         .route("/snapshots/import", post(import_holdings_csv_handler))
 }

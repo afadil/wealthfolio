@@ -421,9 +421,7 @@ impl HoldingsCalculator {
         state: &mut AccountStateSnapshot,
         account_currency: &str,
     ) -> Result<()> {
-        use crate::activities::{
-            ACTIVITY_SUBTYPE_BONUS, ACTIVITY_TYPE_CREDIT,
-        };
+        use crate::activities::{ACTIVITY_SUBTYPE_BONUS, ACTIVITY_TYPE_CREDIT};
 
         let activity_currency = &activity.currency;
         let activity_amount = activity.amt();

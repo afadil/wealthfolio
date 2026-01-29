@@ -8,7 +8,12 @@ import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useRuntimeContext } from "../hooks/use-runtime-context";
-import { flattenThreadPages, useDeleteThread, useThreads, useToggleThreadPin } from "../hooks/use-threads";
+import {
+  flattenThreadPages,
+  useDeleteThread,
+  useThreads,
+  useToggleThreadPin,
+} from "../hooks/use-threads";
 import type { ChatThread } from "../types";
 
 /** Debounce delay for search input (ms) */
@@ -372,14 +377,18 @@ const ThreadListItemCustom: FC<ThreadListItemCustomProps> = ({
           <Button
             variant="ghost"
             size="sm"
-            className="text-blue-500 hover:text-blue-600 size-6 p-0"
+            className="size-6 p-0 text-blue-500 hover:text-blue-600"
             onClick={(e) => {
               e.stopPropagation();
               onTogglePin(thread.id, thread.isPinned);
             }}
             title={thread.isPinned ? "Unpin" : "Pin"}
           >
-            {thread.isPinned ? <Icons.PinOff className="size-3.5" /> : <Icons.Pin className="size-3.5" />}
+            {thread.isPinned ? (
+              <Icons.PinOff className="size-3.5" />
+            ) : (
+              <Icons.Pin className="size-3.5" />
+            )}
           </Button>
           <ActionConfirm
             confirmTitle="Delete conversation?"

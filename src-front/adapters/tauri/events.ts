@@ -1,5 +1,8 @@
 // Event Listeners
-import type { EventCallback as TauriEventCallback, UnlistenFn as TauriUnlistenFn } from "@tauri-apps/api/event";
+import type {
+  EventCallback as TauriEventCallback,
+  UnlistenFn as TauriUnlistenFn,
+} from "@tauri-apps/api/event";
 import { listen } from "@tauri-apps/api/event";
 
 import type { EventCallback, UnlistenFn } from "../types";
@@ -24,17 +27,23 @@ export const listenFileDrop = async <T>(handler: EventCallback<T>): Promise<Unli
   return adaptUnlisten(unlisten);
 };
 
-export const listenFileDropCancelled = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
+export const listenFileDropCancelled = async <T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> => {
   const unlisten = await listen<T>("tauri://file-drop-cancelled", adaptCallback(handler));
   return adaptUnlisten(unlisten);
 };
 
-export const listenPortfolioUpdateStart = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
+export const listenPortfolioUpdateStart = async <T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> => {
   const unlisten = await listen<T>("portfolio:update-start", adaptCallback(handler));
   return adaptUnlisten(unlisten);
 };
 
-export const listenPortfolioUpdateComplete = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
+export const listenPortfolioUpdateComplete = async <T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> => {
   const unlisten = await listen<T>("portfolio:update-complete", adaptCallback(handler));
   return adaptUnlisten(unlisten);
 };
@@ -44,7 +53,9 @@ export const listenDatabaseRestored = async <T>(handler: EventCallback<T>): Prom
   return adaptUnlisten(unlisten);
 };
 
-export const listenPortfolioUpdateError = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
+export const listenPortfolioUpdateError = async <T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> => {
   const unlisten = await listen<T>("portfolio:update-error", adaptCallback(handler));
   return adaptUnlisten(unlisten);
 };

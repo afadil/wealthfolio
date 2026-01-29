@@ -72,9 +72,8 @@ export function useAggregatedSyncStatus() {
 
   // Count of accounts with issues
   const issueCount = useMemo(() => {
-    return syncStates.filter(
-      (s) => s.syncStatus === "NEEDS_REVIEW" || s.syncStatus === "FAILED",
-    ).length;
+    return syncStates.filter((s) => s.syncStatus === "NEEDS_REVIEW" || s.syncStatus === "FAILED")
+      .length;
   }, [syncStates]);
 
   return {

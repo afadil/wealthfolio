@@ -63,7 +63,11 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
     const baseSymbol = searchResult?.exchangeMic ? stripExchangeSuffix(symbol) : symbol;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    setValue(name, baseSymbol as any, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+    setValue(name, baseSymbol as any, {
+      shouldValidate: true,
+      shouldDirty: true,
+      shouldTouch: true,
+    });
 
     // Capture exchangeMic for canonical asset ID generation
     if (searchResult?.exchangeMic && exchangeMicName) {
@@ -82,11 +86,19 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
     if (isManualAsset && assetMetadataName) {
       if (searchResult?.longName) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setValue(`${assetMetadataName}.name` as any, searchResult.longName as any, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+        setValue(`${assetMetadataName}.name` as any, searchResult.longName as any, {
+          shouldValidate: true,
+          shouldDirty: true,
+          shouldTouch: true,
+        });
       }
       if (searchResult?.assetKind) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setValue(`${assetMetadataName}.kind` as any, searchResult.assetKind as any, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+        setValue(`${assetMetadataName}.kind` as any, searchResult.assetKind as any, {
+          shouldValidate: true,
+          shouldDirty: true,
+          shouldTouch: true,
+        });
       }
     }
   };

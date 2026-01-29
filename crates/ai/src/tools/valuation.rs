@@ -131,9 +131,7 @@ impl<E: AiEnvironment + 'static> Tool for GetValuationHistoryTool<E> {
             .start_date
             .as_ref()
             .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
-            .unwrap_or_else(|| {
-                end_date - chrono::Duration::days(DEFAULT_VALUATIONS_DAYS)
-            });
+            .unwrap_or_else(|| end_date - chrono::Duration::days(DEFAULT_VALUATIONS_DAYS));
 
         // Fetch valuations based on account scope
         let valuations = if account_id == "TOTAL" {
@@ -168,12 +166,14 @@ impl<E: AiEnvironment + 'static> Tool for GetValuationHistoryTool<E> {
             // Convert aggregated data to sorted vector
             let mut result: Vec<ValuationPointDto> = aggregated
                 .into_iter()
-                .map(|(date, (total_value, net_contribution))| ValuationPointDto {
-                    date: date.format("%Y-%m-%d").to_string(),
-                    total_value,
-                    net_contribution,
-                    currency: self.base_currency.clone(),
-                })
+                .map(
+                    |(date, (total_value, net_contribution))| ValuationPointDto {
+                        date: date.format("%Y-%m-%d").to_string(),
+                        total_value,
+                        net_contribution,
+                        currency: self.base_currency.clone(),
+                    },
+                )
                 .collect();
             result.sort_by(|a, b| a.date.cmp(&b.date));
             result
@@ -218,7 +218,11 @@ impl<E: AiEnvironment + 'static> Tool for GetValuationHistoryTool<E> {
             start_date: start_date.format("%Y-%m-%d").to_string(),
             end_date: end_date.format("%Y-%m-%d").to_string(),
             truncated: if truncated { Some(true) } else { None },
-            original_count: if truncated { Some(original_count) } else { None },
+            original_count: if truncated {
+                Some(original_count)
+            } else {
+                None
+            },
         })
     }
 }

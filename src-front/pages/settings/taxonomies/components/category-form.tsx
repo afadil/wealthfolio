@@ -146,10 +146,10 @@ export function CategoryForm({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span
-            className="w-4 h-4 rounded-full shrink-0"
+            className="h-4 w-4 shrink-0 rounded-full"
             style={{ backgroundColor: currentColor }}
           />
-          <h3 className="font-semibold text-lg">
+          <h3 className="text-lg font-semibold">
             {isCreateMode ? "New Category" : category?.name}
           </h3>
         </div>
@@ -223,7 +223,7 @@ export function CategoryForm({
               >
                 {isPending ? (
                   <>
-                    <Icons.Loader className="h-4 w-4 mr-2 animate-spin" />
+                    <Icons.Loader className="mr-2 h-4 w-4 animate-spin" />
                     {isCreateMode ? "Creating..." : "Saving..."}
                   </>
                 ) : isCreateMode ? (

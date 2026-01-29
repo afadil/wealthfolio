@@ -134,7 +134,7 @@ export {
   getPortfolioAllocations,
   saveManualHoldings,
   importHoldingsCsv,
-  getManualSnapshots,
+  getSnapshots,
   getSnapshotByDate,
   deleteSnapshot,
 } from "../shared/portfolio";
@@ -157,6 +157,7 @@ export {
   getMarketDataProviderSettings,
   updateMarketDataProviderSettings,
   importManualQuotes,
+  checkQuotesImport,
 } from "../shared/market-data";
 
 // Contribution Limits Commands

@@ -7,14 +7,9 @@ use std::sync::{Arc, RwLock};
 
 use wealthfolio_ai::{AiEnvironment, ChatRepositoryTrait};
 use wealthfolio_core::{
-    accounts::AccountServiceTrait,
-    activities::ActivityServiceTrait,
-    goals::GoalServiceTrait,
-    holdings::HoldingsServiceTrait,
-    quotes::QuoteServiceTrait,
-    secrets::SecretStore,
-    settings::SettingsServiceTrait,
-    valuation::ValuationServiceTrait,
+    accounts::AccountServiceTrait, activities::ActivityServiceTrait, goals::GoalServiceTrait,
+    holdings::HoldingsServiceTrait, quotes::QuoteServiceTrait, secrets::SecretStore,
+    settings::SettingsServiceTrait, valuation::ValuationServiceTrait,
 };
 
 /// Server-side implementation of AiEnvironment.

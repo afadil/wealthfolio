@@ -21,11 +21,7 @@ interface ChatModelProviderProps {
 export function ChatModelProvider({ children }: ChatModelProviderProps) {
   const chatModelState = useChatModel();
 
-  return (
-    <ChatModelContext.Provider value={chatModelState}>
-      {children}
-    </ChatModelContext.Provider>
-  );
+  return <ChatModelContext.Provider value={chatModelState}>{children}</ChatModelContext.Provider>;
 }
 
 /**

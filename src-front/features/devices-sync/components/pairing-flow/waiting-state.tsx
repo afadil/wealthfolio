@@ -25,7 +25,7 @@ export function WaitingState({
   return (
     <div className="flex flex-col items-center px-4 py-6">
       {showQRSkeleton ? (
-        <div className="flex flex-col items-center gap-4 mb-6">
+        <div className="mb-6 flex flex-col items-center gap-4">
           {/* QR Code skeleton */}
           <Skeleton className="h-[160px] w-[160px] rounded-xl" />
           {/* Code skeleton */}

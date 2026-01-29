@@ -1,5 +1,11 @@
 import { Button } from "@wealthfolio/ui/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@wealthfolio/ui/components/ui/card";
 import { DataTable } from "@wealthfolio/ui/components/ui/data-table";
 import { Dialog, DialogContent, DialogTrigger } from "@wealthfolio/ui/components/ui/dialog";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";

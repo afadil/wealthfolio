@@ -22,20 +22,23 @@ use wealthfolio_core::accounts::{
     set_tracking_mode, Account, AccountServiceTrait, AccountUpdate, NewAccount, TrackingMode,
 };
 use wealthfolio_core::activities::{self, compute_idempotency_key, AssetInput, NewActivity};
-use wealthfolio_core::fx::currency::{get_normalization_rule, normalize_amount};
 use wealthfolio_core::assets::{canonical_asset_id, AssetKind, NewAsset};
 use wealthfolio_core::errors::Result;
-use wealthfolio_core::portfolio::snapshot::{AccountStateSnapshot, Position, SnapshotRepositoryTrait, SnapshotSource};
+use wealthfolio_core::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
+use wealthfolio_core::fx::currency::{get_normalization_rule, normalize_amount};
+use wealthfolio_core::portfolio::snapshot::{
+    AccountStateSnapshot, Position, SnapshotRepositoryTrait, SnapshotServiceTrait, SnapshotSource,
+};
 use wealthfolio_core::quotes::DataSource;
-use wealthfolio_core::utils::time_utils::valuation_date_today;
 use wealthfolio_core::sync::{
     ImportRun, ImportRunMode, ImportRunStatus, ImportRunSummary, ImportRunType, ReviewMode,
 };
+use wealthfolio_core::utils::time_utils::valuation_date_today;
 use wealthfolio_storage_sqlite::activities::ActivityDB;
 use wealthfolio_storage_sqlite::assets::AssetDB;
-use wealthfolio_storage_sqlite::portfolio::snapshot::AccountStateSnapshotDB;
 use wealthfolio_storage_sqlite::db::{DbPool, WriteHandle};
 use wealthfolio_storage_sqlite::errors::StorageError;
+use wealthfolio_storage_sqlite::portfolio::snapshot::AccountStateSnapshotDB;
 use wealthfolio_storage_sqlite::schema;
 use wealthfolio_storage_sqlite::sync::ImportRunRepository;
 
@@ -48,6 +51,8 @@ pub struct BrokerSyncService {
     brokers_sync_state_repository: Arc<BrokerSyncStateRepository>,
     import_run_repository: Arc<ImportRunRepository>,
     snapshot_repository: Arc<wealthfolio_storage_sqlite::portfolio::snapshot::SnapshotRepository>,
+    snapshot_service: Option<Arc<dyn SnapshotServiceTrait>>,
+    event_sink: Arc<dyn DomainEventSink>,
     writer: WriteHandle,
 }
 
@@ -72,8 +77,25 @@ impl BrokerSyncService {
                     writer.clone(),
                 ),
             ),
+            snapshot_service: None,
+            event_sink: Arc::new(NoOpDomainEventSink),
             writer,
         }
+    }
+
+    /// Sets the snapshot service for emitting HoldingsChanged events during broker sync.
+    pub fn with_snapshot_service(
+        mut self,
+        snapshot_service: Arc<dyn SnapshotServiceTrait>,
+    ) -> Self {
+        self.snapshot_service = Some(snapshot_service);
+        self
+    }
+
+    /// Sets the domain event sink for emitting events during broker sync.
+    pub fn with_event_sink(mut self, event_sink: Arc<dyn DomainEventSink>) -> Self {
+        self.event_sink = event_sink;
+        self
     }
 }
 
@@ -310,6 +332,8 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
         let mut activity_rows: Vec<ActivityDB> = Vec::new();
         let mut seen_activity_ids: HashSet<String> = HashSet::new();
         let mut needs_review_count: usize = 0;
+        let mut activity_asset_ids: HashSet<String> = HashSet::new();
+        let mut activity_currencies: HashSet<String> = HashSet::new();
 
         for activity in activities_data {
             let activity_id = match activity.id.clone().filter(|v| !v.trim().is_empty()) {
@@ -369,14 +393,12 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             let asset_kind = broker_symbol_type_to_kind(symbol_type_code);
 
             // Extract exchange MIC from broker data (prefer mic_code over code)
-            let exchange_mic = symbol_ref
-                .and_then(|s| s.exchange.as_ref())
-                .and_then(|e| {
-                    e.mic_code
-                        .clone()
-                        .filter(|c| !c.trim().is_empty())
-                        .or_else(|| e.code.clone().filter(|c| !c.trim().is_empty()))
-                });
+            let exchange_mic = symbol_ref.and_then(|s| s.exchange.as_ref()).and_then(|e| {
+                e.mic_code
+                    .clone()
+                    .filter(|c| !c.trim().is_empty())
+                    .or_else(|| e.code.clone().filter(|c| !c.trim().is_empty()))
+            });
 
             // Get the symbol's currency
             let symbol_currency = symbol_ref
@@ -398,12 +420,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                             symbol_ref
                                 .and_then(|s| s.symbol.clone())
                                 .filter(|sym| !sym.trim().is_empty())
-                                .map(|sym| {
-                                    sym.split('-')
-                                        .next()
-                                        .unwrap_or(&sym)
-                                        .to_string()
-                                })
+                                .map(|sym| sym.split('-').next().unwrap_or(&sym).to_string())
                         })
                 }
                 _ => {
@@ -418,10 +435,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                                 .map(|sym| {
                                     // Remove exchange suffix like ".TO" for canonical ID
                                     // The exchange is stored separately in exchange_mic
-                                    sym.split('.')
-                                        .next()
-                                        .unwrap_or(&sym)
-                                        .to_string()
+                                    sym.split('.').next().unwrap_or(&sym).to_string()
                                 })
                         })
                 }
@@ -445,7 +459,12 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 canonical_asset_id(&AssetKind::Cash, &asset_currency, None, &asset_currency)
             } else if let Some(ref opt_sym) = option_symbol {
                 // Option symbol takes priority
-                canonical_asset_id(&asset_kind, opt_sym, exchange_mic.as_deref(), &asset_currency)
+                canonical_asset_id(
+                    &asset_kind,
+                    opt_sym,
+                    exchange_mic.as_deref(),
+                    &asset_currency,
+                )
             } else if let Some(ref sym) = display_symbol {
                 // Regular symbol
                 canonical_asset_id(&asset_kind, sym, exchange_mic.as_deref(), &asset_currency)
@@ -453,6 +472,10 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 // No symbol available - generate UNKNOWN placeholder
                 format!("SEC:UNKNOWN:{}", currency_code)
             };
+
+            // Track asset IDs and currencies for domain events
+            activity_asset_ids.insert(asset_id.clone());
+            activity_currencies.insert(currency_code.clone());
 
             if seen_assets.insert(asset_id.clone()) {
                 let asset_db = if asset_id.starts_with("CASH:") {
@@ -486,11 +509,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                         .or(display_symbol.clone())
                         .unwrap_or_else(|| {
                             // Extract symbol from canonical ID (e.g., "SEC:AAPL:XNAS" -> "AAPL")
-                            asset_id
-                                .split(':')
-                                .nth(1)
-                                .unwrap_or(&asset_id)
-                                .to_string()
+                            asset_id.split(':').nth(1).unwrap_or(&asset_id).to_string()
                         });
 
                     AssetDB {
@@ -545,10 +564,15 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                     let (norm_price, _) = normalize_amount(unit_price, &currency_code);
                     let (norm_fee, _) = normalize_amount(fee, &currency_code);
                     let norm_amount = amount.map(|a| normalize_amount(a, &currency_code).0);
-                    let (_, norm_currency) =
-                        normalize_amount(Decimal::ZERO, &currency_code);
+                    let (_, norm_currency) = normalize_amount(Decimal::ZERO, &currency_code);
                     // Quantity stays the same (it's shares, not currency)
-                    (norm_price, quantity, norm_fee, norm_amount, norm_currency.to_string())
+                    (
+                        norm_price,
+                        quantity,
+                        norm_fee,
+                        norm_amount,
+                        norm_currency.to_string(),
+                    )
                 } else {
                     (unit_price, quantity, fee, amount, currency_code)
                 };
@@ -561,10 +585,9 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             };
 
             // Parse activity date for idempotency key computation
-            let activity_datetime: DateTime<Utc> =
-                DateTime::parse_from_rfc3339(&activity_date)
-                    .map(|dt| dt.with_timezone(&Utc))
-                    .unwrap_or_else(|_| Utc::now());
+            let activity_datetime: DateTime<Utc> = DateTime::parse_from_rfc3339(&activity_date)
+                .map(|dt| dt.with_timezone(&Utc))
+                .unwrap_or_else(|_| Utc::now());
 
             // Compute idempotency key for content-based deduplication
             let idempotency_key = compute_idempotency_key(
@@ -826,7 +849,27 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             activities_count, account_id_for_log, assets_inserted, new_asset_ids.len(), needs_review_count
         );
 
-        Ok((activities_upserted, assets_inserted, new_asset_ids, needs_review_count))
+        // Emit domain events for activities and assets
+        if activities_upserted > 0 {
+            let asset_ids: Vec<String> = activity_asset_ids.into_iter().collect();
+            let currencies: Vec<String> = activity_currencies.into_iter().collect();
+            self.event_sink.emit(DomainEvent::ActivitiesChanged {
+                account_ids: vec![account_id_for_log.clone()],
+                asset_ids,
+                currencies,
+            });
+        }
+        if !new_asset_ids.is_empty() {
+            self.event_sink
+                .emit(DomainEvent::assets_created(new_asset_ids.clone()));
+        }
+
+        Ok((
+            activities_upserted,
+            assets_inserted,
+            new_asset_ids,
+            needs_review_count,
+        ))
     }
 
     async fn finalize_activity_sync_success(
@@ -865,18 +908,21 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
         self.brokers_sync_state_repository.get_all()
     }
 
-    fn get_import_runs(&self, run_type: Option<&str>, limit: i64, offset: i64) -> Result<Vec<ImportRun>> {
+    fn get_import_runs(
+        &self,
+        run_type: Option<&str>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<ImportRun>> {
         match run_type {
-            Some(rt) => self.import_run_repository.get_by_run_type(rt, limit, offset),
+            Some(rt) => self
+                .import_run_repository
+                .get_by_run_type(rt, limit, offset),
             None => self.import_run_repository.get_all(limit, offset),
         }
     }
 
-    async fn create_import_run(
-        &self,
-        account_id: &str,
-        mode: ImportRunMode,
-    ) -> Result<ImportRun> {
+    async fn create_import_run(&self, account_id: &str, mode: ImportRunMode) -> Result<ImportRun> {
         let import_run = ImportRun::new(
             account_id.to_string(),
             DEFAULT_BROKERAGE_PROVIDER.to_string(),
@@ -1093,9 +1139,6 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             }
         }
 
-        // Convert to DB model
-        let snapshot_db: AccountStateSnapshotDB = snapshot.into();
-
         // Collect new asset IDs before the closure moves asset_rows
         // Filter out cash and unknown placeholders - they don't need enrichment (same as activity sync)
         let new_asset_ids: Vec<String> = asset_rows
@@ -1104,12 +1147,10 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             .filter(|id| !id.starts_with("CASH:") && !id.contains(":UNKNOWN:"))
             .collect();
 
-        // Save to database
+        // Insert assets via raw SQL (keep current behavior)
         let writer = self.writer.clone();
-
         let assets_inserted = writer
             .exec(move |conn| {
-                // Insert assets (ignore conflicts)
                 let mut inserted = 0usize;
                 for asset in asset_rows {
                     match diesel::insert_into(schema::assets::table)
@@ -1124,46 +1165,71 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                         }
                     }
                 }
-
-                // Upsert snapshot
-                diesel::insert_into(schema::holdings_snapshots::table)
-                    .values(&snapshot_db)
-                    .on_conflict(schema::holdings_snapshots::id)
-                    .do_update()
-                    .set((
-                        schema::holdings_snapshots::positions
-                            .eq(&snapshot_db.positions),
-                        schema::holdings_snapshots::cash_balances
-                            .eq(&snapshot_db.cash_balances),
-                        schema::holdings_snapshots::cost_basis
-                            .eq(&snapshot_db.cost_basis),
-                        schema::holdings_snapshots::net_contribution
-                            .eq(&snapshot_db.net_contribution),
-                        schema::holdings_snapshots::net_contribution_base
-                            .eq(&snapshot_db.net_contribution_base),
-                        schema::holdings_snapshots::cash_total_account_currency
-                            .eq(&snapshot_db.cash_total_account_currency),
-                        schema::holdings_snapshots::cash_total_base_currency
-                            .eq(&snapshot_db.cash_total_base_currency),
-                        schema::holdings_snapshots::calculated_at
-                            .eq(&snapshot_db.calculated_at),
-                        schema::holdings_snapshots::source
-                            .eq(&snapshot_db.source),
-                    ))
-                    .execute(conn)
-                    .map_err(|e| StorageError::from(e))?;
-
                 Ok::<_, wealthfolio_core::errors::Error>(inserted)
             })
             .await?;
+
+        // Save snapshot via SnapshotService if available (it emits HoldingsChanged internally)
+        // Otherwise fall back to raw SQL and emit events manually
+        if let Some(ref snapshot_service) = self.snapshot_service {
+            // SnapshotService.save_manual_snapshot handles:
+            // - Content comparison (skips if unchanged)
+            // - Emitting HoldingsChanged event
+            // - Ensuring holdings history
+            snapshot_service
+                .save_manual_snapshot(&account_id, snapshot)
+                .await?;
+        } else {
+            // Fallback: use raw SQL for snapshot
+            let snapshot_db: AccountStateSnapshotDB = snapshot.into();
+            let writer = self.writer.clone();
+            writer
+                .exec(move |conn| {
+                    diesel::insert_into(schema::holdings_snapshots::table)
+                        .values(&snapshot_db)
+                        .on_conflict(schema::holdings_snapshots::id)
+                        .do_update()
+                        .set((
+                            schema::holdings_snapshots::positions.eq(&snapshot_db.positions),
+                            schema::holdings_snapshots::cash_balances.eq(&snapshot_db.cash_balances),
+                            schema::holdings_snapshots::cost_basis.eq(&snapshot_db.cost_basis),
+                            schema::holdings_snapshots::net_contribution
+                                .eq(&snapshot_db.net_contribution),
+                            schema::holdings_snapshots::net_contribution_base
+                                .eq(&snapshot_db.net_contribution_base),
+                            schema::holdings_snapshots::cash_total_account_currency
+                                .eq(&snapshot_db.cash_total_account_currency),
+                            schema::holdings_snapshots::cash_total_base_currency
+                                .eq(&snapshot_db.cash_total_base_currency),
+                            schema::holdings_snapshots::calculated_at.eq(&snapshot_db.calculated_at),
+                            schema::holdings_snapshots::source.eq(&snapshot_db.source),
+                        ))
+                        .execute(conn)
+                        .map_err(|e| StorageError::from(e))?;
+                    Ok::<_, wealthfolio_core::errors::Error>(())
+                })
+                .await?;
+
+            // Emit HoldingsChanged event manually since we used raw SQL
+            self.event_sink.emit(DomainEvent::HoldingsChanged {
+                account_ids: vec![account_id.clone()],
+                asset_ids: new_asset_ids.clone(),
+            });
+
+            // Ensure holdings history has at least 2 snapshots (create synthetic if needed)
+            self.ensure_holdings_history(&account_id).await?;
+        }
 
         info!(
             "Saved broker holdings for account {}: {} positions, {} assets inserted, {} new asset IDs",
             account_id, positions_count, assets_inserted, new_asset_ids.len()
         );
 
-        // Ensure holdings history has at least 2 snapshots (create synthetic if needed)
-        self.ensure_holdings_history(&account_id).await?;
+        // Emit AssetsCreated event for new assets (needed for enrichment)
+        if !new_asset_ids.is_empty() {
+            self.event_sink
+                .emit(DomainEvent::assets_created(new_asset_ids.clone()));
+        }
 
         Ok((positions_count, assets_inserted, new_asset_ids))
     }

@@ -109,9 +109,7 @@ pub fn needs_market_quotes(asset_id: &str) -> bool {
 /// Determines if an asset should be enriched with profile data from providers.
 /// Only enriches market-priced assets (securities, crypto, options).
 pub fn should_enrich_asset(asset_id: &str) -> bool {
-    asset_id.starts_with("SEC:")
-        || asset_id.starts_with("CRYPTO:")
-        || asset_id.starts_with("OPT:")
+    asset_id.starts_with("SEC:") || asset_id.starts_with("CRYPTO:") || asset_id.starts_with("OPT:")
 }
 
 /// Length of the random portion of alternative asset IDs
@@ -682,7 +680,11 @@ mod tests {
     #[test]
     fn test_generate_property_id() {
         let id = generate_asset_id(&AssetKind::Property);
-        assert!(id.starts_with("PROP:"), "ID should start with PROP: - got {}", id);
+        assert!(
+            id.starts_with("PROP:"),
+            "ID should start with PROP: - got {}",
+            id
+        );
         assert_eq!(id.len(), 13, "ID should be 13 chars: {}", id);
         assert!(
             is_valid_alternative_asset_id(&id),
@@ -694,7 +696,11 @@ mod tests {
     #[test]
     fn test_generate_vehicle_id() {
         let id = generate_asset_id(&AssetKind::Vehicle);
-        assert!(id.starts_with("VEH:"), "ID should start with VEH: - got {}", id);
+        assert!(
+            id.starts_with("VEH:"),
+            "ID should start with VEH: - got {}",
+            id
+        );
         assert_eq!(id.len(), 12, "ID should be 12 chars: {}", id);
         assert!(
             is_valid_alternative_asset_id(&id),
@@ -754,7 +760,11 @@ mod tests {
     #[test]
     fn test_generate_other_id() {
         let id = generate_asset_id(&AssetKind::Other);
-        assert!(id.starts_with("ALT:"), "ID should start with ALT: - got {}", id);
+        assert!(
+            id.starts_with("ALT:"),
+            "ID should start with ALT: - got {}",
+            id
+        );
         assert_eq!(id.len(), 12, "ID should be 12 chars: {}", id);
         assert!(
             is_valid_alternative_asset_id(&id),
@@ -993,7 +1003,12 @@ mod tests {
     #[test]
     fn test_canonical_asset_id_option() {
         assert_eq!(
-            canonical_asset_id(&AssetKind::Option, "AAPL240119C00150000", Some("XNAS"), "USD"),
+            canonical_asset_id(
+                &AssetKind::Option,
+                "AAPL240119C00150000",
+                Some("XNAS"),
+                "USD"
+            ),
             "OPT:AAPL240119C00150000:XNAS"
         );
     }
@@ -1034,18 +1049,42 @@ mod tests {
 
     #[test]
     fn test_kind_from_asset_id_canonical() {
-        assert_eq!(kind_from_asset_id("SEC:AAPL:XNAS"), Some(AssetKind::Security));
-        assert_eq!(kind_from_asset_id("CRYPTO:BTC:USD"), Some(AssetKind::Crypto));
+        assert_eq!(
+            kind_from_asset_id("SEC:AAPL:XNAS"),
+            Some(AssetKind::Security)
+        );
+        assert_eq!(
+            kind_from_asset_id("CRYPTO:BTC:USD"),
+            Some(AssetKind::Crypto)
+        );
         assert_eq!(kind_from_asset_id("FX:EUR:USD"), Some(AssetKind::FxRate));
         assert_eq!(kind_from_asset_id("CASH:CAD"), Some(AssetKind::Cash));
-        assert_eq!(kind_from_asset_id("OPT:AAPL240119C00150000:XNAS"), Some(AssetKind::Option));
+        assert_eq!(
+            kind_from_asset_id("OPT:AAPL240119C00150000:XNAS"),
+            Some(AssetKind::Option)
+        );
         assert_eq!(kind_from_asset_id("CMDTY:GC"), Some(AssetKind::Commodity));
-        assert_eq!(kind_from_asset_id("PEQ:a1b2c3d4"), Some(AssetKind::PrivateEquity));
-        assert_eq!(kind_from_asset_id("PROP:a1b2c3d4"), Some(AssetKind::Property));
+        assert_eq!(
+            kind_from_asset_id("PEQ:a1b2c3d4"),
+            Some(AssetKind::PrivateEquity)
+        );
+        assert_eq!(
+            kind_from_asset_id("PROP:a1b2c3d4"),
+            Some(AssetKind::Property)
+        );
         assert_eq!(kind_from_asset_id("VEH:a1b2c3d4"), Some(AssetKind::Vehicle));
-        assert_eq!(kind_from_asset_id("COLL:a1b2c3d4"), Some(AssetKind::Collectible));
-        assert_eq!(kind_from_asset_id("PREC:a1b2c3d4"), Some(AssetKind::PhysicalPrecious));
-        assert_eq!(kind_from_asset_id("LIAB:a1b2c3d4"), Some(AssetKind::Liability));
+        assert_eq!(
+            kind_from_asset_id("COLL:a1b2c3d4"),
+            Some(AssetKind::Collectible)
+        );
+        assert_eq!(
+            kind_from_asset_id("PREC:a1b2c3d4"),
+            Some(AssetKind::PhysicalPrecious)
+        );
+        assert_eq!(
+            kind_from_asset_id("LIAB:a1b2c3d4"),
+            Some(AssetKind::Liability)
+        );
         assert_eq!(kind_from_asset_id("ALT:a1b2c3d4"), Some(AssetKind::Other));
 
         // IDs without typed prefix return None
@@ -1149,13 +1188,28 @@ mod tests {
         assert_eq!(AssetKind::from_id_prefix("CASH"), Some(AssetKind::Cash));
         assert_eq!(AssetKind::from_id_prefix("FX"), Some(AssetKind::FxRate));
         assert_eq!(AssetKind::from_id_prefix("OPT"), Some(AssetKind::Option));
-        assert_eq!(AssetKind::from_id_prefix("CMDTY"), Some(AssetKind::Commodity));
-        assert_eq!(AssetKind::from_id_prefix("PEQ"), Some(AssetKind::PrivateEquity));
+        assert_eq!(
+            AssetKind::from_id_prefix("CMDTY"),
+            Some(AssetKind::Commodity)
+        );
+        assert_eq!(
+            AssetKind::from_id_prefix("PEQ"),
+            Some(AssetKind::PrivateEquity)
+        );
         assert_eq!(AssetKind::from_id_prefix("PROP"), Some(AssetKind::Property));
         assert_eq!(AssetKind::from_id_prefix("VEH"), Some(AssetKind::Vehicle));
-        assert_eq!(AssetKind::from_id_prefix("COLL"), Some(AssetKind::Collectible));
-        assert_eq!(AssetKind::from_id_prefix("PREC"), Some(AssetKind::PhysicalPrecious));
-        assert_eq!(AssetKind::from_id_prefix("LIAB"), Some(AssetKind::Liability));
+        assert_eq!(
+            AssetKind::from_id_prefix("COLL"),
+            Some(AssetKind::Collectible)
+        );
+        assert_eq!(
+            AssetKind::from_id_prefix("PREC"),
+            Some(AssetKind::PhysicalPrecious)
+        );
+        assert_eq!(
+            AssetKind::from_id_prefix("LIAB"),
+            Some(AssetKind::Liability)
+        );
         assert_eq!(AssetKind::from_id_prefix("ALT"), Some(AssetKind::Other));
         assert_eq!(AssetKind::from_id_prefix("INVALID"), None);
         assert_eq!(AssetKind::from_id_prefix(""), None);
@@ -1284,7 +1338,10 @@ mod tests {
         assert_eq!(kind_from_asset_id("Sec:AAPL:XNAS"), None);
         assert_eq!(kind_from_asset_id("crypto:BTC:USD"), None);
         // Correct uppercase works
-        assert_eq!(kind_from_asset_id("SEC:AAPL:XNAS"), Some(AssetKind::Security));
+        assert_eq!(
+            kind_from_asset_id("SEC:AAPL:XNAS"),
+            Some(AssetKind::Security)
+        );
     }
 
     // ------------------------------------------------------------------------
@@ -1344,7 +1401,12 @@ mod tests {
 
     #[test]
     fn test_round_trip_option_id() {
-        let id = canonical_asset_id(&AssetKind::Option, "AAPL240119C00150000", Some("XCBO"), "USD");
+        let id = canonical_asset_id(
+            &AssetKind::Option,
+            "AAPL240119C00150000",
+            Some("XCBO"),
+            "USD",
+        );
         let parsed = parse_canonical_asset_id(&id).unwrap();
 
         assert_eq!(parsed.kind, Some(AssetKind::Option));
@@ -1402,9 +1464,12 @@ mod tests {
             let id = canonical_asset_id(&kind, symbol, exchange, currency);
             let parsed_kind = kind_from_asset_id(&id);
             assert_eq!(
-                parsed_kind, Some(kind.clone()),
+                parsed_kind,
+                Some(kind.clone()),
                 "Round-trip failed for {:?}: {} -> {:?}",
-                kind, id, parsed_kind
+                kind,
+                id,
+                parsed_kind
             );
         }
     }

@@ -71,9 +71,8 @@ export const useActivityGridState = ({
     () =>
       activities.map((activity) => {
         const trimmedId = typeof activity.id === "string" ? activity.id.trim() : "";
-        const activityWithId = trimmedId.length > 0
-          ? activity
-          : { ...activity, id: generateTempActivityId() };
+        const activityWithId =
+          trimmedId.length > 0 ? activity : { ...activity, id: generateTempActivityId() };
         // Convert to LocalTransaction to extract derived fields like isExternal from metadata
         return toLocalTransaction(activityWithId);
       }),

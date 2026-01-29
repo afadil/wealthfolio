@@ -217,9 +217,7 @@ impl PromptTemplateCatalog {
 
     /// Get a template by ID and version.
     pub fn get_template_by_version(&self, id: &str, version: &str) -> Option<&PromptTemplate> {
-        self.templates
-            .get(id)
-            .filter(|t| t.version == version)
+        self.templates.get(id).filter(|t| t.version == version)
     }
 
     /// Get the default template.
@@ -351,8 +349,17 @@ mod tests {
 
     #[test]
     fn test_detail_level_from_str() {
-        assert_eq!(DetailLevel::from_str_or_default("brief"), DetailLevel::Brief);
-        assert_eq!(DetailLevel::from_str_or_default("DETAILED"), DetailLevel::Detailed);
-        assert_eq!(DetailLevel::from_str_or_default("unknown"), DetailLevel::Standard);
+        assert_eq!(
+            DetailLevel::from_str_or_default("brief"),
+            DetailLevel::Brief
+        );
+        assert_eq!(
+            DetailLevel::from_str_or_default("DETAILED"),
+            DetailLevel::Detailed
+        );
+        assert_eq!(
+            DetailLevel::from_str_or_default("unknown"),
+            DetailLevel::Standard
+        );
     }
 }

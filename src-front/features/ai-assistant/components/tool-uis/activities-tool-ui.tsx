@@ -149,25 +149,19 @@ function normalizeResult(result: unknown): SearchActivitiesOutput | null {
         (entry.activityType as string | undefined) ??
         (entry.activity_type as string | undefined) ??
         "UNKNOWN",
-      symbol:
-        (entry.symbol as string | undefined) ?? null,
-      quantity:
-        entry.quantity != null ? Number(entry.quantity) : null,
+      symbol: (entry.symbol as string | undefined) ?? null,
+      quantity: entry.quantity != null ? Number(entry.quantity) : null,
       unitPrice:
         entry.unitPrice != null
           ? Number(entry.unitPrice)
           : entry.unit_price != null
             ? Number(entry.unit_price)
             : null,
-      amount:
-        entry.amount != null ? Number(entry.amount) : null,
-      fee:
-        entry.fee != null ? Number(entry.fee) : null,
+      amount: entry.amount != null ? Number(entry.amount) : null,
+      fee: entry.fee != null ? Number(entry.fee) : null,
       currency: (entry.currency as string | undefined) ?? "USD",
       accountId:
-        (entry.accountId as string | undefined) ??
-        (entry.account_id as string | undefined) ??
-        "",
+        (entry.accountId as string | undefined) ?? (entry.account_id as string | undefined) ?? "",
       accountName:
         (entry.accountName as string | undefined) ??
         (entry.account_name as string | undefined) ??
@@ -176,10 +170,7 @@ function normalizeResult(result: unknown): SearchActivitiesOutput | null {
 
   return {
     activities,
-    count:
-      typeof candidate.count === "number"
-        ? candidate.count
-        : activities.length,
+    count: typeof candidate.count === "number" ? candidate.count : activities.length,
     totalRowCount:
       typeof candidate.totalRowCount === "number"
         ? candidate.totalRowCount
@@ -211,7 +202,10 @@ export const ActivitiesToolUI = makeAssistantToolUI<SearchActivitiesArgs, Search
   },
 });
 
-type ActivitiesContentProps = ToolCallMessagePartProps<SearchActivitiesArgs, SearchActivitiesOutput>;
+type ActivitiesContentProps = ToolCallMessagePartProps<
+  SearchActivitiesArgs,
+  SearchActivitiesOutput
+>;
 
 function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
   const { isBalanceHidden } = useBalancePrivacy();
@@ -234,7 +228,7 @@ function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       }),
-    []
+    [],
   );
 
   const quantityFormatter = useMemo(
@@ -244,7 +238,7 @@ function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
         minimumFractionDigits: 0,
         maximumFractionDigits: 4,
       }),
-    []
+    [],
   );
 
   const accountLabel = parsed?.accountScope ?? args?.accountId ?? "all";

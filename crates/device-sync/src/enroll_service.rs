@@ -337,7 +337,12 @@ impl DeviceEnrollService {
             EnrollDeviceResponse::Bootstrap {
                 device_id,
                 e2ee_key_version,
-            } => (device_id.clone(), "BOOTSTRAP", Some(*e2ee_key_version), vec![]),
+            } => (
+                device_id.clone(),
+                "BOOTSTRAP",
+                Some(*e2ee_key_version),
+                vec![],
+            ),
             EnrollDeviceResponse::Pair {
                 device_id,
                 e2ee_key_version,
@@ -345,7 +350,12 @@ impl DeviceEnrollService {
                 ..
             } => {
                 let summaries: Vec<TrustedDeviceSummary> = trusted_devices.clone();
-                (device_id.clone(), "PAIR", Some(*e2ee_key_version), summaries)
+                (
+                    device_id.clone(),
+                    "PAIR",
+                    Some(*e2ee_key_version),
+                    summaries,
+                )
             }
             EnrollDeviceResponse::Ready {
                 device_id,
@@ -482,7 +492,9 @@ impl DeviceEnrollService {
                 key_version,
             } => (challenge, nonce, key_version),
             InitializeKeysResult::PairingRequired { .. } => {
-                return Err("Pairing required but expected bootstrap mode".to_string().into());
+                return Err("Pairing required but expected bootstrap mode"
+                    .to_string()
+                    .into());
             }
             InitializeKeysResult::Ready { e2ee_key_version } => {
                 // Already initialized - this shouldn't happen in bootstrap mode

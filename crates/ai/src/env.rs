@@ -68,8 +68,8 @@ pub mod test_env {
     use wealthfolio_core::{
         accounts::{Account, AccountServiceTrait, AccountUpdate, NewAccount},
         activities::{
-            Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult,
-            ActivityDetails, ActivityImport, ActivitySearchResponse, ActivitySearchResponseMeta,
+            Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityDetails,
+            ActivityImport, ActivitySearchResponse, ActivitySearchResponseMeta,
             ActivityServiceTrait, ActivityUpdate, ImportMappingData, NewActivity, Sort,
         },
         assets::{Asset, ProviderProfile},
@@ -77,8 +77,8 @@ pub mod test_env {
         goals::{Goal, GoalServiceTrait, GoalsAllocation, NewGoal},
         holdings::{Holding, HoldingsServiceTrait},
         quotes::{
-            LatestQuotePair, Quote, QuoteServiceTrait, SymbolSearchResult, QuoteSyncState, SyncMode,
-            SyncResult, SymbolSyncPlan, ProviderInfo, QuoteImport,
+            LatestQuotePair, ProviderInfo, Quote, QuoteImport, QuoteServiceTrait, QuoteSyncState,
+            SymbolSearchResult, SymbolSyncPlan, SyncMode, SyncResult,
         },
         secrets::SecretStore,
         settings::{Settings, SettingsServiceTrait, SettingsUpdate},
@@ -137,7 +137,9 @@ pub mod test_env {
                 .iter()
                 .find(|a| a.id == id)
                 .cloned()
-                .ok_or_else(|| CoreError::Database(DatabaseError::NotFound(format!("Account {}", id))))
+                .ok_or_else(|| {
+                    CoreError::Database(DatabaseError::NotFound(format!("Account {}", id)))
+                })
         }
 
         fn list_accounts(
@@ -146,8 +148,18 @@ pub mod test_env {
             _account_ids: Option<&[String]>,
         ) -> CoreResult<Vec<Account>> {
             let accounts = match is_active_filter {
-                Some(true) => self.accounts.iter().filter(|a| a.is_active).cloned().collect(),
-                Some(false) => self.accounts.iter().filter(|a| !a.is_active).cloned().collect(),
+                Some(true) => self
+                    .accounts
+                    .iter()
+                    .filter(|a| a.is_active)
+                    .cloned()
+                    .collect(),
+                Some(false) => self
+                    .accounts
+                    .iter()
+                    .filter(|a| !a.is_active)
+                    .cloned()
+                    .collect(),
                 None => self.accounts.clone(),
             };
             Ok(accounts)
@@ -195,7 +207,10 @@ pub mod test_env {
             unimplemented!("MockActivityService::get_activities_by_account_id")
         }
 
-        fn get_activities_by_account_ids(&self, _account_ids: &[String]) -> CoreResult<Vec<Activity>> {
+        fn get_activities_by_account_ids(
+            &self,
+            _account_ids: &[String],
+        ) -> CoreResult<Vec<Activity>> {
             unimplemented!("MockActivityService::get_activities_by_account_ids")
         }
 
@@ -216,6 +231,8 @@ pub mod test_env {
             _asset_id_keyword: Option<String>,
             _sort: Option<Sort>,
             _needs_review_filter: Option<bool>,
+            _date_from: Option<chrono::NaiveDate>,
+            _date_to: Option<chrono::NaiveDate>,
         ) -> CoreResult<ActivitySearchResponse> {
             Ok(ActivitySearchResponse {
                 data: self.activities.clone(),
@@ -236,7 +253,8 @@ pub mod test_env {
             // Return error to simulate no saved mapping (tests will use auto-detection)
             Err(wealthfolio_core::errors::DatabaseError::NotFound(
                 "No saved import mapping".to_string(),
-            ).into())
+            )
+            .into())
         }
 
         async fn create_activity(&self, _activity: NewActivity) -> CoreResult<Activity> {
@@ -296,6 +314,13 @@ pub mod test_env {
         ) -> CoreResult<wealthfolio_core::activities::ParsedCsvResult> {
             // Delegate to the actual core parser for testing
             wealthfolio_core::activities::parse_csv(content, config)
+        }
+
+        async fn upsert_activities_bulk(
+            &self,
+            _activities: Vec<wealthfolio_core::activities::ActivityUpsert>,
+        ) -> CoreResult<wealthfolio_core::activities::BulkUpsertResult> {
+            unimplemented!("MockActivityService::upsert_activities_bulk")
         }
     }
 
@@ -592,11 +617,19 @@ pub mod test_env {
             Ok(message)
         }
 
-        async fn add_tag(&self, _thread_id: &str, _tag: &str) -> crate::types::ChatRepositoryResult<()> {
+        async fn add_tag(
+            &self,
+            _thread_id: &str,
+            _tag: &str,
+        ) -> crate::types::ChatRepositoryResult<()> {
             Ok(())
         }
 
-        async fn remove_tag(&self, _thread_id: &str, _tag: &str) -> crate::types::ChatRepositoryResult<()> {
+        async fn remove_tag(
+            &self,
+            _thread_id: &str,
+            _tag: &str,
+        ) -> crate::types::ChatRepositoryResult<()> {
             Ok(())
         }
 
@@ -632,7 +665,9 @@ pub mod test_env {
             Ok(Vec::new())
         }
 
-        fn get_all_historical_quotes(&self) -> CoreResult<HashMap<String, Vec<(NaiveDate, Quote)>>> {
+        fn get_all_historical_quotes(
+            &self,
+        ) -> CoreResult<HashMap<String, Vec<(NaiveDate, Quote)>>> {
             Ok(HashMap::new())
         }
 
@@ -715,7 +750,11 @@ pub mod test_env {
             Ok(Vec::new())
         }
 
-        async fn sync(&self, _mode: SyncMode, _asset_ids: Option<Vec<String>>) -> CoreResult<SyncResult> {
+        async fn sync(
+            &self,
+            _mode: SyncMode,
+            _asset_ids: Option<Vec<String>>,
+        ) -> CoreResult<SyncResult> {
             Ok(SyncResult::default())
         }
 
@@ -785,6 +824,14 @@ pub mod test_env {
             _enabled: bool,
         ) -> CoreResult<()> {
             Ok(())
+        }
+
+        async fn check_quotes_import(
+            &self,
+            _content: &[u8],
+            _has_header_row: bool,
+        ) -> CoreResult<Vec<QuoteImport>> {
+            Ok(vec![])
         }
 
         async fn import_quotes(

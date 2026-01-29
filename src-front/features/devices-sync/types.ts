@@ -3,7 +3,15 @@
 // Types matching the new REST API for device sync
 
 export type TrustState = "trusted" | "untrusted" | "revoked";
-export type DevicePlatform = "ios" | "android" | "mac" | "macos" | "windows" | "linux" | "web" | "server";
+export type DevicePlatform =
+  | "ios"
+  | "android"
+  | "mac"
+  | "macos"
+  | "windows"
+  | "linux"
+  | "web"
+  | "server";
 export type PairingRole = "issuer" | "claimer";
 export type PairingStatus = "open" | "claimed" | "approved" | "completed" | "cancelled" | "expired";
 export type KeyState = "ACTIVE" | "PENDING";
@@ -524,10 +532,7 @@ export class SyncError extends Error {
     }
     if (error instanceof Error) {
       const msg = error.message.toLowerCase();
-      return (
-        msg.includes("last_trusted_device") ||
-        msg.includes("last trusted device")
-      );
+      return msg.includes("last_trusted_device") || msg.includes("last trusted device");
     }
     return false;
   }
@@ -539,9 +544,7 @@ export class SyncError extends Error {
     if (error instanceof Error) {
       const msg = error.message.toLowerCase();
       return (
-        msg.includes("keys already initialized") ||
-        msg.includes("409") ||
-        msg.includes("conflict")
+        msg.includes("keys already initialized") || msg.includes("409") || msg.includes("conflict")
       );
     }
     return false;

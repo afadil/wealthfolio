@@ -8,10 +8,10 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use super::canonical_asset_id;
 use crate::errors::Result;
 use crate::errors::ValidationError;
 use crate::Error;
-use super::canonical_asset_id;
 
 // Re-export InstrumentId from market-data crate for convenience
 pub use wealthfolio_market_data::InstrumentId;
@@ -41,7 +41,7 @@ pub enum AssetKind {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum PricingMode {
     #[default]
-    Market,  // Priced via market data providers
+    Market, // Priced via market data providers
     Manual,  // User-entered quotes only
     Derived, // Calculated from other assets (e.g., options from underlying)
     None,    // No pricing needed (e.g., cash is always 1:1)
@@ -81,9 +81,9 @@ pub struct Asset {
     pub id: String,
 
     // Core identity
-    pub kind: AssetKind,           // Behavior classification (NOT NULL)
+    pub kind: AssetKind, // Behavior classification (NOT NULL)
     pub name: Option<String>,
-    pub symbol: String,            // Canonical ticker (no provider suffix)
+    pub symbol: String, // Canonical ticker (no provider suffix)
 
     // Market identity (for SECURITY)
     pub exchange_mic: Option<String>, // ISO 10383 MIC code
@@ -389,9 +389,9 @@ pub struct NewAsset {
     pub id: Option<String>,
 
     // Core identity
-    pub kind: AssetKind,             // Behavior classification (NOT NULL)
+    pub kind: AssetKind, // Behavior classification (NOT NULL)
     pub name: Option<String>,
-    pub symbol: String,              // Canonical ticker (no provider suffix)
+    pub symbol: String, // Canonical ticker (no provider suffix)
 
     // Market identity (for SECURITY)
     pub exchange_mic: Option<String>, // ISO 10383 MIC code
@@ -503,8 +503,8 @@ impl NewAsset {
             id: Some(asset_id),
             kind: AssetKind::FxRate,
             name: Some(readable_name),
-            symbol: base_upper,        // Base currency only (EUR in EUR:USD)
-            currency: quote_upper,     // Quote currency (USD in EUR:USD)
+            symbol: base_upper,    // Base currency only (EUR in EUR:USD)
+            currency: quote_upper, // Quote currency (USD in EUR:USD)
             pricing_mode: PricingMode::Market,
             preferred_provider: Some(provider.to_string()),
             provider_overrides,
@@ -564,11 +564,11 @@ pub struct UpdateAssetProfile {
     pub symbol: String,
     pub name: Option<String>,
     pub notes: String,
-    pub kind: Option<AssetKind>,            // Asset behavior classification
-    pub exchange_mic: Option<String>,       // ISO 10383 MIC code
+    pub kind: Option<AssetKind>,      // Asset behavior classification
+    pub exchange_mic: Option<String>, // ISO 10383 MIC code
     pub pricing_mode: Option<PricingMode>,
-    pub provider_overrides: Option<Value>,  // JSON for per-provider overrides
-    pub metadata: Option<Value>,            // JSON for provider profile data (sector, industry, etc.)
+    pub provider_overrides: Option<Value>, // JSON for per-provider overrides
+    pub metadata: Option<Value>, // JSON for provider profile data (sector, industry, etc.)
 }
 
 /// Optional asset metadata that can be passed during activity creation.
@@ -593,4 +593,3 @@ impl UpdateAssetProfile {
         Ok(())
     }
 }
-

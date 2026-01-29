@@ -4,8 +4,7 @@ use std::sync::Arc;
 use crate::{
     context::ServiceContext,
     events::{
-        emit_portfolio_trigger_recalculate, emit_portfolio_trigger_update,
-        emit_resource_changed, PortfolioRequestPayload, ResourceEventPayload,
+        emit_portfolio_trigger_recalculate, emit_portfolio_trigger_update, PortfolioRequestPayload,
     },
 };
 
@@ -13,7 +12,6 @@ use chrono::{NaiveDate, Utc};
 use log::{debug, info, warn};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use tauri::{AppHandle, State};
 use wealthfolio_core::{
     accounts::TrackingMode,
@@ -262,7 +260,13 @@ pub async fn calculate_performance_history(
 
     state
         .performance_service()
-        .calculate_performance_history(&item_type, &item_id, start_date_opt, end_date_opt, tracking_mode_opt)
+        .calculate_performance_history(
+            &item_type,
+            &item_id,
+            start_date_opt,
+            end_date_opt,
+            tracking_mode_opt,
+        )
         .await
         .map_err(|e| format!("Failed to calculate performance: {}", e))
 }
@@ -308,7 +312,13 @@ pub async fn calculate_performance_summary(
 
     state
         .performance_service()
-        .calculate_performance_summary(&item_type, &item_id, start_date_opt, end_date_opt, tracking_mode_opt)
+        .calculate_performance_summary(
+            &item_type,
+            &item_id,
+            start_date_opt,
+            end_date_opt,
+            tracking_mode_opt,
+        )
         .await
         .map_err(|e| format!("Failed to calculate performance: {}", e))
 }
@@ -531,18 +541,6 @@ pub async fn save_manual_holdings(
         .build();
     emit_portfolio_trigger_recalculate(&handle, payload);
 
-    // Emit resource changed event for UI updates
-    emit_resource_changed(
-        &handle,
-        ResourceEventPayload::new(
-            "holdings",
-            "updated",
-            json!({
-                "account_id": account_id,
-            }),
-        ),
-    );
-
     Ok(())
 }
 
@@ -676,7 +674,10 @@ pub async fn import_holdings_csv(
 
     info!(
         "Holdings CSV import complete for account {}: {} imported, {} failed, {} assets",
-        account_id, snapshots_imported, snapshots_failed, all_asset_ids.len()
+        account_id,
+        snapshots_imported,
+        snapshots_failed,
+        all_asset_ids.len()
     );
 
     // Trigger portfolio update to sync quotes and recalculate valuations
@@ -691,20 +692,6 @@ pub async fn import_holdings_csv(
         })
         .build();
     emit_portfolio_trigger_recalculate(&handle, payload);
-
-    // Emit resource changed event for UI updates
-    emit_resource_changed(
-        &handle,
-        ResourceEventPayload::new(
-            "holdings",
-            "imported",
-            json!({
-                "account_id": account_id,
-                "snapshots_imported": snapshots_imported,
-                "snapshots_failed": snapshots_failed,
-            }),
-        ),
-    );
 
     Ok(ImportHoldingsCsvResult {
         snapshots_imported,
@@ -881,24 +868,37 @@ async fn import_single_snapshot(
 // Manual Snapshot Management Commands
 // ============================================================================
 
-/// Gets all manual/imported snapshots for an account (non-CALCULATED).
-/// Returns snapshot metadata without full position details.
+/// Gets snapshots for an account (all sources: CALCULATED, MANUAL_ENTRY, etc.)
+/// Optionally filtered by date range. Returns snapshot metadata without full position details.
 #[tauri::command]
-pub async fn get_manual_snapshots(
+pub async fn get_snapshots(
     state: State<'_, Arc<ServiceContext>>,
     account_id: String,
+    date_from: Option<String>, // YYYY-MM-DD, inclusive
+    date_to: Option<String>,   // YYYY-MM-DD, inclusive
 ) -> Result<Vec<SnapshotInfo>, String> {
-    debug!("Getting manual snapshots for account: {}", account_id);
+    debug!(
+        "Getting snapshots for account: {} (from: {:?}, to: {:?})",
+        account_id, date_from, date_to
+    );
+
+    // Parse date strings to NaiveDate
+    let start_date = date_from
+        .map(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d"))
+        .transpose()
+        .map_err(|e| format!("Invalid date_from format: {}", e))?;
+    let end_date = date_to
+        .map(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d"))
+        .transpose()
+        .map_err(|e| format!("Invalid date_to format: {}", e))?;
 
     let snapshots = state
         .snapshot_service()
-        .get_holdings_keyframes(&account_id, None, None)
+        .get_holdings_keyframes(&account_id, start_date, end_date)
         .map_err(|e| format!("Failed to get snapshots: {}", e))?;
 
-    // Filter for non-CALCULATED snapshots and convert to SnapshotInfo
-    let manual_snapshots: Vec<SnapshotInfo> = snapshots
+    let result: Vec<SnapshotInfo> = snapshots
         .into_iter()
-        .filter(|s| s.source != SnapshotSource::Calculated)
         .map(|s| SnapshotInfo {
             id: s.id,
             snapshot_date: s.snapshot_date.format("%Y-%m-%d").to_string(),
@@ -908,13 +908,9 @@ pub async fn get_manual_snapshots(
         })
         .collect();
 
-    debug!(
-        "Found {} manual snapshots for account {}",
-        manual_snapshots.len(),
-        account_id
-    );
+    debug!("Found {} snapshots for account {}", result.len(), account_id);
 
-    Ok(manual_snapshots)
+    Ok(result)
 }
 
 fn snapshot_source_to_string(source: SnapshotSource) -> String {
@@ -1136,7 +1132,10 @@ pub async fn delete_snapshot(
         .ok_or_else(|| format!("No snapshot found for date {}", date))?;
 
     if snapshot.source == SnapshotSource::Calculated {
-        return Err("Cannot delete calculated snapshots. Only manual or imported snapshots can be deleted.".to_string());
+        return Err(
+            "Cannot delete calculated snapshots. Only manual or imported snapshots can be deleted."
+                .to_string(),
+        );
     }
 
     // Delete the snapshot
@@ -1157,19 +1156,6 @@ pub async fn delete_snapshot(
         .market_sync_mode(MarketSyncMode::Incremental { asset_ids: None })
         .build();
     emit_portfolio_trigger_recalculate(&handle, payload);
-
-    // Emit resource changed event for UI updates
-    emit_resource_changed(
-        &handle,
-        ResourceEventPayload::new(
-            "holdings",
-            "deleted",
-            json!({
-                "account_id": account_id,
-                "date": date,
-            }),
-        ),
-    );
 
     Ok(())
 }

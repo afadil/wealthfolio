@@ -243,7 +243,12 @@ export const HoldingsInsightsPage = () => {
               isLoading={isLoading}
               compact={true}
               onSegmentClick={(categoryId, categoryName) =>
-                handleChartSectionClick("risk", categoryName, `Risk Category: ${categoryName}`, categoryId)
+                handleChartSectionClick(
+                  "risk",
+                  categoryName,
+                  `Risk Category: ${categoryName}`,
+                  categoryId,
+                )
               }
             />
           )}
@@ -267,7 +272,12 @@ export const HoldingsInsightsPage = () => {
             baseCurrency={baseCurrency}
             isLoading={isLoading}
             onClassSectionClick={(categoryId, categoryName) =>
-              handleChartSectionClick("class", categoryName, `Asset Class: ${categoryName}`, categoryId)
+              handleChartSectionClick(
+                "class",
+                categoryName,
+                `Asset Class: ${categoryName}`,
+                categoryId,
+              )
             }
           />
 
@@ -276,7 +286,12 @@ export const HoldingsInsightsPage = () => {
             baseCurrency={baseCurrency}
             isLoading={isLoading}
             onCountrySectionClick={(categoryId, categoryName) =>
-              handleChartSectionClick("country", categoryName, `Holdings in ${categoryName}`, categoryId)
+              handleChartSectionClick(
+                "country",
+                categoryName,
+                `Holdings in ${categoryName}`,
+                categoryId,
+              )
             }
           />
         </div>
@@ -294,7 +309,12 @@ export const HoldingsInsightsPage = () => {
               baseCurrency={baseCurrency}
               isLoading={isLoading}
               onSectorSectionClick={(categoryId, categoryName) =>
-                handleChartSectionClick("sector", categoryName, `Holdings in Sector: ${categoryName}`, categoryId)
+                handleChartSectionClick(
+                  "sector",
+                  categoryName,
+                  `Holdings in Sector: ${categoryName}`,
+                  categoryId,
+                )
               }
             />
           </div>
@@ -396,7 +416,7 @@ export const HoldingsInsightsPage = () => {
                       <CardHeader className="flex w-full flex-row items-center justify-between space-x-2 p-4">
                         <div className="flex items-center space-x-2">
                           <Badge
-                            className="flex min-w-[50px] cursor-pointer items-center justify-center rounded-sm hover:bg-primary/80"
+                            className="hover:bg-primary/80 flex min-w-[50px] cursor-pointer items-center justify-center rounded-sm"
                             onClick={handleSymbolClick}
                           >
                             {symbol}

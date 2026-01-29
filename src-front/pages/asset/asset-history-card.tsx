@@ -54,7 +54,7 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
 
     // Sort quotes chronologically (oldest first) for proper chart display
     const sortedQuotes = [...quoteHistory].sort(
-      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
     );
 
     if (!dateRange?.from || !dateRange?.to || selectedIntervalCode === "ALL") {

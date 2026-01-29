@@ -219,9 +219,7 @@ pub enum InitializeKeysResult {
         trusted_devices: Vec<TrustedDeviceSummary>,
     },
     /// Device is already trusted at current key version
-    Ready {
-        e2ee_key_version: i32,
-    },
+    Ready { e2ee_key_version: i32 },
 }
 
 /// Request to commit team key initialization (Phase 2).

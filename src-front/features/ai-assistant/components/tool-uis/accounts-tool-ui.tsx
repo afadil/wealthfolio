@@ -91,14 +91,9 @@ function normalizeAccountsResult(candidate: Record<string, unknown>): GetAccount
     .map((item) => ({
       id: safeString(item.id ?? item.Id, ""),
       name: safeString(item.name ?? item.Name, "Unknown"),
-      accountType: safeString(
-        item.accountType ?? item.account_type ?? item.AccountType,
-        "Unknown"
-      ),
+      accountType: safeString(item.accountType ?? item.account_type ?? item.AccountType, "Unknown"),
       currency: safeString(item.currency ?? item.Currency, "USD"),
-      isActive: Boolean(
-        item.isActive ?? item.is_active ?? item.IsActive ?? true
-      ),
+      isActive: Boolean(item.isActive ?? item.is_active ?? item.IsActive ?? true),
     }));
 
   return {
@@ -118,9 +113,7 @@ function normalizeAccountsResult(candidate: Record<string, unknown>): GetAccount
  * Formats account type for display.
  */
 function formatAccountType(accountType: string): string {
-  return accountType
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return accountType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 // ============================================================================
@@ -140,7 +133,7 @@ function AccountsLoadingSkeleton() {
         {Array.from({ length: 3 }).map((_, index) => (
           <div
             key={index}
-            className="flex items-center justify-between rounded-lg border bg-background/60 p-3"
+            className="bg-background/60 flex items-center justify-between rounded-lg border p-3"
           >
             <div className="flex flex-col gap-1.5">
               <Skeleton className="h-4 w-32" />
@@ -156,9 +149,9 @@ function AccountsLoadingSkeleton() {
 
 function AccountCard({ account }: { account: AccountDto }) {
   return (
-    <div className="flex items-center justify-between rounded-lg border bg-background/60 p-3 transition-colors hover:bg-background/80">
+    <div className="bg-background/60 hover:bg-background/80 flex items-center justify-between rounded-lg border p-3 transition-colors">
       <div className="flex flex-col gap-0.5">
-        <span className="text-sm font-medium leading-tight">{account.name}</span>
+        <span className="text-sm leading-tight font-medium">{account.name}</span>
         <span className="text-muted-foreground text-xs">
           {formatAccountType(account.accountType)}
         </span>
@@ -188,9 +181,7 @@ function ErrorState({ message }: { message?: string }) {
     <Card className="border-destructive/30 bg-destructive/5">
       <CardContent className="py-4">
         <p className="text-destructive text-sm font-medium">Failed to load accounts</p>
-        {message && (
-          <p className="text-muted-foreground mt-1 text-xs">{message}</p>
-        )}
+        {message && <p className="text-muted-foreground mt-1 text-xs">{message}</p>}
       </CardContent>
     </Card>
   );

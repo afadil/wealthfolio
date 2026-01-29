@@ -25,12 +25,7 @@ export function HoldingsConfirmStep() {
   // Parse snapshots from CSV data
   const snapshots = useMemo(() => {
     const fieldMappings = mapping?.fieldMappings || {};
-    return parseHoldingsSnapshots(
-      headers,
-      parsedRows,
-      fieldMappings,
-      parseConfig.defaultCurrency
-    );
+    return parseHoldingsSnapshots(headers, parsedRows, fieldMappings, parseConfig.defaultCurrency);
   }, [headers, parsedRows, mapping?.fieldMappings, parseConfig.defaultCurrency]);
 
   // Import mutation
@@ -49,9 +44,8 @@ export function HoldingsConfirmStep() {
             skipped: 0,
             errors: result.snapshotsFailed,
           },
-          errorMessage:
-            result.errors.length > 0 ? result.errors.join("; ") : undefined,
-        })
+          errorMessage: result.errors.length > 0 ? result.errors.join("; ") : undefined,
+        }),
       );
       dispatch(nextStep());
     },
@@ -66,7 +60,7 @@ export function HoldingsConfirmStep() {
             errors: snapshots.length,
           },
           errorMessage: error.message,
-        })
+        }),
       );
       dispatch(nextStep());
     },
@@ -84,14 +78,14 @@ export function HoldingsConfirmStep() {
   const totalPositions = snapshots.reduce((sum, s) => sum + s.positions.length, 0);
   const totalCashEntries = snapshots.reduce(
     (sum, s) => sum + Object.keys(s.cashBalances).length,
-    0
+    0,
   );
 
   return (
     <div className="flex flex-col gap-6">
       {/* Summary Card */}
       <Card>
-        <CardHeader className="py-3 px-4">
+        <CardHeader className="px-4 py-3">
           <CardTitle className="text-sm font-medium">Confirm Holdings Import</CardTitle>
         </CardHeader>
         <CardContent>
@@ -108,27 +102,27 @@ export function HoldingsConfirmStep() {
 
             {/* Summary Stats */}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <div className="text-center p-3 bg-muted/30 rounded-lg">
-                <div className="text-2xl font-bold text-primary">{snapshots.length}</div>
-                <div className="text-xs text-muted-foreground">Snapshots</div>
+              <div className="bg-muted/30 rounded-lg p-3 text-center">
+                <div className="text-primary text-2xl font-bold">{snapshots.length}</div>
+                <div className="text-muted-foreground text-xs">Snapshots</div>
               </div>
-              <div className="text-center p-3 bg-muted/30 rounded-lg">
+              <div className="bg-muted/30 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold">{totalPositions}</div>
-                <div className="text-xs text-muted-foreground">Positions</div>
+                <div className="text-muted-foreground text-xs">Positions</div>
               </div>
-              <div className="text-center p-3 bg-muted/30 rounded-lg">
+              <div className="bg-muted/30 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold">{totalCashEntries}</div>
-                <div className="text-xs text-muted-foreground">Cash Balances</div>
+                <div className="text-muted-foreground text-xs">Cash Balances</div>
               </div>
-              <div className="text-center p-3 bg-muted/30 rounded-lg">
+              <div className="bg-muted/30 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold">{parsedRows.length}</div>
-                <div className="text-xs text-muted-foreground">CSV Rows</div>
+                <div className="text-muted-foreground text-xs">CSV Rows</div>
               </div>
             </div>
 
             {/* Date Range */}
             {snapshots.length > 0 && (
-              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+              <div className="text-muted-foreground flex items-center justify-center gap-2 text-sm">
                 <Icons.Calendar className="h-4 w-4" />
                 <span>
                   {snapshots[snapshots.length - 1].date} to {snapshots[0].date}

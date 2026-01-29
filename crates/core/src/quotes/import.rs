@@ -48,7 +48,10 @@ pub enum ImportValidationStatus {
 impl ImportValidationStatus {
     /// Returns true if the status indicates the quote can be imported.
     pub fn is_importable(&self) -> bool {
-        matches!(self, ImportValidationStatus::Valid | ImportValidationStatus::Warning(_))
+        matches!(
+            self,
+            ImportValidationStatus::Valid | ImportValidationStatus::Warning(_)
+        )
     }
 
     /// Returns true if the status is valid (no warnings or errors).
@@ -187,8 +190,9 @@ impl QuoteImport {
 
     /// Parse the date string into a NaiveDate.
     pub fn parse_date(&self) -> Result<NaiveDate> {
-        NaiveDate::parse_from_str(&self.date, "%Y-%m-%d")
-            .map_err(|_| ValidationError::InvalidInput(format!("Invalid date format: {}", self.date)).into())
+        NaiveDate::parse_from_str(&self.date, "%Y-%m-%d").map_err(|_| {
+            ValidationError::InvalidInput(format!("Invalid date format: {}", self.date)).into()
+        })
     }
 
     /// Parse the date string into a Day.
@@ -277,12 +281,7 @@ impl ImportValidation {
     }
 
     /// Create a duplicate import validation.
-    pub fn duplicate(
-        asset_id: AssetId,
-        day: Day,
-        close: Decimal,
-        currency: Currency,
-    ) -> Self {
+    pub fn duplicate(asset_id: AssetId, day: Day, close: Decimal, currency: Currency) -> Self {
         Self {
             asset_id,
             day,
@@ -380,11 +379,27 @@ impl QuoteExport {
     pub fn from_quote(quote: &Quote) -> Self {
         Self {
             date: quote.timestamp.format("%Y-%m-%d").to_string(),
-            open: if quote.open == Decimal::ZERO { None } else { Some(quote.open) },
-            high: if quote.high == Decimal::ZERO { None } else { Some(quote.high) },
-            low: if quote.low == Decimal::ZERO { None } else { Some(quote.low) },
+            open: if quote.open == Decimal::ZERO {
+                None
+            } else {
+                Some(quote.open)
+            },
+            high: if quote.high == Decimal::ZERO {
+                None
+            } else {
+                Some(quote.high)
+            },
+            low: if quote.low == Decimal::ZERO {
+                None
+            } else {
+                Some(quote.low)
+            },
             close: quote.close,
-            volume: if quote.volume == Decimal::ZERO { None } else { Some(quote.volume) },
+            volume: if quote.volume == Decimal::ZERO {
+                None
+            } else {
+                Some(quote.volume)
+            },
         }
     }
 }
@@ -496,18 +511,32 @@ impl QuoteImportService {
         }
 
         // Check for existing quote (duplicate detection)
-        let existing = self.quote_store.latest(&asset_id, Some(&QuoteSource::Manual))?;
+        let existing = self
+            .quote_store
+            .latest(&asset_id, Some(&QuoteSource::Manual))?;
         if let Some(existing_quote) = existing {
             let existing_day = Day::new(existing_quote.timestamp.date_naive());
             if existing_day == day {
-                return Ok(ImportValidation::duplicate(asset_id, day, import.close, currency));
+                return Ok(ImportValidation::duplicate(
+                    asset_id,
+                    day,
+                    import.close,
+                    currency,
+                ));
             }
         }
 
         // Also check by range for more thorough duplicate detection
-        let quotes_on_day = self.quote_store.range(&asset_id, day, day, Some(&QuoteSource::Manual))?;
+        let quotes_on_day =
+            self.quote_store
+                .range(&asset_id, day, day, Some(&QuoteSource::Manual))?;
         if !quotes_on_day.is_empty() {
-            return Ok(ImportValidation::duplicate(asset_id, day, import.close, currency));
+            return Ok(ImportValidation::duplicate(
+                asset_id,
+                day,
+                import.close,
+                currency,
+            ));
         }
 
         // All validations passed
@@ -557,10 +586,7 @@ impl QuoteImportService {
         let id = quote_id(&validation.asset_id, validation.day, &source);
 
         // Convert Day to DateTime<Utc> at noon UTC
-        let timestamp = validation.day.0
-            .and_hms_opt(12, 0, 0)
-            .unwrap()
-            .and_utc();
+        let timestamp = validation.day.0.and_hms_opt(12, 0, 0).unwrap().and_utc();
 
         Quote {
             id,
@@ -605,9 +631,7 @@ impl QuoteImportService {
                 ValidationStatus::Invalid(msg) => {
                     result.errors.push(format!(
                         "{} on {}: {}",
-                        validation.asset_id.0,
-                        validation.day,
-                        msg
+                        validation.asset_id.0, validation.day, msg
                     ));
                 }
             }
@@ -865,13 +889,8 @@ mod tests {
         assert!(duplicate.status.is_duplicate());
         assert!(duplicate.message.is_some());
 
-        let invalid = ImportValidation::invalid(
-            asset_id,
-            day,
-            close,
-            currency,
-            "Test error".to_string(),
-        );
+        let invalid =
+            ImportValidation::invalid(asset_id, day, close, currency, "Test error".to_string());
         assert!(invalid.status.is_invalid());
         assert_eq!(invalid.message, Some("Test error".to_string()));
     }

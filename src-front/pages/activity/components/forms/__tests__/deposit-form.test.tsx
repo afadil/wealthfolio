@@ -58,7 +58,12 @@ vi.mock("@wealthfolio/ui/components/ui/button", () => ({
     disabled?: boolean;
     variant?: string;
   }) => (
-    <button type={type as "submit" | "button"} onClick={onClick} disabled={disabled} data-variant={variant}>
+    <button
+      type={type as "submit" | "button"}
+      onClick={onClick}
+      disabled={disabled}
+      data-variant={variant}
+    >
       {children}
     </button>
   ),
@@ -66,7 +71,9 @@ vi.mock("@wealthfolio/ui/components/ui/button", () => ({
 
 vi.mock("@wealthfolio/ui/components/ui/card", () => ({
   Card: ({ children }: { children: React.ReactNode }) => <div data-testid="card">{children}</div>,
-  CardContent: ({ children }: { children: React.ReactNode }) => <div data-testid="card-content">{children}</div>,
+  CardContent: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="card-content">{children}</div>
+  ),
 }));
 
 vi.mock("@wealthfolio/ui/components/ui/icons", () => ({
@@ -113,7 +120,9 @@ describe("DepositForm", () => {
     });
 
     it("renders cancel button when onCancel is provided", () => {
-      render(<DepositForm accounts={mockAccounts} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+      render(
+        <DepositForm accounts={mockAccounts} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />,
+      );
 
       expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
     });
@@ -141,7 +150,9 @@ describe("DepositForm", () => {
   describe("Cancel Button", () => {
     it("calls onCancel when cancel button is clicked", async () => {
       const user = userEvent.setup();
-      render(<DepositForm accounts={mockAccounts} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+      render(
+        <DepositForm accounts={mockAccounts} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />,
+      );
 
       const cancelButton = screen.getByRole("button", { name: /cancel/i });
       await user.click(cancelButton);
@@ -151,7 +162,12 @@ describe("DepositForm", () => {
 
     it("disables cancel button when isLoading is true", () => {
       render(
-        <DepositForm accounts={mockAccounts} onSubmit={mockOnSubmit} onCancel={mockOnCancel} isLoading={true} />,
+        <DepositForm
+          accounts={mockAccounts}
+          onSubmit={mockOnSubmit}
+          onCancel={mockOnCancel}
+          isLoading={true}
+        />,
       );
 
       const cancelButton = screen.getByRole("button", { name: /cancel/i });
@@ -161,7 +177,9 @@ describe("DepositForm", () => {
 
   describe("Default Values", () => {
     it("auto-selects account when only one account is provided", () => {
-      const singleAccount: AccountSelectOption[] = [{ value: "acc-single", label: "Only Account", currency: "USD" }];
+      const singleAccount: AccountSelectOption[] = [
+        { value: "acc-single", label: "Only Account", currency: "USD" },
+      ];
 
       render(<DepositForm accounts={singleAccount} onSubmit={mockOnSubmit} />);
 

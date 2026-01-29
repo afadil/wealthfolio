@@ -17,7 +17,9 @@ use crate::schema::quotes::dsl as quotes_dsl;
 use crate::utils::chunk_for_sqlite;
 use wealthfolio_core::quotes::store::{ProviderSettingsStore, QuoteStore};
 use wealthfolio_core::quotes::types::{AssetId, Day, QuoteSource};
-use wealthfolio_core::quotes::{LatestQuotePair, MarketDataProviderSetting, Quote, UpdateMarketDataProviderSetting};
+use wealthfolio_core::quotes::{
+    LatestQuotePair, MarketDataProviderSetting, Quote, UpdateMarketDataProviderSetting,
+};
 use wealthfolio_core::Result;
 
 pub struct MarketDataRepository {
@@ -568,8 +570,9 @@ impl QuoteStore for MarketDataRepository {
             }
             query_builder = query_builder.bind::<Text, _>(source);
 
-            let rows: Vec<QuoteBoundsRow> =
-                query_builder.load::<QuoteBoundsRow>(&mut conn).into_core()?;
+            let rows: Vec<QuoteBoundsRow> = query_builder
+                .load::<QuoteBoundsRow>(&mut conn)
+                .into_core()?;
 
             for row in rows {
                 if let (Some(min_str), Some(max_str)) = (row.min_day, row.max_day) {

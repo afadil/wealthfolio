@@ -69,7 +69,9 @@ export function SectorsChart({
                     <TooltipTrigger asChild>
                       <div
                         className="hover:bg-muted flex cursor-pointer items-center gap-0 rounded-md py-1"
-                        onClick={() => onSectorSectionClick?.(sector.categoryId, sector.categoryName)}
+                        onClick={() =>
+                          onSectorSectionClick?.(sector.categoryId, sector.categoryName)
+                        }
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => {
@@ -120,7 +122,9 @@ export function SectorsChart({
                                 right: "0",
                               }}
                             >
-                              <span className="pl-1 whitespace-nowrap">{formatPercent(percent)}</span>
+                              <span className="pl-1 whitespace-nowrap">
+                                {formatPercent(percent)}
+                              </span>
                               <span className="truncate pr-1 pl-1" title={sector.categoryName}>
                                 {sector.categoryName}
                               </span>

@@ -49,9 +49,7 @@ export function AccountSelect<TFieldValues extends FieldValues = FieldValues>({
                 {accounts.map((account) => (
                   <SelectItem value={account.value} key={account.value}>
                     {account.label}
-                    <span className="text-muted-foreground font-light">
-                      ({account.currency})
-                    </span>
+                    <span className="text-muted-foreground font-light">({account.currency})</span>
                   </SelectItem>
                 ))}
               </SelectContent>

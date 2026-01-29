@@ -24,9 +24,7 @@ interface UseAlternativeAssetMutationsOptions {
   onMetadataUpdateSuccess?: () => void;
 }
 
-export function useAlternativeAssetMutations(
-  options: UseAlternativeAssetMutationsOptions = {}
-) {
+export function useAlternativeAssetMutations(options: UseAlternativeAssetMutationsOptions = {}) {
   const queryClient = useQueryClient();
 
   const invalidateQueries = () => {
@@ -36,8 +34,7 @@ export function useAlternativeAssetMutations(
   };
 
   const createMutation = useMutation({
-    mutationFn: (request: CreateAlternativeAssetRequest) =>
-      createAlternativeAsset(request),
+    mutationFn: (request: CreateAlternativeAssetRequest) => createAlternativeAsset(request),
     onSuccess: (response) => {
       invalidateQueries();
       toast({
@@ -57,13 +54,8 @@ export function useAlternativeAssetMutations(
   });
 
   const updateValuationMutation = useMutation({
-    mutationFn: ({
-      assetId,
-      request,
-    }: {
-      assetId: string;
-      request: UpdateValuationRequest;
-    }) => updateAlternativeAssetValuation(assetId, request),
+    mutationFn: ({ assetId, request }: { assetId: string; request: UpdateValuationRequest }) =>
+      updateAlternativeAssetValuation(assetId, request),
     onSuccess: () => {
       invalidateQueries();
       toast({
@@ -147,13 +139,8 @@ export function useAlternativeAssetMutations(
   });
 
   const updateMetadataMutation = useMutation({
-    mutationFn: ({
-      assetId,
-      metadata,
-    }: {
-      assetId: string;
-      metadata: Record<string, string>;
-    }) => updateAlternativeAssetMetadata(assetId, metadata),
+    mutationFn: ({ assetId, metadata }: { assetId: string; metadata: Record<string, string> }) =>
+      updateAlternativeAssetMetadata(assetId, metadata),
     onSuccess: () => {
       invalidateQueries();
       options.onMetadataUpdateSuccess?.();

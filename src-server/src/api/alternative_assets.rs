@@ -571,10 +571,7 @@ pub fn router() -> Router<Arc<AppState>> {
             "/alternative-assets/{id}/valuation",
             put(update_alternative_asset_valuation),
         )
-        .route(
-            "/alternative-assets/{id}",
-            delete(delete_alternative_asset),
-        )
+        .route("/alternative-assets/{id}", delete(delete_alternative_asset))
         .route(
             "/alternative-assets/{id}/link-liability",
             post(link_liability),

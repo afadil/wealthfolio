@@ -5,9 +5,7 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
-use crate::health::model::{
-    AffectedItem, HealthCategory, HealthIssue, NavigateAction, Severity,
-};
+use crate::health::model::{AffectedItem, HealthCategory, HealthIssue, NavigateAction, Severity};
 use crate::health::traits::HealthContext;
 
 /// Information about an account missing tracking mode configuration.

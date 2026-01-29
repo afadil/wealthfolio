@@ -133,10 +133,13 @@ export const installUpdate = async (): Promise<void> => {
 export const getPlatform = async (): Promise<PlatformInfo> => {
   // Web environment - detect from user agent
   const userAgent = typeof window !== "undefined" ? window.navigator.userAgent.toLowerCase() : "";
-  const platform = typeof window !== "undefined" ? window.navigator.platform?.toLowerCase() || "" : "";
+  const platform =
+    typeof window !== "undefined" ? window.navigator.platform?.toLowerCase() || "" : "";
 
   // Check for mobile devices
-  const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+  const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(
+    userAgent,
+  );
   const isTablet = /ipad|tablet|playbook|silk/i.test(userAgent);
 
   // Detect OS

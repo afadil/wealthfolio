@@ -223,10 +223,7 @@ export function HistoryChart({
                 const size = 8;
                 const hitAreaSize = 16;
                 return (
-                  <g
-                    style={{ cursor: "pointer" }}
-                    onClick={() => onMarkerClick?.(point.date)}
-                  >
+                  <g style={{ cursor: "pointer" }} onClick={() => onMarkerClick?.(point.date)}>
                     {/* Invisible larger hit area for easier clicking */}
                     <circle cx={cx} cy={cy} r={hitAreaSize} fill="transparent" />
                     {/* Diamond shape */}

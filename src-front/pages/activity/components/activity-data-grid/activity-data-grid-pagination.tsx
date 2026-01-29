@@ -133,7 +133,7 @@ export function ActivityDataGridPagination({
             className="h-7 w-[50px] text-center text-xs"
             title={`Enter a page number between 1 and ${pageCount}`}
           />
-          <span className="text-muted-foreground whitespace-nowrap text-xs">
+          <span className="text-muted-foreground text-xs whitespace-nowrap">
             <span className="hidden sm:inline">of</span>
             <span className="sm:hidden">/</span> {pageCount || 1}
           </span>

@@ -165,56 +165,32 @@ fn map_country_to_region(country: &str) -> Option<&'static str> {
 
         // ========== Countries mapped to regional groups ==========
         // Europe (R10)
-        "united kingdom" | "uk" | "great britain" | "england"
-        | "germany" | "deutschland"
-        | "france"
-        | "switzerland" | "schweiz"
-        | "netherlands" | "holland"
-        | "spain" | "españa"
-        | "italy" | "italia"
-        | "sweden" | "sverige"
-        | "ireland"
-        | "belgium"
-        | "denmark" | "danmark"
-        | "norway" | "norge"
-        | "finland" | "suomi"
-        | "austria" | "österreich"
-        | "portugal"
-        | "poland" | "polska"
-        | "greece"
-        | "czech republic" | "czechia"
-        | "russia" => Some("R10"), // Europe
+        "united kingdom" | "uk" | "great britain" | "england" | "germany" | "deutschland"
+        | "france" | "switzerland" | "schweiz" | "netherlands" | "holland" | "spain" | "españa"
+        | "italy" | "italia" | "sweden" | "sverige" | "ireland" | "belgium" | "denmark"
+        | "danmark" | "norway" | "norge" | "finland" | "suomi" | "austria" | "österreich"
+        | "portugal" | "poland" | "polska" | "greece" | "czech republic" | "czechia" | "russia" => {
+            Some("R10")
+        } // Europe
 
         // North America (R2010) - countries without specific entries
         "mexico" | "méxico" => Some("R2010"),
 
         // South America (R2040)
-        "brazil" | "brasil"
-        | "argentina"
-        | "chile"
-        | "colombia"
-        | "peru" => Some("R2040"),
+        "brazil" | "brasil" | "argentina" | "chile" | "colombia" | "peru" => Some("R2040"),
 
         // East Asia (R3030) - countries without specific entries
-        "south korea" | "korea" | "대한민국"
-        | "taiwan" | "臺灣" => Some("R3030"),
+        "south korea" | "korea" | "대한민국" | "taiwan" | "臺灣" => Some("R3030"),
 
         // Asia (R30) - other Asian countries
-        "singapore"
-        | "india" | "भारत"
-        | "indonesia"
-        | "malaysia"
-        | "thailand"
-        | "vietnam"
+        "singapore" | "india" | "भारत" | "indonesia" | "malaysia" | "thailand" | "vietnam"
         | "philippines" => Some("R30"),
 
         // Oceania (R50)
         "new zealand" => Some("R50"),
 
         // Africa (R40)
-        "south africa"
-        | "nigeria"
-        | "egypt" => Some("R40"),
+        "south africa" | "nigeria" | "egypt" => Some("R40"),
 
         // For unmapped countries, skip
         _ => None,
@@ -380,10 +356,7 @@ impl AutoClassificationService {
                         result.asset_class = Some(category_id.to_string());
                     }
                     Err(e) => {
-                        warn!(
-                            "Failed to auto-classify {} asset_classes: {}",
-                            asset_id, e
-                        );
+                        warn!("Failed to auto-classify {} asset_classes: {}", asset_id, e);
                     }
                 }
             }
@@ -405,7 +378,9 @@ impl AutoClassificationService {
                             category_id,
                             sector.weight * 100.0
                         );
-                        result.sectors.push((category_id.to_string(), sector.weight));
+                        result
+                            .sectors
+                            .push((category_id.to_string(), sector.weight));
                     }
                     Err(e) => {
                         warn!(
@@ -425,10 +400,7 @@ impl AutoClassificationService {
                     .await
                 {
                     Ok(_) => {
-                        debug!(
-                            "Auto-classified {} as {} in regions",
-                            asset_id, category_id
-                        );
+                        debug!("Auto-classified {} as {} in regions", asset_id, category_id);
                         result.region = Some(category_id.to_string());
                     }
                     Err(e) => {
@@ -498,13 +470,19 @@ mod tests {
         assert_eq!(map_quote_type_to_asset_class("EQUITY"), Some("EQUITY"));
         assert_eq!(map_quote_type_to_asset_class("ETF"), Some("EQUITY"));
         assert_eq!(map_quote_type_to_asset_class("MUTUALFUND"), Some("EQUITY"));
-        assert_eq!(map_quote_type_to_asset_class("CRYPTOCURRENCY"), Some("EQUITY"));
+        assert_eq!(
+            map_quote_type_to_asset_class("CRYPTOCURRENCY"),
+            Some("EQUITY")
+        );
         // Debt class
         assert_eq!(map_quote_type_to_asset_class("BOND"), Some("DEBT"));
         // Cash class
         assert_eq!(map_quote_type_to_asset_class("CURRENCY"), Some("CASH"));
         // Commodity class
-        assert_eq!(map_quote_type_to_asset_class("COMMODITY"), Some("COMMODITY"));
+        assert_eq!(
+            map_quote_type_to_asset_class("COMMODITY"),
+            Some("COMMODITY")
+        );
         // Unknown
         assert_eq!(map_quote_type_to_asset_class("unknown"), None);
     }
@@ -551,7 +529,8 @@ mod tests {
     #[test]
     fn test_parse_sectors_json() {
         let json = r#"[{"name":"Technology","weight":0.30},{"name":"Healthcare","weight":0.15}]"#;
-        let input = ClassificationInput::from_provider_profile(None, None, Some(json), None, None, None);
+        let input =
+            ClassificationInput::from_provider_profile(None, None, Some(json), None, None, None);
         assert_eq!(input.sectors.len(), 2);
         assert_eq!(input.sectors[0].name, "Technology");
         assert_eq!(input.sectors[0].weight, 0.30);
@@ -581,8 +560,8 @@ mod tests {
             Some("ETF"),
             None,
             None,
-            None, // no country from provider
-            None, // no countries JSON
+            None,         // no country from provider
+            None,         // no countries JSON
             Some("XTSE"), // Canadian exchange
         );
         assert_eq!(input.country, Some("Canada".to_string()));

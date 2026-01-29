@@ -15,20 +15,16 @@ use log::error;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tauri::{AppHandle, State};
+use tauri::State;
 use uuid::Uuid;
 
-use crate::{
-    context::ServiceContext,
-    events::{
-        emit_portfolio_trigger_recalculate, emit_resource_changed, PortfolioRequestPayload,
-        ResourceEventPayload,
-    },
-};
+use crate::context::ServiceContext;
 
 use wealthfolio_core::{
-    assets::{generate_asset_id, AlternativeAssetRepositoryTrait, AssetKind, NewAsset, PricingMode},
-    quotes::{DataSource, MarketSyncMode, Quote},
+    assets::{
+        generate_asset_id, AlternativeAssetRepositoryTrait, AssetKind, NewAsset, PricingMode,
+    },
+    quotes::{DataSource, Quote},
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -212,7 +208,6 @@ pub struct NetWorthResponse {
 pub async fn create_alternative_asset(
     request: CreateAlternativeAssetRequest,
     state: State<'_, Arc<ServiceContext>>,
-    handle: AppHandle,
 ) -> Result<CreateAlternativeAssetResponse, String> {
     // Parse and validate inputs
     let current_value: Decimal = request
@@ -312,34 +307,8 @@ pub async fn create_alternative_asset(
             format!("Failed to create quote: {}", e)
         })?;
 
-    // Emit resource change events
-    emit_resource_changed(
-        &handle,
-        ResourceEventPayload::new(
-            "alternative_asset",
-            "created",
-            json!({
-                "asset_id": asset_id,
-                "kind": format!("{:?}", request.kind).to_lowercase(),
-                "currency": request.currency,
-            }),
-        ),
-    );
-
-    // Trigger portfolio recalculation - no market sync needed for manual alternative assets
-    let handle_clone = handle.clone();
-    tauri::async_runtime::spawn(async move {
-        let payload = PortfolioRequestPayload::builder()
-            .account_ids(None)
-            .market_sync_mode(MarketSyncMode::None)
-            .build();
-        emit_portfolio_trigger_recalculate(&handle_clone, payload);
-    });
-
-    Ok(CreateAlternativeAssetResponse {
-        asset_id,
-        quote_id,
-    })
+    // Domain events from asset/quote services will trigger recalculation automatically
+    Ok(CreateAlternativeAssetResponse { asset_id, quote_id })
 }
 
 /// Updates the valuation of an alternative asset by inserting a new manual quote.
@@ -348,7 +317,6 @@ pub async fn update_alternative_asset_valuation(
     asset_id: String,
     request: UpdateValuationRequest,
     state: State<'_, Arc<ServiceContext>>,
-    handle: AppHandle,
 ) -> Result<UpdateValuationResponse, String> {
     // Parse and validate inputs
     let value: Decimal = request
@@ -393,33 +361,9 @@ pub async fn update_alternative_asset_valuation(
             format!("Failed to update valuation: {}", e)
         })?;
 
-    // Emit resource change event
-    emit_resource_changed(
-        &handle,
-        ResourceEventPayload::new(
-            "alternative_asset",
-            "valuation_updated",
-            json!({
-                "asset_id": asset_id,
-                "quote_id": quote_id,
-                "value": request.value,
-                "date": request.date,
-            }),
-        ),
-    );
-
-    // Trigger portfolio recalculation - no market sync needed for manual valuation updates
-    let handle_clone = handle.clone();
-    tauri::async_runtime::spawn(async move {
-        let payload = PortfolioRequestPayload::builder()
-            .account_ids(None)
-            .market_sync_mode(MarketSyncMode::None)
-            .build();
-        emit_portfolio_trigger_recalculate(&handle_clone, payload);
-    });
-
+    // Domain events from quote service will trigger recalculation automatically
     Ok(UpdateValuationResponse {
-        quote_id,
+        quote_id: quote_id.clone(),
         valuation_date: request.date,
         value: request.value,
     })
@@ -434,7 +378,6 @@ pub async fn update_alternative_asset_metadata(
     asset_id: String,
     metadata: std::collections::HashMap<String, String>,
     state: State<'_, Arc<ServiceContext>>,
-    handle: AppHandle,
 ) -> Result<(), String> {
     // Get the current asset
     let asset = state
@@ -472,21 +415,7 @@ pub async fn update_alternative_asset_metadata(
         .map_err(|e| {
             error!("Failed to update asset metadata: {}", e);
             format!("Failed to update metadata: {}", e)
-        })?;
-
-    // Emit resource change event
-    emit_resource_changed(
-        &handle,
-        ResourceEventPayload::new(
-            "alternative_asset",
-            "metadata_updated",
-            json!({
-                "asset_id": asset_id,
-            }),
-        ),
-    );
-
-    Ok(())
+        })
 }
 
 /// Deletes an alternative asset and related data.
@@ -501,9 +430,9 @@ pub async fn update_alternative_asset_metadata(
 pub async fn delete_alternative_asset(
     asset_id: String,
     state: State<'_, Arc<ServiceContext>>,
-    handle: AppHandle,
 ) -> Result<(), String> {
     // Delete the asset (repository handles quote cleanup and liability unlinking)
+    // Domain events will trigger recalculation automatically
     state
         .alternative_asset_repository()
         .delete_alternative_asset(&asset_id)
@@ -511,31 +440,7 @@ pub async fn delete_alternative_asset(
         .map_err(|e| {
             error!("Failed to delete alternative asset: {}", e);
             format!("Failed to delete asset: {}", e)
-        })?;
-
-    // Emit resource change event
-    emit_resource_changed(
-        &handle,
-        ResourceEventPayload::new(
-            "alternative_asset",
-            "deleted",
-            json!({
-                "asset_id": asset_id,
-            }),
-        ),
-    );
-
-    // Trigger portfolio recalculation - no market sync needed for asset deletion
-    let handle_clone = handle.clone();
-    tauri::async_runtime::spawn(async move {
-        let payload = PortfolioRequestPayload::builder()
-            .account_ids(None)
-            .market_sync_mode(MarketSyncMode::None)
-            .build();
-        emit_portfolio_trigger_recalculate(&handle_clone, payload);
-    });
-
-    Ok(())
+        })
 }
 
 /// Links a liability to a target asset (for UI-only aggregation per spec section 2.3).
@@ -547,7 +452,6 @@ pub async fn link_liability(
     liability_id: String,
     request: LinkLiabilityRequest,
     state: State<'_, Arc<ServiceContext>>,
-    handle: AppHandle,
 ) -> Result<(), String> {
     // Verify the liability exists and is a liability type
     let liability = state
@@ -588,22 +492,7 @@ pub async fn link_liability(
         .map_err(|e| {
             error!("Failed to update liability metadata: {}", e);
             format!("Failed to link liability: {}", e)
-        })?;
-
-    // Emit resource change event
-    emit_resource_changed(
-        &handle,
-        ResourceEventPayload::new(
-            "liability",
-            "linked",
-            json!({
-                "liability_id": liability_id,
-                "target_asset_id": request.target_asset_id,
-            }),
-        ),
-    );
-
-    Ok(())
+        })
 }
 
 /// Unlinks a liability from its linked asset.
@@ -613,7 +502,6 @@ pub async fn link_liability(
 pub async fn unlink_liability(
     liability_id: String,
     state: State<'_, Arc<ServiceContext>>,
-    handle: AppHandle,
 ) -> Result<(), String> {
     // Verify the liability exists
     let liability = state
@@ -650,21 +538,7 @@ pub async fn unlink_liability(
         .map_err(|e| {
             error!("Failed to update liability metadata: {}", e);
             format!("Failed to unlink liability: {}", e)
-        })?;
-
-    // Emit resource change event
-    emit_resource_changed(
-        &handle,
-        ResourceEventPayload::new(
-            "liability",
-            "unlinked",
-            json!({
-                "liability_id": liability_id,
-            }),
-        ),
-    );
-
-    Ok(())
+        })
 }
 
 /// Response for an alternative holding (simplified view for Holdings page)
@@ -911,10 +785,10 @@ pub fn get_net_worth_history(
     end_date: String,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<Vec<NetWorthHistoryPoint>, String> {
-    let start =
-        NaiveDate::parse_from_str(&start_date, "%Y-%m-%d").map_err(|e| format!("Invalid start date: {}", e))?;
-    let end =
-        NaiveDate::parse_from_str(&end_date, "%Y-%m-%d").map_err(|e| format!("Invalid end date: {}", e))?;
+    let start = NaiveDate::parse_from_str(&start_date, "%Y-%m-%d")
+        .map_err(|e| format!("Invalid start date: {}", e))?;
+    let end = NaiveDate::parse_from_str(&end_date, "%Y-%m-%d")
+        .map_err(|e| format!("Invalid end date: {}", e))?;
 
     let history = state
         .net_worth_service()

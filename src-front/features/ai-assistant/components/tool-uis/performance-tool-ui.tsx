@@ -90,32 +90,20 @@ function normalizeResult(result: unknown): PerformanceResult | null {
       (candidate.currency as string | undefined) ??
       (candidate.Currency as string | undefined) ??
       "USD",
-    cumulativeTwr: Number(
-      candidate.cumulativeTwr ?? candidate.cumulative_twr ?? 0
-    ),
+    cumulativeTwr: Number(candidate.cumulativeTwr ?? candidate.cumulative_twr ?? 0),
     gainLossAmount:
       candidate.gainLossAmount != null || candidate.gain_loss_amount != null
         ? Number(candidate.gainLossAmount ?? candidate.gain_loss_amount)
         : null,
-    annualizedTwr: Number(
-      candidate.annualizedTwr ?? candidate.annualized_twr ?? 0
-    ),
-    simpleReturn: Number(
-      candidate.simpleReturn ?? candidate.simple_return ?? 0
-    ),
+    annualizedTwr: Number(candidate.annualizedTwr ?? candidate.annualized_twr ?? 0),
+    simpleReturn: Number(candidate.simpleReturn ?? candidate.simple_return ?? 0),
     annualizedSimpleReturn: Number(
-      candidate.annualizedSimpleReturn ?? candidate.annualized_simple_return ?? 0
+      candidate.annualizedSimpleReturn ?? candidate.annualized_simple_return ?? 0,
     ),
-    cumulativeMwr: Number(
-      candidate.cumulativeMwr ?? candidate.cumulative_mwr ?? 0
-    ),
-    annualizedMwr: Number(
-      candidate.annualizedMwr ?? candidate.annualized_mwr ?? 0
-    ),
+    cumulativeMwr: Number(candidate.cumulativeMwr ?? candidate.cumulative_mwr ?? 0),
+    annualizedMwr: Number(candidate.annualizedMwr ?? candidate.annualized_mwr ?? 0),
     volatility: Number(candidate.volatility ?? candidate.Volatility ?? 0),
-    maxDrawdown: Number(
-      candidate.maxDrawdown ?? candidate.max_drawdown ?? 0
-    ),
+    maxDrawdown: Number(candidate.maxDrawdown ?? candidate.max_drawdown ?? 0),
   };
 }
 
@@ -144,10 +132,7 @@ function PerformanceLoadingSkeleton() {
         {/* Metrics grid skeleton */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {Array.from({ length: 4 }).map((_, index) => (
-            <div
-              key={index}
-              className="flex flex-col gap-1 rounded-lg border bg-background/60 p-3"
-            >
+            <div key={index} className="bg-background/60 flex flex-col gap-1 rounded-lg border p-3">
               <Skeleton className="h-3 w-16" />
               <Skeleton className="h-5 w-20" />
             </div>
@@ -168,9 +153,7 @@ function ErrorState({ message }: { message?: string }) {
     <Card className="border-destructive/30 bg-destructive/5">
       <CardContent className="py-4">
         <p className="text-destructive text-sm font-medium">Failed to load performance data</p>
-        {message && (
-          <p className="text-muted-foreground mt-1 text-xs">{message}</p>
-        )}
+        {message && <p className="text-muted-foreground mt-1 text-xs">{message}</p>}
       </CardContent>
     </Card>
   );
@@ -193,14 +176,12 @@ function MetricCard({ label, value, subValue, isPositive, isPrivate }: MetricCar
         : "text-foreground";
 
   return (
-    <div className="flex flex-col gap-1 rounded-lg border bg-background/60 p-3">
+    <div className="bg-background/60 flex flex-col gap-1 rounded-lg border p-3">
       <span className="text-muted-foreground text-xs">{label}</span>
       <span className={cn("text-sm font-semibold tabular-nums", isPrivate ? "" : colorClass)}>
         {value}
       </span>
-      {subValue && (
-        <span className="text-muted-foreground text-xs tabular-nums">{subValue}</span>
-      )}
+      {subValue && <span className="text-muted-foreground text-xs tabular-nums">{subValue}</span>}
     </div>
   );
 }
@@ -209,7 +190,10 @@ function MetricCard({ label, value, subValue, isPositive, isPrivate }: MetricCar
 // Main Component
 // ============================================================================
 
-type PerformanceToolUIContentProps = ToolCallMessagePartProps<GetPerformanceArgs, PerformanceResult>;
+type PerformanceToolUIContentProps = ToolCallMessagePartProps<
+  GetPerformanceArgs,
+  PerformanceResult
+>;
 
 function PerformanceToolUIContent({ args, result, status }: PerformanceToolUIContentProps) {
   const { isBalanceHidden } = useBalancePrivacy();
@@ -313,15 +297,12 @@ function PerformanceToolUIContent({ args, result, status }: PerformanceToolUICon
         <div className="flex flex-wrap items-baseline gap-3">
           <div className="flex items-center gap-2">
             <TrendIcon
-              className={cn(
-                "size-6",
-                isPositiveReturn ? "text-success" : "text-destructive"
-              )}
+              className={cn("size-6", isPositiveReturn ? "text-success" : "text-destructive")}
             />
             <span
               className={cn(
                 "text-3xl font-bold tabular-nums",
-                isPositiveReturn ? "text-success" : "text-destructive"
+                isPositiveReturn ? "text-success" : "text-destructive",
               )}
             >
               {formatPercentSigned(parsed.cumulativeTwr)}
@@ -335,7 +316,7 @@ function PerformanceToolUIContent({ args, result, status }: PerformanceToolUICon
                   ? "text-muted-foreground"
                   : isPositiveReturn
                     ? "text-success"
-                    : "text-destructive"
+                    : "text-destructive",
               )}
             >
               {formatCurrency(parsed.gainLossAmount)}

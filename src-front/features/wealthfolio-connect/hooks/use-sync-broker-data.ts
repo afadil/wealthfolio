@@ -14,7 +14,9 @@ export function useSyncBrokerData() {
       toast.loading("Syncing broker data...", { id: "broker-sync-start" });
     },
     onError: (error) => {
-      toast.error(`Failed to start sync: ${error instanceof Error ? error.message : "Unknown error"}`);
+      toast.error(
+        `Failed to start sync: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
     },
   });
 }

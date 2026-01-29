@@ -1,5 +1,9 @@
 import { ReactNode } from "react";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@wealthfolio/ui/components/ui/hover-card";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@wealthfolio/ui/components/ui/hover-card";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -36,7 +40,9 @@ export function PortfolioUpdateTrigger({
 
   return (
     <HoverCard>
-      <HoverCardTrigger className="inline-flex cursor-pointer items-center">{children}</HoverCardTrigger>
+      <HoverCardTrigger className="inline-flex cursor-pointer items-center">
+        {children}
+      </HoverCardTrigger>
       <HoverCardContent align="start" className="w-80 shadow-none">
         <div className="flex flex-col space-y-4">
           <div className="space-y-2">
@@ -77,7 +83,9 @@ export function PortfolioUpdateTrigger({
             ) : (
               <Icons.Clock className="mr-2 h-4 w-4" />
             )}
-            {recalculatePortfolioMutation.isPending ? "Rebuilding history..." : "Rebuild full history"}
+            {recalculatePortfolioMutation.isPending
+              ? "Rebuilding history..."
+              : "Rebuild full history"}
           </Button>
         </div>
       </HoverCardContent>

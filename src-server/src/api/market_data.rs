@@ -11,7 +11,9 @@ use axum::{
     routing::{delete, get, post, put},
     Json, Router,
 };
-use wealthfolio_core::quotes::{MarketSyncMode, ProviderInfo, Quote, QuoteImport, SymbolSearchResult};
+use wealthfolio_core::quotes::{
+    MarketSyncMode, ProviderInfo, Quote, QuoteImport, SymbolSearchResult,
+};
 
 async fn get_market_data_providers(
     State(state): State<Arc<AppState>>,

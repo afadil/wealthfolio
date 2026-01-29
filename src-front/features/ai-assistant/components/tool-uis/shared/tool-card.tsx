@@ -33,18 +33,13 @@ export function ToolCard({
             <CardTitle className="text-base">{title}</CardTitle>
             {badge}
           </div>
-          {subtitle && (
-            <p className="text-muted-foreground text-xs">{subtitle}</p>
-          )}
+          {subtitle && <p className="text-muted-foreground text-xs">{subtitle}</p>}
         </div>
       </CardHeader>
       <CardContent>
-        <div
-          className="relative overflow-y-auto"
-          style={{ maxHeight: `${maxHeight}px` }}
-        >
+        <div className="relative overflow-y-auto" style={{ maxHeight: `${maxHeight}px` }}>
           {error ? (
-            <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <div className="border-destructive/50 bg-destructive/10 text-destructive flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
               <Icons.AlertCircle className="size-4 shrink-0" />
               <span>{error}</span>
             </div>
@@ -52,7 +47,7 @@ export function ToolCard({
             <>
               {children}
               {isLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-sm">
+                <div className="bg-background/60 absolute inset-0 flex items-center justify-center backdrop-blur-sm">
                   <Icons.Spinner className="text-muted-foreground size-6 animate-spin" />
                 </div>
               )}

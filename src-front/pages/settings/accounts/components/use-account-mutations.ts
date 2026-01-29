@@ -1,6 +1,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
-import { createAccount, updateAccount, deleteAccount, switchTrackingMode, logger } from "@/adapters";
+import {
+  createAccount,
+  updateAccount,
+  deleteAccount,
+  switchTrackingMode,
+  logger,
+} from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 import type { TrackingMode } from "@/lib/types";
 interface UseAccountMutationsProps {

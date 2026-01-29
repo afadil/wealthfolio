@@ -8,10 +8,7 @@ use tokio::time::{interval, Duration};
 use tracing::{debug, info, warn};
 use wealthfolio_connect::DEFAULT_CLOUD_API_URL;
 
-use crate::api::shared::{process_portfolio_job, PortfolioJobConfig};
-use crate::events::{ServerEvent, BROKER_SYNC_COMPLETE, BROKER_SYNC_START};
 use crate::main_lib::AppState;
-use wealthfolio_core::quotes::MarketSyncMode;
 
 /// Sync interval: 4 hours (not user-configurable to prevent API abuse)
 const SYNC_INTERVAL_SECS: u64 = 4 * 60 * 60;
@@ -198,8 +195,10 @@ async fn run_scheduled_sync(state: &Arc<AppState>) {
         }
     }
 
-    // Publish start event
-    state.event_bus.publish(ServerEvent::new(BROKER_SYNC_START));
+    // Note: When perform_broker_sync is properly implemented using the orchestrator pattern
+    // (like src-server/src/api/connect.rs does), the EventBusProgressReporter will emit
+    // broker:sync-start and broker:sync-complete events automatically.
+    // Currently this is a placeholder that doesn't actually sync.
 
     // Perform the sync
     match perform_broker_sync(state).await {
@@ -209,29 +208,8 @@ async fn run_scheduled_sync(state: &Arc<AppState>) {
                 result.activities_synced
             );
 
-            // Publish completion event
-            state.event_bus.publish(ServerEvent::with_payload(
-                BROKER_SYNC_COMPLETE,
-                serde_json::json!({
-                    "success": true,
-                    "message": format!("Synced {} activities", result.activities_synced),
-                    "is_scheduled": true
-                }),
-            ));
-
-            // Trigger portfolio update if activities were synced
-            if result.activities_synced > 0 {
-                info!("Triggering portfolio update after sync");
-                // Scheduled broker sync uses incremental sync for all assets
-                let job_config = PortfolioJobConfig {
-                    account_ids: None,
-                    market_sync_mode: MarketSyncMode::Incremental { asset_ids: None },
-                    force_full_recalculation: false,
-                };
-                if let Err(e) = process_portfolio_job(state.clone(), job_config).await {
-                    warn!("Portfolio update after sync failed: {}", e);
-                }
-            }
+            // Note: Portfolio recalculation is triggered automatically via domain events
+            // when activities are synced through the activity service
         }
         Err(e) => {
             // Check if this is an auth error
@@ -239,14 +217,6 @@ async fn run_scheduled_sync(state: &Arc<AppState>) {
                 info!("Scheduled sync skipped: user not authenticated");
             } else {
                 warn!("Scheduled broker sync failed: {}", e);
-                state.event_bus.publish(ServerEvent::with_payload(
-                    BROKER_SYNC_COMPLETE,
-                    serde_json::json!({
-                        "success": false,
-                        "message": e,
-                        "is_scheduled": true
-                    }),
-                ));
             }
         }
     }

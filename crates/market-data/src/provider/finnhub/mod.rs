@@ -151,7 +151,11 @@ impl FinnhubProvider {
     }
 
     /// Make a GET request to the Finnhub API.
-    async fn fetch(&self, endpoint: &str, params: &[(&str, &str)]) -> Result<String, MarketDataError> {
+    async fn fetch(
+        &self,
+        endpoint: &str,
+        params: &[(&str, &str)],
+    ) -> Result<String, MarketDataError> {
         let url = format!("{}{}", BASE_URL, endpoint);
 
         let mut request = self.client.get(&url);
@@ -164,11 +168,7 @@ impl FinnhubProvider {
             request = request.query(&[(key, value)]);
         }
 
-        debug!(
-            "Finnhub request: {} with {} params",
-            endpoint,
-            params.len()
-        );
+        debug!("Finnhub request: {} with {} params", endpoint, params.len());
 
         let response = request.send().await.map_err(|e| {
             if e.is_timeout() {
@@ -270,11 +270,9 @@ impl FinnhubProvider {
                     Ok(symbol.to_string())
                 }
             }
-            ProviderInstrument::MetalSymbol { .. } => {
-                Err(MarketDataError::UnsupportedAssetType(
-                    "Finnhub does not support metals directly".to_string(),
-                ))
-            }
+            ProviderInstrument::MetalSymbol { .. } => Err(MarketDataError::UnsupportedAssetType(
+                "Finnhub does not support metals directly".to_string(),
+            )),
         }
     }
 
@@ -296,12 +294,11 @@ impl FinnhubProvider {
         let params = [("symbol", symbol)];
         let text = self.fetch("/quote", &params).await?;
 
-        let response: QuoteResponse = serde_json::from_str(&text).map_err(|e| {
-            MarketDataError::ProviderError {
+        let response: QuoteResponse =
+            serde_json::from_str(&text).map_err(|e| MarketDataError::ProviderError {
                 provider: PROVIDER_ID.to_string(),
                 message: format!("Failed to parse quote response: {}", e),
-            }
-        })?;
+            })?;
 
         // Check if we got valid data
         let close = response.c.ok_or_else(|| {
@@ -321,11 +318,10 @@ impl FinnhubProvider {
             .and_then(|ts| Utc.timestamp_opt(ts, 0).single())
             .unwrap_or_else(Utc::now);
 
-        let close_decimal = Decimal::try_from(close).map_err(|_| {
-            MarketDataError::ValidationFailed {
+        let close_decimal =
+            Decimal::try_from(close).map_err(|_| MarketDataError::ValidationFailed {
                 message: format!("Invalid close price: {}", close),
-            }
-        })?;
+            })?;
 
         Ok(Quote {
             timestamp,
@@ -359,12 +355,11 @@ impl FinnhubProvider {
 
         let text = self.fetch("/stock/candle", &params).await?;
 
-        let response: CandleResponse = serde_json::from_str(&text).map_err(|e| {
-            MarketDataError::ProviderError {
+        let response: CandleResponse =
+            serde_json::from_str(&text).map_err(|e| MarketDataError::ProviderError {
                 provider: PROVIDER_ID.to_string(),
                 message: format!("Failed to parse candle response: {}", e),
-            }
-        })?;
+            })?;
 
         // Check response status
         if response.s == "no_data" {
@@ -458,12 +453,11 @@ impl FinnhubProvider {
             )));
         }
 
-        let response: ProfileResponse = serde_json::from_str(&text).map_err(|e| {
-            MarketDataError::ProviderError {
+        let response: ProfileResponse =
+            serde_json::from_str(&text).map_err(|e| MarketDataError::ProviderError {
                 provider: PROVIDER_ID.to_string(),
                 message: format!("Failed to parse profile response: {}", e),
-            }
-        })?;
+            })?;
 
         // Check if we got meaningful data
         if response.name.is_none() && response.ticker.is_none() {
@@ -498,12 +492,11 @@ impl FinnhubProvider {
         let params = [("q", query)];
         let text = self.fetch("/search", &params).await?;
 
-        let response: SearchResponse = serde_json::from_str(&text).map_err(|e| {
-            MarketDataError::ProviderError {
+        let response: SearchResponse =
+            serde_json::from_str(&text).map_err(|e| MarketDataError::ProviderError {
                 provider: PROVIDER_ID.to_string(),
                 message: format!("Failed to parse search response: {}", e),
-            }
-        })?;
+            })?;
 
         let results: Vec<SearchResult> = response
             .result
@@ -519,7 +512,11 @@ impl FinnhubProvider {
             })
             .collect();
 
-        debug!("Finnhub: found {} search results for '{}'", results.len(), query);
+        debug!(
+            "Finnhub: found {} search results for '{}'",
+            results.len(),
+            query
+        );
 
         Ok(results)
     }

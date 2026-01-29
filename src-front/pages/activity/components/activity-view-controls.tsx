@@ -149,7 +149,9 @@ export function ActivityViewControls({
           selectedValues={new Set(statusFilter === "all" ? [] : [statusFilter])}
           onFilterChange={(values: Set<string>) => {
             const selected = Array.from(values);
-            onStatusFilterChange(selected.length === 0 ? "all" : (selected[0] as ActivityStatusFilter));
+            onStatusFilterChange(
+              selected.length === 0 ? "all" : (selected[0] as ActivityStatusFilter),
+            );
           }}
         />
 

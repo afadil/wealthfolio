@@ -74,21 +74,18 @@ function CsvPreviewTable({ headers, rows, mapping }: CsvPreviewProps) {
   }, [mapping]);
 
   return (
-    <div className="max-h-[300px] overflow-auto border rounded-lg">
+    <div className="max-h-[300px] overflow-auto rounded-lg border">
       <table className="w-full text-sm">
         <thead className="bg-muted/50 sticky top-0">
           <tr>
             {headers.map((header, idx) => {
               const mappedField = headerToField[header];
               return (
-                <th
-                  key={idx}
-                  className="border-r px-3 py-2 text-left font-medium last:border-r-0"
-                >
+                <th key={idx} className="border-r px-3 py-2 text-left font-medium last:border-r-0">
                   <div className="flex flex-col gap-1">
                     <span className="font-mono text-xs">{header}</span>
                     {mappedField && (
-                      <Badge variant="secondary" className="text-xs w-fit">
+                      <Badge variant="secondary" className="w-fit text-xs">
                         {HOLDINGS_FIELD_LABELS[mappedField]}
                       </Badge>
                     )}
@@ -100,7 +97,7 @@ function CsvPreviewTable({ headers, rows, mapping }: CsvPreviewProps) {
         </thead>
         <tbody className="font-mono text-xs">
           {displayRows.map((row, rowIdx) => (
-            <tr key={rowIdx} className="border-t hover:bg-muted/30">
+            <tr key={rowIdx} className="hover:bg-muted/30 border-t">
               {row.map((cell, cellIdx) => (
                 <td key={cellIdx} className="border-r px-3 py-2 last:border-r-0">
                   {cell || <span className="text-muted-foreground">-</span>}
@@ -134,7 +131,12 @@ export function HoldingsMappingStep() {
         autoMappings[HoldingsFormat.DATE] = header;
       } else if (lowerHeader === "symbol" || lowerHeader === "ticker" || lowerHeader === "name") {
         autoMappings[HoldingsFormat.SYMBOL] = header;
-      } else if (lowerHeader === "quantity" || lowerHeader === "qty" || lowerHeader === "shares" || lowerHeader === "amount") {
+      } else if (
+        lowerHeader === "quantity" ||
+        lowerHeader === "qty" ||
+        lowerHeader === "shares" ||
+        lowerHeader === "amount"
+      ) {
         autoMappings[HoldingsFormat.QUANTITY] = header;
       } else if (lowerHeader === "price" || lowerHeader.includes("price")) {
         autoMappings[HoldingsFormat.PRICE] = header;
@@ -166,12 +168,12 @@ export function HoldingsMappingStep() {
       };
       dispatch(setMapping(updatedMapping));
     },
-    [holdingsFieldMappings, mapping, state.accountId, dispatch]
+    [holdingsFieldMappings, mapping, state.accountId, dispatch],
   );
 
   // Check which required fields are mapped
   const requiredFieldsMapped = HOLDINGS_REQUIRED_FIELDS.every(
-    (field) => holdingsFieldMappings[field] && headers.includes(holdingsFieldMappings[field])
+    (field) => holdingsFieldMappings[field] && headers.includes(holdingsFieldMappings[field]),
   );
 
   // Count unique dates to show number of snapshots
@@ -201,7 +203,7 @@ export function HoldingsMappingStep() {
             Map your CSV columns to the holdings format. Each row should represent one holding at a
             specific date.
           </p>
-          <ul className="list-disc pl-4 text-sm space-y-1">
+          <ul className="list-disc space-y-1 pl-4 text-sm">
             <li>
               <strong>$CASH</strong> is a reserved symbol for cash balances. Use it in the Symbol
               column.
@@ -214,7 +216,7 @@ export function HoldingsMappingStep() {
 
       {/* Field Mappings */}
       <Card>
-        <CardHeader className="py-3 px-4">
+        <CardHeader className="px-4 py-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-medium">Column Mappings</CardTitle>
             <div className="flex items-center gap-2">
@@ -241,7 +243,7 @@ export function HoldingsMappingStep() {
 
               return (
                 <div key={field} className="space-y-1.5">
-                  <label className="text-sm font-medium flex items-center gap-2">
+                  <label className="flex items-center gap-2 text-sm font-medium">
                     {HOLDINGS_FIELD_LABELS[field]}
                     {isRequired && <span className="text-destructive">*</span>}
                     {isMapped && <Icons.Check className="h-4 w-4 text-green-600" />}
@@ -262,7 +264,7 @@ export function HoldingsMappingStep() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-foreground text-xs">
                     {HOLDINGS_FIELD_DESCRIPTIONS[field]}
                   </p>
                 </div>
@@ -275,26 +277,26 @@ export function HoldingsMappingStep() {
       {/* Summary Stats */}
       {requiredFieldsMapped && (
         <Card>
-          <CardHeader className="py-3 px-4">
+          <CardHeader className="px-4 py-3">
             <CardTitle className="text-sm font-medium">Import Summary</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <div className="text-center p-3 bg-muted/30 rounded-lg">
+              <div className="bg-muted/30 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold">{parsedRows.length}</div>
-                <div className="text-xs text-muted-foreground">Total Rows</div>
+                <div className="text-muted-foreground text-xs">Total Rows</div>
               </div>
-              <div className="text-center p-3 bg-muted/30 rounded-lg">
+              <div className="bg-muted/30 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold">{uniqueDates.size}</div>
-                <div className="text-xs text-muted-foreground">Snapshots</div>
+                <div className="text-muted-foreground text-xs">Snapshots</div>
               </div>
-              <div className="text-center p-3 bg-muted/30 rounded-lg">
+              <div className="bg-muted/30 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold">{parsedRows.length - cashRowCount}</div>
-                <div className="text-xs text-muted-foreground">Holdings</div>
+                <div className="text-muted-foreground text-xs">Holdings</div>
               </div>
-              <div className="text-center p-3 bg-muted/30 rounded-lg">
+              <div className="bg-muted/30 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold">{cashRowCount}</div>
-                <div className="text-xs text-muted-foreground">Cash Entries</div>
+                <div className="text-muted-foreground text-xs">Cash Entries</div>
               </div>
             </div>
           </CardContent>
@@ -303,15 +305,11 @@ export function HoldingsMappingStep() {
 
       {/* CSV Preview */}
       <Card>
-        <CardHeader className="py-3 px-4">
+        <CardHeader className="px-4 py-3">
           <CardTitle className="text-sm font-medium">Data Preview</CardTitle>
         </CardHeader>
-        <CardContent className="p-0 border-t">
-          <CsvPreviewTable
-            headers={headers}
-            rows={parsedRows}
-            mapping={holdingsFieldMappings}
-          />
+        <CardContent className="border-t p-0">
+          <CsvPreviewTable headers={headers} rows={parsedRows} mapping={holdingsFieldMappings} />
         </CardContent>
       </Card>
     </div>

@@ -26,10 +26,8 @@ export function SidebarNav({ className, items, ...props }: SidebarNavProps) {
           to={item.href}
           className={cn(
             buttonVariants({ variant: "ghost", size: "sm" }),
-            "rounded-md justify-start px-2.5 py-1 text-[13px] [&_svg]:size-4",
-            location.pathname.includes(item.href)
-              ? "bg-muted hover:bg-muted"
-              : "hover:bg-muted/50",
+            "justify-start rounded-md px-2.5 py-1 text-[13px] [&_svg]:size-4",
+            location.pathname.includes(item.href) ? "bg-muted hover:bg-muted" : "hover:bg-muted/50",
           )}
         >
           {item.icon && <span className="mr-1.5 hidden lg:inline-block">{item.icon}</span>}

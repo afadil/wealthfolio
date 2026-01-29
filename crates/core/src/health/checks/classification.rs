@@ -72,10 +72,7 @@ pub fn gather_legacy_migration_status(
         .ok()
         .flatten();
 
-    let regions_taxonomy = taxonomy_service
-        .get_taxonomy("regions")
-        .ok()
-        .flatten();
+    let regions_taxonomy = taxonomy_service.get_taxonomy("regions").ok().flatten();
 
     let mut assets_needing_migration = Vec::new();
     let mut assets_already_migrated = 0;

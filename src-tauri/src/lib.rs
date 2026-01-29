@@ -3,6 +3,7 @@
 
 mod commands;
 mod context;
+mod domain_events;
 mod events;
 mod listeners;
 mod scheduler;
@@ -59,13 +60,26 @@ mod desktop {
     /// Performs synchronous setup on desktop: initializes context, menu, and registers listeners.
     pub fn setup(handle: AppHandle, app_data_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
         // Initialize context synchronously (required before any commands can work)
-        let context = tauri::async_runtime::block_on(async {
+        let init_result = tauri::async_runtime::block_on(async {
             context::initialize_context(app_data_dir).await
         })?;
-        let context = Arc::new(context);
+        let context = Arc::new(init_result.context);
+        let event_receiver = init_result.event_receiver;
 
         // Make context available to all commands
         handle.manage(Arc::clone(&context));
+
+        // Start the domain event queue worker now that context is managed
+        // This must be done in an async context since it spawns a tokio task
+        let worker_handle = handle.clone();
+        let worker_context = Arc::clone(&context);
+        tauri::async_runtime::spawn(async move {
+            domain_events::TauriDomainEventSink::start_queue_worker(
+                event_receiver,
+                worker_handle,
+                worker_context,
+            );
+        });
 
         // Menu setup is synchronous (no I/O)
         setup_menu(&handle, &context.instance_id);
@@ -110,9 +124,18 @@ mod mobile {
     pub fn setup(handle: AppHandle, app_data_dir: String) {
         tauri::async_runtime::spawn(async move {
             match context::initialize_context(&app_data_dir).await {
-                Ok(ctx) => {
-                    let context = Arc::new(ctx);
+                Ok(init_result) => {
+                    let context = Arc::new(init_result.context);
+                    let event_receiver = init_result.event_receiver;
+
                     handle.manage(Arc::clone(&context));
+
+                    // Start the domain event queue worker now that context is managed
+                    domain_events::TauriDomainEventSink::start_queue_worker(
+                        event_receiver,
+                        handle.clone(),
+                        Arc::clone(&context),
+                    );
 
                     // Notify frontend that app is ready
                     // The frontend will trigger the initial portfolio update after it's mounted
@@ -251,7 +274,7 @@ pub fn run() {
             commands::portfolio::calculate_performance_history,
             commands::portfolio::save_manual_holdings,
             commands::portfolio::import_holdings_csv,
-            commands::portfolio::get_manual_snapshots,
+            commands::portfolio::get_snapshots,
             commands::portfolio::get_snapshot_by_date,
             commands::portfolio::delete_snapshot,
             // Contribution limit commands

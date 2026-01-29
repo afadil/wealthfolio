@@ -12,7 +12,12 @@ import {
   type SymbolSearchResult,
 } from "@wealthfolio/ui";
 import { cn } from "@/lib/utils";
-import { ActivityType, ActivityTypeNames, SUBTYPES_BY_ACTIVITY_TYPE, SUBTYPE_DISPLAY_NAMES } from "@/lib/constants";
+import {
+  ActivityType,
+  ActivityTypeNames,
+  SUBTYPES_BY_ACTIVITY_TYPE,
+  SUBTYPE_DISPLAY_NAMES,
+} from "@/lib/constants";
 import { ActivityTypeBadge } from "../../components/activity-type-badge";
 import type { DraftActivity, DraftActivityStatus } from "../context";
 import { ImportToolbar, ImportContextMenu } from "./import-toolbar";
@@ -112,7 +117,7 @@ function StatusCell({ status, skipReason, duplicateOfId, errors }: StatusCellPro
       case "error":
         return <Icons.XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />;
       case "skipped":
-        return <Icons.MinusCircle className="h-4 w-4 text-muted-foreground" />;
+        return <Icons.MinusCircle className="text-muted-foreground h-4 w-4" />;
       case "duplicate":
         return <Icons.Copy className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
       default:
@@ -127,7 +132,7 @@ function StatusCell({ status, skipReason, duplicateOfId, errors }: StatusCellPro
           <div
             className={cn(
               "flex h-full w-full items-center justify-center rounded",
-              config.bgClassName
+              config.bgClassName,
             )}
           >
             {StatusIcon}
@@ -164,7 +169,7 @@ function useImportReviewColumns({
         value: account.id,
         label: account.name,
       })),
-    [accounts]
+    [accounts],
   );
 
   const activityTypeOptions = useMemo(
@@ -173,7 +178,7 @@ function useImportReviewColumns({
         value: type,
         label: ActivityTypeNames[type],
       })),
-    []
+    [],
   );
 
   // Dynamic subtype options based on activity type
@@ -225,7 +230,7 @@ function useImportReviewColumns({
         header: "#",
         cell: ({ row }) => (
           <div className="flex items-center gap-1.5">
-            <span className="text-muted-foreground text-xs w-5">{row.original.rowIndex + 1}</span>
+            <span className="text-muted-foreground w-5 text-xs">{row.original.rowIndex + 1}</span>
             <StatusCell
               status={row.original.status}
               skipReason={row.original.skipReason}
@@ -401,7 +406,14 @@ function useImportReviewColumns({
         meta: { cell: { variant: "long-text" } },
       },
     ],
-    [accountOptions, activityTypeOptions, getSubtypeOptions, onSymbolSearch, onSymbolSelect, onCreateCustomAsset]
+    [
+      accountOptions,
+      activityTypeOptions,
+      getSubtypeOptions,
+      onSymbolSearch,
+      onSymbolSelect,
+      onCreateCustomAsset,
+    ],
   );
 }
 
@@ -473,7 +485,7 @@ export function ImportReviewGrid({
         });
       }
     },
-    [selectedRows.length]
+    [selectedRows.length],
   );
 
   // Close context menu
@@ -494,14 +506,14 @@ export function ImportReviewGrid({
     (currency: string) => {
       onBulkSetCurrency?.(selectedRows, currency);
     },
-    [onBulkSetCurrency, selectedRows]
+    [onBulkSetCurrency, selectedRows],
   );
 
   const handleSetAccount = useCallback(
     (accountId: string) => {
       onBulkSetAccount?.(selectedRows, accountId);
     },
-    [onBulkSetAccount, selectedRows]
+    [onBulkSetAccount, selectedRows],
   );
 
   const handleClearSelection = useCallback(() => {
@@ -543,7 +555,7 @@ export function ImportReviewGrid({
         currency,
       });
     },
-    [drafts, fallbackCurrency, onDraftUpdate]
+    [drafts, fallbackCurrency, onDraftUpdate],
   );
 
   // Request to create a custom asset - opens the dialog
@@ -570,7 +582,7 @@ export function ImportReviewGrid({
 
       setCustomAssetDialog({ open: false, rowIndex: -1, symbol: "" });
     },
-    [customAssetDialog, drafts, fallbackCurrency, onDraftUpdate]
+    [customAssetDialog, drafts, fallbackCurrency, onDraftUpdate],
   );
 
   // Filter drafts based on current filter
@@ -635,33 +647,36 @@ export function ImportReviewGrid({
         }
       }
     },
-    [filteredDrafts, onDraftUpdate]
+    [filteredDrafts, onDraftUpdate],
   );
 
   // Cell state callback for error/warning highlighting with messages
   const getCellState = useCallback(
-    (rowIndex: number, columnId: string): { type: 'error' | 'warning'; messages: string[] } | null => {
+    (
+      rowIndex: number,
+      columnId: string,
+    ): { type: "error" | "warning"; messages: string[] } | null => {
       const draft = filteredDrafts[rowIndex];
       if (!draft) return null;
 
       // Skip non-data columns
-      if (columnId === 'select' || columnId === 'status') return null;
+      if (columnId === "select" || columnId === "status") return null;
 
       // Check for errors first (higher priority)
       const errors = draft.errors?.[columnId];
       if (errors?.length) {
-        return { type: 'error', messages: errors };
+        return { type: "error", messages: errors };
       }
 
       // Then check for warnings
       const warnings = draft.warnings?.[columnId];
       if (warnings?.length) {
-        return { type: 'warning', messages: warnings };
+        return { type: "warning", messages: warnings };
       }
 
       return null;
     },
-    [filteredDrafts]
+    [filteredDrafts],
   );
 
   // Initialize data grid
@@ -752,16 +767,8 @@ export function ImportReviewGrid({
       />
 
       {/* Data grid with context menu support */}
-      <div
-        className="min-h-0 flex-1 overflow-hidden"
-        onContextMenu={handleContextMenu}
-      >
-        <DataGrid
-          {...dataGrid}
-          stretchColumns
-          height="calc(100vh - 360px)"
-          className="text-sm"
-        />
+      <div className="min-h-0 flex-1 overflow-hidden" onContextMenu={handleContextMenu}>
+        <DataGrid {...dataGrid} stretchColumns height="calc(100vh - 360px)" className="text-sm" />
       </div>
 
       {/* Context menu */}
@@ -788,7 +795,8 @@ export function ImportReviewGrid({
         defaultSymbol={customAssetDialog.symbol}
         defaultCurrency={
           customAssetDialog.rowIndex >= 0
-            ? drafts.find((d) => d.rowIndex === customAssetDialog.rowIndex)?.currency ?? fallbackCurrency
+            ? (drafts.find((d) => d.rowIndex === customAssetDialog.rowIndex)?.currency ??
+              fallbackCurrency)
             : fallbackCurrency
         }
       />

@@ -179,6 +179,11 @@ test.describe("Onboarding And Main Flow", () => {
         await page.waitForTimeout(200);
       }
 
+      // Select Transactions tracking mode
+      const transactionsRadio = page.getByRole("radio", { name: /Transactions/i });
+      await expect(transactionsRadio).toBeVisible();
+      await transactionsRadio.click();
+
       // Submit the form - button text is "Add Account"
       const submitButton = page.getByRole("button", { name: /Add Account/i }).last();
       await expect(submitButton).toBeVisible();
@@ -204,11 +209,14 @@ test.describe("Onboarding And Main Flow", () => {
 
     for (const deposit of TEST_DATA.deposits) {
       // Wait for any overlay/backdrop to disappear before opening new sheet
-      await page.locator('[data-state="open"][aria-hidden="true"]').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+      await page
+        .locator('[data-state="open"][aria-hidden="true"]')
+        .waitFor({ state: "hidden", timeout: 5000 })
+        .catch(() => {});
 
-      // Open Add Activities dropdown and select Add Transaction
+      // Open Add Activities palette and select Add Transaction
       await page.getByRole("button", { name: "Add Activities" }).click();
-      await page.getByRole("menuitem", { name: "Add Transaction" }).click();
+      await page.getByRole("button", { name: "Add Transaction" }).click();
 
       // Wait for sheet to appear
       await expect(page.getByRole("heading", { name: "Add Activity" })).toBeVisible();
@@ -280,9 +288,9 @@ test.describe("Onboarding And Main Flow", () => {
       // Wait for any overlay/backdrop to disappear before opening new sheet
       await page.waitForTimeout(500);
 
-      // Open Add Activities dropdown and select Add Transaction
+      // Open Add Activities palette and select Add Transaction
       await page.getByRole("button", { name: "Add Activities" }).click();
-      await page.getByRole("menuitem", { name: "Add Transaction" }).click();
+      await page.getByRole("button", { name: "Add Transaction" }).click();
 
       // Wait for sheet to appear
       await expect(page.getByRole("heading", { name: "Add Activity" })).toBeVisible();
@@ -435,7 +443,10 @@ test.describe("Onboarding And Main Flow", () => {
       const baseSymbol = trade.symbol.split(".")[0];
       // Note: For LSE stocks, the asset currency is "GBp" (pence), not "GBP" (pounds)
       const assetCurrency = trade.symbol.endsWith(".L") ? "GBp" : trade.currency;
-      const row = page.getByRole("row").filter({ hasText: baseSymbol }).filter({ hasText: assetCurrency });
+      const row = page
+        .getByRole("row")
+        .filter({ hasText: baseSymbol })
+        .filter({ hasText: assetCurrency });
       await expect(row.first()).toBeVisible({ timeout: 15000 });
 
       // Get the price from the Quote column (td[0]=symbol, td[1]=market, td[2]=quote, td[3]=actions)
@@ -445,7 +456,6 @@ test.describe("Onboarding And Main Flow", () => {
       // Extract numeric value (handles formats like "$277.55", "CA$223.77", "€570.00", "£13,520.00")
       const priceMatch = priceText?.match(/[\d,.]+/);
       prices[trade.symbol] = parseFloat(priceMatch?.[0]?.replace(",", "") || "0");
-
     }
 
     // Calculate expected portfolio value in CAD

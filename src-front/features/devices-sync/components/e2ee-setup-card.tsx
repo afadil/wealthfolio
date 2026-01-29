@@ -65,11 +65,7 @@ export function E2EESetupCard() {
             </Alert>
           )}
 
-          <Button
-            onClick={handleEnable}
-            disabled={isEnabling || state.isLoading}
-            className="mt-4"
-          >
+          <Button onClick={handleEnable} disabled={isEnabling || state.isLoading} className="mt-4">
             {isEnabling || state.isLoading ? (
               <>
                 <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />

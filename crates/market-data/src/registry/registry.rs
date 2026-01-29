@@ -181,13 +181,13 @@ impl ProviderRegistry {
                     let original_count = quotes.len();
                     let mut valid_quotes = Vec::with_capacity(original_count);
                     for quote in quotes.drain(..) {
-                        match self.validator.validate_for_instrument(&quote, Some(&context.instrument)) {
+                        match self
+                            .validator
+                            .validate_for_instrument(&quote, Some(&context.instrument))
+                        {
                             Ok(()) => valid_quotes.push(quote),
                             Err(e) => {
-                                warn!(
-                                    "Quote validation failed for {:?}: {:?}",
-                                    quote.timestamp, e
-                                );
+                                warn!("Quote validation failed for {:?}: {:?}", quote.timestamp, e);
                             }
                         }
                     }
@@ -195,8 +195,7 @@ impl ProviderRegistry {
                     if valid_quotes.is_empty() && original_count > 0 {
                         warn!(
                             "All {} quotes from '{}' failed validation",
-                            original_count,
-                            provider_id
+                            original_count, provider_id
                         );
                         last_error = Some(MarketDataError::ValidationFailed {
                             message: "All quotes failed validation".to_string(),
@@ -281,7 +280,10 @@ impl ProviderRegistry {
                 Ok(quote) => {
                     self.circuit_breaker.record_success(&provider_id);
 
-                    if let Err(e) = self.validator.validate_for_instrument(&quote, Some(&context.instrument)) {
+                    if let Err(e) = self
+                        .validator
+                        .validate_for_instrument(&quote, Some(&context.instrument))
+                    {
                         warn!("Latest quote validation failed: {:?}", e);
                         last_error = Some(e);
                         continue;
@@ -296,7 +298,10 @@ impl ProviderRegistry {
                         return Err(e);
                     }
 
-                    if matches!(retry_class, RetryClass::FailoverWithPenalty | RetryClass::CircuitOpen) {
+                    if matches!(
+                        retry_class,
+                        RetryClass::FailoverWithPenalty | RetryClass::CircuitOpen
+                    ) {
                         self.circuit_breaker.record_failure(&provider_id);
                     }
 
@@ -362,7 +367,8 @@ impl ProviderRegistry {
             // Check capability for fetch type
             if for_historical {
                 if !caps.supports_historical {
-                    diagnostics.record_skip(provider_id.clone(), SkipReason::HistoricalNotSupported);
+                    diagnostics
+                        .record_skip(provider_id.clone(), SkipReason::HistoricalNotSupported);
                     continue;
                 }
             } else if !caps.supports_latest {
@@ -371,7 +377,10 @@ impl ProviderRegistry {
             }
 
             // Check instrument kind
-            if !caps.instrument_kinds.contains(&context.instrument.instrument_kind()) {
+            if !caps
+                .instrument_kinds
+                .contains(&context.instrument.instrument_kind())
+            {
                 diagnostics.record_skip(provider_id.clone(), SkipReason::InstrumentKindMismatch);
                 continue;
             }
@@ -487,7 +496,10 @@ impl ProviderRegistry {
                 }
                 Ok(_) => {
                     // Empty results, try next provider
-                    debug!("Provider '{}' returned no search results for '{}'", provider_id, query);
+                    debug!(
+                        "Provider '{}' returned no search results for '{}'",
+                        provider_id, query
+                    );
                 }
                 Err(MarketDataError::NotSupported { .. }) => {
                     // This provider doesn't support search, skip
@@ -495,7 +507,10 @@ impl ProviderRegistry {
                 }
                 Err(e) => {
                     let retry_class = e.retry_class();
-                    if matches!(retry_class, RetryClass::FailoverWithPenalty | RetryClass::CircuitOpen) {
+                    if matches!(
+                        retry_class,
+                        RetryClass::FailoverWithPenalty | RetryClass::CircuitOpen
+                    ) {
                         self.circuit_breaker.record_failure(&provider_id);
                     }
                     last_error = Some(e);
@@ -512,7 +527,10 @@ impl ProviderRegistry {
     /// (e.g., "VFV.TO" for Yahoo when the MIC is XTSE).
     ///
     /// Tries providers that support profiles until one succeeds.
-    pub async fn get_profile(&self, context: &QuoteContext) -> Result<AssetProfile, MarketDataError> {
+    pub async fn get_profile(
+        &self,
+        context: &QuoteContext,
+    ) -> Result<AssetProfile, MarketDataError> {
         let providers: Vec<_> = self
             .providers
             .iter()
@@ -559,7 +577,10 @@ impl ProviderRegistry {
                 }
                 Err(e) => {
                     let retry_class = e.retry_class();
-                    if matches!(retry_class, RetryClass::FailoverWithPenalty | RetryClass::CircuitOpen) {
+                    if matches!(
+                        retry_class,
+                        RetryClass::FailoverWithPenalty | RetryClass::CircuitOpen
+                    ) {
                         self.circuit_breaker.record_failure(&provider_id);
                     }
                     last_error = Some(e);
@@ -630,13 +651,13 @@ impl ProviderRegistry {
                     let original_count = quotes.len();
                     let mut valid_quotes = Vec::with_capacity(original_count);
                     for quote in quotes.drain(..) {
-                        match self.validator.validate_for_instrument(&quote, Some(&context.instrument)) {
+                        match self
+                            .validator
+                            .validate_for_instrument(&quote, Some(&context.instrument))
+                        {
                             Ok(()) => valid_quotes.push(quote),
                             Err(e) => {
-                                warn!(
-                                    "Quote validation failed for {:?}: {:?}",
-                                    quote.timestamp, e
-                                );
+                                warn!("Quote validation failed for {:?}: {:?}", quote.timestamp, e);
                             }
                         }
                     }
@@ -728,7 +749,10 @@ impl ProviderRegistry {
                 Ok(quote) => {
                     self.circuit_breaker.record_success(&provider_id);
 
-                    if let Err(e) = self.validator.validate_for_instrument(&quote, Some(&context.instrument)) {
+                    if let Err(e) = self
+                        .validator
+                        .validate_for_instrument(&quote, Some(&context.instrument))
+                    {
                         diagnostics.record_error(provider_id.clone(), format!("{:?}", e));
                         last_error = Some(e);
                         continue;
@@ -745,7 +769,10 @@ impl ProviderRegistry {
                         return (Err(e), diagnostics);
                     }
 
-                    if matches!(retry_class, RetryClass::FailoverWithPenalty | RetryClass::CircuitOpen) {
+                    if matches!(
+                        retry_class,
+                        RetryClass::FailoverWithPenalty | RetryClass::CircuitOpen
+                    ) {
                         self.circuit_breaker.record_failure(&provider_id);
                     }
 
@@ -889,7 +916,11 @@ mod tests {
             })
         }
 
-        fn get_currency(&self, _provider: &ProviderId, _context: &QuoteContext) -> Option<Currency> {
+        fn get_currency(
+            &self,
+            _provider: &ProviderId,
+            _context: &QuoteContext,
+        ) -> Option<Currency> {
             Some(Cow::Borrowed("USD"))
         }
     }
@@ -1121,14 +1152,14 @@ mod tests {
     fn test_custom_priorities_override_defaults() {
         // Providers with hardcoded priorities: 5, 10, 20
         let providers: Vec<Arc<dyn MarketDataProvider>> = vec![
-            Arc::new(MockProvider::new("PROVIDER_A", 5, false)),  // Default priority 5
+            Arc::new(MockProvider::new("PROVIDER_A", 5, false)), // Default priority 5
             Arc::new(MockProvider::new("PROVIDER_B", 10, false)), // Default priority 10
             Arc::new(MockProvider::new("PROVIDER_C", 20, false)), // Default priority 20
         ];
 
         // Custom priorities: C=1 (highest), A=50 (lowest), B not set (uses default 10)
         let mut custom_priorities = HashMap::new();
-        custom_priorities.insert("PROVIDER_C".to_string(), 1);  // Override to highest priority
+        custom_priorities.insert("PROVIDER_C".to_string(), 1); // Override to highest priority
         custom_priorities.insert("PROVIDER_A".to_string(), 50); // Override to lowest priority
 
         let resolver = Arc::new(MockResolver);

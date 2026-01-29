@@ -12,9 +12,9 @@ use rig::{
     providers::{anthropic, gemini, groq, ollama, openai},
 };
 
+use crate::env::AiEnvironment;
 use crate::error::AiError;
 use crate::providers::ProviderService;
-use crate::env::AiEnvironment;
 use std::sync::Arc;
 
 // ============================================================================
@@ -30,7 +30,12 @@ pub trait TitleGeneratorTrait: Send + Sync {
     /// Falls back to truncating the message if LLM generation fails.
     ///
     /// `chat_model_id` is used as fallback if no title model is configured for the provider.
-    async fn generate_title(&self, user_message: &str, provider_id: &str, chat_model_id: &str) -> String;
+    async fn generate_title(
+        &self,
+        user_message: &str,
+        provider_id: &str,
+        chat_model_id: &str,
+    ) -> String;
 }
 
 // ============================================================================
@@ -110,23 +115,35 @@ Title:",
         let response = match provider_id {
             "anthropic" => {
                 let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-                let client: anthropic::Client<HttpClient> = anthropic::Client::new(&key)
-                    .map_err(|e| AiError::Provider(e.to_string()))?;
-                client.agent(&model_id).build().prompt(&prompt).await
+                let client: anthropic::Client<HttpClient> =
+                    anthropic::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))?;
+                client
+                    .agent(&model_id)
+                    .build()
+                    .prompt(&prompt)
+                    .await
                     .map_err(|e| AiError::Provider(e.to_string()))?
             }
             "gemini" | "google" => {
                 let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-                let client: gemini::Client<HttpClient> = gemini::Client::new(&key)
-                    .map_err(|e| AiError::Provider(e.to_string()))?;
-                client.agent(&model_id).build().prompt(&prompt).await
+                let client: gemini::Client<HttpClient> =
+                    gemini::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))?;
+                client
+                    .agent(&model_id)
+                    .build()
+                    .prompt(&prompt)
+                    .await
                     .map_err(|e| AiError::Provider(e.to_string()))?
             }
             "groq" => {
                 let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-                let client: groq::Client<HttpClient> = groq::Client::new(&key)
-                    .map_err(|e| AiError::Provider(e.to_string()))?;
-                client.agent(&model_id).build().prompt(&prompt).await
+                let client: groq::Client<HttpClient> =
+                    groq::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))?;
+                client
+                    .agent(&model_id)
+                    .build()
+                    .prompt(&prompt)
+                    .await
                     .map_err(|e| AiError::Provider(e.to_string()))?
             }
             "ollama" => {
@@ -134,17 +151,26 @@ Title:",
                 if let Some(url) = provider_url {
                     builder = builder.base_url(&url);
                 }
-                let client = builder.build()
+                let client = builder
+                    .build()
                     .map_err(|e| AiError::Provider(e.to_string()))?;
-                client.agent(&model_id).build().prompt(&prompt).await
+                client
+                    .agent(&model_id)
+                    .build()
+                    .prompt(&prompt)
+                    .await
                     .map_err(|e| AiError::Provider(e.to_string()))?
             }
             _ => {
                 // Default to OpenAI-compatible
                 let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-                let client: openai::Client<HttpClient> = openai::Client::new(&key)
-                    .map_err(|e| AiError::Provider(e.to_string()))?;
-                client.agent(&model_id).build().prompt(&prompt).await
+                let client: openai::Client<HttpClient> =
+                    openai::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))?;
+                client
+                    .agent(&model_id)
+                    .build()
+                    .prompt(&prompt)
+                    .await
                     .map_err(|e| AiError::Provider(e.to_string()))?
             }
         };
@@ -154,7 +180,9 @@ Title:",
 
         // Ensure reasonable length
         if title.is_empty() || title.len() > 100 {
-            return Err(AiError::Internal("Generated title too long or empty".into()));
+            return Err(AiError::Internal(
+                "Generated title too long or empty".into(),
+            ));
         }
 
         Ok(title)
@@ -211,14 +239,19 @@ fn clean_generated_title(raw: &str) -> String {
 
 #[async_trait]
 impl<E: AiEnvironment + 'static> TitleGeneratorTrait for TitleGenerator<E> {
-    async fn generate_title(&self, user_message: &str, provider_id: &str, chat_model_id: &str) -> String {
-        debug!(
-            "Generating title for message (len={})",
-            user_message.len()
-        );
+    async fn generate_title(
+        &self,
+        user_message: &str,
+        provider_id: &str,
+        chat_model_id: &str,
+    ) -> String {
+        debug!("Generating title for message (len={})", user_message.len());
 
         // Try LLM generation, fall back to truncation on failure
-        match self.generate_with_llm(user_message, provider_id, chat_model_id).await {
+        match self
+            .generate_with_llm(user_message, provider_id, chat_model_id)
+            .await
+        {
             Ok(title) => {
                 debug!("Generated title: {}", title);
                 title
@@ -306,7 +339,12 @@ impl FakeTitleGenerator {
 
 #[async_trait]
 impl TitleGeneratorTrait for FakeTitleGenerator {
-    async fn generate_title(&self, user_message: &str, _provider_id: &str, _chat_model_id: &str) -> String {
+    async fn generate_title(
+        &self,
+        user_message: &str,
+        _provider_id: &str,
+        _chat_model_id: &str,
+    ) -> String {
         match &self.fixed_title {
             Some(title) => title.clone(),
             None => truncate_to_title(user_message, self.fallback_max_chars),
@@ -354,7 +392,9 @@ mod tests {
     #[tokio::test]
     async fn test_fake_title_generator_fixed() {
         let generator = FakeTitleGenerator::with_title("Test Title");
-        let title = generator.generate_title("Any message", "openai", "gpt-4o").await;
+        let title = generator
+            .generate_title("Any message", "openai", "gpt-4o")
+            .await;
         assert_eq!(title, "Test Title");
     }
 

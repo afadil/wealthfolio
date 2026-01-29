@@ -84,9 +84,7 @@ export function AssetsTableMobile({
 
   // Get unique asset kinds
   const assetKindOptions = useMemo(() => {
-    const kinds = new Set(
-      assets.map((asset) => asset.kind).filter((k) => !!k),
-    );
+    const kinds = new Set(assets.map((asset) => asset.kind).filter((k) => !!k));
     return Array.from(kinds).sort();
   }, [assets]);
 
@@ -97,24 +95,20 @@ export function AssetsTableMobile({
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter((asset) =>
-        [asset.symbol, asset.name ?? "", asset.kind ?? ""].some(
-          (value) => value.toLowerCase().includes(query),
+        [asset.symbol, asset.name ?? "", asset.kind ?? ""].some((value) =>
+          value.toLowerCase().includes(query),
         ),
       );
     }
 
     // Filter by pricing mode
     if (selectedDataSources.length > 0) {
-      filtered = filtered.filter((asset) =>
-        selectedDataSources.includes(asset.pricingMode),
-      );
+      filtered = filtered.filter((asset) => selectedDataSources.includes(asset.pricingMode));
     }
 
     // Filter by asset kind
     if (selectedAssetKinds.length > 0) {
-      filtered = filtered.filter(
-        (asset) => asset.kind && selectedAssetKinds.includes(asset.kind),
-      );
+      filtered = filtered.filter((asset) => asset.kind && selectedAssetKinds.includes(asset.kind));
     }
 
     // Filter by price status

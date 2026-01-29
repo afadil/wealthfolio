@@ -178,7 +178,9 @@ export function useSaveActivities({
       );
       return { success: !hasErrors || hasSuccesses };
     } catch (error) {
-      logger.error(`Failed to save activities: ${error instanceof Error ? error.message : String(error)}`);
+      logger.error(
+        `Failed to save activities: ${error instanceof Error ? error.message : String(error)}`,
+      );
       // Error toast is handled by the mutation hook
       return { success: false };
     }

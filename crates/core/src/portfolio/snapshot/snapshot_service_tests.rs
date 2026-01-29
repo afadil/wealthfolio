@@ -13,7 +13,9 @@ mod tests {
         ImportMapping as ActivityImportMapping, IncomeData as ActivityIncomeData, NewActivity,
         Sort as ActivitySort,
     };
-    use crate::assets::{Asset, AssetKind, AssetRepositoryTrait, NewAsset, PricingMode, UpdateAssetProfile};
+    use crate::assets::{
+        Asset, AssetKind, AssetRepositoryTrait, NewAsset, PricingMode, UpdateAssetProfile,
+    };
     use crate::constants::{DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
     use crate::errors::{Error, Result as AppResult};
     use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
@@ -344,12 +346,12 @@ mod tests {
         fn get_income_activities(&self) -> AppResult<Vec<Activity>> {
             unimplemented!()
         }
-        fn get_deposit_activities(
+        fn get_contribution_activities(
             &self,
             _account_ids: &[String],
             _start_date: NaiveDateTime,
             _end_date: NaiveDateTime,
-        ) -> AppResult<Vec<(String, Decimal, Decimal, String, Option<Decimal>)>> {
+        ) -> AppResult<Vec<crate::limits::ContributionActivity>> {
             unimplemented!()
         }
         fn search_activities(
@@ -361,6 +363,8 @@ mod tests {
             _asset_id_keyword: Option<String>,
             _sort: Option<ActivitySort>,
             _is_draft_filter: Option<bool>,
+            _date_from: Option<NaiveDate>,
+            _date_to: Option<NaiveDate>,
         ) -> AppResult<ActivitySearchResponse> {
             unimplemented!()
         }
@@ -413,7 +417,10 @@ mod tests {
             &self,
             _asset_ids: &[String],
         ) -> AppResult<
-            std::collections::HashMap<String, (Option<chrono::NaiveDate>, Option<chrono::NaiveDate>)>,
+            std::collections::HashMap<
+                String,
+                (Option<chrono::NaiveDate>, Option<chrono::NaiveDate>),
+            >,
         > {
             Ok(std::collections::HashMap::new())
         }
@@ -423,6 +430,13 @@ mod tests {
             _idempotency_keys: &[String],
         ) -> AppResult<std::collections::HashMap<String, String>> {
             Ok(std::collections::HashMap::new())
+        }
+
+        async fn bulk_upsert(
+            &self,
+            _activities: Vec<crate::activities::ActivityUpsert>,
+        ) -> AppResult<crate::activities::BulkUpsertResult> {
+            unimplemented!()
         }
     }
 
@@ -472,12 +486,12 @@ mod tests {
         fn get_income_activities(&self) -> AppResult<Vec<Activity>> {
             unimplemented!()
         }
-        fn get_deposit_activities(
+        fn get_contribution_activities(
             &self,
             _ids: &[String],
             _s: NaiveDateTime,
             _e: NaiveDateTime,
-        ) -> AppResult<Vec<(String, Decimal, Decimal, String, Option<Decimal>)>> {
+        ) -> AppResult<Vec<crate::limits::ContributionActivity>> {
             unimplemented!()
         }
         fn search_activities(
@@ -489,6 +503,8 @@ mod tests {
             _kw: Option<String>,
             _sort: Option<ActivitySort>,
             _is_draft_filter: Option<bool>,
+            _date_from: Option<NaiveDate>,
+            _date_to: Option<NaiveDate>,
         ) -> AppResult<ActivitySearchResponse> {
             unimplemented!()
         }
@@ -538,7 +554,10 @@ mod tests {
             &self,
             _asset_ids: &[String],
         ) -> AppResult<
-            std::collections::HashMap<String, (Option<chrono::NaiveDate>, Option<chrono::NaiveDate>)>,
+            std::collections::HashMap<
+                String,
+                (Option<chrono::NaiveDate>, Option<chrono::NaiveDate>),
+            >,
         > {
             Ok(std::collections::HashMap::new())
         }
@@ -548,6 +567,13 @@ mod tests {
             _idempotency_keys: &[String],
         ) -> AppResult<std::collections::HashMap<String, String>> {
             Ok(std::collections::HashMap::new())
+        }
+
+        async fn bulk_upsert(
+            &self,
+            _activities: Vec<crate::activities::ActivityUpsert>,
+        ) -> AppResult<crate::activities::BulkUpsertResult> {
+            unimplemented!()
         }
     }
 
@@ -784,10 +810,7 @@ mod tests {
             Ok(0)
         }
 
-        async fn save_or_update_snapshot(
-            &self,
-            snapshot: &AccountStateSnapshot,
-        ) -> AppResult<()> {
+        async fn save_or_update_snapshot(&self, snapshot: &AccountStateSnapshot) -> AppResult<()> {
             let mut store = self.snapshots.write().unwrap();
             let account_snaps = store.entry(snapshot.account_id.clone()).or_default();
 
@@ -1974,7 +1997,10 @@ mod tests {
         );
         credit_bonus.subtype = Some("BONUS".to_string());
 
-        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![deposit, credit_bonus]));
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![
+            deposit,
+            credit_bonus,
+        ]));
         let fx = Arc::new(MockFxService::new());
         let snapshot_repo = Arc::new(MockSnapshotRepository::new());
         let asset_repo = Arc::new(MockAssetRepository::new());
@@ -2042,7 +2068,10 @@ mod tests {
         );
         credit_rebate.subtype = Some("REBATE".to_string());
 
-        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![deposit, credit_rebate]));
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![
+            deposit,
+            credit_rebate,
+        ]));
         let fx = Arc::new(MockFxService::new());
         let snapshot_repo = Arc::new(MockSnapshotRepository::new());
         let asset_repo = Arc::new(MockAssetRepository::new());
@@ -3361,27 +3390,52 @@ mod tests {
         let snapshot_date = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
         let mut manual_snapshot = create_blank_snapshot("acc1", "USD", "2025-01-15");
         manual_snapshot.source = SnapshotSource::ManualEntry; // Caller sets the source
-        manual_snapshot.cash_balances.insert("USD".to_string(), dec!(5000));
+        manual_snapshot
+            .cash_balances
+            .insert("USD".to_string(), dec!(5000));
         manual_snapshot.net_contribution = dec!(5000);
         manual_snapshot.net_contribution_base = dec!(5000);
 
         // Save the manual snapshot
-        let result = svc.save_manual_snapshot("acc1", manual_snapshot.clone()).await;
+        let result = svc
+            .save_manual_snapshot("acc1", manual_snapshot.clone())
+            .await;
         assert!(result.is_ok(), "save_manual_snapshot should succeed");
 
         // Verify snapshots were saved (manual + synthetic for performance history)
-        let saved = snapshot_repo.get_snapshots_by_account("acc1", None, None).unwrap();
-        assert_eq!(saved.len(), 2, "Should have two snapshots: manual + synthetic for holdings history");
+        let saved = snapshot_repo
+            .get_snapshots_by_account("acc1", None, None)
+            .unwrap();
+        assert_eq!(
+            saved.len(),
+            2,
+            "Should have two snapshots: manual + synthetic for holdings history"
+        );
 
         // Find and verify the manual snapshot
-        let saved_snapshot = saved.iter().find(|s| s.snapshot_date == snapshot_date).unwrap();
-        assert_eq!(saved_snapshot.source, SnapshotSource::ManualEntry, "Source should be ManualEntry");
+        let saved_snapshot = saved
+            .iter()
+            .find(|s| s.snapshot_date == snapshot_date)
+            .unwrap();
+        assert_eq!(
+            saved_snapshot.source,
+            SnapshotSource::ManualEntry,
+            "Source should be ManualEntry"
+        );
         assert_eq!(saved_snapshot.cash_balances.get("USD"), Some(&dec!(5000)));
 
         // Verify synthetic snapshot was created 3 months before
-        let synthetic = saved.iter().find(|s| s.source == SnapshotSource::Synthetic).unwrap();
-        let expected_synthetic_date = snapshot_date.checked_sub_months(chrono::Months::new(3)).unwrap();
-        assert_eq!(synthetic.snapshot_date, expected_synthetic_date, "Synthetic should be 3 months before");
+        let synthetic = saved
+            .iter()
+            .find(|s| s.source == SnapshotSource::Synthetic)
+            .unwrap();
+        let expected_synthetic_date = snapshot_date
+            .checked_sub_months(chrono::Months::new(3))
+            .unwrap();
+        assert_eq!(
+            synthetic.snapshot_date, expected_synthetic_date,
+            "Synthetic should be 3 months before"
+        );
     }
 
     #[tokio::test]
@@ -3399,7 +3453,9 @@ mod tests {
 
         // Pre-populate with an existing snapshot for the same date
         let mut existing_snapshot = create_blank_snapshot("acc1", "USD", "2025-01-15");
-        existing_snapshot.cash_balances.insert("USD".to_string(), dec!(3000));
+        existing_snapshot
+            .cash_balances
+            .insert("USD".to_string(), dec!(3000));
         existing_snapshot.source = SnapshotSource::ManualEntry;
         snapshot_repo.add_snapshots(vec![existing_snapshot]);
 
@@ -3415,23 +3471,41 @@ mod tests {
         // Create updated snapshot for same date with different values
         let mut updated_snapshot = create_blank_snapshot("acc1", "USD", "2025-01-15");
         updated_snapshot.source = SnapshotSource::ManualEntry; // Caller sets the source
-        updated_snapshot.cash_balances.insert("USD".to_string(), dec!(7500));
+        updated_snapshot
+            .cash_balances
+            .insert("USD".to_string(), dec!(7500));
         updated_snapshot.net_contribution = dec!(7500);
 
         let result = svc.save_manual_snapshot("acc1", updated_snapshot).await;
-        assert!(result.is_ok(), "save_manual_snapshot should succeed for update");
+        assert!(
+            result.is_ok(),
+            "save_manual_snapshot should succeed for update"
+        );
 
         // Verify: 1 updated manual snapshot + 1 synthetic for holdings history
         // Note: Pre-existing snapshot had count=1, but after first save synthetic is created.
         // After update on same date, still 2 total (synthetic + updated manual).
-        let saved = snapshot_repo.get_snapshots_by_account("acc1", None, None).unwrap();
-        assert_eq!(saved.len(), 2, "Should have 2 snapshots: updated manual + synthetic");
+        let saved = snapshot_repo
+            .get_snapshots_by_account("acc1", None, None)
+            .unwrap();
+        assert_eq!(
+            saved.len(),
+            2,
+            "Should have 2 snapshots: updated manual + synthetic"
+        );
 
         // Find and verify the manual snapshot was updated
         let manual_date = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
-        let saved_snapshot = saved.iter().find(|s| s.snapshot_date == manual_date).unwrap();
+        let saved_snapshot = saved
+            .iter()
+            .find(|s| s.snapshot_date == manual_date)
+            .unwrap();
         assert_eq!(saved_snapshot.source, SnapshotSource::ManualEntry);
-        assert_eq!(saved_snapshot.cash_balances.get("USD"), Some(&dec!(7500)), "Cash should be updated");
+        assert_eq!(
+            saved_snapshot.cash_balances.get("USD"),
+            Some(&dec!(7500)),
+            "Cash should be updated"
+        );
     }
 
     #[tokio::test]
@@ -3449,7 +3523,9 @@ mod tests {
 
         // Pre-populate with an existing snapshot
         let mut existing_snapshot = create_blank_snapshot("acc1", "USD", "2025-01-10");
-        existing_snapshot.cash_balances.insert("USD".to_string(), dec!(3000));
+        existing_snapshot
+            .cash_balances
+            .insert("USD".to_string(), dec!(3000));
         existing_snapshot.source = SnapshotSource::ManualEntry;
         snapshot_repo.add_snapshots(vec![existing_snapshot]);
 
@@ -3465,25 +3541,38 @@ mod tests {
         // Create new snapshot for a different date
         let mut new_snapshot = create_blank_snapshot("acc1", "USD", "2025-01-20");
         new_snapshot.source = SnapshotSource::ManualEntry; // Caller sets the source
-        new_snapshot.cash_balances.insert("USD".to_string(), dec!(8000));
+        new_snapshot
+            .cash_balances
+            .insert("USD".to_string(), dec!(8000));
         new_snapshot.net_contribution = dec!(8000);
 
         let result = svc.save_manual_snapshot("acc1", new_snapshot).await;
-        assert!(result.is_ok(), "save_manual_snapshot should succeed for new date");
+        assert!(
+            result.is_ok(),
+            "save_manual_snapshot should succeed for new date"
+        );
 
         // Verify two snapshots exist
-        let saved = snapshot_repo.get_snapshots_by_account("acc1", None, None).unwrap();
+        let saved = snapshot_repo
+            .get_snapshots_by_account("acc1", None, None)
+            .unwrap();
         assert_eq!(saved.len(), 2, "Should have two snapshots");
 
         // Verify dates and sources
         let mut sorted = saved.clone();
         sorted.sort_by_key(|s| s.snapshot_date);
 
-        assert_eq!(sorted[0].snapshot_date, NaiveDate::from_ymd_opt(2025, 1, 10).unwrap());
+        assert_eq!(
+            sorted[0].snapshot_date,
+            NaiveDate::from_ymd_opt(2025, 1, 10).unwrap()
+        );
         assert_eq!(sorted[0].source, SnapshotSource::ManualEntry);
         assert_eq!(sorted[0].cash_balances.get("USD"), Some(&dec!(3000)));
 
-        assert_eq!(sorted[1].snapshot_date, NaiveDate::from_ymd_opt(2025, 1, 20).unwrap());
+        assert_eq!(
+            sorted[1].snapshot_date,
+            NaiveDate::from_ymd_opt(2025, 1, 20).unwrap()
+        );
         assert_eq!(sorted[1].source, SnapshotSource::ManualEntry);
         assert_eq!(sorted[1].cash_balances.get("USD"), Some(&dec!(8000)));
     }
@@ -3519,13 +3608,23 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify: CsvImport snapshot + synthetic for holdings history
-        let saved = snapshot_repo.get_snapshots_by_account("acc1", None, None).unwrap();
-        assert_eq!(saved.len(), 2, "Should have 2 snapshots: CSV import + synthetic");
+        let saved = snapshot_repo
+            .get_snapshots_by_account("acc1", None, None)
+            .unwrap();
+        assert_eq!(
+            saved.len(),
+            2,
+            "Should have 2 snapshots: CSV import + synthetic"
+        );
 
         // Find and verify the CSV import snapshot preserves source
         let csv_date = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
         let csv_snapshot = saved.iter().find(|s| s.snapshot_date == csv_date).unwrap();
-        assert_eq!(csv_snapshot.source, SnapshotSource::CsvImport, "Source should be preserved from input");
+        assert_eq!(
+            csv_snapshot.source,
+            SnapshotSource::CsvImport,
+            "Source should be preserved from input"
+        );
     }
 
     // ==================== ensure_holdings_history Tests ====================
@@ -3563,16 +3662,27 @@ mod tests {
         // Save another snapshot
         let mut new_snapshot = create_blank_snapshot("acc1", "USD", "2025-02-01");
         new_snapshot.source = SnapshotSource::ManualEntry;
-        new_snapshot.cash_balances.insert("USD".to_string(), dec!(10000));
+        new_snapshot
+            .cash_balances
+            .insert("USD".to_string(), dec!(10000));
 
         let result = svc.save_manual_snapshot("acc1", new_snapshot).await;
         assert!(result.is_ok());
 
         // Should have 3 snapshots total, no synthetic created
-        let saved = snapshot_repo.get_snapshots_by_account("acc1", None, None).unwrap();
-        assert_eq!(saved.len(), 3, "Should have 3 manual snapshots, no synthetic");
+        let saved = snapshot_repo
+            .get_snapshots_by_account("acc1", None, None)
+            .unwrap();
+        assert_eq!(
+            saved.len(),
+            3,
+            "Should have 3 manual snapshots, no synthetic"
+        );
 
-        let synthetic_count = saved.iter().filter(|s| s.source == SnapshotSource::Synthetic).count();
+        let synthetic_count = saved
+            .iter()
+            .filter(|s| s.source == SnapshotSource::Synthetic)
+            .count();
         assert_eq!(synthetic_count, 0, "No synthetic snapshots should exist");
     }
 
@@ -3603,7 +3713,9 @@ mod tests {
         let manual_date = NaiveDate::from_ymd_opt(2025, 6, 15).unwrap();
         let mut manual_snapshot = create_blank_snapshot("acc1", "USD", "2025-06-15");
         manual_snapshot.source = SnapshotSource::ManualEntry;
-        manual_snapshot.cash_balances.insert("USD".to_string(), dec!(5000));
+        manual_snapshot
+            .cash_balances
+            .insert("USD".to_string(), dec!(5000));
         manual_snapshot.cost_basis = dec!(10000);
         manual_snapshot.net_contribution = dec!(15000);
 
@@ -3622,17 +3734,26 @@ mod tests {
             last_updated: Utc::now(),
             is_alternative: false,
         };
-        manual_snapshot.positions.insert("asset1".to_string(), position);
+        manual_snapshot
+            .positions
+            .insert("asset1".to_string(), position);
 
         let result = svc.save_manual_snapshot("acc1", manual_snapshot).await;
         assert!(result.is_ok());
 
         // Verify synthetic was created with same holdings data
-        let saved = snapshot_repo.get_snapshots_by_account("acc1", None, None).unwrap();
-        let synthetic = saved.iter().find(|s| s.source == SnapshotSource::Synthetic).unwrap();
+        let saved = snapshot_repo
+            .get_snapshots_by_account("acc1", None, None)
+            .unwrap();
+        let synthetic = saved
+            .iter()
+            .find(|s| s.source == SnapshotSource::Synthetic)
+            .unwrap();
 
         // Synthetic should be 3 months before manual
-        let expected_synthetic_date = manual_date.checked_sub_months(chrono::Months::new(3)).unwrap();
+        let expected_synthetic_date = manual_date
+            .checked_sub_months(chrono::Months::new(3))
+            .unwrap();
         assert_eq!(synthetic.snapshot_date, expected_synthetic_date);
 
         // Synthetic should have same holdings data
@@ -3640,7 +3761,10 @@ mod tests {
         assert_eq!(synthetic.cost_basis, dec!(10000));
         assert_eq!(synthetic.net_contribution, dec!(15000));
         assert!(synthetic.positions.contains_key("asset1"));
-        assert_eq!(synthetic.positions.get("asset1").unwrap().quantity, dec!(100));
+        assert_eq!(
+            synthetic.positions.get("asset1").unwrap().quantity,
+            dec!(100)
+        );
     }
 
     #[tokio::test]
@@ -3669,16 +3793,22 @@ mod tests {
         // Create broker imported snapshot
         let mut broker_snapshot = create_blank_snapshot("acc1", "USD", "2025-03-15");
         broker_snapshot.source = SnapshotSource::BrokerImported;
-        broker_snapshot.cash_balances.insert("USD".to_string(), dec!(8000));
+        broker_snapshot
+            .cash_balances
+            .insert("USD".to_string(), dec!(8000));
 
         let result = svc.save_manual_snapshot("acc1", broker_snapshot).await;
         assert!(result.is_ok());
 
         // Should have 2 snapshots: broker + synthetic
-        let saved = snapshot_repo.get_snapshots_by_account("acc1", None, None).unwrap();
+        let saved = snapshot_repo
+            .get_snapshots_by_account("acc1", None, None)
+            .unwrap();
         assert_eq!(saved.len(), 2);
 
-        let broker = saved.iter().find(|s| s.source == SnapshotSource::BrokerImported);
+        let broker = saved
+            .iter()
+            .find(|s| s.source == SnapshotSource::BrokerImported);
         let synthetic = saved.iter().find(|s| s.source == SnapshotSource::Synthetic);
 
         assert!(broker.is_some(), "Broker snapshot should exist");
@@ -3726,11 +3856,19 @@ mod tests {
         assert!(result.is_ok());
 
         // Should have: 2 calculated + 1 manual + 1 synthetic = 4 total
-        let saved = snapshot_repo.get_snapshots_by_account("acc1", None, None).unwrap();
+        let saved = snapshot_repo
+            .get_snapshots_by_account("acc1", None, None)
+            .unwrap();
         assert_eq!(saved.len(), 4);
 
         // Synthetic should be created because only 1 non-calculated existed before
-        let synthetic_count = saved.iter().filter(|s| s.source == SnapshotSource::Synthetic).count();
-        assert_eq!(synthetic_count, 1, "Synthetic should be created when only 1 non-calculated exists");
+        let synthetic_count = saved
+            .iter()
+            .filter(|s| s.source == SnapshotSource::Synthetic)
+            .count();
+        assert_eq!(
+            synthetic_count, 1,
+            "Synthetic should be created when only 1 non-calculated exists"
+        );
     }
 }

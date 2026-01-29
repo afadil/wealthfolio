@@ -2,7 +2,9 @@
 #[cfg(test)]
 mod tests {
     use crate::activities::{Activity, ActivityStatus, ActivityType};
-    use crate::assets::{Asset, AssetKind, AssetRepositoryTrait, NewAsset, PricingMode, UpdateAssetProfile};
+    use crate::assets::{
+        Asset, AssetKind, AssetRepositoryTrait, NewAsset, PricingMode, UpdateAssetProfile,
+    };
     use crate::errors::Result;
     use crate::fx::{ExchangeRate, FxError, FxServiceTrait, NewExchangeRate};
     use crate::portfolio::snapshot::holdings_calculator::HoldingsCalculator;
@@ -1508,8 +1510,13 @@ mod tests {
             target_date_str,
         );
 
-        let result = calculator.calculate_next_holdings(&previous_snapshot, &[transfer_in], target_date);
-        assert!(result.is_ok(), "TransferIn should succeed: {:?}", result.err());
+        let result =
+            calculator.calculate_next_holdings(&previous_snapshot, &[transfer_in], target_date);
+        assert!(
+            result.is_ok(),
+            "TransferIn should succeed: {:?}",
+            result.err()
+        );
         let state = result.unwrap().snapshot;
 
         // Account-boundary cashflow: transfers affect net_contribution.
@@ -3075,8 +3082,7 @@ mod tests {
         // Net contribution reflects transfer cost basis in account currency (fx_rate provided)
         let expected_net_contribution = dec!(1510) * activity_fx_rate;
         assert_eq!(
-            next_state.net_contribution,
-            expected_net_contribution,
+            next_state.net_contribution, expected_net_contribution,
             "Net contribution should reflect transfer amount"
         );
     }

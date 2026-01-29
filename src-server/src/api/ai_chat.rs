@@ -17,7 +17,10 @@ use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 
 use crate::main_lib::AppState;
-use wealthfolio_ai::{AiError, AiStreamEvent, ChatMessage, ChatThread, ListThreadsRequest, SendMessageRequest, ThreadPage};
+use wealthfolio_ai::{
+    AiError, AiStreamEvent, ChatMessage, ChatThread, ListThreadsRequest, SendMessageRequest,
+    ThreadPage,
+};
 
 // ============================================================================
 // Request/Response Types
@@ -130,7 +133,10 @@ async fn list_threads(
         limit: query.limit,
         search: query.search,
     };
-    let page = state.ai_chat_service.list_threads_paginated(&request).map_err(AiChatError::Ai)?;
+    let page = state
+        .ai_chat_service
+        .list_threads_paginated(&request)
+        .map_err(AiChatError::Ai)?;
     Ok(Json(page))
 }
 
@@ -141,7 +147,10 @@ async fn get_thread(
     State(state): State<Arc<AppState>>,
     Path(thread_id): Path<String>,
 ) -> Result<Json<Option<ChatThread>>, AiChatError> {
-    let thread = state.ai_chat_service.get_thread(&thread_id).map_err(AiChatError::Ai)?;
+    let thread = state
+        .ai_chat_service
+        .get_thread(&thread_id)
+        .map_err(AiChatError::Ai)?;
     Ok(Json(thread))
 }
 
@@ -152,7 +161,10 @@ async fn get_thread_messages(
     State(state): State<Arc<AppState>>,
     Path(thread_id): Path<String>,
 ) -> Result<Json<Vec<ChatMessage>>, AiChatError> {
-    let messages = state.ai_chat_service.get_messages(&thread_id).map_err(AiChatError::Ai)?;
+    let messages = state
+        .ai_chat_service
+        .get_messages(&thread_id)
+        .map_err(AiChatError::Ai)?;
     Ok(Json(messages))
 }
 
@@ -166,12 +178,20 @@ async fn update_thread(
 ) -> Result<Json<ChatThread>, AiChatError> {
     // Update title if provided
     if let Some(title) = request.title {
-        state.ai_chat_service.update_thread_title(&thread_id, title).await.map_err(AiChatError::Ai)?;
+        state
+            .ai_chat_service
+            .update_thread_title(&thread_id, title)
+            .await
+            .map_err(AiChatError::Ai)?;
     }
 
     // Update pinned status if provided
     if let Some(is_pinned) = request.is_pinned {
-        state.ai_chat_service.update_thread_pinned(&thread_id, is_pinned).await.map_err(AiChatError::Ai)?;
+        state
+            .ai_chat_service
+            .update_thread_pinned(&thread_id, is_pinned)
+            .await
+            .map_err(AiChatError::Ai)?;
     }
 
     // Get updated thread
@@ -190,7 +210,11 @@ async fn delete_thread(
     State(state): State<Arc<AppState>>,
     Path(thread_id): Path<String>,
 ) -> Result<StatusCode, AiChatError> {
-    state.ai_chat_service.delete_thread(&thread_id).await.map_err(AiChatError::Ai)?;
+    state
+        .ai_chat_service
+        .delete_thread(&thread_id)
+        .await
+        .map_err(AiChatError::Ai)?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -253,7 +277,11 @@ async fn update_tool_result(
 ) -> Result<Json<ChatMessage>, AiChatError> {
     let message = state
         .ai_chat_service
-        .update_tool_result(&request.thread_id, &request.tool_call_id, request.result_patch)
+        .update_tool_result(
+            &request.thread_id,
+            &request.tool_call_id,
+            request.result_patch,
+        )
         .await
         .map_err(AiChatError::Ai)?;
     Ok(Json(message))
@@ -288,9 +316,7 @@ impl IntoResponse for AiChatError {
                 };
                 (status, e.code().to_string(), e.to_string())
             }
-            AiChatError::NotFound(msg) => {
-                (StatusCode::NOT_FOUND, "not_found".to_string(), msg)
-            }
+            AiChatError::NotFound(msg) => (StatusCode::NOT_FOUND, "not_found".to_string(), msg),
         };
 
         let body = serde_json::json!({
@@ -323,9 +349,6 @@ pub fn router() -> Router<Arc<AppState>> {
         // Tool result update
         .route("/ai/tool-result", patch(update_tool_result))
         // Tag management
-        .route(
-            "/ai/threads/{id}/tags",
-            get(get_tags).post(add_tag),
-        )
+        .route("/ai/threads/{id}/tags", get(get_tags).post(add_tag))
         .route("/ai/threads/{id}/tags/{tag}", delete(remove_tag))
 }

@@ -15,7 +15,7 @@ export function MigrationBanner() {
     try {
       const result = await migrateMutation.mutateAsync();
       toast.success(
-        `Migration complete! ${result.sectorsMigrated} sectors and ${result.countriesMigrated} countries migrated.`
+        `Migration complete! ${result.sectorsMigrated} sectors and ${result.countriesMigrated} countries migrated.`,
       );
       if (result.errors.length > 0) {
         toast.warning(`${result.errors.length} items could not be matched and were skipped.`);
@@ -34,11 +34,7 @@ export function MigrationBanner() {
           {status.assetsWithLegacyData} assets have legacy sector/country data that can be migrated
           to the new taxonomy system for better organization and analytics.
         </p>
-        <Button
-          onClick={handleMigrate}
-          disabled={migrateMutation.isPending}
-          size="sm"
-        >
+        <Button onClick={handleMigrate} disabled={migrateMutation.isPending} size="sm">
           {migrateMutation.isPending ? (
             <>
               <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />

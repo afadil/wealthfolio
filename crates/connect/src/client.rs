@@ -538,7 +538,10 @@ impl BrokerApiClient for ConnectApiClient {
         limit: Option<i64>,
     ) -> Result<PaginatedUniversalActivity> {
         // Delegate to the inherent method
-        ConnectApiClient::get_account_activities(self, account_id, start_date, end_date, offset, limit).await
+        ConnectApiClient::get_account_activities(
+            self, account_id, start_date, end_date, offset, limit,
+        )
+        .await
     }
 
     /// Fetch current holdings for a broker account.

@@ -28,9 +28,7 @@ export const updateAiProviderSettings = async (
 /**
  * Set or clear the default AI provider.
  */
-export const setDefaultAiProvider = async (
-  request: SetDefaultProviderRequest,
-): Promise<void> => {
+export const setDefaultAiProvider = async (request: SetDefaultProviderRequest): Promise<void> => {
   return invoke<void>("set_default_ai_provider", { request });
 };
 

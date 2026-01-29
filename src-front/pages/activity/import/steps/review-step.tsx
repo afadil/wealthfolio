@@ -15,7 +15,12 @@ import {
 } from "../context";
 import { ImportReviewGrid, type ImportReviewFilter } from "../components/import-review-grid";
 import { ImportAlert } from "../components/import-alert";
-import { ActivityType, ImportFormat, ACTIVITY_SUBTYPES, SUBTYPES_BY_ACTIVITY_TYPE } from "@/lib/constants";
+import {
+  ActivityType,
+  ImportFormat,
+  ACTIVITY_SUBTYPES,
+  SUBTYPES_BY_ACTIVITY_TYPE,
+} from "@/lib/constants";
 import { checkActivitiesImport, checkExistingDuplicates, logger } from "@/adapters";
 import type { ActivityImport } from "@/lib/types";
 import { computeIdempotencyKeys, type IdempotencyKeyInput } from "../utils/idempotency";
@@ -43,7 +48,7 @@ interface FilterStats {
 function parseNumericValue(
   value: string | undefined,
   decimalSeparator: string,
-  thousandsSeparator: string
+  thousandsSeparator: string,
 ): number | undefined {
   if (!value || value.trim() === "") return undefined;
 
@@ -109,14 +114,19 @@ function parseDateValue(value: string | undefined, dateFormat: string): string {
  */
 function mapActivityType(
   csvValue: string | undefined,
-  activityMappings: Record<string, string[]>
+  activityMappings: Record<string, string[]>,
 ): string | undefined {
   if (!csvValue) return undefined;
 
   const normalized = csvValue.trim().toUpperCase();
 
   for (const [activityType, csvValues] of Object.entries(activityMappings)) {
-    if (csvValues?.some((v) => normalized === v.trim().toUpperCase() || normalized.startsWith(v.trim().toUpperCase()))) {
+    if (
+      csvValues?.some(
+        (v) =>
+          normalized === v.trim().toUpperCase() || normalized.startsWith(v.trim().toUpperCase()),
+      )
+    ) {
       return activityType;
     }
   }
@@ -130,7 +140,7 @@ function mapActivityType(
  */
 function mapSymbol(
   csvSymbol: string | undefined,
-  symbolMappings: Record<string, string>
+  symbolMappings: Record<string, string>,
 ): string | undefined {
   if (!csvSymbol) return undefined;
 
@@ -141,9 +151,11 @@ function mapSymbol(
 /**
  * Validate a draft activity and return errors/warnings
  */
-function validateDraft(
-  draft: Partial<DraftActivity>
-): { status: DraftActivityStatus; errors: Record<string, string[]>; warnings: Record<string, string[]> } {
+function validateDraft(draft: Partial<DraftActivity>): {
+  status: DraftActivityStatus;
+  errors: Record<string, string[]>;
+  warnings: Record<string, string[]>;
+} {
   const errors: Record<string, string[]> = {};
   const warnings: Record<string, string[]> = {};
 
@@ -330,7 +342,7 @@ function createDraftActivities(
     thousandsSeparator: string;
     defaultCurrency: string;
   },
-  defaultAccountId: string
+  defaultAccountId: string,
 ): DraftActivity[] {
   const { fieldMappings, activityMappings, symbolMappings, accountMappings } = mapping;
   const { dateFormat, decimalSeparator, thousandsSeparator, defaultCurrency } = parseConfig;
@@ -433,7 +445,12 @@ interface FilterStatsProps {
 
 function FilterStatsBar({ stats, currentFilter, onFilterChange }: FilterStatsProps) {
   // Define filter configs - only show colored variants when count > 0
-  const filters: { id: ImportReviewFilter; label: string; count: number; colorVariant: "default" | "destructive" | "secondary" | "outline" }[] = [
+  const filters: {
+    id: ImportReviewFilter;
+    label: string;
+    count: number;
+    colorVariant: "default" | "destructive" | "secondary" | "outline";
+  }[] = [
     { id: "all", label: "All", count: stats.all, colorVariant: "secondary" },
     { id: "errors", label: "Errors", count: stats.errors, colorVariant: "destructive" },
     { id: "warnings", label: "Warnings", count: stats.warnings, colorVariant: "secondary" },
@@ -445,11 +462,12 @@ function FilterStatsBar({ stats, currentFilter, onFilterChange }: FilterStatsPro
     <div className="flex flex-wrap items-center gap-2">
       {filters.map((filter) => {
         // Use colored variant only when count > 0, otherwise use outline
-        const variant = currentFilter === filter.id
-          ? "default"
-          : filter.count > 0
-            ? filter.colorVariant
-            : "outline";
+        const variant =
+          currentFilter === filter.id
+            ? "default"
+            : filter.count > 0
+              ? filter.colorVariant
+              : "outline";
 
         return (
           <Badge
@@ -498,7 +516,7 @@ export function ReviewStep() {
           thousandsSeparator: parseConfig.thousandsSeparator,
           defaultCurrency: parseConfig.defaultCurrency,
         },
-        accountId
+        accountId,
       );
 
       logger.debug(`Created ${drafts.length} draft activities with frontend validation`);
@@ -518,7 +536,9 @@ export function ReviewStep() {
         try {
           // Check if we have an account selected
           if (!accountId) {
-            logger.warn("No account selected - skipping backend validation. Frontend validation only.");
+            logger.warn(
+              "No account selected - skipping backend validation. Frontend validation only.",
+            );
             dispatch(setDraftActivities(drafts));
             return;
           }
@@ -527,23 +547,29 @@ export function ReviewStep() {
           // Use state's accountId for all activities (not draft.accountId)
           const activitiesToValidate = drafts
             .filter((d) => d.status !== "skipped" && d.activityType)
-            .map((draft) => ({
-              accountId: accountId, // Use the selected account from state
-              activityType: draft.activityType as ActivityImport["activityType"],
-              date: draft.activityDate || "",
-              symbol: draft.symbol || "$CASH-" + (draft.currency || parseConfig.defaultCurrency),
-              quantity: draft.quantity ?? 0,
-              unitPrice: draft.unitPrice ?? 0,
-              amount: draft.amount ?? 0,
-              currency: draft.currency || parseConfig.defaultCurrency,
-              fee: draft.fee ?? 0,
-              isDraft: true,
-              isValid: draft.status === "valid" || draft.status === "warning",
-              lineNumber: draft.rowIndex + 1,
-              comment: draft.comment,
-            } satisfies Partial<ActivityImport>)) as ActivityImport[];
+            .map(
+              (draft) =>
+                ({
+                  accountId: accountId, // Use the selected account from state
+                  activityType: draft.activityType as ActivityImport["activityType"],
+                  date: draft.activityDate || "",
+                  symbol:
+                    draft.symbol || "$CASH-" + (draft.currency || parseConfig.defaultCurrency),
+                  quantity: draft.quantity ?? 0,
+                  unitPrice: draft.unitPrice ?? 0,
+                  amount: draft.amount ?? 0,
+                  currency: draft.currency || parseConfig.defaultCurrency,
+                  fee: draft.fee ?? 0,
+                  isDraft: true,
+                  isValid: draft.status === "valid" || draft.status === "warning",
+                  lineNumber: draft.rowIndex + 1,
+                  comment: draft.comment,
+                }) satisfies Partial<ActivityImport>,
+            ) as ActivityImport[];
 
-          logger.info(`Backend validation: sending ${activitiesToValidate.length} activities to check_activities_import (dryRun=true)`);
+          logger.info(
+            `Backend validation: sending ${activitiesToValidate.length} activities to check_activities_import (dryRun=true)`,
+          );
 
           if (activitiesToValidate.length > 0) {
             // Call backend with dryRun=true for read-only validation
@@ -592,12 +618,22 @@ export function ReviewStep() {
             });
 
             // Check for duplicates after backend validation
-            const draftsWithDuplicates = await checkForDuplicates(updatedDrafts, accountId, parseConfig.defaultCurrency, dispatch);
+            const draftsWithDuplicates = await checkForDuplicates(
+              updatedDrafts,
+              accountId,
+              parseConfig.defaultCurrency,
+              dispatch,
+            );
             dispatch(setDraftActivities(draftsWithDuplicates));
           } else {
             logger.warn("No activities to validate with backend");
             // Still check for duplicates even without backend validation
-            const draftsWithDuplicates = await checkForDuplicates(drafts, accountId, parseConfig.defaultCurrency, dispatch);
+            const draftsWithDuplicates = await checkForDuplicates(
+              drafts,
+              accountId,
+              parseConfig.defaultCurrency,
+              dispatch,
+            );
             dispatch(setDraftActivities(draftsWithDuplicates));
           }
         } catch (error) {
@@ -620,7 +656,7 @@ export function ReviewStep() {
     drafts: DraftActivity[],
     accountId: string,
     defaultCurrency: string,
-    dispatch: ReturnType<typeof useImportContext>["dispatch"]
+    dispatch: ReturnType<typeof useImportContext>["dispatch"],
   ): Promise<DraftActivity[]> {
     if (!accountId) {
       logger.warn("No account selected - skipping duplicate check");
@@ -741,23 +777,24 @@ export function ReviewStep() {
         const validation = validateDraft(mergedDraft);
         // Don't override status if it was skipped or duplicate (unless they changed activity type)
         const shouldRevalidateStatus =
-          currentDraft.status !== "skipped" &&
-          currentDraft.status !== "duplicate";
+          currentDraft.status !== "skipped" && currentDraft.status !== "duplicate";
         dispatch(
           updateDraft(rowIndex, {
             ...updates,
-            ...(shouldRevalidateStatus ? {
-              status: validation.status,
-              errors: validation.errors,
-              warnings: validation.warnings,
-            } : {}),
-          })
+            ...(shouldRevalidateStatus
+              ? {
+                  status: validation.status,
+                  errors: validation.errors,
+                  warnings: validation.warnings,
+                }
+              : {}),
+          }),
         );
       } else {
         dispatch(updateDraft(rowIndex, updates));
       }
     },
-    [dispatch, draftActivities]
+    [dispatch, draftActivities],
   );
 
   const handleBulkSkip = useCallback(
@@ -765,7 +802,7 @@ export function ReviewStep() {
       dispatch(bulkSkipDrafts(rowIndexes, "Skipped by user"));
       setSelectedRows([]);
     },
-    [dispatch]
+    [dispatch],
   );
 
   const handleBulkUnskip = useCallback(
@@ -773,21 +810,21 @@ export function ReviewStep() {
       dispatch(bulkUnskipDrafts(rowIndexes));
       setSelectedRows([]);
     },
-    [dispatch]
+    [dispatch],
   );
 
   const handleBulkSetCurrency = useCallback(
     (rowIndexes: number[], currency: string) => {
       dispatch(bulkSetCurrency(rowIndexes, currency));
     },
-    [dispatch]
+    [dispatch],
   );
 
   const handleBulkSetAccount = useCallback(
     (rowIndexes: number[], newAccountId: string) => {
       dispatch(bulkSetAccount(rowIndexes, newAccountId));
     },
-    [dispatch]
+    [dispatch],
   );
 
   // Show loading state while drafts are being created or validated
@@ -850,11 +887,7 @@ export function ReviewStep() {
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-base font-semibold">Review Activities</h2>
-          <FilterStatsBar
-            stats={filterStats}
-            currentFilter={filter}
-            onFilterChange={setFilter}
-          />
+          <FilterStatsBar stats={filterStats} currentFilter={filter} onFilterChange={setFilter} />
         </div>
         <ImportReviewGrid
           drafts={draftActivities}

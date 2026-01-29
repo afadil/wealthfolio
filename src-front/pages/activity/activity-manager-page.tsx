@@ -225,7 +225,7 @@ const ActivityManagerPage = () => {
               {isEditing && selectedType && (
                 <div className="flex items-center gap-2 text-sm">
                   <span className="text-muted-foreground">Activity Type:</span>
-                  <span className="rounded-md bg-primary/10 px-2 py-1 font-medium text-primary">
+                  <span className="bg-primary/10 text-primary rounded-md px-2 py-1 font-medium">
                     {selectedType}
                   </span>
                 </div>

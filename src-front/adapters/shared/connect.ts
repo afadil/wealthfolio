@@ -99,7 +99,10 @@ export const listDevices = async (scope?: string): Promise<Device[]> => {
   return invoke<Device[]>("list_devices", { scope });
 };
 
-export const updateDevice = async (deviceId: string, displayName: string): Promise<SuccessResponse> => {
+export const updateDevice = async (
+  deviceId: string,
+  displayName: string,
+): Promise<SuccessResponse> => {
   return invoke<SuccessResponse>("update_device", { deviceId, displayName });
 };
 

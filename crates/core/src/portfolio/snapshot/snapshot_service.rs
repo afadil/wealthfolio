@@ -1,10 +1,13 @@
 use super::holdings_calculator::HoldingsCalculator;
 use super::SnapshotRepositoryTrait;
 use crate::accounts::{get_tracking_mode, Account, AccountRepositoryTrait, TrackingMode};
-use crate::activities::{Activity, ActivityCompiler, ActivityRepositoryTrait, DefaultActivityCompiler};
+use crate::activities::{
+    Activity, ActivityCompiler, ActivityRepositoryTrait, DefaultActivityCompiler,
+};
 use crate::assets::AssetRepositoryTrait;
 use crate::constants::{DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
 use crate::errors::{CalculatorError, Error, Result};
+use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::fx::FxServiceTrait;
 use crate::portfolio::performance::{classify_flow_for_scope, FlowType, PerformanceScope};
 use crate::portfolio::snapshot::{
@@ -67,9 +70,13 @@ pub trait SnapshotServiceTrait: Send + Sync {
 
     /// Calculates and stores aggregated "TOTAL" portfolio snapshots based on individual account holdings.
     /// This should typically be run after `calculate_holdings_snapshots` has processed individual accounts.
-    /// It iterates through each day from the earliest activity to the present, generating a TOTAL snapshot
-    /// by aggregating individual account snapshots for that day.
+    /// Uses incremental calculation: skips if TOTAL snapshots are already up-to-date with individual keyframes.
+    /// Only calculates new snapshots for dates after the latest existing TOTAL snapshot.
     async fn calculate_total_portfolio_snapshots(&self) -> Result<usize>;
+
+    /// Forces a full recalculation of "TOTAL" portfolio snapshots, deleting existing data first.
+    /// Use this when you need to rebuild the entire TOTAL history from scratch.
+    async fn force_recalculate_total_portfolio_snapshots(&self) -> Result<usize>;
 
     /// Saves a manual snapshot for the given account.
     /// - The snapshot's source is preserved from the input (e.g., ManualEntry or CsvImport).
@@ -102,6 +109,7 @@ pub struct SnapshotService {
     activity_repository: Arc<dyn ActivityRepositoryTrait>,
     snapshot_repository: Arc<dyn SnapshotRepositoryTrait>,
     holdings_calculator: HoldingsCalculator,
+    event_sink: Arc<dyn DomainEventSink>,
 }
 
 // Type aliases to simplify function signatures
@@ -131,6 +139,23 @@ impl SnapshotService {
             activity_repository,
             snapshot_repository,
             holdings_calculator,
+            event_sink: Arc::new(NoOpDomainEventSink),
+        }
+    }
+
+    /// Sets the domain event sink for emitting HoldingsChanged events.
+    pub fn with_event_sink(mut self, event_sink: Arc<dyn DomainEventSink>) -> Self {
+        self.event_sink = event_sink;
+        self
+    }
+
+    /// Emits a HoldingsChanged event for the given accounts and assets.
+    fn emit_holdings_changed(&self, account_ids: Vec<String>, asset_ids: Vec<String>) {
+        if !account_ids.is_empty() {
+            self.event_sink.emit(DomainEvent::HoldingsChanged {
+                account_ids,
+                asset_ids,
+            });
         }
     }
 
@@ -374,9 +399,13 @@ impl SnapshotService {
         let compiled_activities = compiler.compile_all(all_activities)?;
 
         // Perform split adjustments on the compiled activity list
-        let split_factors =
-            self.calculate_split_factors(&compiled_activities, min_activity_date, calculation_end_date);
-        let adjusted_activities = self.adjust_activities_for_splits(&compiled_activities, &split_factors);
+        let split_factors = self.calculate_split_factors(
+            &compiled_activities,
+            min_activity_date,
+            calculation_end_date,
+        );
+        let adjusted_activities =
+            self.adjust_activities_for_splits(&compiled_activities, &split_factors);
 
         // Group adjusted activities by original account ID and date
         let mut activities_by_account_date: ActivitiesByAccount = HashMap::new();
@@ -850,7 +879,8 @@ impl SnapshotService {
             cash_balances: aggregated_cash_balances, // Itemized by account currency holding the cash
             positions: aggregated_positions,
             cost_basis: overall_cost_basis_base_ccy.round_dp(DECIMAL_PRECISION),
-            net_contribution: (overall_net_contribution_base_ccy - internal_transfer_adjustment_base_ccy)
+            net_contribution: (overall_net_contribution_base_ccy
+                - internal_transfer_adjustment_base_ccy)
                 .round_dp(DECIMAL_PRECISION),
             net_contribution_base: (overall_net_contribution_base_ccy
                 - internal_transfer_adjustment_base_ccy)
@@ -898,12 +928,12 @@ impl SnapshotService {
         let mut adjustments_by_date: HashMap<NaiveDate, Decimal> = HashMap::new();
 
         for (_group_id, group_activities) in grouped {
-            let has_in = group_activities.iter().any(|a| {
-                a.activity_type == crate::activities::ACTIVITY_TYPE_TRANSFER_IN
-            });
-            let has_out = group_activities.iter().any(|a| {
-                a.activity_type == crate::activities::ACTIVITY_TYPE_TRANSFER_OUT
-            });
+            let has_in = group_activities
+                .iter()
+                .any(|a| a.activity_type == crate::activities::ACTIVITY_TYPE_TRANSFER_IN);
+            let has_out = group_activities
+                .iter()
+                .any(|a| a.activity_type == crate::activities::ACTIVITY_TYPE_TRANSFER_OUT);
 
             if !(has_in && has_out) {
                 continue;
@@ -928,12 +958,15 @@ impl SnapshotService {
                 let amount_base = if activity.currency == base_currency {
                     amount
                 } else {
-                    match self.holdings_calculator.fx_service.convert_currency_for_date(
-                        amount,
-                        &activity.currency,
-                        base_currency,
-                        activity_date,
-                    ) {
+                    match self
+                        .holdings_calculator
+                        .fx_service
+                        .convert_currency_for_date(
+                            amount,
+                            &activity.currency,
+                            base_currency,
+                            activity_date,
+                        ) {
                         Ok(converted) => converted,
                         Err(e) => {
                             warn!(
@@ -945,13 +978,12 @@ impl SnapshotService {
                     }
                 };
 
-                let signed_amount = if activity.activity_type
-                    == crate::activities::ACTIVITY_TYPE_TRANSFER_IN
-                {
-                    amount_base
-                } else {
-                    -amount_base
-                };
+                let signed_amount =
+                    if activity.activity_type == crate::activities::ACTIVITY_TYPE_TRANSFER_IN {
+                        amount_base
+                    } else {
+                        -amount_base
+                    };
 
                 *adjustments_by_date
                     .entry(activity_date)
@@ -1104,8 +1136,14 @@ impl SnapshotService {
     }
 
     // --- New method to calculate and store TOTAL portfolio snapshots ---
-    async fn calculate_total_portfolio_snapshots_impl(&self) -> Result<usize> {
-        debug!("Starting calculation of TOTAL portfolio snapshots (based on stored individual keyframes).");
+    async fn calculate_total_portfolio_snapshots_impl(
+        &self,
+        force_full_calculation: bool,
+    ) -> Result<usize> {
+        debug!(
+            "Starting calculation of TOTAL portfolio snapshots (force={})",
+            force_full_calculation
+        );
 
         let active_accounts = self.account_repository.list(Some(true), None)?;
         if active_accounts.is_empty() {
@@ -1132,12 +1170,19 @@ impl SnapshotService {
         let mut keyframes_by_account: HashMap<String, BTreeMap<NaiveDate, AccountStateSnapshot>> =
             HashMap::new();
         let mut all_snapshot_dates: HashSet<NaiveDate> = HashSet::new();
+        let mut max_individual_keyframe_date: Option<NaiveDate> = None;
 
         for keyframe in all_individual_keyframes {
             if keyframe.account_id == PORTFOLIO_TOTAL_ACCOUNT_ID {
                 continue;
             }
             all_snapshot_dates.insert(keyframe.snapshot_date);
+            // Track the max date across all individual keyframes
+            max_individual_keyframe_date = Some(
+                max_individual_keyframe_date
+                    .map(|d| d.max(keyframe.snapshot_date))
+                    .unwrap_or(keyframe.snapshot_date),
+            );
             keyframes_by_account
                 .entry(keyframe.account_id.clone())
                 .or_default()
@@ -1149,11 +1194,67 @@ impl SnapshotService {
             return Ok(0);
         }
 
+        // --- Incremental calculation logic (skip if already up-to-date) ---
+        let calculation_start_date: Option<NaiveDate>;
+
+        if force_full_calculation {
+            debug!("Force full calculation: will regenerate all TOTAL snapshots.");
+            calculation_start_date = None; // Calculate all dates
+        } else {
+            // Check if TOTAL is already up-to-date
+            let today = valuation_date_today();
+            let tomorrow = today.succ_opt().unwrap_or(today);
+            let latest_total_snapshot = self
+                .snapshot_repository
+                .get_latest_snapshot_before_date(PORTFOLIO_TOTAL_ACCOUNT_ID, tomorrow)?;
+
+            if let Some(ref total_snapshot) = latest_total_snapshot {
+                if let Some(max_date) = max_individual_keyframe_date {
+                    if total_snapshot.snapshot_date >= max_date {
+                        debug!(
+                            "TOTAL snapshots already up-to-date (latest TOTAL: {}, max individual: {}). Skipping recalculation.",
+                            total_snapshot.snapshot_date, max_date
+                        );
+                        return Ok(0);
+                    }
+                    // Only calculate from the day after the latest TOTAL snapshot
+                    calculation_start_date = total_snapshot.snapshot_date.succ_opt();
+                    debug!(
+                        "Incremental TOTAL calculation from {} (latest TOTAL: {}, max individual: {})",
+                        calculation_start_date.unwrap_or(total_snapshot.snapshot_date),
+                        total_snapshot.snapshot_date,
+                        max_date
+                    );
+                } else {
+                    calculation_start_date = None;
+                }
+            } else {
+                debug!("No existing TOTAL snapshots. Will calculate all dates.");
+                calculation_start_date = None;
+            }
+        }
+
         let base_portfolio_currency = self.base_currency.read().unwrap().clone();
         let mut total_portfolio_snapshots_to_save: Vec<AccountStateSnapshot> = Vec::new();
 
         let mut sorted_snapshot_dates: Vec<NaiveDate> = all_snapshot_dates.into_iter().collect();
         sorted_snapshot_dates.sort();
+
+        // Filter dates based on calculation_start_date for incremental calculation
+        let dates_to_calculate: Vec<NaiveDate> = if let Some(start_date) = calculation_start_date {
+            sorted_snapshot_dates
+                .iter()
+                .filter(|&&date| date >= start_date)
+                .copied()
+                .collect()
+        } else {
+            sorted_snapshot_dates.clone()
+        };
+
+        if dates_to_calculate.is_empty() {
+            debug!("No new dates to calculate for TOTAL snapshots.");
+            return Ok(0);
+        }
 
         let account_ids: Vec<String> = active_accounts
             .iter()
@@ -1162,9 +1263,21 @@ impl SnapshotService {
             .collect();
         let transfer_adjustments_by_date = self
             .internal_transfer_adjustments_by_date_base(&account_ids, &base_portfolio_currency)?;
-        let mut cumulative_transfer_adjustment = Decimal::ZERO;
 
-        for target_date in sorted_snapshot_dates {
+        // Calculate cumulative transfer adjustment up to (but not including) the first date we're calculating
+        let mut cumulative_transfer_adjustment = Decimal::ZERO;
+        if let Some(start_date) = calculation_start_date {
+            for date in &sorted_snapshot_dates {
+                if *date >= start_date {
+                    break;
+                }
+                if let Some(adjustment) = transfer_adjustments_by_date.get(date) {
+                    cumulative_transfer_adjustment += *adjustment;
+                }
+            }
+        }
+
+        for target_date in dates_to_calculate {
             if let Some(adjustment) = transfer_adjustments_by_date.get(&target_date) {
                 cumulative_transfer_adjustment += *adjustment;
             }
@@ -1204,19 +1317,37 @@ impl SnapshotService {
                 "Saving {} new TOTAL portfolio snapshots.",
                 total_portfolio_snapshots_to_save.len()
             );
-            self.snapshot_repository
-                .overwrite_all_snapshots_for_account(
-                    PORTFOLIO_TOTAL_ACCOUNT_ID,
-                    &total_portfolio_snapshots_to_save,
-                )
-                .await?;
+
+            if force_full_calculation || calculation_start_date.is_none() {
+                // Full recalculation: overwrite all
+                self.snapshot_repository
+                    .overwrite_all_snapshots_for_account(
+                        PORTFOLIO_TOTAL_ACCOUNT_ID,
+                        &total_portfolio_snapshots_to_save,
+                    )
+                    .await?;
+            } else {
+                // Incremental: append new snapshots (save_or_update each)
+                for snapshot in &total_portfolio_snapshots_to_save {
+                    self.snapshot_repository
+                        .save_or_update_snapshot(snapshot)
+                        .await?;
+                }
+            }
+
+            // Note: We intentionally do NOT emit HoldingsChanged here.
+            // This method is called during portfolio recalculation (triggered by domain events).
+            // Emitting events here would create an infinite loop.
+
             Ok(total_portfolio_snapshots_to_save.len())
         } else {
-            warn!("No TOTAL portfolio snapshots were generated to save. Deleting existing TOTAL snapshots anyway if any existed.");
-            self.snapshot_repository
-                .overwrite_all_snapshots_for_account(PORTFOLIO_TOTAL_ACCOUNT_ID, &[])
-                .await?;
-            info!("Cleaned any existing TOTAL snapshots as no new ones were generated.");
+            if force_full_calculation {
+                warn!("No TOTAL portfolio snapshots were generated to save. Deleting existing TOTAL snapshots.");
+                self.snapshot_repository
+                    .overwrite_all_snapshots_for_account(PORTFOLIO_TOTAL_ACCOUNT_ID, &[])
+                    .await?;
+                info!("Cleaned any existing TOTAL snapshots as no new ones were generated.");
+            }
             Ok(0)
         }
     }
@@ -1406,7 +1537,11 @@ impl SnapshotServiceTrait for SnapshotService {
     }
 
     async fn calculate_total_portfolio_snapshots(&self) -> Result<usize> {
-        self.calculate_total_portfolio_snapshots_impl().await
+        self.calculate_total_portfolio_snapshots_impl(false).await
+    }
+
+    async fn force_recalculate_total_portfolio_snapshots(&self) -> Result<usize> {
+        self.calculate_total_portfolio_snapshots_impl(true).await
     }
 
     async fn save_manual_snapshot(
@@ -1427,9 +1562,10 @@ impl SnapshotServiceTrait for SnapshotService {
         );
 
         // Check if content is unchanged from latest snapshot (skip if identical)
-        let latest = self
-            .snapshot_repository
-            .get_latest_snapshot_before_date(account_id, snapshot.snapshot_date + chrono::Days::new(1))?;
+        let latest = self.snapshot_repository.get_latest_snapshot_before_date(
+            account_id,
+            snapshot.snapshot_date + chrono::Days::new(1),
+        )?;
 
         if let Some(existing) = latest {
             if existing.is_content_equal(&snapshot) {
@@ -1453,6 +1589,14 @@ impl SnapshotServiceTrait for SnapshotService {
             "Saved manual snapshot for account {} on date {}",
             account_id, snapshot.snapshot_date
         );
+
+        // Emit HoldingsChanged event after successful save
+        let asset_ids: Vec<String> = snapshot
+            .positions
+            .iter()
+            .map(|(_, p)| p.asset_id.clone())
+            .collect();
+        self.emit_holdings_changed(vec![account_id.to_string()], asset_ids);
 
         // Ensure holdings history has at least 2 snapshots
         self.ensure_holdings_history(account_id).await?;

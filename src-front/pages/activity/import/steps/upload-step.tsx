@@ -55,7 +55,7 @@ function CsvPreview({ headers, rows, maxRows = 50 }: CsvPreviewProps) {
 
   return (
     <Card>
-      <CardHeader className="py-3 px-4">
+      <CardHeader className="px-4 py-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-medium">CSV Preview</CardTitle>
           <span className="text-muted-foreground text-xs">
@@ -69,7 +69,7 @@ function CsvPreview({ headers, rows, maxRows = 50 }: CsvPreviewProps) {
           <table className="w-full">
             <thead className="bg-muted/50 sticky top-0">
               <tr>
-                <th className="text-muted-foreground border-r bg-muted w-12 px-2 py-1.5 text-right font-mono text-xs">
+                <th className="text-muted-foreground bg-muted w-12 border-r px-2 py-1.5 text-right font-mono text-xs">
                   #
                 </th>
                 {headers.map((header, idx) => (
@@ -92,7 +92,7 @@ function CsvPreview({ headers, rows, maxRows = 50 }: CsvPreviewProps) {
                     "hover:bg-muted/50",
                   )}
                 >
-                  <td className="text-muted-foreground border-r bg-muted/20 w-12 px-2 py-1 text-right">
+                  <td className="text-muted-foreground bg-muted/20 w-12 border-r px-2 py-1 text-right">
                     {rowIdx + 1}
                   </td>
                   {row.map((cell, cellIdx) => (
@@ -107,10 +107,7 @@ function CsvPreview({ headers, rows, maxRows = 50 }: CsvPreviewProps) {
                   {/* Fill empty cells if row has fewer columns than headers */}
                   {row.length < headers.length &&
                     Array.from({ length: headers.length - row.length }).map((_, idx) => (
-                      <td
-                        key={`empty-${idx}`}
-                        className="border-r px-2 py-1 last:border-r-0"
-                      >
+                      <td key={`empty-${idx}`} className="border-r px-2 py-1 last:border-r-0">
                         <span className="text-muted-foreground italic">-</span>
                       </td>
                     ))}
@@ -202,10 +199,10 @@ function ParseSettingsPanel({ config, onChange, hasErrors = false }: ParseSettin
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <Card>
         <CollapsibleTrigger asChild>
-          <CardHeader className="cursor-pointer py-3 px-4 hover:bg-muted/50 transition-colors">
+          <CardHeader className="hover:bg-muted/50 cursor-pointer px-4 py-3 transition-colors">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Icons.Settings2 className="h-4 w-4 text-muted-foreground" />
+                <Icons.Settings2 className="text-muted-foreground h-4 w-4" />
                 <CardTitle className="text-sm font-medium">Parse Settings</CardTitle>
                 {hasErrors && (
                   <span className="bg-destructive/10 text-destructive rounded-full px-2 py-0.5 text-xs">
@@ -213,14 +210,12 @@ function ParseSettingsPanel({ config, onChange, hasErrors = false }: ParseSettin
                   </span>
                 )}
                 {!isOpen && !hasErrors && (
-                  <span className="text-muted-foreground text-xs font-normal">
-                    {configSummary}
-                  </span>
+                  <span className="text-muted-foreground text-xs font-normal">{configSummary}</span>
                 )}
               </div>
               <Icons.ChevronDown
                 className={cn(
-                  "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                  "text-muted-foreground h-4 w-4 transition-transform duration-200",
                   isOpen && "rotate-180",
                 )}
               />
@@ -235,9 +230,7 @@ function ParseSettingsPanel({ config, onChange, hasErrors = false }: ParseSettin
                 <Checkbox
                   id="hasHeaderRow"
                   checked={config.hasHeaderRow}
-                  onCheckedChange={(checked) =>
-                    onChange({ hasHeaderRow: checked === true })
-                  }
+                  onCheckedChange={(checked) => onChange({ hasHeaderRow: checked === true })}
                 />
                 <Label htmlFor="hasHeaderRow" className="cursor-pointer text-sm">
                   First row is header
@@ -507,12 +500,14 @@ export function UploadStep() {
           </div>
           <div className="h-[120px]">
             {isMobile ? (
-              <div className={cn(
-                "flex h-full flex-col items-center justify-center gap-3 rounded-lg border p-4 transition-colors",
-                selectedAccount && state.file
-                  ? "border-border bg-background"
-                  : "border-border border-dashed bg-background/50 hover:border-muted-foreground/50 hover:bg-background/80"
-              )}>
+              <div
+                className={cn(
+                  "flex h-full flex-col items-center justify-center gap-3 rounded-lg border p-4 transition-colors",
+                  selectedAccount && state.file
+                    ? "border-border bg-background"
+                    : "border-border bg-background/50 hover:border-muted-foreground/50 hover:bg-background/80 border-dashed",
+                )}
+              >
                 {selectedAccount ? (
                   <>
                     <div className="flex items-center gap-2">
@@ -579,13 +574,8 @@ export function UploadStep() {
 
       {/* CSV Preview */}
       {state.file && state.headers.length > 0 && (
-        <CsvPreview
-          headers={state.headers}
-          rows={state.parsedRows}
-          maxRows={50}
-        />
+        <CsvPreview headers={state.headers} rows={state.parsedRows} maxRows={50} />
       )}
-
     </div>
   );
 }

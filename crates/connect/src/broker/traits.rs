@@ -122,14 +122,15 @@ pub trait BrokerSyncServiceTrait: Send + Sync {
     fn get_all_sync_states(&self) -> Result<Vec<BrokerSyncState>>;
 
     /// Get import runs by type (SYNC or IMPORT) with pagination.
-    fn get_import_runs(&self, run_type: Option<&str>, limit: i64, offset: i64) -> Result<Vec<ImportRun>>;
+    fn get_import_runs(
+        &self,
+        run_type: Option<&str>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<ImportRun>>;
 
     /// Create a new import run for broker sync.
-    async fn create_import_run(
-        &self,
-        account_id: &str,
-        mode: ImportRunMode,
-    ) -> Result<ImportRun>;
+    async fn create_import_run(&self, account_id: &str, mode: ImportRunMode) -> Result<ImportRun>;
 
     /// Finalize an import run with summary and status.
     async fn finalize_import_run(

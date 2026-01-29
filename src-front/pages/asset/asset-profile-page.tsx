@@ -92,7 +92,9 @@ export const AssetProfilePage = () => {
   const [activeTab, setActiveTab] = useState<AssetTab>(defaultTab);
   const [actionPaletteOpen, setActionPaletteOpen] = useState(false);
   const [editSheetOpen, setEditSheetOpen] = useState(false);
-  const [editSheetDefaultTab, setEditSheetDefaultTab] = useState<"general" | "classification" | "market-data">("general");
+  const [editSheetDefaultTab, setEditSheetDefaultTab] = useState<
+    "general" | "classification" | "market-data"
+  >("general");
   const triggerHaptic = useHapticFeedback();
   const isMobile = useIsMobileViewport();
 
@@ -126,25 +128,26 @@ export const AssetProfilePage = () => {
   });
 
   // Taxonomy data for category badges - use same approach as edit sheet
-  const { data: assignments = [], isLoading: isAssignmentsLoading } = useAssetTaxonomyAssignments(symbol);
+  const { data: assignments = [], isLoading: isAssignmentsLoading } =
+    useAssetTaxonomyAssignments(symbol);
   const { updatePricingModeMutation } = useAssetProfileMutations();
 
   // Fetch taxonomy details for taxonomies with assignments
   // We need the categories to get name and color
   const { data: typeOfSecurityTaxonomy } = useTaxonomy(
-    assignments.find((a) => a.taxonomyId === "type_of_security")?.taxonomyId ?? null
+    assignments.find((a) => a.taxonomyId === "type_of_security")?.taxonomyId ?? null,
   );
   const { data: riskCategoryTaxonomy } = useTaxonomy(
-    assignments.find((a) => a.taxonomyId === "risk_category")?.taxonomyId ?? null
+    assignments.find((a) => a.taxonomyId === "risk_category")?.taxonomyId ?? null,
   );
   const { data: assetClassesTaxonomy } = useTaxonomy(
-    assignments.find((a) => a.taxonomyId === "asset_classes")?.taxonomyId ?? null
+    assignments.find((a) => a.taxonomyId === "asset_classes")?.taxonomyId ?? null,
   );
   const { data: industriesTaxonomy } = useTaxonomy(
-    assignments.find((a) => a.taxonomyId === "industries_gics")?.taxonomyId ?? null
+    assignments.find((a) => a.taxonomyId === "industries_gics")?.taxonomyId ?? null,
   );
   const { data: regionsTaxonomy } = useTaxonomy(
-    assignments.find((a) => a.taxonomyId === "regions")?.taxonomyId ?? null
+    assignments.find((a) => a.taxonomyId === "regions")?.taxonomyId ?? null,
   );
 
   const isClassificationsLoading = isAssignmentsLoading;
@@ -152,12 +155,19 @@ export const AssetProfilePage = () => {
   // Build category badges from assignments and taxonomy data
   // Order: Class, Type, Risk
   const categoryBadges = useMemo(() => {
-    const badges: { id: string; categoryName: string; categoryColor: string; taxonomyName: string }[] = [];
+    const badges: {
+      id: string;
+      categoryName: string;
+      categoryColor: string;
+      taxonomyName: string;
+    }[] = [];
 
     // Asset Class badge (first)
     const assetClassAssignment = assignments.find((a) => a.taxonomyId === "asset_classes");
     if (assetClassAssignment && assetClassesTaxonomy?.categories) {
-      const category = assetClassesTaxonomy.categories.find((c) => c.id === assetClassAssignment.categoryId);
+      const category = assetClassesTaxonomy.categories.find(
+        (c) => c.id === assetClassAssignment.categoryId,
+      );
       if (category) {
         badges.push({
           id: category.id,
@@ -171,7 +181,9 @@ export const AssetProfilePage = () => {
     // Type of Security badge (second)
     const typeAssignment = assignments.find((a) => a.taxonomyId === "type_of_security");
     if (typeAssignment && typeOfSecurityTaxonomy?.categories) {
-      const category = typeOfSecurityTaxonomy.categories.find((c) => c.id === typeAssignment.categoryId);
+      const category = typeOfSecurityTaxonomy.categories.find(
+        (c) => c.id === typeAssignment.categoryId,
+      );
       if (category) {
         badges.push({
           id: category.id,
@@ -185,7 +197,9 @@ export const AssetProfilePage = () => {
     // Risk Category badge (third)
     const riskAssignment = assignments.find((a) => a.taxonomyId === "risk_category");
     if (riskAssignment && riskCategoryTaxonomy?.categories) {
-      const category = riskCategoryTaxonomy.categories.find((c) => c.id === riskAssignment.categoryId);
+      const category = riskCategoryTaxonomy.categories.find(
+        (c) => c.id === riskAssignment.categoryId,
+      );
       if (category) {
         badges.push({
           id: category.id,
@@ -235,7 +249,14 @@ export const AssetProfilePage = () => {
     }
 
     return badges;
-  }, [assignments, assetClassesTaxonomy, typeOfSecurityTaxonomy, riskCategoryTaxonomy, industriesTaxonomy, regionsTaxonomy]);
+  }, [
+    assignments,
+    assetClassesTaxonomy,
+    typeOfSecurityTaxonomy,
+    riskCategoryTaxonomy,
+    industriesTaxonomy,
+    regionsTaxonomy,
+  ]);
 
   const quote = useMemo(() => {
     // Backend returns quotes in descending order (newest first)
@@ -419,7 +440,7 @@ export const AssetProfilePage = () => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 text-xs text-muted-foreground"
+                    className="text-muted-foreground h-6 text-xs"
                     onClick={() => {
                       setEditSheetDefaultTab("classification");
                       setEditSheetOpen(true);
@@ -622,52 +643,60 @@ export const AssetProfilePage = () => {
                 const parts = symbol.split(":");
                 return parts.length >= 2 ? parts[1] : symbol;
               })()}
-              groups={[
-                {
-                  title: "Record Transaction",
-                  items: [
-                    {
-                      icon: Icons.TrendingUp,
-                      label: "Buy",
-                      onClick: () =>
-                        navigate(`/activities/manage?symbol=${encodeURIComponent(symbol)}&type=BUY`),
-                    },
-                    {
-                      icon: Icons.TrendingDown,
-                      label: "Sell",
-                      onClick: () =>
-                        navigate(`/activities/manage?symbol=${encodeURIComponent(symbol)}&type=SELL`),
-                    },
-                    {
-                      icon: Icons.Coins,
-                      label: "Dividend",
-                      onClick: () =>
-                        navigate(`/activities/manage?symbol=${encodeURIComponent(symbol)}&type=DIVIDEND`),
-                    },
-                    {
-                      icon: Icons.Ellipsis,
-                      label: "Other",
-                      onClick: () =>
-                        navigate(`/activities/manage?symbol=${encodeURIComponent(symbol)}`),
-                    },
-                  ],
-                },
-                {
-                  title: "Manage",
-                  items: [
-                    {
-                      icon: Icons.Refresh,
-                      label: "Refresh Price",
-                      onClick: handleRefreshQuotes,
-                    },
-                    {
-                      icon: Icons.Pencil,
-                      label: "Edit",
-                      onClick: () => setEditSheetOpen(true),
-                    },
-                  ],
-                },
-              ] satisfies ActionPaletteGroup[]}
+              groups={
+                [
+                  {
+                    title: "Record Transaction",
+                    items: [
+                      {
+                        icon: Icons.TrendingUp,
+                        label: "Buy",
+                        onClick: () =>
+                          navigate(
+                            `/activities/manage?symbol=${encodeURIComponent(symbol)}&type=BUY`,
+                          ),
+                      },
+                      {
+                        icon: Icons.TrendingDown,
+                        label: "Sell",
+                        onClick: () =>
+                          navigate(
+                            `/activities/manage?symbol=${encodeURIComponent(symbol)}&type=SELL`,
+                          ),
+                      },
+                      {
+                        icon: Icons.Coins,
+                        label: "Dividend",
+                        onClick: () =>
+                          navigate(
+                            `/activities/manage?symbol=${encodeURIComponent(symbol)}&type=DIVIDEND`,
+                          ),
+                      },
+                      {
+                        icon: Icons.Ellipsis,
+                        label: "Other",
+                        onClick: () =>
+                          navigate(`/activities/manage?symbol=${encodeURIComponent(symbol)}`),
+                      },
+                    ],
+                  },
+                  {
+                    title: "Manage",
+                    items: [
+                      {
+                        icon: Icons.Refresh,
+                        label: "Refresh Price",
+                        onClick: handleRefreshQuotes,
+                      },
+                      {
+                        icon: Icons.Pencil,
+                        label: "Edit",
+                        onClick: () => setEditSheetOpen(true),
+                      },
+                    ],
+                  },
+                ] satisfies ActionPaletteGroup[]
+              }
               trigger={
                 <Button variant="outline" size="icon" className="h-9 w-9">
                   <Icons.DotsThreeVertical className="h-5 w-5" weight="fill" />
@@ -685,7 +714,7 @@ export const AssetProfilePage = () => {
             />
           )}
           <div className="flex min-w-0 flex-col justify-center">
-            <h1 className="truncate text-base font-semibold leading-tight md:text-lg">
+            <h1 className="truncate text-base leading-tight font-semibold md:text-lg">
               {assetProfile?.name ?? holding?.instrument?.name ?? symbol ?? "-"}
             </h1>
             <p className="text-muted-foreground text-xs leading-tight md:text-sm">
@@ -784,7 +813,7 @@ export const AssetProfilePage = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-6 text-xs text-muted-foreground"
+                        className="text-muted-foreground h-6 text-xs"
                         onClick={() => {
                           setEditSheetDefaultTab("classification");
                           setEditSheetOpen(true);

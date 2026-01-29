@@ -106,11 +106,7 @@ const OnboardingPage = () => {
                 </Button>
               </div>
               <div className="order-1 flex flex-col gap-2 sm:order-2 sm:flex-row sm:gap-3">
-                <Button
-                  asChild
-                  variant="outline"
-                  className="order-2 sm:order-1"
-                >
+                <Button asChild variant="outline" className="order-2 sm:order-1">
                   <a
                     href={WEALTHFOLIO_CONNECT_PORTAL_URL}
                     target="_blank"
@@ -122,7 +118,7 @@ const OnboardingPage = () => {
                 </Button>
                 <Button
                   data-testid="onboarding-finish-button"
-                  className="from-primary to-primary/90 bg-linear-to-r order-1 sm:order-2"
+                  className="from-primary to-primary/90 order-1 bg-linear-to-r sm:order-2"
                   onClick={() => updateSettings({ onboardingCompleted: true })}
                 >
                   Get Started

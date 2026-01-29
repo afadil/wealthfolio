@@ -1,6 +1,7 @@
 use log::{debug, error, info, warn};
 use std::sync::Arc;
 
+use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::quotes::QuoteServiceTrait;
 use crate::taxonomies::TaxonomyServiceTrait;
 
@@ -71,6 +72,7 @@ pub struct AssetService {
     quote_service: Arc<dyn QuoteServiceTrait>,
     asset_repository: Arc<dyn AssetRepositoryTrait>,
     taxonomy_service: Option<Arc<dyn TaxonomyServiceTrait>>,
+    event_sink: Arc<dyn DomainEventSink>,
 }
 
 impl AssetService {
@@ -83,6 +85,7 @@ impl AssetService {
             quote_service,
             asset_repository,
             taxonomy_service: None,
+            event_sink: Arc::new(NoOpDomainEventSink),
         })
     }
 
@@ -96,9 +99,17 @@ impl AssetService {
             quote_service,
             asset_repository,
             taxonomy_service: Some(taxonomy_service),
+            event_sink: Arc::new(NoOpDomainEventSink),
         })
     }
 
+    /// Sets the domain event sink for this service.
+    ///
+    /// Events are emitted after successful asset creation (not updates).
+    pub fn with_event_sink(mut self, event_sink: Arc<dyn DomainEventSink>) -> Self {
+        self.event_sink = event_sink;
+        self
+    }
 }
 
 // Implement the service trait
@@ -112,7 +123,9 @@ impl AssetServiceTrait for AssetService {
 
     /// Retrieves an asset by its ID with enriched fields
     fn get_asset_by_id(&self, asset_id: &str) -> Result<Asset> {
-        self.asset_repository.get_by_id(asset_id).map(|a| a.enrich())
+        self.asset_repository
+            .get_by_id(asset_id)
+            .map(|a| a.enrich())
     }
 
     async fn delete_asset(&self, asset_id: &str) -> Result<()> {
@@ -138,12 +151,24 @@ impl AssetServiceTrait for AssetService {
     /// Creates a new cash asset
     async fn create_cash_asset(&self, currency: &str) -> Result<Asset> {
         let new_asset = NewAsset::new_cash_asset(currency);
-        self.asset_repository.create(new_asset).await
+        let asset = self.asset_repository.create(new_asset).await?;
+
+        // Emit event for newly created asset
+        self.event_sink
+            .emit(DomainEvent::assets_created(vec![asset.id.clone()]));
+
+        Ok(asset)
     }
 
     /// Creates a new asset directly without network lookups.
     async fn create_asset(&self, new_asset: NewAsset) -> Result<Asset> {
-        self.asset_repository.create(new_asset).await
+        let asset = self.asset_repository.create(new_asset).await?;
+
+        // Emit event for newly created asset
+        self.event_sink
+            .emit(DomainEvent::assets_created(vec![asset.id.clone()]));
+
+        Ok(asset)
     }
 
     /// Creates a minimal asset without network calls.
@@ -227,11 +252,7 @@ impl AssetServiceTrait for AssetService {
                 (parsed.symbol, mic)
             } else if kind == AssetKind::Crypto && asset_id.contains('-') {
                 // Legacy crypto format: "BTC-CAD" -> symbol "BTC"
-                let base = asset_id
-                    .split('-')
-                    .next()
-                    .unwrap_or(asset_id)
-                    .to_string();
+                let base = asset_id.split('-').next().unwrap_or(asset_id).to_string();
                 (base, None)
             } else {
                 // Fallback for legacy IDs
@@ -284,7 +305,13 @@ impl AssetServiceTrait for AssetService {
             asset_id, new_asset.kind, new_asset.pricing_mode, new_asset.name
         );
 
-        self.asset_repository.create(new_asset).await
+        let asset = self.asset_repository.create(new_asset).await?;
+
+        // Emit event for newly created asset
+        self.event_sink
+            .emit(DomainEvent::assets_created(vec![asset.id.clone()]));
+
+        Ok(asset)
     }
 
     /// Updates the pricing mode for an asset (MARKET, MANUAL, DERIVED, NONE)
@@ -324,10 +351,12 @@ impl AssetServiceTrait for AssetService {
             Err(e) => {
                 // Return error so caller knows enrichment failed and won't mark as enriched
                 // This allows retry on next sync cycle
-                return Err(Error::MarketData(crate::quotes::MarketDataError::ProviderError(
-                    format!("Could not fetch profile for asset {} (symbol: {}): {}",
-                        asset_id, existing_asset.symbol, e)
-                )));
+                return Err(Error::MarketData(
+                    crate::quotes::MarketDataError::ProviderError(format!(
+                        "Could not fetch profile for asset {} (symbol: {}): {}",
+                        asset_id, existing_asset.symbol, e
+                    )),
+                ));
             }
         };
 
@@ -351,19 +380,34 @@ impl AssetServiceTrait for AssetService {
         let mut profile_metadata = serde_json::Map::new();
         // ProviderProfile uses JSON strings for sectors/countries (legacy format)
         if let Some(ref sectors) = provider_profile.sectors {
-            profile_metadata.insert("sectors".to_string(), serde_json::Value::String(sectors.clone()));
+            profile_metadata.insert(
+                "sectors".to_string(),
+                serde_json::Value::String(sectors.clone()),
+            );
         }
         if let Some(ref industry) = provider_profile.industry {
-            profile_metadata.insert("industry".to_string(), serde_json::Value::String(industry.clone()));
+            profile_metadata.insert(
+                "industry".to_string(),
+                serde_json::Value::String(industry.clone()),
+            );
         }
         if let Some(ref countries) = provider_profile.countries {
-            profile_metadata.insert("countries".to_string(), serde_json::Value::String(countries.clone()));
+            profile_metadata.insert(
+                "countries".to_string(),
+                serde_json::Value::String(countries.clone()),
+            );
         }
         if let Some(ref asset_type) = provider_profile.asset_type {
-            profile_metadata.insert("quoteType".to_string(), serde_json::Value::String(asset_type.clone()));
+            profile_metadata.insert(
+                "quoteType".to_string(),
+                serde_json::Value::String(asset_type.clone()),
+            );
         }
         if let Some(ref url) = provider_profile.url {
-            profile_metadata.insert("website".to_string(), serde_json::Value::String(url.clone()));
+            profile_metadata.insert(
+                "website".to_string(),
+                serde_json::Value::String(url.clone()),
+            );
         }
         if let Some(market_cap) = provider_profile.market_cap {
             profile_metadata.insert("marketCap".to_string(), serde_json::json!(market_cap));
@@ -372,7 +416,10 @@ impl AssetServiceTrait for AssetService {
             profile_metadata.insert("peRatio".to_string(), serde_json::json!(pe_ratio));
         }
         if let Some(dividend_yield) = provider_profile.dividend_yield {
-            profile_metadata.insert("dividendYield".to_string(), serde_json::json!(dividend_yield));
+            profile_metadata.insert(
+                "dividendYield".to_string(),
+                serde_json::json!(dividend_yield),
+            );
         }
         if let Some(week_52_high) = provider_profile.week_52_high {
             profile_metadata.insert("week52High".to_string(), serde_json::json!(week_52_high));
@@ -393,7 +440,10 @@ impl AssetServiceTrait for AssetService {
                 None => serde_json::Map::new(),
             };
             // Add/update profile data under a "profile" key to avoid conflicts
-            merged.insert("profile".to_string(), serde_json::Value::Object(profile_metadata));
+            merged.insert(
+                "profile".to_string(),
+                serde_json::Value::Object(profile_metadata),
+            );
             Some(serde_json::Value::Object(merged))
         };
 
@@ -433,10 +483,10 @@ impl AssetServiceTrait for AssetService {
         if let Some(taxonomy_service) = &self.taxonomy_service {
             let classification_input = ClassificationInput::from_provider_profile(
                 provider_profile.asset_type.as_deref(),
-                None,                                   // Single sector (already in sectors JSON)
-                provider_profile.sectors.as_deref(),    // Sector weightings JSON
-                None,                                   // Single country (already in countries JSON)
-                provider_profile.countries.as_deref(),  // Country weightings JSON
+                None,                                  // Single sector (already in sectors JSON)
+                provider_profile.sectors.as_deref(),   // Sector weightings JSON
+                None,                                  // Single country (already in countries JSON)
+                provider_profile.countries.as_deref(), // Country weightings JSON
                 existing_asset.exchange_mic.as_deref(), // Fallback for ETF region (fund domicile)
             );
 
@@ -531,6 +581,8 @@ impl AssetServiceTrait for AssetService {
     }
 
     async fn cleanup_legacy_metadata(&self, asset_id: &str) -> Result<()> {
-        self.asset_repository.cleanup_legacy_metadata(asset_id).await
+        self.asset_repository
+            .cleanup_legacy_metadata(asset_id)
+            .await
     }
 }

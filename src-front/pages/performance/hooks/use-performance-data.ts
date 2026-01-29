@@ -34,7 +34,8 @@ export function useCalculatePerformanceHistory({
 }) {
   // Filter out invalid items (defensive: handles stale localStorage data)
   const validItems = selectedItems.filter(
-    (item) => item && typeof item.id === "string" && item.id && typeof item.type === "string" && item.type,
+    (item) =>
+      item && typeof item.id === "string" && item.id && typeof item.type === "string" && item.type,
   );
 
   // Use a ref to track the effective start date without causing re-renders
@@ -76,7 +77,14 @@ export function useCalculatePerformanceHistory({
 
   const performanceQueries = useQueries({
     queries: validItems.map((item) => ({
-      queryKey: [QueryKeys.PERFORMANCE_HISTORY, item.type, item.id, startDateToUse, endDate, trackingMode],
+      queryKey: [
+        QueryKeys.PERFORMANCE_HISTORY,
+        item.type,
+        item.id,
+        startDateToUse,
+        endDate,
+        trackingMode,
+      ],
       queryFn: () =>
         calculatePerformanceHistory(
           item.type,

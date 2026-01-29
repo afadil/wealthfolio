@@ -1,295 +1,163 @@
 # AGENTS.md
 
-This guide equips AI coding agents (and humans) to work effectively in this
-repository. It summarizes architecture, key entry points, run targets, code
-conventions, and an actionable playbook for common changes. Prefer surgical
-edits, clear reasoning, and validation via the existing scripts and tests.
-
-## Overview
-
-- React + Vite frontend with Tailwind v4 and shadcn-based UI components.
-- Desktop app via Tauri (Rust) with local SQLite storage; optional web mode
-  served by an Axum HTTP server.
-- Strong addon system powered by a TypeScript SDK enabling dynamic sidebar
-  routes, UI, permissions, and secure secrets.
-- Monorepo-style packages: shared UI (`@wealthfolio/ui`), addon SDK, and addon
-  dev tools.
-
-References:
-
-- `README.md`:1 — Project intro, features, dev, and Docker.
-- `src-front/App.tsx`:1 — App providers and QueryClient wiring.
-- `src-front/routes.tsx`:1 — Route map and dynamic addon routes.
-- `src-front/globals.css`:1 — Tailwind v4 CSS-first setup and theme tokens.
-- `src-front/adapters/index.ts`:1 — Runtime env (desktop/web) and invoke bridges.
-- `src-front/commands/portfolio.ts`:1 — Example web/Tauri command wrappers.
-- `src-server/src/main.rs`:1 — Axum server entrypoint.
-- `src-tauri/src/main.rs`:1 — Tauri desktop entrypoint.
-- `packages/ui/src/index.ts`:1 — Shared UI exports.
-
-## Run Targets
-
-- Desktop dev: `pnpm tauri dev`
-- Desktop build: `pnpm tauri build`
-- Web dev (Vite + Axum): `pnpm run dev:web`
-  - Optional override env: copy `.env.web.example` to `.env.web` (see
-    `README.md`:1)
-- Server only (HTTP API + static):
-  `cargo run --manifest-path src-server/Cargo.toml`
-
-### Testing
-
-- Unit tests: `pnpm test` | `pnpm test:watch` | `pnpm test:coverage`
-- Single test file: `pnpm test -- path/to/file.test.ts`
-- Test by name: `pnpm test -- -t "pattern"`
-- E2E tests: `pnpm test:e2e` | `pnpm test:e2e:ui`
-- Rust tests: `cargo test` (runs all workspace crates)
-
-### Quality Checks
-
-- Type check: `pnpm type-check` (all packages) | `pnpm type-check:root` (root
-  only)
-- Lint: `pnpm lint` | `pnpm lint:fix`
-- Format: `pnpm format` | `pnpm format:check`
-- All checks: `pnpm check`
-
-## Code Layout
-
-- Frontend app: `src-front/`
-  - Pages: `src-front/pages/...`
-  - Components: `src-front/components/...`
-  - Features: `src-front/features/...` (self-contained feature modules)
-  - Hooks: `src-front/hooks/...`
-  - Core types/helpers: `src-front/lib/...`
-  - Commands (frontend bridges): `src-front/commands/...` (call into Tauri or
-    Web server based on runtime)
-  - Addons runtime: `src-front/addons/...`
-- Desktop (Tauri): `src-tauri/` (Rust IPC commands, events, capabilities)
-- Rust crates: `crates/`
-  - `core/` — Core business logic (models, services, calculations)
-  - `storage-sqlite/` — SQLite storage layer (Diesel ORM, repositories)
-  - `market-data/` — Market data providers and sync
-  - `connect/` — External service integrations
-  - `device-sync/` — Device sync and E2EE functionality
-- HTTP Server (web mode): `src-server/`
-- Packages: `packages/`
-  - `addon-sdk` — TypeScript SDK for addons
-  - `addon-dev-tools` — CLI and dev server for addons
-  - `ui` — Shared UI lib (`@wealthfolio/ui`)
-
-## Architecture Notes
-
-- Runtime detection is centralized and selects between Tauri and Web adapters.
-  - `src-front/adapters/index.ts`:1 — Re-exports from runtime-specific adapter.
-  - `src-front/adapters/tauri/index.ts`:1 — Desktop (Tauri IPC) implementation.
-  - `src-front/adapters/web/index.ts`:1 — Web (REST API) implementation.
-- Adapters export typed functions for each backend command (e.g., `getAccounts`,
-  `syncBrokerData`). Services import these directly instead of using generic
-  `invoke`.
-- Frontend services wrap adapter calls with error handling and logging.
-- Web mode server routes (Axum) live in `src-server/src/api/` and wire to
-  services in `crates/core`.
-- Tauri commands live under `src-tauri/src/commands/*` and call into
-  `crates/core` services.
-- Addons:
-  - Runtime host bridge: `src-front/addons/addons-runtime-context.ts`:1
-  - SDK: `packages/addon-sdk/src/*`
-  - Dev tools: `packages/addon-dev-tools/*` (hot reload server, scaffolding)
-
-## Styling & UI
-
-- Use Tailwind v4 (CSS-first) and shared components from `@wealthfolio/ui`.
-- Prefer composition via `packages/ui/src/components/ui/*` and
-  `packages/ui/src/components/common/*`.
-- Theme tokens are declared in `src-front/globals.css`:1 (light/dark, semantic
-  colors, charts, sidebar).
-- Avoid ad-hoc global CSS; local, component-level styling should rely on
-  Tailwind utilities.
-
-## Data & Security
-
-- All user data is local (SQLite). No cloud dependencies.
-- API keys and secrets use OS keyring via core services; never write secrets to
-  disk.
-  - Frontend: use secrets commands through adapters.
-  - Addons: `ctx.api.secrets` provides scoped storage per addon.
-- Permission model for addons is enforced; request only minimal capabilities.
-
-## Development Conventions
-
-- TypeScript: strict mode, no unused locals/params (`tsconfig.json`:1).
-- Keep changes minimal, focused, and consistent with surrounding style.
-- Don’t introduce unrelated refactors; avoid renames unless required by the
-  task.
-- Prefer existing helpers and patterns; follow command wrapper conventions.
-- Error handling: log concisely, surface actionable messages to UI when needed.
-
-## Validation Checklist
-
-- Build the target you’re modifying:
-  - Frontend only: `pnpm build`
-  - Desktop: `pnpm tauri dev`
-  - Web mode: `pnpm run dev:web`
-- Run tests locally where applicable: `pnpm test`
-- Lint/format if touched areas use them (keep changes consistent; don’t add new
-  toolchains).
-- For server changes, run `cargo run --manifest-path src-server/Cargo.toml` and
-  verify endpoints.
-- For Tauri commands, verify desktop flows compile and run.
-
-## Agent Playbook
-
-When adding a new user-visible feature that needs backend data:
-
-1. Frontend route and UI
-
-- Add page under `src-front/pages/...` and route in `src-front/routes.tsx`:1.
-- Build UI with components from `@wealthfolio/ui` and Tailwind.
-
-2. Frontend command wrapper
-
-- Add a function in `src-front/commands/<domain>.ts` following the `RUN_ENV`
-  switch pattern (see `src-front/commands/portfolio.ts`:1).
-
-3. Desktop backend (if needed)
-
-- Add Tauri command under `src-tauri/src/commands/*.rs` and wire it in
-  `src-tauri/src/commands/mod.rs`.
-- Expose the command in `src-tauri/src/lib.rs`:1.
-
-4. Web server endpoint (if needed)
-
-- Add a handler in `src-server/src/api/` and route in its router.
-- Call into the appropriate `crates/core` service.
-
-5. Core logic (shared)
-
-- Implement or update services/repos in `crates/core/` as needed.
-- Add migrations in `crates/storage-sqlite/` if schema changes.
-- Keep business rules and calculations in core, not UI layers.
-
-6. Tests
-
-- Add/extend vitest tests near changed TS modules (e.g.,
-  `src-front/lib/*.test.ts`).
-- For Rust, add tests under the relevant crate when practical.
-
-Common UI tasks:
-
-- Tables/charts: reuse components under `packages/ui/src/components/ui/*` and
-  `packages/ui/src/components/common/*`.
-- Forms: use `react-hook-form` and validators via `zod` types from
-  `src-front/lib/schemas.ts`:1 when possible.
-
-## Useful Commands (Agent Discovery)
-
-- List files: `rg --files`
-- Search text: `rg "keyword"`
-- Rust check: `cargo check` (workspace) or `cargo check -p wealthfolio-core`
-
-## Addon Development (Quickstart)
-
-- Scaffold: `npx @wealthfolio/addon-dev-tools create <my-addon>`
-- Start addon dev server: `npm run dev:server` (from addon dir)
-- Run Wealthfolio (desktop) with addon dev mode:
-  `VITE_ENABLE_ADDON_DEV_MODE=true pnpm tauri dev`
-- Add routes and sidebar via the addon context
-  (`src-front/addons/addons-runtime-context.ts`:1)
-- Use `ctx.api.*` for data, events, and query cache integration (see docs
-  below)
-
-Docs entry points:
-
-- `docs/addons/index.md`:1 — Addon docs hub
-- `docs/addons/addon-api-reference.md`:1 — API surface and examples
-- `docs/addons/addon-architecture.md`:1 — Design and patterns
-- `docs/activities/activity-types.md`:1 — Activity schemas for import/creation
-
-## Frontend Rules (Cursor)
-
-- Scope: applies to `src-front/**`, `.tsx`, `.ts` files; complements repo
-  conventions.
-- Tech stack: Node.js, React, Vite, TanStack Query, Tailwind CSS; routing in
-  this repo uses React Router (not TanStack Router).
-- General principles: write concise, technical TypeScript; avoid duplication;
-  prefer functional/declarative patterns; avoid classes; use descriptive names
-  like `isLoading`/`hasError`.
-- File structure order: exported component → subcomponents → helpers → static
-  content → types.
-- Naming: use lowercase-with-dashes for directories (e.g.,
-  `components/auth-wizard`); favor named exports.
-- TypeScript: use TS everywhere; prefer interfaces over types; avoid enums (use
-  maps/union types); use functional components with interface props.
-- Syntax: use `function` for pure functions; always use curly braces for
-  conditionals; favor simple, declarative JSX.
-- UI/styling: use Tailwind utilities; reuse `@wealthfolio/ui` components where
-  possible.
-- Performance: immutable data; efficient data fetching with React Query;
-  minimize network calls; choose efficient data structures; optimize rendering
-  (memoize, derive state, virtualize when needed).
-- Source: `.cursor/rules/frontend-rules.mdc` (treat as living rules; keep this
-  section concise and defer to the source for updates).
-
-## PR & Review Tips
-
-- Include a brief summary of the change, affected areas, and test steps.
-- Note any migrations or data shape changes.
-- Keep diffs small and cohesive; split unrelated changes.
-- Ensure both desktop and web modes compile when you touch shared layers.
-
-## Security & Privacy
-
-- Never log secrets or personal financial data.
-- Use secrets APIs; do not persist tokens in files or localStorage.
-- Validate all input and handle errors gracefully.
-
-## Troubleshooting
-
-- Vite runs at `http://localhost:1420` in web mode and proxies API to the
-  server.
-- The server logs the effective database path on startup; ensure write
-  permissions.
-- For web mode, verify CORS and env (`.env.web`) if API calls fail.
-- If an adapter call fails, confirm the matching server/Tauri command and
-  parameter names.
-
-## Backend Rules (Rust)
-
-- Scope: Rust code in `src-tauri/**`, `crates/**`, and `src-server/**` (Axum).
-  Source of truth: `.cursor/rules/rust-rules.mdc`.
-- Principles: write clear, idiomatic Rust; do only the requested task; prefer
-  modularity and small, focused functions; expressive names (`is_ready`,
-  `has_data`).
-- Async: embrace `async`/`.await` where appropriate; avoid blocking; use safe
-  await points.
-- Error handling: use `Result`/`Option`; propagate with `?`; define domain
-  errors via `thiserror`; handle edge cases early; return errors rather than
-  panicking.
-- Concurrency & performance: respect ownership/borrowing; avoid unnecessary
-  clones; prefer references and slices; be mindful of locking granularity.
-- Organization: separate concerns (network/api in `src-server`, desktop IPC in
-  `src-tauri`, business logic in `crates/core`, storage in
-  `crates/storage-sqlite`). Keep commands thin—delegate to crate services.
-- Database: Diesel + SQLite; migrations in `crates/storage-sqlite/migrations`;
-  server embeds and applies them automatically on startup.
-- Tauri: add new commands under `src-tauri/src/commands/*.rs`, register in
-  `mod.rs` and expose via `lib.rs`. Keep IPC structs serde-friendly.
-- Axum server: add handlers in `src-server/src/api/`, convert to DTOs as needed,
-  and call `crates/core` services. Validate/parse query/body (e.g., dates).
-- Testing: use `tokio::test` for async; prefer unit tests on services in
-  `crates/core`; add integration tests in `src-server/tests` when touching HTTP.
-  Use fakes/mocks for external deps.
-- Docs & cleanup: add Rustdoc where it clarifies intent; remove dead code during
-  refactors.
-
-## Plan Mode
-
-- Make the plan extremely concise. Sacrifice grammar for the sake of concision.
-- At the end of each plan, give me a list of unresolved questions to answer, if
-  any.
+AI agent guide for this repository. Covers behavioral rules, architecture, and
+common task playbooks.
 
 ---
 
-This document is intended to make AI agents productive, consistent, and safe in
-this codebase. When in doubt, follow the nearest existing pattern and validate
-via the provided scripts.
+## Behavioral Guidelines
+
+**These come first because they prevent the most mistakes.**
+
+### 1. Think Before Coding
+
+- State assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them—don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+
+### 2. Simplicity First
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No error handling for impossible scenarios.
+- If 200 lines could be 50, rewrite it.
+
+### 3. Surgical Changes
+
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated issues, mention them—don't fix them.
+- Remove only what YOUR changes made unused.
+
+### 4. Goal-Driven Execution
+
+- Transform tasks into verifiable goals.
+- For multi-step tasks, state a brief plan with verification steps.
+- Unverified work is incomplete work.
+
+### 5. Output Precision
+
+- Lead with findings, not process descriptions.
+- Use structured formats (lists, tables, code blocks).
+- Include absolute file paths—never relative.
+
+---
+
+## Overview
+
+- **Frontend**: React + Vite + Tailwind v4 + shadcn (`src-front/`)
+- **Desktop**: Tauri/Rust with SQLite (`src-tauri/`, `crates/`)
+- **Web mode**: Axum HTTP server (`src-server/`)
+- **Packages**: `@wealthfolio/ui`, addon-sdk, addon-dev-tools (`packages/`)
+
+## Code Layout
+
+```
+src-front/
+├── pages/          # Route pages
+├── components/     # Shared components
+├── features/       # Self-contained feature modules
+├── commands/       # Backend call wrappers (Tauri/Web)
+├── adapters/       # Runtime detection (desktop vs web)
+└── addons/         # Addon runtime
+
+src-tauri/src/
+└── commands/       # Tauri IPC commands
+
+src-server/src/
+└── api/            # Axum HTTP handlers
+
+crates/
+├── core/           # Business logic, models, services
+├── storage-sqlite/ # Diesel ORM, repositories, migrations
+├── market-data/    # Market data providers
+├── connect/        # External integrations
+└── device-sync/    # Device sync, E2EE
+```
+
+## Run Targets
+
+| Task | Command |
+|------|---------|
+| Desktop dev | `pnpm tauri dev` |
+| Web dev | `pnpm run dev:web` |
+| Tests (TS) | `pnpm test` |
+| Tests (Rust) | `cargo test` |
+| Type check | `pnpm type-check` |
+| Lint | `pnpm lint` |
+| All checks | `pnpm check` |
+
+---
+
+## Agent Playbook
+
+### Adding a feature with backend data
+
+1. **Frontend route/UI** → `src-front/pages/`, `src-front/routes.tsx`
+2. **Command wrapper** → `src-front/commands/<domain>.ts` (follow `RUN_ENV` pattern)
+3. **Tauri command** → `src-tauri/src/commands/*.rs`, wire in `mod.rs` + `lib.rs`
+4. **Web endpoint** → `src-server/src/api/`, call `crates/core` service
+5. **Core logic** → `crates/core/` services/repos
+6. **Tests** → Vitest for TS, `#[test]` for Rust
+
+### UI patterns
+
+- Components: `@wealthfolio/ui` and `packages/ui/src/components/`
+- Forms: `react-hook-form` + `zod` schemas from `src-front/lib/schemas.ts`
+- Theme: tokens in `src-front/globals.css`
+
+### Architecture pattern
+
+```
+Frontend → Adapter (tauri/web) → Command wrapper
+                ↓
+        Tauri IPC  |  Axum HTTP
+                ↓
+           crates/core (business logic)
+                ↓
+           crates/storage-sqlite
+```
+
+---
+
+## Conventions
+
+### TypeScript
+- Strict mode, no unused locals/params
+- Prefer interfaces over types, avoid enums
+- Functional components, named exports
+- Directory names: lowercase-with-dashes
+
+### Rust
+- Idiomatic Rust, small focused functions
+- `Result`/`Option`, propagate with `?`, `thiserror` for domain errors
+- Keep Tauri/Axum commands thin—delegate to `crates/core`
+- Migrations in `crates/storage-sqlite/migrations`
+
+### Security
+- All data local (SQLite), no cloud
+- Secrets via OS keyring—never disk/localStorage
+- Never log secrets or financial data
+
+---
+
+## Validation Checklist
+
+Before completing any task:
+
+- [ ] Builds: `pnpm build` or `pnpm tauri dev` or `cargo check`
+- [ ] Tests pass: `pnpm test` and/or `cargo test`
+- [ ] Both desktop and web compile if touching shared code
+- [ ] Changes are minimal and surgical
+
+---
+
+## Plan Mode
+
+- Make plans extremely concise. Sacrifice grammar for brevity.
+- End with unresolved questions, if any.
+
+---
+
+When in doubt, follow the nearest existing pattern.

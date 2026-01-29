@@ -25,7 +25,11 @@ export function DatePicker<TFieldValues extends FieldValues = FieldValues>({
   // Calculate maxValue for disabling future dates
   // Use now() for time-enabled pickers to include current time in comparison
   // Use today() for date-only pickers
-  const maxValue = allowFutureDates ? undefined : enableTime ? now(getLocalTimeZone()) : today(getLocalTimeZone());
+  const maxValue = allowFutureDates
+    ? undefined
+    : enableTime
+      ? now(getLocalTimeZone())
+      : today(getLocalTimeZone());
 
   return (
     <FormField

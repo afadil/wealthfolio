@@ -35,9 +35,11 @@ impl SyncProgressReporter for TauriProgressReporter {
     }
 
     fn report_sync_start(&self) {
-        self.app_handle.emit(BROKER_SYNC_START, ()).unwrap_or_else(|e| {
-            error!("Failed to emit broker:sync-start event: {}", e);
-        });
+        self.app_handle
+            .emit(BROKER_SYNC_START, ())
+            .unwrap_or_else(|e| {
+                error!("Failed to emit broker:sync-start event: {}", e);
+            });
     }
 
     fn report_sync_complete(&self, result: &SyncResult) {
@@ -118,19 +120,13 @@ pub async fn perform_broker_sync(
     // Use TauriProgressReporter if we have an AppHandle, otherwise use NoOp
     if let Some(app_handle) = app {
         let reporter = Arc::new(TauriProgressReporter::new(app_handle.clone()));
-        let orchestrator = SyncOrchestrator::new(
-            context.sync_service(),
-            reporter,
-            SyncConfig::default(),
-        );
+        let orchestrator =
+            SyncOrchestrator::new(context.sync_service(), reporter, SyncConfig::default());
         orchestrator.sync_all(&client).await
     } else {
         let reporter = Arc::new(wealthfolio_connect::NoOpProgressReporter);
-        let orchestrator = SyncOrchestrator::new(
-            context.sync_service(),
-            reporter,
-            SyncConfig::default(),
-        );
+        let orchestrator =
+            SyncOrchestrator::new(context.sync_service(), reporter, SyncConfig::default());
         orchestrator.sync_all(&client).await
     }
 }
@@ -186,7 +182,10 @@ pub async fn list_broker_accounts(
     info!("Fetching broker accounts from cloud API...");
 
     let client = state.connect_service().get_api_client()?;
-    let accounts = client.list_accounts(None).await.map_err(|e| e.to_string())?;
+    let accounts = client
+        .list_accounts(None)
+        .await
+        .map_err(|e| e.to_string())?;
 
     info!("Found {} broker accounts", accounts.len());
     Ok(accounts)
@@ -244,7 +243,10 @@ pub async fn get_user_info(state: State<'_, Arc<ServiceContext>>) -> Result<User
     let client = state.connect_service().get_api_client()?;
     match client.get_user_info().await {
         Ok(user_info) => {
-            info!("User info retrieved for: {}", user_info.email.as_deref().unwrap_or("unknown"));
+            info!(
+                "User info retrieved for: {}",
+                user_info.email.as_deref().unwrap_or("unknown")
+            );
             Ok(user_info)
         }
         Err(e) => {

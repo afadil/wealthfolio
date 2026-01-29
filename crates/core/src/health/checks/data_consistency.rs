@@ -58,8 +58,10 @@ impl DataConsistencyCheck {
         }
 
         // Group by issue type
-        let mut by_type: std::collections::HashMap<ConsistencyIssueType, Vec<&ConsistencyIssueInfo>> =
-            std::collections::HashMap::new();
+        let mut by_type: std::collections::HashMap<
+            ConsistencyIssueType,
+            Vec<&ConsistencyIssueInfo>,
+        > = std::collections::HashMap::new();
 
         for issue in issues_data {
             by_type
@@ -69,7 +71,9 @@ impl DataConsistencyCheck {
         }
 
         // Emit health issue for orphan activities (account references)
-        if let Some(orphan_account_issues) = by_type.get(&ConsistencyIssueType::OrphanActivityAccount) {
+        if let Some(orphan_account_issues) =
+            by_type.get(&ConsistencyIssueType::OrphanActivityAccount)
+        {
             let count = orphan_account_issues.len();
             let record_ids: Vec<String> = orphan_account_issues
                 .iter()

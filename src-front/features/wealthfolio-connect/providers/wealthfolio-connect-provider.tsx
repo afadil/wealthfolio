@@ -1,4 +1,12 @@
-import { isDesktop, listenDeepLink, logger, openUrlInBrowser, getSecret, setSecret, deleteSecret } from "@/adapters";
+import {
+  isDesktop,
+  listenDeepLink,
+  logger,
+  openUrlInBrowser,
+  getSecret,
+  setSecret,
+  deleteSecret,
+} from "@/adapters";
 import { authenticate as authenticateWithASWebAuth } from "tauri-plugin-web-auth-api";
 import { getUserInfo } from "../services/broker-service";
 import { storeSyncSession, clearSyncSession } from "../services/auth-service";
@@ -254,7 +262,9 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
     if (session.refresh_token) {
       try {
         await setSecret(REFRESH_TOKEN_KEY, session.refresh_token);
-        logger.info(isDesktop ? "Refresh token stored in keyring" : "Refresh token stored in backend");
+        logger.info(
+          isDesktop ? "Refresh token stored in keyring" : "Refresh token stored in backend",
+        );
       } catch (err) {
         logger.error(`setSecret failed: ${err}`);
         // Fallback to localStorage only on desktop where keyring might fail

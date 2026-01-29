@@ -1,8 +1,8 @@
 use crate::accounts::TrackingMode;
 use crate::constants::{DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
 use crate::errors::{self, Result, ValidationError};
-use crate::quotes::QuoteServiceTrait;
 use crate::performance::ReturnData;
+use crate::quotes::QuoteServiceTrait;
 use crate::utils::time_utils::valuation_date_today;
 use crate::valuation::ValuationServiceTrait;
 
@@ -321,13 +321,29 @@ impl PerformanceService {
             period_gain: period_gain.round_dp(DECIMAL_PRECISION),
             period_return: period_return.round_dp(DECIMAL_PRECISION),
             // For HOLDINGS mode, TWR/MWR are not meaningful (no cash flow tracking)
-            cumulative_twr: if is_holdings_mode { None } else { Some(cumulative_twr.round_dp(DECIMAL_PRECISION)) },
+            cumulative_twr: if is_holdings_mode {
+                None
+            } else {
+                Some(cumulative_twr.round_dp(DECIMAL_PRECISION))
+            },
             gain_loss_amount: Some(gain_loss_amount.round_dp(DECIMAL_PRECISION)),
-            annualized_twr: if is_holdings_mode { None } else { Some(annualized_twr.round_dp(DECIMAL_PRECISION)) },
+            annualized_twr: if is_holdings_mode {
+                None
+            } else {
+                Some(annualized_twr.round_dp(DECIMAL_PRECISION))
+            },
             simple_return: simple_total_return.round_dp(DECIMAL_PRECISION),
             annualized_simple_return: annualized_simple_return.round_dp(DECIMAL_PRECISION),
-            cumulative_mwr: if is_holdings_mode { None } else { Some(cumulative_mwr.round_dp(DECIMAL_PRECISION)) },
-            annualized_mwr: if is_holdings_mode { None } else { Some(annualized_mwr.round_dp(DECIMAL_PRECISION)) },
+            cumulative_mwr: if is_holdings_mode {
+                None
+            } else {
+                Some(cumulative_mwr.round_dp(DECIMAL_PRECISION))
+            },
+            annualized_mwr: if is_holdings_mode {
+                None
+            } else {
+                Some(annualized_mwr.round_dp(DECIMAL_PRECISION))
+            },
             volatility: volatility.round_dp(DECIMAL_PRECISION),
             max_drawdown: max_drawdown.round_dp(DECIMAL_PRECISION),
             is_holdings_mode,
@@ -410,13 +426,29 @@ impl PerformanceService {
             currency,
             period_gain: period_gain.round_dp(DECIMAL_PRECISION),
             period_return: period_return.round_dp(DECIMAL_PRECISION),
-            cumulative_twr: if is_holdings_mode { None } else { Some(Decimal::ZERO) },
+            cumulative_twr: if is_holdings_mode {
+                None
+            } else {
+                Some(Decimal::ZERO)
+            },
             gain_loss_amount: Some(gain_loss_amount.round_dp(DECIMAL_PRECISION)),
-            annualized_twr: if is_holdings_mode { None } else { Some(Decimal::ZERO) },
+            annualized_twr: if is_holdings_mode {
+                None
+            } else {
+                Some(Decimal::ZERO)
+            },
             simple_return: simple_total_return.round_dp(DECIMAL_PRECISION),
             annualized_simple_return: annualized_simple_return.round_dp(DECIMAL_PRECISION),
-            cumulative_mwr: if is_holdings_mode { None } else { Some(Decimal::ZERO) },
-            annualized_mwr: if is_holdings_mode { None } else { Some(Decimal::ZERO) },
+            cumulative_mwr: if is_holdings_mode {
+                None
+            } else {
+                Some(Decimal::ZERO)
+            },
+            annualized_mwr: if is_holdings_mode {
+                None
+            } else {
+                Some(Decimal::ZERO)
+            },
             volatility: Decimal::ZERO,
             max_drawdown: Decimal::ZERO,
             is_holdings_mode,
@@ -793,8 +825,13 @@ impl PerformanceServiceTrait for PerformanceService {
     ) -> Result<PerformanceMetrics> {
         match item_type {
             "account" => {
-                self.calculate_account_performance_summary(item_id, start_date, end_date, tracking_mode)
-                    .await
+                self.calculate_account_performance_summary(
+                    item_id,
+                    start_date,
+                    end_date,
+                    tracking_mode,
+                )
+                .await
             }
             "symbol" => {
                 warn!("Performance summary calculation is not supported for symbols. Returning empty response.");

@@ -10,17 +10,11 @@ use thiserror::Error;
 pub enum HealthError {
     /// A health check failed to execute.
     #[error("Health check '{check_id}' failed: {message}")]
-    CheckFailed {
-        check_id: String,
-        message: String,
-    },
+    CheckFailed { check_id: String, message: String },
 
     /// A fix action failed to execute.
     #[error("Fix action '{action_id}' failed: {message}")]
-    FixActionFailed {
-        action_id: String,
-        message: String,
-    },
+    FixActionFailed { action_id: String, message: String },
 
     /// An unknown fix action was requested.
     #[error("Unknown fix action: {0}")]
@@ -28,10 +22,7 @@ pub enum HealthError {
 
     /// Invalid payload for a fix action.
     #[error("Invalid payload for fix action '{action_id}': {message}")]
-    InvalidFixPayload {
-        action_id: String,
-        message: String,
-    },
+    InvalidFixPayload { action_id: String, message: String },
 
     /// Configuration validation error.
     #[error("Invalid health configuration: {0}")]

@@ -21,13 +21,14 @@ pub use activities_model::{
     parse_decimal_string_tolerant, Activity, ActivityBulkIdentifierMapping,
     ActivityBulkMutationError, ActivityBulkMutationRequest, ActivityBulkMutationResult,
     ActivityDetails, ActivityImport, ActivitySearchResponse, ActivitySearchResponseMeta,
-    ActivityStatus, ActivityType, ActivityUpdate, AssetInput, ImportActivitiesResult,
-    ImportActivitiesSummary, ImportMapping, ImportMappingData, IncomeData, NewActivity, Sort,
+    ActivityStatus, ActivityType, ActivityUpdate, ActivityUpsert, AssetInput, BulkUpsertResult,
+    ImportActivitiesResult, ImportActivitiesSummary, ImportMapping, ImportMappingData, IncomeData,
+    NewActivity, Sort,
 };
 pub use activities_service::ActivityService;
 pub use activities_traits::{ActivityRepositoryTrait, ActivityServiceTrait};
 pub use compiler::{ActivityCompiler, DefaultActivityCompiler};
-pub use csv_parser::{parse_csv, ParseConfig, ParsedCsvResult, ParseError};
+pub use csv_parser::{parse_csv, ParseConfig, ParseError, ParsedCsvResult};
 pub use idempotency::{
     compute_activity_idempotency_key, compute_idempotency_key, generate_manual_idempotency_key,
 };

@@ -58,10 +58,9 @@ impl Coverage {
             InstrumentId::Crypto { .. } => true,
 
             // Metal: Apply quote currency filter
-            InstrumentId::Metal { quote, .. } => {
-                self.metal_quote_ccy_allow
-                    .map_or(true, |a| slice_contains(a, quote.as_ref()))
-            }
+            InstrumentId::Metal { quote, .. } => self
+                .metal_quote_ccy_allow
+                .map_or(true, |a| slice_contains(a, quote.as_ref())),
         }
     }
 

@@ -2,15 +2,20 @@
 
 use super::*;
 use crate::accounts::{Account, AccountRepositoryTrait, AccountUpdate, NewAccount};
-use crate::assets::{Asset, AssetKind, AssetRepositoryTrait, NewAsset, PricingMode, ProviderProfile, UpdateAssetProfile};
+use crate::assets::{
+    Asset, AssetKind, AssetRepositoryTrait, NewAsset, PricingMode, ProviderProfile,
+    UpdateAssetProfile,
+};
 use crate::errors::Result;
 use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
-use crate::quotes::DataSource;
-use crate::portfolio::snapshot::{AccountStateSnapshot, Position, SnapshotRepositoryTrait, SnapshotSource};
+use crate::portfolio::snapshot::{
+    AccountStateSnapshot, Position, SnapshotRepositoryTrait, SnapshotSource,
+};
 use crate::portfolio::valuation::{DailyAccountValuation, ValuationRepositoryTrait};
+use crate::quotes::DataSource;
 use crate::quotes::{
-    LatestQuotePair, ProviderInfo, Quote, QuoteImport, QuoteServiceTrait, SymbolSearchResult,
-    QuoteSyncState, SymbolSyncPlan, SyncResult,
+    LatestQuotePair, ProviderInfo, Quote, QuoteImport, QuoteServiceTrait, QuoteSyncState,
+    SymbolSearchResult, SymbolSyncPlan, SyncResult,
 };
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, Utc};
@@ -52,7 +57,9 @@ impl AccountRepositoryTrait for MockAccountRepository {
             .iter()
             .find(|a| a.id == account_id)
             .cloned()
-            .ok_or_else(|| crate::errors::Error::Repository(format!("Account {} not found", account_id)))
+            .ok_or_else(|| {
+                crate::errors::Error::Repository(format!("Account {} not found", account_id))
+            })
     }
 
     fn list(
@@ -61,8 +68,18 @@ impl AccountRepositoryTrait for MockAccountRepository {
         _account_ids: Option<&[String]>,
     ) -> Result<Vec<Account>> {
         let accounts = match is_active_filter {
-            Some(true) => self.accounts.iter().filter(|a| a.is_active).cloned().collect(),
-            Some(false) => self.accounts.iter().filter(|a| !a.is_active).cloned().collect(),
+            Some(true) => self
+                .accounts
+                .iter()
+                .filter(|a| a.is_active)
+                .cloned()
+                .collect(),
+            Some(false) => self
+                .accounts
+                .iter()
+                .filter(|a| !a.is_active)
+                .cloned()
+                .collect(),
             None => self.accounts.clone(),
         };
         Ok(accounts)
@@ -98,7 +115,9 @@ impl AssetRepositoryTrait for MockAssetRepository {
             .iter()
             .find(|a| a.id == asset_id)
             .cloned()
-            .ok_or_else(|| crate::errors::Error::Repository(format!("Asset {} not found", asset_id)))
+            .ok_or_else(|| {
+                crate::errors::Error::Repository(format!("Asset {} not found", asset_id))
+            })
     }
 
     fn list(&self) -> Result<Vec<Asset>> {
@@ -304,7 +323,9 @@ impl QuoteServiceTrait for MockMarketDataRepository {
             .filter(|q| q.asset_id == symbol)
             .max_by_key(|q| q.timestamp)
             .cloned()
-            .ok_or_else(|| crate::errors::Error::Repository(format!("Quote not found for {}", symbol)))
+            .ok_or_else(|| {
+                crate::errors::Error::Repository(format!("Quote not found for {}", symbol))
+            })
     }
 
     fn get_latest_quotes(&self, symbols: &[String]) -> Result<HashMap<String, Quote>> {
@@ -531,6 +552,14 @@ impl QuoteServiceTrait for MockMarketDataRepository {
     // Quote Import
     // =========================================================================
 
+    async fn check_quotes_import(
+        &self,
+        _content: &[u8],
+        _has_header_row: bool,
+    ) -> Result<Vec<QuoteImport>> {
+        unimplemented!()
+    }
+
     async fn import_quotes(
         &self,
         _quotes: Vec<QuoteImport>,
@@ -568,7 +597,11 @@ impl FxServiceTrait for MockFxService {
         Ok(vec![])
     }
 
-    fn get_latest_exchange_rate(&self, _from_currency: &str, _to_currency: &str) -> Result<Decimal> {
+    fn get_latest_exchange_rate(
+        &self,
+        _from_currency: &str,
+        _to_currency: &str,
+    ) -> Result<Decimal> {
         Ok(dec!(1.0))
     }
 
@@ -668,14 +701,8 @@ impl ValuationRepositoryTrait for MockValuationRepository {
             .valuations
             .iter()
             .filter(|v| v.account_id == account_id)
-            .filter(|v| {
-                start_date
-                    .map(|sd| v.valuation_date >= sd)
-                    .unwrap_or(true)
-            })
-            .filter(|v| {
-                end_date.map(|ed| v.valuation_date <= ed).unwrap_or(true)
-            })
+            .filter(|v| start_date.map(|sd| v.valuation_date >= sd).unwrap_or(true))
+            .filter(|v| end_date.map(|ed| v.valuation_date <= ed).unwrap_or(true))
             .cloned()
             .collect();
         Ok(filtered)
@@ -770,13 +797,23 @@ fn create_test_asset(id: &str, kind: AssetKind, currency: &str) -> Asset {
     }
 }
 
-fn create_test_position(account_id: &str, asset_id: &str, quantity: Decimal, cost_basis: Decimal, currency: &str) -> Position {
+fn create_test_position(
+    account_id: &str,
+    asset_id: &str,
+    quantity: Decimal,
+    cost_basis: Decimal,
+    currency: &str,
+) -> Position {
     Position {
         id: format!("POS-{}-{}", asset_id, account_id),
         account_id: account_id.to_string(),
         asset_id: asset_id.to_string(),
         quantity,
-        average_cost: if quantity > Decimal::ZERO { cost_basis / quantity } else { Decimal::ZERO },
+        average_cost: if quantity > Decimal::ZERO {
+            cost_basis / quantity
+        } else {
+            Decimal::ZERO
+        },
         total_cost_basis: cost_basis,
         currency: currency.to_string(),
         inception_date: Utc::now(),
@@ -787,7 +824,11 @@ fn create_test_position(account_id: &str, asset_id: &str, quantity: Decimal, cos
     }
 }
 
-fn create_test_snapshot(account_id: &str, positions: Vec<Position>, cash: HashMap<String, Decimal>) -> AccountStateSnapshot {
+fn create_test_snapshot(
+    account_id: &str,
+    positions: Vec<Position>,
+    cash: HashMap<String, Decimal>,
+) -> AccountStateSnapshot {
     let mut positions_map = HashMap::new();
     for pos in positions {
         positions_map.insert(pos.asset_id.clone(), pos);
@@ -814,10 +855,7 @@ fn create_test_quote(symbol: &str, price: Decimal, date: NaiveDate, currency: &s
     Quote {
         id: format!("{}-{}", symbol, date),
         asset_id: symbol.to_string(),
-        timestamp: DateTime::from_naive_utc_and_offset(
-            date.and_hms_opt(16, 0, 0).unwrap(),
-            Utc,
-        ),
+        timestamp: DateTime::from_naive_utc_and_offset(date.and_hms_opt(16, 0, 0).unwrap(), Utc),
         open: price,
         high: price,
         low: price,
@@ -921,14 +959,14 @@ async fn test_single_investment_account() {
     let asset = create_test_asset("AAPL", AssetKind::Security, "USD");
     let position = create_test_position("acc1", "AAPL", dec!(100), dec!(15000), "USD");
     let snapshot = create_test_snapshot("acc1", vec![position], HashMap::new());
-    let quote = create_test_quote("AAPL", dec!(185), NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(), "USD");
-
-    let service = create_net_worth_service(
-        vec![account],
-        vec![asset],
-        vec![snapshot],
-        vec![quote],
+    let quote = create_test_quote(
+        "AAPL",
+        dec!(185),
+        NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+        "USD",
     );
+
+    let service = create_net_worth_service(vec![account], vec![asset], vec![snapshot], vec![quote]);
 
     let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
     let result = service.get_net_worth(date).await.unwrap();
@@ -947,14 +985,24 @@ async fn test_net_worth_with_liability() {
     let asset = create_test_asset("AAPL", AssetKind::Security, "USD");
     let position = create_test_position("inv1", "AAPL", dec!(100), dec!(15000), "USD");
     let inv_snapshot = create_test_snapshot("inv1", vec![position], HashMap::new());
-    let quote = create_test_quote("AAPL", dec!(200), NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(), "USD");
+    let quote = create_test_quote(
+        "AAPL",
+        dec!(200),
+        NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+        "USD",
+    );
 
     // Liability account
     let liab_account = create_test_account("liab1", "LIABILITY", "USD");
     let liab_asset = create_test_asset("LIAB-12345", AssetKind::Liability, "USD");
     let liab_position = create_test_position("liab1", "LIAB-12345", dec!(1), dec!(50000), "USD");
     let liab_snapshot = create_test_snapshot("liab1", vec![liab_position], HashMap::new());
-    let liab_quote = create_test_quote("LIAB-12345", dec!(50000), NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(), "USD");
+    let liab_quote = create_test_quote(
+        "LIAB-12345",
+        dec!(50000),
+        NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+        "USD",
+    );
 
     let service = create_net_worth_service(
         vec![inv_account, liab_account],
@@ -981,14 +1029,14 @@ async fn test_property_breakdown() {
     let asset = create_test_asset("PROP-abc123", AssetKind::Property, "USD");
     let position = create_test_position("prop1", "PROP-abc123", dec!(1), dec!(400000), "USD");
     let snapshot = create_test_snapshot("prop1", vec![position], HashMap::new());
-    let quote = create_test_quote("PROP-abc123", dec!(450000), NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(), "USD");
-
-    let service = create_net_worth_service(
-        vec![account],
-        vec![asset],
-        vec![snapshot],
-        vec![quote],
+    let quote = create_test_quote(
+        "PROP-abc123",
+        dec!(450000),
+        NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+        "USD",
     );
+
+    let service = create_net_worth_service(vec![account], vec![asset], vec![snapshot], vec![quote]);
 
     let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
     let result = service.get_net_worth(date).await.unwrap();
@@ -1005,12 +1053,7 @@ async fn test_cash_included_in_investments() {
     cash.insert("USD".to_string(), dec!(10000));
     let snapshot = create_test_snapshot("acc1", vec![], cash);
 
-    let service = create_net_worth_service(
-        vec![account],
-        vec![],
-        vec![snapshot],
-        vec![],
-    );
+    let service = create_net_worth_service(vec![account], vec![], vec![snapshot], vec![]);
 
     let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
     let result = service.get_net_worth(date).await.unwrap();
@@ -1031,12 +1074,7 @@ async fn test_staleness_detection() {
     let old_date = NaiveDate::from_ymd_opt(2023, 10, 7).unwrap();
     let quote = create_test_quote("AAPL", dec!(150), old_date, "USD");
 
-    let service = create_net_worth_service(
-        vec![account],
-        vec![asset],
-        vec![snapshot],
-        vec![quote],
-    );
+    let service = create_net_worth_service(vec![account], vec![asset], vec![snapshot], vec![quote]);
 
     let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
     let result = service.get_net_worth(date).await.unwrap();
@@ -1055,28 +1093,49 @@ async fn test_multiple_asset_categories() {
     let sec_asset = create_test_asset("AAPL", AssetKind::Security, "USD");
     let sec_position = create_test_position("sec1", "AAPL", dec!(50), dec!(7500), "USD");
     let sec_snapshot = create_test_snapshot("sec1", vec![sec_position], HashMap::new());
-    let sec_quote = create_test_quote("AAPL", dec!(200), NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(), "USD");
+    let sec_quote = create_test_quote(
+        "AAPL",
+        dec!(200),
+        NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+        "USD",
+    );
 
     // Property account
     let prop_account = create_test_account("prop1", "PROPERTY", "USD");
     let prop_asset = create_test_asset("PROP-house", AssetKind::Property, "USD");
     let prop_position = create_test_position("prop1", "PROP-house", dec!(1), dec!(300000), "USD");
     let prop_snapshot = create_test_snapshot("prop1", vec![prop_position], HashMap::new());
-    let prop_quote = create_test_quote("PROP-house", dec!(350000), NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(), "USD");
+    let prop_quote = create_test_quote(
+        "PROP-house",
+        dec!(350000),
+        NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+        "USD",
+    );
 
     // Vehicle account
     let veh_account = create_test_account("veh1", "VEHICLE", "USD");
     let veh_asset = create_test_asset("VEH-car", AssetKind::Vehicle, "USD");
     let veh_position = create_test_position("veh1", "VEH-car", dec!(1), dec!(35000), "USD");
     let veh_snapshot = create_test_snapshot("veh1", vec![veh_position], HashMap::new());
-    let veh_quote = create_test_quote("VEH-car", dec!(30000), NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(), "USD");
+    let veh_quote = create_test_quote(
+        "VEH-car",
+        dec!(30000),
+        NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+        "USD",
+    );
 
     // Liability account
     let liab_account = create_test_account("liab1", "LIABILITY", "USD");
     let liab_asset = create_test_asset("LIAB-mortgage", AssetKind::Liability, "USD");
-    let liab_position = create_test_position("liab1", "LIAB-mortgage", dec!(1), dec!(200000), "USD");
+    let liab_position =
+        create_test_position("liab1", "LIAB-mortgage", dec!(1), dec!(200000), "USD");
     let liab_snapshot = create_test_snapshot("liab1", vec![liab_position], HashMap::new());
-    let liab_quote = create_test_quote("LIAB-mortgage", dec!(200000), NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(), "USD");
+    let liab_quote = create_test_quote(
+        "LIAB-mortgage",
+        dec!(200000),
+        NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+        "USD",
+    );
 
     let service = create_net_worth_service(
         vec![sec_account, prop_account, veh_account, liab_account],
@@ -1111,14 +1170,14 @@ async fn test_precious_metals_category() {
     let position = create_test_position("prec1", "PREC-gold", dec!(10), dec!(18000), "USD");
     let snapshot = create_test_snapshot("prec1", vec![position], HashMap::new());
     // Gold at $2000/oz
-    let quote = create_test_quote("PREC-gold", dec!(2000), NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(), "USD");
-
-    let service = create_net_worth_service(
-        vec![account],
-        vec![asset],
-        vec![snapshot],
-        vec![quote],
+    let quote = create_test_quote(
+        "PREC-gold",
+        dec!(2000),
+        NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+        "USD",
     );
+
+    let service = create_net_worth_service(vec![account], vec![asset], vec![snapshot], vec![quote]);
 
     let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
     let result = service.get_net_worth(date).await.unwrap();
@@ -1134,14 +1193,14 @@ async fn test_collectibles_category() {
     let asset = create_test_asset("COLL-art", AssetKind::Collectible, "USD");
     let position = create_test_position("coll1", "COLL-art", dec!(1), dec!(50000), "USD");
     let snapshot = create_test_snapshot("coll1", vec![position], HashMap::new());
-    let quote = create_test_quote("COLL-art", dec!(75000), NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(), "USD");
-
-    let service = create_net_worth_service(
-        vec![account],
-        vec![asset],
-        vec![snapshot],
-        vec![quote],
+    let quote = create_test_quote(
+        "COLL-art",
+        dec!(75000),
+        NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+        "USD",
     );
+
+    let service = create_net_worth_service(vec![account], vec![asset], vec![snapshot], vec![quote]);
 
     let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
     let result = service.get_net_worth(date).await.unwrap();
@@ -1163,7 +1222,7 @@ async fn test_no_quote_falls_back_to_cost_basis() {
         vec![account],
         vec![asset],
         vec![snapshot],
-        vec![],  // Empty quotes
+        vec![], // Empty quotes
     );
 
     let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
@@ -1188,25 +1247,25 @@ fn test_history_basic_portfolio_with_alt_assets() {
 
     // Portfolio valuations (TOTAL account)
     let valuations = vec![
-        create_total_valuation(d1, dec!(100000), dec!(95000)),  // $5K gain
-        create_total_valuation(d2, dec!(101000), dec!(95000)),  // $6K gain
-        create_total_valuation(d3, dec!(102000), dec!(96000)),  // $6K gain (deposited $1K)
-        create_total_valuation(d4, dec!(103000), dec!(96000)),  // $7K gain
-        create_total_valuation(d5, dec!(104000), dec!(96000)),  // $8K gain
+        create_total_valuation(d1, dec!(100000), dec!(95000)), // $5K gain
+        create_total_valuation(d2, dec!(101000), dec!(95000)), // $6K gain
+        create_total_valuation(d3, dec!(102000), dec!(96000)), // $6K gain (deposited $1K)
+        create_total_valuation(d4, dec!(103000), dec!(96000)), // $7K gain
+        create_total_valuation(d5, dec!(104000), dec!(96000)), // $8K gain
     ];
 
     // Property asset
     let property = create_test_asset("PROP-house", AssetKind::Property, "USD");
     let property_quotes = vec![
         create_test_quote("PROP-house", dec!(500000), d1, "USD"),
-        create_test_quote("PROP-house", dec!(505000), d5, "USD"),  // Appreciated
+        create_test_quote("PROP-house", dec!(505000), d5, "USD"), // Appreciated
     ];
 
     // Liability asset
     let liability = create_test_asset("LIAB-mortgage", AssetKind::Liability, "USD");
     let liability_quotes = vec![
         create_test_quote("LIAB-mortgage", dec!(300000), d1, "USD"),
-        create_test_quote("LIAB-mortgage", dec!(298000), d5, "USD"),  // Paid down
+        create_test_quote("LIAB-mortgage", dec!(298000), d5, "USD"), // Paid down
     ];
 
     let all_quotes = [property_quotes, liability_quotes].concat();
@@ -1268,9 +1327,9 @@ fn test_history_portfolio_only_no_alt_assets() {
 
     let service = create_net_worth_service_with_valuations(
         vec![],
-        vec![],  // No alternative assets
+        vec![], // No alternative assets
         vec![],
-        vec![],  // No quotes
+        vec![], // No quotes
         valuations,
     );
 
@@ -1302,7 +1361,7 @@ fn test_history_alt_assets_only_no_portfolio() {
         vec![property],
         vec![],
         quotes,
-        vec![],  // No portfolio valuations
+        vec![], // No portfolio valuations
     );
 
     let history = service.get_net_worth_history(d1, d2).unwrap();
@@ -1413,17 +1472,10 @@ fn test_history_empty_range() {
     let d2 = NaiveDate::from_ymd_opt(2024, 1, 5).unwrap();
     let d_after = NaiveDate::from_ymd_opt(2024, 2, 1).unwrap();
 
-    let valuations = vec![
-        create_total_valuation(d_after, dec!(50000), dec!(50000)),
-    ];
+    let valuations = vec![create_total_valuation(d_after, dec!(50000), dec!(50000))];
 
-    let service = create_net_worth_service_with_valuations(
-        vec![],
-        vec![],
-        vec![],
-        vec![],
-        valuations,
-    );
+    let service =
+        create_net_worth_service_with_valuations(vec![], vec![], vec![], vec![], valuations);
 
     // Query before any data
     let history = service.get_net_worth_history(d1, d2).unwrap();
@@ -1435,14 +1487,10 @@ fn test_history_empty_range() {
 fn test_history_single_day() {
     let d1 = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
 
-    let valuations = vec![
-        create_total_valuation(d1, dec!(100000), dec!(90000)),
-    ];
+    let valuations = vec![create_total_valuation(d1, dec!(100000), dec!(90000))];
 
     let property = create_test_asset("PROP-house", AssetKind::Property, "USD");
-    let quotes = vec![
-        create_test_quote("PROP-house", dec!(500000), d1, "USD"),
-    ];
+    let quotes = vec![create_test_quote("PROP-house", dec!(500000), d1, "USD")];
 
     let service = create_net_worth_service_with_valuations(
         vec![],
@@ -1469,14 +1517,14 @@ fn test_history_liability_reduction_is_positive_gain() {
     let d2 = NaiveDate::from_ymd_opt(2024, 1, 31).unwrap();
 
     let valuations = vec![
-        create_total_valuation(d1, dec!(50000), dec!(50000)),  // No portfolio gain
+        create_total_valuation(d1, dec!(50000), dec!(50000)), // No portfolio gain
         create_total_valuation(d2, dec!(50000), dec!(50000)),
     ];
 
     let liability = create_test_asset("LIAB-mortgage", AssetKind::Liability, "USD");
     let quotes = vec![
         create_test_quote("LIAB-mortgage", dec!(200000), d1, "USD"),
-        create_test_quote("LIAB-mortgage", dec!(195000), d2, "USD"),  // Paid $5K
+        create_test_quote("LIAB-mortgage", dec!(195000), d2, "USD"), // Paid $5K
     ];
 
     let service = create_net_worth_service_with_valuations(
@@ -1516,13 +1564,8 @@ fn test_history_contribution_adjusted_gain() {
         create_total_valuation(d2, dec!(150000), dec!(140000)),
     ];
 
-    let service = create_net_worth_service_with_valuations(
-        vec![],
-        vec![],
-        vec![],
-        vec![],
-        valuations,
-    );
+    let service =
+        create_net_worth_service_with_valuations(vec![], vec![], vec![], vec![], valuations);
 
     let history = service.get_net_worth_history(d1, d2).unwrap();
 

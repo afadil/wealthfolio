@@ -19,6 +19,8 @@ interface ActivityFilters {
   activityTypes?: string | string[];
   symbol?: string;
   needsReview?: boolean;
+  dateFrom?: string; // YYYY-MM-DD format
+  dateTo?: string; // YYYY-MM-DD format
 }
 
 interface ActivitySort {
@@ -65,6 +67,8 @@ export const searchActivities = async (
     ? { id: sort.id, desc: sort.desc ?? false }
     : { id: "date", desc: true };
   const needsReviewFilter = filters?.needsReview;
+  const dateFrom = filters?.dateFrom;
+  const dateTo = filters?.dateTo;
 
   try {
     return await invoke<ActivitySearchResponse>("search_activities", {
@@ -75,6 +79,8 @@ export const searchActivities = async (
       assetIdKeyword,
       sort: sortOption,
       needsReviewFilter,
+      dateFrom,
+      dateTo,
     });
   } catch (err) {
     logger.error("Error fetching activities.");
@@ -217,4 +223,3 @@ export const checkExistingDuplicates = async (
     throw err;
   }
 };
-

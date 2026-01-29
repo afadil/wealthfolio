@@ -6,20 +6,17 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { SwipablePage, SwipablePageView } from "@/components/page";
 import { AccountSelector } from "@/components/account-selector";
+import { ActionPalette, type ActionPaletteGroup } from "@/components/action-palette";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useHoldings } from "@/hooks/use-holdings";
-import {
-  useAlternativeHoldings,
-  useDeleteAlternativeAsset,
-} from "@/hooks/use-alternative-assets";
+import { useAlternativeHoldings, useDeleteAlternativeAsset } from "@/hooks/use-alternative-assets";
 import { usePersistentState } from "@/hooks/use-persistent-state";
-import { PORTFOLIO_ACCOUNT_ID, HOLDING_CATEGORY_FILTERS, apiKindToAlternativeAssetKind } from "@/lib/constants";
 import {
-  Account,
-  HoldingType,
-  AlternativeAssetHolding,
-  AlternativeAssetKind,
-} from "@/lib/types";
+  PORTFOLIO_ACCOUNT_ID,
+  HOLDING_CATEGORY_FILTERS,
+  apiKindToAlternativeAssetKind,
+} from "@/lib/constants";
+import { Account, HoldingType, AlternativeAssetHolding, AlternativeAssetKind } from "@/lib/types";
 import { canAddHoldings } from "@/lib/activity-restrictions";
 import { HoldingsMobileFilterSheet } from "./components/holdings-mobile-filter-sheet";
 import { HoldingsTable } from "./components/holdings-table";
@@ -34,6 +31,7 @@ import {
 } from "@/features/alternative-assets";
 import { updateAlternativeAssetMetadata } from "@/adapters";
 import { ClassificationSheet } from "@/components/classification/classification-sheet";
+import { useUpdatePortfolioMutation } from "@/hooks/use-calculate-portfolio";
 
 export const HoldingsPage = () => {
   const navigate = useNavigate();
@@ -79,10 +77,21 @@ export const HoldingsPage = () => {
   const { mutate: deleteAsset, isPending: isDeleting } = useDeleteAlternativeAsset();
 
   // Classification sheet state
-  const [classifyAsset, setClassifyAsset] = useState<{id: string, symbol: string, name?: string} | null>(null);
+  const [classifyAsset, setClassifyAsset] = useState<{
+    id: string;
+    symbol: string;
+    name?: string;
+  } | null>(null);
 
   // Edit mode state for HOLDINGS-mode accounts
   const [isEditMode, setIsEditMode] = useState(false);
+
+  // Action palette state
+  const [isActionPaletteOpen, setIsActionPaletteOpen] = useState(false);
+  const [modalDefaultKind, setModalDefaultKind] = useState<AlternativeAssetKind | undefined>(
+    undefined,
+  );
+  const updatePortfolioMutation = useUpdatePortfolioMutation();
 
   const handleAccountSelect = (account: Account) => {
     setSelectedAccount(account);
@@ -245,11 +254,13 @@ export const HoldingsPage = () => {
               isLoading={isDataLoading}
               showTotalReturn={showTotalReturn}
               setShowTotalReturn={setShowTotalReturn}
-              onClassify={(holding) => setClassifyAsset({
-                id: holding.instrument?.id ?? holding.id,
-                symbol: holding.instrument?.symbol ?? holding.id,
-                name: holding.instrument?.name ?? undefined,
-              })}
+              onClassify={(holding) =>
+                setClassifyAsset({
+                  id: holding.instrument?.id ?? holding.id,
+                  symbol: holding.instrument?.symbol ?? holding.id,
+                  name: holding.instrument?.name ?? undefined,
+                })
+              }
             />
           </div>
 
@@ -338,6 +349,43 @@ export const HoldingsPage = () => {
     </>
   );
 
+  // Action palette groups
+  const actionPaletteGroups: ActionPaletteGroup[] = useMemo(
+    () => [
+      {
+        items: [
+          {
+            icon: Icons.Wallet,
+            label: "Add Asset",
+            onClick: () => {
+              setModalDefaultKind(undefined);
+              setIsAlternativeAssetModalOpen(true);
+            },
+          },
+          {
+            icon: Icons.CreditCard,
+            label: "Add Liability",
+            onClick: () => {
+              setModalDefaultKind(AlternativeAssetKind.LIABILITY);
+              setIsAlternativeAssetModalOpen(true);
+            },
+          },
+          {
+            icon: Icons.Plus,
+            label: "Add Activity",
+            onClick: () => navigate("/activities/manage"),
+          },
+          {
+            icon: Icons.Refresh,
+            label: "Update Prices",
+            onClick: () => updatePortfolioMutation.mutate(),
+          },
+        ],
+      },
+    ],
+    [navigate, updatePortfolioMutation],
+  );
+
   // Shared actions for header
   const sharedActions = useMemo(
     () => (
@@ -356,13 +404,22 @@ export const HoldingsPage = () => {
             Update
           </Button>
         )}
-        <Button size="sm" onClick={() => setIsAlternativeAssetModalOpen(true)}>
-          <Icons.Plus className="mr-2 h-4 w-4" />
-          Add Asset
-        </Button>
+        <ActionPalette
+          open={isActionPaletteOpen}
+          onOpenChange={setIsActionPaletteOpen}
+          groups={actionPaletteGroups}
+        />
       </>
     ),
-    [selectedAccount, handleAccountSelect, canEditHoldings, isEditMode, currentTab],
+    [
+      selectedAccount,
+      handleAccountSelect,
+      canEditHoldings,
+      isEditMode,
+      currentTab,
+      isActionPaletteOpen,
+      actionPaletteGroups,
+    ],
   );
 
   // Define the swipeable views
@@ -393,8 +450,9 @@ export const HoldingsPage = () => {
     [investmentsContent, assetsContent, liabilitiesContent, sharedActions],
   );
 
-  // Determine defaultKind for modal based on current tab
+  // Determine defaultKind for modal - explicit state takes precedence, then fall back to current tab
   const getDefaultKindForModal = (): AlternativeAssetKind | undefined => {
+    if (modalDefaultKind !== undefined) return modalDefaultKind;
     if (currentTab === "liabilities") return AlternativeAssetKind.LIABILITY;
     return undefined;
   };
@@ -421,7 +479,10 @@ export const HoldingsPage = () => {
       {/* Alternative Asset Quick Add Modal */}
       <AlternativeAssetQuickAddModal
         open={isAlternativeAssetModalOpen}
-        onOpenChange={setIsAlternativeAssetModalOpen}
+        onOpenChange={(open) => {
+          setIsAlternativeAssetModalOpen(open);
+          if (!open) setModalDefaultKind(undefined);
+        }}
         defaultKind={getDefaultKindForModal()}
       />
 

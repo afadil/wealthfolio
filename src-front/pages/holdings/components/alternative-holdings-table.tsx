@@ -259,7 +259,10 @@ export function AlternativeHoldingsTable({
       />
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={assetToDelete !== null} onOpenChange={(open) => !open && setAssetToDelete(null)}>
+      <AlertDialog
+        open={assetToDelete !== null}
+        onOpenChange={(open) => !open && setAssetToDelete(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Asset</AlertDialogTitle>

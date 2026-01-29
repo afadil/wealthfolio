@@ -17,7 +17,15 @@ fn text_to_datetime(s: &str) -> NaiveDateTime {
 
 /// Database model for taxonomies
 #[derive(
-    Queryable, Identifiable, AsChangeset, Selectable, PartialEq, Serialize, Deserialize, Debug, Clone,
+    Queryable,
+    Identifiable,
+    AsChangeset,
+    Selectable,
+    PartialEq,
+    Serialize,
+    Deserialize,
+    Debug,
+    Clone,
 )]
 #[diesel(table_name = crate::schema::taxonomies)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
@@ -30,8 +38,8 @@ pub struct TaxonomyDB {
     pub is_system: i32,        // Schema uses Integer
     pub is_single_select: i32, // Schema uses Integer
     pub sort_order: i32,
-    pub created_at: String,    // Schema uses Text
-    pub updated_at: String,    // Schema uses Text
+    pub created_at: String, // Schema uses Text
+    pub updated_at: String, // Schema uses Text
 }
 
 /// Database model for creating a new taxonomy
@@ -46,13 +54,21 @@ pub struct NewTaxonomyDB {
     pub is_system: i32,        // Schema uses Integer
     pub is_single_select: i32, // Schema uses Integer
     pub sort_order: i32,
-    pub created_at: String,    // Schema uses Text
-    pub updated_at: String,    // Schema uses Text
+    pub created_at: String, // Schema uses Text
+    pub updated_at: String, // Schema uses Text
 }
 
 /// Database model for taxonomy categories
 #[derive(
-    Queryable, Identifiable, AsChangeset, Selectable, PartialEq, Serialize, Deserialize, Debug, Clone,
+    Queryable,
+    Identifiable,
+    AsChangeset,
+    Selectable,
+    PartialEq,
+    Serialize,
+    Deserialize,
+    Debug,
+    Clone,
 )]
 #[diesel(table_name = crate::schema::taxonomy_categories)]
 #[diesel(primary_key(taxonomy_id, id))]
@@ -90,7 +106,15 @@ pub struct NewCategoryDB {
 
 /// Database model for asset taxonomy assignments
 #[derive(
-    Queryable, Identifiable, AsChangeset, Selectable, PartialEq, Serialize, Deserialize, Debug, Clone,
+    Queryable,
+    Identifiable,
+    AsChangeset,
+    Selectable,
+    PartialEq,
+    Serialize,
+    Deserialize,
+    Debug,
+    Clone,
 )]
 #[diesel(table_name = crate::schema::asset_taxonomy_assignments)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
@@ -100,7 +124,7 @@ pub struct AssetTaxonomyAssignmentDB {
     pub asset_id: String,
     pub taxonomy_id: String,
     pub category_id: String,
-    pub weight: i32,  // basis points: 10000 = 100%
+    pub weight: i32, // basis points: 10000 = 100%
     pub source: String,
     pub created_at: String, // Schema uses Text
     pub updated_at: String, // Schema uses Text
@@ -115,7 +139,7 @@ pub struct NewAssetTaxonomyAssignmentDB {
     pub asset_id: String,
     pub taxonomy_id: String,
     pub category_id: String,
-    pub weight: i32,  // basis points: 10000 = 100%
+    pub weight: i32, // basis points: 10000 = 100%
     pub source: String,
     pub created_at: String, // Schema uses Text
     pub updated_at: String, // Schema uses Text
@@ -206,7 +230,9 @@ impl From<wealthfolio_core::taxonomies::NewCategory> for NewCategoryDB {
     }
 }
 
-impl From<wealthfolio_core::taxonomies::NewAssetTaxonomyAssignment> for NewAssetTaxonomyAssignmentDB {
+impl From<wealthfolio_core::taxonomies::NewAssetTaxonomyAssignment>
+    for NewAssetTaxonomyAssignmentDB
+{
     fn from(domain: wealthfolio_core::taxonomies::NewAssetTaxonomyAssignment) -> Self {
         let now = chrono::Utc::now().to_rfc3339();
         Self {

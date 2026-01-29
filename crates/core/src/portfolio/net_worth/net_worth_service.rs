@@ -17,9 +17,9 @@ use crate::assets::{AssetKind, AssetRepositoryTrait};
 use crate::constants::DECIMAL_PRECISION;
 use crate::errors::Result;
 use crate::fx::FxServiceTrait;
-use crate::quotes::QuoteServiceTrait;
 use crate::portfolio::snapshot::SnapshotRepositoryTrait;
 use crate::portfolio::valuation::ValuationRepositoryTrait;
+use crate::quotes::QuoteServiceTrait;
 
 /// Number of days after which a valuation is considered stale.
 const STALENESS_THRESHOLD_DAYS: i64 = 90;
@@ -99,10 +99,7 @@ impl NetWorthService {
         date: NaiveDate,
     ) -> Option<(Decimal, NaiveDate)> {
         // Get all quotes for this symbol and find the latest one <= date
-        let quotes = self
-            .quote_service
-            .get_historical_quotes(asset_id)
-            .ok()?;
+        let quotes = self.quote_service.get_historical_quotes(asset_id).ok()?;
 
         quotes
             .iter()
@@ -503,9 +500,11 @@ impl NetWorthServiceTrait for NetWorthService {
         // =====================================================================
         // The TOTAL account has aggregated values already converted to base currency.
         // Fields: total_value, net_contribution, fx_rate_to_base (always 1 for TOTAL)
-        let total_valuations = self
-            .valuation_repository
-            .get_historical_valuations("TOTAL", Some(start_date), Some(end_date))?;
+        let total_valuations = self.valuation_repository.get_historical_valuations(
+            "TOTAL",
+            Some(start_date),
+            Some(end_date),
+        )?;
 
         // Build portfolio lookup by date
         #[derive(Clone)]
@@ -561,9 +560,12 @@ impl NetWorthServiceTrait for NetWorthService {
             alternative_assets.iter().map(|a| a.id.clone()).collect();
 
         // Get quotes in the date range
-        let quotes_vec = self
-            .quote_service
-            .get_quotes_in_range_filled(&all_alt_symbols, start_date, end_date, &HashMap::new())?;
+        let quotes_vec = self.quote_service.get_quotes_in_range_filled(
+            &all_alt_symbols,
+            start_date,
+            end_date,
+            &HashMap::new(),
+        )?;
 
         // Organize quotes by date -> asset_id -> value (converted to base currency)
         let mut quotes_by_date: BTreeMap<NaiveDate, HashMap<String, Decimal>> = BTreeMap::new();
@@ -700,7 +702,9 @@ impl NetWorthServiceTrait for NetWorthService {
                 total_liabilities: liabilities_value.round_dp(DECIMAL_PRECISION),
                 total_assets: total_assets.round_dp(DECIMAL_PRECISION),
                 net_worth: net_worth.round_dp(DECIMAL_PRECISION),
-                net_contribution: current_portfolio.net_contribution.round_dp(DECIMAL_PRECISION),
+                net_contribution: current_portfolio
+                    .net_contribution
+                    .round_dp(DECIMAL_PRECISION),
                 currency: base_currency.clone(),
             });
         }

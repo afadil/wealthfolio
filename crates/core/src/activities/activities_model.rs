@@ -827,3 +827,46 @@ pub struct ImportActivitiesSummary {
     /// Whether the import was successful (no validation errors)
     pub success: bool,
 }
+
+/// Input model for upserting activities (insert or update on conflict).
+/// Used by broker sync to efficiently sync activities with idempotency support.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivityUpsert {
+    /// Provider activity ID (used as primary key for upsert)
+    pub id: String,
+    pub account_id: String,
+    pub asset_id: Option<String>,
+    pub activity_type: String,
+    pub subtype: Option<String>,
+    pub activity_date: String,
+    pub quantity: Option<Decimal>,
+    pub unit_price: Option<Decimal>,
+    pub currency: String,
+    pub fee: Option<Decimal>,
+    pub amount: Option<Decimal>,
+    pub status: Option<ActivityStatus>,
+    pub notes: Option<String>,
+    pub fx_rate: Option<Decimal>,
+    pub metadata: Option<String>,
+    pub needs_review: Option<bool>,
+    pub source_system: Option<String>,
+    pub source_record_id: Option<String>,
+    pub source_group_id: Option<String>,
+    pub idempotency_key: Option<String>,
+    pub import_run_id: Option<String>,
+}
+
+/// Result of a bulk upsert operation
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkUpsertResult {
+    /// Total number of activities processed
+    pub upserted: usize,
+    /// Number of activities that were newly created
+    pub created: usize,
+    /// Number of activities that were updated
+    pub updated: usize,
+    /// Number of activities skipped (e.g., user-modified)
+    pub skipped: usize,
+}

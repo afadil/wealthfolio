@@ -19,7 +19,7 @@ const MarkdownTextImpl = () => {
   return (
     <MarkdownTextPrimitive
       remarkPlugins={[remarkGfm]}
-      className="aui-md prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent"
+      className="aui-md prose prose-sm dark:prose-invert prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent max-w-none"
       components={customComponents}
     />
   );
@@ -80,7 +80,7 @@ const MarkdownLink: FC<React.AnchorHTMLAttributes<HTMLAnchorElement>> = ({
     return (
       <Link
         to={href}
-        className={cn("text-primary underline underline-offset-2 hover:text-primary/80", className)}
+        className={cn("text-primary hover:text-primary/80 underline underline-offset-2", className)}
         {...props}
       >
         {children}
@@ -94,7 +94,7 @@ const MarkdownLink: FC<React.AnchorHTMLAttributes<HTMLAnchorElement>> = ({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className={cn("text-primary underline underline-offset-2 hover:text-primary/80", className)}
+      className={cn("text-primary hover:text-primary/80 underline underline-offset-2", className)}
       {...props}
     >
       {children}
@@ -113,7 +113,7 @@ const customComponents = memoizeMarkdownComponents({
   pre: ({ className, ...props }) => (
     <pre
       className={cn(
-        "aui-md-pre not-prose overflow-x-auto rounded-b-lg rounded-t-none bg-black p-4 text-sm text-white",
+        "aui-md-pre not-prose overflow-x-auto rounded-t-none rounded-b-lg bg-black p-4 text-sm text-white",
         className,
       )}
       {...props}
@@ -125,7 +125,8 @@ const customComponents = memoizeMarkdownComponents({
     return (
       <code
         className={cn(
-          !isCodeBlock && "aui-md-inline-code rounded border bg-muted px-1.5 py-0.5 font-mono text-sm font-medium before:content-none after:content-none",
+          !isCodeBlock &&
+            "aui-md-inline-code bg-muted rounded border px-1.5 py-0.5 font-mono text-sm font-medium before:content-none after:content-none",
           className,
         )}
         {...props}

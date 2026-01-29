@@ -304,8 +304,7 @@ impl MarketDataProvider for MarketDataAppProvider {
                 None => {
                     warn!(
                         "Skipping quote at index {}: failed to convert close price {}",
-                        i,
-                        close
+                        i, close
                     );
                     continue;
                 }
@@ -327,8 +326,7 @@ impl MarketDataProvider for MarketDataAppProvider {
                 None => {
                     warn!(
                         "Skipping quote at index {}: failed to parse timestamp {}",
-                        i,
-                        timestamp_unix
+                        i, timestamp_unix
                     );
                     continue;
                 }

@@ -65,7 +65,10 @@ impl AllocationService {
             self.build_top_level_map(categories)
         } else {
             // Identity map - each category maps to itself
-            categories.iter().map(|c| (c.id.as_str(), c.id.as_str())).collect()
+            categories
+                .iter()
+                .map(|c| (c.id.as_str(), c.id.as_str()))
+                .collect()
         };
 
         // Aggregate values by category
@@ -93,8 +96,9 @@ impl AllocationService {
 
                 if taxonomy_assignments.is_empty() {
                     // No assignment for this taxonomy - count as "Unknown"
-                    *category_values.entry("__UNKNOWN__".to_string()).or_insert(Decimal::ZERO) +=
-                        market_value;
+                    *category_values
+                        .entry("__UNKNOWN__".to_string())
+                        .or_insert(Decimal::ZERO) += market_value;
                 } else {
                     for (_, category_id, weight) in taxonomy_assignments {
                         // Convert weight from basis points (0-10000) to decimal (0-1)
@@ -118,8 +122,9 @@ impl AllocationService {
                 }
             } else {
                 // No assignments at all - count as "Unknown"
-                *category_values.entry("__UNKNOWN__".to_string()).or_insert(Decimal::ZERO) +=
-                    market_value;
+                *category_values
+                    .entry("__UNKNOWN__".to_string())
+                    .or_insert(Decimal::ZERO) += market_value;
             }
         }
 
@@ -251,7 +256,8 @@ impl AllocationServiceTrait for AllocationService {
         }
 
         // 6. Find each taxonomy and its categories
-        let mut asset_classes_alloc = TaxonomyAllocation::empty("asset_classes", "Asset Classes", "#879a39");
+        let mut asset_classes_alloc =
+            TaxonomyAllocation::empty("asset_classes", "Asset Classes", "#879a39");
         let mut sectors_alloc = TaxonomyAllocation::empty("industries_gics", "Sectors", "#da702c");
         let mut regions_alloc = TaxonomyAllocation::empty("regions", "Regions", "#8b7ec8");
         let mut risk_alloc = TaxonomyAllocation::empty("risk_category", "Risk Category", "#d14d41");
@@ -308,7 +314,9 @@ impl AllocationServiceTrait for AllocationService {
                             });
                         }
                         // Re-sort by value
-                        asset_classes_alloc.categories.sort_by(|a, b| b.value.cmp(&a.value));
+                        asset_classes_alloc
+                            .categories
+                            .sort_by(|a, b| b.value.cmp(&a.value));
                     }
                 }
                 "industries_gics" => {

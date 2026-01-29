@@ -87,7 +87,9 @@ export type ActivityRestrictionLevel = "none" | "limited" | "blocked";
 /**
  * Returns the restriction level for an account's activity entry.
  */
-export function getActivityRestrictionLevel(account: Account | undefined): ActivityRestrictionLevel {
+export function getActivityRestrictionLevel(
+  account: Account | undefined,
+): ActivityRestrictionLevel {
   if (!account) {
     return "none";
   }

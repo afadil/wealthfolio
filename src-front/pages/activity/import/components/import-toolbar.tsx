@@ -55,7 +55,7 @@ export function ImportToolbar({
     ? worldCurrencies.filter(
         (c) =>
           c.value.toLowerCase().includes(currencySearch.toLowerCase()) ||
-          c.label.toLowerCase().includes(currencySearch.toLowerCase())
+          c.label.toLowerCase().includes(currencySearch.toLowerCase()),
       )
     : worldCurrencies;
 
@@ -107,7 +107,12 @@ export function ImportToolbar({
         {/* Currency dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" title="Set currency for selected rows" className="h-8">
+            <Button
+              variant="outline"
+              size="sm"
+              title="Set currency for selected rows"
+              className="h-8"
+            >
               <Icons.DollarSign className="mr-1.5 h-3.5 w-3.5" />
               Currency
               <Icons.ChevronDown className="ml-1 h-3 w-3" />
@@ -121,7 +126,7 @@ export function ImportToolbar({
                 placeholder="Search currencies..."
                 value={currencySearch}
                 onChange={(e) => setCurrencySearch(e.target.value)}
-                className="bg-muted/50 w-full rounded-md border px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
+                className="bg-muted/50 focus:ring-ring w-full rounded-md border px-2 py-1 text-sm outline-none focus:ring-1"
                 onClick={(e) => e.stopPropagation()}
               />
             </div>
@@ -129,9 +134,7 @@ export function ImportToolbar({
             {/* Common currencies */}
             {!currencySearch && (
               <>
-                <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
-                  Common
-                </div>
+                <div className="text-muted-foreground px-2 py-1 text-xs font-medium">Common</div>
                 {COMMON_CURRENCIES.map((code) => (
                   <DropdownMenuItem
                     key={code}
@@ -144,7 +147,7 @@ export function ImportToolbar({
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />
-                <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
+                <div className="text-muted-foreground px-2 py-1 text-xs font-medium">
                   All Currencies
                 </div>
               </>
@@ -160,20 +163,18 @@ export function ImportToolbar({
                   }}
                 >
                   <span className="font-mono">{currency.value}</span>
-                  <span className="ml-2 truncate text-xs text-muted-foreground">
+                  <span className="text-muted-foreground ml-2 truncate text-xs">
                     {currency.label.replace(` (${currency.value})`, "")}
                   </span>
                 </DropdownMenuItem>
               ))}
               {filteredCurrencies.length > 20 && (
-                <div className="px-2 py-1 text-xs text-muted-foreground">
+                <div className="text-muted-foreground px-2 py-1 text-xs">
                   Type to search more...
                 </div>
               )}
               {filteredCurrencies.length === 0 && (
-                <div className="px-2 py-1 text-xs text-muted-foreground">
-                  No currencies found
-                </div>
+                <div className="text-muted-foreground px-2 py-1 text-xs">No currencies found</div>
               )}
             </div>
           </DropdownMenuContent>
@@ -182,7 +183,12 @@ export function ImportToolbar({
         {/* Account dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" title="Set account for selected rows" className="h-8">
+            <Button
+              variant="outline"
+              size="sm"
+              title="Set account for selected rows"
+              className="h-8"
+            >
               <Icons.Briefcase className="mr-1.5 h-3.5 w-3.5" />
               Account
               <Icons.ChevronDown className="ml-1 h-3 w-3" />
@@ -190,20 +196,15 @@ export function ImportToolbar({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             {accounts.length === 0 ? (
-              <div className="px-2 py-3 text-center text-sm text-muted-foreground">
+              <div className="text-muted-foreground px-2 py-3 text-center text-sm">
                 No accounts available
               </div>
             ) : (
               accounts.map((account) => (
-                <DropdownMenuItem
-                  key={account.id}
-                  onSelect={() => onSetAccount(account.id)}
-                >
+                <DropdownMenuItem key={account.id} onSelect={() => onSetAccount(account.id)}>
                   <Icons.Briefcase className="mr-2 h-3.5 w-3.5" />
                   <span className="truncate">{account.name}</span>
-                  <span className="ml-auto text-xs text-muted-foreground">
-                    {account.currency}
-                  </span>
+                  <span className="text-muted-foreground ml-auto text-xs">{account.currency}</span>
                 </DropdownMenuItem>
               ))
             )}
@@ -274,7 +275,7 @@ export function ImportContextMenu({
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger style={triggerStyle} />
       <DropdownMenuContent align="start" className="w-52">
-        <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+        <div className="text-muted-foreground px-2 py-1.5 text-xs font-medium">
           {selectedCount} row{selectedCount === 1 ? "" : "s"} selected
         </div>
         <DropdownMenuSeparator />
@@ -314,19 +315,12 @@ export function ImportContextMenu({
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="w-48">
             {accounts.length === 0 ? (
-              <div className="px-2 py-2 text-xs text-muted-foreground">
-                No accounts available
-              </div>
+              <div className="text-muted-foreground px-2 py-2 text-xs">No accounts available</div>
             ) : (
               accounts.map((account) => (
-                <DropdownMenuItem
-                  key={account.id}
-                  onSelect={() => onSetAccount(account.id)}
-                >
+                <DropdownMenuItem key={account.id} onSelect={() => onSetAccount(account.id)}>
                   <span className="truncate">{account.name}</span>
-                  <span className="ml-auto text-xs text-muted-foreground">
-                    {account.currency}
-                  </span>
+                  <span className="text-muted-foreground ml-auto text-xs">{account.currency}</span>
                 </DropdownMenuItem>
               ))
             )}

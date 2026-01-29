@@ -25,7 +25,15 @@ pub const MAX_CONTENT_SIZE_BYTES: usize = 256 * 1024;
 
 /// Database model for AI chat threads.
 #[derive(
-    Debug, Clone, Queryable, Identifiable, Insertable, AsChangeset, Selectable, Serialize, Deserialize,
+    Debug,
+    Clone,
+    Queryable,
+    Identifiable,
+    Insertable,
+    AsChangeset,
+    Selectable,
+    Serialize,
+    Deserialize,
 )]
 #[diesel(table_name = ai_threads)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
@@ -42,7 +50,15 @@ pub struct AiThreadDB {
 
 /// Database model for AI chat messages.
 #[derive(
-    Debug, Clone, Queryable, Identifiable, Insertable, AsChangeset, Selectable, Serialize, Deserialize,
+    Debug,
+    Clone,
+    Queryable,
+    Identifiable,
+    Insertable,
+    AsChangeset,
+    Selectable,
+    Serialize,
+    Deserialize,
 )]
 #[diesel(table_name = ai_messages)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
@@ -56,7 +72,15 @@ pub struct AiMessageDB {
 
 /// Database model for thread tags.
 #[derive(
-    Debug, Clone, Queryable, Identifiable, Insertable, AsChangeset, Selectable, Serialize, Deserialize,
+    Debug,
+    Clone,
+    Queryable,
+    Identifiable,
+    Insertable,
+    AsChangeset,
+    Selectable,
+    Serialize,
+    Deserialize,
 )]
 #[diesel(table_name = ai_thread_tags)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
@@ -149,14 +173,8 @@ impl MessageContent {
                 MessagePart::ToolResult { data, meta, .. } => {
                     let json = serde_json::to_string(data).unwrap_or_default();
                     if json.len() > per_part_budget {
-                        meta.insert(
-                            "_truncated".to_string(),
-                            serde_json::json!(true),
-                        );
-                        meta.insert(
-                            "_originalSize".to_string(),
-                            serde_json::json!(json.len()),
-                        );
+                        meta.insert("_truncated".to_string(), serde_json::json!(true));
+                        meta.insert("_originalSize".to_string(), serde_json::json!(json.len()));
                         *data = serde_json::Value::Null;
                     }
                 }

@@ -74,14 +74,22 @@ export const propertyDetailsSchema = baseSchema.extend({
 export const vehicleDetailsSchema = baseSchema.extend({
   kind: z.literal(AlternativeAssetKind.VEHICLE),
   vehicleType: z.enum(["car", "motorcycle", "boat", "rv"]).optional().nullable(),
-  description: z.string().max(200, "Description must be less than 200 characters").optional().nullable(),
+  description: z
+    .string()
+    .max(200, "Description must be less than 200 characters")
+    .optional()
+    .nullable(),
 });
 
 // Collectible-specific schema
 export const collectibleDetailsSchema = baseSchema.extend({
   kind: z.literal(AlternativeAssetKind.COLLECTIBLE),
   collectibleType: z.enum(["art", "wine", "watch", "jewelry", "memorabilia"]).optional().nullable(),
-  description: z.string().max(200, "Description must be less than 200 characters").optional().nullable(),
+  description: z
+    .string()
+    .max(200, "Description must be less than 200 characters")
+    .optional()
+    .nullable(),
 });
 
 // Precious metal-specific schema
@@ -89,7 +97,11 @@ export const preciousMetalDetailsSchema = baseSchema.extend({
   kind: z.literal(AlternativeAssetKind.PHYSICAL_PRECIOUS),
   metalType: z.enum(["gold", "silver", "platinum", "palladium"]).optional().nullable(),
   unit: z.enum(["oz", "g", "kg"]).optional().nullable(),
-  description: z.string().max(200, "Description must be less than 200 characters").optional().nullable(),
+  description: z
+    .string()
+    .max(200, "Description must be less than 200 characters")
+    .optional()
+    .nullable(),
 });
 
 // Liability-specific schema
@@ -117,7 +129,11 @@ export const liabilityDetailsSchema = baseSchema.extend({
 // Other asset schema (generic)
 export const otherDetailsSchema = baseSchema.extend({
   kind: z.literal(AlternativeAssetKind.OTHER),
-  description: z.string().max(200, "Description must be less than 200 characters").optional().nullable(),
+  description: z
+    .string()
+    .max(200, "Description must be less than 200 characters")
+    .optional()
+    .nullable(),
 });
 
 // Discriminated union of all asset type schemas
@@ -144,15 +160,11 @@ export type OtherDetailsFormValues = z.infer<typeof otherDetailsSchema>;
 // Helper function to get default form values based on asset kind and existing metadata
 export function getDefaultDetailsFormValues(
   kind: AlternativeAssetKind,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
 ): AssetDetailsFormValues {
   const base = {
-    purchasePrice: metadata?.purchase_price
-      ? parseFloat(metadata.purchase_price as string)
-      : null,
-    purchaseDate: metadata?.purchase_date
-      ? new Date(metadata.purchase_date as string)
-      : null,
+    purchasePrice: metadata?.purchase_price ? parseFloat(metadata.purchase_price as string) : null,
+    purchaseDate: metadata?.purchase_date ? new Date(metadata.purchase_date as string) : null,
     notes: (metadata?.notes as string) ?? null,
   };
 
@@ -162,7 +174,8 @@ export function getDefaultDetailsFormValues(
         ...base,
         kind: AlternativeAssetKind.PROPERTY,
         address: (metadata?.address as string) ?? null,
-        propertyType: (metadata?.property_type as PropertyDetailsFormValues["propertyType"]) ?? null,
+        propertyType:
+          (metadata?.property_type as PropertyDetailsFormValues["propertyType"]) ?? null,
       };
 
     case AlternativeAssetKind.VEHICLE:
@@ -177,7 +190,8 @@ export function getDefaultDetailsFormValues(
       return {
         ...base,
         kind: AlternativeAssetKind.COLLECTIBLE,
-        collectibleType: (metadata?.collectible_type as CollectibleDetailsFormValues["collectibleType"]) ?? null,
+        collectibleType:
+          (metadata?.collectible_type as CollectibleDetailsFormValues["collectibleType"]) ?? null,
         description: (metadata?.description as string) ?? null,
       };
 
@@ -197,16 +211,15 @@ export function getDefaultDetailsFormValues(
       return {
         ...base,
         kind: AlternativeAssetKind.LIABILITY,
-        liabilityType: (metadata?.liability_type as LiabilityDetailsFormValues["liabilityType"]) ?? null,
+        liabilityType:
+          (metadata?.liability_type as LiabilityDetailsFormValues["liabilityType"]) ?? null,
         originalAmount: metadata?.original_amount
           ? parseFloat(metadata.original_amount as string)
           : null,
         originationDate: metadata?.origination_date
           ? new Date(metadata.origination_date as string)
           : null,
-        interestRate: metadata?.interest_rate
-          ? parseFloat(metadata.interest_rate as string)
-          : null,
+        interestRate: metadata?.interest_rate ? parseFloat(metadata.interest_rate as string) : null,
         linkedAssetId: (metadata?.linked_asset_id as string) ?? null,
       };
 
@@ -221,9 +234,7 @@ export function getDefaultDetailsFormValues(
 }
 
 // Helper function to convert form values to metadata for API
-export function formValuesToMetadata(
-  values: AssetDetailsFormValues
-): Record<string, string> {
+export function formValuesToMetadata(values: AssetDetailsFormValues): Record<string, string> {
   const metadata: Record<string, string> = {};
 
   // Common fields
@@ -269,8 +280,10 @@ export function formValuesToMetadata(
 
     case AlternativeAssetKind.LIABILITY:
       if (values.liabilityType) metadata.liability_type = values.liabilityType;
-      if (values.originalAmount != null) metadata.original_amount = values.originalAmount.toString();
-      if (values.originationDate) metadata.origination_date = formatDateToISO(values.originationDate);
+      if (values.originalAmount != null)
+        metadata.original_amount = values.originalAmount.toString();
+      if (values.originationDate)
+        metadata.origination_date = formatDateToISO(values.originationDate);
       if (values.interestRate != null) metadata.interest_rate = values.interestRate.toString();
       if (values.linkedAssetId) metadata.linked_asset_id = values.linkedAssetId;
       break;

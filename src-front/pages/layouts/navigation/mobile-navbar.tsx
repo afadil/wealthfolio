@@ -212,7 +212,9 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
                         handleNavigation("/connect", isActive);
                         setMobileMenuOpen(false);
                       }}
-                      aria-current={isPathActive(location.pathname, "/connect") ? "page" : undefined}
+                      aria-current={
+                        isPathActive(location.pathname, "/connect") ? "page" : undefined
+                      }
                       className="relative z-10 flex w-full items-center gap-3 rounded-full px-3 py-2 text-sm"
                     >
                       <span className="flex size-6 shrink-0 items-center justify-center">

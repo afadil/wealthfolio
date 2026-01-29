@@ -10,8 +10,8 @@ use tauri::State;
 
 use crate::context::ServiceContext;
 use crate::secret_store::KeyringSecretStore;
-use wealthfolio_core::secrets::SecretStore;
 use wealthfolio_connect::DEFAULT_CLOUD_API_URL;
+use wealthfolio_core::secrets::SecretStore;
 use wealthfolio_device_sync::{
     ClaimPairingRequest, ClaimPairingResponse, CommitInitializeKeysRequest,
     CommitInitializeKeysResponse, CommitRotateKeysRequest, CommitRotateKeysResponse,

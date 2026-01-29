@@ -24,10 +24,7 @@ export {
   getUserInfo,
 } from "./services/broker-service";
 
-export {
-  storeSyncSession,
-  clearSyncSession,
-} from "./services/auth-service";
+export { storeSyncSession, clearSyncSession } from "./services/auth-service";
 
 // Types
 export type {

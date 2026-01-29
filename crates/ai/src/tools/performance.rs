@@ -151,7 +151,12 @@ impl<E: AiEnvironment + 'static> Tool for GetPerformanceTool<E> {
             let start_val = first.total_value.to_f64().unwrap_or(0.0);
             let end_val = last.total_value.to_f64().unwrap_or(0.0);
 
-            (start_val, first.valuation_date, end_val, last.valuation_date)
+            (
+                start_val,
+                first.valuation_date,
+                end_val,
+                last.valuation_date,
+            )
         };
 
         // Calculate simple return: (endValue - startValue) / startValue * 100

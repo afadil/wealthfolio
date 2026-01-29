@@ -43,12 +43,20 @@ interface InterestFormProps {
   isEditing?: boolean;
 }
 
-export function InterestForm({ accounts, defaultValues, onSubmit, onCancel, isLoading = false, isEditing = false }: InterestFormProps) {
+export function InterestForm({
+  accounts,
+  defaultValues,
+  onSubmit,
+  onCancel,
+  isLoading = false,
+  isEditing = false,
+}: InterestFormProps) {
   const { data: settings } = useSettings();
   const baseCurrency = settings?.baseCurrency;
 
   // Compute initial account and currency for defaultValues
-  const initialAccountId = defaultValues?.accountId ?? (accounts.length === 1 ? accounts[0].value : "");
+  const initialAccountId =
+    defaultValues?.accountId ?? (accounts.length === 1 ? accounts[0].value : "");
   const initialAccount = accounts.find((a) => a.value === initialAccountId);
   const initialCurrency = defaultValues?.currency ?? initialAccount?.currency;
 

@@ -34,7 +34,7 @@ export function parseHoldingsSnapshots(
   headers: string[],
   rows: string[][],
   mapping: Record<string, string>,
-  defaultCurrency: string
+  defaultCurrency: string,
 ): HoldingsSnapshotInput[] {
   const dateHeader = mapping[HoldingsFormat.DATE];
   const symbolHeader = mapping[HoldingsFormat.SYMBOL];
@@ -158,47 +158,42 @@ export function HoldingsReviewStep() {
   // Parse snapshots from CSV data
   const snapshots = useMemo(() => {
     const fieldMappings = mapping?.fieldMappings || {};
-    return parseHoldingsSnapshots(
-      headers,
-      parsedRows,
-      fieldMappings,
-      parseConfig.defaultCurrency
-    );
+    return parseHoldingsSnapshots(headers, parsedRows, fieldMappings, parseConfig.defaultCurrency);
   }, [headers, parsedRows, mapping?.fieldMappings, parseConfig.defaultCurrency]);
 
   // Calculate totals
   const totalPositions = snapshots.reduce((sum, s) => sum + s.positions.length, 0);
   const totalCashEntries = snapshots.reduce(
     (sum, s) => sum + Object.keys(s.cashBalances).length,
-    0
+    0,
   );
 
   return (
     <div className="flex flex-col gap-6">
       {/* Summary Card */}
       <Card>
-        <CardHeader className="py-3 px-4">
+        <CardHeader className="px-4 py-3">
           <CardTitle className="text-sm font-medium">Review Holdings Import</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <div className="text-center p-3 bg-muted/30 rounded-lg">
-              <div className="text-2xl font-bold text-primary">{snapshots.length}</div>
-              <div className="text-xs text-muted-foreground">Snapshots</div>
+            <div className="bg-muted/30 rounded-lg p-3 text-center">
+              <div className="text-primary text-2xl font-bold">{snapshots.length}</div>
+              <div className="text-muted-foreground text-xs">Snapshots</div>
             </div>
-            <div className="text-center p-3 bg-muted/30 rounded-lg">
+            <div className="bg-muted/30 rounded-lg p-3 text-center">
               <div className="text-2xl font-bold">{totalPositions}</div>
-              <div className="text-xs text-muted-foreground">Positions</div>
+              <div className="text-muted-foreground text-xs">Positions</div>
             </div>
-            <div className="text-center p-3 bg-muted/30 rounded-lg">
+            <div className="bg-muted/30 rounded-lg p-3 text-center">
               <div className="text-2xl font-bold">{totalCashEntries}</div>
-              <div className="text-xs text-muted-foreground">Cash Balances</div>
+              <div className="text-muted-foreground text-xs">Cash Balances</div>
             </div>
-            <div className="text-center p-3 bg-primary/10 rounded-lg">
-              <div className="text-2xl font-bold text-primary">
-                <Icons.Check className="h-8 w-8 mx-auto" />
+            <div className="bg-primary/10 rounded-lg p-3 text-center">
+              <div className="text-primary text-2xl font-bold">
+                <Icons.Check className="mx-auto h-8 w-8" />
               </div>
-              <div className="text-xs text-muted-foreground">Ready to Import</div>
+              <div className="text-muted-foreground text-xs">Ready to Import</div>
             </div>
           </div>
         </CardContent>
@@ -206,7 +201,7 @@ export function HoldingsReviewStep() {
 
       {/* Snapshots Accordion */}
       <Card>
-        <CardHeader className="py-3 px-4">
+        <CardHeader className="px-4 py-3">
           <CardTitle className="text-sm font-medium">Snapshots by Date</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -214,14 +209,15 @@ export function HoldingsReviewStep() {
             {snapshots.map((snapshot) => (
               <AccordionItem key={snapshot.date} value={snapshot.date}>
                 <AccordionTrigger className="px-4 hover:no-underline">
-                  <div className="flex items-center justify-between w-full pr-4">
+                  <div className="flex w-full items-center justify-between pr-4">
                     <div className="flex items-center gap-3">
-                      <Icons.Calendar className="h-4 w-4 text-muted-foreground" />
+                      <Icons.Calendar className="text-muted-foreground h-4 w-4" />
                       <span className="font-medium">{snapshot.date}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary">
-                        {snapshot.positions.length} position{snapshot.positions.length !== 1 ? "s" : ""}
+                        {snapshot.positions.length} position
+                        {snapshot.positions.length !== 1 ? "s" : ""}
                       </Badge>
                       {Object.keys(snapshot.cashBalances).length > 0 && (
                         <Badge variant="outline">
@@ -232,11 +228,11 @@ export function HoldingsReviewStep() {
                   </div>
                 </AccordionTrigger>
                 <AccordionContent>
-                  <div className="px-4 pb-4 space-y-4">
+                  <div className="space-y-4 px-4 pb-4">
                     {/* Positions Table */}
                     {snapshot.positions.length > 0 && (
                       <div>
-                        <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                        <h4 className="mb-2 flex items-center gap-2 text-sm font-medium">
                           <Icons.TrendingUp className="h-4 w-4" />
                           Positions
                         </h4>
@@ -270,7 +266,7 @@ export function HoldingsReviewStep() {
                     {/* Cash Balances */}
                     {Object.keys(snapshot.cashBalances).length > 0 && (
                       <div>
-                        <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                        <h4 className="mb-2 flex items-center gap-2 text-sm font-medium">
                           <Icons.DollarSign className="h-4 w-4" />
                           Cash Balances
                         </h4>

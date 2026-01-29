@@ -318,7 +318,10 @@ impl<E: AiEnvironment> ProviderService<E> {
             .and_then(|s| serde_json::from_str::<AiProviderSettings>(&s).ok())
             .and_then(|settings| settings.providers.get(provider_id).cloned())
             .and_then(|provider_settings| {
-                provider_settings.model_capability_overrides.get(model_id).cloned()
+                provider_settings
+                    .model_capability_overrides
+                    .get(model_id)
+                    .cloned()
             });
 
         // Build final capabilities: start with catalog or defaults, then apply overrides

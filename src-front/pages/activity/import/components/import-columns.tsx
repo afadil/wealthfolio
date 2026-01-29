@@ -1,7 +1,12 @@
 import { useCallback, useMemo } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Checkbox, type SymbolSearchResult } from "@wealthfolio/ui";
-import { ActivityType, ActivityTypeNames, SUBTYPES_BY_ACTIVITY_TYPE, SUBTYPE_DISPLAY_NAMES } from "@/lib/constants";
+import {
+  ActivityType,
+  ActivityTypeNames,
+  SUBTYPES_BY_ACTIVITY_TYPE,
+  SUBTYPE_DISPLAY_NAMES,
+} from "@/lib/constants";
 import { ActivityTypeBadge } from "../../components/activity-type-badge";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -84,7 +89,7 @@ export function useImportColumns<T extends ImportRowData>({
         value: account.id,
         label: account.name,
       })),
-    [accounts]
+    [accounts],
   );
 
   const activityTypeOptions = useMemo(
@@ -93,7 +98,7 @@ export function useImportColumns<T extends ImportRowData>({
         value: type,
         label: ActivityTypeNames[type],
       })),
-    []
+    [],
   );
 
   // Dynamic subtype options based on activity type
@@ -215,7 +220,7 @@ export function useImportColumns<T extends ImportRowData>({
           options: getSubtypeOptions as any,
           allowEmpty: true,
           emptyLabel: "None",
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any,
       },
     });
@@ -239,7 +244,7 @@ export function useImportColumns<T extends ImportRowData>({
               activityType !== ActivityType.TRANSFER_OUT
             );
           },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any,
       },
     });

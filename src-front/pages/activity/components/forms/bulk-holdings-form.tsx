@@ -119,11 +119,17 @@ const HoldingRow = memo(
     const handleAssetSelect = useCallback(
       (_symbol: string, searchResult?: SymbolSearchResult) => {
         const isManualAsset = searchResult?.dataSource === "MANUAL";
-        setValue(`holdings.${index}.pricingMode`, isManualAsset ? PricingMode.MANUAL : PricingMode.MARKET, { shouldDirty: true });
+        setValue(
+          `holdings.${index}.pricingMode`,
+          isManualAsset ? PricingMode.MANUAL : PricingMode.MARKET,
+          { shouldDirty: true },
+        );
 
         // Capture exchangeMic for canonical asset ID generation
         if (searchResult?.exchangeMic) {
-          setValue(`holdings.${index}.exchangeMic`, searchResult.exchangeMic, { shouldDirty: true });
+          setValue(`holdings.${index}.exchangeMic`, searchResult.exchangeMic, {
+            shouldDirty: true,
+          });
         }
 
         // Capture name for custom assets

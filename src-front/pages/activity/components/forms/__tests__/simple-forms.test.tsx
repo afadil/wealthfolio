@@ -61,7 +61,12 @@ vi.mock("@wealthfolio/ui/components/ui/button", () => ({
     disabled?: boolean;
     variant?: string;
   }) => (
-    <button type={type as "submit" | "button"} onClick={onClick} disabled={disabled} data-variant={variant}>
+    <button
+      type={type as "submit" | "button"}
+      onClick={onClick}
+      disabled={disabled}
+      data-variant={variant}
+    >
       {children}
     </button>
   ),
@@ -69,7 +74,9 @@ vi.mock("@wealthfolio/ui/components/ui/button", () => ({
 
 vi.mock("@wealthfolio/ui/components/ui/card", () => ({
   Card: ({ children }: { children: React.ReactNode }) => <div data-testid="card">{children}</div>,
-  CardContent: ({ children }: { children: React.ReactNode }) => <div data-testid="card-content">{children}</div>,
+  CardContent: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="card-content">{children}</div>
+  ),
 }));
 
 vi.mock("@wealthfolio/ui/components/ui/icons", () => ({
@@ -117,7 +124,9 @@ describe("WithdrawalForm", () => {
     });
 
     it("renders cancel button when onCancel is provided", () => {
-      render(<WithdrawalForm accounts={mockAccounts} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+      render(
+        <WithdrawalForm accounts={mockAccounts} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />,
+      );
 
       expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
     });
@@ -132,7 +141,9 @@ describe("WithdrawalForm", () => {
   describe("Cancel Button", () => {
     it("calls onCancel when clicked", async () => {
       const user = userEvent.setup();
-      render(<WithdrawalForm accounts={mockAccounts} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+      render(
+        <WithdrawalForm accounts={mockAccounts} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />,
+      );
 
       await user.click(screen.getByRole("button", { name: /cancel/i }));
       expect(mockOnCancel).toHaveBeenCalledTimes(1);
@@ -215,7 +226,9 @@ describe("InterestForm", () => {
     });
 
     it("renders cancel button when onCancel is provided", () => {
-      render(<InterestForm accounts={mockAccounts} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+      render(
+        <InterestForm accounts={mockAccounts} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />,
+      );
 
       expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
     });

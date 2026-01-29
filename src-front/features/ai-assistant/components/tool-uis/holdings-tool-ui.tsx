@@ -88,13 +88,9 @@ function normalizeResult(result: unknown): GetHoldingsOutput | null {
     .map((entry) => entry as Record<string, unknown>)
     .map((entry) => ({
       accountId:
-        (entry.accountId as string | undefined) ??
-        (entry.account_id as string | undefined) ??
-        "",
+        (entry.accountId as string | undefined) ?? (entry.account_id as string | undefined) ?? "",
       symbol: (entry.symbol as string | undefined) ?? "",
-      name:
-        (entry.name as string | undefined) ??
-        null,
+      name: (entry.name as string | undefined) ?? null,
       holdingType:
         (entry.holdingType as string | undefined) ??
         (entry.holding_type as string | undefined) ??
@@ -103,7 +99,7 @@ function normalizeResult(result: unknown): GetHoldingsOutput | null {
       marketValueBase: Number(
         (entry.marketValueBase as number | string | undefined) ??
           (entry.market_value_base as number | string | undefined) ??
-          0
+          0,
       ),
       costBasisBase:
         entry.costBasisBase != null || entry.cost_basis_base != null
@@ -118,8 +114,7 @@ function normalizeResult(result: unknown): GetHoldingsOutput | null {
           ? Number(entry.dayChangePct ?? entry.day_change_pct)
           : null,
       weight: Number(entry.weight ?? 0),
-      currency:
-        (entry.currency as string | undefined) ?? "USD",
+      currency: (entry.currency as string | undefined) ?? "USD",
     }));
 
   return {
@@ -127,16 +122,14 @@ function normalizeResult(result: unknown): GetHoldingsOutput | null {
     totalValue: Number(
       (candidate.totalValue as number | string | undefined) ??
         (candidate.total_value as number | string | undefined) ??
-        0
+        0,
     ),
-    currency:
-      (candidate.currency as string | undefined) ?? "USD",
+    currency: (candidate.currency as string | undefined) ?? "USD",
     accountScope:
       (candidate.accountScope as string | undefined) ??
       (candidate.account_scope as string | undefined) ??
       "TOTAL",
-    truncated:
-      (candidate.truncated as boolean | undefined) ?? false,
+    truncated: (candidate.truncated as boolean | undefined) ?? false,
     originalCount:
       (candidate.originalCount as number | undefined) ??
       (candidate.original_count as number | undefined),
@@ -176,7 +169,7 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
       }),
-    [currency]
+    [currency],
   );
 
   const percentFormatter = useMemo(
@@ -187,7 +180,7 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
         maximumFractionDigits: 1,
         signDisplay: "exceptZero",
       }),
-    []
+    [],
   );
 
   // Calculate totals for summary
@@ -195,7 +188,8 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
     if (!sortedHoldings.length) {
       return { totalValue: 0, totalGain: 0, totalGainPct: 0 };
     }
-    const value = parsed?.totalValue ?? sortedHoldings.reduce((sum, h) => sum + h.marketValueBase, 0);
+    const value =
+      parsed?.totalValue ?? sortedHoldings.reduce((sum, h) => sum + h.marketValueBase, 0);
     const costBasis = sortedHoldings.reduce((sum, h) => sum + (h.costBasisBase ?? 0), 0);
     const gain = value - costBasis;
     const gainPct = costBasis > 0 ? gain / costBasis : 0;
@@ -312,7 +306,7 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
               <p
                 className={cn(
                   "text-sm font-medium",
-                  totalGain >= 0 ? "text-success" : "text-destructive"
+                  totalGain >= 0 ? "text-success" : "text-destructive",
                 )}
               >
                 {totalGain >= 0 ? "+" : ""}
@@ -358,7 +352,7 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
                       <span
                         className={cn(
                           "tabular-nums",
-                          holding.unrealizedGainPct >= 0 ? "text-success" : "text-destructive"
+                          holding.unrealizedGainPct >= 0 ? "text-success" : "text-destructive",
                         )}
                       >
                         {percentFormatter.format(holding.unrealizedGainPct / 100)}

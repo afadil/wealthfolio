@@ -4,7 +4,12 @@ import { DataTablePagination } from "@wealthfolio/ui/components/ui/data-table/da
 import { DataTableToolbar } from "@wealthfolio/ui/components/ui/data-table/data-table-toolbar";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Table, TableBody, TableCell, TableRow } from "@wealthfolio/ui/components/ui/table";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@wealthfolio/ui/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
   ColumnDef,

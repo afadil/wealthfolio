@@ -88,7 +88,9 @@ export function BrokerAccountCard({ account }: BrokerAccountCardProps) {
               <span>{account.institution_name}</span>
               {account.number && (
                 <>
-                  <span className="text-muted-foreground/50">{maskAccountNumber(account.number)}</span>
+                  <span className="text-muted-foreground/50">
+                    {maskAccountNumber(account.number)}
+                  </span>
                 </>
               )}
             </div>
@@ -96,9 +98,7 @@ export function BrokerAccountCard({ account }: BrokerAccountCardProps) {
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="text-muted-foreground text-sm">
-            {formatLastSyncDate(lastSyncDate)}
-          </span>
+          <span className="text-muted-foreground text-sm">{formatLastSyncDate(lastSyncDate)}</span>
 
           {/* Sync enabled indicator */}
           {account.sync_enabled ? (

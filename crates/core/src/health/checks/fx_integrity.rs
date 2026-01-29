@@ -42,8 +42,7 @@ impl FxIntegrityCheck {
         }
 
         // Calculate thresholds
-        let warning_threshold =
-            ctx.now - Duration::hours(ctx.config.fx_stale_warning_hours as i64);
+        let warning_threshold = ctx.now - Duration::hours(ctx.config.fx_stale_warning_hours as i64);
         let critical_threshold =
             ctx.now - Duration::hours(ctx.config.fx_stale_critical_hours as i64);
 
@@ -90,7 +89,10 @@ impl FxIntegrityCheck {
 
             let count = missing_pairs.len();
             let title = if count == 1 {
-                format!("Missing exchange rate for {}", missing_pairs[0].split(':').next().unwrap_or("currency"))
+                format!(
+                    "Missing exchange rate for {}",
+                    missing_pairs[0].split(':').next().unwrap_or("currency")
+                )
             } else {
                 format!("Missing exchange rates for {} currencies", count)
             };

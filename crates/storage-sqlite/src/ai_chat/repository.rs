@@ -12,8 +12,8 @@ use std::sync::Arc;
 
 use wealthfolio_ai::{
     AiError, ChatMessage, ChatMessageContent, ChatMessagePart, ChatMessageRole,
-    ChatRepositoryResult, ChatRepositoryTrait, ChatThread, ChatThreadConfig,
-    ListThreadsRequest, ThreadPage, CHAT_MAX_CONTENT_SIZE_BYTES,
+    ChatRepositoryResult, ChatRepositoryTrait, ChatThread, ChatThreadConfig, ListThreadsRequest,
+    ThreadPage, CHAT_MAX_CONTENT_SIZE_BYTES,
 };
 use wealthfolio_core::errors::{DatabaseError, ValidationError};
 use wealthfolio_core::{Error as CoreError, Result as CoreResult};
@@ -59,19 +59,25 @@ impl ChatRepositoryTrait for AiChatRepository {
         let thread_id = thread_db.id.clone();
 
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> CoreResult<ChatThread> {
-                diesel::insert_into(ai_threads::table)
-                    .values(&thread_db)
-                    .execute(conn)
-                    .map_err(|e| CoreError::Database(DatabaseError::QueryFailed(e.to_string())))?;
+            .exec(
+                move |conn: &mut SqliteConnection| -> CoreResult<ChatThread> {
+                    diesel::insert_into(ai_threads::table)
+                        .values(&thread_db)
+                        .execute(conn)
+                        .map_err(|e| {
+                            CoreError::Database(DatabaseError::QueryFailed(e.to_string()))
+                        })?;
 
-                let db = ai_threads::table
-                    .find(&thread_id)
-                    .first::<AiThreadDB>(conn)
-                    .map_err(|e| CoreError::Database(DatabaseError::QueryFailed(e.to_string())))?;
+                    let db = ai_threads::table
+                        .find(&thread_id)
+                        .first::<AiThreadDB>(conn)
+                        .map_err(|e| {
+                            CoreError::Database(DatabaseError::QueryFailed(e.to_string()))
+                        })?;
 
-                Ok(db_to_thread(&db))
-            })
+                    Ok(db_to_thread(&db))
+                },
+            )
             .await
             .map_err(core_to_ai_error)
     }
@@ -83,7 +89,11 @@ impl ChatRepositoryTrait for AiChatRepository {
             .find(thread_id)
             .first::<AiThreadDB>(&mut conn)
             .optional()
-            .map_err(|e| AiError::Core(CoreError::Database(DatabaseError::QueryFailed(e.to_string()))))?;
+            .map_err(|e| {
+                AiError::Core(CoreError::Database(DatabaseError::QueryFailed(
+                    e.to_string(),
+                )))
+            })?;
 
         Ok(result.map(|db| db_to_thread(&db)))
     }
@@ -97,7 +107,11 @@ impl ChatRepositoryTrait for AiChatRepository {
             .limit(limit)
             .offset(offset)
             .load::<AiThreadDB>(&mut conn)
-            .map_err(|e| AiError::Core(CoreError::Database(DatabaseError::QueryFailed(e.to_string()))))?;
+            .map_err(|e| {
+                AiError::Core(CoreError::Database(DatabaseError::QueryFailed(
+                    e.to_string(),
+                )))
+            })?;
 
         // Load tags for each thread
         let mut threads: Vec<ChatThread> = Vec::with_capacity(threads_db.len());
@@ -114,7 +128,10 @@ impl ChatRepositoryTrait for AiChatRepository {
         Ok(threads)
     }
 
-    fn list_threads_paginated(&self, request: &ListThreadsRequest) -> ChatRepositoryResult<ThreadPage> {
+    fn list_threads_paginated(
+        &self,
+        request: &ListThreadsRequest,
+    ) -> ChatRepositoryResult<ThreadPage> {
         let mut conn = get_connection(&self.pool).map_err(core_to_ai_error)?;
 
         let limit = request.limit.unwrap_or(20).min(100) as i64;
@@ -147,9 +164,9 @@ impl ChatRepositoryTrait for AiChatRepository {
             query = query.filter(
                 ai_threads::is_pinned
                     .lt(cursor_pinned)
-                    .or(ai_threads::is_pinned.eq(cursor_pinned).and(
-                        ai_threads::updated_at.lt(cursor_updated_at.clone()),
-                    ))
+                    .or(ai_threads::is_pinned
+                        .eq(cursor_pinned)
+                        .and(ai_threads::updated_at.lt(cursor_updated_at.clone())))
                     .or(ai_threads::is_pinned
                         .eq(cursor_pinned)
                         .and(ai_threads::updated_at.eq(cursor_updated_at))
@@ -168,7 +185,11 @@ impl ChatRepositoryTrait for AiChatRepository {
         let threads_db = query
             .limit(limit + 1)
             .load::<AiThreadDB>(&mut conn)
-            .map_err(|e| AiError::Core(CoreError::Database(DatabaseError::QueryFailed(e.to_string()))))?;
+            .map_err(|e| {
+                AiError::Core(CoreError::Database(DatabaseError::QueryFailed(
+                    e.to_string(),
+                )))
+            })?;
 
         let has_more = threads_db.len() > limit as usize;
         let threads_db: Vec<_> = threads_db.into_iter().take(limit as usize).collect();
@@ -187,7 +208,9 @@ impl ChatRepositoryTrait for AiChatRepository {
 
         // Generate next cursor from the last thread
         let next_cursor = if has_more {
-            threads_db.last().map(|t| encode_cursor(t.is_pinned, &t.updated_at, &t.id))
+            threads_db
+                .last()
+                .map(|t| encode_cursor(t.is_pinned, &t.updated_at, &t.id))
         } else {
             None
         };
@@ -210,24 +233,30 @@ impl ChatRepositoryTrait for AiChatRepository {
         let updated_at = Utc::now().to_rfc3339();
 
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> CoreResult<ChatThread> {
-                diesel::update(ai_threads::table.find(&thread_id))
-                    .set((
-                        ai_threads::title.eq(&title),
-                        ai_threads::is_pinned.eq(&is_pinned),
-                        ai_threads::config_snapshot.eq(&config_snapshot),
-                        ai_threads::updated_at.eq(&updated_at),
-                    ))
-                    .execute(conn)
-                    .map_err(|e| CoreError::Database(DatabaseError::QueryFailed(e.to_string())))?;
+            .exec(
+                move |conn: &mut SqliteConnection| -> CoreResult<ChatThread> {
+                    diesel::update(ai_threads::table.find(&thread_id))
+                        .set((
+                            ai_threads::title.eq(&title),
+                            ai_threads::is_pinned.eq(&is_pinned),
+                            ai_threads::config_snapshot.eq(&config_snapshot),
+                            ai_threads::updated_at.eq(&updated_at),
+                        ))
+                        .execute(conn)
+                        .map_err(|e| {
+                            CoreError::Database(DatabaseError::QueryFailed(e.to_string()))
+                        })?;
 
-                let db = ai_threads::table
-                    .find(&thread_id)
-                    .first::<AiThreadDB>(conn)
-                    .map_err(|e| CoreError::Database(DatabaseError::QueryFailed(e.to_string())))?;
+                    let db = ai_threads::table
+                        .find(&thread_id)
+                        .first::<AiThreadDB>(conn)
+                        .map_err(|e| {
+                            CoreError::Database(DatabaseError::QueryFailed(e.to_string()))
+                        })?;
 
-                Ok(db_to_thread(&db))
-            })
+                    Ok(db_to_thread(&db))
+                },
+            )
             .await
             .map_err(core_to_ai_error)
     }
@@ -256,29 +285,39 @@ impl ChatRepositoryTrait for AiChatRepository {
         let thread_id = message_db.thread_id.clone();
 
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> CoreResult<ChatMessage> {
-                // Insert message
-                diesel::insert_into(ai_messages::table)
-                    .values(&message_db)
-                    .execute(conn)
-                    .map_err(|e| CoreError::Database(DatabaseError::QueryFailed(e.to_string())))?;
+            .exec(
+                move |conn: &mut SqliteConnection| -> CoreResult<ChatMessage> {
+                    // Insert message
+                    diesel::insert_into(ai_messages::table)
+                        .values(&message_db)
+                        .execute(conn)
+                        .map_err(|e| {
+                            CoreError::Database(DatabaseError::QueryFailed(e.to_string()))
+                        })?;
 
-                // Update thread's updated_at
-                diesel::update(ai_threads::table.find(&thread_id))
-                    .set(ai_threads::updated_at.eq(chrono::Utc::now().to_rfc3339()))
-                    .execute(conn)
-                    .map_err(|e| CoreError::Database(DatabaseError::QueryFailed(e.to_string())))?;
+                    // Update thread's updated_at
+                    diesel::update(ai_threads::table.find(&thread_id))
+                        .set(ai_threads::updated_at.eq(chrono::Utc::now().to_rfc3339()))
+                        .execute(conn)
+                        .map_err(|e| {
+                            CoreError::Database(DatabaseError::QueryFailed(e.to_string()))
+                        })?;
 
-                let db = ai_messages::table
-                    .find(&message_id)
-                    .first::<AiMessageDB>(conn)
-                    .map_err(|e| CoreError::Database(DatabaseError::QueryFailed(e.to_string())))?;
+                    let db = ai_messages::table
+                        .find(&message_id)
+                        .first::<AiMessageDB>(conn)
+                        .map_err(|e| {
+                            CoreError::Database(DatabaseError::QueryFailed(e.to_string()))
+                        })?;
 
-                db_to_message(&db).map_err(|e| match e {
-                    AiError::InvalidInput(msg) => CoreError::Validation(ValidationError::InvalidInput(msg)),
-                    _ => CoreError::Database(DatabaseError::QueryFailed(e.to_string())),
-                })
-            })
+                    db_to_message(&db).map_err(|e| match e {
+                        AiError::InvalidInput(msg) => {
+                            CoreError::Validation(ValidationError::InvalidInput(msg))
+                        }
+                        _ => CoreError::Database(DatabaseError::QueryFailed(e.to_string())),
+                    })
+                },
+            )
             .await
             .map_err(core_to_ai_error)
     }
@@ -290,7 +329,11 @@ impl ChatRepositoryTrait for AiChatRepository {
             .find(message_id)
             .first::<AiMessageDB>(&mut conn)
             .optional()
-            .map_err(|e| AiError::Core(CoreError::Database(DatabaseError::QueryFailed(e.to_string()))))?;
+            .map_err(|e| {
+                AiError::Core(CoreError::Database(DatabaseError::QueryFailed(
+                    e.to_string(),
+                )))
+            })?;
 
         match result {
             Some(db) => Ok(Some(db_to_message(&db)?)),
@@ -305,7 +348,11 @@ impl ChatRepositoryTrait for AiChatRepository {
             .filter(ai_messages::thread_id.eq(thread_id))
             .order(ai_messages::created_at.asc())
             .load::<AiMessageDB>(&mut conn)
-            .map_err(|e| AiError::Core(CoreError::Database(DatabaseError::QueryFailed(e.to_string()))))?;
+            .map_err(|e| {
+                AiError::Core(CoreError::Database(DatabaseError::QueryFailed(
+                    e.to_string(),
+                )))
+            })?;
 
         messages_db
             .iter()
@@ -318,22 +365,30 @@ impl ChatRepositoryTrait for AiChatRepository {
         let content_json = convert_content_to_json(&message.content)?;
 
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> CoreResult<ChatMessage> {
-                diesel::update(ai_messages::table.find(&message_id))
-                    .set(ai_messages::content_json.eq(&content_json))
-                    .execute(conn)
-                    .map_err(|e| CoreError::Database(DatabaseError::QueryFailed(e.to_string())))?;
+            .exec(
+                move |conn: &mut SqliteConnection| -> CoreResult<ChatMessage> {
+                    diesel::update(ai_messages::table.find(&message_id))
+                        .set(ai_messages::content_json.eq(&content_json))
+                        .execute(conn)
+                        .map_err(|e| {
+                            CoreError::Database(DatabaseError::QueryFailed(e.to_string()))
+                        })?;
 
-                let db = ai_messages::table
-                    .find(&message_id)
-                    .first::<AiMessageDB>(conn)
-                    .map_err(|e| CoreError::Database(DatabaseError::QueryFailed(e.to_string())))?;
+                    let db = ai_messages::table
+                        .find(&message_id)
+                        .first::<AiMessageDB>(conn)
+                        .map_err(|e| {
+                            CoreError::Database(DatabaseError::QueryFailed(e.to_string()))
+                        })?;
 
-                db_to_message(&db).map_err(|e| match e {
-                    AiError::InvalidInput(msg) => CoreError::Validation(ValidationError::InvalidInput(msg)),
-                    _ => CoreError::Database(DatabaseError::QueryFailed(e.to_string())),
-                })
-            })
+                    db_to_message(&db).map_err(|e| match e {
+                        AiError::InvalidInput(msg) => {
+                            CoreError::Validation(ValidationError::InvalidInput(msg))
+                        }
+                        _ => CoreError::Database(DatabaseError::QueryFailed(e.to_string())),
+                    })
+                },
+            )
             .await
             .map_err(core_to_ai_error)
     }
@@ -389,7 +444,11 @@ impl ChatRepositoryTrait for AiChatRepository {
             .filter(ai_thread_tags::thread_id.eq(thread_id))
             .select(ai_thread_tags::tag)
             .load::<String>(&mut conn)
-            .map_err(|e| AiError::Core(CoreError::Database(DatabaseError::QueryFailed(e.to_string()))))
+            .map_err(|e| {
+                AiError::Core(CoreError::Database(DatabaseError::QueryFailed(
+                    e.to_string(),
+                )))
+            })
     }
 }
 
@@ -408,9 +467,9 @@ fn parse_cursor(cursor: &str) -> ChatRepositoryResult<(i32, String, String)> {
         )));
     }
 
-    let is_pinned: i32 = parts[0].parse().map_err(|_| {
-        AiError::InvalidCursor(format!("Invalid is_pinned value: {}", parts[0]))
-    })?;
+    let is_pinned: i32 = parts[0]
+        .parse()
+        .map_err(|_| AiError::InvalidCursor(format!("Invalid is_pinned value: {}", parts[0])))?;
 
     Ok((is_pinned, parts[1].to_string(), parts[2].to_string()))
 }
@@ -551,8 +610,8 @@ fn convert_content_to_json(content: &ChatMessageContent) -> ChatRepositoryResult
 
 /// Convert JSON string from storage to ChatMessageContent.
 fn convert_json_to_content(json: &str) -> ChatRepositoryResult<ChatMessageContent> {
-    let storage_content = MessageContent::from_json(json)
-        .map_err(|e| AiError::InvalidInput(e.to_string()))?;
+    let storage_content =
+        MessageContent::from_json(json).map_err(|e| AiError::InvalidInput(e.to_string()))?;
 
     // Convert storage parts to core parts
     let core_parts: Vec<ChatMessagePart> = storage_content
@@ -888,10 +947,7 @@ mod tests {
             prompt_version: "2.0.0".to_string(),
             locale: Some("en-US".to_string()),
             detail_level: Some("detailed".to_string()),
-            tools_allowlist: Some(vec![
-                "get_holdings".to_string(),
-                "get_accounts".to_string(),
-            ]),
+            tools_allowlist: Some(vec!["get_holdings".to_string(), "get_accounts".to_string()]),
         };
 
         let thread = ChatThread::with_config(config.clone());
@@ -905,10 +961,7 @@ mod tests {
         assert_eq!(back_config.detail_level, Some("detailed".to_string()));
         assert_eq!(
             back_config.tools_allowlist,
-            Some(vec![
-                "get_holdings".to_string(),
-                "get_accounts".to_string()
-            ])
+            Some(vec!["get_holdings".to_string(), "get_accounts".to_string()])
         );
     }
 

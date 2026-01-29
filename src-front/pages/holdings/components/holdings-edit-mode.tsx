@@ -22,7 +22,12 @@ import { format, parseISO } from "date-fns";
 
 import { TickerAvatar } from "@/components/ticker-avatar";
 import TickerSearchInput from "@/components/ticker-search";
-import { saveManualHoldings, getSnapshotByDate, deleteSnapshot, type HoldingInput } from "@/adapters";
+import {
+  saveManualHoldings,
+  getSnapshotByDate,
+  deleteSnapshot,
+  type HoldingInput,
+} from "@/adapters";
 import { Holding, Account, SymbolSearchResult } from "@/lib/types";
 import { buildCanonicalAssetId } from "@/lib/asset-utils";
 import { HoldingType } from "@/lib/constants";
@@ -73,7 +78,7 @@ export const HoldingsEditMode = ({
   // When editing an existing snapshot, the date is locked
   const isEditingExistingSnapshot = !!existingSnapshotDate;
   const [snapshotDate, setSnapshotDate] = useState<Date>(
-    existingSnapshotDate ? parseISO(existingSnapshotDate) : new Date()
+    existingSnapshotDate ? parseISO(existingSnapshotDate) : new Date(),
   );
 
   // Fetch holdings for existing snapshot date
@@ -84,7 +89,8 @@ export const HoldingsEditMode = ({
   });
 
   // Use snapshot holdings when editing existing, otherwise use current holdings
-  const effectiveHoldings = isEditingExistingSnapshot && snapshotHoldings ? snapshotHoldings : holdings;
+  const effectiveHoldings =
+    isEditingExistingSnapshot && snapshotHoldings ? snapshotHoldings : holdings;
 
   // Convert holdings to editable format
   const convertToEditableHoldings = useCallback((holdingsList: Holding[]): EditableHolding[] => {
@@ -128,10 +134,8 @@ export const HoldingsEditMode = ({
     return convertToCashBalances(effectiveHoldings);
   }, [effectiveHoldings, convertToCashBalances]);
 
-  const [editableHoldings, setEditableHoldings] =
-    useState<EditableHolding[]>(initialHoldings);
-  const [cashBalances, setCashBalances] =
-    useState<EditableCashBalance[]>(initialCashBalances);
+  const [editableHoldings, setEditableHoldings] = useState<EditableHolding[]>(initialHoldings);
+  const [cashBalances, setCashBalances] = useState<EditableCashBalance[]>(initialCashBalances);
 
   // Update editable holdings when snapshot holdings are loaded
   useEffect(() => {
@@ -139,7 +143,12 @@ export const HoldingsEditMode = ({
       setEditableHoldings(convertToEditableHoldings(snapshotHoldings));
       setCashBalances(convertToCashBalances(snapshotHoldings));
     }
-  }, [isEditingExistingSnapshot, snapshotHoldings, convertToEditableHoldings, convertToCashBalances]);
+  }, [
+    isEditingExistingSnapshot,
+    snapshotHoldings,
+    convertToEditableHoldings,
+    convertToCashBalances,
+  ]);
 
   // Track if there are unsaved changes
   const hasChanges = useMemo(() => {
@@ -175,9 +184,7 @@ export const HoldingsEditMode = ({
 
   const handleCashAmountChange = useCallback((currency: string, amount: string) => {
     if (amount !== "" && !/^-?\d*\.?\d*$/.test(amount)) return;
-    setCashBalances((prev) =>
-      prev.map((c) => (c.currency === currency ? { ...c, amount } : c)),
-    );
+    setCashBalances((prev) => prev.map((c) => (c.currency === currency ? { ...c, amount } : c)));
   }, []);
 
   const handleRemoveHolding = useCallback((assetId: string) => {
@@ -399,7 +406,9 @@ export const HoldingsEditMode = ({
                             type="text"
                             inputMode="decimal"
                             value={holding.averageCost}
-                            onChange={(e) => handleAverageCostChange(holding.assetId, e.target.value)}
+                            onChange={(e) =>
+                              handleAverageCostChange(holding.assetId, e.target.value)
+                            }
                             placeholder="0.00"
                             className="h-8 text-right text-sm"
                           />
@@ -597,7 +606,7 @@ export const HoldingsEditMode = ({
       </ScrollArea>
 
       {/* Footer with Save/Cancel buttons */}
-      <div className="border-t bg-background py-4">
+      <div className="bg-background border-t py-4">
         <div className="flex items-center justify-between">
           {/* Delete button (only when editing existing snapshot) */}
           <div>
@@ -657,8 +666,8 @@ export const HoldingsEditMode = ({
             <AlertDialogTitle>Delete snapshot?</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently delete the holdings snapshot from{" "}
-              <strong>{existingSnapshotDate}</strong>. The portfolio valuations will be
-              recalculated without this data point. This action cannot be undone.
+              <strong>{existingSnapshotDate}</strong>. The portfolio valuations will be recalculated
+              without this data point. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -182,7 +182,7 @@ pub trait HealthDismissalStore: Send + Sync {
 
 use super::checks::{
     AssetHoldingInfo, ConsistencyIssueInfo, FxPairInfo, LegacyMigrationInfo, QuoteSyncErrorInfo,
-    UnconfiguredAccountInfo, UnclassifiedAssetInfo,
+    UnclassifiedAssetInfo, UnconfiguredAccountInfo,
 };
 use super::model::{FixAction, HealthStatus};
 use crate::accounts::AccountServiceTrait;

@@ -91,13 +91,7 @@ const NetWorthWidgetSkeleton = ({ compact = false }: { compact?: boolean }) => (
 /**
  * Error state for the NetWorthWidget
  */
-const NetWorthWidgetError = ({
-  error,
-  compact = false,
-}: {
-  error: Error;
-  compact?: boolean;
-}) => (
+const NetWorthWidgetError = ({ error, compact = false }: { error: Error; compact?: boolean }) => (
   <Card className={cn("p-4", compact && "p-3")}>
     <div className="flex items-start gap-3">
       <div className="bg-destructive/10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
@@ -189,10 +183,7 @@ export const NetWorthWidget = ({
     if (!parsedValues) return [];
 
     // Combine assets and liabilities breakdown
-    return [
-      ...parsedValues.assetsBreakdown,
-      ...parsedValues.liabilitiesBreakdown,
-    ];
+    return [...parsedValues.assetsBreakdown, ...parsedValues.liabilitiesBreakdown];
   }, [parsedValues]);
 
   // Check for stale valuations
@@ -286,12 +277,7 @@ export const NetWorthWidget = ({
             >
               Assets
             </span>
-            <span
-              className={cn(
-                "text-success font-medium",
-                compact ? "text-sm" : "text-base",
-              )}
-            >
+            <span className={cn("text-success font-medium", compact ? "text-sm" : "text-base")}>
               <PrivacyAmount value={parsedValues.totalAssets} currency={currency} />
             </span>
           </div>
@@ -305,12 +291,7 @@ export const NetWorthWidget = ({
             >
               Debts
             </span>
-            <span
-              className={cn(
-                "text-destructive font-medium",
-                compact ? "text-sm" : "text-base",
-              )}
-            >
+            <span className={cn("text-destructive font-medium", compact ? "text-sm" : "text-base")}>
               <PrivacyAmount value={parsedValues.totalLiabilities} currency={currency} />
             </span>
           </div>

@@ -1,9 +1,7 @@
 use crate::assets::{Asset, AssetClassificationService, AssetKind, AssetServiceTrait};
 use crate::errors::{CalculatorError, Error as CoreError, Result};
 use crate::fx::currency::{get_normalization_rule, normalize_currency_code};
-use crate::portfolio::holdings::holdings_model::{
-    Holding, HoldingType, Instrument, MonetaryValue,
-};
+use crate::portfolio::holdings::holdings_model::{Holding, HoldingType, Instrument, MonetaryValue};
 use crate::portfolio::snapshot::{self, Position, SnapshotServiceTrait};
 use crate::utils::time_utils::valuation_date_today;
 use async_trait::async_trait;
@@ -174,18 +172,17 @@ impl HoldingsServiceTrait for HoldingsService {
                         let metadata: Option<Value> = asset.metadata.clone();
 
                         // Extract purchase_price from metadata for alternative assets
-                        let purchase_price: Option<Decimal> =
-                            metadata.as_ref().and_then(|m| {
-                                m.get("purchase_price").and_then(|v| {
-                                    if let Some(s) = v.as_str() {
-                                        s.parse::<Decimal>().ok()
-                                    } else if let Some(n) = v.as_f64() {
-                                        Decimal::try_from(n).ok()
-                                    } else {
-                                        None
-                                    }
-                                })
-                            });
+                        let purchase_price: Option<Decimal> = metadata.as_ref().and_then(|m| {
+                            m.get("purchase_price").and_then(|v| {
+                                if let Some(s) = v.as_str() {
+                                    s.parse::<Decimal>().ok()
+                                } else if let Some(n) = v.as_f64() {
+                                    Decimal::try_from(n).ok()
+                                } else {
+                                    None
+                                }
+                            })
+                        });
 
                         let instrument = Instrument {
                             id: asset.id.clone(),
@@ -372,7 +369,9 @@ impl HoldingsServiceTrait for HoldingsService {
             .collect();
 
         if !asset_ids.is_empty() {
-            let classifications_map = self.classification_service.get_classifications_batch(&asset_ids);
+            let classifications_map = self
+                .classification_service
+                .get_classifications_batch(&asset_ids);
             for holding in &mut holdings {
                 if let Some(ref mut instrument) = holding.instrument {
                     if let Some(classifications) = classifications_map.get(&instrument.id) {
@@ -529,8 +528,9 @@ impl HoldingsServiceTrait for HoldingsService {
                     normalize_holding_currency(&mut valued_holding);
                     // Enrich with classifications
                     if let Some(ref mut instrument) = valued_holding.instrument {
-                        if let Ok(classifications) =
-                            self.classification_service.get_classifications(&instrument.id)
+                        if let Ok(classifications) = self
+                            .classification_service
+                            .get_classifications(&instrument.id)
                         {
                             instrument.classifications = Some(classifications);
                         }

@@ -67,7 +67,7 @@ export function CardListSkeleton({ count = 3 }: CardListSkeletonProps) {
       {Array.from({ length: count }, (_, i) => (
         <div
           key={i}
-          className="flex min-w-[180px] flex-col gap-2 rounded-lg border bg-background/60 p-4"
+          className="bg-background/60 flex min-w-[180px] flex-col gap-2 rounded-lg border p-4"
         >
           <Skeleton className="h-4 w-2/3" />
           <Skeleton className="h-6 w-full" />

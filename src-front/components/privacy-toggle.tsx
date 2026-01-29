@@ -14,7 +14,7 @@ export function PrivacyToggle({ className }: PrivacyToggleProps) {
     <Button
       variant="secondary"
       size="icon-xs"
-      className={cn("rounded-full bg-secondary/50", className)}
+      className={cn("bg-secondary/50 rounded-full", className)}
       onClick={(e) => {
         e.stopPropagation();
         toggleBalanceVisibility();

@@ -1,4 +1,5 @@
 use super::activities_model::*;
+use crate::limits::ContributionActivity;
 use crate::Result;
 use async_trait::async_trait;
 use chrono::DateTime;
@@ -17,13 +18,14 @@ pub trait ActivityRepositoryTrait: Send + Sync {
     fn get_activities_by_account_ids(&self, account_ids: &[String]) -> Result<Vec<Activity>>;
     fn get_trading_activities(&self) -> Result<Vec<Activity>>;
     fn get_income_activities(&self) -> Result<Vec<Activity>>;
-    #[allow(clippy::type_complexity)]
-    fn get_deposit_activities(
+    /// Fetches contribution-eligible activities (DEPOSIT, TRANSFER_IN, TRANSFER_OUT, CREDIT)
+    /// for the given accounts within the date range. Filtering logic applied in service layer.
+    fn get_contribution_activities(
         &self,
         account_ids: &[String],
         start_date: NaiveDateTime,
         end_date: NaiveDateTime,
-    ) -> Result<Vec<(String, Decimal, Decimal, String, Option<Decimal>)>>;
+    ) -> Result<Vec<ContributionActivity>>;
     fn search_activities(
         &self,
         page: i64,
@@ -33,6 +35,8 @@ pub trait ActivityRepositoryTrait: Send + Sync {
         asset_id_keyword: Option<String>,
         sort: Option<Sort>,
         needs_review_filter: Option<bool>,
+        date_from: Option<NaiveDate>,
+        date_to: Option<NaiveDate>,
     ) -> Result<ActivitySearchResponse>;
     async fn create_activity(&self, new_activity: NewActivity) -> Result<Activity>;
     async fn update_activity(&self, activity_update: ActivityUpdate) -> Result<Activity>;
@@ -76,6 +80,13 @@ pub trait ActivityRepositoryTrait: Send + Sync {
         &self,
         idempotency_keys: &[String],
     ) -> Result<HashMap<String, String>>;
+
+    /// Upserts multiple activities (insert or update on conflict by ID or idempotency_key).
+    /// Respects is_user_modified flag - skips updates to user-modified activities.
+    ///
+    /// Returns statistics about the operation.
+    async fn bulk_upsert(&self, activities: Vec<super::ActivityUpsert>)
+        -> Result<super::BulkUpsertResult>;
 }
 
 /// Trait defining the contract for Activity service operations.
@@ -96,6 +107,8 @@ pub trait ActivityServiceTrait: Send + Sync {
         asset_id_keyword: Option<String>,
         sort: Option<Sort>,
         needs_review_filter: Option<bool>,
+        date_from: Option<NaiveDate>,
+        date_to: Option<NaiveDate>,
     ) -> Result<ActivitySearchResponse>;
     fn get_first_activity_date(
         &self,
@@ -139,4 +152,12 @@ pub trait ActivityServiceTrait: Send + Sync {
         content: &[u8],
         config: &super::csv_parser::ParseConfig,
     ) -> Result<super::csv_parser::ParsedCsvResult>;
+
+    /// Upserts multiple activities (insert or update on conflict).
+    /// Used by broker sync to efficiently sync activities.
+    /// Emits a single aggregated ActivitiesChanged event for all upserted activities.
+    async fn upsert_activities_bulk(
+        &self,
+        activities: Vec<super::ActivityUpsert>,
+    ) -> Result<super::BulkUpsertResult>;
 }

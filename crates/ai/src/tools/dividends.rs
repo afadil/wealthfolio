@@ -135,6 +135,8 @@ impl<E: AiEnvironment + 'static> Tool for GetDividendsTool<E> {
                 symbol_keyword,
                 Some(sort),
                 None, // needs_review_filter
+                None, // date_from
+                None, // date_to
             )
             .map_err(|e| AiError::ToolExecutionFailed(e.to_string()))?;
 
@@ -147,11 +149,7 @@ impl<E: AiEnvironment + 'static> Tool for GetDividendsTool<E> {
             .filter(|a| {
                 // Apply date filters if provided
                 let date = &a.date;
-                let after_start = args
-                    .start_date
-                    .as_ref()
-                    .map(|s| date >= s)
-                    .unwrap_or(true);
+                let after_start = args.start_date.as_ref().map(|s| date >= s).unwrap_or(true);
                 let before_end = args.end_date.as_ref().map(|e| date <= e).unwrap_or(true);
                 after_start && before_end
             })

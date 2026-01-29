@@ -32,8 +32,8 @@ use super::client::MarketDataClient;
 use super::constants::*;
 use super::store::QuoteStore;
 use super::sync_state::{
-    calculate_sync_window, determine_sync_category, QuoteSyncState, SyncPlanningInputs,
-    SymbolSyncPlan, SyncCategory, SyncMode, SyncStateStore,
+    calculate_sync_window, determine_sync_category, QuoteSyncState, SymbolSyncPlan, SyncCategory,
+    SyncMode, SyncPlanningInputs, SyncStateStore,
 };
 use super::types::{AssetId, Day, ProviderId};
 use crate::activities::ActivityRepositoryTrait;
@@ -484,7 +484,8 @@ where
         match mode {
             SyncMode::Incremental => {
                 // Use category-based calculation for incremental mode
-                let category = determine_sync_category(inputs, CLOSED_POSITION_GRACE_PERIOD_DAYS, today);
+                let category =
+                    determine_sync_category(inputs, CLOSED_POSITION_GRACE_PERIOD_DAYS, today);
                 calculate_sync_window(&category, inputs, today)
                     .unwrap_or((today - Duration::days(QUOTE_HISTORY_BUFFER_DAYS), today))
             }
@@ -761,7 +762,8 @@ where
                 quote_max,
             };
 
-            let category = determine_sync_category(&inputs, CLOSED_POSITION_GRACE_PERIOD_DAYS, today);
+            let category =
+                determine_sync_category(&inputs, CLOSED_POSITION_GRACE_PERIOD_DAYS, today);
 
             if matches!(category, SyncCategory::Closed) {
                 continue;

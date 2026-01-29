@@ -182,15 +182,12 @@ pub fn parse_csv(content: &[u8], config: &ParseConfig) -> Result<ParsedCsvResult
 /// Decodes content bytes to UTF-8 string, handling BOM if present.
 fn decode_content(content: &[u8], errors: &mut Vec<ParseError>) -> Result<String> {
     // Check for UTF-8 BOM (EF BB BF)
-    let content_without_bom = if content.len() >= 3
-        && content[0] == 0xEF
-        && content[1] == 0xBB
-        && content[2] == 0xBF
-    {
-        &content[3..]
-    } else {
-        content
-    };
+    let content_without_bom =
+        if content.len() >= 3 && content[0] == 0xEF && content[1] == 0xBB && content[2] == 0xBF {
+            &content[3..]
+        } else {
+            content
+        };
 
     // Try UTF-8 decoding
     match std::str::from_utf8(content_without_bom) {

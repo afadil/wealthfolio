@@ -71,9 +71,7 @@ impl AlternativeAssetService {
     }
 
     /// Builds the asset metadata JSON, including purchase info and kind-specific metadata.
-    fn build_asset_metadata(
-        request: &CreateAlternativeAssetRequest,
-    ) -> Option<Value> {
+    fn build_asset_metadata(request: &CreateAlternativeAssetRequest) -> Option<Value> {
         let mut metadata = request.metadata.clone().unwrap_or_else(|| json!({}));
 
         // Add purchase info if provided
@@ -240,10 +238,7 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
 
         // Get the existing quote to find the currency
         // If no existing quote, we need to fetch the asset to get currency
-        let currency = match self
-            .quote_service
-            .get_latest_quote(&request.asset_id)
-        {
+        let currency = match self.quote_service.get_latest_quote(&request.asset_id) {
             Ok(existing_quote) => existing_quote.currency,
             Err(_) => {
                 // Fallback: try to get from recent quotes or default
@@ -260,8 +255,7 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
         let quote = Quote {
             id: quote_id.clone(),
             asset_id: request.asset_id.clone(),
-            timestamp: Utc
-                .from_utc_datetime(&request.date.and_hms_opt(12, 0, 0).unwrap()),
+            timestamp: Utc.from_utc_datetime(&request.date.and_hms_opt(12, 0, 0).unwrap()),
             open: request.value,
             high: request.value,
             low: request.value,
@@ -307,10 +301,7 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
         Ok(())
     }
 
-    async fn link_liability(
-        &self,
-        request: LinkLiabilityRequest,
-    ) -> Result<LinkLiabilityResponse> {
+    async fn link_liability(&self, request: LinkLiabilityRequest) -> Result<LinkLiabilityResponse> {
         debug!(
             "Linking liability {} to asset {}",
             request.liability_id, request.target_asset_id
@@ -392,7 +383,10 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
         }
 
         // Get symbols for quote lookup
-        let symbols: Vec<String> = alternative_assets.iter().map(|a| a.symbol.clone()).collect();
+        let symbols: Vec<String> = alternative_assets
+            .iter()
+            .map(|a| a.symbol.clone())
+            .collect();
 
         // Fetch latest quotes for all alternative assets
         let quotes = self.quote_service.get_latest_quotes(&symbols)?;
@@ -471,17 +465,37 @@ mod tests {
     #[test]
     fn test_validate_alternative_asset_kind() {
         // Valid alternative asset kinds
-        assert!(AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Property).is_ok());
-        assert!(AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Vehicle).is_ok());
-        assert!(AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Collectible).is_ok());
-        assert!(AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::PhysicalPrecious).is_ok());
-        assert!(AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Liability).is_ok());
-        assert!(AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Other).is_ok());
+        assert!(
+            AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Property).is_ok()
+        );
+        assert!(
+            AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Vehicle).is_ok()
+        );
+        assert!(
+            AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Collectible)
+                .is_ok()
+        );
+        assert!(AlternativeAssetService::validate_alternative_asset_kind(
+            &AssetKind::PhysicalPrecious
+        )
+        .is_ok());
+        assert!(
+            AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Liability).is_ok()
+        );
+        assert!(
+            AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Other).is_ok()
+        );
 
         // Invalid asset kinds
-        assert!(AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Security).is_err());
-        assert!(AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Crypto).is_err());
-        assert!(AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Cash).is_err());
+        assert!(
+            AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Security).is_err()
+        );
+        assert!(
+            AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Crypto).is_err()
+        );
+        assert!(
+            AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Cash).is_err()
+        );
     }
 
     #[test]
@@ -509,10 +523,7 @@ mod tests {
     #[test]
     fn test_set_and_remove_linked_asset_id() {
         let metadata = AlternativeAssetService::set_linked_asset_id(None, "PROP-a1b2c3d4");
-        assert_eq!(
-            metadata.get("linked_asset_id").unwrap(),
-            "PROP-a1b2c3d4"
-        );
+        assert_eq!(metadata.get("linked_asset_id").unwrap(), "PROP-a1b2c3d4");
 
         let linked_id = AlternativeAssetService::get_linked_asset_id(&Some(metadata.clone()));
         assert_eq!(linked_id, Some("PROP-a1b2c3d4".to_string()));

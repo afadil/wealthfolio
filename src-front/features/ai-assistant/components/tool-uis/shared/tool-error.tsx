@@ -7,24 +7,20 @@ export interface ToolErrorProps {
   onRetry?: () => void;
 }
 
-export function ToolError({
-  title = "Error",
-  message,
-  onRetry,
-}: ToolErrorProps) {
+export function ToolError({ title = "Error", message, onRetry }: ToolErrorProps) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-6 text-center">
-      <Icons.AlertCircle className="size-8 text-destructive" />
+    <div className="border-destructive/50 bg-destructive/10 flex flex-col items-center gap-3 rounded-lg border px-4 py-6 text-center">
+      <Icons.AlertCircle className="text-destructive size-8" />
       <div className="flex flex-col gap-1">
-        <p className="font-medium text-destructive">{title}</p>
-        <p className="text-sm text-destructive/80">{message}</p>
+        <p className="text-destructive font-medium">{title}</p>
+        <p className="text-destructive/80 text-sm">{message}</p>
       </div>
       {onRetry && (
         <Button
           variant="outline"
           size="sm"
           onClick={onRetry}
-          className="mt-2 gap-1.5 border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          className="border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive mt-2 gap-1.5"
         >
           <Icons.RefreshCw className="size-3.5" />
           Retry

@@ -48,7 +48,10 @@ export function usePairing() {
       setSas(null);
       return;
     }
-    actions.computeSAS().then(setSas).catch(() => setSas(null));
+    actions
+      .computeSAS()
+      .then(setSas)
+      .catch(() => setSas(null));
   }, [sessionKey, actions]);
 
   // Start polling when session becomes available (avoids stale closure)
@@ -62,7 +65,9 @@ export function usePairing() {
       clearInterval(pollRef.current);
     }
 
-    logger.info(`[usePairing] Starting poll for claimer, pairingId: ${state.pairingSession.pairingId}`);
+    logger.info(
+      `[usePairing] Starting poll for claimer, pairingId: ${state.pairingSession.pairingId}`,
+    );
 
     pollRef.current = setInterval(async () => {
       // Check if session has expired

@@ -2,20 +2,23 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 use crate::{
-    ai_environment::ServerAiEnvironment, auth::AuthManager, config::Config, events::EventBus,
-    secrets::build_secret_store,
+    ai_environment::ServerAiEnvironment, auth::AuthManager, config::Config,
+    domain_events::WebDomainEventSink, events::EventBus, secrets::build_secret_store,
 };
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, EnvFilter};
 use wealthfolio_ai::{AiProviderService, AiProviderServiceTrait, ChatConfig, ChatService};
-use wealthfolio_connect::{BrokerSyncService, BrokerSyncServiceTrait, PlatformRepository, DEFAULT_CLOUD_API_URL};
-use wealthfolio_device_sync::DeviceEnrollService;
+use wealthfolio_connect::{
+    BrokerSyncService, BrokerSyncServiceTrait, PlatformRepository, DEFAULT_CLOUD_API_URL,
+};
 use wealthfolio_core::{
     accounts::AccountService,
     activities::{ActivityService as CoreActivityService, ActivityServiceTrait},
     assets::{
-        AlternativeAssetRepositoryTrait, AssetClassificationService, AssetService, AssetServiceTrait,
+        AlternativeAssetRepositoryTrait, AssetClassificationService, AssetService,
+        AssetServiceTrait,
     },
+    events::DomainEventSink,
     fx::{FxService, FxServiceTrait},
     goals::{GoalService, GoalServiceTrait},
     health::{HealthService, HealthServiceTrait},
@@ -33,9 +36,10 @@ use wealthfolio_core::{
     },
     quotes::{QuoteService, QuoteServiceTrait},
     secrets::SecretStore,
-    settings::{SettingsService, SettingsServiceTrait, SettingsRepositoryTrait},
+    settings::{SettingsRepositoryTrait, SettingsService, SettingsServiceTrait},
     taxonomies::{TaxonomyService, TaxonomyServiceTrait},
 };
+use wealthfolio_device_sync::DeviceEnrollService;
 use wealthfolio_storage_sqlite::{
     accounts::AccountRepository,
     activities::ActivityRepository,
@@ -54,6 +58,11 @@ use wealthfolio_storage_sqlite::{
 };
 
 pub struct AppState {
+    /// Domain event sink for emitting events after mutations.
+    /// Note: The sink is used by services injected at construction time; this field
+    /// is kept for documentation and possible future access patterns.
+    #[allow(dead_code)]
+    pub domain_event_sink: Arc<dyn DomainEventSink>,
     pub account_service: Arc<AccountService>,
     pub settings_service: Arc<SettingsService>,
     pub holdings_service: Arc<dyn HoldingsServiceTrait + Send + Sync>,
@@ -138,15 +147,23 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     fx_service.initialize()?;
 
     let settings_repo = Arc::new(SettingsRepository::new(pool.clone(), writer.clone()));
-    let settings_service = Arc::new(SettingsService::new(settings_repo.clone(), fx_service.clone()));
+    let settings_service = Arc::new(SettingsService::new(
+        settings_repo.clone(),
+        fx_service.clone(),
+    ));
     let settings = settings_service.get_settings()?;
     let base_currency = Arc::new(RwLock::new(settings.base_currency));
+
+    // Domain event sink - two-phase initialization to handle circular dependencies
+    // Phase 1: Create the sink (can receive events immediately, buffers until worker starts)
+    let domain_event_sink = Arc::new(WebDomainEventSink::new());
 
     let account_repo = Arc::new(AccountRepository::new(pool.clone(), writer.clone()));
     let account_service = Arc::new(AccountService::new(
         account_repo.clone(),
         fx_service.clone(),
         base_currency.clone(),
+        domain_event_sink.clone(),
     ));
 
     // Additional repositories/services for web API
@@ -172,19 +189,25 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let taxonomy_repository = Arc::new(TaxonomyRepository::new(pool.clone(), writer.clone()));
     let taxonomy_service = Arc::new(TaxonomyService::new(taxonomy_repository));
 
-    let asset_service = Arc::new(AssetService::with_taxonomy_service(
-        asset_repository.clone(),
-        quote_service.clone(),
-        taxonomy_service.clone(),
-    )?);
-    let snapshot_service = Arc::new(SnapshotService::new(
-        base_currency.clone(),
-        account_repo.clone(),
-        activity_repository.clone(),
-        snapshot_repository.clone(),
-        asset_repository.clone(),
-        fx_service.clone(),
-    ));
+    let asset_service = Arc::new(
+        AssetService::with_taxonomy_service(
+            asset_repository.clone(),
+            quote_service.clone(),
+            taxonomy_service.clone(),
+        )?
+        .with_event_sink(domain_event_sink.clone()),
+    );
+    let snapshot_service = Arc::new(
+        SnapshotService::new(
+            base_currency.clone(),
+            account_repo.clone(),
+            activity_repository.clone(),
+            snapshot_repository.clone(),
+            asset_repository.clone(),
+            fx_service.clone(),
+        )
+        .with_event_sink(domain_event_sink.clone()),
+    );
 
     let valuation_repository = Arc::new(ValuationRepository::new(pool.clone(), writer.clone()));
     let valuation_service = Arc::new(ValuationService::new(
@@ -210,7 +233,8 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         fx_service.clone(),
         quote_service.clone(),
     ));
-    let classification_service = Arc::new(AssetClassificationService::new(taxonomy_service.clone()));
+    let classification_service =
+        Arc::new(AssetClassificationService::new(taxonomy_service.clone()));
     let holdings_service = Arc::new(HoldingsService::new(
         asset_service.clone(),
         snapshot_service.clone(),
@@ -218,11 +242,9 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         classification_service.clone(),
     ));
 
-    let allocation_service: Arc<dyn AllocationServiceTrait + Send + Sync> =
-        Arc::new(AllocationService::new(
-            holdings_service.clone(),
-            taxonomy_service.clone(),
-        ));
+    let allocation_service: Arc<dyn AllocationServiceTrait + Send + Sync> = Arc::new(
+        AllocationService::new(holdings_service.clone(), taxonomy_service.clone()),
+    );
 
     let performance_service = Arc::new(
         wealthfolio_core::portfolio::performance::PerformanceService::new(
@@ -254,29 +276,37 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     // Import run repository for tracking CSV imports
     let import_run_repository = Arc::new(ImportRunRepository::new(pool.clone(), writer.clone()));
 
-    let activity_service: Arc<dyn ActivityServiceTrait + Send + Sync> =
-        Arc::new(CoreActivityService::with_import_run_repository(
+    let activity_service: Arc<dyn ActivityServiceTrait + Send + Sync> = Arc::new(
+        CoreActivityService::with_import_run_repository(
             activity_repository.clone(),
             account_service.clone(),
             asset_service.clone(),
             fx_service.clone(),
             quote_service.clone(),
             import_run_repository,
-        ));
+        )
+        .with_event_sink(domain_event_sink.clone()),
+    );
 
     // Alternative asset repository for alternative assets operations
     let alternative_asset_repository: Arc<dyn AlternativeAssetRepositoryTrait + Send + Sync> =
-        Arc::new(AlternativeAssetRepository::new(pool.clone(), writer.clone()));
+        Arc::new(AlternativeAssetRepository::new(
+            pool.clone(),
+            writer.clone(),
+        ));
 
     // Connect sync service for broker data synchronization
     let platform_repository = Arc::new(PlatformRepository::new(pool.clone(), writer.clone()));
-    let connect_sync_service: Arc<dyn BrokerSyncServiceTrait + Send + Sync> =
-        Arc::new(BrokerSyncService::new(
+    let connect_sync_service: Arc<dyn BrokerSyncServiceTrait + Send + Sync> = Arc::new(
+        BrokerSyncService::new(
             account_service.clone(),
             platform_repository,
             pool.clone(),
             writer.clone(),
-        ));
+        )
+        .with_event_sink(domain_event_sink.clone())
+        .with_snapshot_service(snapshot_service.clone()),
+    );
 
     // Determine data root directory (parent of DB path)
     let data_root = data_root_path.to_string_lossy().to_string();
@@ -331,6 +361,20 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
 
     let event_bus = EventBus::new(256);
 
+    // Domain event sink - Phase 2: Start the worker now that all services are ready
+    domain_event_sink.start_worker(
+        base_currency.clone(),
+        asset_service.clone(),
+        connect_sync_service.clone(),
+        event_bus.clone(),
+        snapshot_service.clone(),
+        quote_service.clone(),
+        valuation_service.clone(),
+        account_service.clone(),
+        fx_service.clone(),
+        secret_store.clone(),
+    );
+
     let auth_manager = config
         .auth
         .as_ref()
@@ -339,6 +383,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         .map(Arc::new);
 
     Ok(Arc::new(AppState {
+        domain_event_sink,
         account_service,
         settings_service,
         holdings_service,

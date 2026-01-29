@@ -7,7 +7,9 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-use wealthfolio_core::activities::{Activity, ActivityStatus, ActivityUpdate, NewActivity};
+use wealthfolio_core::activities::{
+    Activity, ActivityStatus, ActivityUpdate, ActivityUpsert, NewActivity,
+};
 
 /// Helper function to parse a string into a Decimal,
 /// with a fallback for scientific notation by parsing as f64 first.
@@ -268,7 +270,9 @@ impl From<ActivityDetailsDB> for wealthfolio_core::activities::ActivityDetails {
             account_currency: db.account_currency,
             asset_symbol: db.asset_symbol.unwrap_or_default(),
             asset_name: db.asset_name,
-            asset_pricing_mode: db.asset_pricing_mode.unwrap_or_else(|| "MARKET".to_string()),
+            asset_pricing_mode: db
+                .asset_pricing_mode
+                .unwrap_or_else(|| "MARKET".to_string()),
             source_system: db.source_system,
             source_record_id: db.source_record_id,
             idempotency_key: db.idempotency_key,
@@ -577,6 +581,92 @@ impl From<ActivityUpdate> for ActivityDB {
             // Sync flags - mark as user modified since this is an update
             is_user_modified: 1,
             needs_review: 0,
+
+            // Audit
+            created_at: now.to_rfc3339(),
+            updated_at: now.to_rfc3339(),
+        }
+    }
+}
+
+impl From<ActivityUpsert> for ActivityDB {
+    fn from(domain: ActivityUpsert) -> Self {
+        use chrono::DateTime;
+
+        let now = Utc::now();
+
+        // Parse the date and normalize to UTC
+        let activity_datetime = DateTime::parse_from_rfc3339(&domain.activity_date)
+            .map(|dt| dt.with_timezone(&Utc))
+            .or_else(|_| {
+                NaiveDate::parse_from_str(&domain.activity_date, "%Y-%m-%d").map(|date| {
+                    Utc.from_utc_datetime(&date.and_hms_opt(0, 0, 0).unwrap_or_default())
+                })
+            })
+            .unwrap_or_else(|e| {
+                log::error!(
+                    "Failed to parse activity date '{}': {}",
+                    domain.activity_date,
+                    e
+                );
+                Utc.from_utc_datetime(
+                    &now.date_naive()
+                        .and_hms_opt(0, 0, 0)
+                        .unwrap_or_else(|| now.naive_utc()),
+                )
+            });
+
+        // Convert ActivityStatus to string, defaulting to POSTED
+        let status = domain
+            .status
+            .as_ref()
+            .map(|s| match s {
+                ActivityStatus::Posted => "POSTED",
+                ActivityStatus::Pending => "PENDING",
+                ActivityStatus::Draft => "DRAFT",
+                ActivityStatus::Void => "VOID",
+            })
+            .unwrap_or("POSTED")
+            .to_string();
+
+        Self {
+            id: domain.id,
+            account_id: domain.account_id,
+            asset_id: domain.asset_id,
+
+            // Classification
+            activity_type: domain.activity_type,
+            activity_type_override: None,
+            source_type: None,
+            subtype: domain.subtype,
+            status,
+
+            // Timing
+            activity_date: activity_datetime.to_rfc3339(),
+            settlement_date: None,
+
+            // Quantities
+            quantity: domain.quantity.map(|d| d.to_string()),
+            unit_price: domain.unit_price.map(|d| d.to_string()),
+            amount: domain.amount.map(|d| d.to_string()),
+            fee: domain.fee.map(|d| d.to_string()),
+            currency: domain.currency,
+            fx_rate: domain.fx_rate.map(|d| d.to_string()),
+
+            // Metadata
+            notes: domain.notes,
+            metadata: domain.metadata,
+
+            // Source identity
+            source_system: domain.source_system,
+            source_record_id: domain.source_record_id,
+            source_group_id: domain.source_group_id,
+            idempotency_key: domain.idempotency_key,
+            import_run_id: domain.import_run_id,
+
+            // Sync flags - sync activities are not user modified by default
+            is_user_modified: 0,
+            needs_review: domain.needs_review.map(|b| b as i32).unwrap_or(0),
 
             // Audit
             created_at: now.to_rfc3339(),

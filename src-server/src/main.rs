@@ -2,6 +2,7 @@ mod ai_environment;
 mod api;
 mod auth;
 mod config;
+mod domain_events;
 mod error;
 mod events;
 mod main_lib;

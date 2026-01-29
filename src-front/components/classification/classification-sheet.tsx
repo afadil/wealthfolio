@@ -69,14 +69,16 @@ export function ClassificationSheet({
           <div className="flex items-center gap-3">
             {assetSymbol && <TickerAvatar symbol={assetSymbol} className="size-10" />}
             <div className="min-w-0 flex-1">
-              <SheetTitle className="truncate text-lg">{assetSymbol || "Classify Asset"}</SheetTitle>
+              <SheetTitle className="truncate text-lg">
+                {assetSymbol || "Classify Asset"}
+              </SheetTitle>
               <SheetDescription className="truncate text-sm">{assetName}</SheetDescription>
             </div>
           </div>
         </SheetHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-          <div className="space-y-8 pb-8 pt-4">
+          <div className="space-y-8 pt-4 pb-8">
             {/* Loading State */}
             {isLoading && <ClassificationSkeleton />}
 

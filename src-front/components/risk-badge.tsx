@@ -1,9 +1,5 @@
 import { cn } from "@/lib/utils";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@wealthfolio/ui/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 
 type RiskLevel = "UNKNOWN" | "LOW" | "MEDIUM" | "HIGH";
 
@@ -14,10 +10,7 @@ interface RiskBadgeProps {
   className?: string;
 }
 
-const RISK_CONFIG: Record<
-  RiskLevel,
-  { label: string; dotClass: string; textClass: string }
-> = {
+const RISK_CONFIG: Record<RiskLevel, { label: string; dotClass: string; textClass: string }> = {
   UNKNOWN: {
     label: "Unknown",
     dotClass: "bg-muted-foreground",
@@ -49,12 +42,7 @@ function normalizeLevel(level: RiskLevel | null | undefined): RiskLevel {
   return "UNKNOWN";
 }
 
-export function RiskBadge({
-  level,
-  size = "md",
-  showLabel = true,
-  className,
-}: RiskBadgeProps) {
+export function RiskBadge({ level, size = "md", showLabel = true, className }: RiskBadgeProps) {
   const normalizedLevel = normalizeLevel(level);
   const config = RISK_CONFIG[normalizedLevel];
 
@@ -70,12 +58,7 @@ export function RiskBadge({
 
   const content = (
     <span
-      className={cn(
-        "inline-flex items-center gap-1.5",
-        textSizeClass,
-        config.textClass,
-        className
-      )}
+      className={cn("inline-flex items-center gap-1.5", textSizeClass, config.textClass, className)}
     >
       {dot}
       {showLabel && <span className="font-medium">{config.label}</span>}

@@ -242,7 +242,10 @@ pub trait QuoteStore: Send + Sync {
     /// # Returns
     ///
     /// A map from symbol to its quote pair (latest + previous).
-    fn get_latest_quotes_pair(&self, symbols: &[String]) -> Result<HashMap<String, LatestQuotePair>>;
+    fn get_latest_quotes_pair(
+        &self,
+        symbols: &[String],
+    ) -> Result<HashMap<String, LatestQuotePair>>;
 
     /// Gets all historical quotes for a symbol, ordered by date.
     ///
@@ -279,7 +282,12 @@ pub trait QuoteStore: Send + Sync {
     /// # Returns
     ///
     /// Quotes within the specified date range
-    fn get_quotes_in_range(&self, symbol: &str, start: NaiveDate, end: NaiveDate) -> Result<Vec<Quote>>;
+    fn get_quotes_in_range(
+        &self,
+        symbol: &str,
+        start: NaiveDate,
+        end: NaiveDate,
+    ) -> Result<Vec<Quote>>;
 
     /// Finds duplicate quotes for a symbol on a specific date.
     ///

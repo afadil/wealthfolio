@@ -33,7 +33,10 @@ impl HealthDismissalRepository {
         let dismissals_db = health_issue_dismissals
             .load::<HealthIssueDismissalDB>(&mut conn)
             .map_err(StorageError::from)?;
-        Ok(dismissals_db.into_iter().map(IssueDismissal::from).collect())
+        Ok(dismissals_db
+            .into_iter()
+            .map(IssueDismissal::from)
+            .collect())
     }
 
     fn get_dismissal_impl(&self, id: &str) -> Result<Option<IssueDismissal>> {

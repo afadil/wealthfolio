@@ -2,8 +2,8 @@ use std::sync::{Arc, RwLock};
 use wealthfolio_ai::{AiProviderServiceTrait, ChatService};
 use wealthfolio_connect::BrokerSyncServiceTrait;
 use wealthfolio_core::{
-    self, accounts, activities, assets, fx, goals, health, limits, portfolio, quotes, settings,
-    taxonomies,
+    self, accounts, activities, assets, events::DomainEventSink, fx, goals, health, limits,
+    portfolio, quotes, settings, taxonomies,
 };
 use wealthfolio_device_sync::DeviceEnrollService;
 use wealthfolio_storage_sqlite::assets::AlternativeAssetRepository;
@@ -15,6 +15,14 @@ use crate::services::ConnectService;
 pub struct ServiceContext {
     pub base_currency: Arc<RwLock<String>>,
     pub instance_id: Arc<String>,
+
+    /// Domain event sink for emitting events after mutations.
+    /// Runtime bridges (Tauri/Web) implement this to trigger portfolio recalculation,
+    /// asset enrichment, and broker sync based on domain events.
+    /// Note: The sink is used by services injected at construction time; this field
+    /// is kept for documentation and possible future access patterns.
+    #[allow(dead_code)]
+    pub domain_event_sink: Arc<dyn DomainEventSink>,
 
     // Services
     pub settings_service: Arc<dyn settings::SettingsServiceTrait>,

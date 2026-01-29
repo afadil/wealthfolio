@@ -422,7 +422,7 @@ export function ActivityDataGrid({
   // Get default currency for custom asset dialog from the row's account
   const dialogDefaultCurrency =
     customAssetDialog.rowIndex >= 0 && localTransactions[customAssetDialog.rowIndex]
-      ? localTransactions[customAssetDialog.rowIndex].accountCurrency ?? fallbackCurrency
+      ? (localTransactions[customAssetDialog.rowIndex].accountCurrency ?? fallbackCurrency)
       : fallbackCurrency;
 
   return (

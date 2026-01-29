@@ -37,10 +37,7 @@ interface FlattenedCategory {
 /**
  * Flatten tree nodes with depth level for display
  */
-function flattenTreeWithLevels(
-  nodes: TreeNode[],
-  level = 0
-): FlattenedCategory[] {
+function flattenTreeWithLevels(nodes: TreeNode[], level = 0): FlattenedCategory[] {
   const result: FlattenedCategory[] = [];
 
   for (const node of nodes) {
@@ -98,7 +95,7 @@ export function TaxonomyPicker({
       }
       setOpen(false);
     },
-    [value, onChange]
+    [value, onChange],
   );
 
   const handleClear = useCallback(
@@ -106,17 +103,13 @@ export function TaxonomyPicker({
       e.stopPropagation();
       onChange(null);
     },
-    [onChange]
+    [onChange],
   );
 
   // Loading state
   if (isLoading) {
     return (
-      <Button
-        variant="outline"
-        className="w-full justify-between"
-        disabled
-      >
+      <Button variant="outline" className="w-full justify-between" disabled>
         <Skeleton className="h-4 w-32" />
         <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
       </Button>
@@ -126,11 +119,7 @@ export function TaxonomyPicker({
   // Error state
   if (isError) {
     return (
-      <Button
-        variant="outline"
-        className="w-full justify-between text-destructive"
-        disabled
-      >
+      <Button variant="outline" className="text-destructive w-full justify-between" disabled>
         <span>Error loading taxonomy</span>
         <Icons.AlertCircle className="ml-2 h-4 w-4 shrink-0" />
       </Button>
@@ -140,11 +129,7 @@ export function TaxonomyPicker({
   // Empty state (no categories)
   if (!taxonomyData?.categories || taxonomyData.categories.length === 0) {
     return (
-      <Button
-        variant="outline"
-        className="w-full justify-between"
-        disabled
-      >
+      <Button variant="outline" className="w-full justify-between" disabled>
         <span className="text-muted-foreground">No categories available</span>
         <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
       </Button>
@@ -159,10 +144,7 @@ export function TaxonomyPicker({
           role="combobox"
           aria-expanded={open}
           aria-label="Select a category"
-          className={cn(
-            "w-full justify-between",
-            !selectedCategory && "text-muted-foreground"
-          )}
+          className={cn("w-full justify-between", !selectedCategory && "text-muted-foreground")}
           disabled={disabled}
         >
           <div className="flex items-center gap-2 truncate">
@@ -183,7 +165,7 @@ export function TaxonomyPicker({
               <span
                 role="button"
                 tabIndex={0}
-                className="rounded-sm p-0.5 hover:bg-muted"
+                className="hover:bg-muted rounded-sm p-0.5"
                 onClick={handleClear}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
@@ -232,7 +214,7 @@ export function TaxonomyPicker({
                   <Icons.Check
                     className={cn(
                       "ml-auto h-4 w-4 shrink-0",
-                      value === category.id ? "opacity-100" : "opacity-0"
+                      value === category.id ? "opacity-100" : "opacity-0",
                     )}
                   />
                 </CommandItem>

@@ -191,7 +191,8 @@ impl PriceStalenessCheck {
                 format!("Price updates needed for {} holdings", count)
             };
 
-            let asset_ids: Vec<String> = warning_assets.iter().map(|a| a.asset_id.clone()).collect();
+            let asset_ids: Vec<String> =
+                warning_assets.iter().map(|a| a.asset_id.clone()).collect();
             let data_hash = compute_data_hash(&asset_ids, severity, mv_pct);
 
             // Build affected items list for display
@@ -336,15 +337,21 @@ fn build_asset_details(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::{Duration, TimeZone};
     use crate::health::model::HealthConfig;
+    use chrono::{Duration, TimeZone};
 
     #[test]
     fn test_data_hash_stability() {
-        let hash1 =
-            compute_data_hash(&["AAPL".to_string(), "MSFT".to_string()], Severity::Warning, 0.15);
-        let hash2 =
-            compute_data_hash(&["MSFT".to_string(), "AAPL".to_string()], Severity::Warning, 0.15);
+        let hash1 = compute_data_hash(
+            &["AAPL".to_string(), "MSFT".to_string()],
+            Severity::Warning,
+            0.15,
+        );
+        let hash2 = compute_data_hash(
+            &["MSFT".to_string(), "AAPL".to_string()],
+            Severity::Warning,
+            0.15,
+        );
         // Order shouldn't matter
         assert_eq!(hash1, hash2);
     }
@@ -408,12 +415,7 @@ mod tests {
 
         // Set "now" to Wednesday Jan 17, 2024
         let now = Utc.with_ymd_and_hms(2024, 1, 17, 12, 0, 0).unwrap();
-        let ctx = HealthContext::with_timestamp(
-            HealthConfig::default(),
-            "USD",
-            100_000.0,
-            now,
-        );
+        let ctx = HealthContext::with_timestamp(HealthConfig::default(), "USD", 100_000.0, now);
 
         let holdings = vec![AssetHoldingInfo {
             asset_id: "SEC:AAPL:XNAS".to_string(),
@@ -440,12 +442,8 @@ mod tests {
 
         // Set "now" to Saturday Jan 20, 2024
         let saturday = Utc.with_ymd_and_hms(2024, 1, 20, 12, 0, 0).unwrap();
-        let ctx = HealthContext::with_timestamp(
-            HealthConfig::default(),
-            "USD",
-            100_000.0,
-            saturday,
-        );
+        let ctx =
+            HealthContext::with_timestamp(HealthConfig::default(), "USD", 100_000.0, saturday);
 
         let holdings = vec![AssetHoldingInfo {
             asset_id: "SEC:AAPL:XNAS".to_string(),
@@ -462,7 +460,10 @@ mod tests {
         quote_times.insert("SEC:AAPL:XNAS".to_string(), friday);
 
         let issues = check.analyze(&holdings, &quote_times, &ctx);
-        assert!(issues.is_empty(), "Friday quote should not be stale on Saturday");
+        assert!(
+            issues.is_empty(),
+            "Friday quote should not be stale on Saturday"
+        );
     }
 
     #[test]
@@ -471,12 +472,7 @@ mod tests {
 
         // Set "now" to Sunday Jan 21, 2024
         let sunday = Utc.with_ymd_and_hms(2024, 1, 21, 12, 0, 0).unwrap();
-        let ctx = HealthContext::with_timestamp(
-            HealthConfig::default(),
-            "USD",
-            100_000.0,
-            sunday,
-        );
+        let ctx = HealthContext::with_timestamp(HealthConfig::default(), "USD", 100_000.0, sunday);
 
         let holdings = vec![AssetHoldingInfo {
             asset_id: "SEC:AAPL:XNAS".to_string(),
@@ -492,7 +488,10 @@ mod tests {
         quote_times.insert("SEC:AAPL:XNAS".to_string(), friday);
 
         let issues = check.analyze(&holdings, &quote_times, &ctx);
-        assert!(issues.is_empty(), "Friday quote should not be stale on Sunday");
+        assert!(
+            issues.is_empty(),
+            "Friday quote should not be stale on Sunday"
+        );
     }
 
     #[test]
@@ -501,12 +500,7 @@ mod tests {
 
         // Set "now" to Monday Jan 22, 2024
         let monday = Utc.with_ymd_and_hms(2024, 1, 22, 10, 0, 0).unwrap();
-        let ctx = HealthContext::with_timestamp(
-            HealthConfig::default(),
-            "USD",
-            100_000.0,
-            monday,
-        );
+        let ctx = HealthContext::with_timestamp(HealthConfig::default(), "USD", 100_000.0, monday);
 
         let holdings = vec![AssetHoldingInfo {
             asset_id: "SEC:AAPL:XNAS".to_string(),
@@ -601,12 +595,7 @@ mod tests {
 
         // Set "now" to Friday Jan 26, 2024
         let now = Utc.with_ymd_and_hms(2024, 1, 26, 12, 0, 0).unwrap();
-        let ctx = HealthContext::with_timestamp(
-            HealthConfig::default(),
-            "USD",
-            100_000.0,
-            now,
-        );
+        let ctx = HealthContext::with_timestamp(HealthConfig::default(), "USD", 100_000.0, now);
 
         let holdings = vec![AssetHoldingInfo {
             asset_id: "SEC:AAPL:XNAS".to_string(),

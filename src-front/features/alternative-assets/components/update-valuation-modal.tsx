@@ -119,7 +119,7 @@ export function UpdateValuationModal({
               <div className="bg-muted rounded-md p-4">
                 <div className="text-muted-foreground text-sm">Current Recorded Value</div>
                 <div className="text-xl font-semibold">{formattedCurrentValue}</div>
-                <div className="text-muted-foreground text-xs mt-1">
+                <div className="text-muted-foreground mt-1 text-xs">
                   Last updated: {formattedLastUpdatedDate}
                 </div>
               </div>
@@ -177,12 +177,7 @@ export function UpdateValuationModal({
             </div>
 
             <DialogFooter className="gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleClose}
-                disabled={isLoading}
-              >
+              <Button type="button" variant="outline" onClick={handleClose} disabled={isLoading}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isLoading}>

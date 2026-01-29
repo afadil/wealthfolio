@@ -298,7 +298,10 @@ describe("AiStreamEvent type validation", () => {
 
     expect(event.type).toBe("done");
     if (event.type === "done") {
-      expect(event.message.content.parts[0]).toEqual({ type: "text", content: "Here is your portfolio summary." });
+      expect(event.message.content.parts[0]).toEqual({
+        type: "text",
+        content: "Here is your portfolio summary.",
+      });
       expect(event.usage?.totalTokens).toBe(150);
     }
   });
@@ -541,7 +544,13 @@ describe("Incremental transcript assembly", () => {
         messageId: "m1",
         delta: "about this...",
       },
-      { type: "textDelta", threadId: "t1", runId: "r1", messageId: "m1", delta: "The answer is 42." },
+      {
+        type: "textDelta",
+        threadId: "t1",
+        runId: "r1",
+        messageId: "m1",
+        delta: "The answer is 42.",
+      },
       {
         type: "done",
         threadId: "t1",

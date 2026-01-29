@@ -136,11 +136,23 @@ mod tests {
             "fiftyTwoWeekLow": {"raw": 124.17, "fmt": "124.17"}
         }"#;
         let detail: YahooSummaryDetail = serde_json::from_str(json).unwrap();
-        assert_eq!(detail.market_cap.as_ref().and_then(|d| d.raw), Some(2800000000000.0));
+        assert_eq!(
+            detail.market_cap.as_ref().and_then(|d| d.raw),
+            Some(2800000000000.0)
+        );
         assert_eq!(detail.trailing_pe.as_ref().and_then(|d| d.raw), Some(28.5));
-        assert_eq!(detail.dividend_yield.as_ref().and_then(|d| d.raw), Some(0.005));
-        assert_eq!(detail.fifty_two_week_high.as_ref().and_then(|d| d.raw), Some(199.62));
-        assert_eq!(detail.fifty_two_week_low.as_ref().and_then(|d| d.raw), Some(124.17));
+        assert_eq!(
+            detail.dividend_yield.as_ref().and_then(|d| d.raw),
+            Some(0.005)
+        );
+        assert_eq!(
+            detail.fifty_two_week_high.as_ref().and_then(|d| d.raw),
+            Some(199.62)
+        );
+        assert_eq!(
+            detail.fifty_two_week_low.as_ref().and_then(|d| d.raw),
+            Some(124.17)
+        );
     }
 
     #[test]
@@ -154,10 +166,16 @@ mod tests {
             "fiftyTwoWeekLow": {"raw": 200.0, "fmt": "200.00"}
         }"#;
         let detail: YahooSummaryDetail = serde_json::from_str(json).unwrap();
-        assert_eq!(detail.market_cap.as_ref().and_then(|d| d.raw), Some(1000000000000.0));
+        assert_eq!(
+            detail.market_cap.as_ref().and_then(|d| d.raw),
+            Some(1000000000000.0)
+        );
         // dividendYield is empty object - raw should be None
         assert_eq!(detail.dividend_yield.as_ref().and_then(|d| d.raw), None);
-        assert_eq!(detail.fifty_two_week_high.as_ref().and_then(|d| d.raw), Some(300.0));
+        assert_eq!(
+            detail.fifty_two_week_high.as_ref().and_then(|d| d.raw),
+            Some(300.0)
+        );
     }
 
     #[test]

@@ -119,24 +119,21 @@ export function ValueHistoryDataGrid({
   const columnHelper = createColumnHelper<ValueHistoryEntry>();
 
   // Delete a single row
-  const handleDeleteRow = useCallback(
-    (entry: ValueHistoryEntry) => {
-      if (entry.isNew) {
-        // Remove new entries immediately
-        setLocalEntries((prev) => prev.filter((e) => e.id !== entry.id));
-        setDirtyIds((prev) => {
-          const next = new Set(prev);
-          next.delete(entry.id);
-          return next;
-        });
-      } else {
-        // Mark existing entries for deletion
-        setDeletedIds((prev) => new Set(prev).add(entry.id));
-        setLocalEntries((prev) => prev.filter((e) => e.id !== entry.id));
-      }
-    },
-    [],
-  );
+  const handleDeleteRow = useCallback((entry: ValueHistoryEntry) => {
+    if (entry.isNew) {
+      // Remove new entries immediately
+      setLocalEntries((prev) => prev.filter((e) => e.id !== entry.id));
+      setDirtyIds((prev) => {
+        const next = new Set(prev);
+        next.delete(entry.id);
+        return next;
+      });
+    } else {
+      // Mark existing entries for deletion
+      setDeletedIds((prev) => new Set(prev).add(entry.id));
+      setLocalEntries((prev) => prev.filter((e) => e.id !== entry.id));
+    }
+  }, []);
 
   const columns = useMemo(
     () => [

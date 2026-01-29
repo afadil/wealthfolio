@@ -40,9 +40,7 @@ pub async fn enable_device_sync(
 /// Clear all device sync data and return to FRESH state.
 /// Use for troubleshooting or when user wants to reset sync.
 #[tauri::command]
-pub fn clear_device_sync_data(
-    context: State<'_, Arc<ServiceContext>>,
-) -> Result<(), String> {
+pub fn clear_device_sync_data(context: State<'_, Arc<ServiceContext>>) -> Result<(), String> {
     context
         .device_enroll_service()
         .clear_sync_data()

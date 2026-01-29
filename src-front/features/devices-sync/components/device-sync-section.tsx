@@ -203,8 +203,8 @@ export function DeviceSyncSection() {
           </div>
 
           <div className="flex flex-col items-center justify-center py-4 text-center sm:py-6">
-            <div className="bg-amber-100 dark:bg-amber-900/30 mb-3 rounded-full p-2.5 sm:mb-4 sm:p-3">
-              <Icons.RefreshCw className="h-5 w-5 text-amber-600 dark:text-amber-400 sm:h-6 sm:w-6" />
+            <div className="mb-3 rounded-full bg-amber-100 p-2.5 sm:mb-4 sm:p-3 dark:bg-amber-900/30">
+              <Icons.RefreshCw className="h-5 w-5 text-amber-600 sm:h-6 sm:w-6 dark:text-amber-400" />
             </div>
             <p className="text-foreground text-sm font-medium">Keys need updating</p>
             <p className="text-muted-foreground mt-1 max-w-xs text-xs">
@@ -364,13 +364,13 @@ function OrphanedKeysPrompt({ onReinitialize }: { onReinitialize: () => Promise<
   return (
     <>
       <div className="flex flex-col items-center justify-center py-4 text-center sm:py-6">
-        <div className="bg-amber-100 dark:bg-amber-900/30 mb-3 rounded-full p-2.5 sm:mb-4 sm:p-3">
-          <Icons.AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 sm:h-6 sm:w-6" />
+        <div className="mb-3 rounded-full bg-amber-100 p-2.5 sm:mb-4 sm:p-3 dark:bg-amber-900/30">
+          <Icons.AlertTriangle className="h-5 w-5 text-amber-600 sm:h-6 sm:w-6 dark:text-amber-400" />
         </div>
         <p className="text-foreground text-sm font-medium">No Devices Paired</p>
         <p className="text-muted-foreground mt-1 max-w-xs text-xs">
-          Sync was set up before but no devices are currently connected.
-          Reinitialize to get started.
+          Sync was set up before but no devices are currently connected. Reinitialize to get
+          started.
         </p>
         <Button
           className="mt-3 sm:mt-4"

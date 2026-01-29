@@ -135,12 +135,13 @@ impl From<ExternalMarketDataError> for MarketDataError {
             ExternalMarketDataError::AllProvidersFailed => {
                 MarketDataError::ProviderExhausted("All providers failed".to_string())
             }
-            ExternalMarketDataError::NotSupported { operation, provider } => {
-                MarketDataError::ProviderError(format!(
-                    "{} does not support '{}'",
-                    provider, operation
-                ))
-            }
+            ExternalMarketDataError::NotSupported {
+                operation,
+                provider,
+            } => MarketDataError::ProviderError(format!(
+                "{} does not support '{}'",
+                provider, operation
+            )),
             ExternalMarketDataError::Network(e) => MarketDataError::Unknown(e.to_string()),
         }
     }
