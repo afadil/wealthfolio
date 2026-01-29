@@ -190,21 +190,14 @@ function normalizeResult(result: unknown): RecordActivityOutput | null {
   // Normalize draft
   const draftRaw = (candidate.draft ?? candidate) as Record<string, unknown>;
   const draft: ActivityDraft = {
-    activityType:
-      (draftRaw.activityType as string) ??
-      (draftRaw.activity_type as string) ??
-      "",
+    activityType: (draftRaw.activityType as string) ?? (draftRaw.activity_type as string) ?? "",
     activityDate:
       (draftRaw.activityDate as string) ??
       (draftRaw.activity_date as string) ??
       new Date().toISOString(),
     symbol: (draftRaw.symbol as string) ?? undefined,
-    assetId:
-      (draftRaw.assetId as string) ?? (draftRaw.asset_id as string) ?? undefined,
-    assetName:
-      (draftRaw.assetName as string) ??
-      (draftRaw.asset_name as string) ??
-      undefined,
+    assetId: (draftRaw.assetId as string) ?? (draftRaw.asset_id as string) ?? undefined,
+    assetName: (draftRaw.assetName as string) ?? (draftRaw.asset_name as string) ?? undefined,
     quantity: draftRaw.quantity != null ? Number(draftRaw.quantity) : undefined,
     unitPrice:
       draftRaw.unitPrice != null
@@ -215,47 +208,26 @@ function normalizeResult(result: unknown): RecordActivityOutput | null {
     amount: draftRaw.amount != null ? Number(draftRaw.amount) : undefined,
     fee: draftRaw.fee != null ? Number(draftRaw.fee) : undefined,
     currency: (draftRaw.currency as string) ?? "USD",
-    accountId:
-      (draftRaw.accountId as string) ??
-      (draftRaw.account_id as string) ??
-      undefined,
-    accountName:
-      (draftRaw.accountName as string) ??
-      (draftRaw.account_name as string) ??
-      undefined,
+    accountId: (draftRaw.accountId as string) ?? (draftRaw.account_id as string) ?? undefined,
+    accountName: (draftRaw.accountName as string) ?? (draftRaw.account_name as string) ?? undefined,
     subtype: (draftRaw.subtype as string) ?? undefined,
     notes: (draftRaw.notes as string) ?? undefined,
-    priceSource:
-      (draftRaw.priceSource as string) ??
-      (draftRaw.price_source as string) ??
-      "none",
-    pricingMode:
-      (draftRaw.pricingMode as string) ??
-      (draftRaw.pricing_mode as string) ??
-      "MARKET",
-    isCustomAsset: Boolean(
-      draftRaw.isCustomAsset ?? draftRaw.is_custom_asset ?? false,
-    ),
-    assetKind:
-      (draftRaw.assetKind as string) ??
-      (draftRaw.asset_kind as string) ??
-      undefined,
+    priceSource: (draftRaw.priceSource as string) ?? (draftRaw.price_source as string) ?? "none",
+    pricingMode: (draftRaw.pricingMode as string) ?? (draftRaw.pricing_mode as string) ?? "MARKET",
+    isCustomAsset: Boolean(draftRaw.isCustomAsset ?? draftRaw.is_custom_asset ?? false),
+    assetKind: (draftRaw.assetKind as string) ?? (draftRaw.asset_kind as string) ?? undefined,
   };
 
   // Normalize validation
   const validationRaw = (candidate.validation ?? {}) as Record<string, unknown>;
   const validation: ValidationResult = {
-    isValid: Boolean(
-      validationRaw.isValid ?? validationRaw.is_valid ?? false
-    ),
+    isValid: Boolean(validationRaw.isValid ?? validationRaw.is_valid ?? false),
     missingFields: Array.isArray(validationRaw.missingFields)
       ? validationRaw.missingFields
       : Array.isArray(validationRaw.missing_fields)
         ? validationRaw.missing_fields
         : [],
-    errors: Array.isArray(validationRaw.errors)
-      ? (validationRaw.errors as ValidationError[])
-      : [],
+    errors: Array.isArray(validationRaw.errors) ? (validationRaw.errors as ValidationError[]) : [],
   };
 
   // Normalize available accounts
@@ -264,13 +236,11 @@ function normalizeResult(result: unknown): RecordActivityOutput | null {
     : Array.isArray(candidate.available_accounts)
       ? candidate.available_accounts
       : [];
-  const availableAccounts: AccountOption[] = accountsRaw.map(
-    (acc: Record<string, unknown>) => ({
-      id: (acc.id as string) ?? "",
-      name: (acc.name as string) ?? "",
-      currency: (acc.currency as string) ?? "USD",
-    })
-  );
+  const availableAccounts: AccountOption[] = accountsRaw.map((acc: Record<string, unknown>) => ({
+    id: (acc.id as string) ?? "",
+    name: (acc.name as string) ?? "",
+    currency: (acc.currency as string) ?? "USD",
+  }));
 
   // Normalize resolved asset
   const assetRaw = (candidate.resolvedAsset ?? candidate.resolved_asset) as
@@ -278,16 +248,13 @@ function normalizeResult(result: unknown): RecordActivityOutput | null {
     | undefined;
   const resolvedAsset: ResolvedAsset | undefined = assetRaw
     ? {
-        assetId:
-          (assetRaw.assetId as string) ?? (assetRaw.asset_id as string) ?? "",
+        assetId: (assetRaw.assetId as string) ?? (assetRaw.asset_id as string) ?? "",
         symbol: (assetRaw.symbol as string) ?? "",
         name: (assetRaw.name as string) ?? "",
         currency: (assetRaw.currency as string) ?? "USD",
         exchange: (assetRaw.exchange as string) ?? undefined,
         exchangeMic:
-          (assetRaw.exchangeMic as string) ??
-          (assetRaw.exchange_mic as string) ??
-          undefined,
+          (assetRaw.exchangeMic as string) ?? (assetRaw.exchange_mic as string) ?? undefined,
       }
     : undefined;
 
@@ -297,12 +264,10 @@ function normalizeResult(result: unknown): RecordActivityOutput | null {
     : Array.isArray(candidate.available_subtypes)
       ? candidate.available_subtypes
       : [];
-  const availableSubtypes: SubtypeOption[] = subtypesRaw.map(
-    (st: Record<string, unknown>) => ({
-      value: (st.value as string) ?? "",
-      label: (st.label as string) ?? (st.value as string) ?? "",
-    })
-  );
+  const availableSubtypes: SubtypeOption[] = subtypesRaw.map((st: Record<string, unknown>) => ({
+    value: (st.value as string) ?? "",
+    label: (st.label as string) ?? (st.value as string) ?? "",
+  }));
 
   return {
     draft,
@@ -315,10 +280,7 @@ function normalizeResult(result: unknown): RecordActivityOutput | null {
       (candidate.createdActivityId as string) ??
       (candidate.created_activity_id as string) ??
       undefined,
-    createdAt:
-      (candidate.createdAt as string) ??
-      (candidate.created_at as string) ??
-      undefined,
+    createdAt: (candidate.createdAt as string) ?? (candidate.created_at as string) ?? undefined,
   };
 }
 
@@ -387,19 +349,18 @@ function SuccessState({ draft, createdActivityId, currency }: SuccessStateProps)
         currency,
       }).format(value);
     },
-    [currency, isBalanceHidden]
+    [currency, isBalanceHidden],
   );
 
   const activityTypeDisplay =
-    (ACTIVITY_TYPE_DISPLAY_NAMES as Record<string, string>)[
-      draft.activityType
-    ] ?? draft.activityType;
+    (ACTIVITY_TYPE_DISPLAY_NAMES as Record<string, string>)[draft.activityType] ??
+    draft.activityType;
 
   return (
     <Card className="bg-muted/40 border-success/30">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
-          <Icons.CheckCircle className="h-5 w-5 text-success" />
+          <Icons.CheckCircle className="text-success h-5 w-5" />
           <CardTitle className="text-base">Activity Recorded</CardTitle>
         </div>
       </CardHeader>
@@ -411,9 +372,7 @@ function SuccessState({ draft, createdActivityId, currency }: SuccessStateProps)
           </div>
           <div>
             <span className="text-muted-foreground">Date:</span>{" "}
-            <span className="font-medium">
-              {new Date(draft.activityDate).toLocaleDateString()}
-            </span>
+            <span className="font-medium">{new Date(draft.activityDate).toLocaleDateString()}</span>
           </div>
           {draft.symbol && (
             <div>
@@ -446,10 +405,8 @@ function SuccessState({ draft, createdActivityId, currency }: SuccessStateProps)
             size="sm"
             onClick={() =>
               window.open(
-                createdActivityId
-                  ? `/activities?id=${createdActivityId}`
-                  : "/activities",
-                "_blank"
+                createdActivityId ? `/activities?id=${createdActivityId}` : "/activities",
+                "_blank",
               )
             }
           >
@@ -496,7 +453,7 @@ function DraftForm({
   const initialSymbol = resolvedAsset?.symbol ?? draft.symbol ?? "";
   const [selectedSymbol, setSelectedSymbol] = useState<string>(initialSymbol);
   const [selectedExchangeMic, setSelectedExchangeMic] = useState<string | undefined>(
-    resolvedAsset?.exchangeMic
+    resolvedAsset?.exchangeMic,
   );
 
   // Auto-select account: use draft value, or auto-select if only one account
@@ -584,7 +541,7 @@ function DraftForm({
   // Get selected account (for reference)
   const selectedAccount = useMemo(
     () => availableAccounts.find((a) => a.id === accountId),
-    [availableAccounts, accountId]
+    [availableAccounts, accountId],
   );
 
   // Use watched form currency (user can override in Advanced Options)
@@ -600,7 +557,7 @@ function DraftForm({
         currency,
       }).format(value);
     },
-    [currency, isBalanceHidden]
+    [currency, isBalanceHidden],
   );
 
   // Get current form values for error checking
@@ -614,7 +571,7 @@ function DraftForm({
       unitPrice,
       symbol: selectedSymbol,
     }),
-    [accountId, activityType, activityDate, amount, quantity, unitPrice, selectedSymbol]
+    [accountId, activityType, activityDate, amount, quantity, unitPrice, selectedSymbol],
   );
 
   // Check if field has validation error (only show if field is still empty)
@@ -624,9 +581,7 @@ function DraftForm({
       const fieldHasBackendError =
         validation.missingFields.includes(fieldName) ||
         validation.missingFields.includes(snakeCaseField) ||
-        validation.errors.some(
-          (e) => e.field === fieldName || e.field === snakeCaseField
-        );
+        validation.errors.some((e) => e.field === fieldName || e.field === snakeCaseField);
 
       // If no backend error, no error to show
       if (!fieldHasBackendError) return false;
@@ -639,7 +594,7 @@ function DraftForm({
 
       return true;
     },
-    [validation, currentFormValues]
+    [validation, currentFormValues],
   );
 
   // Get error message for field (only if field is still empty)
@@ -653,11 +608,11 @@ function DraftForm({
 
       const snakeCaseField = fieldName.replace(/([A-Z])/g, "_$1").toLowerCase();
       const error = validation.errors.find(
-        (e) => e.field === fieldName || e.field === snakeCaseField
+        (e) => e.field === fieldName || e.field === snakeCaseField,
       );
       return error?.message;
     },
-    [validation, currentFormValues]
+    [validation, currentFormValues],
   );
 
   // Check if asset requires symbol
@@ -685,15 +640,21 @@ function DraftForm({
     }
 
     // DEPOSIT/WITHDRAWAL need amount
-    if (
-      activityType === ActivityType.DEPOSIT ||
-      activityType === ActivityType.WITHDRAWAL
-    ) {
+    if (activityType === ActivityType.DEPOSIT || activityType === ActivityType.WITHDRAWAL) {
       if (!amount) return false;
     }
 
     return true;
-  }, [accountId, activityDate, activityType, requiresAsset, selectedSymbol, quantity, unitPrice, amount]);
+  }, [
+    accountId,
+    activityDate,
+    activityType,
+    requiresAsset,
+    selectedSymbol,
+    quantity,
+    unitPrice,
+    amount,
+  ]);
 
   // Handle symbol selection from ticker search
   const handleSymbolSelect = useCallback(
@@ -704,7 +665,7 @@ function DraftForm({
         setSelectedExchangeMic(searchResult.exchangeMic);
       }
     },
-    [setValue]
+    [setValue],
   );
 
   // Handle form submission
@@ -734,9 +695,7 @@ function DraftForm({
         fee: formValues.fee,
         comment: formValues.notes || undefined,
         subtype:
-          formValues.subtype && formValues.subtype !== "__none__"
-            ? formValues.subtype
-            : undefined,
+          formValues.subtype && formValues.subtype !== "__none__" ? formValues.subtype : undefined,
       };
 
       // Create the activity
@@ -763,9 +722,7 @@ function DraftForm({
       // Notify parent of success
       onSuccess(createdActivity.id);
     } catch (error) {
-      setSubmitError(
-        error instanceof Error ? error.message : "Failed to create activity"
-      );
+      setSubmitError(error instanceof Error ? error.message : "Failed to create activity");
     } finally {
       setIsSubmitting(false);
     }
@@ -780,15 +737,14 @@ function DraftForm({
   ]);
 
   const activityTypeDisplay =
-    (ACTIVITY_TYPE_DISPLAY_NAMES as Record<string, string>)[activityType] ??
-    activityType;
+    (ACTIVITY_TYPE_DISPLAY_NAMES as Record<string, string>)[activityType] ?? activityType;
 
   return (
     <Card className="bg-muted/40 border-primary/10">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Icons.Pencil className="h-5 w-5 text-primary" />
+            <Icons.Pencil className="text-primary h-5 w-5" />
             <CardTitle className="text-base">Record Activity</CardTitle>
           </div>
           <Badge variant="outline" className="uppercase">
@@ -802,9 +758,7 @@ function DraftForm({
           <div className="grid grid-cols-2 gap-4">
             {/* Activity Type Select */}
             <FormItem>
-              <FormLabel
-                className={cn(hasFieldError("activityType") && "text-destructive")}
-              >
+              <FormLabel className={cn(hasFieldError("activityType") && "text-destructive")}>
                 Type
                 {hasFieldError("activityType") && (
                   <Badge variant="destructive" className="ml-2 text-xs">
@@ -817,26 +771,20 @@ function DraftForm({
                 onValueChange={(value) => setValue("activityType", value)}
               >
                 <SelectTrigger
-                  className={cn(
-                    hasFieldError("activityType") && "border-destructive"
-                  )}
+                  className={cn(hasFieldError("activityType") && "border-destructive")}
                 >
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(ACTIVITY_TYPE_DISPLAY_NAMES).map(
-                    ([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
-                      </SelectItem>
-                    )
-                  )}
+                  {Object.entries(ACTIVITY_TYPE_DISPLAY_NAMES).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               {getFieldError("activityType") && (
-                <p className="text-xs text-destructive">
-                  {getFieldError("activityType")}
-                </p>
+                <p className="text-destructive text-xs">{getFieldError("activityType")}</p>
               )}
             </FormItem>
 
@@ -846,11 +794,7 @@ function DraftForm({
               name="activityDate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel
-                    className={cn(
-                      hasFieldError("activityDate") && "text-destructive"
-                    )}
-                  >
+                  <FormLabel className={cn(hasFieldError("activityDate") && "text-destructive")}>
                     Date
                     {hasFieldError("activityDate") && (
                       <Badge variant="destructive" className="ml-2 text-xs">
@@ -877,11 +821,7 @@ function DraftForm({
               name="accountId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel
-                    className={cn(
-                      hasFieldError("accountId") && "text-destructive"
-                    )}
-                  >
+                  <FormLabel className={cn(hasFieldError("accountId") && "text-destructive")}>
                     Account
                     {hasFieldError("accountId") && (
                       <Badge variant="destructive" className="ml-2 text-xs">
@@ -892,9 +832,7 @@ function DraftForm({
                   <FormControl>
                     <Select value={field.value} onValueChange={field.onChange}>
                       <SelectTrigger
-                        className={cn(
-                          hasFieldError("accountId") && "border-destructive"
-                        )}
+                        className={cn(hasFieldError("accountId") && "border-destructive")}
                       >
                         <SelectValue placeholder="Select account" />
                       </SelectTrigger>
@@ -902,18 +840,14 @@ function DraftForm({
                         {availableAccounts.map((account) => (
                           <SelectItem key={account.id} value={account.id}>
                             {account.name}{" "}
-                            <span className="text-muted-foreground">
-                              ({account.currency})
-                            </span>
+                            <span className="text-muted-foreground">({account.currency})</span>
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </FormControl>
                   {getFieldError("accountId") && (
-                    <p className="text-xs text-destructive">
-                      {getFieldError("accountId")}
-                    </p>
+                    <p className="text-destructive text-xs">{getFieldError("accountId")}</p>
                   )}
                 </FormItem>
               )}
@@ -922,9 +856,7 @@ function DraftForm({
             {/* Asset Search (if required) */}
             {requiresAsset && (
               <FormItem>
-                <FormLabel
-                  className={cn(hasFieldError("symbol") && "text-destructive")}
-                >
+                <FormLabel className={cn(hasFieldError("symbol") && "text-destructive")}>
                   Asset
                   {hasFieldError("symbol") && (
                     <Badge variant="destructive" className="ml-2 text-xs">
@@ -940,33 +872,26 @@ function DraftForm({
                   />
                 </FormControl>
                 {draft.isCustomAsset && (
-                  <p className="text-xs text-warning">
+                  <p className="text-warning text-xs">
                     Asset not found. Will be created as custom asset.
                   </p>
                 )}
                 {getFieldError("symbol") && (
-                  <p className="text-xs text-destructive">
-                    {getFieldError("symbol")}
-                  </p>
+                  <p className="text-destructive text-xs">{getFieldError("symbol")}</p>
                 )}
               </FormItem>
             )}
           </div>
 
           {/* Quantity, Price, Fee Row (for trading activities) */}
-          {(activityType === ActivityType.BUY ||
-            activityType === ActivityType.SELL) && (
+          {(activityType === ActivityType.BUY || activityType === ActivityType.SELL) && (
             <div className="grid grid-cols-3 gap-4">
               <FormField
                 control={form.control}
                 name="quantity"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel
-                      className={cn(
-                        hasFieldError("quantity") && "text-destructive"
-                      )}
-                    >
+                    <FormLabel className={cn(hasFieldError("quantity") && "text-destructive")}>
                       Quantity
                       {hasFieldError("quantity") && (
                         <Badge variant="destructive" className="ml-2 text-xs">
@@ -981,13 +906,9 @@ function DraftForm({
                         value={field.value ?? ""}
                         onChange={(e) => {
                           const value = e.target.value;
-                          field.onChange(
-                            value === "" ? undefined : parseFloat(value)
-                          );
+                          field.onChange(value === "" ? undefined : parseFloat(value));
                         }}
-                        className={cn(
-                          hasFieldError("quantity") && "border-destructive"
-                        )}
+                        className={cn(hasFieldError("quantity") && "border-destructive")}
                       />
                     </FormControl>
                   </FormItem>
@@ -999,11 +920,7 @@ function DraftForm({
                 name="unitPrice"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel
-                      className={cn(
-                        hasFieldError("unitPrice") && "text-destructive"
-                      )}
-                    >
+                    <FormLabel className={cn(hasFieldError("unitPrice") && "text-destructive")}>
                       Price
                       {hasFieldError("unitPrice") && (
                         <Badge variant="destructive" className="ml-2 text-xs">
@@ -1018,19 +935,13 @@ function DraftForm({
                         value={field.value ?? ""}
                         onChange={(e) => {
                           const value = e.target.value;
-                          field.onChange(
-                            value === "" ? undefined : parseFloat(value)
-                          );
+                          field.onChange(value === "" ? undefined : parseFloat(value));
                         }}
-                        className={cn(
-                          hasFieldError("unitPrice") && "border-destructive"
-                        )}
+                        className={cn(hasFieldError("unitPrice") && "border-destructive")}
                       />
                     </FormControl>
                     {draft.priceSource === "historical" && (
-                      <p className="text-xs text-muted-foreground">
-                        Historical price
-                      </p>
+                      <p className="text-muted-foreground text-xs">Historical price</p>
                     )}
                   </FormItem>
                 )}
@@ -1049,9 +960,7 @@ function DraftForm({
                         value={field.value ?? ""}
                         onChange={(e) => {
                           const value = e.target.value;
-                          field.onChange(
-                            value === "" ? undefined : parseFloat(value)
-                          );
+                          field.onChange(value === "" ? undefined : parseFloat(value));
                         }}
                       />
                     </FormControl>
@@ -1073,9 +982,7 @@ function DraftForm({
               name="amount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel
-                    className={cn(hasFieldError("amount") && "text-destructive")}
-                  >
+                  <FormLabel className={cn(hasFieldError("amount") && "text-destructive")}>
                     Amount
                     {hasFieldError("amount") && (
                       <Badge variant="destructive" className="ml-2 text-xs">
@@ -1090,13 +997,9 @@ function DraftForm({
                       value={field.value ?? ""}
                       onChange={(e) => {
                         const value = e.target.value;
-                        field.onChange(
-                          value === "" ? undefined : parseFloat(value)
-                        );
+                        field.onChange(value === "" ? undefined : parseFloat(value));
                       }}
-                      className={cn(
-                        hasFieldError("amount") && "border-destructive"
-                      )}
+                      className={cn(hasFieldError("amount") && "border-destructive")}
                     />
                   </FormControl>
                 </FormItem>
@@ -1105,32 +1008,29 @@ function DraftForm({
           )}
 
           {/* Calculated Total (for BUY/SELL) */}
-          {(activityType === ActivityType.BUY ||
-            activityType === ActivityType.SELL) &&
+          {(activityType === ActivityType.BUY || activityType === ActivityType.SELL) &&
             calculatedAmount !== undefined && (
-              <div className="flex items-center justify-between rounded-md bg-muted/50 p-3">
-                <span className="text-sm text-muted-foreground">Total</span>
-                <span className="text-lg font-medium">
-                  {formatAmount(calculatedAmount)}
-                </span>
+              <div className="bg-muted/50 flex items-center justify-between rounded-md p-3">
+                <span className="text-muted-foreground text-sm">Total</span>
+                <span className="text-lg font-medium">{formatAmount(calculatedAmount)}</span>
               </div>
             )}
 
           {/* Advanced Options (collapsible) */}
-          {(
+          {
             <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
               <CollapsibleTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
                   type="button"
-                  className="flex w-full items-center justify-between px-0 py-2 text-muted-foreground hover:text-foreground"
+                  className="text-muted-foreground hover:text-foreground flex w-full items-center justify-between px-0 py-2"
                 >
                   <span className="text-sm font-medium">Advanced Options</span>
                   <Icons.ChevronDown
                     className={cn(
                       "h-4 w-4 transition-transform duration-200",
-                      advancedOpen && "rotate-180"
+                      advancedOpen && "rotate-180",
                     )}
                   />
                 </Button>
@@ -1155,10 +1055,7 @@ function DraftForm({
                         {/* Quick-select buttons for relevant currencies */}
                         {(resolvedAsset?.currency || selectedAccount?.currency) && (
                           <div className="flex flex-wrap gap-1 pt-1">
-                            {[
-                              resolvedAsset?.currency,
-                              selectedAccount?.currency,
-                            ]
+                            {[resolvedAsset?.currency, selectedAccount?.currency]
                               .filter((c): c is string => !!c && c !== field.value)
                               .filter((c, i, arr) => arr.indexOf(c) === i) // dedupe
                               .map((curr) => (
@@ -1197,9 +1094,7 @@ function DraftForm({
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="__none__">
-                                  <span className="text-muted-foreground">
-                                    None
-                                  </span>
+                                  <span className="text-muted-foreground">None</span>
                                 </SelectItem>
                                 {subtypesForType.map((st) => (
                                   <SelectItem key={st.value} value={st.value}>
@@ -1236,11 +1131,11 @@ function DraftForm({
                 />
               </CollapsibleContent>
             </Collapsible>
-          )}
+          }
 
           {/* Error Message */}
           {submitError && (
-            <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <div className="border-destructive/50 bg-destructive/10 text-destructive flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
               <Icons.AlertCircle className="h-4 w-4 shrink-0" />
               <span>{submitError}</span>
             </div>
@@ -1248,11 +1143,7 @@ function DraftForm({
 
           {/* Action Buttons */}
           <div className="flex justify-end gap-2 pt-2">
-            <Button
-              type="button"
-              onClick={handleSubmit}
-              disabled={isSubmitting || !canSubmit}
-            >
+            <Button type="button" onClick={handleSubmit} disabled={isSubmitting || !canSubmit}>
               {isSubmitting ? (
                 <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
               ) : (
@@ -1303,10 +1194,8 @@ function RecordActivityToolUIContent({
     return (
       <Card className="border-destructive/30 bg-destructive/5">
         <CardContent className="py-4">
-          <p className="text-sm font-medium text-destructive">
-            Failed to prepare activity
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="text-destructive text-sm font-medium">Failed to prepare activity</p>
+          <p className="text-muted-foreground mt-1 text-xs">
             The request was interrupted or failed.
           </p>
         </CardContent>
@@ -1319,9 +1208,7 @@ function RecordActivityToolUIContent({
     return (
       <Card className="border-destructive/30 bg-destructive/5">
         <CardContent className="py-4">
-          <p className="text-sm font-medium text-destructive">
-            No activity data available
-          </p>
+          <p className="text-destructive text-sm font-medium">No activity data available</p>
         </CardContent>
       </Card>
     );
@@ -1332,9 +1219,7 @@ function RecordActivityToolUIContent({
     return (
       <SuccessState
         draft={parsed.draft}
-        createdActivityId={
-          parsed.createdActivityId ?? successState.createdActivityId
-        }
+        createdActivityId={parsed.createdActivityId ?? successState.createdActivityId}
         currency={parsed.draft.currency}
       />
     );
@@ -1360,10 +1245,7 @@ function RecordActivityToolUIContent({
 // Export
 // ============================================================================
 
-export const RecordActivityToolUI = makeAssistantToolUI<
-  RecordActivityArgs,
-  RecordActivityOutput
->({
+export const RecordActivityToolUI = makeAssistantToolUI<RecordActivityArgs, RecordActivityOutput>({
   toolName: "record_activity",
   render: (props) => {
     return <RecordActivityToolUIContent {...props} />;

@@ -78,7 +78,15 @@ export const alternativeAssetQuickAddSchema = z
 
     // Liability-specific fields
     liabilityType: z
-      .enum(["mortgage", "auto_loan", "student_loan", "credit_card", "personal_loan", "heloc", "other"])
+      .enum([
+        "mortgage",
+        "auto_loan",
+        "student_loan",
+        "credit_card",
+        "personal_loan",
+        "heloc",
+        "other",
+      ])
       .optional(),
     linkedAssetId: z.string().optional(),
   })

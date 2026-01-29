@@ -19,7 +19,13 @@ interface PairingFlowProps {
 }
 
 // Claimer flow steps
-type ClaimerStep = "enter_code" | "connecting" | "waiting_keys" | "verify_sas" | "success" | "error";
+type ClaimerStep =
+  | "enter_code"
+  | "connecting"
+  | "waiting_keys"
+  | "verify_sas"
+  | "success"
+  | "error";
 
 export function PairingFlow({ onComplete, onCancel }: PairingFlowProps) {
   const { state } = useDeviceSync();
@@ -58,7 +64,9 @@ function IssuerFlow({ onComplete, onCancel }: PairingFlowProps) {
   // Auto-start pairing when component mounts
   const hasAutoStarted = useRef(false);
   useEffect(() => {
-    logger.info(`[IssuerFlow] Auto-start check: step=${step}, hasAutoStarted=${hasAutoStarted.current}`);
+    logger.info(
+      `[IssuerFlow] Auto-start check: step=${step}, hasAutoStarted=${hasAutoStarted.current}`,
+    );
     if (step === "idle" && !hasAutoStarted.current) {
       hasAutoStarted.current = true;
       logger.info("[IssuerFlow] Starting pairing...");
@@ -112,10 +120,19 @@ function IssuerFlow({ onComplete, onCancel }: PairingFlowProps) {
       return <PairingResult success onDone={handleDone} />;
 
     case "error":
-      return <PairingResult success={false} error={error} onRetry={handleRetry} onDone={handleCancel} />;
+      return (
+        <PairingResult success={false} error={error} onRetry={handleRetry} onDone={handleCancel} />
+      );
 
     case "expired":
-      return <PairingResult success={false} error="Session expired" onRetry={handleRetry} onDone={handleCancel} />;
+      return (
+        <PairingResult
+          success={false}
+          error="Session expired"
+          onRetry={handleRetry}
+          onDone={handleCancel}
+        />
+      );
 
     default:
       return null;
@@ -158,7 +175,10 @@ function ClaimerFlow({ onComplete, onCancel }: PairingFlowProps) {
       setSas(null);
       return;
     }
-    actionsRef.current.computeSAS().then(setSas).catch(() => setSas(null));
+    actionsRef.current
+      .computeSAS()
+      .then(setSas)
+      .catch(() => setSas(null));
   }, [sessionKey]);
 
   // Start polling for key bundle
@@ -170,7 +190,9 @@ function ClaimerFlow({ onComplete, onCancel }: PairingFlowProps) {
     pollRef.current = setInterval(async () => {
       try {
         const result = await actionsRef.current.pollForKeyBundle();
-        logger.info(`[ClaimerFlow] Poll result: received=${result.received}, hasKeyBundle=${!!result.keyBundle}`);
+        logger.info(
+          `[ClaimerFlow] Poll result: received=${result.received}, hasKeyBundle=${!!result.keyBundle}`,
+        );
         if (result.received && result.keyBundle) {
           if (pollRef.current) clearInterval(pollRef.current);
           pollRef.current = null;
@@ -195,28 +217,31 @@ function ClaimerFlow({ onComplete, onCancel }: PairingFlowProps) {
   }, []);
 
   // Handle code submission
-  const handleCodeSubmit = useCallback(async (code: string) => {
-    logger.info(`[ClaimerFlow] Submitting code: ${code}`);
-    setStep("connecting");
-    setError(null);
+  const handleCodeSubmit = useCallback(
+    async (code: string) => {
+      logger.info(`[ClaimerFlow] Submitting code: ${code}`);
+      setStep("connecting");
+      setError(null);
 
-    try {
-      const session = await actionsRef.current.claimPairing(code);
-      logger.info(`[ClaimerFlow] Session claimed, pairingId=${session.pairingId}`);
+      try {
+        const session = await actionsRef.current.claimPairing(code);
+        logger.info(`[ClaimerFlow] Session claimed, pairingId=${session.pairingId}`);
 
-      // Start polling for key bundle in background
-      startPolling();
+        // Start polling for key bundle in background
+        startPolling();
 
-      // Show waiting state - claimer auto-completes when key bundle arrives
-      // SAS verification happens on issuer (trusted device) side only
-      logger.info("[ClaimerFlow] Waiting for key bundle from trusted device...");
-      setStep("waiting_keys");
-    } catch (err) {
-      logger.error(`[ClaimerFlow] Claim error: ${err}`);
-      setError(err instanceof Error ? err.message : String(err));
-      setStep("error");
-    }
-  }, [startPolling]);
+        // Show waiting state - claimer auto-completes when key bundle arrives
+        // SAS verification happens on issuer (trusted device) side only
+        logger.info("[ClaimerFlow] Waiting for key bundle from trusted device...");
+        setStep("waiting_keys");
+      } catch (err) {
+        logger.error(`[ClaimerFlow] Claim error: ${err}`);
+        setError(err instanceof Error ? err.message : String(err));
+        setStep("error");
+      }
+    },
+    [startPolling],
+  );
 
   // Handle SAS confirmation
   const handleConfirmSAS = useCallback(async () => {
@@ -279,24 +304,14 @@ function ClaimerFlow({ onComplete, onCancel }: PairingFlowProps) {
 
   switch (step) {
     case "enter_code":
-      return (
-        <EnterCode
-          onSubmit={handleCodeSubmit}
-          onCancel={handleCancel}
-          error={error}
-        />
-      );
+      return <EnterCode onSubmit={handleCodeSubmit} onCancel={handleCancel} error={error} />;
 
     case "connecting":
       return <WaitingState title="Connecting..." onCancel={handleCancel} />;
 
     case "waiting_keys":
       return (
-        <WaitingState
-          title="Verify Security Code"
-          securityCode={sas}
-          onCancel={handleCancel}
-        />
+        <WaitingState title="Verify Security Code" securityCode={sas} onCancel={handleCancel} />
       );
 
     case "verify_sas":
@@ -316,7 +331,9 @@ function ClaimerFlow({ onComplete, onCancel }: PairingFlowProps) {
       return <PairingResult success onDone={handleDone} />;
 
     case "error":
-      return <PairingResult success={false} error={error} onRetry={handleRetry} onDone={handleCancel} />;
+      return (
+        <PairingResult success={false} error={error} onRetry={handleRetry} onDone={handleCancel} />
+      );
 
     default:
       return null;

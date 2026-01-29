@@ -9,7 +9,9 @@ import { Button } from "@wealthfolio/ui/components/ui/button";
 /**
  * Type guard to check if result has wrapped format with meta
  */
-function hasResultMeta(result: unknown): result is { data: unknown; meta: Record<string, unknown> } {
+function hasResultMeta(
+  result: unknown,
+): result is { data: unknown; meta: Record<string, unknown> } {
   return (
     typeof result === "object" &&
     result !== null &&
@@ -19,7 +21,12 @@ function hasResultMeta(result: unknown): result is { data: unknown; meta: Record
   );
 }
 
-export const ToolFallback: ToolCallMessagePartComponent = ({ toolName, argsText, result, status }) => {
+export const ToolFallback: ToolCallMessagePartComponent = ({
+  toolName,
+  argsText,
+  result,
+  status,
+}) => {
   const [isCollapsed, setIsCollapsed] = useState(true);
 
   const isCancelled = status?.type === "incomplete" && status.reason === "cancelled";
@@ -48,7 +55,12 @@ export const ToolFallback: ToolCallMessagePartComponent = ({ toolName, argsText,
         ) : (
           <Icons.Check className="aui-tool-fallback-icon size-4" />
         )}
-        <p className={cn("aui-tool-fallback-title grow", isCancelled && "text-muted-foreground line-through")}>
+        <p
+          className={cn(
+            "aui-tool-fallback-title grow",
+            isCancelled && "text-muted-foreground line-through",
+          )}
+        >
           {isCancelled ? "Cancelled tool: " : "Used tool: "}
           <b>{toolName}</b>
         </p>
@@ -69,7 +81,9 @@ export const ToolFallback: ToolCallMessagePartComponent = ({ toolName, argsText,
               <p className="aui-tool-fallback-cancelled-header text-muted-foreground font-semibold">
                 Cancelled reason:
               </p>
-              <p className="aui-tool-fallback-cancelled-reason text-muted-foreground">{cancelledReason}</p>
+              <p className="aui-tool-fallback-cancelled-reason text-muted-foreground">
+                {cancelledReason}
+              </p>
             </div>
           )}
           <div className={cn("aui-tool-fallback-args-root px-4", isCancelled && "opacity-60")}>

@@ -146,7 +146,7 @@ export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProp
 
         {/* Classifications Section */}
         {asset.id && (singleSelectTaxonomies.length > 0 || multiSelectTaxonomies.length > 0) && (
-          <div className="space-y-4 pt-4 border-t">
+          <div className="space-y-4 border-t pt-4">
             <h4 className="text-sm font-medium">Classifications</h4>
 
             {/* Single-select taxonomies */}

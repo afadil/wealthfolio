@@ -50,7 +50,9 @@ pub struct FetchDiagnostics {
 
 impl FetchDiagnostics {
     pub fn new() -> Self {
-        Self { attempts: Vec::new() }
+        Self {
+            attempts: Vec::new(),
+        }
     }
 
     pub fn record_skip(&mut self, provider_id: ProviderId, reason: SkipReason) {

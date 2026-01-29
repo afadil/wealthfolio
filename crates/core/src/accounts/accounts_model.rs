@@ -35,7 +35,11 @@ pub fn get_tracking_mode(account: &Account) -> TrackingMode {
             }
             serde_json::from_str::<Value>(meta_str).ok()
         })
-        .and_then(|json| json.get("wealthfolio").and_then(|w| w.get("trackingMode")).cloned())
+        .and_then(|json| {
+            json.get("wealthfolio")
+                .and_then(|w| w.get("trackingMode"))
+                .cloned()
+        })
         .and_then(|mode_value| serde_json::from_value::<TrackingMode>(mode_value).ok())
         .unwrap_or(TrackingMode::NotSet)
 }

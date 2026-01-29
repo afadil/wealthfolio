@@ -81,7 +81,12 @@ pub struct ChatThreadConfig {
 
 impl ChatThreadConfig {
     /// Create a new config with default settings.
-    pub fn new(provider_id: &str, model_id: &str, template_id: &str, template_version: &str) -> Self {
+    pub fn new(
+        provider_id: &str,
+        model_id: &str,
+        template_id: &str,
+        template_version: &str,
+    ) -> Self {
         Self {
             schema_version: CHAT_CONFIG_SCHEMA_VERSION,
             provider_id: provider_id.to_string(),
@@ -96,15 +101,23 @@ impl ChatThreadConfig {
 
     /// Create config with default read-only tools allowlist.
     pub fn with_default_tools(mut self) -> Self {
-        self.tools_allowlist = Some(DEFAULT_TOOLS_ALLOWLIST.iter().map(|s| s.to_string()).collect());
+        self.tools_allowlist = Some(
+            DEFAULT_TOOLS_ALLOWLIST
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+        );
         self
     }
 
     /// Get the effective tools allowlist.
     pub fn get_tools_allowlist(&self) -> Vec<String> {
-        self.tools_allowlist
-            .clone()
-            .unwrap_or_else(|| DEFAULT_TOOLS_ALLOWLIST.iter().map(|s| s.to_string()).collect())
+        self.tools_allowlist.clone().unwrap_or_else(|| {
+            DEFAULT_TOOLS_ALLOWLIST
+                .iter()
+                .map(|s| s.to_string())
+                .collect()
+        })
     }
 
     /// Serialize to JSON.
@@ -128,7 +141,12 @@ impl Default for ChatThreadConfig {
             prompt_version: "1.0.0".to_string(),
             locale: None,
             detail_level: None,
-            tools_allowlist: Some(DEFAULT_TOOLS_ALLOWLIST.iter().map(|s| s.to_string()).collect()),
+            tools_allowlist: Some(
+                DEFAULT_TOOLS_ALLOWLIST
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect(),
+            ),
         }
     }
 }
@@ -209,7 +227,12 @@ impl ChatThread {
         self.config
             .as_ref()
             .map(|c| c.get_tools_allowlist())
-            .unwrap_or_else(|| DEFAULT_TOOLS_ALLOWLIST.iter().map(|s| s.to_string()).collect())
+            .unwrap_or_else(|| {
+                DEFAULT_TOOLS_ALLOWLIST
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect()
+            })
     }
 }
 
@@ -453,7 +476,10 @@ pub trait ChatRepositoryTrait: Send + Sync {
     fn get_thread(&self, thread_id: &str) -> ChatRepositoryResult<Option<ChatThread>>;
     fn list_threads(&self, limit: i64, offset: i64) -> ChatRepositoryResult<Vec<ChatThread>>;
     /// List threads with cursor-based pagination and optional search.
-    fn list_threads_paginated(&self, request: &ListThreadsRequest) -> ChatRepositoryResult<ThreadPage>;
+    fn list_threads_paginated(
+        &self,
+        request: &ListThreadsRequest,
+    ) -> ChatRepositoryResult<ThreadPage>;
     async fn update_thread(&self, thread: ChatThread) -> ChatRepositoryResult<ChatThread>;
     async fn delete_thread(&self, thread_id: &str) -> ChatRepositoryResult<()>;
 
@@ -713,12 +739,7 @@ impl AiStreamEvent {
     }
 
     /// Create a tool call event.
-    pub fn tool_call(
-        thread_id: &str,
-        run_id: &str,
-        message_id: &str,
-        tool_call: ToolCall,
-    ) -> Self {
+    pub fn tool_call(thread_id: &str, run_id: &str, message_id: &str, tool_call: ToolCall) -> Self {
         Self::ToolCall {
             thread_id: thread_id.to_string(),
             run_id: run_id.to_string(),
@@ -964,10 +985,22 @@ mod tests {
 
     #[test]
     fn test_role_parsing() {
-        assert_eq!("user".parse::<ChatMessageRole>().unwrap(), ChatMessageRole::User);
-        assert_eq!("assistant".parse::<ChatMessageRole>().unwrap(), ChatMessageRole::Assistant);
-        assert_eq!("system".parse::<ChatMessageRole>().unwrap(), ChatMessageRole::System);
-        assert_eq!("tool".parse::<ChatMessageRole>().unwrap(), ChatMessageRole::Tool);
+        assert_eq!(
+            "user".parse::<ChatMessageRole>().unwrap(),
+            ChatMessageRole::User
+        );
+        assert_eq!(
+            "assistant".parse::<ChatMessageRole>().unwrap(),
+            ChatMessageRole::Assistant
+        );
+        assert_eq!(
+            "system".parse::<ChatMessageRole>().unwrap(),
+            ChatMessageRole::System
+        );
+        assert_eq!(
+            "tool".parse::<ChatMessageRole>().unwrap(),
+            ChatMessageRole::Tool
+        );
     }
 
     #[test]
@@ -982,7 +1015,8 @@ mod tests {
 
     #[test]
     fn test_thread_config_with_default_tools() {
-        let config = ChatThreadConfig::new("anthropic", "claude-3-sonnet", "test", "1.0.0").with_default_tools();
+        let config = ChatThreadConfig::new("anthropic", "claude-3-sonnet", "test", "1.0.0")
+            .with_default_tools();
         assert!(config.tools_allowlist.is_some());
         let tools = config.get_tools_allowlist();
         assert!(tools.contains(&"get_holdings".to_string()));
@@ -1022,7 +1056,8 @@ mod tests {
 
     #[test]
     fn test_thread_title_updated_event_serialization() {
-        let event = AiStreamEvent::thread_title_updated("thread-1", "run-1", "My Portfolio Summary");
+        let event =
+            AiStreamEvent::thread_title_updated("thread-1", "run-1", "My Portfolio Summary");
         let json = serde_json::to_string(&event).unwrap();
         // Verify camelCase serialization: "threadTitleUpdated" as the type
         assert!(json.contains("threadTitleUpdated"));

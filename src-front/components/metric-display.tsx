@@ -1,7 +1,12 @@
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@wealthfolio/ui/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { GainPercent } from "@wealthfolio/ui";
 import React, { useState } from "react";

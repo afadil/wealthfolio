@@ -1,10 +1,5 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@wealthfolio/ui/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -17,7 +12,12 @@ import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { cn } from "@/lib/utils";
 import { useImportContext, setMapping as setMappingAction } from "../context";
-import { ImportFormat, IMPORT_REQUIRED_FIELDS, ActivityType, ACTIVITY_TYPES } from "@/lib/constants";
+import {
+  ImportFormat,
+  IMPORT_REQUIRED_FIELDS,
+  ActivityType,
+  ACTIVITY_TYPES,
+} from "@/lib/constants";
 import type { ImportMappingData, SymbolSearchResult } from "@/lib/types";
 import TickerSearchInput from "@/components/ticker-search";
 import { initializeColumnMapping } from "../hooks/use-import-mapping";
@@ -124,7 +124,7 @@ function getSmartDefault(csvValue: string): string | null {
 
 function findMappedActivityType(
   csvValue: string,
-  activityMappings: Record<string, string[]>
+  activityMappings: Record<string, string[]>,
 ): string | null {
   const normalized = csvValue.trim().toUpperCase();
 
@@ -159,31 +159,32 @@ function ColumnMappingSection({ columns, onMapColumn, usedFields }: ColumnMappin
             className={cn(
               "flex items-center gap-3 rounded-md border px-3 py-2",
               isMapped
-                ? "bg-green-50/50 border-green-200 dark:bg-green-950/20 dark:border-green-900"
-                : "bg-muted/30 border-dashed"
+                ? "border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/20"
+                : "bg-muted/30 border-dashed",
             )}
           >
             {/* Status icon */}
             {isMapped ? (
-              <Icons.CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+              <Icons.CheckCircle className="h-4 w-4 shrink-0 text-green-600" />
             ) : (
-              <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30 shrink-0" />
+              <div className="border-muted-foreground/30 h-4 w-4 shrink-0 rounded-full border-2" />
             )}
 
             {/* Column info */}
-            <div className="flex-1 min-w-0">
+            <div className="min-w-0 flex-1">
               <span className={cn("text-sm font-medium", !isMapped && "text-muted-foreground")}>
                 {column.csvColumn}
               </span>
               {column.sampleValues.length > 0 && (
-                <span className="text-muted-foreground text-xs ml-2">
-                  ({column.sampleValues.slice(0, 3).join(", ")}{column.sampleValues.length > 3 ? ", …" : ""})
+                <span className="text-muted-foreground ml-2 text-xs">
+                  ({column.sampleValues.slice(0, 3).join(", ")}
+                  {column.sampleValues.length > 3 ? ", …" : ""})
                 </span>
               )}
             </div>
 
             {/* Arrow */}
-            <Icons.ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Icons.ArrowRight className="text-muted-foreground h-4 w-4 shrink-0" />
 
             {/* Field Selector */}
             <Select
@@ -191,14 +192,16 @@ function ColumnMappingSection({ columns, onMapColumn, usedFields }: ColumnMappin
               onValueChange={(value) => {
                 onMapColumn(
                   column.csvColumn,
-                  value === SKIP_FIELD_VALUE ? null : (value as ImportFormat)
+                  value === SKIP_FIELD_VALUE ? null : (value as ImportFormat),
                 );
               }}
             >
-              <SelectTrigger className={cn(
-                "w-[180px] h-8 text-sm shrink-0",
-                !isMapped && "border-dashed text-muted-foreground"
-              )}>
+              <SelectTrigger
+                className={cn(
+                  "h-8 w-[180px] shrink-0 text-sm",
+                  !isMapped && "text-muted-foreground border-dashed",
+                )}
+              >
                 <SelectValue placeholder="Select field..." />
               </SelectTrigger>
               <SelectContent>
@@ -211,8 +214,8 @@ function ColumnMappingSection({ columns, onMapColumn, usedFields }: ColumnMappin
                   return (
                     <SelectItem key={field.value} value={field.value} disabled={isUsed}>
                       {field.label}
-                      {field.required && <span className="text-amber-600 ml-1">*</span>}
-                      {isUsed && <span className="text-muted-foreground text-xs ml-1">(used)</span>}
+                      {field.required && <span className="ml-1 text-amber-600">*</span>}
+                      {isUsed && <span className="text-muted-foreground ml-1 text-xs">(used)</span>}
                     </SelectItem>
                   );
                 })}
@@ -252,39 +255,43 @@ function ActivityTypeMappingSection({ items, onMapActivityType }: ActivityTypeMa
             className={cn(
               "flex items-center gap-3 rounded-md border px-3 py-2",
               isMapped
-                ? "bg-green-50/50 border-green-200 dark:bg-green-950/20 dark:border-green-900"
-                : "bg-red-50/50 border-red-300 dark:bg-red-950/20 dark:border-red-900"
+                ? "border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/20"
+                : "border-red-300 bg-red-50/50 dark:border-red-900 dark:bg-red-950/20",
             )}
           >
             {/* Status icon */}
             {isMapped ? (
-              <Icons.CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+              <Icons.CheckCircle className="h-4 w-4 shrink-0 text-green-600" />
             ) : (
-              <Icons.AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
+              <Icons.AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
             )}
 
             {/* CSV Value with count */}
-            <div className="flex-1 min-w-0">
-              <span className={cn("text-sm font-medium", !isMapped && "text-red-700 dark:text-red-400")}>
+            <div className="min-w-0 flex-1">
+              <span
+                className={cn("text-sm font-medium", !isMapped && "text-red-700 dark:text-red-400")}
+              >
                 {item.csvValue}
               </span>
-              <span className="text-muted-foreground text-xs ml-2">
+              <span className="text-muted-foreground ml-2 text-xs">
                 ({item.count} row{item.count !== 1 ? "s" : ""})
               </span>
             </div>
 
             {/* Arrow */}
-            <Icons.ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Icons.ArrowRight className="text-muted-foreground h-4 w-4 shrink-0" />
 
             {/* Activity Type Selector */}
             <Select
               value={item.mappedType || ""}
               onValueChange={(value) => onMapActivityType(item.csvValue, value)}
             >
-              <SelectTrigger className={cn(
-                "w-[180px] h-8 text-sm shrink-0",
-                !isMapped && "border-red-300 dark:border-red-800"
-              )}>
+              <SelectTrigger
+                className={cn(
+                  "h-8 w-[180px] shrink-0 text-sm",
+                  !isMapped && "border-red-300 dark:border-red-800",
+                )}
+              >
                 <SelectValue placeholder="Select type..." />
               </SelectTrigger>
               <SelectContent>
@@ -304,7 +311,11 @@ function ActivityTypeMappingSection({ items, onMapActivityType }: ActivityTypeMa
 
 interface SymbolResolutionSectionProps {
   items: SymbolItem[];
-  onResolveSymbol: (csvSymbol: string, resolvedSymbol: string, searchResult?: SymbolSearchResult) => void;
+  onResolveSymbol: (
+    csvSymbol: string,
+    resolvedSymbol: string,
+    searchResult?: SymbolSearchResult,
+  ) => void;
 }
 
 function SymbolResolutionSection({ items, onResolveSymbol }: SymbolResolutionSectionProps) {
@@ -312,9 +323,7 @@ function SymbolResolutionSection({ items, onResolveSymbol }: SymbolResolutionSec
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <Icons.AlertCircle className="text-muted-foreground mb-4 h-12 w-12" />
-        <p className="text-muted-foreground">
-          Map the "Symbol" column first to see values here.
-        </p>
+        <p className="text-muted-foreground">Map the "Symbol" column first to see values here.</p>
       </div>
     );
   }
@@ -333,49 +342,47 @@ function SymbolResolutionSection({ items, onResolveSymbol }: SymbolResolutionSec
               isResolved
                 ? isCashOnly
                   ? "bg-muted/30 border-muted-foreground/20"
-                  : "bg-green-50/50 border-green-200 dark:bg-green-950/20 dark:border-green-900"
-                : "bg-red-50/50 border-red-300 dark:bg-red-950/20 dark:border-red-900"
+                  : "border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/20"
+                : "border-red-300 bg-red-50/50 dark:border-red-900 dark:bg-red-950/20",
             )}
           >
             {/* Status icon */}
             {isResolved ? (
               isCashOnly ? (
-                <Icons.Minus className="h-4 w-4 text-muted-foreground shrink-0" />
+                <Icons.Minus className="text-muted-foreground h-4 w-4 shrink-0" />
               ) : (
-                <Icons.CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+                <Icons.CheckCircle className="h-4 w-4 shrink-0 text-green-600" />
               )
             ) : (
-              <Icons.AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
+              <Icons.AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
             )}
 
             {/* CSV Symbol with count */}
-            <div className="flex-1 min-w-0">
-              <span className={cn(
-                "text-sm font-medium font-mono",
-                isCashOnly && "text-muted-foreground",
-                !isResolved && "text-red-700 dark:text-red-400"
-              )}>
+            <div className="min-w-0 flex-1">
+              <span
+                className={cn(
+                  "font-mono text-sm font-medium",
+                  isCashOnly && "text-muted-foreground",
+                  !isResolved && "text-red-700 dark:text-red-400",
+                )}
+              >
                 {item.csvSymbol || "(empty)"}
               </span>
-              <span className="text-muted-foreground text-xs ml-2">
+              <span className="text-muted-foreground ml-2 text-xs">
                 ({item.count} row{item.count !== 1 ? "s" : ""})
               </span>
               {isCashOnly && (
-                <span className="text-muted-foreground text-xs ml-2">
-                  — cash activity
-                </span>
+                <span className="text-muted-foreground ml-2 text-xs">— cash activity</span>
               )}
               {!isCashOnly && item.resolvedSymbol && item.resolvedSymbol !== item.csvSymbol && (
-                <span className="text-muted-foreground text-xs ml-2">
-                  → {item.resolvedSymbol}
-                </span>
+                <span className="text-muted-foreground ml-2 text-xs">→ {item.resolvedSymbol}</span>
               )}
             </div>
 
             {/* Arrow and Symbol Search - only show for non-cash symbols */}
             {!isCashOnly && (
               <>
-                <Icons.ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                <Icons.ArrowRight className="text-muted-foreground h-4 w-4 shrink-0" />
                 <TickerSearchInput
                   defaultValue={item.resolvedSymbol || item.csvSymbol}
                   onSelectResult={(symbol, searchResult) => {
@@ -383,8 +390,8 @@ function SymbolResolutionSection({ items, onResolveSymbol }: SymbolResolutionSec
                   }}
                   placeholder="Search symbol..."
                   className={cn(
-                    "w-[180px] h-8 text-sm shrink-0 bg-background",
-                    !isResolved && "border-red-300 dark:border-red-800"
+                    "bg-background h-8 w-[180px] shrink-0 text-sm",
+                    !isResolved && "border-red-300 dark:border-red-800",
                   )}
                 />
               </>
@@ -468,7 +475,7 @@ export function MappingStepV2() {
 
       // Find if this column is mapped to any field
       const mappedField = Object.entries(localMapping.fieldMappings).find(
-        ([_, csvHeader]) => csvHeader === header
+        ([_, csvHeader]) => csvHeader === header,
       )?.[0] as ImportFormat | undefined;
 
       return {
@@ -483,8 +490,8 @@ export function MappingStepV2() {
   const usedFields = useMemo(() => {
     return new Set(
       Object.keys(localMapping.fieldMappings).filter(
-        (key) => localMapping.fieldMappings[key]
-      ) as ImportFormat[]
+        (key) => localMapping.fieldMappings[key],
+      ) as ImportFormat[],
     );
   }, [localMapping.fieldMappings]);
 
@@ -508,26 +515,28 @@ export function MappingStepV2() {
       }
     });
 
-    return Array.from(valueCounts.entries()).map(([csvValue, count]) => {
-      // Check if already mapped
-      let mappedType = findMappedActivityType(csvValue, localMapping.activityMappings);
+    return Array.from(valueCounts.entries())
+      .map(([csvValue, count]) => {
+        // Check if already mapped
+        let mappedType = findMappedActivityType(csvValue, localMapping.activityMappings);
 
-      // If not mapped, try smart defaults
-      if (!mappedType) {
-        mappedType = getSmartDefault(csvValue);
-      }
+        // If not mapped, try smart defaults
+        if (!mappedType) {
+          mappedType = getSmartDefault(csvValue);
+        }
 
-      return {
-        csvValue,
-        count,
-        mappedType,
-      };
-    }).sort((a, b) => {
-      // Sort unmapped items first, then by count
-      if (a.mappedType && !b.mappedType) return 1;
-      if (!a.mappedType && b.mappedType) return -1;
-      return b.count - a.count;
-    });
+        return {
+          csvValue,
+          count,
+          mappedType,
+        };
+      })
+      .sort((a, b) => {
+        // Sort unmapped items first, then by count
+        if (a.mappedType && !b.mappedType) return 1;
+        if (!a.mappedType && b.mappedType) return -1;
+        return b.count - a.count;
+      });
   }, [headers, parsedRows, localMapping.fieldMappings, localMapping.activityMappings]);
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -543,7 +552,9 @@ export function MappingStepV2() {
 
     // Get activity type column index for cash activity detection
     const activityTypeColumnHeader = localMapping.fieldMappings[ImportFormat.ACTIVITY_TYPE];
-    const activityHeaderIndex = activityTypeColumnHeader ? headers.indexOf(activityTypeColumnHeader) : -1;
+    const activityHeaderIndex = activityTypeColumnHeader
+      ? headers.indexOf(activityTypeColumnHeader)
+      : -1;
 
     // Track symbol counts and whether they're only used in cash activities
     const symbolData = new Map<string, { count: number; hasNonCashUsage: boolean }>();
@@ -562,7 +573,9 @@ export function MappingStepV2() {
           const mappedType = findMappedActivityType(csvActivityType, localMapping.activityMappings);
           // Use the smart default if no explicit mapping
           const effectiveType = mappedType || getSmartDefault(csvActivityType);
-          const isNoSymbolRequired = effectiveType && (NO_SYMBOL_REQUIRED_ACTIVITY_TYPES as readonly string[]).includes(effectiveType);
+          const isNoSymbolRequired =
+            effectiveType &&
+            (NO_SYMBOL_REQUIRED_ACTIVITY_TYPES as readonly string[]).includes(effectiveType);
           if (!isNoSymbolRequired) {
             existing.hasNonCashUsage = true;
           }
@@ -578,30 +591,38 @@ export function MappingStepV2() {
       symbolData.set(symbol, existing);
     });
 
-    return Array.from(symbolData.entries()).map(([csvSymbol, data]) => {
-      const resolvedSymbol = localMapping.symbolMappings[csvSymbol];
-      const isValidSymbol = /^[A-Z0-9]{1,10}([.-][A-Z0-9]+){0,2}$/.test(csvSymbol.trim());
-      const isCashOnly = !data.hasNonCashUsage;
+    return Array.from(symbolData.entries())
+      .map(([csvSymbol, data]) => {
+        const resolvedSymbol = localMapping.symbolMappings[csvSymbol];
+        const isValidSymbol = /^[A-Z0-9]{1,10}([.-][A-Z0-9]+){0,2}$/.test(csvSymbol.trim());
+        const isCashOnly = !data.hasNonCashUsage;
 
-      // Consider resolved if: cash-only OR valid symbol format OR has explicit mapping
-      const isResolved = isCashOnly || isValidSymbol || !!resolvedSymbol;
+        // Consider resolved if: cash-only OR valid symbol format OR has explicit mapping
+        const isResolved = isCashOnly || isValidSymbol || !!resolvedSymbol;
 
-      return {
-        csvSymbol,
-        count: data.count,
-        resolvedSymbol: resolvedSymbol || null,
-        isResolved,
-        isCashOnly,
-      };
-    }).sort((a, b) => {
-      // Sort: unresolved first, then cash-only, then by count
-      if (a.isResolved && !b.isResolved) return 1;
-      if (!a.isResolved && b.isResolved) return -1;
-      if (a.isCashOnly && !b.isCashOnly) return 1;
-      if (!a.isCashOnly && b.isCashOnly) return -1;
-      return b.count - a.count;
-    });
-  }, [headers, parsedRows, localMapping.fieldMappings, localMapping.symbolMappings, localMapping.activityMappings]);
+        return {
+          csvSymbol,
+          count: data.count,
+          resolvedSymbol: resolvedSymbol || null,
+          isResolved,
+          isCashOnly,
+        };
+      })
+      .sort((a, b) => {
+        // Sort: unresolved first, then cash-only, then by count
+        if (a.isResolved && !b.isResolved) return 1;
+        if (!a.isResolved && b.isResolved) return -1;
+        if (a.isCashOnly && !b.isCashOnly) return 1;
+        if (!a.isCashOnly && b.isCashOnly) return -1;
+        return b.count - a.count;
+      });
+  }, [
+    headers,
+    parsedRows,
+    localMapping.fieldMappings,
+    localMapping.symbolMappings,
+    localMapping.activityMappings,
+  ]);
 
   // ───────────────────────────────────────────────────────────────────────────
   // Handlers
@@ -647,7 +668,7 @@ export function MappingStepV2() {
       // Remove this CSV value from any existing mapping
       Object.keys(newActivityMappings).forEach((key) => {
         newActivityMappings[key] = (newActivityMappings[key] || []).filter(
-          (v) => v.trim().toUpperCase() !== normalizedCsvValue
+          (v) => v.trim().toUpperCase() !== normalizedCsvValue,
         );
         // Clean up empty arrays
         if (newActivityMappings[key].length === 0) {
@@ -672,15 +693,18 @@ export function MappingStepV2() {
     });
   }, []);
 
-  const handleResolveSymbol = useCallback((csvSymbol: string, resolvedSymbol: string, _searchResult?: SymbolSearchResult) => {
-    setLocalMapping((prev) => ({
-      ...prev,
-      symbolMappings: {
-        ...prev.symbolMappings,
-        [csvSymbol.trim()]: resolvedSymbol.trim(),
-      },
-    }));
-  }, []);
+  const handleResolveSymbol = useCallback(
+    (csvSymbol: string, resolvedSymbol: string, _searchResult?: SymbolSearchResult) => {
+      setLocalMapping((prev) => ({
+        ...prev,
+        symbolMappings: {
+          ...prev.symbolMappings,
+          [csvSymbol.trim()]: resolvedSymbol.trim(),
+        },
+      }));
+    },
+    [],
+  );
 
   // Auto-save mapping to context when local mapping changes
   // This keeps the context in sync with local edits
@@ -700,15 +724,21 @@ export function MappingStepV2() {
   // ───────────────────────────────────────────────────────────────────────────
 
   const requiredFieldsMapped = IMPORT_REQUIRED_FIELDS.every(
-    (field) => localMapping.fieldMappings[field]
+    (field) => localMapping.fieldMappings[field],
   );
 
   const unmappedActivityTypes = activityTypeItems.filter((item) => !item.mappedType).length;
   const unresolvedSymbols = symbolItems.filter((item) => !item.isResolved).length;
 
   const columnStatus = requiredFieldsMapped ? "complete" : "incomplete";
-  const activityStatus = unmappedActivityTypes === 0 ? "complete" : activityTypeItems.length === 0 ? "empty" : "incomplete";
-  const symbolStatus = unresolvedSymbols === 0 ? "complete" : symbolItems.length === 0 ? "empty" : "incomplete";
+  const activityStatus =
+    unmappedActivityTypes === 0
+      ? "complete"
+      : activityTypeItems.length === 0
+        ? "empty"
+        : "incomplete";
+  const symbolStatus =
+    unresolvedSymbols === 0 ? "complete" : symbolItems.length === 0 ? "empty" : "incomplete";
 
   // ───────────────────────────────────────────────────────────────────────────
   // Render
@@ -718,28 +748,41 @@ export function MappingStepV2() {
     <div className="space-y-6">
       {/* Status Summary */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className={cn(
-          "flex items-center gap-2 rounded-lg border p-3",
-          columnStatus === "complete" ? "border-green-500/50 bg-green-50/50 dark:bg-green-950/20" : "border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20"
-        )}>
+        <div
+          className={cn(
+            "flex items-center gap-2 rounded-lg border p-3",
+            columnStatus === "complete"
+              ? "border-green-500/50 bg-green-50/50 dark:bg-green-950/20"
+              : "border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20",
+          )}
+        >
           {columnStatus === "complete" ? (
             <Icons.CheckCircle className="h-5 w-5 text-green-600" />
           ) : (
             <Icons.AlertCircle className="h-5 w-5 text-amber-600" />
           )}
           <div>
-            <div className="font-medium text-sm">Columns</div>
+            <div className="text-sm font-medium">Columns</div>
             <div className="text-muted-foreground text-xs">
-              {Object.keys(localMapping.fieldMappings).filter(k => localMapping.fieldMappings[k]).length} mapped
+              {
+                Object.keys(localMapping.fieldMappings).filter((k) => localMapping.fieldMappings[k])
+                  .length
+              }{" "}
+              mapped
             </div>
           </div>
         </div>
 
-        <div className={cn(
-          "flex items-center gap-2 rounded-lg border p-3",
-          activityStatus === "complete" ? "border-green-500/50 bg-green-50/50 dark:bg-green-950/20" :
-          activityStatus === "empty" ? "border-border" : "border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20"
-        )}>
+        <div
+          className={cn(
+            "flex items-center gap-2 rounded-lg border p-3",
+            activityStatus === "complete"
+              ? "border-green-500/50 bg-green-50/50 dark:bg-green-950/20"
+              : activityStatus === "empty"
+                ? "border-border"
+                : "border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20",
+          )}
+        >
           {activityStatus === "complete" ? (
             <Icons.CheckCircle className="h-5 w-5 text-green-600" />
           ) : activityStatus === "empty" ? (
@@ -748,18 +791,23 @@ export function MappingStepV2() {
             <Icons.AlertCircle className="h-5 w-5 text-amber-600" />
           )}
           <div>
-            <div className="font-medium text-sm">Activity Types</div>
+            <div className="text-sm font-medium">Activity Types</div>
             <div className="text-muted-foreground text-xs">
               {activityTypeItems.length - unmappedActivityTypes}/{activityTypeItems.length} mapped
             </div>
           </div>
         </div>
 
-        <div className={cn(
-          "flex items-center gap-2 rounded-lg border p-3",
-          symbolStatus === "complete" ? "border-green-500/50 bg-green-50/50 dark:bg-green-950/20" :
-          symbolStatus === "empty" ? "border-border" : "border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20"
-        )}>
+        <div
+          className={cn(
+            "flex items-center gap-2 rounded-lg border p-3",
+            symbolStatus === "complete"
+              ? "border-green-500/50 bg-green-50/50 dark:bg-green-950/20"
+              : symbolStatus === "empty"
+                ? "border-border"
+                : "border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20",
+          )}
+        >
           {symbolStatus === "complete" ? (
             <Icons.CheckCircle className="h-5 w-5 text-green-600" />
           ) : symbolStatus === "empty" ? (
@@ -768,7 +816,7 @@ export function MappingStepV2() {
             <Icons.AlertCircle className="h-5 w-5 text-amber-600" />
           )}
           <div>
-            <div className="font-medium text-sm">Symbols</div>
+            <div className="text-sm font-medium">Symbols</div>
             <div className="text-muted-foreground text-xs">
               {symbolItems.length - unresolvedSymbols}/{symbolItems.length} resolved
             </div>
@@ -783,7 +831,9 @@ export function MappingStepV2() {
             <Icons.ListChecks className="h-4 w-4" />
             Columns
             {columnStatus === "incomplete" && (
-              <Badge variant="destructive" className="ml-1 h-5 px-1.5 text-xs">!</Badge>
+              <Badge variant="destructive" className="ml-1 h-5 px-1.5 text-xs">
+                !
+              </Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="types" className="flex items-center gap-2">
@@ -822,10 +872,7 @@ export function MappingStepV2() {
         </TabsContent>
 
         <TabsContent value="symbols" className="mt-4">
-          <SymbolResolutionSection
-            items={symbolItems}
-            onResolveSymbol={handleResolveSymbol}
-          />
+          <SymbolResolutionSection items={symbolItems} onResolveSymbol={handleResolveSymbol} />
         </TabsContent>
       </Tabs>
     </div>

@@ -1,5 +1,10 @@
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@wealthfolio/ui/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from "@wealthfolio/ui/components/ui/tooltip";
 
 interface HelpTooltipProps {
   content: React.ReactNode;

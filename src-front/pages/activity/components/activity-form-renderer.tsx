@@ -30,7 +30,7 @@ export function ActivityFormRenderer({
 }: ActivityFormRendererProps) {
   if (!selectedType) {
     return (
-      <div className="flex h-40 items-center justify-center text-muted-foreground">
+      <div className="text-muted-foreground flex h-40 items-center justify-center">
         Select an activity type above to continue
       </div>
     );

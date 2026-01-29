@@ -36,7 +36,9 @@ vi.mock("../fields", () => ({
       </select>
     </div>
   ),
-  SymbolSearch: ({ name }: { name: string }) => <input data-testid={`symbol-search-${name}`} name={name} />,
+  SymbolSearch: ({ name }: { name: string }) => (
+    <input data-testid={`symbol-search-${name}`} name={name} />
+  ),
   DatePicker: ({ name, label }: { name: string; label: string }) => (
     <div data-testid={`date-picker-${name}`}>{label}</div>
   ),
@@ -76,7 +78,12 @@ vi.mock("@wealthfolio/ui/components/ui/button", () => ({
     disabled?: boolean;
     variant?: string;
   }) => (
-    <button type={type as "submit" | "button"} onClick={onClick} disabled={disabled} data-variant={variant}>
+    <button
+      type={type as "submit" | "button"}
+      onClick={onClick}
+      disabled={disabled}
+      data-variant={variant}
+    >
       {children}
     </button>
   ),
@@ -84,7 +91,9 @@ vi.mock("@wealthfolio/ui/components/ui/button", () => ({
 
 vi.mock("@wealthfolio/ui/components/ui/card", () => ({
   Card: ({ children }: { children: React.ReactNode }) => <div data-testid="card">{children}</div>,
-  CardContent: ({ children }: { children: React.ReactNode }) => <div data-testid="card-content">{children}</div>,
+  CardContent: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="card-content">{children}</div>
+  ),
 }));
 
 vi.mock("@wealthfolio/ui/components/ui/icons", () => ({
@@ -248,7 +257,9 @@ describe("TransferForm", () => {
     });
 
     it("renders cancel button when onCancel is provided", () => {
-      render(<TransferForm accounts={mockAccounts} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+      render(
+        <TransferForm accounts={mockAccounts} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />,
+      );
 
       expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
     });
@@ -276,7 +287,9 @@ describe("TransferForm", () => {
   describe("Cancel Button", () => {
     it("calls onCancel when cancel button is clicked", async () => {
       const user = userEvent.setup();
-      render(<TransferForm accounts={mockAccounts} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+      render(
+        <TransferForm accounts={mockAccounts} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />,
+      );
 
       const cancelButton = screen.getByRole("button", { name: /cancel/i });
       await user.click(cancelButton);
@@ -286,7 +299,12 @@ describe("TransferForm", () => {
 
     it("disables cancel button when isLoading is true", () => {
       render(
-        <TransferForm accounts={mockAccounts} onSubmit={mockOnSubmit} onCancel={mockOnCancel} isLoading={true} />,
+        <TransferForm
+          accounts={mockAccounts}
+          onSubmit={mockOnSubmit}
+          onCancel={mockOnCancel}
+          isLoading={true}
+        />,
       );
 
       const cancelButton = screen.getByRole("button", { name: /cancel/i });
@@ -303,7 +321,9 @@ describe("TransferForm", () => {
     });
 
     it("renders form with proper structure", () => {
-      const { container } = render(<TransferForm accounts={mockAccounts} onSubmit={mockOnSubmit} />);
+      const { container } = render(
+        <TransferForm accounts={mockAccounts} onSubmit={mockOnSubmit} />,
+      );
 
       const form = container.querySelector("form");
       expect(form).toBeInTheDocument();

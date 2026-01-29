@@ -146,7 +146,6 @@ export function MultiSelectTaxonomy({
     return assignments.reduce((sum, a) => sum + a.weight, 0) / 100;
   }, [assignments]);
 
-
   const handleSelectCategory = (category: CategoryNode) => {
     if (assignedCategoryIds.has(category.id) || isPending) return;
     setPendingCategory({ category, weight: "100" });
@@ -285,7 +284,7 @@ export function MultiSelectTaxonomy({
                         className="h-8 pr-6 text-sm"
                         placeholder="100"
                       />
-                      <span className="text-muted-foreground pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-sm">
+                      <span className="text-muted-foreground pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-sm">
                         %
                       </span>
                     </div>
@@ -373,10 +372,7 @@ export function MultiSelectTaxonomy({
       {assignedCategories.length > 0 && (
         <div className="bg-muted/30 divide-y rounded-md border">
           {assignedCategories.map(({ assignment, category }) => (
-            <div
-              key={assignment.id}
-              className="flex items-center gap-2 px-3 py-2"
-            >
+            <div key={assignment.id} className="flex items-center gap-2 px-3 py-2">
               <span
                 className="h-2.5 w-2.5 shrink-0 rounded-full"
                 style={{ backgroundColor: category.color }}

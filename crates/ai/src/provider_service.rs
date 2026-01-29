@@ -29,8 +29,10 @@ pub trait AiProviderServiceTrait: Send + Sync {
     /// Get provider configuration for backend-only use (chat, model listing).
     /// This retrieves the API key from the secret store - never exposed to frontend.
     /// Returns ProviderApiError::MissingApiKey if API key is required but not configured.
-    fn get_provider_config(&self, provider_id: &str)
-        -> std::result::Result<ProviderConfig, ProviderApiError>;
+    fn get_provider_config(
+        &self,
+        provider_id: &str,
+    ) -> std::result::Result<ProviderConfig, ProviderApiError>;
 
     /// Get the title model ID for a provider (fast model for generating thread titles).
     /// Falls back to the default model if not configured.
@@ -202,21 +204,17 @@ impl AiProviderServiceTrait for AiProviderService {
             .iter()
             .map(|(id, catalog_provider)| {
                 // Get user settings for this provider, or use defaults
-                let user = user_settings
-                    .providers
-                    .get(id)
-                    .cloned()
-                    .unwrap_or_else(|| {
-                        // Use catalog defaults for providers not in user settings
-                        ProviderUserSettings {
-                            enabled: catalog_provider.default_config.enabled,
-                            favorite: catalog_provider.default_config.enabled, // Recommended = favorite
-                            selected_model: None,
-                            custom_url: catalog_provider.default_config.url.clone(),
-                            priority: 100, // Default priority
-                            ..Default::default()
-                        }
-                    });
+                let user = user_settings.providers.get(id).cloned().unwrap_or_else(|| {
+                    // Use catalog defaults for providers not in user settings
+                    ProviderUserSettings {
+                        enabled: catalog_provider.default_config.enabled,
+                        favorite: catalog_provider.default_config.enabled, // Recommended = favorite
+                        selected_model: None,
+                        custom_url: catalog_provider.default_config.url.clone(),
+                        priority: 100, // Default priority
+                        ..Default::default()
+                    }
+                });
 
                 // Convert models map to sorted vec, applying capability overrides
                 let mut models: Vec<MergedModel> = catalog_provider
@@ -274,11 +272,7 @@ impl AiProviderServiceTrait for AiProviderService {
             .collect();
 
         // Sort by priority (lower first), then by provider ID for stable tiebreaker
-        providers.sort_by(|a, b| {
-            a.priority
-                .cmp(&b.priority)
-                .then_with(|| a.id.cmp(&b.id))
-        });
+        providers.sort_by(|a, b| a.priority.cmp(&b.priority).then_with(|| a.id.cmp(&b.id)));
 
         Ok(AiProvidersResponse {
             providers,
@@ -440,16 +434,17 @@ impl AiProviderServiceTrait for AiProviderService {
         }
 
         // Build the model list URL based on provider
-        let base_url = config.base_url.as_deref().unwrap_or_else(|| {
-            match provider_id {
+        let base_url = config
+            .base_url
+            .as_deref()
+            .unwrap_or_else(|| match provider_id {
                 "openai" => "https://api.openai.com",
                 "groq" => "https://api.groq.com/openai",
                 "openrouter" => "https://openrouter.ai/api",
                 "google" => "https://generativelanguage.googleapis.com",
                 "ollama" => "http://localhost:11434",
                 _ => "https://api.openai.com",
-            }
-        });
+            });
 
         let models_url = match provider_id {
             "ollama" => format!("{}/api/tags", base_url.trim_end_matches('/')),
@@ -471,9 +466,12 @@ impl AiProviderServiceTrait for AiProviderService {
         }
 
         // Make the request
-        let response = request.send().await.map_err(|e| ProviderApiError::ProviderError {
-            message: format!("Failed to connect to provider: {}", e),
-        })?;
+        let response = request
+            .send()
+            .await
+            .map_err(|e| ProviderApiError::ProviderError {
+                message: format!("Failed to connect to provider: {}", e),
+            })?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -497,9 +495,12 @@ impl AiProviderServiceTrait for AiProviderService {
                 }
 
                 let resp: OllamaResponse =
-                    response.json().await.map_err(|e| ProviderApiError::ProviderError {
-                        message: format!("Failed to parse Ollama response: {}", e),
-                    })?;
+                    response
+                        .json()
+                        .await
+                        .map_err(|e| ProviderApiError::ProviderError {
+                            message: format!("Failed to parse Ollama response: {}", e),
+                        })?;
 
                 resp.models
                     .into_iter()
@@ -523,16 +524,23 @@ impl AiProviderServiceTrait for AiProviderService {
                 }
 
                 let resp: GoogleResponse =
-                    response.json().await.map_err(|e| ProviderApiError::ProviderError {
-                        message: format!("Failed to parse Google response: {}", e),
-                    })?;
+                    response
+                        .json()
+                        .await
+                        .map_err(|e| ProviderApiError::ProviderError {
+                            message: format!("Failed to parse Google response: {}", e),
+                        })?;
 
                 resp.models
                     .into_iter()
                     .filter(|m| m.name.contains("gemini"))
                     .map(|m| {
                         // Google returns "models/gemini-pro", we want just "gemini-pro"
-                        let id = m.name.strip_prefix("models/").unwrap_or(&m.name).to_string();
+                        let id = m
+                            .name
+                            .strip_prefix("models/")
+                            .unwrap_or(&m.name)
+                            .to_string();
                         FetchedModel {
                             id,
                             name: m.display_name,
@@ -553,9 +561,12 @@ impl AiProviderServiceTrait for AiProviderService {
                 }
 
                 let resp: OpenAIResponse =
-                    response.json().await.map_err(|e| ProviderApiError::ProviderError {
-                        message: format!("Failed to parse provider response: {}", e),
-                    })?;
+                    response
+                        .json()
+                        .await
+                        .map_err(|e| ProviderApiError::ProviderError {
+                            message: format!("Failed to parse provider response: {}", e),
+                        })?;
 
                 resp.data
                     .into_iter()

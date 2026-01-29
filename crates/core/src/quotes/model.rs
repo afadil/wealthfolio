@@ -198,9 +198,15 @@ mod tests {
     fn test_data_source_from_str() {
         assert_eq!(DataSource::from("YAHOO"), DataSource::Yahoo);
         assert_eq!(DataSource::from("yahoo"), DataSource::Yahoo);
-        assert_eq!(DataSource::from("MARKETDATA_APP"), DataSource::MarketDataApp);
+        assert_eq!(
+            DataSource::from("MARKETDATA_APP"),
+            DataSource::MarketDataApp
+        );
         assert_eq!(DataSource::from("ALPHA_VANTAGE"), DataSource::AlphaVantage);
-        assert_eq!(DataSource::from("METAL_PRICE_API"), DataSource::MetalPriceApi);
+        assert_eq!(
+            DataSource::from("METAL_PRICE_API"),
+            DataSource::MetalPriceApi
+        );
         assert_eq!(DataSource::from("FINNHUB"), DataSource::Finnhub);
         assert_eq!(DataSource::from("finnhub"), DataSource::Finnhub);
         assert_eq!(DataSource::from("MANUAL"), DataSource::Manual);

@@ -41,10 +41,24 @@ vi.mock("../fields", () => ({
       <input data-testid={`input-${name}`} name={name} type="number" id={name} />
     </div>
   ),
-  QuantityInput: ({ name, label, placeholder }: { name: string; label: string; placeholder?: string }) => (
+  QuantityInput: ({
+    name,
+    label,
+    placeholder,
+  }: {
+    name: string;
+    label: string;
+    placeholder?: string;
+  }) => (
     <div>
       <label htmlFor={name}>{label}</label>
-      <input data-testid={`input-${name}`} name={name} type="number" id={name} placeholder={placeholder} />
+      <input
+        data-testid={`input-${name}`}
+        name={name}
+        type="number"
+        id={name}
+        placeholder={placeholder}
+      />
     </div>
   ),
   NotesInput: ({ name, label }: { name: string; label: string }) => (
@@ -71,7 +85,12 @@ vi.mock("@wealthfolio/ui/components/ui/button", () => ({
     disabled?: boolean;
     variant?: string;
   }) => (
-    <button type={type as "submit" | "button"} onClick={onClick} disabled={disabled} data-variant={variant}>
+    <button
+      type={type as "submit" | "button"}
+      onClick={onClick}
+      disabled={disabled}
+      data-variant={variant}
+    >
       {children}
     </button>
   ),
@@ -79,7 +98,9 @@ vi.mock("@wealthfolio/ui/components/ui/button", () => ({
 
 vi.mock("@wealthfolio/ui/components/ui/card", () => ({
   Card: ({ children }: { children: React.ReactNode }) => <div data-testid="card">{children}</div>,
-  CardContent: ({ children }: { children: React.ReactNode }) => <div data-testid="card-content">{children}</div>,
+  CardContent: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="card-content">{children}</div>
+  ),
 }));
 
 vi.mock("@wealthfolio/ui/components/ui/icons", () => ({
@@ -127,7 +148,9 @@ describe("DividendForm", () => {
     });
 
     it("renders cancel button when onCancel is provided", () => {
-      render(<DividendForm accounts={mockAccounts} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+      render(
+        <DividendForm accounts={mockAccounts} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />,
+      );
 
       expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
     });
@@ -149,7 +172,9 @@ describe("DividendForm", () => {
   describe("Cancel Button", () => {
     it("calls onCancel when cancel button is clicked", async () => {
       const user = userEvent.setup();
-      render(<DividendForm accounts={mockAccounts} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+      render(
+        <DividendForm accounts={mockAccounts} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />,
+      );
 
       const cancelButton = screen.getByRole("button", { name: /cancel/i });
       await user.click(cancelButton);
@@ -167,7 +192,9 @@ describe("DividendForm", () => {
     });
 
     it("renders form with proper structure", () => {
-      const { container } = render(<DividendForm accounts={mockAccounts} onSubmit={mockOnSubmit} />);
+      const { container } = render(
+        <DividendForm accounts={mockAccounts} onSubmit={mockOnSubmit} />,
+      );
 
       const form = container.querySelector("form");
       expect(form).toBeInTheDocument();

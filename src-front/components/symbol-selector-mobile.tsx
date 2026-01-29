@@ -69,7 +69,9 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
     // Custom asset form state
     const [customSymbol, setCustomSymbol] = useState("");
     const [customName, setCustomName] = useState("");
-    const [customAssetType, setCustomAssetType] = useState<"SECURITY" | "CRYPTO" | "OTHER">("SECURITY");
+    const [customAssetType, setCustomAssetType] = useState<"SECURITY" | "CRYPTO" | "OTHER">(
+      "SECURITY",
+    );
     const [customCurrency, setCustomCurrency] = useState("");
 
     // Reset state when sheet closes
@@ -246,10 +248,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
 
                         <div className="space-y-2">
                           <label className="text-base font-medium">Currency</label>
-                          <CurrencyInput
-                            value={customCurrency}
-                            onChange={setCustomCurrency}
-                          />
+                          <CurrencyInput value={customCurrency} onChange={setCustomCurrency} />
                         </div>
                       </div>
                     </div>
@@ -270,7 +269,9 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                       size="lg"
                       onClick={handleCustomAssetSubmit}
                       className="flex-1"
-                      disabled={!customSymbol.trim() || !customName.trim() || !customCurrency.trim()}
+                      disabled={
+                        !customSymbol.trim() || !customName.trim() || !customCurrency.trim()
+                      }
                       type="button"
                     >
                       Create Asset
@@ -283,7 +284,9 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                 {/* Search View Header */}
                 <SheetHeader className="border-border border-b px-6 py-4">
                   <SheetTitle>Select Symbol</SheetTitle>
-                  <SheetDescription>Search for a stock, ETF, crypto, or other asset</SheetDescription>
+                  <SheetDescription>
+                    Search for a stock, ETF, crypto, or other asset
+                  </SheetDescription>
                 </SheetHeader>
 
                 <div className="flex h-[calc(85vh-6rem)] flex-col">
@@ -307,7 +310,9 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                     {/* Loading state */}
                     {isLoading && searchQuery.length > 1 && (
                       <div className="space-y-3">
-                        <div className="text-muted-foreground text-sm font-medium">Searching...</div>
+                        <div className="text-muted-foreground text-sm font-medium">
+                          Searching...
+                        </div>
                         <Skeleton className="h-16 w-full rounded-xl" />
                         <Skeleton className="h-16 w-full rounded-xl" />
                         <Skeleton className="h-16 w-full rounded-xl" />

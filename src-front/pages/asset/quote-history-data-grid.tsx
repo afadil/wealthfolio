@@ -156,24 +156,21 @@ export function QuoteHistoryDataGrid({
   const stepValue = Math.pow(10, -decimalPrecision);
 
   // Delete a single row
-  const handleDeleteRow = useCallback(
-    (entry: QuoteEntry) => {
-      if (entry.isNew) {
-        // Remove new entries immediately
-        setLocalEntries((prev) => prev.filter((e) => e.id !== entry.id));
-        setDirtyIds((prev) => {
-          const next = new Set(prev);
-          next.delete(entry.id);
-          return next;
-        });
-      } else {
-        // Mark existing entries for deletion
-        setDeletedIds((prev) => new Set(prev).add(entry.id));
-        setLocalEntries((prev) => prev.filter((e) => e.id !== entry.id));
-      }
-    },
-    [],
-  );
+  const handleDeleteRow = useCallback((entry: QuoteEntry) => {
+    if (entry.isNew) {
+      // Remove new entries immediately
+      setLocalEntries((prev) => prev.filter((e) => e.id !== entry.id));
+      setDirtyIds((prev) => {
+        const next = new Set(prev);
+        next.delete(entry.id);
+        return next;
+      });
+    } else {
+      // Mark existing entries for deletion
+      setDeletedIds((prev) => new Set(prev).add(entry.id));
+      setLocalEntries((prev) => prev.filter((e) => e.id !== entry.id));
+    }
+  }, []);
 
   const columns = useMemo(
     () => [
@@ -263,7 +260,14 @@ export function QuoteHistoryDataGrid({
         const closeChanged = entry.close !== previous.close;
         const volumeChanged = entry.volume !== previous.volume;
 
-        if (dateChanged || openChanged || highChanged || lowChanged || closeChanged || volumeChanged) {
+        if (
+          dateChanged ||
+          openChanged ||
+          highChanged ||
+          lowChanged ||
+          closeChanged ||
+          volumeChanged
+        ) {
           changedIds.push(entry.id);
           return normalizedEntry;
         }

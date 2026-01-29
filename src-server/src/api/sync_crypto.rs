@@ -73,9 +73,7 @@ pub struct StringResponse {
 // Handlers
 // ─────────────────────────────────────────────────────────────────────────────
 
-async fn generate_root_key(
-    State(_state): State<Arc<AppState>>,
-) -> ApiResult<Json<StringResponse>> {
+async fn generate_root_key(State(_state): State<Arc<AppState>>) -> ApiResult<Json<StringResponse>> {
     let value = crypto::generate_root_key();
     Ok(Json(StringResponse { value }))
 }
@@ -84,8 +82,8 @@ async fn derive_dek(
     State(_state): State<Arc<AppState>>,
     Json(body): Json<DeriveDekRequest>,
 ) -> ApiResult<Json<StringResponse>> {
-    let value = crypto::derive_dek(&body.root_key, body.version)
-        .map_err(|e| ApiError::BadRequest(e))?;
+    let value =
+        crypto::derive_dek(&body.root_key, body.version).map_err(|e| ApiError::BadRequest(e))?;
     Ok(Json(StringResponse { value }))
 }
 
@@ -118,8 +116,7 @@ async fn encrypt(
     State(_state): State<Arc<AppState>>,
     Json(body): Json<EncryptRequest>,
 ) -> ApiResult<Json<StringResponse>> {
-    let value = crypto::encrypt(&body.key, &body.plaintext)
-        .map_err(|e| ApiError::BadRequest(e))?;
+    let value = crypto::encrypt(&body.key, &body.plaintext).map_err(|e| ApiError::BadRequest(e))?;
     Ok(Json(StringResponse { value }))
 }
 
@@ -127,8 +124,8 @@ async fn decrypt(
     State(_state): State<Arc<AppState>>,
     Json(body): Json<DecryptRequest>,
 ) -> ApiResult<Json<StringResponse>> {
-    let value = crypto::decrypt(&body.key, &body.ciphertext)
-        .map_err(|e| ApiError::BadRequest(e))?;
+    let value =
+        crypto::decrypt(&body.key, &body.ciphertext).map_err(|e| ApiError::BadRequest(e))?;
     Ok(Json(StringResponse { value }))
 }
 
@@ -151,8 +148,7 @@ async fn compute_sas(
     State(_state): State<Arc<AppState>>,
     Json(body): Json<ComputeSasRequest>,
 ) -> ApiResult<Json<StringResponse>> {
-    let value = crypto::compute_sas(&body.shared_secret)
-        .map_err(|e| ApiError::BadRequest(e))?;
+    let value = crypto::compute_sas(&body.shared_secret).map_err(|e| ApiError::BadRequest(e))?;
     Ok(Json(StringResponse { value }))
 }
 
@@ -176,10 +172,7 @@ pub fn router() -> Router<Arc<AppState>> {
             "/sync/crypto/compute-shared-secret",
             post(compute_shared_secret),
         )
-        .route(
-            "/sync/crypto/derive-session-key",
-            post(derive_session_key),
-        )
+        .route("/sync/crypto/derive-session-key", post(derive_session_key))
         .route("/sync/crypto/encrypt", post(encrypt))
         .route("/sync/crypto/decrypt", post(decrypt))
         .route(

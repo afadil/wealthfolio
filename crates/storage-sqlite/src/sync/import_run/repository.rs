@@ -115,7 +115,12 @@ impl ImportRunRepository {
     }
 
     /// Get import runs by run type (SYNC or IMPORT) with pagination
-    pub fn get_by_run_type(&self, run_type: &str, limit: i64, offset: i64) -> Result<Vec<ImportRun>> {
+    pub fn get_by_run_type(
+        &self,
+        run_type: &str,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<ImportRun>> {
         let mut conn = get_connection(&self.pool)?;
 
         let results = import_runs::table

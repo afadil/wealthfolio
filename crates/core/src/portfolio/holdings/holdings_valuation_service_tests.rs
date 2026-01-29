@@ -4,16 +4,16 @@ mod tests {
     use crate::assets::{Asset, ProviderProfile};
     use crate::errors::{Error, Result};
     use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
-    use crate::quotes::{DataSource, MarketDataError};
     use crate::portfolio::holdings::holdings_model::{
         Holding, HoldingType, Instrument, MonetaryValue,
     };
     use crate::portfolio::holdings::holdings_valuation_service::{
         HoldingsValuationService, HoldingsValuationServiceTrait,
     };
+    use crate::quotes::{DataSource, MarketDataError};
     use crate::quotes::{
-        LatestQuotePair, ProviderInfo, Quote, QuoteImport, SymbolSearchResult, QuoteServiceTrait,
-        QuoteSyncState, SymbolSyncPlan, SyncResult,
+        LatestQuotePair, ProviderInfo, Quote, QuoteImport, QuoteServiceTrait, QuoteSyncState,
+        SymbolSearchResult, SymbolSyncPlan, SyncResult,
     };
     use crate::utils::time_utils::valuation_date_today;
     use async_trait::async_trait;
@@ -370,6 +370,14 @@ mod tests {
         // Quote Import
         // =========================================================================
 
+        async fn check_quotes_import(
+            &self,
+            _content: &[u8],
+            _has_header_row: bool,
+        ) -> Result<Vec<QuoteImport>> {
+            unimplemented!()
+        }
+
         async fn import_quotes(
             &self,
             _quotes: Vec<QuoteImport>,
@@ -451,16 +459,16 @@ mod tests {
             market_value: MonetaryValue::zero(),                      // To be calculated
             price: None,                                              // To be calculated
             purchase_price: None,
-            fx_rate: None,                                            // To be calculated
-            unrealized_gain: None,                                    // To be calculated
-            unrealized_gain_pct: None,                                // To be calculated
-            day_change: None,                                         // To be calculated
-            day_change_pct: None,                                     // To be calculated
-            prev_close_value: None,                                   // To be calculated
-            realized_gain: None,                                      // To be calculated
-            realized_gain_pct: None,                                  // To be calculated
-            total_gain: None,                                         // To be calculated
-            total_gain_pct: None,                                     // To be calculated
+            fx_rate: None,             // To be calculated
+            unrealized_gain: None,     // To be calculated
+            unrealized_gain_pct: None, // To be calculated
+            day_change: None,          // To be calculated
+            day_change_pct: None,      // To be calculated
+            prev_close_value: None,    // To be calculated
+            realized_gain: None,       // To be calculated
+            realized_gain_pct: None,   // To be calculated
+            total_gain: None,          // To be calculated
+            total_gain_pct: None,      // To be calculated
             metadata: None,
         }
     }

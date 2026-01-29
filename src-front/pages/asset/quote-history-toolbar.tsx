@@ -79,8 +79,8 @@ export function QuoteHistoryToolbar({
                 <>
                   <p className="text-muted-foreground text-sm">
                     Switching to automatic tracking will enable data fetching from Market Data
-                    Provider. Please note that this will override any manually entered quotes on
-                    the next sync.
+                    Provider. Please note that this will override any manually entered quotes on the
+                    next sync.
                   </p>
                   <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
                     Your manually entered historical data may be lost.

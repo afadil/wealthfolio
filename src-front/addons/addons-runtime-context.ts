@@ -70,7 +70,14 @@ import {
   listenPortfolioUpdateError,
   listenPortfolioUpdateStart,
 } from "@/adapters";
-import { deleteSecret, getSecret, setSecret, backupDatabase, getSettings, updateSettings } from "@/adapters";
+import {
+  deleteSecret,
+  getSecret,
+  setSecret,
+  backupDatabase,
+  getSettings,
+  updateSettings,
+} from "@/adapters";
 
 // Store for dynamically added navigation items
 interface NavItem {

@@ -145,7 +145,10 @@ export function NewAccountsFoundModal({
         <div className="flex-1 overflow-hidden">
           <ScrollArea className="h-[calc(100vh-220px)]">
             <div className="space-y-6 p-6">
-              <Alert variant="warning" className="py-2.5 px-3 [&>svg]:top-2.5 [&>svg]:left-3 [&>svg~*]:pl-6">
+              <Alert
+                variant="warning"
+                className="px-3 py-2.5 [&>svg]:top-2.5 [&>svg]:left-3 [&>svg~*]:pl-6"
+              >
                 <Icons.AlertTriangle className="h-4 w-4" />
                 <AlertDescription className="text-sm">
                   <strong>Transactions</strong> mode tracks every trade for full performance
@@ -155,7 +158,7 @@ export function NewAccountsFoundModal({
                     href="https://wealthfolio.app/docs/concepts/activity-types"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="underline hover:text-foreground"
+                    className="hover:text-foreground underline"
                   >
                     Learn more
                   </a>
@@ -203,7 +206,7 @@ export function NewAccountsFoundModal({
                         className="grid grid-cols-2 gap-3"
                       >
                         <label
-                          className={`relative flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors hover:bg-accent ${
+                          className={`hover:bg-accent relative flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors ${
                             setup?.trackingMode === "TRANSACTIONS"
                               ? "border-primary bg-primary/5"
                               : "border-muted"
@@ -218,7 +221,7 @@ export function NewAccountsFoundModal({
                           </div>
                         </label>
                         <label
-                          className={`relative flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors hover:bg-accent ${
+                          className={`hover:bg-accent relative flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors ${
                             setup?.trackingMode === "HOLDINGS"
                               ? "border-primary bg-primary/5"
                               : "border-muted"

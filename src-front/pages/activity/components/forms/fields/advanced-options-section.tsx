@@ -99,7 +99,10 @@ export function AdvancedOptionsSection<TFieldValues extends FieldValues = FieldV
   }, [assetCurrency, accountCurrency, baseCurrency]);
 
   // Don't render if nothing to show
-  const hasContent = (showCurrency && currencyName) || (showFxRate && fxRateName) || (showSubtype && subtypeName && availableSubtypes.length > 0);
+  const hasContent =
+    (showCurrency && currencyName) ||
+    (showFxRate && fxRateName) ||
+    (showSubtype && subtypeName && availableSubtypes.length > 0);
   if (!hasContent) {
     return null;
   }
@@ -108,14 +111,14 @@ export function AdvancedOptionsSection<TFieldValues extends FieldValues = FieldV
     <Collapsible
       open={isOpen}
       onOpenChange={setIsOpen}
-      className={isMobile ? "bg-muted/30 rounded-md border px-3 py-2 w-full" : "w-full"}
+      className={isMobile ? "bg-muted/30 w-full rounded-md border px-3 py-2" : "w-full"}
     >
       <CollapsibleTrigger asChild>
         <Button
           variant="ghost"
           size="sm"
           type="button"
-          className="text-muted-foreground hover:text-foreground hover:bg-transparent flex w-full items-center justify-between px-0 py-1"
+          className="text-muted-foreground hover:text-foreground flex w-full items-center justify-between px-0 py-1 hover:bg-transparent"
         >
           <span className="text-sm font-medium">Advanced Options</span>
           <Icons.ChevronDown
@@ -124,7 +127,9 @@ export function AdvancedOptionsSection<TFieldValues extends FieldValues = FieldV
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent className="space-y-4 pt-2">
-        <div className={isMobile ? "grid grid-cols-1 gap-4" : "grid grid-cols-1 gap-4 sm:grid-cols-2"}>
+        <div
+          className={isMobile ? "grid grid-cols-1 gap-4" : "grid grid-cols-1 gap-4 sm:grid-cols-2"}
+        >
           {/* Currency Field */}
           {showCurrency && currencyName && (
             <FormField

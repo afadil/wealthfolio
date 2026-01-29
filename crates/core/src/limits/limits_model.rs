@@ -1,6 +1,6 @@
 //! Contribution limits domain models.
 
-use chrono::NaiveDateTime;
+use chrono::{NaiveDate, NaiveDateTime};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -47,4 +47,17 @@ pub struct DepositsCalculation {
     pub total: Decimal,
     pub base_currency: String,
     pub by_account: HashMap<String, AccountDeposit>,
+}
+
+/// Raw activity data for contribution calculation.
+/// Fetched from DB, filtered in Rust for performance.
+#[derive(Debug, Clone)]
+pub struct ContributionActivity {
+    pub account_id: String,
+    pub activity_type: String,
+    pub activity_date: NaiveDate,
+    pub amount: Option<Decimal>,
+    pub currency: String,
+    pub metadata: Option<String>,
+    pub source_group_id: Option<String>,
 }

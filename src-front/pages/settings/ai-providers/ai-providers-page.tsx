@@ -40,7 +40,7 @@ export default function AiProvidersPage() {
   const handleSetCapabilityOverride = (
     providerId: string,
     modelId: string,
-    overrides: ModelCapabilityOverrides | null
+    overrides: ModelCapabilityOverrides | null,
   ) => {
     updateSettings({
       providerId,
@@ -58,7 +58,10 @@ export default function AiProvidersPage() {
   if (isLoading) {
     return (
       <div className="text-foreground space-y-6">
-        <SettingsHeader heading="AI Providers" text="Configure AI providers for portfolio insights." />
+        <SettingsHeader
+          heading="AI Providers"
+          text="Configure AI providers for portfolio insights."
+        />
         <Separator />
         <div className="overflow-hidden rounded-lg border">
           {[1, 2, 3].map((i) => (
@@ -85,9 +88,12 @@ export default function AiProvidersPage() {
   if (error) {
     return (
       <div className="text-foreground space-y-6">
-        <SettingsHeader heading="AI Providers" text="Configure AI providers for portfolio insights." />
+        <SettingsHeader
+          heading="AI Providers"
+          text="Configure AI providers for portfolio insights."
+        />
         <Separator />
-        <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-6">
+        <div className="border-destructive/20 bg-destructive/5 rounded-lg border p-6">
           <div className="flex items-start gap-3">
             <Icons.XCircle className="text-destructive mt-0.5 h-5 w-5 shrink-0" />
             <div className="space-y-2">
@@ -112,7 +118,10 @@ export default function AiProvidersPage() {
 
   return (
     <div className="text-foreground space-y-6">
-      <SettingsHeader heading="AI Providers" text="Configure AI providers for portfolio insights." />
+      <SettingsHeader
+        heading="AI Providers"
+        text="Configure AI providers for portfolio insights."
+      />
       <Separator />
       <div>
         {sortedProviders.length === 0 ? (
@@ -130,9 +139,7 @@ export default function AiProvidersPage() {
                 key={provider.id}
                 provider={provider}
                 isLast={index === arr.length - 1}
-                onToggleEnabled={(enabled) =>
-                  updateSettings({ providerId: provider.id, enabled })
-                }
+                onToggleEnabled={(enabled) => updateSettings({ providerId: provider.id, enabled })}
                 onSetDefault={() => setDefault({ providerId: provider.id })}
                 onCustomUrlChange={(url) => handleCustomUrlChange(provider.id, url)}
                 onSelectModel={(modelId) => handleSelectModel(provider.id, modelId)}
@@ -140,9 +147,7 @@ export default function AiProvidersPage() {
                 onSetCapabilityOverride={(modelId, overrides) =>
                   handleSetCapabilityOverride(provider.id, modelId, overrides)
                 }
-                onToolsAllowlistChange={(tools) =>
-                  handleToolsAllowlistChange(provider.id, tools)
-                }
+                onToolsAllowlistChange={(tools) => handleToolsAllowlistChange(provider.id, tools)}
               />
             ))}
           </div>

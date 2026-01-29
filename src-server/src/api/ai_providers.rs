@@ -47,10 +47,7 @@ async fn list_models(
     State(state): State<Arc<AppState>>,
     Path(provider_id): Path<String>,
 ) -> ApiResult<Json<ListModelsResponse>> {
-    let response = state
-        .ai_provider_service
-        .list_models(&provider_id)
-        .await?;
+    let response = state.ai_provider_service.list_models(&provider_id).await?;
     Ok(Json(response))
 }
 

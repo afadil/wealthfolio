@@ -13,11 +13,11 @@ use std::time::Duration;
 use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
 use lazy_static::lazy_static;
+use log::{debug, warn};
 use num_traits::FromPrimitive;
 use reqwest::header;
 use rust_decimal::Decimal;
 use time::OffsetDateTime;
-use log::{debug, warn};
 use urlencoding::encode;
 use yahoo_finance_api as yahoo;
 
@@ -78,7 +78,9 @@ impl YahooProvider {
             ProviderInstrument::EquitySymbol { symbol } => Ok(symbol.to_string()),
             ProviderInstrument::CryptoSymbol { symbol } => Ok(symbol.to_string()),
             ProviderInstrument::FxSymbol { symbol } => Ok(symbol.to_string()),
-            ProviderInstrument::CryptoPair { symbol, market } => Ok(format!("{}-{}", symbol, market)),
+            ProviderInstrument::CryptoPair { symbol, market } => {
+                Ok(format!("{}-{}", symbol, market))
+            }
             ProviderInstrument::FxPair { from, to } => Ok(format!("{}{}=X", from, to)),
             ProviderInstrument::MetalSymbol { symbol, .. } => Ok(symbol.to_string()),
         }
@@ -301,12 +303,14 @@ impl YahooProvider {
             });
         }
 
-        let data: YahooQuoteSummaryResponse = response.json().await.map_err(|e| {
-            MarketDataError::ProviderError {
-                provider: "YAHOO".to_string(),
-                message: format!("Failed to parse backup quote response: {}", e),
-            }
-        })?;
+        let data: YahooQuoteSummaryResponse =
+            response
+                .json()
+                .await
+                .map_err(|e| MarketDataError::ProviderError {
+                    provider: "YAHOO".to_string(),
+                    message: format!("Failed to parse backup quote response: {}", e),
+                })?;
 
         let price = data
             .quote_summary
@@ -404,12 +408,13 @@ impl YahooProvider {
         }
 
         // Get response text first for debugging
-        let response_text = response.text().await.map_err(|e| {
-            MarketDataError::ProviderError {
+        let response_text = response
+            .text()
+            .await
+            .map_err(|e| MarketDataError::ProviderError {
                 provider: "YAHOO".to_string(),
                 message: format!("Failed to read profile response: {}", e),
-            }
-        })?;
+            })?;
 
         // Log first 500 chars of response for debugging
         debug!(
@@ -418,18 +423,19 @@ impl YahooProvider {
             &response_text[..response_text.len().min(500)]
         );
 
-        let data: YahooQuoteSummaryResponse = serde_json::from_str(&response_text).map_err(|e| {
-            warn!(
-                "[YAHOO] Failed to parse quoteSummary for {}: {}. Response: {}",
-                symbol,
-                e,
-                &response_text[..response_text.len().min(1000)]
-            );
-            MarketDataError::ProviderError {
-                provider: "YAHOO".to_string(),
-                message: format!("Failed to parse profile response: {}", e),
-            }
-        })?;
+        let data: YahooQuoteSummaryResponse =
+            serde_json::from_str(&response_text).map_err(|e| {
+                warn!(
+                    "[YAHOO] Failed to parse quoteSummary for {}: {}. Response: {}",
+                    symbol,
+                    e,
+                    &response_text[..response_text.len().min(1000)]
+                );
+                MarketDataError::ProviderError {
+                    provider: "YAHOO".to_string(),
+                    message: format!("Failed to parse profile response: {}", e),
+                }
+            })?;
 
         let result = data
             .quote_summary
@@ -441,10 +447,7 @@ impl YahooProvider {
         // Log raw Yahoo response for debugging
         debug!(
             "[YAHOO PROFILE RAW] symbol={}, price={:?}, summary_profile={:?}, summary_detail={:?}",
-            symbol,
-            result.price,
-            result.summary_profile,
-            result.summary_detail
+            symbol, result.price, result.summary_profile, result.summary_detail
         );
 
         self.map_quote_summary_to_profile(symbol, &result)
@@ -602,7 +605,11 @@ impl MarketDataProvider for YahooProvider {
 
     fn capabilities(&self) -> ProviderCapabilities {
         ProviderCapabilities {
-            instrument_kinds: &[InstrumentKind::Equity, InstrumentKind::Crypto, InstrumentKind::Fx],
+            instrument_kinds: &[
+                InstrumentKind::Equity,
+                InstrumentKind::Crypto,
+                InstrumentKind::Fx,
+            ],
             coverage: Coverage::global_best_effort(),
             supports_latest: true,
             supports_historical: true,
@@ -755,7 +762,10 @@ impl MarketDataProvider for YahooProvider {
         }
 
         // Last resort: search-based profile
-        debug!("[YAHOO] Falling back to search-based profile for {}", symbol);
+        debug!(
+            "[YAHOO] Falling back to search-based profile for {}",
+            symbol
+        );
         let profile = self.fetch_search_profile(symbol).await?;
         debug!(
             "[YAHOO PROFILE FROM SEARCH] symbol={}, name={:?}, quote_type={:?}",
@@ -861,7 +871,10 @@ mod tests {
         );
 
         // Test fallback to short_name
-        assert_eq!(format_name(None, "EQUITY", Some("AAPL Inc"), "AAPL"), "AAPL Inc");
+        assert_eq!(
+            format_name(None, "EQUITY", Some("AAPL Inc"), "AAPL"),
+            "AAPL Inc"
+        );
 
         // Test fallback to symbol
         assert_eq!(format_name(None, "EQUITY", None, "AAPL"), "AAPL");
@@ -951,7 +964,11 @@ mod tests {
     #[test]
     fn test_capabilities() {
         let capabilities = ProviderCapabilities {
-            instrument_kinds: &[InstrumentKind::Equity, InstrumentKind::Crypto, InstrumentKind::Fx],
+            instrument_kinds: &[
+                InstrumentKind::Equity,
+                InstrumentKind::Crypto,
+                InstrumentKind::Fx,
+            ],
             coverage: Coverage::global_best_effort(),
             supports_latest: true,
             supports_historical: true,
@@ -959,8 +976,12 @@ mod tests {
             supports_profile: true,
         };
 
-        assert!(capabilities.instrument_kinds.contains(&InstrumentKind::Equity));
-        assert!(capabilities.instrument_kinds.contains(&InstrumentKind::Crypto));
+        assert!(capabilities
+            .instrument_kinds
+            .contains(&InstrumentKind::Equity));
+        assert!(capabilities
+            .instrument_kinds
+            .contains(&InstrumentKind::Crypto));
         assert!(capabilities.instrument_kinds.contains(&InstrumentKind::Fx));
         assert!(capabilities.supports_latest);
         assert!(capabilities.supports_historical);

@@ -1,17 +1,12 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::{
-    api::shared::{trigger_activity_portfolio_job, ActivityImpact},
-    error::ApiResult,
-    main_lib::AppState,
-};
+use crate::{error::ApiResult, main_lib::AppState};
 use axum::{
     extract::{Multipart, Path, Query, State},
     routing::{delete, get, post},
     Json, Router,
 };
-use tracing::info;
 use wealthfolio_core::activities::{
     Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityImport,
     ActivitySearchResponse, ActivityUpdate, ImportActivitiesResult, ImportMappingData, NewActivity,
@@ -47,6 +42,10 @@ struct ActivitySearchBody {
     sort: Option<SortWrapper>,
     #[serde(rename = "needsReviewFilter")]
     needs_review_filter: Option<bool>,
+    #[serde(rename = "dateFrom")]
+    date_from: Option<String>, // YYYY-MM-DD format
+    #[serde(rename = "dateTo")]
+    date_to: Option<String>, // YYYY-MM-DD format
 }
 
 async fn search_activities(
@@ -69,6 +68,18 @@ async fn search_activities(
         Some(StringOrVec::Many(v)) => Some(v),
         None => None,
     };
+    // Parse date filters
+    let date_from_parsed = body
+        .date_from
+        .map(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d"))
+        .transpose()
+        .map_err(|e| crate::error::ApiError::BadRequest(format!("Invalid dateFrom format: {}", e)))?;
+    let date_to_parsed = body
+        .date_to
+        .map(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d"))
+        .transpose()
+        .map_err(|e| crate::error::ApiError::BadRequest(format!("Invalid dateTo format: {}", e)))?;
+
     let resp = state.activity_service.search_activities(
         body.page,
         body.page_size,
@@ -77,6 +88,8 @@ async fn search_activities(
         body.asset_id_keyword,
         sort_normalized,
         body.needs_review_filter,
+        date_from_parsed,
+        date_to_parsed,
     )?;
     Ok(Json(resp))
 }
@@ -87,16 +100,7 @@ async fn create_activity(
 ) -> ApiResult<Json<Activity>> {
     let created = state.activity_service.create_activity(activity).await?;
 
-    // Trigger asset enrichment (service handles filtering)
-    if let Some(ref asset_id) = created.asset_id {
-        let asset_service = state.asset_service.clone();
-        let asset_id = asset_id.clone();
-        tokio::spawn(async move {
-            let _ = asset_service.enrich_assets(vec![asset_id]).await;
-        });
-    }
-
-    trigger_activity_portfolio_job(state, vec![ActivityImpact::from_activity(&created)]);
+    // Domain events handle asset enrichment and portfolio recalculation
     Ok(Json(created))
 }
 
@@ -104,27 +108,8 @@ async fn update_activity(
     State(state): State<Arc<AppState>>,
     Json(activity): Json<ActivityUpdate>,
 ) -> ApiResult<Json<Activity>> {
-    let previous = state.activity_service.get_activity(&activity.id)?;
     let updated = state.activity_service.update_activity(activity).await?;
-
-    // Trigger asset enrichment if asset changed (service handles filtering)
-    if updated.asset_id != previous.asset_id {
-        if let Some(ref asset_id) = updated.asset_id {
-            let asset_service = state.asset_service.clone();
-            let asset_id = asset_id.clone();
-            tokio::spawn(async move {
-                let _ = asset_service.enrich_assets(vec![asset_id]).await;
-            });
-        }
-    }
-
-    trigger_activity_portfolio_job(
-        state,
-        vec![
-            ActivityImpact::from_activity(&updated),
-            ActivityImpact::from_activity(&previous),
-        ],
-    );
+    // Domain events handle asset enrichment and portfolio recalculation
     Ok(Json(updated))
 }
 
@@ -136,29 +121,7 @@ async fn save_activities(
         .activity_service
         .bulk_mutate_activities(request)
         .await?;
-
-    // Trigger asset enrichment for all assets from created activities (service handles filtering)
-    let new_asset_ids: Vec<String> = result
-        .created
-        .iter()
-        .filter_map(|a| a.asset_id.clone())
-        .collect::<HashSet<_>>()
-        .into_iter()
-        .collect();
-
-    if !new_asset_ids.is_empty() {
-        info!("Triggering enrichment for {} assets from bulk mutation", new_asset_ids.len());
-        let asset_service = state.asset_service.clone();
-        tokio::spawn(async move {
-            let _ = asset_service.enrich_assets(new_asset_ids).await;
-        });
-    }
-
-    let mut impacts: Vec<ActivityImpact> = Vec::new();
-    impacts.extend(result.created.iter().map(ActivityImpact::from_activity));
-    impacts.extend(result.updated.iter().map(ActivityImpact::from_activity));
-    impacts.extend(result.deleted.iter().map(ActivityImpact::from_activity));
-    trigger_activity_portfolio_job(state, impacts);
+    // Domain events handle asset enrichment and portfolio recalculation
     Ok(Json(result))
 }
 
@@ -167,7 +130,7 @@ async fn delete_activity(
     State(state): State<Arc<AppState>>,
 ) -> ApiResult<Json<Activity>> {
     let deleted = state.activity_service.delete_activity(id).await?;
-    trigger_activity_portfolio_job(state, vec![ActivityImpact::from_activity(&deleted)]);
+    // Domain events handle portfolio recalculation
     Ok(Json(deleted))
 }
 
@@ -207,39 +170,7 @@ async fn import_activities(
         .activity_service
         .import_activities(body.account_id, body.activities)
         .await?;
-
-    // Trigger asset enrichment for all assets from imported activities (service handles filtering)
-    let imported_asset_ids: Vec<String> = result
-        .activities
-        .iter()
-        .filter(|a| a.is_valid)
-        .map(|a| a.symbol.clone())
-        .collect::<HashSet<_>>()
-        .into_iter()
-        .collect();
-
-    if !imported_asset_ids.is_empty() {
-        info!("Triggering enrichment for {} assets from import", imported_asset_ids.len());
-        let asset_service = state.asset_service.clone();
-        tokio::spawn(async move {
-            let _ = asset_service.enrich_assets(imported_asset_ids).await;
-        });
-    }
-
-    trigger_activity_portfolio_job(
-        state,
-        result
-            .activities
-            .iter()
-            .map(|item| {
-                ActivityImpact::from_parts(
-                    item.account_id.clone().unwrap_or_default(),
-                    Some(item.currency.clone()),
-                    Some(item.symbol.clone()),
-                )
-            })
-            .collect(),
-    );
+    // Domain events handle asset enrichment and portfolio recalculation
     Ok(Json(result))
 }
 
@@ -295,7 +226,7 @@ async fn check_existing_duplicates(
 }
 
 async fn parse_csv_endpoint(
-    State(state): State<Arc<AppState>>,
+    State(_state): State<Arc<AppState>>,
     mut multipart: Multipart,
 ) -> ApiResult<Json<ParsedCsvResult>> {
     let mut file_content: Option<Vec<u8>> = None;

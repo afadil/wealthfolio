@@ -294,7 +294,9 @@ pub fn calculate_sync_window(
             // Use same buffer as detection to ensure we cover the required range
             let start = inputs
                 .activity_min
-                .map(|d| d - Duration::days(QUOTE_HISTORY_BUFFER_DAYS + BACKFILL_SAFETY_MARGIN_DAYS))
+                .map(|d| {
+                    d - Duration::days(QUOTE_HISTORY_BUFFER_DAYS + BACKFILL_SAFETY_MARGIN_DAYS)
+                })
                 .unwrap_or(today);
 
             // End at quote_min - 1 to avoid refetching existing data
@@ -541,9 +543,9 @@ mod tests {
         let inputs = create_inputs(
             false,
             None,
-            Some(today),         // has activity
+            Some(today), // has activity
             Some(today),
-            None,                // no quotes
+            None, // no quotes
             None,
         );
 
@@ -578,9 +580,9 @@ mod tests {
         let inputs = create_inputs(
             true,
             None,
-            Some(today - Duration::days(60)),  // activity started 60 days ago
+            Some(today - Duration::days(60)), // activity started 60 days ago
             Some(today - Duration::days(1)),
-            Some(today - Duration::days(20)),  // but quotes only go back 20 days
+            Some(today - Duration::days(20)), // but quotes only go back 20 days
             Some(today - Duration::days(1)),
         );
 
@@ -597,7 +599,7 @@ mod tests {
         let today = Utc::now().date_naive();
         let inputs = create_inputs(
             false,
-            Some(today - Duration::days(5)),   // closed 5 days ago
+            Some(today - Duration::days(5)), // closed 5 days ago
             Some(today - Duration::days(100)),
             Some(today - Duration::days(5)),
             Some(today - Duration::days(160)), // enough history to avoid NeedsBackfill
@@ -617,7 +619,7 @@ mod tests {
         let today = Utc::now().date_naive();
         let inputs = create_inputs(
             false,
-            None,                              // no explicit closed date
+            None, // no explicit closed date
             Some(today - Duration::days(100)),
             Some(today - Duration::days(10)), // last activity 10 days ago
             Some(today - Duration::days(160)),
@@ -637,7 +639,7 @@ mod tests {
         let today = Utc::now().date_naive();
         let inputs = create_inputs(
             false,
-            Some(today - Duration::days(50)),  // closed 50 days ago
+            Some(today - Duration::days(50)), // closed 50 days ago
             Some(today - Duration::days(100)),
             Some(today - Duration::days(50)),
             Some(today - Duration::days(160)),
@@ -660,7 +662,7 @@ mod tests {
             None,
             Some(today - Duration::days(100)), // activity started 100 days ago
             Some(today - Duration::days(50)),
-            Some(today - Duration::days(50)),  // quotes only go back 50 days
+            Some(today - Duration::days(50)), // quotes only go back 50 days
             Some(today - Duration::days(1)),
         );
 

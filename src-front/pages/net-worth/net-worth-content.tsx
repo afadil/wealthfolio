@@ -260,7 +260,8 @@ function CompositionWidget({ data, isLoading }: CompositionWidgetProps) {
                     className="h-full transition-opacity hover:opacity-80"
                     style={{
                       width: `${item.percentage}%`,
-                      backgroundColor: CATEGORY_CSS_COLORS[item.category] || "var(--muted-foreground)",
+                      backgroundColor:
+                        CATEGORY_CSS_COLORS[item.category] || "var(--muted-foreground)",
                       marginLeft: index > 0 ? "1px" : 0,
                     }}
                   />
@@ -382,7 +383,7 @@ export function NetWorthContent() {
     // Portfolio gain = (last.portfolioValue - last.netContribution) - (first.portfolioValue - first.netContribution)
     // This removes the effect of deposits/withdrawals
     const portfolioGain =
-      (lastPortfolioValue - lastNetContribution) - (firstPortfolioValue - firstNetContribution);
+      lastPortfolioValue - lastNetContribution - (firstPortfolioValue - firstNetContribution);
 
     // Alternative asset gain = simple delta (no contribution tracking)
     const altAssetGain = lastAltAssets - firstAltAssets;

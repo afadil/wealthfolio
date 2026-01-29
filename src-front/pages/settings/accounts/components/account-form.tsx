@@ -94,7 +94,12 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
 
       if (id) {
         if (options?.async) {
-          return updateAccountMutation.mutateAsync({ id, trackingMode, ...rest, meta: updatedMeta });
+          return updateAccountMutation.mutateAsync({
+            id,
+            trackingMode,
+            ...rest,
+            meta: updatedMeta,
+          });
         }
         return updateAccountMutation.mutate({ id, trackingMode, ...rest, meta: updatedMeta });
       }
@@ -233,7 +238,10 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
               <FormItem className="space-y-2">
                 <FormLabel>Tracking Mode</FormLabel>
                 {needsSetup && !currentTrackingMode && (
-                  <Alert variant="warning" className="py-2.5 px-3 [&>svg]:top-2.5 [&>svg]:left-3 [&>svg~*]:pl-6">
+                  <Alert
+                    variant="warning"
+                    className="px-3 py-2.5 [&>svg]:top-2.5 [&>svg]:left-3 [&>svg~*]:pl-6"
+                  >
                     <Icons.AlertTriangle className="h-4 w-4" />
                     <AlertDescription className="text-xs">
                       Choose how to track this account. This affects what data you enter and what
@@ -242,7 +250,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                         href="https://wealthfolio.app/docs/concepts/activity-types"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="underline hover:text-foreground"
+                        className="hover:text-foreground underline"
                       >
                         Learn more
                       </a>
@@ -256,7 +264,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                     className="grid grid-cols-1 gap-3 sm:grid-cols-2"
                   >
                     <label
-                      className={`relative flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors hover:bg-accent ${
+                      className={`hover:bg-accent relative flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors ${
                         field.value === "TRANSACTIONS"
                           ? "border-primary bg-primary/5"
                           : "border-muted"
@@ -265,20 +273,20 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                       <RadioGroupItem value="TRANSACTIONS" className="mt-0.5" />
                       <div className="flex flex-col">
                         <span className="text-sm font-medium">Transactions</span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-muted-foreground text-xs">
                           Track every trade for performance analytics
                         </span>
                       </div>
                     </label>
                     <label
-                      className={`relative flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors hover:bg-accent ${
+                      className={`hover:bg-accent relative flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors ${
                         field.value === "HOLDINGS" ? "border-primary bg-primary/5" : "border-muted"
                       }`}
                     >
                       <RadioGroupItem value="HOLDINGS" className="mt-0.5" />
                       <div className="flex flex-col">
                         <span className="text-sm font-medium">Holdings</span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-muted-foreground text-xs">
                           Add holdings directly as snapshots
                         </span>
                       </div>
@@ -286,7 +294,10 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                   </RadioGroup>
                 </FormControl>
                 {field.value === "HOLDINGS" && (
-                  <Alert variant="warning" className="py-2.5 px-3 [&>svg]:top-2.5 [&>svg]:left-3 [&>svg~*]:pl-6">
+                  <Alert
+                    variant="warning"
+                    className="px-3 py-2.5 [&>svg]:top-2.5 [&>svg]:left-3 [&>svg~*]:pl-6"
+                  >
                     <Icons.AlertTriangle className="h-4 w-4" />
                     <AlertDescription className="text-xs">
                       Performance metrics will be limited without transaction history.{" "}
@@ -294,7 +305,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                         href="https://wealthfolio.app/docs/concepts/activity-types"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="underline hover:text-foreground"
+                        className="hover:text-foreground underline"
                       >
                         Learn more
                       </a>

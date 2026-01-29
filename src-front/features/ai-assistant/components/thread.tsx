@@ -130,7 +130,9 @@ const ThreadSuggestions: FC = () => {
               className="aui-thread-welcome-suggestion dark:hover:bg-accent/60 h-auto w-full flex-1 flex-wrap items-start justify-start gap-1 rounded-3xl border px-5 py-4 text-left text-sm @md:flex-col"
               aria-label={suggestedAction.action}
             >
-              <span className="aui-thread-welcome-suggestion-text-1 font-medium">{suggestedAction.title}</span>
+              <span className="aui-thread-welcome-suggestion-text-1 font-medium">
+                {suggestedAction.title}
+              </span>
               <span className="aui-thread-welcome-suggestion-text-2 text-muted-foreground">
                 {suggestedAction.label}
               </span>
@@ -230,7 +232,7 @@ const TypingIndicator: FC = () => {
   if (!showIndicator) return null;
 
   return (
-    <div className="bg-muted mb-2 inline-flex items-end gap-1 rounded-2xl px-3.5 pb-2.5 pt-3">
+    <div className="bg-muted mb-2 inline-flex items-end gap-1 rounded-2xl px-3.5 pt-3 pb-2.5">
       <span className="bg-foreground/50 size-2 animate-bounce rounded-full [animation-delay:-0.3s]" />
       <span className="bg-foreground/50 size-2 animate-bounce rounded-full [animation-delay:-0.15s]" />
       <span className="bg-foreground/50 size-2 animate-bounce rounded-full" />

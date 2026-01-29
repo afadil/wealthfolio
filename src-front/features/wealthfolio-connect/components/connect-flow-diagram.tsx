@@ -2,7 +2,7 @@ import appLogo from "@/assets/logo-rounded.png";
 
 export function ConnectFlowDiagram() {
   return (
-    <div className="bg-card rounded-2xl border border-dashed border-border p-4 sm:p-5">
+    <div className="bg-card border-border rounded-2xl border border-dashed p-4 sm:p-5">
       <svg viewBox="0 -8 730 175" className="h-auto w-full" xmlns="http://www.w3.org/2000/svg">
         {/* ========== YOUR DEVICE (Left) ========== */}
         <g transform="translate(20, 40)">
@@ -26,7 +26,13 @@ export function ConnectFlowDiagram() {
             preserveAspectRatio="xMidYMid slice"
           />
           {/* Text */}
-          <text x="68" y="32" className="fill-[#3d3d3d] dark:fill-white/90" fontSize="14" fontWeight="500">
+          <text
+            x="68"
+            y="32"
+            className="fill-[#3d3d3d] dark:fill-white/90"
+            fontSize="14"
+            fontWeight="500"
+          >
             Your Device
           </text>
           <text x="68" y="50" className="fill-[#9a9a9a] dark:fill-white/50" fontSize="12">
@@ -34,10 +40,22 @@ export function ConnectFlowDiagram() {
           </text>
 
           {/* Labels below */}
-          <text x="90" y="100" textAnchor="middle" className="fill-[#504f4f] dark:fill-white/50" fontSize="12">
+          <text
+            x="90"
+            y="100"
+            textAnchor="middle"
+            className="fill-[#504f4f] dark:fill-white/50"
+            fontSize="12"
+          >
             Wealthfolio
           </text>
-          <text x="90" y="116" textAnchor="middle" className="fill-[#b5b0a6] dark:fill-white/30" fontSize="10">
+          <text
+            x="90"
+            y="116"
+            textAnchor="middle"
+            className="fill-[#b5b0a6] dark:fill-white/30"
+            fontSize="10"
+          >
             Data stays here
           </text>
         </g>
@@ -83,7 +101,14 @@ export function ConnectFlowDiagram() {
             </image>
           </g>
           {/* Label below */}
-          <text x="32" y="100" textAnchor="middle" className="fill-[#5a5347] dark:fill-white/70" fontSize="14" fontWeight="700">
+          <text
+            x="32"
+            y="100"
+            textAnchor="middle"
+            className="fill-[#5a5347] dark:fill-white/70"
+            fontSize="14"
+            fontWeight="700"
+          >
             Connect
           </text>
         </g>
@@ -128,10 +153,22 @@ export function ConnectFlowDiagram() {
             />
           </g>
           {/* Labels below */}
-          <text x="28" y="88" textAnchor="middle" className="fill-[#504f4f] dark:fill-white/50" fontSize="12">
+          <text
+            x="28"
+            y="88"
+            textAnchor="middle"
+            className="fill-[#504f4f] dark:fill-white/50"
+            fontSize="12"
+          >
             Aggregators
           </text>
-          <text x="28" y="104" textAnchor="middle" className="fill-[#b5b0a6] dark:fill-white/30" fontSize="10">
+          <text
+            x="28"
+            y="104"
+            textAnchor="middle"
+            className="fill-[#b5b0a6] dark:fill-white/30"
+            fontSize="10"
+          >
             (e.g. SnapTrade)
           </text>
         </g>
@@ -167,13 +204,23 @@ export function ConnectFlowDiagram() {
           />
           {/* Animated dots - using same paths reversed */}
           <circle r="4" className="fill-[#8b7355] dark:fill-[#a69580]">
-            <animateMotion dur="3s" repeatCount="indefinite" begin="0s" path="M 95 -58 C 55 -58, 40 0, 0 0" />
+            <animateMotion
+              dur="3s"
+              repeatCount="indefinite"
+              begin="0s"
+              path="M 95 -58 C 55 -58, 40 0, 0 0"
+            />
           </circle>
           <circle r="4" className="fill-[#8b7355] dark:fill-[#a69580]">
             <animateMotion dur="3s" repeatCount="indefinite" begin="0.4s" path="M 95 0 L 0 0" />
           </circle>
           <circle r="4" className="fill-[#8b7355] dark:fill-[#a69580]">
-            <animateMotion dur="3s" repeatCount="indefinite" begin="0.8s" path="M 95 58 C 55 58, 40 0, 0 0" />
+            <animateMotion
+              dur="3s"
+              repeatCount="indefinite"
+              begin="0.8s"
+              path="M 95 58 C 55 58, 40 0, 0 0"
+            />
           </circle>
         </g>
 
@@ -190,7 +237,14 @@ export function ConnectFlowDiagram() {
             strokeWidth="1"
           />
           {/* Icon background */}
-          <rect x="12" y="9" width="32" height="32" rx="10" className="fill-[#f5f3ed] dark:fill-white/10" />
+          <rect
+            x="12"
+            y="9"
+            width="32"
+            height="32"
+            rx="10"
+            className="fill-[#f5f3ed] dark:fill-white/10"
+          />
           {/* Landmark icon (bank building) */}
           <g transform="translate(19, 15)">
             <path
@@ -203,7 +257,13 @@ export function ConnectFlowDiagram() {
               transform="scale(0.8)"
             />
           </g>
-          <text x="56" y="30" className="fill-[#3d3d3d] dark:fill-white/80" fontSize="13" fontWeight="500">
+          <text
+            x="56"
+            y="30"
+            className="fill-[#3d3d3d] dark:fill-white/80"
+            fontSize="13"
+            fontWeight="500"
+          >
             Brokerages
           </text>
         </g>
@@ -220,7 +280,14 @@ export function ConnectFlowDiagram() {
             strokeWidth="1"
           />
           {/* Icon background */}
-          <rect x="12" y="9" width="32" height="32" rx="10" className="fill-[#f5f3ed] dark:fill-white/10" />
+          <rect
+            x="12"
+            y="9"
+            width="32"
+            height="32"
+            rx="10"
+            className="fill-[#f5f3ed] dark:fill-white/10"
+          />
           {/* Building icon */}
           <g transform="translate(19, 15)">
             <path
@@ -233,7 +300,13 @@ export function ConnectFlowDiagram() {
               transform="scale(0.75)"
             />
           </g>
-          <text x="56" y="30" className="fill-[#3d3d3d] dark:fill-white/80" fontSize="13" fontWeight="500">
+          <text
+            x="56"
+            y="30"
+            className="fill-[#3d3d3d] dark:fill-white/80"
+            fontSize="13"
+            fontWeight="500"
+          >
             Banks
           </text>
         </g>
@@ -250,7 +323,14 @@ export function ConnectFlowDiagram() {
             strokeWidth="1"
           />
           {/* Icon background */}
-          <rect x="12" y="9" width="32" height="32" rx="10" className="fill-[#f5f3ed] dark:fill-white/10" />
+          <rect
+            x="12"
+            y="9"
+            width="32"
+            height="32"
+            rx="10"
+            className="fill-[#f5f3ed] dark:fill-white/10"
+          />
           {/* Bitcoin icon */}
           <g transform="translate(21, 16)">
             <path
@@ -263,7 +343,13 @@ export function ConnectFlowDiagram() {
               transform="scale(0.7)"
             />
           </g>
-          <text x="56" y="30" className="fill-[#3d3d3d] dark:fill-white/80" fontSize="13" fontWeight="500">
+          <text
+            x="56"
+            y="30"
+            className="fill-[#3d3d3d] dark:fill-white/80"
+            fontSize="13"
+            fontWeight="500"
+          >
             Crypto
           </text>
         </g>

@@ -86,25 +86,36 @@ interface SellFormProps {
  * Calculates the expected amount from quantity, price, and fee.
  * For SELL: Amount = (quantity * price) - fee
  */
-function calculateAmount(quantity: number | undefined, unitPrice: number | undefined, fee: number | undefined): number {
+function calculateAmount(
+  quantity: number | undefined,
+  unitPrice: number | undefined,
+  fee: number | undefined,
+): number {
   const qty = quantity || 0;
   const price = unitPrice || 0;
   const feeVal = fee || 0;
   return Math.max(0, qty * price - feeVal);
 }
 
-export function SellForm({ accounts, defaultValues, onSubmit, onCancel, isLoading = false, isEditing = false, assetCurrency }: SellFormProps) {
+export function SellForm({
+  accounts,
+  defaultValues,
+  onSubmit,
+  onCancel,
+  isLoading = false,
+  isEditing = false,
+  assetCurrency,
+}: SellFormProps) {
   const { data: settings } = useSettings();
   const baseCurrency = settings?.baseCurrency;
 
   // Compute initial account and currency for defaultValues
-  const initialAccountId = defaultValues?.accountId ?? (accounts.length === 1 ? accounts[0].value : "");
+  const initialAccountId =
+    defaultValues?.accountId ?? (accounts.length === 1 ? accounts[0].value : "");
   const initialAccount = accounts.find((a) => a.value === initialAccountId);
   // Currency priority: provided default > normalized asset currency > account currency
   const initialCurrency =
-    defaultValues?.currency ??
-    normalizeCurrency(assetCurrency) ??
-    initialAccount?.currency;
+    defaultValues?.currency ?? normalizeCurrency(assetCurrency) ?? initialAccount?.currency;
 
   const form = useForm<SellFormValues>({
     resolver: zodResolver(sellFormSchema) as Resolver<SellFormValues>,
@@ -212,7 +223,8 @@ export function SellForm({ accounts, defaultValues, onSubmit, onCancel, isLoadin
 
             {calculatedAmount > 0 && (
               <p className="text-muted-foreground text-sm">
-                Amount: {calculatedAmount.toFixed(2)}{currency && ` ${currency}`}
+                Amount: {calculatedAmount.toFixed(2)}
+                {currency && ` ${currency}`}
               </p>
             )}
 
@@ -221,8 +233,9 @@ export function SellForm({ accounts, defaultValues, onSubmit, onCancel, isLoadin
               <Alert variant="default" className="border-warning bg-warning/10">
                 <Icons.AlertTriangle className="text-warning h-4 w-4" />
                 <AlertDescription className="text-warning text-sm">
-                  You are selling more shares ({quantity?.toLocaleString()}) than your current holdings (
-                  {currentHoldingQuantity.toLocaleString()}). This may result in a short position.
+                  You are selling more shares ({quantity?.toLocaleString()}) than your current
+                  holdings ({currentHoldingQuantity.toLocaleString()}). This may result in a short
+                  position.
                 </AlertDescription>
               </Alert>
             )}

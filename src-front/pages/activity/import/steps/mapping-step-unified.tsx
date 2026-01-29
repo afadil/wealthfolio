@@ -46,7 +46,7 @@ const ACTIVITY_TYPE_SMART_DEFAULTS: Record<string, ActivityType> = {
 
 function findAppTypeForCsvType(
   csvType: string,
-  mappings: Record<string, string[]>
+  mappings: Record<string, string[]>,
 ): ActivityType | null {
   const normalizedCsvType = csvType.trim().toUpperCase();
 
@@ -128,7 +128,7 @@ export function MappingStepUnified() {
     (updatedMapping: ImportMappingData) => {
       dispatch(setMapping(updatedMapping));
     },
-    [dispatch]
+    [dispatch],
   );
 
   // Wrapper handlers that sync to context
@@ -142,7 +142,7 @@ export function MappingStepUnified() {
       };
       syncMappingToContext(updated);
     },
-    [handleColumnMapping, localMapping, syncMappingToContext]
+    [handleColumnMapping, localMapping, syncMappingToContext],
   );
 
   const onActivityTypeMapping = useCallback(
@@ -151,7 +151,7 @@ export function MappingStepUnified() {
       // The hook updates internally, we need to sync
       setTimeout(() => syncMappingToContext(localMapping), 0);
     },
-    [handleActivityTypeMapping, localMapping, syncMappingToContext]
+    [handleActivityTypeMapping, localMapping, syncMappingToContext],
   );
 
   const onSymbolMapping = useCallback(
@@ -163,7 +163,7 @@ export function MappingStepUnified() {
       };
       syncMappingToContext(updated);
     },
-    [handleSymbolMapping, localMapping, syncMappingToContext]
+    [handleSymbolMapping, localMapping, syncMappingToContext],
   );
 
   const onAccountIdMapping = useCallback(
@@ -171,11 +171,14 @@ export function MappingStepUnified() {
       handleAccountIdMapping(csvAccountId, newAccountId);
       const updated = {
         ...localMapping,
-        accountMappings: { ...localMapping.accountMappings, [csvAccountId.trim()]: newAccountId.trim() },
+        accountMappings: {
+          ...localMapping.accountMappings,
+          [csvAccountId.trim()]: newAccountId.trim(),
+        },
       };
       syncMappingToContext(updated);
     },
-    [handleAccountIdMapping, localMapping, syncMappingToContext]
+    [handleAccountIdMapping, localMapping, syncMappingToContext],
   );
 
   // Helper to get mapped value from row
@@ -185,24 +188,25 @@ export function MappingStepUnified() {
       if (!headerName) return "";
       return row[headerName] || "";
     },
-    [localMapping.fieldMappings]
+    [localMapping.fieldMappings],
   );
 
   // Check if all required fields are mapped
   const requiredFieldsMapped = IMPORT_REQUIRED_FIELDS.every(
-    (field) => localMapping.fieldMappings[field] && headers.includes(localMapping.fieldMappings[field])
+    (field) =>
+      localMapping.fieldMappings[field] && headers.includes(localMapping.fieldMappings[field]),
   );
 
   // Count how many fields are mapped
   const mappedFieldsCount = Object.entries(localMapping.fieldMappings).filter(
-    ([_, headerName]) => headerName && headers.includes(headerName)
+    ([_, headerName]) => headerName && headers.includes(headerName),
   ).length;
   const totalFields = Object.values(ImportFormat).length;
 
   // Symbols validation
   const distinctSymbols = useMemo(() => {
     return Array.from(new Set(data.map((row) => getMappedValue(row, ImportFormat.SYMBOL)))).filter(
-      Boolean
+      Boolean,
     );
   }, [data, getMappedValue]);
 
@@ -214,7 +218,7 @@ export function MappingStepUnified() {
   const distinctAccountIds = useMemo(() => {
     if (!localMapping.fieldMappings[ImportFormat.ACCOUNT]) return [];
     return Array.from(new Set(data.map((row) => getMappedValue(row, ImportFormat.ACCOUNT)))).filter(
-      Boolean
+      Boolean,
     );
   }, [data, localMapping.fieldMappings, getMappedValue]);
 
@@ -266,7 +270,7 @@ export function MappingStepUnified() {
     return invalidSymbols.filter((symbol) => {
       const normalizedSymbol = symbol.trim();
       return !Object.keys(localMapping.symbolMappings || {}).some(
-        (mappedSymbol) => mappedSymbol.trim() === normalizedSymbol
+        (mappedSymbol) => mappedSymbol.trim() === normalizedSymbol,
       );
     }).length;
   }, [invalidSymbols, localMapping.symbolMappings]);
@@ -444,7 +448,8 @@ export function MappingStepUnified() {
           <div className="py-2">
             <div className="flex items-center justify-between">
               <div className="text-muted-foreground hidden px-3 text-sm md:block">
-                <span className="font-medium">{totalRows} </span>total row{totalRows !== 1 ? "s" : ""}
+                <span className="font-medium">{totalRows} </span>total row
+                {totalRows !== 1 ? "s" : ""}
               </div>
               <TabsList className="bg-secondary flex space-x-1 rounded-full p-1">
                 <TabsTrigger

@@ -1037,7 +1037,11 @@ where
                 .map(|h| h.to_lowercase())
                 .collect()
         } else {
-            vec!["symbol".to_string(), "date".to_string(), "close".to_string()]
+            vec![
+                "symbol".to_string(),
+                "date".to_string(),
+                "close".to_string(),
+            ]
         };
 
         // Validate required headers
@@ -1077,7 +1081,8 @@ where
                 }
             };
 
-            let get_field = |idx: usize| record.get(idx).map(|s| s.trim()).filter(|s| !s.is_empty());
+            let get_field =
+                |idx: usize| record.get(idx).map(|s| s.trim()).filter(|s| !s.is_empty());
             let parse_decimal = |idx: Option<usize>| -> Option<Decimal> {
                 idx.and_then(|i| get_field(i))
                     .and_then(|s| Decimal::from_str(&s.replace(',', "")).ok())
@@ -1246,77 +1251,77 @@ where
 fn mic_to_yahoo_suffix(mic: &str) -> Option<&'static str> {
     match mic {
         // North America
-        "XTSE" => Some("TO"),        // Toronto Stock Exchange
-        "XTSX" => Some("V"),         // TSX Venture
-        "XCNQ" => Some("CN"),        // Canadian Securities Exchange
-        "XMEX" => Some("MX"),        // Mexican Stock Exchange
+        "XTSE" => Some("TO"), // Toronto Stock Exchange
+        "XTSX" => Some("V"),  // TSX Venture
+        "XCNQ" => Some("CN"), // Canadian Securities Exchange
+        "XMEX" => Some("MX"), // Mexican Stock Exchange
         // UK & Ireland
-        "XLON" => Some("L"),         // London Stock Exchange
-        "XDUB" => Some("IR"),        // Dublin
+        "XLON" => Some("L"),  // London Stock Exchange
+        "XDUB" => Some("IR"), // Dublin
         // Germany
-        "XETR" => Some("DE"),        // XETRA
-        "XFRA" => Some("F"),         // Frankfurt
-        "XSTU" => Some("SG"),        // Stuttgart
-        "XHAM" => Some("HM"),        // Hamburg
-        "XDUS" => Some("DU"),        // Dusseldorf
-        "XMUN" => Some("MU"),        // Munich
-        "XBER" => Some("BE"),        // Berlin
-        "XHAN" => Some("HA"),        // Hanover
+        "XETR" => Some("DE"), // XETRA
+        "XFRA" => Some("F"),  // Frankfurt
+        "XSTU" => Some("SG"), // Stuttgart
+        "XHAM" => Some("HM"), // Hamburg
+        "XDUS" => Some("DU"), // Dusseldorf
+        "XMUN" => Some("MU"), // Munich
+        "XBER" => Some("BE"), // Berlin
+        "XHAN" => Some("HA"), // Hanover
         // Euronext
-        "XPAR" => Some("PA"),        // Paris
-        "XAMS" => Some("AS"),        // Amsterdam
-        "XBRU" => Some("BR"),        // Brussels
-        "XLIS" => Some("LS"),        // Lisbon
+        "XPAR" => Some("PA"), // Paris
+        "XAMS" => Some("AS"), // Amsterdam
+        "XBRU" => Some("BR"), // Brussels
+        "XLIS" => Some("LS"), // Lisbon
         // Southern Europe
-        "XMIL" => Some("MI"),        // Milan
-        "XMAD" => Some("MC"),        // Madrid
-        "XATH" => Some("AT"),        // Athens
+        "XMIL" => Some("MI"), // Milan
+        "XMAD" => Some("MC"), // Madrid
+        "XATH" => Some("AT"), // Athens
         // Nordic
-        "XSTO" => Some("ST"),        // Stockholm
-        "XHEL" => Some("HE"),        // Helsinki
-        "XCSE" => Some("CO"),        // Copenhagen
-        "XOSL" => Some("OL"),        // Oslo
-        "XICE" => Some("IC"),        // Iceland
+        "XSTO" => Some("ST"), // Stockholm
+        "XHEL" => Some("HE"), // Helsinki
+        "XCSE" => Some("CO"), // Copenhagen
+        "XOSL" => Some("OL"), // Oslo
+        "XICE" => Some("IC"), // Iceland
         // Central/Eastern Europe
-        "XSWX" => Some("SW"),        // Swiss Exchange
-        "XWBO" => Some("VI"),        // Vienna
-        "XWAR" => Some("WA"),        // Warsaw
-        "XPRA" => Some("PR"),        // Prague
-        "XBUD" => Some("BD"),        // Budapest
-        "XIST" => Some("IS"),        // Istanbul
+        "XSWX" => Some("SW"), // Swiss Exchange
+        "XWBO" => Some("VI"), // Vienna
+        "XWAR" => Some("WA"), // Warsaw
+        "XPRA" => Some("PR"), // Prague
+        "XBUD" => Some("BD"), // Budapest
+        "XIST" => Some("IS"), // Istanbul
         // Asia - China & Hong Kong
-        "XSHG" => Some("SS"),        // Shanghai
-        "XSHE" => Some("SZ"),        // Shenzhen
-        "XHKG" => Some("HK"),        // Hong Kong
+        "XSHG" => Some("SS"), // Shanghai
+        "XSHE" => Some("SZ"), // Shenzhen
+        "XHKG" => Some("HK"), // Hong Kong
         // Asia - Japan & Korea
-        "XTKS" => Some("T"),         // Tokyo
-        "XKRX" => Some("KS"),        // Korea (KOSPI)
-        "XKOS" => Some("KQ"),        // Korea (KOSDAQ)
+        "XTKS" => Some("T"),  // Tokyo
+        "XKRX" => Some("KS"), // Korea (KOSPI)
+        "XKOS" => Some("KQ"), // Korea (KOSDAQ)
         // Southeast Asia
-        "XSES" => Some("SI"),        // Singapore
-        "XBKK" => Some("BK"),        // Bangkok
-        "XIDX" => Some("JK"),        // Jakarta
-        "XKLS" => Some("KL"),        // Kuala Lumpur
+        "XSES" => Some("SI"), // Singapore
+        "XBKK" => Some("BK"), // Bangkok
+        "XIDX" => Some("JK"), // Jakarta
+        "XKLS" => Some("KL"), // Kuala Lumpur
         // India
-        "XBOM" => Some("BO"),        // Bombay
-        "XNSE" => Some("NS"),        // National Stock Exchange India
+        "XBOM" => Some("BO"), // Bombay
+        "XNSE" => Some("NS"), // National Stock Exchange India
         // Taiwan
-        "XTAI" => Some("TW"),        // Taiwan
+        "XTAI" => Some("TW"), // Taiwan
         // Oceania
-        "XASX" => Some("AX"),        // Australia
-        "XNZE" => Some("NZ"),        // New Zealand
+        "XASX" => Some("AX"), // Australia
+        "XNZE" => Some("NZ"), // New Zealand
         // South America
-        "BVMF" => Some("SA"),        // Brazil (B3)
-        "XBUE" => Some("BA"),        // Buenos Aires
-        "XSGO" => Some("SN"),        // Santiago
+        "BVMF" => Some("SA"), // Brazil (B3)
+        "XBUE" => Some("BA"), // Buenos Aires
+        "XSGO" => Some("SN"), // Santiago
         // Middle East
-        "XTAE" => Some("TA"),        // Tel Aviv
-        "XSAU" => Some("SAU"),       // Saudi Arabia
-        "XDFM" => Some("AE"),        // Dubai Financial Market
-        "DSMD" => Some("QA"),        // Qatar
+        "XTAE" => Some("TA"),  // Tel Aviv
+        "XSAU" => Some("SAU"), // Saudi Arabia
+        "XDFM" => Some("AE"),  // Dubai Financial Market
+        "DSMD" => Some("QA"),  // Qatar
         // Africa
-        "XJSE" => Some("JO"),        // Johannesburg
-        "XCAI" => Some("CA"),        // Cairo
+        "XJSE" => Some("JO"), // Johannesburg
+        "XCAI" => Some("CA"), // Cairo
         _ => None,
     }
 }

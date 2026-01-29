@@ -112,35 +112,27 @@ function normalizeGoalsResult(candidate: Record<string, unknown>): GetGoalsResul
         (item.description as string | undefined) ??
         (item.Description as string | undefined) ??
         null,
-      targetAmount: Number(
-        item.targetAmount ?? item.target_amount ?? item.TargetAmount ?? 0
-      ),
-      currentAmount: Number(
-        item.currentAmount ?? item.current_amount ?? item.CurrentAmount ?? 0
-      ),
+      targetAmount: Number(item.targetAmount ?? item.target_amount ?? item.TargetAmount ?? 0),
+      currentAmount: Number(item.currentAmount ?? item.current_amount ?? item.CurrentAmount ?? 0),
       progressPercent: Number(
-        item.progressPercent ?? item.progress_percent ?? item.ProgressPercent ?? 0
+        item.progressPercent ?? item.progress_percent ?? item.ProgressPercent ?? 0,
       ),
       deadline:
-        (item.deadline as string | undefined) ??
-        (item.Deadline as string | undefined) ??
-        null,
-      isAchieved: Boolean(
-        item.isAchieved ?? item.is_achieved ?? item.IsAchieved ?? false
-      ),
+        (item.deadline as string | undefined) ?? (item.Deadline as string | undefined) ?? null,
+      isAchieved: Boolean(item.isAchieved ?? item.is_achieved ?? item.IsAchieved ?? false),
     }));
 
   return {
     goals,
     count: typeof candidate.count === "number" ? candidate.count : goals.length,
     totalTarget: Number(
-      candidate.totalTarget ?? candidate.total_target ?? candidate.TotalTarget ?? 0
+      candidate.totalTarget ?? candidate.total_target ?? candidate.TotalTarget ?? 0,
     ),
     totalCurrent: Number(
-      candidate.totalCurrent ?? candidate.total_current ?? candidate.TotalCurrent ?? 0
+      candidate.totalCurrent ?? candidate.total_current ?? candidate.TotalCurrent ?? 0,
     ),
     achievedCount: Number(
-      candidate.achievedCount ?? candidate.achieved_count ?? candidate.AchievedCount ?? 0
+      candidate.achievedCount ?? candidate.achieved_count ?? candidate.AchievedCount ?? 0,
     ),
     truncated: candidate.truncated === true,
     originalCount:
@@ -223,10 +215,7 @@ function GoalsLoadingSkeleton() {
       </CardHeader>
       <CardContent className="max-h-[320px] space-y-3 overflow-y-auto">
         {Array.from({ length: 3 }).map((_, index) => (
-          <div
-            key={index}
-            className="flex flex-col gap-2 rounded-lg border bg-background/60 p-3"
-          >
+          <div key={index} className="bg-background/60 flex flex-col gap-2 rounded-lg border p-3">
             <div className="flex items-center justify-between">
               <Skeleton className="h-4 w-32" />
               <Skeleton className="h-4 w-16" />
@@ -262,7 +251,7 @@ function GoalCard({
   };
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border bg-background/60 p-3 transition-colors hover:bg-background/80">
+    <div className="bg-background/60 hover:bg-background/80 flex flex-col gap-2 rounded-lg border p-3 transition-colors">
       {/* Header: Title and Status */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
@@ -271,14 +260,11 @@ function GoalCard({
           ) : (
             <Icons.Target className="text-muted-foreground h-4 w-4 flex-shrink-0" />
           )}
-          <span className="text-sm font-medium leading-tight">{goal.title}</span>
+          <span className="text-sm leading-tight font-medium">{goal.title}</span>
         </div>
         <Badge
           variant={goal.isAchieved ? "default" : "secondary"}
-          className={cn(
-            "text-xs",
-            goal.isAchieved && "bg-success text-success-foreground"
-          )}
+          className={cn("text-xs", goal.isAchieved && "bg-success text-success-foreground")}
         >
           {goal.progressPercent.toFixed(0)}%
         </Badge>
@@ -286,10 +272,7 @@ function GoalCard({
 
       {/* Progress Bar */}
       <div className="relative">
-        <Progress
-          value={Math.min(goal.progressPercent, 100)}
-          className="h-2"
-        />
+        <Progress value={Math.min(goal.progressPercent, 100)} className="h-2" />
         {/* Colored overlay for the progress indicator */}
         <div
           className={cn("absolute inset-y-0 left-0 h-2 rounded-full transition-all", progressColor)}
@@ -337,9 +320,7 @@ function ErrorState({ message }: { message?: string }) {
     <Card className="border-destructive/30 bg-destructive/5">
       <CardContent className="py-4">
         <p className="text-destructive text-sm font-medium">Failed to load goals</p>
-        {message && (
-          <p className="text-muted-foreground mt-1 text-xs">{message}</p>
-        )}
+        {message && <p className="text-muted-foreground mt-1 text-xs">{message}</p>}
       </CardContent>
     </Card>
   );
@@ -367,7 +348,7 @@ function GoalsToolUIContent({ result, status }: GoalsToolUIContentProps) {
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
       }),
-    []
+    [],
   );
 
   // Show loading skeleton while running

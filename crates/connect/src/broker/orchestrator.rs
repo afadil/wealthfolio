@@ -102,7 +102,10 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
     }
 
     /// Internal sync logic that may fail at any step.
-    async fn sync_all_internal(&self, api_client: &dyn BrokerApiClient) -> Result<SyncResult, String> {
+    async fn sync_all_internal(
+        &self,
+        api_client: &dyn BrokerApiClient,
+    ) -> Result<SyncResult, String> {
         // Step 1: Sync connections (platforms)
         info!("Fetching broker connections...");
         let connections = api_client
@@ -134,7 +137,10 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
             .await
             .map_err(|e| e.to_string())?;
 
-        info!("Fetched {} total broker accounts from API", all_accounts.len());
+        info!(
+            "Fetched {} total broker accounts from API",
+            all_accounts.len()
+        );
         for acc in &all_accounts {
             debug!(
                 "  Account '{}' (id={:?}): sync_enabled={}, shared_with_household={}",
@@ -154,7 +160,10 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
 
         let accounts: Vec<_> = all_accounts.into_iter().collect();
 
-        info!("Syncing {} broker accounts (including sync_disabled)", accounts.len());
+        info!(
+            "Syncing {} broker accounts (including sync_disabled)",
+            accounts.len()
+        );
 
         let accounts_result = self
             .sync_service
@@ -287,7 +296,12 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
                 TrackingMode::Holdings => {
                     // Sync holdings for HOLDINGS mode accounts
                     match self
-                        .sync_account_holdings(api_client, &account.id, &account.name, &broker_account_id)
+                        .sync_account_holdings(
+                            api_client,
+                            &account.id,
+                            &account.name,
+                            &broker_account_id,
+                        )
                         .await
                     {
                         Ok((positions_saved, assets_created, new_asset_ids)) => {
@@ -319,7 +333,10 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
                 .await
                 .map_err(|e| format!("Failed to mark activity sync attempt: {}", e))
             {
-                error!("Failed to mark activity sync attempt for '{}': {}", account_name, err);
+                error!(
+                    "Failed to mark activity sync attempt for '{}': {}",
+                    account_name, err
+                );
                 activities_summary.accounts_failed += 1;
                 continue;
             }
@@ -342,7 +359,10 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
                 .await
             {
                 Ok(run) => {
-                    debug!("Created import run {} for account '{}'", run.id, account_name);
+                    debug!(
+                        "Created import run {} for account '{}'",
+                        run.id, account_name
+                    );
                     Some(run)
                 }
                 Err(e) => {
@@ -406,7 +426,10 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
                         .is_err();
 
                     if sync_state_failed {
-                        error!("Failed to update sync state for '{}', but activities were synced", account_name);
+                        error!(
+                            "Failed to update sync state for '{}', but activities were synced",
+                            account_name
+                        );
                     }
 
                     // Always finalize import run (even if sync state update failed)
@@ -465,7 +488,12 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
                         let summary = ImportRunSummary::default();
                         let _ = self
                             .sync_service
-                            .finalize_import_run(run_id, summary, ImportRunStatus::Failed, Some(err.clone()))
+                            .finalize_import_run(
+                                run_id,
+                                summary,
+                                ImportRunStatus::Failed,
+                                Some(err.clone()),
+                            )
                             .await;
                     }
 
@@ -494,7 +522,10 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
         account_name: &str,
         broker_account_id: &str,
     ) -> Result<(usize, usize, Vec<String>), String> {
-        info!("Syncing holdings for account '{}' ({})", account_name, broker_account_id);
+        info!(
+            "Syncing holdings for account '{}' ({})",
+            account_name, broker_account_id
+        );
 
         // Emit progress event
         self.progress_reporter.report_progress(
@@ -529,11 +560,12 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
 
         // Emit completion event
         self.progress_reporter.report_progress(
-            SyncProgressPayload::new(account_id, account_name, SyncStatus::Complete)
-                .with_message(format!(
+            SyncProgressPayload::new(account_id, account_name, SyncStatus::Complete).with_message(
+                format!(
                     "Synced {} positions ({} assets created)",
                     positions_saved, assets_created
-                )),
+                ),
+            ),
         );
 
         Ok((positions_saved, assets_created, new_asset_ids))
@@ -574,7 +606,13 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
 
             // Fetch page
             let page = api_client
-                .get_account_activities(broker_account_id, start_date, end_date, Some(offset), Some(limit))
+                .get_account_activities(
+                    broker_account_id,
+                    start_date,
+                    end_date,
+                    Some(offset),
+                    Some(limit),
+                )
                 .await
                 .map_err(|e| e.to_string())?;
 
@@ -628,7 +666,11 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
 
                 let (upserted, assets, new_asset_ids, needs_review) = self
                     .sync_service
-                    .upsert_account_activities(account_id.to_string(), import_run_id.clone(), data.clone())
+                    .upsert_account_activities(
+                        account_id.to_string(),
+                        import_run_id.clone(),
+                        data.clone(),
+                    )
                     .await
                     .map_err(|e| format!("Failed to upsert activities: {}", e))?;
 
@@ -658,7 +700,13 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
             }
         }
 
-        Ok((total_fetched, total_inserted, total_assets_created, total_needs_review, all_new_asset_ids))
+        Ok((
+            total_fetched,
+            total_inserted,
+            total_assets_created,
+            total_needs_review,
+            all_new_asset_ids,
+        ))
     }
 
     /// Compute the activity query window for incremental sync.

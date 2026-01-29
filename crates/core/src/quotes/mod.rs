@@ -60,8 +60,8 @@ pub use types::{quote_id, AssetId, Currency, Day, ProviderId, QuoteSource};
 
 // Re-export sync state types
 pub use sync_state::{
-    MarketSyncMode, ProviderSyncStats, QuoteSyncState, QuoteSyncStateUpdate, SyncCategory,
-    SyncMode, SyncStateStore, SymbolSyncPlan,
+    MarketSyncMode, ProviderSyncStats, QuoteSyncState, QuoteSyncStateUpdate, SymbolSyncPlan,
+    SyncCategory, SyncMode, SyncStateStore,
 };
 
 // Re-export sync service types

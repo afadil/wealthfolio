@@ -120,7 +120,10 @@ pub async fn move_category(
     position: i32,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<Category, String> {
-    debug!("Moving category {} to position {}...", category_id, position);
+    debug!(
+        "Moving category {} to position {}...",
+        category_id, position
+    );
     state
         .taxonomy_service()
         .move_category(&taxonomy_id, &category_id, new_parent_id, position)
@@ -220,9 +223,7 @@ pub async fn migrate_legacy_classifications(
 }
 
 /// Core migration logic - can be called from Tauri command or health fix action
-pub async fn run_legacy_migration(
-    state: &Arc<ServiceContext>,
-) -> Result<MigrationResult, String> {
+pub async fn run_legacy_migration(state: &Arc<ServiceContext>) -> Result<MigrationResult, String> {
     debug!("Starting legacy classification migration...");
     wealthfolio_core::health::migrate_legacy_classifications(
         state.asset_service().as_ref(),

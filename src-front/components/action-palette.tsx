@@ -44,7 +44,7 @@ export function ActionPalette({
       item.onClick();
       onOpenChange(false);
     },
-    [triggerHaptic, onOpenChange]
+    [triggerHaptic, onOpenChange],
   );
 
   const handleClose = React.useCallback(() => {
@@ -65,17 +65,17 @@ export function ActionPalette({
         side={side}
         sideOffset={8}
         className={cn(
-          "w-auto min-w-[260px] max-w-[320px] p-0",
+          "w-auto max-w-[320px] min-w-[260px] p-0",
           "rounded-2xl",
-          "border border-border/50 dark:border-white/10",
+          "border-border/50 border dark:border-white/10",
           "bg-card backdrop-blur-xl",
-          "shadow-lg"
+          "shadow-lg",
         )}
       >
         {/* Header - only show if title provided */}
         {title && (
           <div className="flex items-center justify-between px-5 pt-5 pb-3">
-            <h3 className="text-lg font-bold text-foreground">{title}</h3>
+            <h3 className="text-foreground text-lg font-bold">{title}</h3>
             <button
               onClick={handleClose}
               className={cn(
@@ -83,7 +83,7 @@ export function ActionPalette({
                 "bg-muted/80 hover:bg-muted",
                 "text-muted-foreground hover:text-foreground",
                 "transition-colors duration-150",
-                "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                "focus-visible:ring-ring focus:outline-none focus-visible:ring-2",
               )}
               aria-label="Close"
             >
@@ -97,7 +97,7 @@ export function ActionPalette({
           {groups.map((group, groupIndex) => (
             <div key={groupIndex}>
               {group.title && (
-                <div className="px-2 py-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                <div className="text-muted-foreground px-2 py-1.5 text-xs font-medium tracking-wider uppercase">
                   {group.title}
                 </div>
               )}
@@ -107,9 +107,7 @@ export function ActionPalette({
                   const isDestructive = item.variant === "destructive";
                   return (
                     <React.Fragment key={itemIndex}>
-                      {itemIndex > 0 && (
-                        <div className="mx-3 h-px bg-border/70" />
-                      )}
+                      {itemIndex > 0 && <div className="bg-border/70 mx-3 h-px" />}
                       <button
                         onClick={() => handleItemClick(item)}
                         className={cn(
@@ -118,13 +116,13 @@ export function ActionPalette({
                           isDestructive
                             ? "text-destructive hover:bg-destructive/10 active:bg-destructive/15"
                             : "text-foreground hover:bg-accent active:bg-accent/80",
-                          "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                          "focus-visible:ring-ring focus:outline-none focus-visible:ring-2 focus-visible:ring-inset",
                         )}
                       >
                         <IconComponent
                           className={cn(
                             "h-5 w-5 flex-shrink-0",
-                            isDestructive ? "text-destructive" : "text-muted-foreground"
+                            isDestructive ? "text-destructive" : "text-muted-foreground",
                           )}
                         />
                         <span className="text-[15px] font-medium">{item.label}</span>
@@ -133,9 +131,7 @@ export function ActionPalette({
                   );
                 })}
               </div>
-              {groupIndex < groups.length - 1 && (
-                <div className="my-1.5 mx-3 h-px bg-border/70" />
-              )}
+              {groupIndex < groups.length - 1 && <div className="bg-border/70 mx-3 my-1.5 h-px" />}
             </div>
           ))}
         </div>

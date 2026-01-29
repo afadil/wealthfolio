@@ -80,13 +80,10 @@ function normalizeResult(result: unknown): GetAssetAllocationOutput | null {
   }
 
   // Extract allocation object
-  const allocationRaw =
-    (candidate.allocation as Record<string, unknown> | undefined) ?? candidate;
+  const allocationRaw = (candidate.allocation as Record<string, unknown> | undefined) ?? candidate;
 
   // Parse categories array
-  const categoriesRaw = Array.isArray(allocationRaw.categories)
-    ? allocationRaw.categories
-    : [];
+  const categoriesRaw = Array.isArray(allocationRaw.categories) ? allocationRaw.categories : [];
 
   const categories: CategoryAllocation[] = categoriesRaw
     .map((entry) => entry as Record<string, unknown>)
@@ -99,8 +96,7 @@ function normalizeResult(result: unknown): GetAssetAllocationOutput | null {
         (entry.categoryName as string | undefined) ??
         (entry.category_name as string | undefined) ??
         "Unknown",
-      color:
-        (entry.color as string | undefined) ?? `var(--chart-${(index % 5) + 1})`,
+      color: (entry.color as string | undefined) ?? `var(--chart-${(index % 5) + 1})`,
       value: Number(entry.value ?? 0),
       percentage: Number(entry.percentage ?? 0),
     }));
@@ -123,7 +119,7 @@ function normalizeResult(result: unknown): GetAssetAllocationOutput | null {
     totalValue: Number(
       (candidate.totalValue as number | string | undefined) ??
         (candidate.total_value as number | string | undefined) ??
-        categories.reduce((sum, c) => sum + c.value, 0)
+        categories.reduce((sum, c) => sum + c.value, 0),
     ),
     currency: (candidate.currency as string | undefined) ?? "USD",
     accountScope:
@@ -147,7 +143,10 @@ export const AllocationToolUI = makeAssistantToolUI<
   },
 });
 
-type AllocationContentProps = ToolCallMessagePartProps<GetAssetAllocationArgs, GetAssetAllocationOutput>;
+type AllocationContentProps = ToolCallMessagePartProps<
+  GetAssetAllocationArgs,
+  GetAssetAllocationOutput
+>;
 
 function AllocationContent({ args, result, status }: AllocationContentProps) {
   // Cast args to typed interface since makeAssistantToolUI provides ReadonlyJSONObject
@@ -174,7 +173,7 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
       }),
-    [currency]
+    [currency],
   );
 
   const accountLabel = parsed?.accountScope ?? typedArgs?.accountId ?? "TOTAL";
@@ -241,9 +240,7 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
     return (
       <Card className="bg-muted/40 border-destructive/30 w-full">
         <CardContent className="py-4">
-          <p className="text-destructive text-sm">
-            Failed to load allocation data.
-          </p>
+          <p className="text-destructive text-sm">Failed to load allocation data.</p>
         </CardContent>
       </Card>
     );
@@ -280,8 +277,7 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
           {/* Horizontal stacked bar */}
           <div className="mb-4 flex h-6 w-full items-center gap-0.5 overflow-hidden rounded-md">
             {sortedCategories.map((category, index) => {
-              const percent =
-                computedTotal > 0 ? category.value / computedTotal : 0;
+              const percent = computedTotal > 0 ? category.value / computedTotal : 0;
               const widthPercent = percent * 100;
 
               if (widthPercent < 0.5) return null;
@@ -293,8 +289,7 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
                       className="flex h-full cursor-default items-center justify-center transition-opacity hover:opacity-80"
                       style={{
                         width: `${widthPercent}%`,
-                        backgroundColor:
-                          category.color || `var(--chart-${(index % 5) + 1})`,
+                        backgroundColor: category.color || `var(--chart-${(index % 5) + 1})`,
                         minWidth: widthPercent >= 1 ? "4px" : undefined,
                       }}
                     >
@@ -326,8 +321,7 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
           {/* Legend list */}
           <div className="max-h-[200px] space-y-1.5 overflow-y-auto">
             {sortedCategories.map((category, index) => {
-              const percent =
-                computedTotal > 0 ? category.value / computedTotal : 0;
+              const percent = computedTotal > 0 ? category.value / computedTotal : 0;
 
               return (
                 <div
@@ -338,13 +332,10 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
                     <div
                       className="h-3 w-3 flex-shrink-0 rounded-sm"
                       style={{
-                        backgroundColor:
-                          category.color || `var(--chart-${(index % 5) + 1})`,
+                        backgroundColor: category.color || `var(--chart-${(index % 5) + 1})`,
                       }}
                     />
-                    <span className="text-foreground truncate">
-                      {category.categoryName}
-                    </span>
+                    <span className="text-foreground truncate">{category.categoryName}</span>
                   </div>
                   <div className="flex flex-shrink-0 items-center gap-3 tabular-nums">
                     <span className="text-muted-foreground w-12 text-right">

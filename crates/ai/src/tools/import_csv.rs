@@ -190,59 +190,127 @@ const FIELD_SUBTYPE: &str = "subtype";
 
 /// Common header patterns for each field (case-insensitive).
 const DATE_PATTERNS: &[&str] = &[
-    "date", "trade date", "activity date", "transaction date", "settlement date",
-    "trade_date", "activity_date", "transaction_date", "time", "datetime",
+    "date",
+    "trade date",
+    "activity date",
+    "transaction date",
+    "settlement date",
+    "trade_date",
+    "activity_date",
+    "transaction_date",
+    "time",
+    "datetime",
 ];
 
 const ACTIVITY_TYPE_PATTERNS: &[&str] = &[
-    "type", "activity type", "transaction type", "action", "activity",
-    "activity_type", "transaction_type", "trans type", "operation",
+    "type",
+    "activity type",
+    "transaction type",
+    "action",
+    "activity",
+    "activity_type",
+    "transaction_type",
+    "trans type",
+    "operation",
 ];
 
 const SYMBOL_PATTERNS: &[&str] = &[
-    "symbol", "ticker", "stock", "security", "asset", "instrument",
-    "ticker symbol", "stock symbol", "isin", "cusip",
+    "symbol",
+    "ticker",
+    "stock",
+    "security",
+    "asset",
+    "instrument",
+    "ticker symbol",
+    "stock symbol",
+    "isin",
+    "cusip",
 ];
 
 const QUANTITY_PATTERNS: &[&str] = &[
-    "quantity", "qty", "shares", "units", "no of shares",
-    "number of shares", "volume",
+    "quantity",
+    "qty",
+    "shares",
+    "units",
+    "no of shares",
+    "number of shares",
+    "volume",
 ];
 
 const UNIT_PRICE_PATTERNS: &[&str] = &[
-    "price", "unit price", "share price", "cost per share", "avg price",
-    "unit_price", "share_price", "execution price", "trade price",
+    "price",
+    "unit price",
+    "share price",
+    "cost per share",
+    "avg price",
+    "unit_price",
+    "share_price",
+    "execution price",
+    "trade price",
 ];
 
 const AMOUNT_PATTERNS: &[&str] = &[
-    "total", "amount", "value", "net amount", "gross amount", "market value",
-    "total amount", "total value", "proceeds", "cost", "net value",
+    "total",
+    "amount",
+    "value",
+    "net amount",
+    "gross amount",
+    "market value",
+    "total amount",
+    "total value",
+    "proceeds",
+    "cost",
+    "net value",
 ];
 
-const CURRENCY_PATTERNS: &[&str] = &[
-    "currency", "ccy", "currency code", "curr", "trade currency",
-];
+const CURRENCY_PATTERNS: &[&str] = &["currency", "ccy", "currency code", "curr", "trade currency"];
 
 const FEE_PATTERNS: &[&str] = &[
-    "fee", "fees", "commission", "commissions", "trading fee", "transaction fee",
-    "brokerage", "charges",
+    "fee",
+    "fees",
+    "commission",
+    "commissions",
+    "trading fee",
+    "transaction fee",
+    "brokerage",
+    "charges",
 ];
 
 const ACCOUNT_PATTERNS: &[&str] = &[
-    "account", "account id", "account name", "portfolio", "account number",
+    "account",
+    "account id",
+    "account name",
+    "portfolio",
+    "account number",
 ];
 
 const COMMENT_PATTERNS: &[&str] = &[
-    "comment", "comments", "note", "notes", "description", "memo", "remarks",
+    "comment",
+    "comments",
+    "note",
+    "notes",
+    "description",
+    "memo",
+    "remarks",
 ];
 
 const FX_RATE_PATTERNS: &[&str] = &[
-    "fx rate", "fxrate", "fx_rate", "exchange rate", "exchangerate",
-    "exchange_rate", "forex rate", "conversion rate",
+    "fx rate",
+    "fxrate",
+    "fx_rate",
+    "exchange rate",
+    "exchangerate",
+    "exchange_rate",
+    "forex rate",
+    "conversion rate",
 ];
 
 const SUBTYPE_PATTERNS: &[&str] = &[
-    "subtype", "sub type", "sub_type", "variation", "subcategory",
+    "subtype",
+    "sub type",
+    "sub_type",
+    "variation",
+    "subcategory",
 ];
 
 // ============================================================================
@@ -302,8 +370,16 @@ fn normalize_date(input: &str, _format_hints: &[String]) -> Option<String> {
 
     // Common date formats to try
     let formats = [
-        "%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y", "%m-%d-%Y", "%d-%m-%Y",
-        "%Y/%m/%d", "%d.%m.%Y", "%d %b %Y", "%d-%b-%Y", "%b %d, %Y",
+        "%Y-%m-%d",
+        "%m/%d/%Y",
+        "%d/%m/%Y",
+        "%m-%d-%Y",
+        "%d-%m-%Y",
+        "%Y/%m/%d",
+        "%d.%m.%Y",
+        "%d %b %Y",
+        "%d-%b-%Y",
+        "%b %d, %Y",
     ];
 
     for fmt in formats {
@@ -360,7 +436,11 @@ fn parse_number(input: &str, strip_sign: bool) -> Option<f64> {
 
     match s.parse::<f64>() {
         Ok(num) => {
-            let result = if is_negative && !strip_sign { -num } else { num.abs() };
+            let result = if is_negative && !strip_sign {
+                -num
+            } else {
+                num.abs()
+            };
             Some(result)
         }
         Err(_) => None,
@@ -368,7 +448,10 @@ fn parse_number(input: &str, strip_sign: bool) -> Option<f64> {
 }
 
 /// Normalize activity type to canonical form.
-fn normalize_activity_type(input: &str, custom_mappings: &HashMap<String, Vec<String>>) -> Option<String> {
+fn normalize_activity_type(
+    input: &str,
+    custom_mappings: &HashMap<String, Vec<String>>,
+) -> Option<String> {
     let upper = input.trim().to_uppercase();
     if upper.is_empty() {
         return None;
@@ -385,15 +468,42 @@ fn normalize_activity_type(input: &str, custom_mappings: &HashMap<String, Vec<St
 
     // Built-in mappings
     let builtin: &[(&[&str], &str)] = &[
-        (&["BUY", "PURCHASE", "BOUGHT", "MARKET BUY", "LIMIT BUY"], "BUY"),
+        (
+            &["BUY", "PURCHASE", "BOUGHT", "MARKET BUY", "LIMIT BUY"],
+            "BUY",
+        ),
         (&["SELL", "SOLD", "MARKET SELL", "LIMIT SELL"], "SELL"),
-        (&["DIVIDEND", "DIV", "CASH DIVIDEND", "QUALIFIED DIVIDEND"], "DIVIDEND"),
+        (
+            &["DIVIDEND", "DIV", "CASH DIVIDEND", "QUALIFIED DIVIDEND"],
+            "DIVIDEND",
+        ),
         (&["INTEREST", "INT", "CASH INTEREST"], "INTEREST"),
-        (&["DEPOSIT", "DEP", "CASH DEPOSIT", "WIRE IN", "ACH IN"], "DEPOSIT"),
-        (&["WITHDRAWAL", "WITHDRAW", "CASH WITHDRAWAL", "WIRE OUT", "ACH OUT"], "WITHDRAWAL"),
-        (&["TRANSFER IN", "TRANSFER_IN", "JOURNAL IN", "ACAT IN"], "TRANSFER_IN"),
-        (&["TRANSFER OUT", "TRANSFER_OUT", "JOURNAL OUT", "ACAT OUT"], "TRANSFER_OUT"),
-        (&["SPLIT", "STOCK SPLIT", "FORWARD SPLIT", "REVERSE SPLIT"], "SPLIT"),
+        (
+            &["DEPOSIT", "DEP", "CASH DEPOSIT", "WIRE IN", "ACH IN"],
+            "DEPOSIT",
+        ),
+        (
+            &[
+                "WITHDRAWAL",
+                "WITHDRAW",
+                "CASH WITHDRAWAL",
+                "WIRE OUT",
+                "ACH OUT",
+            ],
+            "WITHDRAWAL",
+        ),
+        (
+            &["TRANSFER IN", "TRANSFER_IN", "JOURNAL IN", "ACAT IN"],
+            "TRANSFER_IN",
+        ),
+        (
+            &["TRANSFER OUT", "TRANSFER_OUT", "JOURNAL OUT", "ACAT OUT"],
+            "TRANSFER_OUT",
+        ),
+        (
+            &["SPLIT", "STOCK SPLIT", "FORWARD SPLIT", "REVERSE SPLIT"],
+            "SPLIT",
+        ),
         (&["FEE", "FEES", "SERVICE FEE", "MANAGEMENT FEE"], "FEE"),
         (&["TAX", "TAXES", "WITHHOLDING", "TAX WITHHELD"], "TAX"),
     ];
@@ -567,9 +677,8 @@ impl<E: AiEnvironment> ImportCsvTool<E> {
 
             // Determine account ID
             let draft_account_id = account_id.map(|s| s.to_string()).or_else(|| {
-                get_field(account_idx).and_then(|csv_acc| {
-                    mapping.account_mappings.get(&csv_acc).cloned()
-                })
+                get_field(account_idx)
+                    .and_then(|csv_acc| mapping.account_mappings.get(&csv_acc).cloned())
             });
 
             let mut draft = CsvActivityDraft {
@@ -635,13 +744,19 @@ impl<E: AiEnvironment> ImportCsvTool<E> {
         match activity_type {
             "BUY" | "SELL" => {
                 if draft.symbol.is_none() {
-                    draft.errors.push("Symbol is required for BUY/SELL".to_string());
+                    draft
+                        .errors
+                        .push("Symbol is required for BUY/SELL".to_string());
                 }
                 if draft.quantity.is_none() {
-                    draft.errors.push("Quantity is required for BUY/SELL".to_string());
+                    draft
+                        .errors
+                        .push("Quantity is required for BUY/SELL".to_string());
                 }
                 if draft.unit_price.is_none() && draft.amount.is_none() {
-                    draft.errors.push("Either unit price or amount is required".to_string());
+                    draft
+                        .errors
+                        .push("Either unit price or amount is required".to_string());
                 }
                 // Derive amount if missing
                 if draft.amount.is_none() {
@@ -653,25 +768,35 @@ impl<E: AiEnvironment> ImportCsvTool<E> {
             }
             "DIVIDEND" | "INTEREST" => {
                 if draft.amount.is_none() {
-                    draft.errors.push(format!("Amount is required for {}", activity_type));
+                    draft
+                        .errors
+                        .push(format!("Amount is required for {}", activity_type));
                 }
             }
             "DEPOSIT" | "WITHDRAWAL" | "FEE" | "TAX" => {
                 if draft.amount.is_none() {
-                    draft.errors.push(format!("Amount is required for {}", activity_type));
+                    draft
+                        .errors
+                        .push(format!("Amount is required for {}", activity_type));
                 }
             }
             "TRANSFER_IN" | "TRANSFER_OUT" => {
                 if draft.amount.is_none() && (draft.symbol.is_none() || draft.quantity.is_none()) {
-                    draft.errors.push("Either amount or symbol+quantity required".to_string());
+                    draft
+                        .errors
+                        .push("Either amount or symbol+quantity required".to_string());
                 }
             }
             "SPLIT" => {
                 if draft.symbol.is_none() {
-                    draft.errors.push("Symbol is required for SPLIT".to_string());
+                    draft
+                        .errors
+                        .push("Symbol is required for SPLIT".to_string());
                 }
                 if draft.quantity.is_none() {
-                    draft.errors.push("Quantity is required for SPLIT".to_string());
+                    draft
+                        .errors
+                        .push("Quantity is required for SPLIT".to_string());
                 }
             }
             "" => {
@@ -789,7 +914,11 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
             llm_mapping
         } else if let Some(ref account_id) = args.account_id {
             // Try to load saved profile
-            match self.env.activity_service().get_import_mapping(account_id.clone()) {
+            match self
+                .env
+                .activity_service()
+                .get_import_mapping(account_id.clone())
+            {
                 Ok(saved) => {
                     used_saved_profile = true;
                     debug!("Loaded saved import mapping for account {}", account_id);
@@ -825,11 +954,17 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
         // Log delimiter if non-standard
         if let Some(ref delim) = parsed_csv.detected_config.delimiter {
             if delim != "," {
-                cleaning_actions.insert(0, CleaningAction {
-                    action_type: "detect_delimiter".to_string(),
-                    description: format!("Detected delimiter: '{}'", if delim == "\t" { "tab" } else { delim }),
-                    affected_rows: 0,
-                });
+                cleaning_actions.insert(
+                    0,
+                    CleaningAction {
+                        action_type: "detect_delimiter".to_string(),
+                        description: format!(
+                            "Detected delimiter: '{}'",
+                            if delim == "\t" { "tab" } else { delim }
+                        ),
+                        affected_rows: 0,
+                    },
+                );
             }
         }
 
@@ -841,8 +976,18 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
         }
 
         // Resolve symbols for non-cash activities
-        let cash_types: HashSet<&str> = ["DEPOSIT", "WITHDRAWAL", "INTEREST", "TRANSFER_IN", "TRANSFER_OUT", "TAX", "FEE", "CREDIT"]
-            .into_iter().collect();
+        let cash_types: HashSet<&str> = [
+            "DEPOSIT",
+            "WITHDRAWAL",
+            "INTEREST",
+            "TRANSFER_IN",
+            "TRANSFER_OUT",
+            "TAX",
+            "FEE",
+            "CREDIT",
+        ]
+        .into_iter()
+        .collect();
 
         let symbols_to_resolve: HashSet<String> = activities
             .iter()
@@ -868,7 +1013,10 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
                 .search_symbol_with_currency(symbol, Some(&self.base_currency))
                 .await
                 .unwrap_or_default();
-            symbol_mic_cache.insert(symbol.clone(), results.first().and_then(|r| r.exchange_mic.clone()));
+            symbol_mic_cache.insert(
+                symbol.clone(),
+                results.first().and_then(|r| r.exchange_mic.clone()),
+            );
         }
 
         // Update activities with resolved MICs
@@ -886,7 +1034,9 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
                     if let Some(mic) = mic_opt {
                         draft.exchange_mic = Some(mic.clone());
                     } else {
-                        draft.warnings.push(format!("Symbol '{}' not found in market data", symbol));
+                        draft
+                            .warnings
+                            .push(format!("Symbol '{}' not found in market data", symbol));
                     }
                 }
             }
@@ -932,9 +1082,18 @@ mod tests {
 
     #[test]
     fn test_normalize_date() {
-        assert_eq!(normalize_date("2024-01-15", &[]), Some("2024-01-15".to_string()));
-        assert_eq!(normalize_date("01/15/2024", &[]), Some("2024-01-15".to_string()));
-        assert_eq!(normalize_date("15-Jan-2024", &[]), Some("2024-01-15".to_string()));
+        assert_eq!(
+            normalize_date("2024-01-15", &[]),
+            Some("2024-01-15".to_string())
+        );
+        assert_eq!(
+            normalize_date("01/15/2024", &[]),
+            Some("2024-01-15".to_string())
+        );
+        assert_eq!(
+            normalize_date("15-Jan-2024", &[]),
+            Some("2024-01-15".to_string())
+        );
         assert_eq!(normalize_date("invalid", &[]), None);
     }
 
@@ -950,10 +1109,22 @@ mod tests {
     #[test]
     fn test_normalize_activity_type() {
         let custom = HashMap::new();
-        assert_eq!(normalize_activity_type("Buy", &custom), Some("BUY".to_string()));
-        assert_eq!(normalize_activity_type("PURCHASE", &custom), Some("BUY".to_string()));
-        assert_eq!(normalize_activity_type("Sell", &custom), Some("SELL".to_string()));
-        assert_eq!(normalize_activity_type("Dividend", &custom), Some("DIVIDEND".to_string()));
+        assert_eq!(
+            normalize_activity_type("Buy", &custom),
+            Some("BUY".to_string())
+        );
+        assert_eq!(
+            normalize_activity_type("PURCHASE", &custom),
+            Some("BUY".to_string())
+        );
+        assert_eq!(
+            normalize_activity_type("Sell", &custom),
+            Some("SELL".to_string())
+        );
+        assert_eq!(
+            normalize_activity_type("Dividend", &custom),
+            Some("DIVIDEND".to_string())
+        );
     }
 
     #[test]
@@ -962,8 +1133,14 @@ mod tests {
         custom.insert("BUY".to_string(), vec!["ACHAT".to_string()]);
         custom.insert("SELL".to_string(), vec!["VENTE".to_string()]);
 
-        assert_eq!(normalize_activity_type("ACHAT", &custom), Some("BUY".to_string()));
-        assert_eq!(normalize_activity_type("Vente", &custom), Some("SELL".to_string()));
+        assert_eq!(
+            normalize_activity_type("ACHAT", &custom),
+            Some("BUY".to_string())
+        );
+        assert_eq!(
+            normalize_activity_type("Vente", &custom),
+            Some("SELL".to_string())
+        );
     }
 
     #[test]

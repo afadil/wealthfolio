@@ -165,7 +165,11 @@ impl<E: AiEnvironment + 'static> Tool for GetHoldingsTool<E> {
             currency: self.base_currency.clone(),
             account_scope: account_id.clone(),
             truncated: if truncated { Some(true) } else { None },
-            original_count: if truncated { Some(original_count) } else { None },
+            original_count: if truncated {
+                Some(original_count)
+            } else {
+                None
+            },
         })
     }
 }
@@ -180,7 +184,11 @@ mod tests {
         let env = Arc::new(MockEnvironment::new());
         let tool = GetHoldingsTool::new(env, "USD".to_string());
 
-        let result = tool.call(GetHoldingsArgs { account_id: "TOTAL".to_string() }).await;
+        let result = tool
+            .call(GetHoldingsArgs {
+                account_id: "TOTAL".to_string(),
+            })
+            .await;
         assert!(result.is_ok());
 
         let output = result.unwrap();
@@ -193,7 +201,11 @@ mod tests {
         let env = Arc::new(MockEnvironment::new());
         let tool = GetHoldingsTool::new(env, "USD".to_string());
 
-        let result = tool.call(GetHoldingsArgs { account_id: "acc-123".to_string() }).await;
+        let result = tool
+            .call(GetHoldingsArgs {
+                account_id: "acc-123".to_string(),
+            })
+            .await;
         assert!(result.is_ok());
 
         let output = result.unwrap();

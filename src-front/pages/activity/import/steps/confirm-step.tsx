@@ -118,12 +118,32 @@ function draftToActivityImport(draft: DraftActivity): ActivityImport {
 const ACTIVITY_TYPE_CONFIG: Record<string, { label: string; icon: Icon; color: string }> = {
   BUY: { label: "Buy", icon: Icons.TrendingUp, color: "text-green-600 dark:text-green-400" },
   SELL: { label: "Sell", icon: Icons.TrendingDown, color: "text-red-500 dark:text-red-400" },
-  DIVIDEND: { label: "Dividend", icon: Icons.DollarSign, color: "text-emerald-600 dark:text-emerald-400" },
+  DIVIDEND: {
+    label: "Dividend",
+    icon: Icons.DollarSign,
+    color: "text-emerald-600 dark:text-emerald-400",
+  },
   INTEREST: { label: "Interest", icon: Icons.Coins, color: "text-amber-600 dark:text-amber-400" },
-  DEPOSIT: { label: "Deposit", icon: Icons.ArrowDownLeft, color: "text-blue-600 dark:text-blue-400" },
-  WITHDRAWAL: { label: "Withdrawal", icon: Icons.ArrowUpRight, color: "text-orange-600 dark:text-orange-400" },
-  TRANSFER_IN: { label: "Transfer In", icon: Icons.ArrowDownLeft, color: "text-blue-600 dark:text-blue-400" },
-  TRANSFER_OUT: { label: "Transfer Out", icon: Icons.ArrowUpRight, color: "text-orange-600 dark:text-orange-400" },
+  DEPOSIT: {
+    label: "Deposit",
+    icon: Icons.ArrowDownLeft,
+    color: "text-blue-600 dark:text-blue-400",
+  },
+  WITHDRAWAL: {
+    label: "Withdrawal",
+    icon: Icons.ArrowUpRight,
+    color: "text-orange-600 dark:text-orange-400",
+  },
+  TRANSFER_IN: {
+    label: "Transfer In",
+    icon: Icons.ArrowDownLeft,
+    color: "text-blue-600 dark:text-blue-400",
+  },
+  TRANSFER_OUT: {
+    label: "Transfer Out",
+    icon: Icons.ArrowUpRight,
+    color: "text-orange-600 dark:text-orange-400",
+  },
   FEE: { label: "Fee", icon: Icons.Receipt, color: "text-slate-600 dark:text-slate-400" },
   TAX: { label: "Tax", icon: Icons.FileText, color: "text-slate-600 dark:text-slate-400" },
   SPLIT: { label: "Split", icon: Icons.Split, color: "text-purple-600 dark:text-purple-400" },
@@ -177,10 +197,7 @@ export function ConfirmStep() {
 
   const isProcessing = confirmImportMutation.isPending;
 
-  const summary = useMemo(
-    () => computeSummary(state.draftActivities),
-    [state.draftActivities],
-  );
+  const summary = useMemo(() => computeSummary(state.draftActivities), [state.draftActivities]);
 
   const skippedTotal = summary.skipped + summary.duplicates + summary.errors;
 
@@ -241,15 +258,15 @@ export function ConfirmStep() {
 
       {/* Summary section */}
       <div className="space-y-6">
-        <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
+        <h4 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
           Import Summary
         </h4>
 
         {/* Stats row */}
         <div className="grid grid-cols-3 gap-4">
           {/* Total Rows */}
-          <div className="flex items-center gap-3 rounded-xl bg-muted/50 p-4">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-background">
+          <div className="bg-muted/50 flex items-center gap-3 rounded-xl p-4">
+            <div className="bg-background flex h-11 w-11 shrink-0 items-center justify-center rounded-lg">
               <Icons.FileText className="text-muted-foreground h-5 w-5" />
             </div>
             <div>
@@ -259,7 +276,7 @@ export function ConfirmStep() {
           </div>
 
           {/* To Import - highlighted */}
-          <div className="flex items-center gap-3 rounded-xl border-2 border-green-500/50 bg-muted/50 p-4 dark:border-green-500/30">
+          <div className="bg-muted/50 flex items-center gap-3 rounded-xl border-2 border-green-500/50 p-4 dark:border-green-500/30">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-green-500">
               <Icons.Check className="h-5 w-5 text-white" />
             </div>
@@ -272,8 +289,8 @@ export function ConfirmStep() {
           </div>
 
           {/* Skipped */}
-          <div className="flex items-center gap-3 rounded-xl bg-muted/50 p-4">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-background">
+          <div className="bg-muted/50 flex items-center gap-3 rounded-xl p-4">
+            <div className="bg-background flex h-11 w-11 shrink-0 items-center justify-center rounded-lg">
               <Icons.Minus className="text-muted-foreground h-5 w-5" />
             </div>
             <div>
@@ -286,7 +303,7 @@ export function ConfirmStep() {
         {/* Activity type breakdown */}
         {Object.keys(summary.byType).length > 0 && (
           <div className="space-y-3">
-            <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
+            <h4 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
               By Activity Type
             </h4>
             <div className="flex flex-wrap gap-2">
@@ -298,11 +315,11 @@ export function ConfirmStep() {
                   return (
                     <div
                       key={type}
-                      className="flex items-center gap-2 rounded-full bg-muted/50 px-3 py-1.5"
+                      className="bg-muted/50 flex items-center gap-2 rounded-full px-3 py-1.5"
                     >
                       <IconComponent className={`h-4 w-4 ${config.color}`} />
                       <span className="text-sm">{config.label}</span>
-                      <span className="text-muted-foreground rounded-full bg-background px-2 py-0.5 text-xs font-medium">
+                      <span className="text-muted-foreground bg-background rounded-full px-2 py-0.5 text-xs font-medium">
                         {count}
                       </span>
                     </div>
@@ -315,7 +332,7 @@ export function ConfirmStep() {
         {/* Skipped breakdown */}
         {Object.keys(summary.bySkipReason).length > 0 && (
           <div className="space-y-3">
-            <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
+            <h4 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
               Skipped Breakdown
             </h4>
             <div className="flex flex-wrap gap-2">
@@ -324,11 +341,11 @@ export function ConfirmStep() {
                 .map(([reason, count]) => (
                   <div
                     key={reason}
-                    className="flex items-center gap-2 rounded-full bg-muted/50 px-3 py-1.5"
+                    className="bg-muted/50 flex items-center gap-2 rounded-full px-3 py-1.5"
                   >
                     <Icons.XCircle className="text-muted-foreground h-4 w-4" />
                     <span className="text-muted-foreground text-sm">{reason}</span>
-                    <span className="text-muted-foreground rounded-full bg-background px-2 py-0.5 text-xs font-medium">
+                    <span className="text-muted-foreground bg-background rounded-full px-2 py-0.5 text-xs font-medium">
                       {count}
                     </span>
                   </div>

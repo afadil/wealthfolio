@@ -2,6 +2,7 @@ pub mod ai_environment;
 pub mod api;
 pub mod auth;
 pub mod config;
+mod domain_events;
 pub mod error;
 pub mod events;
 mod main_lib;

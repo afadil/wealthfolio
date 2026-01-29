@@ -114,7 +114,7 @@ export default function ConnectPage() {
       (run) =>
         run.status === "NEEDS_REVIEW" ||
         (run.summary?.warnings ?? 0) > 0 ||
-        (run.summary?.errors ?? 0) > 0
+        (run.summary?.errors ?? 0) > 0,
     ).length;
   }, [recentActivity]);
 
@@ -152,7 +152,7 @@ export default function ConnectPage() {
             {/* Stats Card Skeleton */}
             <Card>
               <CardContent className="p-0">
-                <div className="grid grid-cols-3 divide-x divide-border">
+                <div className="divide-border grid grid-cols-3 divide-x">
                   {[...Array(3)].map((_, i) => (
                     <div key={i} className="flex items-center gap-4 p-5">
                       <Skeleton className="h-12 w-12 rounded-lg" />
@@ -273,7 +273,8 @@ export default function ConnectPage() {
                 <div>
                   <p className="font-medium">Action needed: choose a tracking mode</p>
                   <p className="text-muted-foreground text-sm">
-                    {accountsNeedingSetup.length} account(s) need configuration before importing data.
+                    {accountsNeedingSetup.length} account(s) need configuration before importing
+                    data.
                   </p>
                 </div>
                 <Button
@@ -293,7 +294,7 @@ export default function ConnectPage() {
           {/* Stats Cards Row */}
           <Card>
             <CardContent className="p-0">
-              <div className="grid grid-cols-3 divide-x divide-border">
+              <div className="divide-border grid grid-cols-3 divide-x">
                 {/* Broker Connections */}
                 <button
                   className="hover:bg-muted/50 flex items-center gap-4 p-5 text-left transition-colors"
@@ -356,14 +357,14 @@ export default function ConnectPage() {
                     No broker connections yet
                   </p>
                 ) : (
-                  <div className="divide-y divide-border">
+                  <div className="divide-border divide-y">
                     {brokerConnections.map((connection) => (
                       <BrokerConnectionItem
                         key={connection.id}
                         connection={connection}
                         accountCount={
                           brokerAccounts.filter(
-                            (a) => a.brokerage_authorization === connection.id && a.sync_enabled
+                            (a) => a.brokerage_authorization === connection.id && a.sync_enabled,
                           ).length
                         }
                       />
@@ -392,13 +393,13 @@ export default function ConnectPage() {
                     No synced accounts yet
                   </p>
                 ) : (
-                  <div className="divide-y divide-border">
+                  <div className="divide-border divide-y">
                     {brokerAccounts
                       .filter((a) => a.sync_enabled)
                       .map((account) => {
                         // Find the matching local account to get trackingMode
                         const localAccount = localAccounts.find(
-                          (la) => la.providerAccountId === account.id
+                          (la) => la.providerAccountId === account.id,
                         );
                         return (
                           <AccountItem
@@ -433,7 +434,7 @@ export default function ConnectPage() {
                   No sync activity yet
                 </p>
               ) : (
-                <div className="-mx-3 divide-y divide-border">
+                <div className="divide-border -mx-3 divide-y">
                   {recentActivity.map((run) => (
                     <ActivityItem
                       key={run.id}
@@ -470,7 +471,10 @@ function BrokerConnectionItem({
   accountCount: number;
 }) {
   const name =
-    connection.brokerage?.display_name || connection.brokerage?.name || connection.name || "Unknown";
+    connection.brokerage?.display_name ||
+    connection.brokerage?.name ||
+    connection.name ||
+    "Unknown";
   const isDisabled = connection.disabled;
   const status = isDisabled ? "warning" : "healthy";
 
@@ -578,7 +582,7 @@ function ActivityItem({ run, accountName }: { run: ImportRun; accountName?: stri
       }`}
     >
       <StatusDot status={dotStatus} />
-      <span className="text-muted-foreground min-w-[100px] shrink-0 whitespace-nowrap text-sm">
+      <span className="text-muted-foreground min-w-[100px] shrink-0 text-sm whitespace-nowrap">
         {timeAgo} ago
       </span>
       {accountName && (
@@ -608,9 +612,7 @@ function ActivityItem({ run, accountName }: { run: ImportRun; accountName?: stri
             {assetsCreated} {assetsCreated === 1 ? "asset" : "assets"} created
           </span>
         )}
-        {!hasAnyChanges && !isRunning && (
-          <span className="text-muted-foreground">No changes</span>
-        )}
+        {!hasAnyChanges && !isRunning && <span className="text-muted-foreground">No changes</span>}
         {isRunning && (
           <span className="text-muted-foreground flex items-center gap-1.5">
             <Icons.Spinner className="h-3 w-3 animate-spin" />

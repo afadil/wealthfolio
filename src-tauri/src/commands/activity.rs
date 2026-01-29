@@ -1,16 +1,14 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::context::ServiceContext;
-use crate::events::{emit_assets_enrich_requested, emit_resource_changed, AssetsEnrichPayload, ResourceEventPayload};
 use log::debug;
-use tauri::{AppHandle, State};
+use tauri::State;
 use wealthfolio_core::activities::{
     Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityImport,
-    ActivitySearchResponse, ActivityUpdate, ImportActivitiesResult, ImportMappingData,
-    NewActivity, ParseConfig, ParsedCsvResult, Sort,
+    ActivitySearchResponse, ActivityUpdate, ImportActivitiesResult, ImportMappingData, NewActivity,
+    ParseConfig, ParsedCsvResult, Sort,
 };
-use serde_json::json;
 
 #[tauri::command]
 pub async fn search_activities(
@@ -21,9 +19,22 @@ pub async fn search_activities(
     asset_id_keyword: Option<String>,          // Optional asset_id keyword for search
     sort: Option<Sort>,
     needs_review_filter: Option<bool>, // Optional needs_review filter for pending review
+    date_from: Option<String>,         // Optional start date filter (YYYY-MM-DD, inclusive)
+    date_to: Option<String>,           // Optional end date filter (YYYY-MM-DD, inclusive)
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ActivitySearchResponse, String> {
     debug!("Search activities... {}, {}", page, page_size);
+
+    // Parse date strings to NaiveDate
+    let date_from_parsed = date_from
+        .map(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d"))
+        .transpose()
+        .map_err(|e| format!("Invalid date_from format: {}", e))?;
+    let date_to_parsed = date_to
+        .map(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d"))
+        .transpose()
+        .map_err(|e| format!("Invalid date_to format: {}", e))?;
+
     Ok(state.activity_service().search_activities(
         page,
         page_size,
@@ -32,6 +43,8 @@ pub async fn search_activities(
         asset_id_keyword,
         sort,
         needs_review_filter,
+        date_from_parsed,
+        date_to_parsed,
     )?)
 }
 
@@ -39,130 +52,48 @@ pub async fn search_activities(
 pub async fn create_activity(
     activity: NewActivity,
     state: State<'_, Arc<ServiceContext>>,
-    handle: AppHandle,
 ) -> Result<Activity, String> {
     debug!("Creating activity...");
-    let result = state.activity_service().create_activity(activity).await?;
-
-    let activity_date = result.activity_date.date_naive();
-    emit_resource_changed(
-        &handle,
-        ResourceEventPayload::new(
-            "activity",
-            "created",
-            json!({
-                "activity_id": result.id,
-                "account_id": result.account_id,
-                "currency": result.currency,
-                "asset_id": result.asset_id,
-                "activity_date": activity_date.to_string(),
-            }),
-        ),
-    );
-
-    // Trigger asset enrichment (listener's enrich_assets handles filtering)
-    if let Some(ref asset_id) = result.asset_id {
-        emit_assets_enrich_requested(
-            &handle,
-            AssetsEnrichPayload {
-                asset_ids: vec![asset_id.clone()],
-            },
-        );
-    }
-
-    Ok(result)
+    // Domain events handle recalculation and asset enrichment automatically
+    state
+        .activity_service()
+        .create_activity(activity)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn update_activity(
     activity: ActivityUpdate,
     state: State<'_, Arc<ServiceContext>>,
-    handle: AppHandle,
 ) -> Result<Activity, String> {
     debug!("Updating activity...");
-
-    let original_activity = state
+    // Domain events handle recalculation and asset enrichment automatically
+    state
         .activity_service()
-        .get_activity(&activity.id)
-        .map_err(|e| e.to_string())?;
-
-    let result = state.activity_service().update_activity(activity).await?;
-
-    // Detect if the activity date changed (for quote backfill detection)
-    let original_date = original_activity.activity_date.date_naive();
-    let new_date = result.activity_date.date_naive();
-    let date_changed = original_date != new_date;
-
-    emit_resource_changed(
-        &handle,
-        ResourceEventPayload::new(
-            "activity",
-            "updated",
-            json!({
-                "activity_id": result.id,
-                "account_id": result.account_id,
-                "currency": result.currency,
-                "asset_id": result.asset_id,
-                "activity_date": new_date.to_string(),
-                "previous_account_id": original_activity.account_id,
-                "previous_currency": original_activity.currency,
-                "previous_asset_id": original_activity.asset_id,
-                "previous_activity_date": original_date.to_string(),
-                "date_changed": date_changed,
-            }),
-        ),
-    );
-
-    // Trigger asset enrichment if asset changed (listener's enrich_assets handles filtering)
-    if result.asset_id != original_activity.asset_id {
-        if let Some(ref asset_id) = result.asset_id {
-            emit_assets_enrich_requested(
-                &handle,
-                AssetsEnrichPayload {
-                    asset_ids: vec![asset_id.clone()],
-                },
-            );
-        }
-    }
-
-    Ok(result)
+        .update_activity(activity)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn delete_activity(
     activity_id: String,
     state: State<'_, Arc<ServiceContext>>,
-    handle: AppHandle,
 ) -> Result<Activity, String> {
     debug!("Deleting activity...");
-    let result = state
+    // Domain events handle recalculation automatically
+    state
         .activity_service()
         .delete_activity(activity_id)
         .await
-        .map_err(|e| e.to_string())?;
-
-    emit_resource_changed(
-        &handle,
-        ResourceEventPayload::new(
-            "activity",
-            "deleted",
-            json!({
-                "activity_id": result.id,
-                "account_id": result.account_id,
-                "currency": result.currency,
-                "asset_id": result.asset_id,
-            }),
-        ),
-    );
-
-    Ok(result)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn save_activities(
     request: ActivityBulkMutationRequest,
     state: State<'_, Arc<ServiceContext>>,
-    handle: AppHandle,
 ) -> Result<ActivityBulkMutationResult, String> {
     let create_count = request.creates.len();
     let update_count = request.updates.len();
@@ -172,46 +103,12 @@ pub async fn save_activities(
         create_count, update_count, delete_count
     );
 
-    let result = state
+    // Domain events handle recalculation and asset enrichment automatically
+    state
         .activity_service()
         .bulk_mutate_activities(request)
         .await
-        .map_err(|e| e.to_string())?;
-
-    let result_value = serde_json::to_value(&result).unwrap_or_else(|_| json!({}));
-    let event_payload = json!({
-        "request": {
-            "createCount": create_count,
-            "updateCount": update_count,
-            "deleteCount": delete_count,
-        },
-        "result": result_value,
-    });
-
-    emit_resource_changed(
-        &handle,
-        ResourceEventPayload::new("activity", "bulk-mutated", event_payload),
-    );
-
-    // Trigger asset enrichment for all assets from created activities (listener's enrich_assets handles filtering)
-    let new_asset_ids: Vec<String> = result
-        .created
-        .iter()
-        .filter_map(|a| a.asset_id.clone())
-        .collect::<HashSet<_>>()
-        .into_iter()
-        .collect();
-
-    if !new_asset_ids.is_empty() {
-        emit_assets_enrich_requested(
-            &handle,
-            AssetsEnrichPayload {
-                asset_ids: new_asset_ids,
-            },
-        );
-    }
-
-    Ok(result)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -260,57 +157,14 @@ pub async fn import_activities(
     account_id: String,
     activities: Vec<ActivityImport>,
     state: State<'_, Arc<ServiceContext>>,
-    handle: AppHandle,
 ) -> Result<ImportActivitiesResult, String> {
     debug!("Importing activities for account: {}", account_id);
-    let event_metadata: Vec<_> = activities
-        .iter()
-        .map(|activity| {
-            json!({
-                "asset_id": activity.symbol,
-                "currency": activity.currency,
-            })
-        })
-        .collect();
-
-    let result = state
+    // Domain events handle recalculation and asset enrichment automatically
+    state
         .activity_service()
-        .import_activities(account_id.clone(), activities) // activities is moved here
-        .await?;
-    emit_resource_changed(
-        &handle,
-        ResourceEventPayload::new(
-            "activity",
-            "imported",
-            json!({
-                "account_id": account_id,
-                "activities": event_metadata,
-                "import_run_id": result.import_run_id,
-                "summary": result.summary,
-            }),
-        ),
-    );
-
-    // Trigger asset enrichment for all assets from imported activities (listener's enrich_assets handles filtering)
-    let imported_asset_ids: Vec<String> = result
-        .activities
-        .iter()
-        .filter(|a| a.is_valid)
-        .map(|a| a.symbol.clone())
-        .collect::<HashSet<_>>()
-        .into_iter()
-        .collect();
-
-    if !imported_asset_ids.is_empty() {
-        emit_assets_enrich_requested(
-            &handle,
-            AssetsEnrichPayload {
-                asset_ids: imported_asset_ids,
-            },
-        );
-    }
-
-    Ok(result)
+        .import_activities(account_id, activities)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -334,7 +188,11 @@ pub async fn parse_csv(
     config: ParseConfig,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ParsedCsvResult, String> {
-    debug!("Parsing CSV with {} bytes, config: {:?}", content.len(), config);
+    debug!(
+        "Parsing CSV with {} bytes, config: {:?}",
+        content.len(),
+        config
+    );
     state
         .activity_service()
         .parse_csv(&content, &config)

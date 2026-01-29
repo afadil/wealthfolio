@@ -6,7 +6,8 @@ use log::{info, warn};
 use wealthfolio_core::errors::Result;
 
 use crate::prompt_template::{
-    ChatRunConfig, DetailLevel, PromptTemplate, PromptTemplateCatalog, PROMPT_TEMPLATE_SCHEMA_VERSION,
+    ChatRunConfig, DetailLevel, PromptTemplate, PromptTemplateCatalog,
+    PROMPT_TEMPLATE_SCHEMA_VERSION,
 };
 
 /// Service trait for prompt template operations.
@@ -19,8 +20,7 @@ pub trait PromptTemplateServiceTrait: Send + Sync {
     fn get_template(&self, template_id: &str) -> Option<&PromptTemplate>;
 
     /// Get a template by ID and version.
-    fn get_template_by_version(&self, template_id: &str, version: &str)
-        -> Option<&PromptTemplate>;
+    fn get_template_by_version(&self, template_id: &str, version: &str) -> Option<&PromptTemplate>;
 
     /// Get the default template.
     fn get_default_template(&self) -> Option<&PromptTemplate>;
@@ -87,11 +87,7 @@ impl PromptTemplateServiceTrait for PromptTemplateService {
         self.catalog.get_template(template_id)
     }
 
-    fn get_template_by_version(
-        &self,
-        template_id: &str,
-        version: &str,
-    ) -> Option<&PromptTemplate> {
+    fn get_template_by_version(&self, template_id: &str, version: &str) -> Option<&PromptTemplate> {
         self.catalog.get_template_by_version(template_id, version)
     }
 

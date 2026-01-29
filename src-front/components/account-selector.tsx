@@ -210,7 +210,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
                   ? "border-primary bg-primary/5"
                   : selectedAccount
                     ? "border-border bg-background"
-                    : "border-border bg-background/50 hover:bg-background/80 hover:border-muted-foreground/50"
+                    : "border-border bg-background/50 hover:bg-background/80 hover:border-muted-foreground/50",
               )}
             >
               <div className="flex flex-col items-center justify-center space-y-1">

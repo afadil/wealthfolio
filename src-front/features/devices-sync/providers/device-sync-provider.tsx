@@ -50,7 +50,12 @@ type SyncAction =
 
   // Pairing - Issuer
   | { type: "PAIRING_STARTED"; session: PairingSession }
-  | { type: "PAIRING_CLAIMED"; claimerPublicKey: string; claimerDeviceId: string; sessionKey: string }
+  | {
+      type: "PAIRING_CLAIMED";
+      claimerPublicKey: string;
+      claimerDeviceId: string;
+      sessionKey: string;
+    }
   | { type: "PAIRING_APPROVED" }
   | { type: "PAIRING_CANCELED" }
   | { type: "PAIRING_ERROR"; error: SyncError }

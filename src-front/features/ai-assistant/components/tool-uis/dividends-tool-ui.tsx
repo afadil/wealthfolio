@@ -81,13 +81,9 @@ function normalizeResult(result: unknown): GetDividendsOutput | null {
   }
 
   // Handle search_activities output format (activities array)
-  const activitiesRaw = Array.isArray(candidate.activities)
-    ? candidate.activities
-    : null;
+  const activitiesRaw = Array.isArray(candidate.activities) ? candidate.activities : null;
   // Handle direct dividends array format
-  const dividendsRaw = Array.isArray(candidate.dividends)
-    ? candidate.dividends
-    : null;
+  const dividendsRaw = Array.isArray(candidate.dividends) ? candidate.dividends : null;
 
   const rawData = activitiesRaw ?? dividendsRaw ?? [];
 
@@ -96,8 +92,7 @@ function normalizeResult(result: unknown): GetDividendsOutput | null {
     .filter((entry) => {
       // If from activities, only include DIVIDEND type
       const activityType =
-        (entry.activityType as string | undefined) ??
-        (entry.activity_type as string | undefined);
+        (entry.activityType as string | undefined) ?? (entry.activity_type as string | undefined);
       // If activityType exists, it must be DIVIDEND; otherwise include all
       return !activityType || activityType.toUpperCase() === "DIVIDEND";
     })
@@ -116,9 +111,7 @@ function normalizeResult(result: unknown): GetDividendsOutput | null {
       amount: Number(entry.amount ?? 0),
       currency: (entry.currency as string | undefined) ?? "USD",
       accountId:
-        (entry.accountId as string | undefined) ??
-        (entry.account_id as string | undefined) ??
-        "",
+        (entry.accountId as string | undefined) ?? (entry.account_id as string | undefined) ?? "",
       accountName:
         (entry.accountName as string | undefined) ??
         (entry.account_name as string | undefined) ??
@@ -141,8 +134,7 @@ function normalizeResult(result: unknown): GetDividendsOutput | null {
 
   return {
     dividends,
-    count:
-      typeof candidate.count === "number" ? candidate.count : dividends.length,
+    count: typeof candidate.count === "number" ? candidate.count : dividends.length,
     totalAmount,
     currency,
     accountScope:
@@ -162,10 +154,7 @@ function normalizeResult(result: unknown): GetDividendsOutput | null {
 // Tool UI Component
 // ============================================================================
 
-export const DividendsToolUI = makeAssistantToolUI<
-  GetDividendsArgs,
-  GetDividendsOutput
->({
+export const DividendsToolUI = makeAssistantToolUI<GetDividendsArgs, GetDividendsOutput>({
   toolName: "get_dividends",
   render: (props) => {
     return <DividendsContent {...props} />;
@@ -182,7 +171,7 @@ function DividendsContent({ result, status }: DividendsContentProps) {
   const sortedDividends = useMemo(() => {
     if (!parsed?.dividends) return [];
     return [...parsed.dividends].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
     );
   }, [parsed?.dividends]);
 
@@ -196,7 +185,7 @@ function DividendsContent({ result, status }: DividendsContentProps) {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       }),
-    [currency]
+    [currency],
   );
 
   const dateFormatter = useMemo(
@@ -206,7 +195,7 @@ function DividendsContent({ result, status }: DividendsContentProps) {
         month: "short",
         day: "numeric",
       }),
-    []
+    [],
   );
 
   // Calculate totals for summary
@@ -214,9 +203,7 @@ function DividendsContent({ result, status }: DividendsContentProps) {
     if (!sortedDividends.length) {
       return { totalAmount: 0, paymentCount: 0 };
     }
-    const total =
-      parsed?.totalAmount ??
-      sortedDividends.reduce((sum, d) => sum + d.amount, 0);
+    const total = parsed?.totalAmount ?? sortedDividends.reduce((sum, d) => sum + d.amount, 0);
     return { totalAmount: total, paymentCount: sortedDividends.length };
   }, [parsed?.totalAmount, sortedDividends]);
 

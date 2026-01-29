@@ -235,19 +235,13 @@ export function AssetDetailsSheet({
               />
 
               {/* Property-specific fields */}
-              {asset.kind === AlternativeAssetKind.PROPERTY && (
-                <PropertyFields form={form} />
-              )}
+              {asset.kind === AlternativeAssetKind.PROPERTY && <PropertyFields form={form} />}
 
               {/* Vehicle-specific fields */}
-              {asset.kind === AlternativeAssetKind.VEHICLE && (
-                <VehicleFields form={form} />
-              )}
+              {asset.kind === AlternativeAssetKind.VEHICLE && <VehicleFields form={form} />}
 
               {/* Collectible-specific fields */}
-              {asset.kind === AlternativeAssetKind.COLLECTIBLE && (
-                <CollectibleFields form={form} />
-              )}
+              {asset.kind === AlternativeAssetKind.COLLECTIBLE && <CollectibleFields form={form} />}
 
               {/* Precious Metal-specific fields */}
               {asset.kind === AlternativeAssetKind.PHYSICAL_PRECIOUS && (
@@ -264,9 +258,7 @@ export function AssetDetailsSheet({
               )}
 
               {/* Other asset fields */}
-              {asset.kind === AlternativeAssetKind.OTHER && (
-                <OtherFields form={form} />
-              )}
+              {asset.kind === AlternativeAssetKind.OTHER && <OtherFields form={form} />}
             </div>
 
             {/* Linked Liabilities Display (for properties) */}
@@ -278,17 +270,12 @@ export function AssetDetailsSheet({
                     title="Linked Liabilities"
                     description="Debts associated with this property"
                   />
-                  <div className="bg-muted/30 rounded-lg border p-3 space-y-2">
+                  <div className="bg-muted/30 space-y-2 rounded-lg border p-3">
                     {linkedLiabilities.map((liability) => (
-                      <div
-                        key={liability.id}
-                        className="flex items-center justify-between text-sm"
-                      >
+                      <div key={liability.id} className="flex items-center justify-between text-sm">
                         <span className="font-medium">{liability.name}</span>
                         {liability.balance && (
-                          <span className="text-muted-foreground">
-                            -{liability.balance}
-                          </span>
+                          <span className="text-muted-foreground">-{liability.balance}</span>
                         )}
                       </div>
                     ))}
@@ -351,30 +338,16 @@ export function AssetDetailsSheet({
 // Helper Components
 // ============================================================================
 
-function SectionHeader({
-  title,
-  description,
-}: {
-  title: string;
-  description?: string;
-}) {
+function SectionHeader({ title, description }: { title: string; description?: string }) {
   return (
     <div className="space-y-1">
       <h4 className="text-sm font-semibold">{title}</h4>
-      {description && (
-        <p className="text-muted-foreground text-xs">{description}</p>
-      )}
+      {description && <p className="text-muted-foreground text-xs">{description}</p>}
     </div>
   );
 }
 
-function AssetKindIcon({
-  kind,
-  className,
-}: {
-  kind: AlternativeAssetKind;
-  className?: string;
-}) {
+function AssetKindIcon({ kind, className }: { kind: AlternativeAssetKind; className?: string }) {
   switch (kind) {
     case AlternativeAssetKind.PROPERTY:
       return <Icons.Building className={className} />;
@@ -544,7 +517,11 @@ function CollectibleFields({ form }: { form: ReturnType<typeof useForm<AssetDeta
   );
 }
 
-function PreciousMetalFields({ form }: { form: ReturnType<typeof useForm<AssetDetailsFormValues>> }) {
+function PreciousMetalFields({
+  form,
+}: {
+  form: ReturnType<typeof useForm<AssetDetailsFormValues>>;
+}) {
   return (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">

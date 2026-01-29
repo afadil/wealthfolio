@@ -1,6 +1,12 @@
 import { searchTicker } from "@/adapters";
 import { Button } from "@wealthfolio/ui/components/ui/button";
-import { Command, CommandInput, CommandItem, CommandList, CommandSeparator } from "@wealthfolio/ui/components/ui/command";
+import {
+  Command,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@wealthfolio/ui/components/ui/command";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
@@ -36,7 +42,14 @@ interface SearchResultsProps {
 
 // Memoize search results component
 const SearchResults = memo(
-  ({ results, query, isLoading, selectedResult, onSelect, onCreateCustomAsset }: SearchResultsProps) => {
+  ({
+    results,
+    query,
+    isLoading,
+    selectedResult,
+    onSelect,
+    onCreateCustomAsset,
+  }: SearchResultsProps) => {
     const hasResults = results && results.length > 0;
     const showNoResults = !isLoading && !hasResults && query.length > 1;
 
@@ -74,7 +87,7 @@ const SearchResults = memo(
               >
                 <div className="flex flex-col">
                   <span className="font-mono text-xs font-semibold uppercase">{ticker.symbol}</span>
-                  <span className="text-muted-foreground text-xs line-clamp-1">{displayName}</span>
+                  <span className="text-muted-foreground line-clamp-1 text-xs">{displayName}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-muted-foreground text-xs">{exchangeDisplay}</span>
@@ -130,7 +143,8 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
     const [selected, setSelected] = useState(() => {
       if (selectedResult) {
         // Show symbol - name (exchange) for better context
-        const exchangeDisplay = selectedResult.exchangeName || getExchangeDisplayName(selectedResult.exchange);
+        const exchangeDisplay =
+          selectedResult.exchangeName || getExchangeDisplayName(selectedResult.exchange);
         const exchangeSuffix = exchangeDisplay ? ` (${exchangeDisplay})` : "";
         return `${selectedResult.symbol} - ${selectedResult.longName}${exchangeSuffix}`;
       }
@@ -258,7 +272,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
           <PopoverContent
             side="bottom"
             align="start"
-            className="h-auto min-w-[280px] w-(--radix-popover-trigger-width) p-0"
+            className="h-auto w-(--radix-popover-trigger-width) min-w-[280px] p-0"
             onOpenAutoFocus={handleOpenAutoFocus}
             onCloseAutoFocus={handleCloseAutoFocus}
           >

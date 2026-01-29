@@ -1,6 +1,10 @@
 import { useState, useMemo } from "react";
 import { Icons, ScrollArea, Card, Button, Tabs, TabsList, TabsTrigger } from "@wealthfolio/ui";
-import { TreeView, buildCategoryTree, type TreeNode } from "@wealthfolio/ui/components/ui/tree-view";
+import {
+  TreeView,
+  buildCategoryTree,
+  type TreeNode,
+} from "@wealthfolio/ui/components/ui/tree-view";
 import { useTaxonomies, useTaxonomy, useExportTaxonomy } from "@/hooks/use-taxonomies";
 import { SettingsHeader } from "../settings-header";
 import { CategoryForm } from "./components/category-form";
@@ -33,9 +37,7 @@ export default function TaxonomiesPage() {
   // Find selected category
   const selectedCategory = useMemo(() => {
     if (!selectedCategoryId || !taxonomyWithCategories?.categories) return null;
-    return (
-      taxonomyWithCategories.categories.find((c) => c.id === selectedCategoryId) ?? null
-    );
+    return taxonomyWithCategories.categories.find((c) => c.id === selectedCategoryId) ?? null;
   }, [selectedCategoryId, taxonomyWithCategories?.categories]);
 
   const handleSelectCategory = (node: TreeNode) => {
@@ -101,7 +103,7 @@ export default function TaxonomiesPage() {
                 className="flex items-center gap-2"
               >
                 <span
-                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
                   style={{ backgroundColor: taxonomy.color }}
                 />
                 <span>{taxonomy.name.replace(" (GICS)", "")}</span>
@@ -115,15 +117,15 @@ export default function TaxonomiesPage() {
       {activeTaxonomyId && taxonomyWithCategories ? (
         <Card>
           {/* Header with export button */}
-          <div className="flex items-center justify-between p-4 border-b">
+          <div className="flex items-center justify-between border-b p-4">
             <div className="flex items-center gap-3">
               <span
-                className="w-4 h-4 rounded-full"
+                className="h-4 w-4 rounded-full"
                 style={{ backgroundColor: activeTaxonomy?.color }}
               />
               <div>
                 <h3 className="font-semibold">{activeTaxonomy?.name}</h3>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-muted-foreground text-xs">
                   {taxonomyWithCategories.categories.length} categories
                 </p>
               </div>
@@ -131,30 +133,26 @@ export default function TaxonomiesPage() {
             <div className="flex items-center gap-2">
               {isEditableTaxonomy && (
                 <Button variant="default" size="sm" onClick={handleAddCategory}>
-                  <Icons.Plus className="h-4 w-4 mr-2" />
+                  <Icons.Plus className="mr-2 h-4 w-4" />
                   Add Category
                 </Button>
               )}
               <Button variant="outline" size="sm" onClick={handleExport}>
-                <Icons.Download className="h-4 w-4 mr-2" />
+                <Icons.Download className="mr-2 h-4 w-4" />
                 Export
               </Button>
             </div>
           </div>
 
           {/* Categories and details */}
-          <div className="flex flex-col lg:flex-row min-h-[500px]">
+          <div className="flex min-h-[500px] flex-col lg:flex-row">
             {/* Category tree */}
-            <div className="w-full lg:w-80 border-b lg:border-b-0 lg:border-r">
+            <div className="w-full border-b lg:w-80 lg:border-r lg:border-b-0">
               <ScrollArea className="h-[300px] lg:h-[500px]">
                 {isLoadingCategories ? (
-                  <div className="p-4 text-center text-muted-foreground text-sm">
-                    Loading...
-                  </div>
+                  <div className="text-muted-foreground p-4 text-center text-sm">Loading...</div>
                 ) : categoryTree.length === 0 ? (
-                  <div className="p-4 text-center text-muted-foreground text-sm">
-                    No categories
-                  </div>
+                  <div className="text-muted-foreground p-4 text-center text-sm">No categories</div>
                 ) : (
                   <TreeView
                     data={categoryTree}
@@ -184,9 +182,9 @@ export default function TaxonomiesPage() {
                   onDelete={() => setSelectedCategoryId(null)}
                 />
               ) : (
-                <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
+                <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
                   <div className="text-center">
-                    <Icons.Info className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <Icons.Info className="mx-auto mb-2 h-8 w-8 opacity-50" />
                     <p>Select a category to view details</p>
                   </div>
                 </div>
@@ -195,16 +193,16 @@ export default function TaxonomiesPage() {
           </div>
         </Card>
       ) : isLoading ? (
-        <Card className="flex items-center justify-center h-64">
-          <div className="text-center text-muted-foreground">
-            <Icons.Loader className="h-6 w-6 animate-spin mx-auto mb-2" />
+        <Card className="flex h-64 items-center justify-center">
+          <div className="text-muted-foreground text-center">
+            <Icons.Loader className="mx-auto mb-2 h-6 w-6 animate-spin" />
             <p>Loading classifications...</p>
           </div>
         </Card>
       ) : (
-        <Card className="flex items-center justify-center h-64">
-          <div className="text-center text-muted-foreground">
-            <Icons.Blocks className="h-8 w-8 mx-auto mb-2 opacity-50" />
+        <Card className="flex h-64 items-center justify-center">
+          <div className="text-muted-foreground text-center">
+            <Icons.Blocks className="mx-auto mb-2 h-8 w-8 opacity-50" />
             <p>Select a classification to view categories</p>
           </div>
         </Card>

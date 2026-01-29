@@ -78,8 +78,7 @@ export function useRenameThread() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, title }: { id: string; title: string }) =>
-      updateAiThread({ id, title }),
+    mutationFn: ({ id, title }: { id: string; title: string }) => updateAiThread({ id, title }),
     onSuccess: (updatedThread) => {
       queryClient.invalidateQueries({ queryKey: AI_THREADS_KEY });
       queryClient.setQueryData(QueryKeys.aiThread(updatedThread.id), updatedThread);
@@ -180,8 +179,6 @@ export function useRemoveThreadTag() {
  * @param pages - Array of ThreadPage objects from infinite query
  * @returns Flat array of ChatThread objects
  */
-export function flattenThreadPages(
-  pages: ThreadPage[] | undefined,
-): ChatThread[] {
+export function flattenThreadPages(pages: ThreadPage[] | undefined): ChatThread[] {
   return pages?.flatMap((page) => page.threads as unknown as ChatThread[]) ?? [];
 }

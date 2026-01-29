@@ -104,7 +104,11 @@ mod tests {
             Ok(original_len - quotes.len())
         }
 
-        fn latest(&self, asset_id: &AssetId, _source: Option<&QuoteSource>) -> Result<Option<Quote>> {
+        fn latest(
+            &self,
+            asset_id: &AssetId,
+            _source: Option<&QuoteSource>,
+        ) -> Result<Option<Quote>> {
             let quotes = self.quotes.lock().unwrap();
             Ok(quotes
                 .iter()
@@ -180,8 +184,12 @@ mod tests {
 
         // Legacy methods
         fn get_latest_quote(&self, symbol: &str) -> Result<Quote> {
-            self.latest(&AssetId::new(symbol), None)?
-                .ok_or_else(|| crate::Error::Database(DatabaseError::NotFound(format!("Quote for {} not found", symbol))))
+            self.latest(&AssetId::new(symbol), None)?.ok_or_else(|| {
+                crate::Error::Database(DatabaseError::NotFound(format!(
+                    "Quote for {} not found",
+                    symbol
+                )))
+            })
         }
 
         fn get_latest_quotes(&self, symbols: &[String]) -> Result<HashMap<String, Quote>> {
@@ -255,13 +263,19 @@ mod tests {
             for asset_id in asset_ids {
                 let matching: Vec<_> = quotes
                     .iter()
-                    .filter(|q| {
-                        q.asset_id == *asset_id && q.data_source.as_str() == source
-                    })
+                    .filter(|q| q.asset_id == *asset_id && q.data_source.as_str() == source)
                     .collect();
                 if !matching.is_empty() {
-                    let min_date = matching.iter().map(|q| q.timestamp.date_naive()).min().unwrap();
-                    let max_date = matching.iter().map(|q| q.timestamp.date_naive()).max().unwrap();
+                    let min_date = matching
+                        .iter()
+                        .map(|q| q.timestamp.date_naive())
+                        .min()
+                        .unwrap();
+                    let max_date = matching
+                        .iter()
+                        .map(|q| q.timestamp.date_naive())
+                        .max()
+                        .unwrap();
                     result.insert(asset_id.clone(), (min_date, max_date));
                 }
             }
@@ -497,7 +511,9 @@ mod tests {
         store.add_quote(q1);
         store.add_quote(q2);
 
-        let duplicates = store.find_duplicate_quotes("AAPL", date(2024, 1, 1)).unwrap();
+        let duplicates = store
+            .find_duplicate_quotes("AAPL", date(2024, 1, 1))
+            .unwrap();
         assert_eq!(duplicates.len(), 2);
     }
 
@@ -529,7 +545,10 @@ mod tests {
         store.add_quote(create_quote("AAPL", date(2024, 1, 2), dec!(155)));
         store.add_quote(create_quote("MSFT", date(2024, 1, 1), dec!(350)));
 
-        let deleted = store.delete_quotes_for_asset(&AssetId::new("AAPL")).await.unwrap();
+        let deleted = store
+            .delete_quotes_for_asset(&AssetId::new("AAPL"))
+            .await
+            .unwrap();
 
         assert_eq!(deleted, 2);
         assert!(store.get_latest_quote("AAPL").is_err());

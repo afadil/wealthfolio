@@ -29,7 +29,12 @@ import {
   TableHeader,
   TableRow,
 } from "@wealthfolio/ui/components/ui/table";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@wealthfolio/ui/components/ui/tooltip";
 import type { Account, ActivityImport } from "@/lib/types";
 import { cn, formatDateTime, toPascalCase } from "@/lib/utils";
 import { formatAmount } from "@wealthfolio/ui";

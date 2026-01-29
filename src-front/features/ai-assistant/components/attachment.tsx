@@ -11,7 +11,12 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useShallow } from "zustand/shallow";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@wealthfolio/ui/components/ui/avatar";
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@wealthfolio/ui/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+} from "@wealthfolio/ui/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { TooltipIconButton } from "./tooltip-icon-button";
 
@@ -98,7 +103,11 @@ const AttachmentThumb: FC = () => {
 
   return (
     <Avatar className="aui-attachment-tile-avatar h-full w-full rounded-none">
-      <AvatarImage src={src} alt="Attachment preview" className="aui-attachment-tile-image object-cover" />
+      <AvatarImage
+        src={src}
+        alt="Attachment preview"
+        className="aui-attachment-tile-image object-cover"
+      />
       <AvatarFallback delayMs={isImage ? 200 : 0}>
         <Icons.FileText className="aui-attachment-tile-fallback-icon text-muted-foreground size-8" />
       </AvatarFallback>

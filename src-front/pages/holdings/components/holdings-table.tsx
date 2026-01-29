@@ -204,7 +204,7 @@ const getColumns = (
             <div className="flex items-center gap-1.5">
               <span className="font-medium">{displaySymbol}</span>
               {isManual && (
-                <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4">
+                <Badge variant="secondary" className="h-4 px-1 py-0 text-[10px]">
                   Manual
                 </Badge>
               )}

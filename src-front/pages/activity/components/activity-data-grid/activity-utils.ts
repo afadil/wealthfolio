@@ -379,9 +379,8 @@ export function buildSavePayload(
     // For assets not in our lookup (new assets), send undefined currency to let the backend
     // derive it from the asset and properly register the FX pair if needed.
     // Only use account currency fallback for cash activities where the currency is deterministic.
-    const currencyForPayload = resolvedCurrency ?? (isCashActivity(transaction.activityType)
-      ? currencyFallback
-      : undefined);
+    const currencyForPayload =
+      resolvedCurrency ?? (isCashActivity(transaction.activityType) ? currencyFallback : undefined);
 
     const isCash = isCashActivity(transaction.activityType);
     const isNew = transaction.isNew === true;
@@ -393,12 +392,13 @@ export function buildSavePayload(
       transaction.activityType === ActivityType.TRANSFER_OUT;
     if (isTransfer && transaction.isExternal != null) {
       // Merge with existing metadata if present
-      const existingMeta =
-        typeof transaction.metadata === "object" ? transaction.metadata : {};
+      const existingMeta = typeof transaction.metadata === "object" ? transaction.metadata : {};
       const newMeta = {
         ...existingMeta,
         flow: {
-          ...(existingMeta as Record<string, unknown>)?.flow as Record<string, unknown> | undefined,
+          ...((existingMeta as Record<string, unknown>)?.flow as
+            | Record<string, unknown>
+            | undefined),
           is_external: transaction.isExternal,
         },
       };

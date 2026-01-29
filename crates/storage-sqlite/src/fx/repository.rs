@@ -160,7 +160,9 @@ impl FxRepository {
                     from_currency,
                     to_currency,
                     rate: Decimal::ZERO,
-                    source: DataSource::from(asset.preferred_provider.as_deref().unwrap_or("MANUAL")),
+                    source: DataSource::from(
+                        asset.preferred_provider.as_deref().unwrap_or("MANUAL"),
+                    ),
                     timestamp,
                 });
             }
@@ -192,8 +194,8 @@ impl FxRepository {
 
                 ExchangeRate {
                     id: asset_db.id,
-                    from_currency: asset_db.symbol,  // Use asset.symbol as from
-                    to_currency: asset_db.currency,  // Use asset.currency as to
+                    from_currency: asset_db.symbol, // Use asset.symbol as from
+                    to_currency: asset_db.currency, // Use asset.currency as to
                     rate,
                     source: DataSource::from(quote_db.source.as_str()),
                     timestamp,
@@ -491,7 +493,7 @@ impl FxRepository {
                     notes: Some(notes),
                     metadata: None,
                     currency: to_owned.to_string(), // Quote currency (USD)
-                    is_active: 1, // FX assets should be active for quote syncing
+                    is_active: 1,                   // FX assets should be active for quote syncing
                     created_at: now_rfc3339.clone(),
                     updated_at: now_rfc3339.clone(),
                     ..Default::default()

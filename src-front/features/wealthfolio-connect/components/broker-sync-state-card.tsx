@@ -13,7 +13,11 @@ interface BrokerSyncStateCardProps {
 
 const statusConfig: Record<
   SyncStatus,
-  { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ReactNode }
+  {
+    label: string;
+    variant: "default" | "secondary" | "destructive" | "outline";
+    icon: React.ReactNode;
+  }
 > = {
   IDLE: {
     label: "Up to Date",

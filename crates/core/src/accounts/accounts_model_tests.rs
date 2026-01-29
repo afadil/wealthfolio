@@ -73,25 +73,33 @@ mod tests {
 
     #[test]
     fn test_get_tracking_mode_transactions() {
-        let account = create_test_account(Some(r#"{"wealthfolio":{"trackingMode":"TRANSACTIONS"}}"#.to_string()));
+        let account = create_test_account(Some(
+            r#"{"wealthfolio":{"trackingMode":"TRANSACTIONS"}}"#.to_string(),
+        ));
         assert_eq!(get_tracking_mode(&account), TrackingMode::Transactions);
     }
 
     #[test]
     fn test_get_tracking_mode_holdings() {
-        let account = create_test_account(Some(r#"{"wealthfolio":{"trackingMode":"HOLDINGS"}}"#.to_string()));
+        let account = create_test_account(Some(
+            r#"{"wealthfolio":{"trackingMode":"HOLDINGS"}}"#.to_string(),
+        ));
         assert_eq!(get_tracking_mode(&account), TrackingMode::Holdings);
     }
 
     #[test]
     fn test_get_tracking_mode_not_set_explicit() {
-        let account = create_test_account(Some(r#"{"wealthfolio":{"trackingMode":"NOT_SET"}}"#.to_string()));
+        let account = create_test_account(Some(
+            r#"{"wealthfolio":{"trackingMode":"NOT_SET"}}"#.to_string(),
+        ));
         assert_eq!(get_tracking_mode(&account), TrackingMode::NotSet);
     }
 
     #[test]
     fn test_get_tracking_mode_invalid_value() {
-        let account = create_test_account(Some(r#"{"wealthfolio":{"trackingMode":"INVALID"}}"#.to_string()));
+        let account = create_test_account(Some(
+            r#"{"wealthfolio":{"trackingMode":"INVALID"}}"#.to_string(),
+        ));
         assert_eq!(get_tracking_mode(&account), TrackingMode::NotSet);
     }
 
@@ -128,7 +136,8 @@ mod tests {
 
     #[test]
     fn test_set_tracking_mode_invalid_json() {
-        let result = set_tracking_mode(Some("invalid json".to_string()), TrackingMode::Transactions);
+        let result =
+            set_tracking_mode(Some("invalid json".to_string()), TrackingMode::Transactions);
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
         assert_eq!(parsed["wealthfolio"]["trackingMode"], "TRANSACTIONS");
     }

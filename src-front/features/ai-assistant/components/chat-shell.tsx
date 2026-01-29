@@ -12,11 +12,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@wealthfolio/ui/components/ui/sheet";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@wealthfolio/ui/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { Thread } from "./thread";
 import { ThreadList } from "./thread-list";
 import { ProviderPicker } from "./provider-picker";
@@ -167,7 +163,14 @@ function NoProvidersEmptyState({ className }: { className?: string }) {
  */
 function ChatShellInner({ className }: ChatShellProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const { currentProviderId, currentModelId, enabledProviders, isLoading, thinkingEnabled, supportsThinking } = useChatModelContext();
+  const {
+    currentProviderId,
+    currentModelId,
+    enabledProviders,
+    isLoading,
+    thinkingEnabled,
+    supportsThinking,
+  } = useChatModelContext();
 
   // Build chat config from current selection
   const chatConfig = useMemo(() => {

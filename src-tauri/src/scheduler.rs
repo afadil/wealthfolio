@@ -11,10 +11,6 @@ use wealthfolio_core::quotes::MarketSyncMode;
 
 use crate::commands::brokers_sync::perform_broker_sync;
 use crate::context::ServiceContext;
-use crate::events::{
-    emit_assets_enrich_requested, emit_broker_sync_complete, emit_broker_sync_start,
-    AssetsEnrichPayload, BrokerSyncEventPayload,
-};
 
 /// Runs broker sync once on startup (async, non-blocking).
 ///
@@ -36,15 +32,15 @@ pub async fn run_startup_sync(handle: &AppHandle, context: &Arc<ServiceContext>)
         }
         Err(e) => {
             // If we can't check subscription (no token, network error, etc.), skip silently
-            debug!("Startup sync skipped: could not verify subscription ({})", e);
+            debug!(
+                "Startup sync skipped: could not verify subscription ({})",
+                e
+            );
             return;
         }
     }
 
-    // Emit start event
-    emit_broker_sync_start(handle);
-
-    // Perform sync
+    // Perform sync (orchestrator emits broker:sync-start and broker:sync-complete events)
     match perform_broker_sync(context, Some(handle)).await {
         Ok(result) => {
             info!(
@@ -52,9 +48,7 @@ pub async fn run_startup_sync(handle: &AppHandle, context: &Arc<ServiceContext>)
                 result.success, result.message
             );
 
-            // Emit completion event (is_scheduled=false, no toast for startup sync)
-            let payload = BrokerSyncEventPayload::new(result.success, &result.message, false);
-            emit_broker_sync_complete(handle, payload);
+            // Note: broker:sync-complete event is emitted by the orchestrator via TauriProgressReporter
 
             // Trigger portfolio update if sync was successful and activities were synced
             if result.success {
@@ -79,12 +73,13 @@ pub async fn run_startup_sync(handle: &AppHandle, context: &Arc<ServiceContext>)
                             "Triggering asset enrichment for {} new assets from activities",
                             activities.new_asset_ids.len()
                         );
-                        emit_assets_enrich_requested(
-                            handle,
-                            AssetsEnrichPayload {
-                                asset_ids: activities.new_asset_ids.clone(),
-                            },
-                        );
+                        let asset_service = context.asset_service();
+                        let asset_ids = activities.new_asset_ids.clone();
+                        tokio::spawn(async move {
+                            if let Err(e) = asset_service.enrich_assets(asset_ids).await {
+                                warn!("Asset enrichment failed: {}", e);
+                            }
+                        });
                     }
                 }
 
@@ -95,12 +90,13 @@ pub async fn run_startup_sync(handle: &AppHandle, context: &Arc<ServiceContext>)
                             "Triggering asset enrichment for {} new assets from holdings",
                             holdings.new_asset_ids.len()
                         );
-                        emit_assets_enrich_requested(
-                            handle,
-                            AssetsEnrichPayload {
-                                asset_ids: holdings.new_asset_ids.clone(),
-                            },
-                        );
+                        let asset_service = context.asset_service();
+                        let asset_ids = holdings.new_asset_ids.clone();
+                        tokio::spawn(async move {
+                            if let Err(e) = asset_service.enrich_assets(asset_ids).await {
+                                warn!("Asset enrichment failed: {}", e);
+                            }
+                        });
                     }
 
                     // Also trigger portfolio update if holdings were synced
@@ -125,9 +121,7 @@ pub async fn run_startup_sync(handle: &AppHandle, context: &Arc<ServiceContext>)
                 debug!("Startup sync skipped: user not authenticated");
             } else {
                 warn!("Startup sync failed: {}", e);
-                // Emit error event (is_scheduled=false, no toast)
-                let payload = BrokerSyncEventPayload::new(false, &e, false);
-                emit_broker_sync_complete(handle, payload);
+                // Note: broker:sync-error event is emitted by the orchestrator via TauriProgressReporter
             }
         }
     }

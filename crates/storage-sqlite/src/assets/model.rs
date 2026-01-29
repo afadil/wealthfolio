@@ -33,7 +33,9 @@ fn text_to_datetime(s: &str) -> NaiveDateTime {
 
     // Try date only: "YYYY-MM-DD"
     if let Ok(date) = chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d") {
-        return date.and_hms_opt(0, 0, 0).unwrap_or_else(|| chrono::Utc::now().naive_utc());
+        return date
+            .and_hms_opt(0, 0, 0)
+            .unwrap_or_else(|| chrono::Utc::now().naive_utc());
     }
 
     error!("Failed to parse datetime '{}': unsupported format", s);
@@ -61,9 +63,9 @@ pub struct AssetDB {
     pub id: String,
 
     // Core identity
-    pub kind: String,            // AssetKind enum (NOT NULL)
+    pub kind: String, // AssetKind enum (NOT NULL)
     pub name: Option<String>,
-    pub symbol: String,          // Canonical ticker (no provider suffix)
+    pub symbol: String, // Canonical ticker (no provider suffix)
 
     // Market identity (for SECURITY)
     pub exchange_mic: Option<String>, // ISO 10383 MIC code
@@ -72,13 +74,13 @@ pub struct AssetDB {
     pub currency: String,
 
     // Pricing configuration
-    pub pricing_mode: String,            // MARKET, MANUAL, DERIVED, NONE (NOT NULL)
+    pub pricing_mode: String, // MARKET, MANUAL, DERIVED, NONE (NOT NULL)
     pub preferred_provider: Option<String>,
     pub provider_overrides: Option<String>, // JSON for per-provider overrides
 
     // Metadata
     pub notes: Option<String>,
-    pub metadata: Option<String>,  // JSON: $.identifiers.isin (optional)
+    pub metadata: Option<String>, // JSON: $.identifiers.isin (optional)
 
     // Status
     pub is_active: i32,

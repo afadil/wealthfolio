@@ -197,7 +197,11 @@ function ActivityTypeDisplayCell({
 
   return (
     <div className="flex w-full items-center gap-2">
-      <Badge variant="destructive" title={trimmedCsvType} className="shrink-0 whitespace-nowrap text-xs">
+      <Badge
+        variant="destructive"
+        title={trimmedCsvType}
+        className="shrink-0 text-xs whitespace-nowrap"
+      >
         {displayValue}
       </Badge>
       <SearchableSelect

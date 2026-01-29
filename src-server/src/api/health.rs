@@ -133,5 +133,8 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/health/restore", post(restore_health_issue))
         .route("/health/dismissed", get(get_dismissed_health_issues))
         .route("/health/fix", post(execute_health_fix))
-        .route("/health/config", get(get_health_config).put(update_health_config))
+        .route(
+            "/health/config",
+            get(get_health_config).put(update_health_config),
+        )
 }

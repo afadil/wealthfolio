@@ -67,7 +67,12 @@ export function DisplayCode({ code, expiresAt, onCancel }: DisplayCodeProps) {
       <div className="flex items-center gap-3">
         <span className="text-muted-foreground text-xs tabular-nums">{timeLeft}</span>
         <span className="text-muted-foreground/50">·</span>
-        <Button variant="link" size="sm" className="text-muted-foreground h-auto p-0 text-xs" onClick={onCancel}>
+        <Button
+          variant="link"
+          size="sm"
+          className="text-muted-foreground h-auto p-0 text-xs"
+          onClick={onCancel}
+        >
           Cancel
         </Button>
       </div>

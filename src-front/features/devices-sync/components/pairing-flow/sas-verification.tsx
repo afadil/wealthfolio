@@ -14,7 +14,13 @@ interface SASVerificationProps {
   isLoading?: boolean;
 }
 
-export function SASVerification({ sas, role, onConfirm, onReject, isLoading }: SASVerificationProps) {
+export function SASVerification({
+  sas,
+  role,
+  onConfirm,
+  onReject,
+  isLoading,
+}: SASVerificationProps) {
   const formattedSAS = sas.length > 3 ? `${sas.slice(0, 3)} ${sas.slice(3)}` : sas;
 
   return (

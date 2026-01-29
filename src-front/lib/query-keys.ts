@@ -118,8 +118,15 @@ export const QueryKeys = {
   DISMISSED_HEALTH_ISSUES: "dismissedHealthIssues",
 
   // Snapshot Management
-  MANUAL_SNAPSHOTS: "manualSnapshots",
-  manualSnapshots: (accountId: string) => [QueryKeys.MANUAL_SNAPSHOTS, accountId],
+  SNAPSHOTS: "snapshots",
+  snapshots: (accountId: string) => [QueryKeys.SNAPSHOTS, accountId],
+  // Legacy alias for backwards compatibility
+  MANUAL_SNAPSHOTS: "snapshots",
+  manualSnapshots: (accountId: string) => [QueryKeys.SNAPSHOTS, accountId],
   SNAPSHOT_HOLDINGS: "snapshotHoldings",
-  snapshotHoldings: (accountId: string, date: string) => [QueryKeys.SNAPSHOT_HOLDINGS, accountId, date],
+  snapshotHoldings: (accountId: string, date: string) => [
+    QueryKeys.SNAPSHOT_HOLDINGS,
+    accountId,
+    date,
+  ],
 } as const;

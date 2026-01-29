@@ -23,10 +23,7 @@ interface IssueDetailSheetProps {
   isFixing: boolean;
 }
 
-const SEVERITY_CONFIG: Record<
-  HealthSeverity,
-  { label: string; color: string }
-> = {
+const SEVERITY_CONFIG: Record<HealthSeverity, { label: string; color: string }> = {
   INFO: { label: "Info", color: "text-muted-foreground" },
   WARNING: { label: "Warning", color: "text-yellow-600 dark:text-yellow-400" },
   ERROR: { label: "Error", color: "text-destructive" },
@@ -36,23 +33,28 @@ const SEVERITY_CONFIG: Record<
 const CATEGORY_LABELS: Record<HealthCategory, { label: string; description: string }> = {
   PRICE_STALENESS: {
     label: "Price Staleness",
-    description: "Market prices are outdated and need to be refreshed. This can affect the accuracy of your portfolio valuation.",
+    description:
+      "Market prices are outdated and need to be refreshed. This can affect the accuracy of your portfolio valuation.",
   },
   FX_INTEGRITY: {
     label: "Exchange Rates",
-    description: "Missing or outdated exchange rates for currency conversion. This may impact multi-currency portfolio calculations.",
+    description:
+      "Missing or outdated exchange rates for currency conversion. This may impact multi-currency portfolio calculations.",
   },
   CLASSIFICATION: {
     label: "Classification",
-    description: "Assets are missing categories or classifications. This affects portfolio breakdowns and allocation analysis.",
+    description:
+      "Assets are missing categories or classifications. This affects portfolio breakdowns and allocation analysis.",
   },
   DATA_CONSISTENCY: {
     label: "Data Consistency",
-    description: "Inconsistencies detected in portfolio data. This may cause inaccurate reporting or calculations.",
+    description:
+      "Inconsistencies detected in portfolio data. This may cause inaccurate reporting or calculations.",
   },
   ACCOUNT_CONFIGURATION: {
     label: "Account Setup",
-    description: "Some accounts need configuration before data can be synced. Set tracking mode to start importing data.",
+    description:
+      "Some accounts need configuration before data can be synced. Set tracking mode to start importing data.",
   },
 };
 
@@ -88,7 +90,7 @@ export function IssueDetailSheet({
           {/* Affected Items List - grows to fill space */}
           {issue.affectedItems && issue.affectedItems.length > 0 && (
             <div className="flex min-h-0 flex-1 flex-col gap-3">
-              <h4 className="text-muted-foreground shrink-0 text-xs font-medium uppercase tracking-wide">
+              <h4 className="text-muted-foreground shrink-0 text-xs font-medium tracking-wide uppercase">
                 Affected Items ({issue.affectedItems.length})
               </h4>
               <ScrollArea className="min-h-0 flex-1 rounded-md border">
@@ -128,30 +130,37 @@ export function IssueDetailSheet({
           )}
 
           {/* Impact Stats - only show if no affected items list */}
-          {(issue.affectedCount > 0 || (issue.affectedMvPct != null && issue.affectedMvPct > 0)) && !issue.affectedItems && (
-            <div className="space-y-3">
-              <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Impact</h4>
-              <div className="grid grid-cols-2 gap-4">
-                {issue.affectedCount > 0 && (
-                  <div>
-                    <p className="text-2xl font-semibold tabular-nums">{issue.affectedCount}</p>
-                    <p className="text-muted-foreground text-xs">Affected items</p>
-                  </div>
-                )}
-                {issue.affectedMvPct != null && issue.affectedMvPct > 0 && (
-                  <div>
-                    <p className="text-2xl font-semibold tabular-nums">{(issue.affectedMvPct * 100).toFixed(1)}%</p>
-                    <p className="text-muted-foreground text-xs">Portfolio impact</p>
-                  </div>
-                )}
+          {(issue.affectedCount > 0 || (issue.affectedMvPct != null && issue.affectedMvPct > 0)) &&
+            !issue.affectedItems && (
+              <div className="space-y-3">
+                <h4 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                  Impact
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  {issue.affectedCount > 0 && (
+                    <div>
+                      <p className="text-2xl font-semibold tabular-nums">{issue.affectedCount}</p>
+                      <p className="text-muted-foreground text-xs">Affected items</p>
+                    </div>
+                  )}
+                  {issue.affectedMvPct != null && issue.affectedMvPct > 0 && (
+                    <div>
+                      <p className="text-2xl font-semibold tabular-nums">
+                        {(issue.affectedMvPct * 100).toFixed(1)}%
+                      </p>
+                      <p className="text-muted-foreground text-xs">Portfolio impact</p>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* Additional Details */}
           {issue.details && (
             <div className="space-y-2">
-              <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Details</h4>
+              <h4 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                Details
+              </h4>
               <p className="text-muted-foreground text-sm">{issue.details}</p>
             </div>
           )}
@@ -159,7 +168,9 @@ export function IssueDetailSheet({
 
         {/* About this issue - before actions */}
         <div className="shrink-0 space-y-2 border-t pt-6">
-          <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">About this issue</h4>
+          <h4 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+            About this issue
+          </h4>
           <p className="text-muted-foreground text-sm">{categoryConfig.description}</p>
         </div>
 

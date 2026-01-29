@@ -1,15 +1,17 @@
 use super::ai_environment::TauriAiEnvironment;
 use super::registry::ServiceContext;
+use crate::domain_events::TauriDomainEventSink;
 use crate::secret_store::shared_secret_store;
 use crate::services::ConnectService;
 use std::sync::{Arc, RwLock};
+use tokio::sync::mpsc;
 use wealthfolio_ai::{AiProviderService, ChatConfig, ChatService};
 use wealthfolio_connect::{BrokerSyncService, PlatformRepository, DEFAULT_CLOUD_API_URL};
-use wealthfolio_device_sync::DeviceEnrollService;
 use wealthfolio_core::{
     accounts::AccountService,
     activities::ActivityService,
     assets::{AssetClassificationService, AssetService},
+    events::DomainEvent,
     fx::{FxService, FxServiceTrait},
     goals::GoalService,
     health::HealthService,
@@ -24,9 +26,10 @@ use wealthfolio_core::{
         valuation::ValuationService,
     },
     quotes::{QuoteService, QuoteServiceTrait},
-    settings::{SettingsService, SettingsServiceTrait, SettingsRepositoryTrait},
+    settings::{SettingsRepositoryTrait, SettingsService, SettingsServiceTrait},
     taxonomies::TaxonomyService,
 };
+use wealthfolio_device_sync::DeviceEnrollService;
 use wealthfolio_storage_sqlite::{
     accounts::AccountRepository,
     activities::ActivityRepository,
@@ -44,11 +47,15 @@ use wealthfolio_storage_sqlite::{
     taxonomies::TaxonomyRepository,
 };
 
-// Other imports
+/// Result of context initialization, including the receiver for domain events.
+pub struct ContextInitResult {
+    pub context: ServiceContext,
+    pub event_receiver: mpsc::UnboundedReceiver<DomainEvent>,
+}
 
 pub async fn initialize_context(
     app_data_dir: &str,
-) -> Result<ServiceContext, Box<dyn std::error::Error>> {
+) -> Result<ContextInitResult, Box<dyn std::error::Error>> {
     let db_path = db::init(app_data_dir)?;
     let pool = db::create_pool(&db_path)?;
     let writer = write_actor::spawn_writer(pool.as_ref().clone());
@@ -93,11 +100,11 @@ pub async fn initialize_context(
     // QuoteService provides all quote operations via QuoteServiceTrait
     let quote_service: Arc<dyn QuoteServiceTrait> = Arc::new(
         QuoteService::new(
-            market_data_repo.clone(),           // QuoteStore
+            market_data_repo.clone(),            // QuoteStore
             quote_sync_state_repository.clone(), // SyncStateStore
-            market_data_repo.clone(),           // ProviderSettingsStore
-            asset_repository.clone(),           // AssetRepositoryTrait
-            activity_repository.clone(),        // ActivityRepositoryTrait
+            market_data_repo.clone(),            // ProviderSettingsStore
+            asset_repository.clone(),            // AssetRepositoryTrait
+            activity_repository.clone(),         // ActivityRepositoryTrait
             secret_store.clone(),
         )
         .await?,
@@ -107,29 +114,43 @@ pub async fn initialize_context(
     let taxonomy_repository = Arc::new(TaxonomyRepository::new(pool.clone(), writer.clone()));
     let taxonomy_service = Arc::new(TaxonomyService::new(taxonomy_repository));
 
-    let asset_service = Arc::new(AssetService::with_taxonomy_service(
-        asset_repository.clone(),
-        quote_service.clone(),
-        taxonomy_service.clone(),
-    )?);
+    // Domain event sink - TauriDomainEventSink sends events to a channel
+    // The worker will be started by the caller after the context is managed
+    // Must be created before services that emit events
+    let (domain_event_sink, event_receiver) = TauriDomainEventSink::new();
+    let domain_event_sink: Arc<dyn wealthfolio_core::events::DomainEventSink> =
+        Arc::new(domain_event_sink);
+
+    let asset_service = Arc::new(
+        AssetService::with_taxonomy_service(
+            asset_repository.clone(),
+            quote_service.clone(),
+            taxonomy_service.clone(),
+        )?
+        .with_event_sink(domain_event_sink.clone()),
+    );
 
     let account_service = Arc::new(AccountService::new(
         account_repository.clone(),
         fx_service.clone(),
         base_currency.clone(),
+        domain_event_sink.clone(),
     ));
 
     // Import run repository for tracking CSV imports
     let import_run_repository = Arc::new(ImportRunRepository::new(pool.clone(), writer.clone()));
 
-    let activity_service = Arc::new(ActivityService::with_import_run_repository(
-        activity_repository.clone(),
-        account_service.clone(),
-        asset_service.clone(),
-        fx_service.clone(),
-        quote_service.clone(),
-        import_run_repository,
-    ));
+    let activity_service = Arc::new(
+        ActivityService::with_import_run_repository(
+            activity_repository.clone(),
+            account_service.clone(),
+            asset_service.clone(),
+            fx_service.clone(),
+            quote_service.clone(),
+            import_run_repository,
+        )
+        .with_event_sink(domain_event_sink.clone()),
+    );
     let goal_service = Arc::new(GoalService::new(goal_repo.clone()));
     let limits_service = Arc::new(ContributionLimitService::new(
         fx_service.clone(),
@@ -143,14 +164,17 @@ pub async fn initialize_context(
         base_currency.clone(),
     ));
 
-    let snapshot_service = Arc::new(SnapshotService::new(
-        base_currency.clone(),
-        account_repository.clone(),
-        activity_repository.clone(),
-        snapshot_repository.clone(),
-        asset_repository.clone(),
-        fx_service.clone(),
-    ));
+    let snapshot_service = Arc::new(
+        SnapshotService::new(
+            base_currency.clone(),
+            account_repository.clone(),
+            activity_repository.clone(),
+            snapshot_repository.clone(),
+            asset_repository.clone(),
+            fx_service.clone(),
+        )
+        .with_event_sink(domain_event_sink.clone()),
+    );
 
     let holdings_valuation_service = Arc::new(HoldingsValuationService::new(
         fx_service.clone(),
@@ -170,7 +194,8 @@ pub async fn initialize_context(
         quote_service.clone(),
     ));
 
-    let classification_service = Arc::new(AssetClassificationService::new(taxonomy_service.clone()));
+    let classification_service =
+        Arc::new(AssetClassificationService::new(taxonomy_service.clone()));
     let holdings_service = Arc::new(HoldingsService::new(
         asset_service.clone(),
         snapshot_service.clone(),
@@ -193,15 +218,21 @@ pub async fn initialize_context(
         fx_service.clone(),
     ));
 
-    let alternative_asset_repository =
-        Arc::new(AlternativeAssetRepository::new(pool.clone(), writer.clone()));
-
-    let sync_service = Arc::new(BrokerSyncService::new(
-        account_service.clone(),
-        platform_repository.clone(),
+    let alternative_asset_repository = Arc::new(AlternativeAssetRepository::new(
         pool.clone(),
         writer.clone(),
     ));
+
+    let sync_service = Arc::new(
+        BrokerSyncService::new(
+            account_service.clone(),
+            platform_repository.clone(),
+            pool.clone(),
+            writer.clone(),
+        )
+        .with_event_sink(domain_event_sink.clone())
+        .with_snapshot_service(snapshot_service.clone()),
+    );
 
     let connect_service = Arc::new(ConnectService::new());
 
@@ -251,33 +282,37 @@ pub async fn initialize_context(
         Arc::new(HealthDismissalRepository::new(pool.clone(), writer.clone()));
     let health_service = Arc::new(HealthService::new(health_dismissal_repository));
 
-    Ok(ServiceContext {
-        base_currency,
-        instance_id,
-        settings_service,
-        account_service,
-        activity_service,
-        asset_service,
-        goal_service,
-        quote_service,
-        limits_service,
-        fx_service,
-        performance_service,
-        income_service,
-        snapshot_service,
-        snapshot_repository,
-        holdings_service,
-        allocation_service,
-        valuation_service,
-        net_worth_service,
-        sync_service,
-        alternative_asset_repository,
-        taxonomy_service,
-        connect_service,
-        ai_provider_service,
-        ai_chat_service,
-        device_enroll_service,
-        health_service,
+    Ok(ContextInitResult {
+        context: ServiceContext {
+            base_currency,
+            instance_id,
+            domain_event_sink,
+            settings_service,
+            account_service,
+            activity_service,
+            asset_service,
+            goal_service,
+            quote_service,
+            limits_service,
+            fx_service,
+            performance_service,
+            income_service,
+            snapshot_service,
+            snapshot_repository,
+            holdings_service,
+            allocation_service,
+            valuation_service,
+            net_worth_service,
+            sync_service,
+            alternative_asset_repository,
+            taxonomy_service,
+            connect_service,
+            ai_provider_service,
+            ai_chat_service,
+            device_enroll_service,
+            health_service,
+        },
+        event_receiver,
     })
 }
 

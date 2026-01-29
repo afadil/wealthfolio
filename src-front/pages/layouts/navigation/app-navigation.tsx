@@ -118,9 +118,7 @@ export function isPathActive(pathname: string, href: string): boolean {
   // Dashboard and Net Worth are grouped together
   if (normalizedHref === "/dashboard") {
     return (
-      normalizedPath === "/" ||
-      normalizedPath === "/dashboard" ||
-      normalizedPath === "/net-worth"
+      normalizedPath === "/" || normalizedPath === "/dashboard" || normalizedPath === "/net-worth"
     );
   }
 

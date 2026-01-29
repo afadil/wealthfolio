@@ -12,7 +12,7 @@ pub struct Taxonomy {
     pub color: String,
     pub description: Option<String>,
     pub is_system: bool,
-    pub is_single_select: bool,  // true = only one category per asset allowed
+    pub is_single_select: bool, // true = only one category per asset allowed
     pub sort_order: i32,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
@@ -106,7 +106,7 @@ pub struct AssetTaxonomyAssignment {
     pub asset_id: String,
     pub taxonomy_id: String,
     pub category_id: String,
-    pub weight: i32,  // basis points: 10000 = 100%
+    pub weight: i32, // basis points: 10000 = 100%
     pub source: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
@@ -120,7 +120,7 @@ pub struct NewAssetTaxonomyAssignment {
     pub asset_id: String,
     pub taxonomy_id: String,
     pub category_id: String,
-    pub weight: i32,  // basis points: 10000 = 100%
+    pub weight: i32, // basis points: 10000 = 100%
     pub source: String,
 }
 
@@ -131,7 +131,7 @@ impl Default for NewAssetTaxonomyAssignment {
             asset_id: String::new(),
             taxonomy_id: String::new(),
             category_id: String::new(),
-            weight: 10000,  // 100%
+            weight: 10000, // 100%
             source: "manual".to_string(),
         }
     }

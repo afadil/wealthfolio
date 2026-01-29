@@ -239,9 +239,7 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
               TWR/MWR not available. Requires transaction tracking.
             </p>
             {lastUpdated && (
-              <p className="text-muted-foreground m-0 p-0 text-xs">
-                Last updated: {lastUpdated}
-              </p>
+              <p className="text-muted-foreground m-0 p-0 text-xs">Last updated: {lastUpdated}</p>
             )}
           </>
         ) : (

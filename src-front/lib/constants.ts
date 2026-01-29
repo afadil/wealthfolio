@@ -447,7 +447,11 @@ export const SUBTYPE_DISPLAY_NAMES: Record<string, string> = {
 export const SUBTYPES_BY_ACTIVITY_TYPE: Record<string, string[]> = {
   [ActivityType.DIVIDEND]: [ACTIVITY_SUBTYPES.DRIP, ACTIVITY_SUBTYPES.DIVIDEND_IN_KIND],
   [ActivityType.INTEREST]: [ACTIVITY_SUBTYPES.STAKING_REWARD],
-  [ActivityType.CREDIT]: [ACTIVITY_SUBTYPES.BONUS, ACTIVITY_SUBTYPES.REBATE, ACTIVITY_SUBTYPES.REFUND],
+  [ActivityType.CREDIT]: [
+    ACTIVITY_SUBTYPES.BONUS,
+    ACTIVITY_SUBTYPES.REBATE,
+    ACTIVITY_SUBTYPES.REFUND,
+  ],
 };
 
 // Asset kinds for behavior classification
@@ -570,8 +574,16 @@ export const ASSET_SUBCLASS_TYPES = [
  * IDs are stable strings for URL persistence and local storage.
  */
 export const HOLDING_CATEGORY_FILTERS = [
-  { id: "investments", label: "Investments", assetKinds: ["SECURITY", "CRYPTO", "OPTION", "COMMODITY", "PRIVATE_EQUITY"] },
-  { id: "assets", label: "Personal Assets", assetKinds: ["PROPERTY", "VEHICLE", "COLLECTIBLE", "PHYSICAL_PRECIOUS", "OTHER"] },
+  {
+    id: "investments",
+    label: "Investments",
+    assetKinds: ["SECURITY", "CRYPTO", "OPTION", "COMMODITY", "PRIVATE_EQUITY"],
+  },
+  {
+    id: "assets",
+    label: "Personal Assets",
+    assetKinds: ["PROPERTY", "VEHICLE", "COLLECTIBLE", "PHYSICAL_PRECIOUS", "OTHER"],
+  },
   { id: "liabilities", label: "Liabilities", assetKinds: ["LIABILITY"] },
 ] as const;
 

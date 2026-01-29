@@ -2,12 +2,7 @@ import { useHealthStatus } from "@/hooks/use-health";
 import { cn } from "@/lib/utils";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@wealthfolio/ui";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@wealthfolio/ui";
 import { Link } from "react-router-dom";
 import type { HealthSeverity } from "@/lib/types";
 
@@ -68,7 +63,7 @@ export function HealthStatusIndicator() {
           <Button
             variant="secondary"
             size="icon-xs"
-            className="rounded-full bg-secondary/50"
+            className="bg-secondary/50 rounded-full"
             asChild
           >
             <Link to="/health" title="Data Status">

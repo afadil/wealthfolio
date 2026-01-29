@@ -79,7 +79,7 @@ function ImportRunItem({ run }: { run: ImportRun }) {
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <div className="rounded-lg border">
         <CollapsibleTrigger asChild>
-          <button className="flex w-full items-center justify-between p-3 hover:bg-accent/50">
+          <button className="hover:bg-accent/50 flex w-full items-center justify-between p-3">
             <div className="flex items-center gap-3">
               <div className="text-left">
                 <p className="text-sm font-medium">
@@ -132,7 +132,9 @@ function ImportRunItem({ run }: { run: ImportRun }) {
             {/* Warnings */}
             {hasWarnings && (
               <div className="space-y-2">
-                <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">Warnings:</p>
+                <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                  Warnings:
+                </p>
                 <ul className="space-y-1">
                   {run.warnings?.slice(0, 5).map((warning, idx) => (
                     <li key={idx} className="text-muted-foreground text-sm">

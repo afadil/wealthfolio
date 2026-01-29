@@ -42,12 +42,12 @@ function App() {
       <AuthProvider>
         <WealthfolioConnectProvider>
           <DeviceSyncProvider>
-              <PrivacyProvider>
-                <SettingsProvider>
-                  <TooltipProvider>{routedContent}</TooltipProvider>
-                </SettingsProvider>
-              </PrivacyProvider>
-            </DeviceSyncProvider>
+            <PrivacyProvider>
+              <SettingsProvider>
+                <TooltipProvider>{routedContent}</TooltipProvider>
+              </SettingsProvider>
+            </PrivacyProvider>
+          </DeviceSyncProvider>
         </WealthfolioConnectProvider>
       </AuthProvider>
     </QueryClientProvider>

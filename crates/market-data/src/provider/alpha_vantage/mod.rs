@@ -18,7 +18,9 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use crate::errors::MarketDataError;
-use crate::models::{AssetProfile, Coverage, InstrumentKind, ProviderInstrument, Quote, QuoteContext, SearchResult};
+use crate::models::{
+    AssetProfile, Coverage, InstrumentKind, ProviderInstrument, Quote, QuoteContext, SearchResult,
+};
 use crate::provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
 
 const BASE_URL: &str = "https://www.alphavantage.co/query";
@@ -313,7 +315,10 @@ impl EtfProfileResponse {
     /// Check if the response indicates an error or no data
     fn has_error(&self) -> bool {
         self.error_message.is_some()
-            || self.information.as_ref().map_or(false, |i| i.contains("demo"))
+            || self
+                .information
+                .as_ref()
+                .map_or(false, |i| i.contains("demo"))
             || self.sectors.is_empty()
     }
 
@@ -322,7 +327,11 @@ impl EtfProfileResponse {
         let trimmed = s.trim();
         if trimmed.ends_with('%') {
             // Convert percentage to decimal: "51.1%" -> 0.511
-            trimmed.trim_end_matches('%').parse::<f64>().ok().map(|v| v / 100.0)
+            trimmed
+                .trim_end_matches('%')
+                .parse::<f64>()
+                .ok()
+                .map(|v| v / 100.0)
         } else {
             trimmed.parse::<f64>().ok()
         }
@@ -369,7 +378,9 @@ impl EtfProfileResponse {
             logo_url: None,
             market_cap: None,
             pe_ratio: None,
-            dividend_yield: self.dividend_yield.as_ref()
+            dividend_yield: self
+                .dividend_yield
+                .as_ref()
                 .and_then(|s| Self::parse_weight(s)),
             week_52_high: None,
             week_52_low: None,
@@ -388,20 +399,24 @@ impl CompanyOverviewResponse {
     /// Check if the response indicates an error
     fn has_error(&self) -> bool {
         self.error_message.is_some()
-            || self.information.as_ref().map_or(false, |i| i.contains("demo"))
+            || self
+                .information
+                .as_ref()
+                .map_or(false, |i| i.contains("demo"))
     }
 
     /// Convert to AssetProfile
     fn to_asset_profile(&self) -> AssetProfile {
         // Normalize Alpha Vantage asset types to standard format
         // Alpha Vantage returns: "Common Stock", "ETF", "Mutual Fund", etc.
-        let quote_type = self.asset_type.as_ref().map(|t| {
-            match t.to_uppercase().as_str() {
+        let quote_type = self
+            .asset_type
+            .as_ref()
+            .map(|t| match t.to_uppercase().as_str() {
                 "COMMON STOCK" => "EQUITY".to_string(),
                 "MUTUAL FUND" => "MUTUALFUND".to_string(),
                 other => other.to_string(),
-            }
-        });
+            });
 
         AssetProfile {
             source: Some(PROVIDER_ID.to_string()),
@@ -749,10 +764,7 @@ impl AlphaVantageProvider {
     }
 
     /// Fetch company overview using OVERVIEW endpoint.
-    async fn fetch_company_overview(
-        &self,
-        symbol: &str,
-    ) -> Result<AssetProfile, MarketDataError> {
+    async fn fetch_company_overview(&self, symbol: &str) -> Result<AssetProfile, MarketDataError> {
         let params = [("function", "OVERVIEW"), ("symbol", symbol)];
 
         let text = self.fetch(&params).await?;
@@ -779,20 +791,14 @@ impl AlphaVantageProvider {
             )));
         }
 
-        debug!(
-            "Alpha Vantage: fetched company overview for {}",
-            symbol
-        );
+        debug!("Alpha Vantage: fetched company overview for {}", symbol);
 
         Ok(response.to_asset_profile())
     }
 
     /// Fetch ETF profile using ETF_PROFILE endpoint.
     /// Returns sector weightings and holdings data for ETFs.
-    async fn fetch_etf_profile(
-        &self,
-        symbol: &str,
-    ) -> Result<AssetProfile, MarketDataError> {
+    async fn fetch_etf_profile(&self, symbol: &str) -> Result<AssetProfile, MarketDataError> {
         let params = [("function", "ETF_PROFILE"), ("symbol", symbol)];
 
         let text = self.fetch(&params).await?;
@@ -898,12 +904,16 @@ impl MarketDataProvider for AlphaVantageProvider {
 
     fn capabilities(&self) -> ProviderCapabilities {
         ProviderCapabilities {
-            instrument_kinds: &[InstrumentKind::Equity, InstrumentKind::Crypto, InstrumentKind::Fx],
+            instrument_kinds: &[
+                InstrumentKind::Equity,
+                InstrumentKind::Crypto,
+                InstrumentKind::Fx,
+            ],
             // Use best_effort to accept instruments without MIC codes
             coverage: Coverage::global_best_effort(),
             supports_latest: true,
             supports_historical: true,
-            supports_search: true, // Via SYMBOL_SEARCH endpoint
+            supports_search: true,  // Via SYMBOL_SEARCH endpoint
             supports_profile: true, // Via OVERVIEW endpoint for equities
         }
     }
@@ -1056,10 +1066,7 @@ impl MarketDataProvider for AlphaVantageProvider {
                         if etf_profile.dividend_yield.is_some() {
                             profile.dividend_yield = etf_profile.dividend_yield;
                         }
-                        debug!(
-                            "Alpha Vantage: merged ETF profile data for {}",
-                            symbol
-                        );
+                        debug!("Alpha Vantage: merged ETF profile data for {}", symbol);
                     }
                     Err(e) => {
                         // ETF_PROFILE failed, continue with OVERVIEW data only
@@ -1274,11 +1281,26 @@ mod tests {
 
     #[test]
     fn test_company_overview_parse_f64() {
-        assert_eq!(CompanyOverviewResponse::parse_f64(&Some("123.45".to_string())), Some(123.45));
-        assert_eq!(CompanyOverviewResponse::parse_f64(&Some("None".to_string())), None);
-        assert_eq!(CompanyOverviewResponse::parse_f64(&Some("-".to_string())), None);
-        assert_eq!(CompanyOverviewResponse::parse_f64(&Some("0".to_string())), None);
-        assert_eq!(CompanyOverviewResponse::parse_f64(&Some("".to_string())), None);
+        assert_eq!(
+            CompanyOverviewResponse::parse_f64(&Some("123.45".to_string())),
+            Some(123.45)
+        );
+        assert_eq!(
+            CompanyOverviewResponse::parse_f64(&Some("None".to_string())),
+            None
+        );
+        assert_eq!(
+            CompanyOverviewResponse::parse_f64(&Some("-".to_string())),
+            None
+        );
+        assert_eq!(
+            CompanyOverviewResponse::parse_f64(&Some("0".to_string())),
+            None
+        );
+        assert_eq!(
+            CompanyOverviewResponse::parse_f64(&Some("".to_string())),
+            None
+        );
         assert_eq!(CompanyOverviewResponse::parse_f64(&None), None);
     }
 

@@ -98,7 +98,11 @@ impl<E: AiEnvironment + 'static> Tool for GetGoalsTool<E> {
             .map_err(|e| AiError::ToolExecutionFailed(e.to_string()))?;
 
         // Fetch allocations for progress
-        let allocations = self.env.goal_service().load_goals_allocations().unwrap_or_default();
+        let allocations = self
+            .env
+            .goal_service()
+            .load_goals_allocations()
+            .unwrap_or_default();
 
         // Fetch latest valuations for progress calculation
         let account_ids: Vec<String> = allocations.iter().map(|a| a.account_id.clone()).collect();
@@ -168,7 +172,11 @@ impl<E: AiEnvironment + 'static> Tool for GetGoalsTool<E> {
             total_current,
             achieved_count,
             truncated: if truncated { Some(true) } else { None },
-            original_count: if truncated { Some(original_count) } else { None },
+            original_count: if truncated {
+                Some(original_count)
+            } else {
+                None
+            },
         })
     }
 }

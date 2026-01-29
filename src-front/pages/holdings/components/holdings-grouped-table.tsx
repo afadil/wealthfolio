@@ -1,7 +1,11 @@
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@wealthfolio/ui/components/ui/collapsible";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@wealthfolio/ui/components/ui/collapsible";
 import { AmountDisplay, GainPercent, QuantityDisplay } from "@wealthfolio/ui";
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
@@ -262,16 +266,12 @@ function HoldingRow({
               <GainPercent className="text-xs" value={gainPct ?? 0} />
             </>
           )}
-          {holding.isLiability && (
-            <span className="text-muted-foreground text-sm">--</span>
-          )}
+          {holding.isLiability && <span className="text-muted-foreground text-sm">--</span>}
         </div>
 
         {/* Actions Column */}
         <div className="w-8 flex-shrink-0">
-          {isClickable && (
-            <Icons.ChevronRight className="text-muted-foreground h-4 w-4" />
-          )}
+          {isClickable && <Icons.ChevronRight className="text-muted-foreground h-4 w-4" />}
         </div>
       </div>
 

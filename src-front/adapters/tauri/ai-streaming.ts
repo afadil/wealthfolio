@@ -4,10 +4,7 @@
 import { Channel } from "@tauri-apps/api/core";
 import { tauriInvoke } from "./core";
 
-import type {
-  AiSendMessageRequest,
-  AiStreamEvent,
-} from "@/features/ai-assistant/types";
+import type { AiSendMessageRequest, AiStreamEvent } from "@/features/ai-assistant/types";
 
 /**
  * Stream AI chat responses via Tauri IPC.

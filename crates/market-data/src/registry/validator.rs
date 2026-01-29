@@ -160,8 +160,14 @@ impl QuoteValidator {
         }
 
         // Log warnings
-        for issue in issues.iter().filter(|i| i.severity == ValidationSeverity::Soft) {
-            warn!("Quote validation warning for {:?}: {}", quote.timestamp, issue.message);
+        for issue in issues
+            .iter()
+            .filter(|i| i.severity == ValidationSeverity::Soft)
+        {
+            warn!(
+                "Quote validation warning for {:?}: {}",
+                quote.timestamp, issue.message
+            );
         }
 
         Ok(())
@@ -170,7 +176,10 @@ impl QuoteValidator {
     /// Validate all quotes in a batch.
     ///
     /// Returns a tuple of (valid_quotes, invalid_quotes_with_errors).
-    pub fn validate_batch(&self, quotes: Vec<Quote>) -> (Vec<Quote>, Vec<(Quote, MarketDataError)>) {
+    pub fn validate_batch(
+        &self,
+        quotes: Vec<Quote>,
+    ) -> (Vec<Quote>, Vec<(Quote, MarketDataError)>) {
         let mut valid = Vec::with_capacity(quotes.len());
         let mut invalid = Vec::new();
 
@@ -489,9 +498,9 @@ mod tests {
         let validator = QuoteValidator::new();
 
         let quotes = vec![
-            make_quote(dec!(100)),  // valid
-            make_quote(dec!(-10)),  // invalid
-            make_quote(dec!(200)),  // valid
+            make_quote(dec!(100)), // valid
+            make_quote(dec!(-10)), // invalid
+            make_quote(dec!(200)), // valid
         ];
 
         let (valid, invalid) = validator.validate_batch(quotes);

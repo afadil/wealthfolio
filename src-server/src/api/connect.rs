@@ -15,7 +15,9 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, warn};
 
 use crate::error::{ApiError, ApiResult};
-use crate::events::{EventBus, ServerEvent, BROKER_SYNC_COMPLETE, BROKER_SYNC_ERROR, BROKER_SYNC_START};
+use crate::events::{
+    EventBus, ServerEvent, BROKER_SYNC_COMPLETE, BROKER_SYNC_ERROR, BROKER_SYNC_START,
+};
 use crate::main_lib::AppState;
 use axum::http::StatusCode;
 use wealthfolio_connect::{
@@ -409,7 +411,11 @@ async fn sync_broker_activities(
                             );
                             let _ = state
                                 .connect_sync_service
-                                .finalize_activity_sync_failure(account.id.clone(), e.to_string(), None)
+                                .finalize_activity_sync_failure(
+                                    account.id.clone(),
+                                    e.to_string(),
+                                    None,
+                                )
                                 .await;
                             accounts_failed += 1;
                         }
@@ -475,7 +481,7 @@ async fn sync_broker_data(State(state): State<Arc<AppState>>) -> StatusCode {
 
 /// Core broker sync logic - syncs connections, accounts, and activities from cloud to local DB.
 /// Uses the centralized SyncOrchestrator for full pagination support.
-async fn perform_broker_sync(state: &AppState) -> Result<SyncResult, String> {
+pub(crate) async fn perform_broker_sync(state: &AppState) -> Result<SyncResult, String> {
     // Create API client
     let client = create_connect_client(state)
         .await
@@ -769,5 +775,8 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/connect/device/sync-state", get(get_device_sync_state))
         .route("/connect/device/enable", post(enable_device_sync))
         .route("/connect/device/sync-data", delete(clear_device_sync_data))
-        .route("/connect/device/reinitialize", post(reinitialize_device_sync))
+        .route(
+            "/connect/device/reinitialize",
+            post(reinitialize_device_sync),
+        )
 }

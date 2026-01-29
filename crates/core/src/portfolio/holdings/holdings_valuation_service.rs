@@ -2,8 +2,8 @@ use crate::assets::AssetKind;
 use crate::errors::Result;
 use crate::fx::currency::{normalize_amount, normalize_currency_code};
 use crate::fx::FxServiceTrait;
-use crate::quotes::{LatestQuotePair, QuoteServiceTrait};
 use crate::portfolio::holdings::{Holding, HoldingType, MonetaryValue};
+use crate::quotes::{LatestQuotePair, QuoteServiceTrait};
 use crate::utils::time_utils::valuation_date_today;
 use async_trait::async_trait;
 use log::{debug, warn};
@@ -167,7 +167,7 @@ impl HoldingsValuationService {
                 return Ok(());
             }
         };
-        let asset_id = &instrument.id;   // Use ID for quote lookups
+        let asset_id = &instrument.id; // Use ID for quote lookups
         let symbol = &instrument.symbol; // Use symbol for logging
         let quantity = holding.quantity;
         let pos_currency = &holding.local_currency;
@@ -372,7 +372,7 @@ impl HoldingsValuationService {
                 return Ok(());
             }
         };
-        let asset_id = &instrument.id;   // Use ID for quote lookups
+        let asset_id = &instrument.id; // Use ID for quote lookups
         let symbol = &instrument.symbol; // Use symbol for logging
         let quantity = holding.quantity;
         let pos_currency = &holding.local_currency;

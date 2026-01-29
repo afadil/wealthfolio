@@ -252,7 +252,7 @@ impl MarketDataClient {
             .map(|mq| Self::convert_quote(mq, &asset.id))
             .collect();
 
-        info!(
+        debug!(
             "Fetched {} quotes for asset {}",
             core_quotes.len(),
             asset.id
@@ -359,11 +359,7 @@ impl MarketDataClient {
 
     /// Get list of available providers.
     pub fn providers(&self) -> Vec<&str> {
-        self.registry
-            .providers()
-            .iter()
-            .map(|p| p.id())
-            .collect()
+        self.registry.providers().iter().map(|p| p.id()).collect()
     }
 
     /// Check if any providers are available.
@@ -408,10 +404,7 @@ impl MarketDataClient {
                     }
                 }
                 Err(e) => {
-                    warn!(
-                        "Failed to fetch quotes for asset {}: {:?}",
-                        asset.id, e
-                    );
+                    warn!("Failed to fetch quotes for asset {}: {:?}", asset.id, e);
                 }
             }
         }
@@ -486,8 +479,7 @@ impl MarketDataClient {
     /// 4. Infer currency from MIC if not provided
     fn convert_search_result(result: MarketSearchResult) -> SymbolSearchResult {
         // Try to determine MIC from Yahoo's exchange code first
-        let mut exchange_mic = yahoo_exchange_to_mic(&result.exchange)
-            .map(|mic| mic.to_string());
+        let mut exchange_mic = yahoo_exchange_to_mic(&result.exchange).map(|mic| mic.to_string());
 
         // If no MIC from exchange code, try extracting from symbol suffix
         if exchange_mic.is_none() {

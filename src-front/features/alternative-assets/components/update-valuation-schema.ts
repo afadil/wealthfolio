@@ -27,7 +27,7 @@ export type UpdateValuationFormValues = z.infer<typeof updateValuationSchema>;
  * Get default form values for the update valuation form
  */
 export const getUpdateValuationDefaultValues = (
-  currentValue?: string
+  currentValue?: string,
 ): UpdateValuationFormValues => ({
   value: currentValue ? parseFloat(currentValue) : 0,
   date: new Date(),

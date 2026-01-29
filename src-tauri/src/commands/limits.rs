@@ -1,12 +1,8 @@
 use std::sync::Arc;
 
-use crate::{
-    context::ServiceContext,
-    events::{emit_resource_changed, ResourceEventPayload},
-};
+use crate::context::ServiceContext;
 use log::debug;
-use serde_json::json;
-use tauri::{AppHandle, State};
+use tauri::State;
 use wealthfolio_core::limits::{ContributionLimit, DepositsCalculation, NewContributionLimit};
 
 #[tauri::command]
@@ -24,25 +20,13 @@ pub async fn get_contribution_limits(
 pub async fn create_contribution_limit(
     new_limit: NewContributionLimit,
     state: State<'_, Arc<ServiceContext>>,
-    handle: AppHandle,
 ) -> Result<ContributionLimit, String> {
     debug!("Creating new contribution limit...");
-    let new_limit = state
+    state
         .limits_service()
         .create_contribution_limit(new_limit)
         .await
-        .map_err(|e| format!("Failed to create contribution limit: {}", e))?;
-
-    emit_resource_changed(
-        &handle,
-        ResourceEventPayload::new(
-            "contribution_limit",
-            "created",
-            json!({ "limit_id": new_limit.id }),
-        ),
-    );
-
-    Ok(new_limit)
+        .map_err(|e| format!("Failed to create contribution limit: {}", e))
 }
 
 #[tauri::command]
@@ -50,42 +34,26 @@ pub async fn update_contribution_limit(
     id: String,
     updated_limit: NewContributionLimit,
     state: State<'_, Arc<ServiceContext>>,
-    handle: AppHandle,
 ) -> Result<ContributionLimit, String> {
     debug!("Updating contribution limit...");
-    let updated_limit = state
+    state
         .limits_service()
         .update_contribution_limit(&id, updated_limit)
         .await
-        .map_err(|e| format!("Failed to update contribution limit: {}", e))?;
-
-    emit_resource_changed(
-        &handle,
-        ResourceEventPayload::new("contribution_limit", "updated", json!({ "limit_id": id })),
-    );
-
-    Ok(updated_limit)
+        .map_err(|e| format!("Failed to update contribution limit: {}", e))
 }
 
 #[tauri::command]
 pub async fn delete_contribution_limit(
     id: String,
     state: State<'_, Arc<ServiceContext>>,
-    handle: AppHandle,
 ) -> Result<(), String> {
     debug!("Deleting contribution limit...");
     state
         .limits_service()
         .delete_contribution_limit(&id)
         .await
-        .map_err(|e| format!("Failed to delete contribution limit: {}", e))?;
-
-    emit_resource_changed(
-        &handle,
-        ResourceEventPayload::new("contribution_limit", "deleted", json!({ "limit_id": id })),
-    );
-
-    Ok(())
+        .map_err(|e| format!("Failed to delete contribution limit: {}", e))
 }
 
 #[tauri::command]

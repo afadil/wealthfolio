@@ -113,40 +113,40 @@ export const ModelPicker: FC = () => {
             <Icons.ChevronDown className="size-3 opacity-50" />
           </Button>
         </PopoverTrigger>
-      <PopoverContent className="w-fit min-w-56 p-1.5" align="start" sideOffset={8}>
-        <Command>
-          <CommandEmpty>No models available</CommandEmpty>
-          <CommandGroup>
-            {selectedModels.map((model) => {
-              const isSelected = model.id === currentModelId;
-              return (
-                <CommandItem
-                  key={model.id}
-                  value={model.id}
-                  onSelect={() => handleModelSelect(model.id)}
-                  className={`flex cursor-pointer items-center gap-2 px-2 py-1.5 ${
-                    isSelected ? "bg-accent" : ""
-                  }`}
-                >
-                  {isSelected && <Icons.Check className="h-3.5 w-3.5 shrink-0" />}
-                  {!isSelected && <div className="h-3.5 w-3.5 shrink-0" />}
-                  <span className="whitespace-nowrap">{getDisplayName(model.id)}</span>
-                </CommandItem>
-              );
-            })}
-          </CommandGroup>
-          <CommandSeparator />
-          <CommandGroup>
-            <CommandItem
-              onSelect={handleAddModels}
-              className="text-muted-foreground flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs"
-            >
-              <Icons.Plus className="h-3 w-3 shrink-0" />
-              <span className="whitespace-nowrap">Add models...</span>
-            </CommandItem>
-          </CommandGroup>
-        </Command>
-      </PopoverContent>
+        <PopoverContent className="w-fit min-w-56 p-1.5" align="start" sideOffset={8}>
+          <Command>
+            <CommandEmpty>No models available</CommandEmpty>
+            <CommandGroup>
+              {selectedModels.map((model) => {
+                const isSelected = model.id === currentModelId;
+                return (
+                  <CommandItem
+                    key={model.id}
+                    value={model.id}
+                    onSelect={() => handleModelSelect(model.id)}
+                    className={`flex cursor-pointer items-center gap-2 px-2 py-1.5 ${
+                      isSelected ? "bg-accent" : ""
+                    }`}
+                  >
+                    {isSelected && <Icons.Check className="h-3.5 w-3.5 shrink-0" />}
+                    {!isSelected && <div className="h-3.5 w-3.5 shrink-0" />}
+                    <span className="whitespace-nowrap">{getDisplayName(model.id)}</span>
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+            <CommandSeparator />
+            <CommandGroup>
+              <CommandItem
+                onSelect={handleAddModels}
+                className="text-muted-foreground flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs"
+              >
+                <Icons.Plus className="h-3 w-3 shrink-0" />
+                <span className="whitespace-nowrap">Add models...</span>
+              </CommandItem>
+            </CommandGroup>
+          </Command>
+        </PopoverContent>
       </Popover>
       <ThinkingToggle />
     </div>

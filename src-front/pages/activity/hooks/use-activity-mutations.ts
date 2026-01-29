@@ -35,14 +35,15 @@ export function useActivityMutations(
   const addActivityMutation = useMutation({
     mutationFn: async (data: NewActivityFormValues) => {
       // Extract asset-related fields from form data
-      const { assetId, exchangeMic, metadata, assetMetadata, pricingMode, assetKind, ...rest } = data as NewActivityFormValues & {
-        assetId?: string;
-        exchangeMic?: string;
-        metadata?: Record<string, unknown>;
-        assetMetadata?: { name?: string; kind?: string; exchangeMic?: string };
-        pricingMode?: string;
-        assetKind?: string;
-      };
+      const { assetId, exchangeMic, metadata, assetMetadata, pricingMode, assetKind, ...rest } =
+        data as NewActivityFormValues & {
+          assetId?: string;
+          exchangeMic?: string;
+          metadata?: Record<string, unknown>;
+          assetMetadata?: { name?: string; kind?: string; exchangeMic?: string };
+          pricingMode?: string;
+          assetKind?: string;
+        };
 
       // Build nested asset object
       const createPayload: ActivityCreate = {
@@ -53,7 +54,9 @@ export function useActivityMutations(
           exchangeMic,
           kind: assetKind || assetMetadata?.kind,
           name: assetMetadata?.name,
-          pricingMode: pricingMode as ActivityCreate["asset"] extends { pricingMode?: infer P } ? P : never,
+          pricingMode: pricingMode as ActivityCreate["asset"] extends { pricingMode?: infer P }
+            ? P
+            : never,
         },
         // Serialize metadata object to JSON string for backend
         metadata: metadata ? JSON.stringify(metadata) : undefined,
@@ -67,15 +70,16 @@ export function useActivityMutations(
   const updateActivityMutation = useMutation({
     mutationFn: async (data: NewActivityFormValues & { id: string }) => {
       // Extract asset-related fields from form data
-      const { assetId, exchangeMic, metadata, assetMetadata, pricingMode, assetKind, ...rest } = data as NewActivityFormValues & {
-        id: string;
-        assetId?: string;
-        exchangeMic?: string;
-        metadata?: Record<string, unknown>;
-        assetMetadata?: { name?: string; kind?: string; exchangeMic?: string };
-        pricingMode?: string;
-        assetKind?: string;
-      };
+      const { assetId, exchangeMic, metadata, assetMetadata, pricingMode, assetKind, ...rest } =
+        data as NewActivityFormValues & {
+          id: string;
+          assetId?: string;
+          exchangeMic?: string;
+          metadata?: Record<string, unknown>;
+          assetMetadata?: { name?: string; kind?: string; exchangeMic?: string };
+          pricingMode?: string;
+          assetKind?: string;
+        };
 
       // Build nested asset object
       const updatePayload: ActivityUpdate = {
@@ -87,7 +91,9 @@ export function useActivityMutations(
           exchangeMic,
           kind: assetKind || assetMetadata?.kind,
           name: assetMetadata?.name,
-          pricingMode: pricingMode as ActivityUpdate["asset"] extends { pricingMode?: infer P } ? P : never,
+          pricingMode: pricingMode as ActivityUpdate["asset"] extends { pricingMode?: infer P }
+            ? P
+            : never,
         },
         // Serialize metadata object to JSON string for backend
         metadata: metadata ? JSON.stringify(metadata) : undefined,

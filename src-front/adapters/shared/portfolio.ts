@@ -117,7 +117,9 @@ export const calculatePerformanceSummary = async ({
 export const calculateAccountsSimplePerformance = async (
   accountIds: string[],
 ): Promise<SimplePerformanceMetrics[]> => {
-  return invoke<SimplePerformanceMetrics[]>("calculate_accounts_simple_performance", { accountIds });
+  return invoke<SimplePerformanceMetrics[]>("calculate_accounts_simple_performance", {
+    accountIds,
+  });
 };
 
 export const getHolding = async (accountId: string, assetId: string): Promise<Holding | null> => {
@@ -192,11 +194,18 @@ export const importHoldingsCsv = async (
 // ============================================================================
 
 /**
- * Gets all manual/imported snapshots for an account (non-CALCULATED).
- * Returns snapshot metadata without full position details.
+ * Gets snapshots for an account (all sources: CALCULATED, MANUAL_ENTRY, etc.)
+ * Optionally filtered by date range. Returns snapshot metadata without full position details.
+ * @param accountId - The account ID
+ * @param dateFrom - Optional start date (YYYY-MM-DD, inclusive)
+ * @param dateTo - Optional end date (YYYY-MM-DD, inclusive)
  */
-export const getManualSnapshots = async (accountId: string): Promise<SnapshotInfo[]> => {
-  return invoke<SnapshotInfo[]>("get_manual_snapshots", { accountId });
+export const getSnapshots = async (
+  accountId: string,
+  dateFrom?: string,
+  dateTo?: string,
+): Promise<SnapshotInfo[]> => {
+  return invoke<SnapshotInfo[]>("get_snapshots", { accountId, dateFrom, dateTo });
 };
 
 /**

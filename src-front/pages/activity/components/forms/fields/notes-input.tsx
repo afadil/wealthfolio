@@ -1,4 +1,11 @@
-import { FormControl, FormField, FormItem, FormLabel, FormMessage, Textarea } from "@wealthfolio/ui";
+import {
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+  Textarea,
+} from "@wealthfolio/ui";
 import { useFormContext, type FieldPath, type FieldValues } from "react-hook-form";
 
 interface NotesInputProps<TFieldValues extends FieldValues = FieldValues> {

@@ -197,7 +197,7 @@ function ValuationContent({ args, result, status }: ValuationContentProps) {
         )}
       </CardHeader>
       <CardContent>
-        <div className="h-[200px] w-full min-w-[280px] rounded-xl border bg-background/60 p-3 shadow-inner">
+        <div className="bg-background/60 h-[200px] w-full min-w-[280px] rounded-xl border p-3 shadow-inner">
           {shouldRenderChart ? (
             <HistoryChart data={chartData} isLoading={false} />
           ) : (

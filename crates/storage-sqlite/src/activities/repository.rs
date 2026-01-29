@@ -13,8 +13,10 @@ use wealthfolio_core::activities::ActivityError;
 use wealthfolio_core::activities::{
     Activity, ActivityBulkIdentifierMapping, ActivityBulkMutationResult, ActivityDetails,
     ActivityRepositoryTrait, ActivitySearchResponse, ActivitySearchResponseMeta, ActivityUpdate,
-    ImportMapping, IncomeData, NewActivity, Sort, INCOME_ACTIVITY_TYPES, TRADING_ACTIVITY_TYPES,
+    ActivityUpsert, BulkUpsertResult, ImportMapping, IncomeData, NewActivity, Sort,
+    INCOME_ACTIVITY_TYPES, TRADING_ACTIVITY_TYPES,
 };
+use wealthfolio_core::limits::ContributionActivity;
 use wealthfolio_core::{Error, Result};
 
 use super::model::{ActivityDB, ActivityDetailsDB, ImportMappingDB};
@@ -106,6 +108,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
         asset_id_keyword: Option<String>,          // Optional asset_id keyword for search
         sort: Option<Sort>,                        // Optional sort
         needs_review_filter: Option<bool>, // Optional needs_review filter (maps to DRAFT status)
+        date_from: Option<NaiveDate>,      // Optional start date filter (inclusive)
+        date_to: Option<NaiveDate>,        // Optional end date filter (inclusive)
     ) -> Result<ActivitySearchResponse> {
         let mut conn = get_connection(&self.pool)?;
 
@@ -135,6 +139,17 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 } else {
                     query = query.filter(activities::status.ne("DRAFT"));
                 }
+            }
+            // Date range filters (activity_date is stored as RFC3339 string, compare lexicographically)
+            if let Some(from_date) = date_from {
+                // Start of day in RFC3339 format for lexicographic comparison
+                let from_str = format!("{}T00:00:00", from_date);
+                query = query.filter(activities::activity_date.ge(from_str));
+            }
+            if let Some(to_date) = date_to {
+                // End of day in RFC3339 format for lexicographic comparison
+                let to_str = format!("{}T23:59:59", to_date);
+                query = query.filter(activities::activity_date.le(to_str));
             }
 
             // Apply sorting
@@ -607,63 +622,82 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .await
     }
 
-    /// Retrieves deposit activities for specified accounts within a year as raw data
-    fn get_deposit_activities(
+    /// Fetches contribution-eligible activities (DEPOSIT, TRANSFER_IN, TRANSFER_OUT, CREDIT)
+    /// for the given accounts within the date range.
+    fn get_contribution_activities(
         &self,
         account_ids: &[String],
         start_date: NaiveDateTime,
         end_date: NaiveDateTime,
-    ) -> Result<Vec<(String, Decimal, Decimal, String, Option<Decimal>)>> {
+    ) -> Result<Vec<ContributionActivity>> {
         let mut conn = get_connection(&self.pool)?;
 
-        // Use a proper join with explicit ON condition
+        const CONTRIBUTION_TYPES: [&str; 4] = ["DEPOSIT", "TRANSFER_IN", "TRANSFER_OUT", "CREDIT"];
+
         let results = activities::table
             .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
             .filter(accounts::id.eq_any(account_ids))
             .filter(accounts::is_active.eq(true))
-            .filter(activities::activity_type.eq("DEPOSIT"))
+            .filter(activities::activity_type.eq_any(CONTRIBUTION_TYPES))
             .filter(activities::activity_date.between(
                 Utc.from_utc_datetime(&start_date).to_rfc3339(),
                 Utc.from_utc_datetime(&end_date).to_rfc3339(),
             ))
             .select((
                 activities::account_id,
-                activities::quantity,
-                activities::unit_price,
-                activities::currency,
+                activities::activity_type,
+                activities::activity_date,
                 activities::amount,
+                activities::currency,
+                activities::metadata,
+                activities::source_group_id,
             ))
             .load::<(
                 String,
-                Option<String>,
+                String,
+                String,
                 Option<String>,
                 String,
+                Option<String>,
                 Option<String>,
             )>(&mut conn)
             .map_err(ActivityError::from)?;
 
-        // Convert string values to Decimal
-        let converted_results = results
+        // Convert to ContributionActivity structs
+        let activities = results
             .into_iter()
-            .map(|(account_id, quantity, unit_price, currency, amount)| {
-                Ok((
+            .filter_map(
+                |(
                     account_id,
-                    quantity
-                        .map(|q| Decimal::from_str(&q))
-                        .transpose()?
-                        .unwrap_or(Decimal::ZERO),
-                    unit_price
-                        .map(|p| Decimal::from_str(&p))
-                        .transpose()?
-                        .unwrap_or(Decimal::ZERO),
+                    activity_type,
+                    activity_date_str,
+                    amount_str,
                     currency,
-                    amount.map(|a| Decimal::from_str(&a)).transpose()?,
-                ))
-            })
-            .collect::<std::result::Result<Vec<_>, rust_decimal::Error>>()
-            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
+                    metadata,
+                    source_group_id,
+                )| {
+                    // Parse date - try RFC3339 first, then date-only format
+                    let activity_date = chrono::DateTime::parse_from_rfc3339(&activity_date_str)
+                        .map(|dt| dt.naive_utc().date())
+                        .or_else(|_| NaiveDate::parse_from_str(&activity_date_str, "%Y-%m-%d"))
+                        .ok()?;
 
-        Ok(converted_results)
+                    let amount = amount_str.and_then(|s| Decimal::from_str(&s).ok());
+
+                    Some(ContributionActivity {
+                        account_id,
+                        activity_type,
+                        activity_date,
+                        amount,
+                        currency,
+                        metadata,
+                        source_group_id,
+                    })
+                },
+            )
+            .collect();
+
+        Ok(activities)
     }
 
     fn get_income_activities_data(&self) -> Result<Vec<IncomeData>> {
@@ -808,7 +842,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
         }
 
         let mut conn = get_connection(&self.pool)?;
-        let mut result_map: HashMap<String, (Option<NaiveDate>, Option<NaiveDate>)> = HashMap::new();
+        let mut result_map: HashMap<String, (Option<NaiveDate>, Option<NaiveDate>)> =
+            HashMap::new();
 
         // Chunk the asset_ids to avoid SQLite parameter limits
         for chunk in chunk_for_sqlite(asset_ids) {
@@ -878,5 +913,180 @@ impl ActivityRepositoryTrait for ActivityRepository {
         }
 
         Ok(result_map)
+    }
+
+    /// Upserts multiple activities (insert or update on conflict by ID or idempotency_key).
+    /// Respects is_user_modified flag - skips updates to user-modified activities.
+    ///
+    /// Returns statistics about the operation.
+    async fn bulk_upsert(&self, activities_vec: Vec<ActivityUpsert>) -> Result<BulkUpsertResult> {
+        use diesel::upsert::excluded;
+
+        if activities_vec.is_empty() {
+            return Ok(BulkUpsertResult::default());
+        }
+
+        // Convert to ActivityDB
+        let activity_rows: Vec<ActivityDB> =
+            activities_vec.into_iter().map(ActivityDB::from).collect();
+
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<BulkUpsertResult> {
+                // Collect all activity IDs and idempotency keys for batch lookup
+                let activity_ids: Vec<String> =
+                    activity_rows.iter().map(|a| a.id.clone()).collect();
+                let idempotency_keys: Vec<String> = activity_rows
+                    .iter()
+                    .filter_map(|a| a.idempotency_key.clone())
+                    .collect();
+
+                // Fetch existing activities by ID or idempotency_key in one query
+                // This allows us to check is_user_modified and handle idempotency conflicts
+                let existing_activities: Vec<(String, Option<String>, i32)> = activities::table
+                    .filter(
+                        activities::id
+                            .eq_any(&activity_ids)
+                            .or(activities::idempotency_key.eq_any(&idempotency_keys)),
+                    )
+                    .select((
+                        activities::id,
+                        activities::idempotency_key,
+                        activities::is_user_modified,
+                    ))
+                    .load::<(String, Option<String>, i32)>(conn)
+                    .map_err(StorageError::from)?;
+
+                // Build lookup maps for quick access
+                let mut existing_by_id: HashMap<String, i32> = HashMap::new();
+                let mut existing_by_idemp: HashMap<String, (String, i32)> = HashMap::new();
+
+                for (id, idemp_key, is_modified) in existing_activities {
+                    existing_by_id.insert(id.clone(), is_modified);
+                    if let Some(key) = idemp_key {
+                        existing_by_idemp.insert(key, (id, is_modified));
+                    }
+                }
+
+                let mut result = BulkUpsertResult::default();
+
+                for mut activity_db in activity_rows {
+                    let now_update = chrono::Utc::now().to_rfc3339();
+                    let activity_id = activity_db.id.clone();
+                    let idempotency_key = activity_db.idempotency_key.clone();
+
+                    // Check if this activity exists and is user-modified
+                    // First check by ID
+                    if let Some(&is_modified) = existing_by_id.get(&activity_id) {
+                        if is_modified != 0 {
+                            log::debug!(
+                                "Skipping user-modified activity {} (type={})",
+                                activity_id,
+                                activity_db.activity_type
+                            );
+                            result.skipped += 1;
+                            continue;
+                        }
+                    }
+
+                    // If not found by ID, check by idempotency_key
+                    // This handles cases where provider IDs changed but content is the same
+                    let is_existing = existing_by_id.contains_key(&activity_id);
+                    if !is_existing {
+                        if let Some(ref key) = idempotency_key {
+                            if let Some((existing_id, is_modified)) = existing_by_idemp.get(key) {
+                                if *is_modified != 0 {
+                                    log::debug!(
+                                        "Skipping update for user-modified activity (matched by idempotency_key: {} -> {})",
+                                        activity_id,
+                                        existing_id
+                                    );
+                                    result.skipped += 1;
+                                    continue;
+                                }
+                                // Found by idempotency_key - update the existing record instead
+                                log::debug!(
+                                    "Activity {} matched existing {} by idempotency_key, updating existing",
+                                    activity_id,
+                                    existing_id
+                                );
+                                activity_db.id = existing_id.clone();
+                            }
+                        }
+                    }
+
+                    // Determine if this is a create or update for counting purposes
+                    let will_update = existing_by_id.contains_key(&activity_db.id)
+                        || (idempotency_key.is_some()
+                            && existing_by_idemp.contains_key(idempotency_key.as_ref().unwrap()));
+
+                    match diesel::insert_into(activities::table)
+                        .values(&activity_db)
+                        .on_conflict(activities::id)
+                        .do_update()
+                        .set((
+                            activities::account_id.eq(excluded(activities::account_id)),
+                            activities::asset_id.eq(excluded(activities::asset_id)),
+                            activities::activity_type.eq(excluded(activities::activity_type)),
+                            activities::subtype.eq(excluded(activities::subtype)),
+                            activities::activity_date.eq(excluded(activities::activity_date)),
+                            activities::quantity.eq(excluded(activities::quantity)),
+                            activities::unit_price.eq(excluded(activities::unit_price)),
+                            activities::currency.eq(excluded(activities::currency)),
+                            activities::fee.eq(excluded(activities::fee)),
+                            activities::amount.eq(excluded(activities::amount)),
+                            activities::status.eq(excluded(activities::status)),
+                            activities::notes.eq(excluded(activities::notes)),
+                            activities::fx_rate.eq(excluded(activities::fx_rate)),
+                            activities::metadata.eq(excluded(activities::metadata)),
+                            activities::source_system.eq(excluded(activities::source_system)),
+                            activities::source_record_id.eq(excluded(activities::source_record_id)),
+                            activities::source_group_id.eq(excluded(activities::source_group_id)),
+                            activities::needs_review.eq(excluded(activities::needs_review)),
+                            activities::idempotency_key.eq(excluded(activities::idempotency_key)),
+                            activities::import_run_id.eq(excluded(activities::import_run_id)),
+                            activities::updated_at.eq(now_update),
+                        ))
+                        .execute(conn)
+                    {
+                        Ok(count) => {
+                            if count > 0 {
+                                result.upserted += count;
+                                if will_update {
+                                    result.updated += count;
+                                } else {
+                                    result.created += count;
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "Failed to upsert activity {} (type={}): {:?}",
+                                activity_db.id,
+                                activity_db.activity_type,
+                                e
+                            );
+                            return Err(StorageError::from(e).into());
+                        }
+                    }
+                }
+
+                if result.skipped > 0 {
+                    log::info!(
+                        "Skipped {} user-modified activities during bulk upsert",
+                        result.skipped
+                    );
+                }
+
+                log::debug!(
+                    "Bulk upsert complete: {} upserted ({} created, {} updated), {} skipped",
+                    result.upserted,
+                    result.created,
+                    result.updated,
+                    result.skipped
+                );
+
+                Ok(result)
+            })
+            .await
     }
 }

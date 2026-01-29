@@ -77,7 +77,9 @@ pub fn assert_valid_event_ordering(events: &[AiStreamEvent]) -> Result<(), Strin
 
 /// Assert tool outputs respect guardrails.
 pub fn assert_guardrails_respected(results: &[ToolResultSummary]) -> Result<(), String> {
-    let max_allowed = MAX_ACTIVITIES_ROWS.max(MAX_HOLDINGS).max(MAX_VALUATIONS_POINTS);
+    let max_allowed = MAX_ACTIVITIES_ROWS
+        .max(MAX_HOLDINGS)
+        .max(MAX_VALUATIONS_POINTS);
 
     for result in results {
         if let Some(count) = result.row_count {
@@ -158,12 +160,7 @@ mod tests {
         let events = vec![
             AiStreamEvent::system("t1", "r1", "m1"),
             AiStreamEvent::text_delta("t1", "r1", "m1", "Hello"),
-            AiStreamEvent::done(
-                "t1",
-                "r1",
-                test_assistant_message("t1", "Hello"),
-                None,
-            ),
+            AiStreamEvent::done("t1", "r1", test_assistant_message("t1", "Hello"), None),
         ];
 
         let result = assert_valid_event_ordering(&events);
@@ -191,12 +188,7 @@ mod tests {
                 },
             ),
             AiStreamEvent::text_delta("t1", "r1", "m1", "Analysis"),
-            AiStreamEvent::done(
-                "t1",
-                "r1",
-                test_assistant_message("t1", "Analysis"),
-                None,
-            ),
+            AiStreamEvent::done("t1", "r1", test_assistant_message("t1", "Analysis"), None),
         ];
 
         let result = assert_valid_event_ordering(&events);
@@ -207,12 +199,7 @@ mod tests {
     fn test_invalid_event_ordering_no_system() {
         let events = vec![
             AiStreamEvent::text_delta("t1", "r1", "m1", "Hello"),
-            AiStreamEvent::done(
-                "t1",
-                "r1",
-                test_assistant_message("t1", "Hello"),
-                None,
-            ),
+            AiStreamEvent::done("t1", "r1", test_assistant_message("t1", "Hello"), None),
         ];
 
         let result = assert_valid_event_ordering(&events);

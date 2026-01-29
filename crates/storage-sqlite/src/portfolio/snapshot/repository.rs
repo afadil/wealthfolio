@@ -529,12 +529,11 @@ impl SnapshotRepository {
 
         self.writer
             .exec(move |conn| {
-                let updated_count = diesel::update(
-                    holdings_snapshots.filter(account_id.eq(&account_id_owned)),
-                )
-                .set(source.eq(&new_source_owned))
-                .execute(conn)
-                .map_err(StorageError::from)?;
+                let updated_count =
+                    diesel::update(holdings_snapshots.filter(account_id.eq(&account_id_owned)))
+                        .set(source.eq(&new_source_owned))
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
 
                 debug!(
                     "Updated {} snapshots for account {} to source {}",
@@ -711,10 +710,7 @@ impl SnapshotRepository {
     }
 
     /// Get count of non-calculated snapshots for an account.
-    pub fn get_non_calculated_snapshot_count_impl(
-        &self,
-        target_account_id: &str,
-    ) -> Result<usize> {
+    pub fn get_non_calculated_snapshot_count_impl(&self, target_account_id: &str) -> Result<usize> {
         use crate::schema::holdings_snapshots::dsl::*;
 
         let mut conn = get_connection(&self.pool)?;
@@ -872,11 +868,7 @@ impl SnapshotRepositoryTrait for SnapshotRepository {
             .await
     }
 
-    async fn update_snapshots_source(
-        &self,
-        account_id: &str,
-        new_source: &str,
-    ) -> Result<usize> {
+    async fn update_snapshots_source(&self, account_id: &str, new_source: &str) -> Result<usize> {
         self.update_snapshots_source(account_id, new_source).await
     }
 
@@ -1321,7 +1313,10 @@ mod tests {
         let count = repo
             .get_non_calculated_snapshot_count(account_id)
             .expect("Failed to get count");
-        assert_eq!(count, 3, "Should count ManualEntry, BrokerImported, Synthetic");
+        assert_eq!(
+            count, 3,
+            "Should count ManualEntry, BrokerImported, Synthetic"
+        );
     }
 
     #[tokio::test]
@@ -1333,7 +1328,10 @@ mod tests {
         let earliest = repo
             .get_earliest_non_calculated_snapshot(account_id)
             .expect("Failed to get earliest");
-        assert!(earliest.is_none(), "Should return None when no snapshots exist");
+        assert!(
+            earliest.is_none(),
+            "Should return None when no snapshots exist"
+        );
     }
 
     #[tokio::test]
@@ -1348,14 +1346,15 @@ mod tests {
             SnapshotSource::Calculated,
         );
 
-        repo.save_snapshots(&[calc])
-            .await
-            .expect("Failed to save");
+        repo.save_snapshots(&[calc]).await.expect("Failed to save");
 
         let earliest = repo
             .get_earliest_non_calculated_snapshot(account_id)
             .expect("Failed to get earliest");
-        assert!(earliest.is_none(), "Should return None when only calculated exist");
+        assert!(
+            earliest.is_none(),
+            "Should return None when only calculated exist"
+        );
     }
 
     #[tokio::test]
@@ -1386,9 +1385,14 @@ mod tests {
             SnapshotSource::Calculated,
         );
 
-        repo.save_snapshots(&[later_broker, earliest_manual.clone(), middle_synthetic, calc])
-            .await
-            .expect("Failed to save");
+        repo.save_snapshots(&[
+            later_broker,
+            earliest_manual.clone(),
+            middle_synthetic,
+            calc,
+        ])
+        .await
+        .expect("Failed to save");
 
         let earliest = repo
             .get_earliest_non_calculated_snapshot(account_id)

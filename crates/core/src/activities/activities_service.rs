@@ -13,6 +13,7 @@ use crate::activities::activities_model::*;
 use crate::activities::csv_parser::{self, ParseConfig, ParsedCsvResult};
 use crate::activities::{ActivityRepositoryTrait, ActivityServiceTrait};
 use crate::assets::{canonical_asset_id, AssetKind, AssetServiceTrait};
+use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::fx::currency::{get_normalization_rule, normalize_amount};
 use crate::fx::FxServiceTrait;
 use crate::quotes::{DataSource, Quote, QuoteServiceTrait};
@@ -31,6 +32,7 @@ pub struct ActivityService {
     fx_service: Arc<dyn FxServiceTrait>,
     quote_service: Arc<dyn QuoteServiceTrait>,
     import_run_repository: Option<Arc<dyn ImportRunRepositoryTrait>>,
+    event_sink: Arc<dyn DomainEventSink>,
 }
 
 impl ActivityService {
@@ -49,6 +51,7 @@ impl ActivityService {
             fx_service,
             quote_service,
             import_run_repository: None,
+            event_sink: Arc::new(NoOpDomainEventSink),
         }
     }
 
@@ -68,7 +71,16 @@ impl ActivityService {
             fx_service,
             quote_service,
             import_run_repository: Some(import_run_repository),
+            event_sink: Arc::new(NoOpDomainEventSink),
         }
+    }
+
+    /// Sets the domain event sink for this service.
+    ///
+    /// Events are emitted after successful mutations (create, update, delete).
+    pub fn with_event_sink(mut self, event_sink: Arc<dyn DomainEventSink>) -> Self {
+        self.event_sink = event_sink;
+        self
     }
 
     /// Resolves symbols to exchange MICs in batch.
@@ -440,8 +452,7 @@ impl ActivityService {
                 activity.currency = normalized_currency.to_string();
             } else {
                 // Still need to normalize currency even if no fee
-                let (_, normalized_currency) =
-                    normalize_amount(Decimal::ZERO, &activity.currency);
+                let (_, normalized_currency) = normalize_amount(Decimal::ZERO, &activity.currency);
                 activity.currency = normalized_currency.to_string();
             }
         }
@@ -643,6 +654,8 @@ impl ActivityServiceTrait for ActivityService {
         asset_id_keyword: Option<String>,
         sort: Option<Sort>,
         needs_review_filter: Option<bool>,
+        date_from: Option<NaiveDate>,
+        date_to: Option<NaiveDate>,
     ) -> Result<ActivitySearchResponse> {
         self.activity_repository.search_activities(
             page,
@@ -652,24 +665,91 @@ impl ActivityServiceTrait for ActivityService {
             asset_id_keyword,
             sort,
             needs_review_filter,
+            date_from,
+            date_to,
         )
     }
 
     /// Creates a new activity
     async fn create_activity(&self, activity: NewActivity) -> Result<Activity> {
         let prepared = self.prepare_new_activity(activity).await?;
-        self.activity_repository.create_activity(prepared).await
+        let created = self.activity_repository.create_activity(prepared).await?;
+
+        // Emit domain event after successful creation
+        let account_ids = vec![created.account_id.clone()];
+        let asset_ids = created.asset_id.clone().into_iter().collect();
+        let currencies = vec![created.currency.clone()];
+        self.event_sink
+            .emit(DomainEvent::activities_changed(
+                account_ids,
+                asset_ids,
+                currencies,
+            ));
+
+        Ok(created)
     }
 
     /// Updates an existing activity
     async fn update_activity(&self, activity: ActivityUpdate) -> Result<Activity> {
+        // Get the existing activity BEFORE the update to capture old account_id and asset_id
+        // This ensures we emit events for both old and new locations if they changed
+        let existing = self.activity_repository.get_activity(&activity.id)?;
+
         let prepared = self.prepare_update_activity(activity).await?;
-        self.activity_repository.update_activity(prepared).await
+        let updated = self.activity_repository.update_activity(prepared).await?;
+
+        // Emit domain event after successful update
+        // Include BOTH old and new account_ids and asset_ids (if they differ)
+        let mut account_ids_set: HashSet<String> = HashSet::new();
+        let mut asset_ids_set: HashSet<String> = HashSet::new();
+        let mut currencies_set: HashSet<String> = HashSet::new();
+
+        // Add old values
+        account_ids_set.insert(existing.account_id.clone());
+        if let Some(ref old_asset_id) = existing.asset_id {
+            asset_ids_set.insert(old_asset_id.clone());
+        }
+        currencies_set.insert(existing.currency.clone());
+
+        // Add new values
+        account_ids_set.insert(updated.account_id.clone());
+        if let Some(ref new_asset_id) = updated.asset_id {
+            asset_ids_set.insert(new_asset_id.clone());
+        }
+        currencies_set.insert(updated.currency.clone());
+
+        let account_ids: Vec<String> = account_ids_set.into_iter().collect();
+        let asset_ids: Vec<String> = asset_ids_set.into_iter().collect();
+        let currencies: Vec<String> = currencies_set.into_iter().collect();
+        self.event_sink
+            .emit(DomainEvent::activities_changed(
+                account_ids,
+                asset_ids,
+                currencies,
+            ));
+
+        Ok(updated)
     }
 
     /// Deletes an activity
     async fn delete_activity(&self, activity_id: String) -> Result<Activity> {
-        self.activity_repository.delete_activity(activity_id).await
+        let deleted = self
+            .activity_repository
+            .delete_activity(activity_id)
+            .await?;
+
+        // Emit domain event after successful deletion
+        let account_ids = vec![deleted.account_id.clone()];
+        let asset_ids = deleted.asset_id.clone().into_iter().collect();
+        let currencies = vec![deleted.currency.clone()];
+        self.event_sink
+            .emit(DomainEvent::activities_changed(
+                account_ids,
+                asset_ids,
+                currencies,
+            ));
+
+        Ok(deleted)
     }
 
     async fn bulk_mutate_activities(
@@ -680,6 +760,12 @@ impl ActivityServiceTrait for ActivityService {
         let mut prepared_creates: Vec<NewActivity> = Vec::new();
         let mut prepared_updates: Vec<ActivityUpdate> = Vec::new();
         let mut valid_delete_ids: Vec<String> = Vec::new();
+
+        // Capture OLD account_ids and asset_ids BEFORE updates/deletes for proper event emission
+        // This ensures that when an activity moves accounts or changes assets, both old and new locations get recalculated
+        let mut old_account_ids: HashSet<String> = HashSet::new();
+        let mut old_asset_ids: HashSet<String> = HashSet::new();
+        let mut old_currencies: HashSet<String> = HashSet::new();
 
         // Batch resolve symbols that don't have exchange_mic
         // Collect unique symbols from creates that need resolution
@@ -737,8 +823,22 @@ impl ActivityServiceTrait for ActivityService {
             }
         }
 
+        // For updates: capture OLD values before preparing the update
         for update_request in request.updates {
             let target_id = update_request.id.clone();
+            // Get the existing activity to capture old account_id and asset_id
+            match self.activity_repository.get_activity(&target_id) {
+                Ok(existing) => {
+                    old_account_ids.insert(existing.account_id.clone());
+                    if let Some(ref asset_id) = existing.asset_id {
+                        old_asset_ids.insert(asset_id.clone());
+                    }
+                    old_currencies.insert(existing.currency.clone());
+                }
+                Err(_) => {
+                    // Activity doesn't exist - will fail during prepare_update_activity
+                }
+            }
             match self.prepare_update_activity(update_request).await {
                 Ok(prepared) => prepared_updates.push(prepared),
                 Err(err) => {
@@ -751,9 +851,18 @@ impl ActivityServiceTrait for ActivityService {
             }
         }
 
+        // For deletes: capture OLD values before deletion
         for delete_id in request.delete_ids {
             match self.activity_repository.get_activity(&delete_id) {
-                Ok(_) => valid_delete_ids.push(delete_id.clone()),
+                Ok(existing) => {
+                    // Capture old values for event emission
+                    old_account_ids.insert(existing.account_id.clone());
+                    if let Some(ref asset_id) = existing.asset_id {
+                        old_asset_ids.insert(asset_id.clone());
+                    }
+                    old_currencies.insert(existing.currency.clone());
+                    valid_delete_ids.push(delete_id.clone());
+                }
                 Err(err) => {
                     errors.push(ActivityBulkMutationError {
                         id: Some(delete_id),
@@ -778,6 +887,43 @@ impl ActivityServiceTrait for ActivityService {
             .await?;
 
         persisted.errors = errors;
+
+        // Emit ONE aggregated domain event for all mutations
+        // Start with OLD values captured before updates/deletes (to recalculate old locations)
+        let mut account_ids_set: HashSet<String> = old_account_ids;
+        let mut asset_ids_set: HashSet<String> = old_asset_ids;
+        let mut currencies_set: HashSet<String> = HashSet::new();
+
+        // Add NEW values from created and updated activities
+        for activity in &persisted.created {
+            account_ids_set.insert(activity.account_id.clone());
+            if let Some(ref asset_id) = activity.asset_id {
+                asset_ids_set.insert(asset_id.clone());
+            }
+            currencies_set.insert(activity.currency.clone());
+        }
+        for activity in &persisted.updated {
+            account_ids_set.insert(activity.account_id.clone());
+            if let Some(ref asset_id) = activity.asset_id {
+                asset_ids_set.insert(asset_id.clone());
+            }
+            currencies_set.insert(activity.currency.clone());
+        }
+        // Note: deleted activities' old values are already in the sets from old_account_ids/old_asset_ids
+
+        // Only emit if there were actual changes
+        if !account_ids_set.is_empty() {
+            let account_ids: Vec<String> = account_ids_set.into_iter().collect();
+            let asset_ids: Vec<String> = asset_ids_set.into_iter().collect();
+            let currencies: Vec<String> = currencies_set.into_iter().collect();
+            self.event_sink
+                .emit(DomainEvent::activities_changed(
+                    account_ids,
+                    asset_ids,
+                    currencies,
+                ));
+        }
+
         Ok(persisted)
     }
 
@@ -819,10 +965,7 @@ impl ActivityServiceTrait for ActivityService {
             };
 
             // Get resolved exchange MIC from cache
-            let exchange_mic = symbol_mic_cache
-                .get(&activity.symbol)
-                .cloned()
-                .flatten();
+            let exchange_mic = symbol_mic_cache.get(&activity.symbol).cloned().flatten();
 
             // Store resolved exchange_mic in activity for use during import
             activity.exchange_mic = exchange_mic.clone();
@@ -834,9 +977,8 @@ impl ActivityServiceTrait for ActivityService {
             // Cash symbols ($CASH-XXX) and cash activities don't need exchange MIC
             let is_cash_symbol = activity.symbol.starts_with("$CASH-");
             let is_cash_type = is_cash_activity(&activity.activity_type);
-            let needs_exchange_mic = inferred_kind == AssetKind::Security
-                && !is_cash_symbol
-                && !is_cash_type;
+            let needs_exchange_mic =
+                inferred_kind == AssetKind::Security && !is_cash_symbol && !is_cash_type;
 
             // Early validation: if we need exchange MIC but couldn't resolve it, mark as invalid
             if needs_exchange_mic && exchange_mic.is_none() {
@@ -894,22 +1036,20 @@ impl ActivityServiceTrait for ActivityService {
                         || !to.chars().all(|c| c.is_alphabetic())
                     {
                         is_valid = false;
-                        error_message = Some(format!(
-                            "Invalid currency code: {} or {}",
-                            from, to
-                        ));
+                        error_message = Some(format!("Invalid currency code: {} or {}", from, to));
                     }
                 }
             } else {
                 // Legacy mode: create assets and register FX pairs
                 // Pass exchange_mic as metadata for asset creation
-                let asset_metadata = exchange_mic.as_ref().map(|mic| {
-                    crate::assets::AssetMetadata {
-                        name: None,
-                        kind: None,
-                        exchange_mic: Some(mic.clone()),
-                    }
-                });
+                let asset_metadata =
+                    exchange_mic
+                        .as_ref()
+                        .map(|mic| crate::assets::AssetMetadata {
+                            name: None,
+                            kind: None,
+                            exchange_mic: Some(mic.clone()),
+                        });
 
                 let symbol_profile_result = self
                     .asset_service
@@ -930,8 +1070,9 @@ impl ActivityServiceTrait for ActivityService {
                         if activity.currency.is_empty() {
                             // Activity must have a currency specified in the import
                             is_valid = false;
-                            error_message =
-                                Some("Activity currency is missing in the import data.".to_string());
+                            error_message = Some(
+                                "Activity currency is missing in the import data.".to_string(),
+                            );
                         } else if activity.currency != account.currency {
                             match self
                                 .fx_service
@@ -944,8 +1085,10 @@ impl ActivityServiceTrait for ActivityService {
                                 Ok(_) => { /* FX pair registered or already exists */ }
                                 Err(e) => {
                                     is_valid = false;
-                                    error_message =
-                                        Some(format!("Failed to register currency pair for FX: {}", e));
+                                    error_message = Some(format!(
+                                        "Failed to register currency pair for FX: {}",
+                                        e
+                                    ));
                                 }
                             }
                         }
@@ -1016,10 +1159,7 @@ impl ActivityServiceTrait for ActivityService {
 
         if has_errors {
             // Mark import run as failed due to validation errors
-            let skipped_count = validated_activities
-                .iter()
-                .filter(|a| !a.is_valid)
-                .count() as u32;
+            let skipped_count = validated_activities.iter().filter(|a| !a.is_valid).count() as u32;
 
             if let Some(ref repo) = self.import_run_repository {
                 let mut failed_run = import_run;
@@ -1108,11 +1248,34 @@ impl ActivityServiceTrait for ActivityService {
 
         self.link_imported_transfer_pairs(&validated_activities, &mut new_activities);
 
+        // Collect unique asset_ids and currencies before consuming new_activities
+        let asset_ids: Vec<String> = new_activities
+            .iter()
+            .filter_map(|a| a.get_asset_id().map(|s| s.to_string()))
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+        let currencies: Vec<String> = new_activities
+            .iter()
+            .map(|a| a.currency.clone())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+
         let count = self
             .activity_repository
             .create_activities(new_activities)
             .await?;
         debug!("Successfully imported {} activities", count);
+
+        // Emit domain event after successful import
+        if count > 0 {
+            self.event_sink.emit(DomainEvent::activities_changed(
+                vec![account_id.clone()],
+                asset_ids,
+                currencies,
+            ));
+        }
 
         // Mark import run as successful
         if let Some(ref repo) = self.import_run_repository {
@@ -1198,6 +1361,54 @@ impl ActivityServiceTrait for ActivityService {
         config: &csv_parser::ParseConfig,
     ) -> Result<csv_parser::ParsedCsvResult> {
         csv_parser::parse_csv(content, config)
+    }
+
+    /// Upserts multiple activities (insert or update on conflict).
+    /// Used by broker sync to efficiently sync activities.
+    /// Emits a single aggregated ActivitiesChanged event for all upserted activities.
+    async fn upsert_activities_bulk(
+        &self,
+        activities: Vec<ActivityUpsert>,
+    ) -> Result<BulkUpsertResult> {
+        if activities.is_empty() {
+            return Ok(BulkUpsertResult::default());
+        }
+
+        // Collect unique account_ids, asset_ids, and currencies for the event before the upsert
+        let account_ids: Vec<String> = activities
+            .iter()
+            .map(|a| a.account_id.clone())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+
+        let asset_ids: Vec<String> = activities
+            .iter()
+            .filter_map(|a| a.asset_id.clone())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+        let currencies: Vec<String> = activities
+            .iter()
+            .map(|a| a.currency.clone())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+
+        // Perform the upsert via repository
+        let result = self.activity_repository.bulk_upsert(activities).await?;
+
+        // Emit single aggregated event if any activities were affected
+        if result.upserted > 0 {
+            self.event_sink
+                .emit(DomainEvent::activities_changed(
+                    account_ids,
+                    asset_ids,
+                    currencies,
+                ));
+        }
+
+        Ok(result)
     }
 }
 

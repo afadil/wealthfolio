@@ -8,8 +8,8 @@ use axum::{
     routing::{delete, get, post},
     Json, Router,
 };
-use tracing::{debug, warn};
 use serde::{Deserialize, Serialize};
+use tracing::{debug, warn};
 use wealthfolio_core::taxonomies::{
     AssetTaxonomyAssignment, Category, NewAssetTaxonomyAssignment, NewCategory, NewTaxonomy,
     Taxonomy, TaxonomyWithCategories,
@@ -281,13 +281,13 @@ async fn get_migration_status(
             .get_asset_assignments(&asset.id)
             .unwrap_or_default();
 
-        let has_gics_assignment = gics_taxonomy
-            .as_ref()
-            .map_or(false, |t| assignments.iter().any(|a| a.taxonomy_id == t.taxonomy.id));
+        let has_gics_assignment = gics_taxonomy.as_ref().map_or(false, |t| {
+            assignments.iter().any(|a| a.taxonomy_id == t.taxonomy.id)
+        });
 
-        let has_regions_assignment = regions_taxonomy
-            .as_ref()
-            .map_or(false, |t| assignments.iter().any(|a| a.taxonomy_id == t.taxonomy.id));
+        let has_regions_assignment = regions_taxonomy.as_ref().map_or(false, |t| {
+            assignments.iter().any(|a| a.taxonomy_id == t.taxonomy.id)
+        });
 
         // If has legacy data but no corresponding taxonomy assignments, needs migration
         if (has_legacy_sectors && !has_gics_assignment)
@@ -497,11 +497,7 @@ async fn migrate_legacy_classifications(
             result.assets_processed += 1;
 
             // Cleanup legacy metadata after successful migration
-            if let Err(e) = state
-                .asset_service
-                .cleanup_legacy_metadata(&asset.id)
-                .await
-            {
+            if let Err(e) = state.asset_service.cleanup_legacy_metadata(&asset.id).await {
                 warn!(
                     "Failed to cleanup legacy metadata for asset '{}': {}",
                     asset.id, e
@@ -743,9 +739,14 @@ pub fn router() -> Router<Arc<AppState>> {
         // Taxonomy CRUD
         .route(
             "/taxonomies",
-            get(get_taxonomies).post(create_taxonomy).put(update_taxonomy),
+            get(get_taxonomies)
+                .post(create_taxonomy)
+                .put(update_taxonomy),
         )
-        .route("/taxonomies/{id}", get(get_taxonomy).delete(delete_taxonomy))
+        .route(
+            "/taxonomies/{id}",
+            get(get_taxonomy).delete(delete_taxonomy),
+        )
         // Category operations
         .route(
             "/taxonomies/categories",

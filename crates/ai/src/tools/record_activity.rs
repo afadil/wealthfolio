@@ -247,10 +247,7 @@ impl<E: AiEnvironment> RecordActivityTool<E> {
         // If no hint provided, auto-select if there's only one account
         let Some(hint) = account_hint else {
             if accounts.len() == 1 {
-                return (
-                    Some(accounts[0].id.clone()),
-                    Some(accounts[0].name.clone()),
-                );
+                return (Some(accounts[0].id.clone()), Some(accounts[0].name.clone()));
             }
             return (None, None);
         };
@@ -277,10 +274,7 @@ impl<E: AiEnvironment> RecordActivityTool<E> {
             .collect();
 
         if matches.len() == 1 {
-            return (
-                Some(matches[0].id.clone()),
-                Some(matches[0].name.clone()),
-            );
+            return (Some(matches[0].id.clone()), Some(matches[0].name.clone()));
         }
 
         // Ambiguous or not found
@@ -480,10 +474,7 @@ impl<E: AiEnvironment + 'static> Tool for RecordActivityTool<E> {
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         debug!(
             "record_activity called: type={}, symbol={:?}, account={:?}, date={}",
-            args.activity_type,
-            args.symbol,
-            args.account,
-            args.activity_date
+            args.activity_type, args.symbol, args.account, args.activity_date
         );
 
         // 1. Validate activity type
@@ -520,8 +511,7 @@ impl<E: AiEnvironment + 'static> Tool for RecordActivityTool<E> {
         let (account_id, account_name) = self.resolve_account(account_hint, &accounts);
         debug!(
             "Account resolved: id={:?}, name={:?}",
-            account_id,
-            account_name
+            account_id, account_name
         );
 
         // Get currency from resolved account, or use base currency as fallback
@@ -532,24 +522,20 @@ impl<E: AiEnvironment + 'static> Tool for RecordActivityTool<E> {
             .unwrap_or_else(|| self.env.base_currency());
 
         // 4. Handle symbol/asset resolution using quote_service
-        let (resolved_asset, asset_id, asset_name, is_custom_asset) = if let Some(symbol) =
-            &args.symbol
-        {
-            // Search for the symbol using quote_service
-            let search_results = self
-                .env
-                .quote_service()
-                .search_symbol_with_currency(symbol, Some(&currency))
-                .await
-                .unwrap_or_default();
+        let (resolved_asset, asset_id, asset_name, is_custom_asset) =
+            if let Some(symbol) = &args.symbol {
+                // Search for the symbol using quote_service
+                let search_results = self
+                    .env
+                    .quote_service()
+                    .search_symbol_with_currency(symbol, Some(&currency))
+                    .await
+                    .unwrap_or_default();
 
-            if let Some(top_result) = search_results.first() {
-                // Found a match - use the top result
-                let asset = ResolvedAsset {
-                    asset_id: top_result
-                        .existing_asset_id
-                        .clone()
-                        .unwrap_or_else(|| {
+                if let Some(top_result) = search_results.first() {
+                    // Found a match - use the top result
+                    let asset = ResolvedAsset {
+                        asset_id: top_result.existing_asset_id.clone().unwrap_or_else(|| {
                             // Construct asset ID from symbol and exchange
                             format!(
                                 "{}:{}",
@@ -557,30 +543,33 @@ impl<E: AiEnvironment + 'static> Tool for RecordActivityTool<E> {
                                 top_result.exchange_mic.as_deref().unwrap_or("UNKNOWN")
                             )
                         }),
-                    symbol: top_result.symbol.clone(),
-                    name: top_result.long_name.clone(),
-                    currency: top_result.currency.clone().unwrap_or_else(|| currency.clone()),
-                    exchange: top_result.exchange_name.clone(),
-                    exchange_mic: top_result.exchange_mic.clone(),
-                };
-                (
-                    Some(asset.clone()),
-                    Some(asset.asset_id.clone()),
-                    Some(asset.name.clone()),
-                    false,
-                )
+                        symbol: top_result.symbol.clone(),
+                        name: top_result.long_name.clone(),
+                        currency: top_result
+                            .currency
+                            .clone()
+                            .unwrap_or_else(|| currency.clone()),
+                        exchange: top_result.exchange_name.clone(),
+                        exchange_mic: top_result.exchange_mic.clone(),
+                    };
+                    (
+                        Some(asset.clone()),
+                        Some(asset.asset_id.clone()),
+                        Some(asset.name.clone()),
+                        false,
+                    )
+                } else {
+                    // No match found - treat as custom asset
+                    (
+                        None,
+                        None,
+                        Some(symbol.clone()),
+                        true, // Mark as custom asset so user can create it
+                    )
+                }
             } else {
-                // No match found - treat as custom asset
-                (
-                    None,
-                    None,
-                    Some(symbol.clone()),
-                    true, // Mark as custom asset so user can create it
-                )
-            }
-        } else {
-            (None, None, None, false)
-        };
+                (None, None, None, false)
+            };
 
         // 5. Determine price source
         let price_source = if args.unit_price.is_some() {
@@ -590,8 +579,7 @@ impl<E: AiEnvironment + 'static> Tool for RecordActivityTool<E> {
         };
 
         // 6. Compute amount if not provided
-        let amount =
-            self.compute_amount(args.quantity, args.unit_price, args.fee, args.amount);
+        let amount = self.compute_amount(args.quantity, args.unit_price, args.fee, args.amount);
 
         // 7. Build draft
         // Use asset's currency for trading activities, otherwise use account currency
@@ -672,7 +660,10 @@ mod tests {
         assert_eq!(output.draft.price_source, "user");
 
         // Should have missing account_id since none provided
-        assert!(output.validation.missing_fields.contains(&"account_id".to_string()));
+        assert!(output
+            .validation
+            .missing_fields
+            .contains(&"account_id".to_string()));
     }
 
     #[tokio::test]
@@ -729,10 +720,7 @@ mod tests {
 
         // Should have subtypes available for DIVIDEND
         assert!(!output.available_subtypes.is_empty());
-        assert!(output
-            .available_subtypes
-            .iter()
-            .any(|s| s.value == "DRIP"));
+        assert!(output.available_subtypes.iter().any(|s| s.value == "DRIP"));
     }
 
     #[tokio::test]
@@ -740,10 +728,7 @@ mod tests {
         let env = Arc::new(MockEnvironment::new());
         let tool = RecordActivityTool::new(env);
 
-        assert_eq!(
-            tool.validate_activity_type("buy"),
-            Some("BUY".to_string())
-        );
+        assert_eq!(tool.validate_activity_type("buy"), Some("BUY".to_string()));
         assert_eq!(
             tool.validate_activity_type("SELL"),
             Some("SELL".to_string())
@@ -755,7 +740,8 @@ mod tests {
     async fn test_get_subtypes_for_activity_type() {
         let subtypes = get_subtypes_for_activity_type("DIVIDEND");
         assert!(subtypes.iter().any(|s| s.value == "DRIP"));
-        assert_eq!(subtypes.len(), 1); // Only DRIP
+        assert!(subtypes.iter().any(|s| s.value == "DIVIDEND_IN_KIND"));
+        assert_eq!(subtypes.len(), 2); // DRIP and DIVIDEND_IN_KIND
 
         let subtypes = get_subtypes_for_activity_type("INTEREST");
         assert!(subtypes.iter().any(|s| s.value == "STAKING_REWARD"));

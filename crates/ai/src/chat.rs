@@ -15,10 +15,14 @@ use rig::{
     agent::{Agent, MultiTurnStreamItem},
     client::{CompletionClient, Nothing},
     completion::{CompletionModel, Message},
-    message::{AssistantContent, Reasoning, Text, ToolCall as RigToolCall, ToolChoice, ToolResultContent, UserContent},
+    message::{
+        AssistantContent, Reasoning, Text, ToolCall as RigToolCall, ToolChoice, ToolResultContent,
+        UserContent,
+    },
     providers::{
-        anthropic, gemini, groq, ollama, openai,
+        anthropic, gemini, groq,
         groq::{GroqAdditionalParameters, ReasoningFormat},
+        ollama, openai,
     },
     streaming::{StreamedAssistantContent, StreamedUserContent, StreamingChat},
     OneOrMany,
@@ -30,12 +34,13 @@ use uuid::Uuid;
 use crate::env::AiEnvironment;
 use crate::error::AiError;
 use crate::providers::ProviderService;
-use crate::title_generator::{TitleGenerator, TitleGeneratorConfig, TitleGeneratorTrait};
 use crate::title_generator::truncate_to_title;
+use crate::title_generator::{TitleGenerator, TitleGeneratorConfig, TitleGeneratorTrait};
 use crate::tools::ToolSet;
 use crate::types::{
-    AiStreamEvent, ChatMessage, ChatMessageContent, ChatMessagePart, ChatMessageRole, ChatRepositoryTrait, ChatThread,
-    ListThreadsRequest, SendMessageRequest, SimpleChatMessage, ThreadPage, ToolCall, ToolResultData,
+    AiStreamEvent, ChatMessage, ChatMessageContent, ChatMessagePart, ChatMessageRole,
+    ChatRepositoryTrait, ChatThread, ListThreadsRequest, SendMessageRequest, SimpleChatMessage,
+    ThreadPage, ToolCall, ToolResultData,
 };
 
 fn derive_initial_thread_title(first_user_message: &str) -> Option<String> {
@@ -109,7 +114,10 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
     }
 
     /// List threads with cursor-based pagination and optional search.
-    pub fn list_threads_paginated(&self, request: &ListThreadsRequest) -> Result<ThreadPage, AiError> {
+    pub fn list_threads_paginated(
+        &self,
+        request: &ListThreadsRequest,
+    ) -> Result<ThreadPage, AiError> {
         self.env.chat_repository().list_threads_paginated(request)
     }
 
@@ -476,10 +484,9 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
             portfolio data, account information, or transaction history. When users ask about \
             their specific holdings, accounts, or financial data, politely explain that you \
             cannot access this information with the current model and suggest they switch to \
-            a model that supports tools (look for the wrench icon in the model picker)."
+            a model that supports tools (look for the wrench icon in the model picker).",
         );
     }
-
 
     // Create title context for post-stream title generation (clone user_message before move)
     let title_ctx = TitleContext {
@@ -550,7 +557,10 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
             }
 
             let agent = builder.build();
-            stream_agent_response(agent, prompt, history, tx, repo, thread_id, run_id, message_id, title_ctx).await
+            stream_agent_response(
+                agent, prompt, history, tx, repo, thread_id, run_id, message_id, title_ctx,
+            )
+            .await
         }};
     }
 
@@ -564,7 +574,10 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
             }
 
             let agent = builder.build();
-            stream_agent_response(agent, prompt, history, tx, repo, thread_id, run_id, message_id, title_ctx).await
+            stream_agent_response(
+                agent, prompt, history, tx, repo, thread_id, run_id, message_id, title_ctx,
+            )
+            .await
         }};
     }
 
@@ -579,13 +592,15 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
             reasoning_format: Some(ReasoningFormat::Hidden), // Model reasons but output hidden
             include_reasoning: Some(true),
             extra: None,
-        }).ok()
+        })
+        .ok()
     } else {
         serde_json::to_value(GroqAdditionalParameters {
             reasoning_format: None,
             include_reasoning: Some(false),
             extra: None,
-        }).ok()
+        })
+        .ok()
     };
 
     let groq_reasoning_params_no_tools: Option<serde_json::Value> = if capabilities.thinking {
@@ -593,13 +608,15 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
             reasoning_format: Some(ReasoningFormat::Parsed), // Reasoning exposed in response
             include_reasoning: Some(true),
             extra: None,
-        }).ok()
+        })
+        .ok()
     } else {
         serde_json::to_value(GroqAdditionalParameters {
             reasoning_format: None,
             include_reasoning: Some(false),
             extra: None,
-        }).ok()
+        })
+        .ok()
     };
 
     // Ollama: pass think parameter to enable/disable thinking mode
@@ -608,7 +625,6 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     let ollama_thinking_params: Option<serde_json::Value> = Some(serde_json::json!({
         "think": capabilities.thinking
     }));
-
 
     // Anthropic: extended thinking with budget_tokens
     // Only enable thinking when capabilities.thinking is true
@@ -745,12 +761,16 @@ fn create_openai_client(
     openai::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))
 }
 
-fn create_ollama_client(provider_url: Option<String>) -> Result<ollama::Client<HttpClient>, AiError> {
+fn create_ollama_client(
+    provider_url: Option<String>,
+) -> Result<ollama::Client<HttpClient>, AiError> {
     let mut builder = ollama::Client::builder().api_key(Nothing);
     if let Some(url) = provider_url {
         builder = builder.base_url(&url);
     }
-    builder.build().map_err(|e| AiError::Provider(e.to_string()))
+    builder
+        .build()
+        .map_err(|e| AiError::Provider(e.to_string()))
 }
 
 // ============================================================================
@@ -785,11 +805,15 @@ impl ThinkTagParser {
                     self.accumulated_reasoning.push_str(&self.buffer[..end_idx]);
                     self.buffer = self.buffer[end_idx + 8..].to_string();
                     self.in_think_block = false;
-                } else if self.buffer.len() > 8 && !self.buffer.ends_with('<') && !self.buffer.ends_with("</") {
+                } else if self.buffer.len() > 8
+                    && !self.buffer.ends_with('<')
+                    && !self.buffer.ends_with("</")
+                {
                     // Safe to emit most of the buffer as reasoning
                     let safe_len = self.buffer.len().saturating_sub(8);
                     reasoning_out.push_str(&self.buffer[..safe_len]);
-                    self.accumulated_reasoning.push_str(&self.buffer[..safe_len]);
+                    self.accumulated_reasoning
+                        .push_str(&self.buffer[..safe_len]);
                     self.buffer = self.buffer[safe_len..].to_string();
                     break;
                 } else {
@@ -956,9 +980,14 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
                     // Emit text content
                     if !text_out.is_empty() {
                         accumulated_text.push_str(&text_out);
-                        tx.send(AiStreamEvent::text_delta(&thread_id, &run_id, &message_id, &text_out))
-                            .await
-                            .map_err(|e| AiError::Internal(e.to_string()))?;
+                        tx.send(AiStreamEvent::text_delta(
+                            &thread_id,
+                            &run_id,
+                            &message_id,
+                            &text_out,
+                        ))
+                        .await
+                        .map_err(|e| AiError::Internal(e.to_string()))?;
                     }
                 }
             }
@@ -1121,7 +1150,10 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
 
             // Other stream items - log for debugging
             Ok(other) => {
-                debug!("Unhandled stream item: {:?}", std::any::type_name_of_val(&other));
+                debug!(
+                    "Unhandled stream item: {:?}",
+                    std::any::type_name_of_val(&other)
+                );
             }
 
             // Errors
@@ -1155,9 +1187,14 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
     }
     if !remaining_text.is_empty() {
         accumulated_text.push_str(&remaining_text);
-        tx.send(AiStreamEvent::text_delta(&thread_id, &run_id, &message_id, &remaining_text))
-            .await
-            .map_err(|e| AiError::Internal(e.to_string()))?;
+        tx.send(AiStreamEvent::text_delta(
+            &thread_id,
+            &run_id,
+            &message_id,
+            &remaining_text,
+        ))
+        .await
+        .map_err(|e| AiError::Internal(e.to_string()))?;
     }
 
     // Add reasoning parsed from <think> tags to content parts
@@ -1196,9 +1233,14 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
     }
 
     // Send done event - this is the terminal event, stream closes after this
-    tx.send(AiStreamEvent::done(&thread_id, &run_id, final_message, None))
-        .await
-        .map_err(|e| AiError::Internal(e.to_string()))?;
+    tx.send(AiStreamEvent::done(
+        &thread_id,
+        &run_id,
+        final_message,
+        None,
+    ))
+    .await
+    .map_err(|e| AiError::Internal(e.to_string()))?;
 
     Ok(())
 }

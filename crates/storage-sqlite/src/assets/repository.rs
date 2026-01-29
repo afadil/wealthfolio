@@ -98,18 +98,14 @@ impl AssetRepository {
 
         let results = assets::table
             .select(AssetDB::as_select())
-            .filter(
-                diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-                    "UPPER(symbol) LIKE '{}'",
-                    pattern.replace('\'', "''")
-                ))
-            )
-            .or_filter(
-                diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-                    "UPPER(name) LIKE '{}'",
-                    pattern.replace('\'', "''")
-                ))
-            )
+            .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
+                "UPPER(symbol) LIKE '{}'",
+                pattern.replace('\'', "''")
+            )))
+            .or_filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
+                "UPPER(name) LIKE '{}'",
+                pattern.replace('\'', "''")
+            )))
             .order(assets::symbol.asc())
             .limit(50) // Limit results to avoid huge result sets
             .load::<AssetDB>(&mut conn)
@@ -153,18 +149,25 @@ impl AssetRepositoryTrait for AssetRepository {
 
                 // Use payload metadata if provided, otherwise preserve existing
                 let metadata_json = match &payload_owned.metadata {
-                    Some(new_metadata) => Some(serde_json::to_string(new_metadata).unwrap_or_default()),
+                    Some(new_metadata) => {
+                        Some(serde_json::to_string(new_metadata).unwrap_or_default())
+                    }
                     None => existing.metadata.clone(),
                 };
 
                 // Serialize kind to string if present
-                let kind_str = payload_owned.kind.as_ref().map(|k| k.as_db_str().to_string());
+                let kind_str = payload_owned
+                    .kind
+                    .as_ref()
+                    .map(|k| k.as_db_str().to_string());
 
                 // Serialize pricing_mode to string if present
-                let pricing_mode_str = payload_owned
-                    .pricing_mode
-                    .as_ref()
-                    .map(|pm| serde_json::to_string(pm).unwrap_or_default().trim_matches('"').to_string());
+                let pricing_mode_str = payload_owned.pricing_mode.as_ref().map(|pm| {
+                    serde_json::to_string(pm)
+                        .unwrap_or_default()
+                        .trim_matches('"')
+                        .to_string()
+                });
 
                 // Serialize provider_overrides to JSON string if present
                 let provider_overrides_str = payload_owned
@@ -188,7 +191,9 @@ impl AssetRepositoryTrait for AssetRepository {
                             assets::exchange_mic.eq(&exchange_mic_value),
                             assets::notes.eq(&payload_owned.notes),
                             assets::metadata.eq(&metadata_json),
-                            assets::pricing_mode.eq(pricing_mode_str.clone().unwrap_or_else(|| "MARKET".to_string())),
+                            assets::pricing_mode.eq(pricing_mode_str
+                                .clone()
+                                .unwrap_or_else(|| "MARKET".to_string())),
                             assets::provider_overrides.eq(&provider_overrides_str),
                         ))
                         .get_result::<AssetDB>(conn)
@@ -200,7 +205,8 @@ impl AssetRepositoryTrait for AssetRepository {
                             assets::exchange_mic.eq(&exchange_mic_value),
                             assets::notes.eq(&payload_owned.notes),
                             assets::metadata.eq(&metadata_json),
-                            assets::pricing_mode.eq(pricing_mode_str.unwrap_or_else(|| "MARKET".to_string())),
+                            assets::pricing_mode
+                                .eq(pricing_mode_str.unwrap_or_else(|| "MARKET".to_string())),
                             assets::provider_overrides.eq(&provider_overrides_str),
                         ))
                         .get_result::<AssetDB>(conn)
@@ -299,9 +305,9 @@ impl AssetRepositoryTrait for AssetRepository {
                         .and_then(|meta| {
                             let identifiers = meta.get("identifiers").cloned();
                             match identifiers {
-                                Some(ids) => Some(
-                                    serde_json::json!({ "identifiers": ids }).to_string(),
-                                ),
+                                Some(ids) => {
+                                    Some(serde_json::json!({ "identifiers": ids }).to_string())
+                                }
                                 None => None,
                             }
                         })

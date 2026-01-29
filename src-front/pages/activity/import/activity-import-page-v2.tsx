@@ -13,13 +13,7 @@ import type { Account, TrackingMode } from "@/lib/types";
 import { canImportCSV } from "@/lib/activity-restrictions";
 
 // Context
-import {
-  ImportProvider,
-  useImportContext,
-  nextStep,
-  prevStep,
-  type ImportStep,
-} from "./context";
+import { ImportProvider, useImportContext, nextStep, prevStep, type ImportStep } from "./context";
 
 // Components
 import { WizardStepIndicator, type WizardStep } from "./components/wizard-step-indicator";
@@ -131,7 +125,7 @@ const HOLDINGS_REQUIRED_FIELDS: HoldingsFormat[] = [
  */
 function findMappedActivityType(
   csvValue: string,
-  activityMappings: Record<string, string[]>
+  activityMappings: Record<string, string[]>,
 ): string | null {
   const normalized = csvValue.trim().toUpperCase();
 
@@ -162,7 +156,7 @@ function findMappedActivityType(
  */
 function hasActivityTypeMapping(
   csvValue: string,
-  activityMappings: Record<string, string[]>
+  activityMappings: Record<string, string[]>,
 ): boolean {
   return findMappedActivityType(csvValue, activityMappings) !== null;
 }
@@ -199,7 +193,8 @@ function useStepValidation(isHoldingsMode: boolean) {
           // Holdings mode: check if required holdings fields are mapped
           if (!mapping) return false;
           const requiredFieldsMapped = HOLDINGS_REQUIRED_FIELDS.every(
-            (field) => mapping.fieldMappings[field] && headers.includes(mapping.fieldMappings[field])
+            (field) =>
+              mapping.fieldMappings[field] && headers.includes(mapping.fieldMappings[field]),
           );
           return requiredFieldsMapped;
         }
@@ -207,7 +202,7 @@ function useStepValidation(isHoldingsMode: boolean) {
         // Activity mode: existing validation logic
         if (!mapping) return false;
         const requiredFieldsMapped = IMPORT_REQUIRED_FIELDS.every(
-          (field) => mapping.fieldMappings[field]
+          (field) => mapping.fieldMappings[field],
         );
         if (!requiredFieldsMapped) return false;
 
@@ -253,9 +248,15 @@ function useStepValidation(isHoldingsMode: boolean) {
                 const csvActivityType = row[activityHeaderIndex]?.trim();
                 if (csvActivityType) {
                   // Find the mapped activity type (explicit or smart default)
-                  const mappedType = findMappedActivityType(csvActivityType, mapping.activityMappings || {});
+                  const mappedType = findMappedActivityType(
+                    csvActivityType,
+                    mapping.activityMappings || {},
+                  );
 
-                  if (mappedType && (NO_SYMBOL_REQUIRED_ACTIVITY_TYPES as readonly string[]).includes(mappedType)) {
+                  if (
+                    mappedType &&
+                    (NO_SYMBOL_REQUIRED_ACTIVITY_TYPES as readonly string[]).includes(mappedType)
+                  ) {
                     requiresSymbol = false;
                   }
                 }
@@ -340,7 +341,7 @@ function ImportWizardContent() {
   // Step navigation
   const currentStepIndex = useMemo(
     () => steps.findIndex((s) => s.id === state.step),
-    [state.step, steps]
+    [state.step, steps],
   );
 
   const canGoBack = currentStepIndex > 0 && state.step !== "result";

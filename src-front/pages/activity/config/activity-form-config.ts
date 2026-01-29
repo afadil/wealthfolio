@@ -28,7 +28,13 @@ export type PickerActivityType =
   | "TAX";
 
 // Pure cash activities that need account currency
-export const PURE_CASH_ACTIVITY_TYPES = ["DEPOSIT", "WITHDRAWAL", "FEE", "INTEREST", "TAX"] as const;
+export const PURE_CASH_ACTIVITY_TYPES = [
+  "DEPOSIT",
+  "WITHDRAWAL",
+  "FEE",
+  "INTEREST",
+  "TAX",
+] as const;
 
 // Form values union type
 export type ActivityFormValues =
@@ -77,7 +83,10 @@ function getBaseDefaults(
 }
 
 // Configuration for each activity type
-export const ACTIVITY_FORM_CONFIG: Record<PickerActivityType, ActivityTypeConfig<ActivityFormValues>> = {
+export const ACTIVITY_FORM_CONFIG: Record<
+  PickerActivityType,
+  ActivityTypeConfig<ActivityFormValues>
+> = {
   BUY: {
     component: BuyForm as ComponentType<ActivityFormComponentProps<ActivityFormValues>>,
     activityType: ActivityType.BUY,
@@ -88,7 +97,8 @@ export const ACTIVITY_FORM_CONFIG: Record<PickerActivityType, ActivityTypeConfig
       unitPrice: activity?.unitPrice,
       amount: activity?.amount,
       fee: activity?.fee ?? 0,
-      pricingMode: activity?.assetPricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET,
+      pricingMode:
+        activity?.assetPricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET,
       // Advanced options
       currency: activity?.currency,
       fxRate: activity?.fxRate ?? undefined,
@@ -123,7 +133,8 @@ export const ACTIVITY_FORM_CONFIG: Record<PickerActivityType, ActivityTypeConfig
       unitPrice: activity?.unitPrice,
       amount: activity?.amount,
       fee: activity?.fee ?? 0,
-      pricingMode: activity?.assetPricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET,
+      pricingMode:
+        activity?.assetPricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET,
       // Advanced options
       currency: activity?.currency,
       fxRate: activity?.fxRate ?? undefined,
@@ -222,13 +233,12 @@ export const ACTIVITY_FORM_CONFIG: Record<PickerActivityType, ActivityTypeConfig
       const flowMetadata = activity?.metadata?.flow as { is_external?: boolean } | undefined;
       const isExternal = flowMetadata?.is_external === true;
       // Derive direction from activity type
-      const direction =
-        activity?.activityType === ActivityType.TRANSFER_IN ? "in" : "out";
+      const direction = activity?.activityType === ActivityType.TRANSFER_IN ? "in" : "out";
       return {
         isExternal,
         direction,
-        accountId: isExternal ? activity?.accountId ?? "" : "",
-        fromAccountId: !isExternal ? activity?.accountId ?? "" : "",
+        accountId: isExternal ? (activity?.accountId ?? "") : "",
+        fromAccountId: !isExternal ? (activity?.accountId ?? "") : "",
         toAccountId: "",
         activityDate: activity?.date ? new Date(activity.date) : new Date(),
         transferMode,
@@ -239,7 +249,8 @@ export const ACTIVITY_FORM_CONFIG: Record<PickerActivityType, ActivityTypeConfig
         // Advanced options
         currency: activity?.currency,
         subtype: activity?.subtype ?? null,
-        pricingMode: activity?.assetPricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET,
+        pricingMode:
+          activity?.assetPricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET,
         exchangeMic: activity?.exchangeMic,
       };
     },

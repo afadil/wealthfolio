@@ -6,11 +6,11 @@ mod tests {
     use crate::assets::{Asset, AssetServiceTrait, ProviderProfile, UpdateAssetProfile};
     use crate::errors::Result;
     use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
-    use crate::quotes::{
-        LatestQuotePair, Quote, QuoteImport, QuoteServiceTrait, QuoteSyncState, SyncMode,
-        SyncResult, SymbolSearchResult, SymbolSyncPlan,
-    };
     use crate::quotes::service::ProviderInfo;
+    use crate::quotes::{
+        LatestQuotePair, Quote, QuoteImport, QuoteServiceTrait, QuoteSyncState, SymbolSearchResult,
+        SymbolSyncPlan, SyncMode, SyncResult,
+    };
     use async_trait::async_trait;
     use chrono::{DateTime, NaiveDate, Utc};
     use rust_decimal::Decimal;
@@ -133,11 +133,7 @@ mod tests {
             unimplemented!()
         }
 
-        async fn update_pricing_mode(
-            &self,
-            _asset_id: &str,
-            _pricing_mode: &str,
-        ) -> Result<Asset> {
+        async fn update_pricing_mode(&self, _asset_id: &str, _pricing_mode: &str) -> Result<Asset> {
             // Return a dummy asset
             Ok(Asset::default())
         }
@@ -466,6 +462,14 @@ mod tests {
             Ok(())
         }
 
+        async fn check_quotes_import(
+            &self,
+            _content: &[u8],
+            _has_header_row: bool,
+        ) -> Result<Vec<QuoteImport>> {
+            Ok(vec![])
+        }
+
         async fn import_quotes(
             &self,
             quotes: Vec<QuoteImport>,
@@ -515,12 +519,12 @@ mod tests {
             unimplemented!()
         }
 
-        fn get_deposit_activities(
+        fn get_contribution_activities(
             &self,
             _account_ids: &[String],
             _start_date: chrono::NaiveDateTime,
             _end_date: chrono::NaiveDateTime,
-        ) -> Result<Vec<(String, Decimal, Decimal, String, Option<Decimal>)>> {
+        ) -> Result<Vec<crate::limits::ContributionActivity>> {
             unimplemented!()
         }
 
@@ -533,6 +537,8 @@ mod tests {
             _asset_id_keyword: Option<String>,
             _sort: Option<Sort>,
             _is_draft_filter: Option<bool>,
+            _date_from: Option<chrono::NaiveDate>,
+            _date_to: Option<chrono::NaiveDate>,
         ) -> Result<ActivitySearchResponse> {
             unimplemented!()
         }
@@ -636,8 +642,12 @@ mod tests {
         fn get_activity_bounds_for_assets(
             &self,
             _asset_ids: &[String],
-        ) -> Result<std::collections::HashMap<String, (Option<chrono::NaiveDate>, Option<chrono::NaiveDate>)>>
-        {
+        ) -> Result<
+            std::collections::HashMap<
+                String,
+                (Option<chrono::NaiveDate>, Option<chrono::NaiveDate>),
+            >,
+        > {
             Ok(std::collections::HashMap::new())
         }
 
@@ -646,6 +656,13 @@ mod tests {
             _idempotency_keys: &[String],
         ) -> Result<std::collections::HashMap<String, String>> {
             Ok(std::collections::HashMap::new())
+        }
+
+        async fn bulk_upsert(
+            &self,
+            _activities: Vec<crate::activities::ActivityUpsert>,
+        ) -> Result<crate::activities::BulkUpsertResult> {
+            unimplemented!()
         }
     }
 
@@ -1242,7 +1259,10 @@ mod tests {
         };
 
         let result = activity_service.create_activity(new_activity).await;
-        assert!(result.is_err(), "BUY without symbol or asset_id should fail");
+        assert!(
+            result.is_err(),
+            "BUY without symbol or asset_id should fail"
+        );
     }
 
     /// Test: Crypto symbol (BTC) without exchange infers CRYPTO kind
@@ -1791,11 +1811,7 @@ mod tests {
 
         let created = result.unwrap();
         assert_eq!(created.currency, "GBP", "GBX should normalize to GBP");
-        assert_eq!(
-            created.unit_price,
-            Some(dec!(75)),
-            "7500 pence = 75 pounds"
-        );
+        assert_eq!(created.unit_price, Some(dec!(75)), "7500 pence = 75 pounds");
         assert_eq!(
             created.amount,
             Some(dec!(7500)),

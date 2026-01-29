@@ -108,7 +108,11 @@ impl<E: AiEnvironment + 'static> Tool for GetAccountsTool<E> {
             accounts: accounts_dto,
             count: returned_count,
             truncated: if truncated { Some(true) } else { None },
-            original_count: if truncated { Some(original_count) } else { None },
+            original_count: if truncated {
+                Some(original_count)
+            } else {
+                None
+            },
         })
     }
 }

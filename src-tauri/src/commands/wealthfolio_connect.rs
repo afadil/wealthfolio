@@ -70,6 +70,9 @@ pub async fn clear_sync_session(
         info!("Sync session cleared from keyring");
         Ok(())
     } else {
-        Err(format!("Failed to clear some tokens: {}", errors.join(", ")))
+        Err(format!(
+            "Failed to clear some tokens: {}",
+            errors.join(", ")
+        ))
     }
 }

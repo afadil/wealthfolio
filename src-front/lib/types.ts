@@ -152,9 +152,7 @@ export function getActivityDisplayName(activity: Activity): string {
   }
   // Use effective type (respects user override)
   const effectiveType = getEffectiveType(activity);
-  return (
-    (ACTIVITY_TYPE_DISPLAY_NAMES as Record<string, string>)[effectiveType] || effectiveType
-  );
+  return (ACTIVITY_TYPE_DISPLAY_NAMES as Record<string, string>)[effectiveType] || effectiveType;
 }
 
 export interface ActivityDetails {
@@ -1147,7 +1145,13 @@ export interface PreciousMetalMetadata {
  * Liability-specific metadata fields
  */
 export interface LiabilityMetadata {
-  liabilityType?: "mortgage" | "auto_loan" | "student_loan" | "credit_card" | "personal_loan" | "heloc";
+  liabilityType?:
+    | "mortgage"
+    | "auto_loan"
+    | "student_loan"
+    | "credit_card"
+    | "personal_loan"
+    | "heloc";
   linkedAssetId?: string;
   originalAmount?: string;
   originationDate?: string;

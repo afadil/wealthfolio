@@ -145,6 +145,8 @@ impl<E: AiEnvironment + 'static> Tool for SearchActivitiesTool<E> {
                 symbol_keyword,
                 Some(sort),
                 None, // needs_review_filter
+                None, // date_from
+                None, // date_to
             )
             .map_err(|e| AiError::ToolExecutionFailed(e.to_string()))?;
 
@@ -188,9 +190,7 @@ impl<E: AiEnvironment + 'static> Tool for SearchActivitiesTool<E> {
         // Calculate totals for metadata
         let total_amount: f64 = activities.iter().filter_map(|a| a.amount).sum();
 
-        let account_scope = args
-            .account_id
-            .unwrap_or_else(|| "all".to_string());
+        let account_scope = args.account_id.unwrap_or_else(|| "all".to_string());
 
         Ok(SearchActivitiesOutput {
             activities,

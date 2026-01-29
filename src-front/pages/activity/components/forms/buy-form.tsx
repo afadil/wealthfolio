@@ -84,25 +84,36 @@ interface BuyFormProps {
  * Calculates the expected amount from quantity, price, and fee.
  * Amount = (quantity * price) + fee
  */
-function calculateAmount(quantity: number | undefined, unitPrice: number | undefined, fee: number | undefined): number {
+function calculateAmount(
+  quantity: number | undefined,
+  unitPrice: number | undefined,
+  fee: number | undefined,
+): number {
   const qty = quantity || 0;
   const price = unitPrice || 0;
   const feeVal = fee || 0;
   return qty * price + feeVal;
 }
 
-export function BuyForm({ accounts, defaultValues, onSubmit, onCancel, isLoading = false, isEditing = false, assetCurrency }: BuyFormProps) {
+export function BuyForm({
+  accounts,
+  defaultValues,
+  onSubmit,
+  onCancel,
+  isLoading = false,
+  isEditing = false,
+  assetCurrency,
+}: BuyFormProps) {
   const { data: settings } = useSettings();
   const baseCurrency = settings?.baseCurrency;
 
   // Compute initial account and currency for defaultValues
-  const initialAccountId = defaultValues?.accountId ?? (accounts.length === 1 ? accounts[0].value : "");
+  const initialAccountId =
+    defaultValues?.accountId ?? (accounts.length === 1 ? accounts[0].value : "");
   const initialAccount = accounts.find((a) => a.value === initialAccountId);
   // Currency priority: provided default > normalized asset currency > account currency
   const initialCurrency =
-    defaultValues?.currency ??
-    normalizeCurrency(assetCurrency) ??
-    initialAccount?.currency;
+    defaultValues?.currency ?? normalizeCurrency(assetCurrency) ?? initialAccount?.currency;
 
   const form = useForm<BuyFormValues>({
     resolver: zodResolver(buyFormSchema) as Resolver<BuyFormValues>,
@@ -185,7 +196,8 @@ export function BuyForm({ accounts, defaultValues, onSubmit, onCancel, isLoading
             </div>
             {calculatedAmount > 0 && (
               <p className="text-muted-foreground text-sm">
-                Amount: {calculatedAmount.toFixed(2)}{currency && ` ${currency}`}
+                Amount: {calculatedAmount.toFixed(2)}
+                {currency && ` ${currency}`}
               </p>
             )}
 

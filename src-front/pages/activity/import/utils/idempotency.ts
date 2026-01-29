@@ -52,9 +52,7 @@ export interface IdempotencyKeyInput {
  * This matches the backend computation in crates/core/src/activities/idempotency.rs
  * The key is a SHA-256 hash of the activity's semantic content.
  */
-export async function computeIdempotencyKey(
-  input: IdempotencyKeyInput
-): Promise<string> {
+export async function computeIdempotencyKey(input: IdempotencyKeyInput): Promise<string> {
   // Build the same string format as the backend
   const parts: string[] = [
     input.accountId,
@@ -87,7 +85,7 @@ export async function computeIdempotencyKey(
  * Compute idempotency keys for multiple activities in parallel
  */
 export async function computeIdempotencyKeys(
-  inputs: IdempotencyKeyInput[]
+  inputs: IdempotencyKeyInput[],
 ): Promise<Map<number, string>> {
   const results = new Map<number, string>();
 

@@ -3,9 +3,7 @@
 //! These tests verify that universal properties hold across all valid inputs,
 //! using the `proptest` crate for random test case generation.
 
-use crate::health::{
-    HealthCategory, HealthIssue, HealthStatus, Severity,
-};
+use crate::health::{HealthCategory, HealthIssue, HealthStatus, Severity};
 use proptest::prelude::*;
 use std::collections::HashSet;
 
@@ -38,11 +36,11 @@ fn arb_health_issue() -> impl Strategy<Value = HealthIssue> {
     (
         arb_severity(),
         arb_category(),
-        "[a-z]{5,20}",          // title
-        "[a-z ]{10,50}",        // message
-        0u32..1000,             // affected_count
+        "[a-z]{5,20}",                     // title
+        "[a-z ]{10,50}",                   // message
+        0u32..1000,                        // affected_count
         proptest::option::of(0.0f64..1.0), // affected_mv_pct
-        "[a-f0-9]{16}",         // data_hash
+        "[a-f0-9]{16}",                    // data_hash
     )
         .prop_map(
             |(severity, category, title, message, count, mv_pct, hash)| {

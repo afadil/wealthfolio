@@ -1,4 +1,5 @@
-import { getHoldings, getManualSnapshots } from "@/adapters";
+import { getHoldings, getSnapshots, searchActivities } from "@/adapters";
+import type { ActivityDetails } from "@/lib/types";
 import { HistoryChart } from "@/components/history-chart";
 import {
   Card,
@@ -60,12 +61,13 @@ import { PortfolioUpdateTrigger } from "@/pages/dashboard/portfolio-update-trigg
 import { useCalculatePerformanceHistory } from "@/pages/performance/hooks/use-performance-data";
 import { useQuery } from "@tanstack/react-query";
 import { Icons, type Icon } from "@wealthfolio/ui";
-import { subMonths } from "date-fns";
+import { format, parseISO, subMonths } from "date-fns";
 import { useNavigate, useParams } from "react-router-dom";
 import { AccountContributionLimit } from "./account-contribution-limit";
 import AccountHoldings from "./account-holdings";
 import AccountMetrics from "./account-metrics";
 import { HoldingsEditMode } from "@/pages/holdings/components/holdings-edit-mode";
+import { ActivityTableMobile } from "@/pages/activity/components/activity-table/activity-table-mobile";
 
 interface HistoryChartData {
   date: string;
@@ -93,6 +95,15 @@ const getInitialDateRange = (): DateRange => ({
   to: new Date(),
 });
 
+// Format date for display
+const formatDate = (dateStr: string): string => {
+  try {
+    return format(parseISO(dateStr), "MMMM d, yyyy");
+  } catch {
+    return dateStr;
+  }
+};
+
 // Define the initial interval code (consistent with other pages)
 const INITIAL_INTERVAL_CODE: TimePeriod = "3M";
 
@@ -108,6 +119,8 @@ const AccountPage = () => {
   const [isEditingHoldings, setIsEditingHoldings] = useState(false);
   const [showSnapshotMarkers, setShowSnapshotMarkers] = useState(false);
   const [editingSnapshotDate, setEditingSnapshotDate] = useState<string | null>(null);
+  const [selectedActivityDate, setSelectedActivityDate] = useState<string | null>(null);
+  const [isActivitySheetOpen, setIsActivitySheetOpen] = useState(false);
 
   const { accounts, isLoading: isAccountsLoading } = useAccounts();
   const account = useMemo(() => accounts?.find((acc) => acc.id === id), [accounts, id]);
@@ -135,18 +148,43 @@ const AccountPage = () => {
     return holdings.length > 0;
   }, [holdings]);
 
-  // Query manual snapshots for HOLDINGS mode accounts (only when toggle is on)
-  const { data: manualSnapshots } = useQuery<SnapshotInfo[], Error>({
-    queryKey: QueryKeys.manualSnapshots(id),
-    queryFn: () => getManualSnapshots(id),
-    enabled: isHoldingsMode && showSnapshotMarkers,
+  // Format date range for snapshot query
+  const snapshotDateFrom = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined;
+  const snapshotDateTo = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined;
+
+  // Query snapshots for chart markers (only when toggle is on)
+  // Filtered by the chart's visible date range
+  const { data: snapshots } = useQuery<SnapshotInfo[], Error>({
+    queryKey: [...QueryKeys.snapshots(id), snapshotDateFrom, snapshotDateTo],
+    queryFn: () => getSnapshots(id, snapshotDateFrom, snapshotDateTo),
+    enabled: showSnapshotMarkers && !!account,
   });
 
   // Extract snapshot dates for chart markers
   const snapshotDates = useMemo(() => {
-    if (!manualSnapshots) return [];
-    return manualSnapshots.map((s) => s.snapshotDate);
-  }, [manualSnapshots]);
+    if (!snapshots) return [];
+    return snapshots.map((s) => s.snapshotDate);
+  }, [snapshots]);
+
+  // Query activities for selected date (Transactions mode marker click)
+  const { data: dateActivities, isLoading: isDateActivitiesLoading } = useQuery<
+    ActivityDetails[],
+    Error
+  >({
+    queryKey: ["activities", "byDate", id, selectedActivityDate],
+    queryFn: async () => {
+      if (!selectedActivityDate) return [];
+      const response = await searchActivities(
+        0,
+        100,
+        { accountIds: [id], dateFrom: selectedActivityDate, dateTo: selectedActivityDate },
+        "",
+        { id: "date", desc: true },
+      );
+      return response.data;
+    },
+    enabled: isActivitySheetOpen && !!selectedActivityDate,
+  });
 
   // Group accounts by type for the selector
   const accountsByType = useMemo(() => {
@@ -370,123 +408,125 @@ const AccountPage = () => {
           )}
           <div className="flex min-w-0 flex-col justify-center">
             <div className="flex items-center gap-1">
-              <h1 className="truncate text-base font-semibold leading-tight md:text-lg">
+              <h1 className="truncate text-base leading-tight font-semibold md:text-lg">
                 {account?.name ?? "Account"}
               </h1>
               {/* Desktop account selector */}
-            <div className="hidden sm:block">
-              <Popover open={desktopSelectorOpen} onOpenChange={setDesktopSelectorOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 rounded-full"
-                    aria-label="Switch account"
-                  >
-                    <Icons.ChevronDown className="text-muted-foreground size-5" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[240px] p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Search accounts..." />
-                    <CommandList>
-                      <CommandEmpty>No accounts found.</CommandEmpty>
-                      {accountsByType.map(([type, typeAccounts]) => (
-                        <CommandGroup key={type} heading={type}>
-                          {typeAccounts.map((acc) => {
-                            const IconComponent =
-                              accountTypeIcons[acc.accountType] ?? Icons.CreditCard;
-                            return (
-                              <CommandItem
-                                key={acc.id}
-                                value={`${acc.name} ${acc.currency}`}
-                                onSelect={() => handleAccountSwitch(acc)}
-                                className="flex items-center py-1.5"
-                              >
-                                <IconComponent className="mr-2 h-4 w-4" />
-                                <span>
-                                  {acc.name} ({acc.currency})
-                                </span>
-                                <Icons.Check
-                                  className={cn(
-                                    "ml-auto h-4 w-4",
-                                    account?.id === acc.id ? "opacity-100" : "opacity-0",
-                                  )}
-                                />
-                              </CommandItem>
-                            );
-                          })}
-                        </CommandGroup>
-                      ))}
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            {/* Mobile account selector */}
-            <div className="block sm:hidden">
-              <Sheet open={mobileSelectorOpen} onOpenChange={setMobileSelectorOpen}>
-                <SheetTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 rounded-full"
-                    aria-label="Switch account"
-                  >
-                    <Icons.ChevronDown className="text-muted-foreground h-5 w-5" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="bottom" className="mx-1 h-[80vh] rounded-t-4xl p-0">
-                  <SheetHeader className="border-border border-b px-6 py-4">
-                    <SheetTitle>Switch Account</SheetTitle>
-                    <SheetDescription>Choose an account to view</SheetDescription>
-                  </SheetHeader>
-                  <ScrollArea className="h-[calc(80vh-5rem)] px-6 py-4">
-                    <div className="space-y-6">
-                      {accountsByType.map(([type, typeAccounts]) => (
-                        <div key={type}>
-                          <h3 className="text-muted-foreground mb-3 text-sm font-medium">{type}</h3>
-                          <div className="space-y-2">
+              <div className="hidden sm:block">
+                <Popover open={desktopSelectorOpen} onOpenChange={setDesktopSelectorOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full"
+                      aria-label="Switch account"
+                    >
+                      <Icons.ChevronDown className="text-muted-foreground size-5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[240px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search accounts..." />
+                      <CommandList>
+                        <CommandEmpty>No accounts found.</CommandEmpty>
+                        {accountsByType.map(([type, typeAccounts]) => (
+                          <CommandGroup key={type} heading={type}>
                             {typeAccounts.map((acc) => {
                               const IconComponent =
                                 accountTypeIcons[acc.accountType] ?? Icons.CreditCard;
                               return (
-                                <button
+                                <CommandItem
                                   key={acc.id}
-                                  onClick={() => handleAccountSwitch(acc)}
-                                  className={cn(
-                                    "hover:bg-accent active:bg-accent/80 flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors focus:outline-none",
-                                    account?.id === acc.id
-                                      ? "border-primary bg-accent"
-                                      : "border-transparent",
-                                  )}
+                                  value={`${acc.name} ${acc.currency}`}
+                                  onSelect={() => handleAccountSwitch(acc)}
+                                  className="flex items-center py-1.5"
                                 >
-                                  <div className="bg-primary/10 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full">
-                                    <IconComponent className="text-primary h-5 w-5" />
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="text-foreground truncate font-medium">
-                                      {acc.name}
-                                    </div>
-                                    <div className="text-muted-foreground text-sm">
-                                      {acc.currency}
-                                    </div>
-                                  </div>
-                                  {account?.id === acc.id && (
-                                    <Icons.Check className="text-primary h-5 w-5 flex-shrink-0" />
-                                  )}
-                                </button>
+                                  <IconComponent className="mr-2 h-4 w-4" />
+                                  <span>
+                                    {acc.name} ({acc.currency})
+                                  </span>
+                                  <Icons.Check
+                                    className={cn(
+                                      "ml-auto h-4 w-4",
+                                      account?.id === acc.id ? "opacity-100" : "opacity-0",
+                                    )}
+                                  />
+                                </CommandItem>
                               );
                             })}
+                          </CommandGroup>
+                        ))}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Mobile account selector */}
+              <div className="block sm:hidden">
+                <Sheet open={mobileSelectorOpen} onOpenChange={setMobileSelectorOpen}>
+                  <SheetTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full"
+                      aria-label="Switch account"
+                    >
+                      <Icons.ChevronDown className="text-muted-foreground h-5 w-5" />
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="bottom" className="mx-1 h-[80vh] rounded-t-4xl p-0">
+                    <SheetHeader className="border-border border-b px-6 py-4">
+                      <SheetTitle>Switch Account</SheetTitle>
+                      <SheetDescription>Choose an account to view</SheetDescription>
+                    </SheetHeader>
+                    <ScrollArea className="h-[calc(80vh-5rem)] px-6 py-4">
+                      <div className="space-y-6">
+                        {accountsByType.map(([type, typeAccounts]) => (
+                          <div key={type}>
+                            <h3 className="text-muted-foreground mb-3 text-sm font-medium">
+                              {type}
+                            </h3>
+                            <div className="space-y-2">
+                              {typeAccounts.map((acc) => {
+                                const IconComponent =
+                                  accountTypeIcons[acc.accountType] ?? Icons.CreditCard;
+                                return (
+                                  <button
+                                    key={acc.id}
+                                    onClick={() => handleAccountSwitch(acc)}
+                                    className={cn(
+                                      "hover:bg-accent active:bg-accent/80 flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors focus:outline-none",
+                                      account?.id === acc.id
+                                        ? "border-primary bg-accent"
+                                        : "border-transparent",
+                                    )}
+                                  >
+                                    <div className="bg-primary/10 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full">
+                                      <IconComponent className="text-primary h-5 w-5" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="text-foreground truncate font-medium">
+                                        {acc.name}
+                                      </div>
+                                      <div className="text-muted-foreground text-sm">
+                                        {acc.currency}
+                                      </div>
+                                    </div>
+                                    {account?.id === acc.id && (
+                                      <Icons.Check className="text-primary h-5 w-5 flex-shrink-0" />
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </SheetContent>
-              </Sheet>
-            </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </SheetContent>
+                </Sheet>
+              </div>
             </div>
             <p className="text-muted-foreground text-xs leading-tight md:text-sm">
               {account?.group ?? account?.currency}
@@ -529,28 +569,26 @@ const AccountPage = () => {
                   </CardTitle>
                   <div className="-mt-3 flex items-center gap-1 self-start">
                     <PrivacyToggle />
-                    {isHoldingsMode && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant={showSnapshotMarkers ? "default" : "secondary"}
-                              size="icon-xs"
-                              className={cn(
-                                "rounded-full",
-                                !showSnapshotMarkers && "bg-secondary/50",
-                              )}
-                              onClick={() => setShowSnapshotMarkers(!showSnapshotMarkers)}
-                            >
-                              <Icons.History className="size-5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{showSnapshotMarkers ? "Hide" : "Show"} snapshot markers</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant={showSnapshotMarkers ? "default" : "secondary"}
+                            size="icon-xs"
+                            className={cn(
+                              "rounded-full",
+                              !showSnapshotMarkers && "bg-secondary/50",
+                            )}
+                            onClick={() => setShowSnapshotMarkers(!showSnapshotMarkers)}
+                          >
+                            <Icons.History className="size-5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{showSnapshotMarkers ? "Hide" : "Show"} snapshot markers</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -560,11 +598,18 @@ const AccountPage = () => {
                         <HistoryChart
                           data={chartData}
                           isLoading={false}
-                          showMarkers={isHoldingsMode && showSnapshotMarkers}
+                          showMarkers={showSnapshotMarkers}
                           snapshotDates={snapshotDates}
                           onMarkerClick={(date) => {
-                            setEditingSnapshotDate(date);
-                            setIsEditingHoldings(true);
+                            if (isHoldingsMode) {
+                              // Holdings mode: open edit holdings sheet
+                              setEditingSnapshotDate(date);
+                              setIsEditingHoldings(true);
+                            } else {
+                              // Transactions mode: open activities sheet for this date
+                              setSelectedActivityDate(date);
+                              setIsActivitySheetOpen(true);
+                            }
                           }}
                         />
                         <IntervalSelector
@@ -592,10 +637,7 @@ const AccountPage = () => {
               </div>
             </div>
 
-            <AccountHoldings
-              accountId={id}
-              onAddHoldings={() => setIsEditingHoldings(true)}
-            />
+            <AccountHoldings accountId={id} onAddHoldings={() => setIsEditingHoldings(true)} />
           </>
         ) : (
           <AccountHoldings
@@ -631,6 +673,35 @@ const AccountPage = () => {
           </SheetContent>
         </Sheet>
       )}
+
+      {/* Activities Sheet for Transactions mode marker click */}
+      <Sheet open={isActivitySheetOpen} onOpenChange={setIsActivitySheetOpen}>
+        <SheetContent side="right" className="flex h-full w-full flex-col p-0 sm:max-w-md">
+          <SheetHeader className="border-b px-6 py-4">
+            <SheetTitle>
+              Activities on {selectedActivityDate ? formatDate(selectedActivityDate) : ""}
+            </SheetTitle>
+            <SheetDescription>
+              {dateActivities?.length ?? 0} activities recorded on this date
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex-1 overflow-auto px-4 py-4">
+            {isDateActivitiesLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Icons.Spinner className="size-6 animate-spin" />
+              </div>
+            ) : (
+              <ActivityTableMobile
+                activities={dateActivities ?? []}
+                isCompactView={true}
+                handleEdit={() => {}}
+                handleDelete={() => {}}
+                onDuplicate={async () => {}}
+              />
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </Page>
   );
 };

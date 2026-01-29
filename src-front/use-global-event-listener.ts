@@ -65,9 +65,7 @@ const useGlobalEventListener = () => {
       }
     };
 
-    const handleMarketSyncComplete = (event: {
-      payload: { failed_syncs: [string, string][] };
-    }) => {
+    const handleMarketSyncComplete = (event: { payload: { failed_syncs: [string, string][] } }) => {
       const { failed_syncs } = event.payload || { failed_syncs: [] };
 
       if (isMobileViewportRef.current && syncContextRef.current) {
@@ -135,7 +133,13 @@ const useGlobalEventListener = () => {
         message: string;
         accountsSynced?: { created: number; updated: number; skipped: number };
         activitiesSynced?: { activitiesUpserted: number; assetsInserted: number };
-        holdingsSynced?: { accountsSynced: number; snapshotsUpserted: number; positionsUpserted: number; assetsInserted: number; newAssetIds: string[] };
+        holdingsSynced?: {
+          accountsSynced: number;
+          snapshotsUpserted: number;
+          positionsUpserted: number;
+          assetsInserted: number;
+          newAssetIds: string[];
+        };
         newAccounts?: {
           localAccountId: string;
           providerAccountId: string;
@@ -225,8 +229,9 @@ const useGlobalEventListener = () => {
     };
 
     const setupListeners = async () => {
-      const unlistenPortfolioSyncStart =
-        await listenPortfolioUpdateStart(handlePortfolioUpdateStart);
+      const unlistenPortfolioSyncStart = await listenPortfolioUpdateStart(
+        handlePortfolioUpdateStart,
+      );
       const unlistenPortfolioSyncComplete = await listenPortfolioUpdateComplete(
         handlePortfolioUpdateComplete,
       );

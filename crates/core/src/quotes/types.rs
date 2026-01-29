@@ -456,10 +456,7 @@ mod tests {
     #[test]
     fn test_data_source_conversion() {
         // DataSource -> QuoteSource
-        assert_eq!(
-            QuoteSource::from(DataSource::Manual),
-            QuoteSource::Manual
-        );
+        assert_eq!(QuoteSource::from(DataSource::Manual), QuoteSource::Manual);
         assert_eq!(
             QuoteSource::from(DataSource::Yahoo),
             QuoteSource::Provider(ProviderId::yahoo())

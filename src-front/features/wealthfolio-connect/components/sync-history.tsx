@@ -11,7 +11,11 @@ import type { ImportRun, ImportRunStatus } from "../types";
 
 const statusConfig: Record<
   ImportRunStatus,
-  { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: typeof Icons.Check }
+  {
+    label: string;
+    variant: "default" | "secondary" | "destructive" | "outline";
+    icon: typeof Icons.Check;
+  }
 > = {
   RUNNING: { label: "Syncing", variant: "outline", icon: Icons.Spinner },
   APPLIED: { label: "Success", variant: "default", icon: Icons.Check },
@@ -25,13 +29,9 @@ interface SyncHistoryProps {
 }
 
 export function SyncHistory({ pageSize = 10 }: SyncHistoryProps) {
-  const {
-    data,
-    isLoading,
-    isFetchingNextPage,
-    hasNextPage,
-    fetchNextPage,
-  } = useImportRunsInfinite({ pageSize });
+  const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } = useImportRunsInfinite(
+    { pageSize },
+  );
 
   const runs = useMemo(() => {
     if (!data?.pages) return [];
@@ -203,9 +203,7 @@ function SyncRunItem({ run }: { run: ImportRun }) {
             </div>
             {run.summary.skipped > 0 && (
               <div className="text-center">
-                <p className="text-muted-foreground font-semibold">
-                  {run.summary.skipped}
-                </p>
+                <p className="text-muted-foreground font-semibold">{run.summary.skipped}</p>
                 <p className="text-muted-foreground">skipped</p>
               </div>
             )}

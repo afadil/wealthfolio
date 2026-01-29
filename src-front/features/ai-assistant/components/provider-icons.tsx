@@ -1,13 +1,7 @@
 // Individual logo components with inline SVGs
 
 // Generic Bot icon for fallback
-const BotIcon = ({
-  size = 16,
-  className = "",
-}: {
-  size?: number;
-  className?: string;
-}) => (
+const BotIcon = ({ size = 16, className = "" }: { size?: number; className?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     width={size}
@@ -29,13 +23,7 @@ const BotIcon = ({
   </svg>
 );
 
-const LogoOllama = ({
-  size = 24,
-  className = "",
-}: {
-  size?: number;
-  className?: string;
-}) => (
+const LogoOllama = ({ size = 24, className = "" }: { size?: number; className?: string }) => (
   <svg width={size} height={size} viewBox="0 0 60 60" className={className}>
     <path
       d="M25.2 14.9c2.7-1.5 6.4-2 9.7 0 .7-8.8 9.7-11 8.4 4.6 5 3.8 4.1 10.8 2.2 13 2.2 4.1 1.6 8-.2 11.3a13 13 0 0 1 .9 7.1c-.3 1.6-2.7 1.2-2.6-.4.3-2 0-4.1-1-6.2-.2-.4-.2-1 .1-1.3 1-1.5 3-5.4 0-10-.4-.6-.2-1.4.4-1.8.8-.5 1.9-3 1-6.2-1.3-4.2-5-4.7-7-4.5-.6 0-1-.3-1.3-.8-2.6-5.6-10.2-3.8-11.6-.1-.2.5-.7.8-1.2.8-2.5 0-6 .7-7.1 4.6-.8 3 .3 5.7 1 6.3.5.4.6 1 .3 1.6-.8 1.2-2.8 6.2.1 9.9.3.5.4 1 .2 1.5-1.2 2.4-1.5 4.5-1.1 6 .3 1.7-2.2 2.3-2.6.7a12 12 0 0 1 1-7.1c-3.1-4.8-.9-10.2-.3-11.5-2.1-3-2.4-9.7 2.3-13-1.3-15.3 7.6-13.6 8.4-4.5M30 26.4c4 0 7 2.8 7 5.6 0 7-14.1 6.6-14.1 0 0-2.8 3.2-5.6 7.1-5.6M24.8 32c0 4.4 10.3 4.5 10.3 0 0-1.8-2-3.8-5-3.8-2.9 0-5.3 2-5.3 3.8zm6.5-.4-.6.4v1c0 1-1.5 1-1.5 0v-1l-.6-.4c-.6-.6.3-1.7 1-1.1l.4.3.4-.3c.8-.5 1.7.5.9 1.1zm-10.4-21c-2 .9-1.6 6.9-1.5 7.7.9-.3 1.8-.4 2.8-.5 1-1.9 0-6.4-1.3-7.2zm16.9 7.3c1 0 2 .1 3 .4 0-.9.5-7-1.5-7.7-1.2.3-2.5 5.7-1.5 7.3zm2.7 10.5c0 2.4-3.6 2.4-3.6 0s3.6-2.4 3.6 0zm-17.5 0c0 2.4-3.6 2.4-3.6 0s3.6-2.4 3.6 0z"
@@ -44,13 +32,7 @@ const LogoOllama = ({
   </svg>
 );
 
-const LogoGroq = ({
-  size = 24,
-  className = "",
-}: {
-  size?: number;
-  className?: string;
-}) => (
+const LogoGroq = ({ size = 24, className = "" }: { size?: number; className?: string }) => (
   <svg width={size} height={size} viewBox="0 0 64 64" className={className}>
     <rect width="64" height="64" rx="8" fill="#F54F35" />
     <path
@@ -60,13 +42,7 @@ const LogoGroq = ({
   </svg>
 );
 
-const LogoOpenAI = ({
-  size = 16,
-  className = "",
-}: {
-  size?: number;
-  className?: string;
-}) => (
+const LogoOpenAI = ({ size = 16, className = "" }: { size?: number; className?: string }) => (
   <svg
     height={size}
     strokeLinejoin="round"
@@ -82,13 +58,7 @@ const LogoOpenAI = ({
   </svg>
 );
 
-const LogoGoogle = ({
-  size = 16,
-  className = "",
-}: {
-  size?: number;
-  className?: string;
-}) => (
+const LogoGoogle = ({ size = 16, className = "" }: { size?: number; className?: string }) => (
   <svg
     data-testid="geist-icon"
     height={size}
@@ -117,13 +87,7 @@ const LogoGoogle = ({
   </svg>
 );
 
-const LogoAnthropic = ({
-  size = 18,
-  className = "",
-}: {
-  size?: number;
-  className?: string;
-}) => (
+const LogoAnthropic = ({ size = 18, className = "" }: { size?: number; className?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     x="0px"
@@ -141,13 +105,7 @@ const LogoAnthropic = ({
   </svg>
 );
 
-const LogoOpenRouter = ({
-  size = 16,
-  className = "",
-}: {
-  size?: number;
-  className?: string;
-}) => (
+const LogoOpenRouter = ({ size = 16, className = "" }: { size?: number; className?: string }) => (
   <svg
     height={size}
     width={size}

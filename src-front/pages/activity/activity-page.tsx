@@ -6,13 +6,7 @@ import { QueryKeys } from "@/lib/query-keys";
 import { Account, ActivityDetails } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import type { SortingState } from "@tanstack/react-table";
-import {
-  Button,
-  Icons,
-  Page,
-  PageContent,
-  PageHeader,
-} from "@wealthfolio/ui";
+import { Button, Icons, Page, PageContent, PageHeader } from "@wealthfolio/ui";
 import { debounce } from "lodash";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -100,7 +94,11 @@ const ActivityPage = () => {
   // Infinite scroll search for table view
   const infiniteSearch = useActivitySearch({
     mode: "infinite",
-    filters: { accountIds: selectedAccounts, activityTypes: selectedActivityTypes, status: statusFilter },
+    filters: {
+      accountIds: selectedAccounts,
+      activityTypes: selectedActivityTypes,
+      status: statusFilter,
+    },
     searchQuery,
     sorting,
   });
@@ -108,7 +106,11 @@ const ActivityPage = () => {
   // Paginated search for datagrid view
   const paginatedSearch = useActivitySearch({
     mode: "paginated",
-    filters: { accountIds: selectedAccounts, activityTypes: selectedActivityTypes, status: statusFilter },
+    filters: {
+      accountIds: selectedAccounts,
+      activityTypes: selectedActivityTypes,
+      status: statusFilter,
+    },
     searchQuery,
     sorting,
     pageIndex,
@@ -127,7 +129,9 @@ const ActivityPage = () => {
   const tableActivities = infiniteSearch.data;
   const datagridActivities = paginatedSearch.data;
   const totalFetched = tableActivities.length;
-  const totalRowCount = isDatagridView ? paginatedSearch.totalRowCount : infiniteSearch.totalRowCount;
+  const totalRowCount = isDatagridView
+    ? paginatedSearch.totalRowCount
+    : infiniteSearch.totalRowCount;
 
   const handleEdit = useCallback((activity?: ActivityDetails, activityType?: ActivityType) => {
     setSelectedActivity(activity ?? { activityType });
@@ -185,7 +189,7 @@ const ActivityPage = () => {
         ],
       },
     ],
-    [handleEdit, navigate]
+    [handleEdit, navigate],
   );
 
   const headerActions = (

@@ -116,11 +116,7 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
         }
       }
 
-      if (
-        "pricingMode" in submitData &&
-        submitData.pricingMode === PricingMode.MANUAL &&
-        account
-      ) {
+      if ("pricingMode" in submitData && submitData.pricingMode === PricingMode.MANUAL && account) {
         submitData.currency = submitData.currency ?? account.currency;
       }
 

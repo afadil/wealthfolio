@@ -19,11 +19,7 @@ interface RuntimeProviderProps {
  * Provider component for runtime context.
  */
 export function RuntimeProvider({ runtime, children }: RuntimeProviderProps) {
-  return (
-    <RuntimeContext.Provider value={runtime}>
-      {children}
-    </RuntimeContext.Provider>
-  );
+  return <RuntimeContext.Provider value={runtime}>{children}</RuntimeContext.Provider>;
 }
 
 /**

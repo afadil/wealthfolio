@@ -72,40 +72,69 @@ pub use title_generator::{
 };
 pub use tools::{
     GetAccountsTool, GetGoalsTool, GetHoldingsTool, SearchActivitiesTool, ToolSet,
-    DEFAULT_ACTIVITIES_DAYS, DEFAULT_VALUATIONS_DAYS, MAX_ACTIVITIES_ROWS, MAX_GOALS,
-    MAX_HOLDINGS, MAX_ACCOUNTS, MAX_INCOME_RECORDS, MAX_VALUATIONS_POINTS,
+    DEFAULT_ACTIVITIES_DAYS, DEFAULT_VALUATIONS_DAYS, MAX_ACCOUNTS, MAX_ACTIVITIES_ROWS, MAX_GOALS,
+    MAX_HOLDINGS, MAX_INCOME_RECORDS, MAX_VALUATIONS_POINTS,
 };
 pub use types::{
-    // Domain types (chat thread, message, content)
-    ChatMessage, ChatMessageContent, ChatMessagePart, ChatMessageRole, ChatRepositoryResult,
-    ChatRepositoryTrait, ChatThread, ChatThreadConfig,
     // Streaming and request types
-    AiStreamEvent, ChatModelConfig, SendMessageRequest, SimpleChatMessage, ToolCall, ToolResult,
-    ToolResultData, UsageStats,
+    AiStreamEvent,
+    // Domain types (chat thread, message, content)
+    ChatMessage,
+    ChatMessageContent,
+    ChatMessagePart,
+    ChatMessageRole,
+    ChatModelConfig,
+    ChatRepositoryResult,
+    ChatRepositoryTrait,
+    ChatThread,
+    ChatThreadConfig,
     // Pagination types
-    ListThreadsRequest, ThreadPage,
+    ListThreadsRequest,
+    SendMessageRequest,
+    SimpleChatMessage,
+    ThreadPage,
+    ToolCall,
+    ToolResult,
+    ToolResultData,
+    UsageStats,
     // Constants
-    CHAT_CONFIG_SCHEMA_VERSION, CHAT_CONTENT_SCHEMA_VERSION, CHAT_MAX_CONTENT_SIZE_BYTES,
+    CHAT_CONFIG_SCHEMA_VERSION,
+    CHAT_CONTENT_SCHEMA_VERSION,
+    CHAT_MAX_CONTENT_SIZE_BYTES,
     DEFAULT_TOOLS_ALLOWLIST,
 };
 
 // Provider model types
 pub use provider_model::{
     // Catalog types
-    AiProviderCatalog, CapabilityInfo, CatalogModel, CatalogProvider, ConnectionField,
-    ModelCapabilities, ProviderDefaultConfig,
+    AiProviderCatalog,
     // User settings types
-    AiProviderSettings, ModelCapabilityOverrides, ProviderUserSettings,
+    AiProviderSettings,
     // Merged view types
-    AiProvidersResponse, MergedModel, MergedProvider,
+    AiProvidersResponse,
+    CapabilityInfo,
+    CatalogModel,
+    CatalogProvider,
+    ConnectionField,
+    // Provider config types
+    FetchedModel,
+    ListModelsResponse,
+    MergedModel,
+    MergedProvider,
+    ModelCapabilities,
     // Update types
-    ModelCapabilityOverrideUpdate, SetDefaultProviderRequest, UpdateProviderSettingsRequest,
+    ModelCapabilityOverrideUpdate,
+    ModelCapabilityOverrides,
     // Provider API error
     ProviderApiError,
-    // Provider config types
-    FetchedModel, ListModelsResponse, ProviderConfig,
+    ProviderConfig,
+    ProviderDefaultConfig,
+    ProviderUserSettings,
+    SetDefaultProviderRequest,
+    UpdateProviderSettingsRequest,
     // Constants
-    AI_PROVIDER_SETTINGS_KEY, AI_PROVIDER_SETTINGS_SCHEMA_VERSION,
+    AI_PROVIDER_SETTINGS_KEY,
+    AI_PROVIDER_SETTINGS_SCHEMA_VERSION,
 };
 
 // Provider service

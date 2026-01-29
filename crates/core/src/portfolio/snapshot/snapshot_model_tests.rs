@@ -300,8 +300,8 @@ mod tests {
                 id: "pos-2".to_string(), // Different ID (should be ignored)
                 account_id: "account-1".to_string(),
                 asset_id: "AAPL".to_string(),
-                quantity: Decimal::from(100), // Same quantity
-                average_cost: Decimal::from(150), // Same avg cost
+                quantity: Decimal::from(100),           // Same quantity
+                average_cost: Decimal::from(150),       // Same avg cost
                 total_cost_basis: Decimal::from(15000), // Same cost basis
                 currency: "USD".to_string(),
                 inception_date: Utc::now(), // Different timestamp (should be ignored)

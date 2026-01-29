@@ -1,15 +1,15 @@
-import { Button } from '@wealthfolio/ui/components/ui/button';
-import { Icons } from '@wealthfolio/ui/components/ui/icons';
-import { cn } from '@/lib/utils';
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { cn } from "@/lib/utils";
 
 interface ProviderButtonProps {
-  provider: 'google' | 'apple' | 'email';
+  provider: "google" | "apple" | "email";
   onClick: () => void;
   isLoading: boolean;
   isLastUsed?: boolean;
-  variant?: 'default' | 'outline';
+  variant?: "default" | "outline";
   className?: string;
-  type?: 'button' | 'submit';
+  type?: "button" | "submit";
 }
 
 export function ProviderButton({
@@ -17,22 +17,22 @@ export function ProviderButton({
   onClick,
   isLoading,
   isLastUsed = false,
-  variant = 'outline',
+  variant = "outline",
   className,
-  type = 'button',
+  type = "button",
 }: ProviderButtonProps) {
   const providerConfig = {
     google: {
       icon: Icons.Google,
-      label: 'Continue with Google',
+      label: "Continue with Google",
     },
     apple: {
       icon: Icons.Apple,
-      label: 'Continue with Apple',
+      label: "Continue with Apple",
     },
     email: {
       icon: Icons.Mail,
-      label: 'Continue with Email',
+      label: "Continue with Email",
     },
   };
 
@@ -45,7 +45,7 @@ export function ProviderButton({
       variant={variant}
       onClick={onClick}
       disabled={isLoading}
-      className={cn('relative h-12 w-full max-w-sm justify-start gap-3', className)}
+      className={cn("relative h-12 w-full max-w-sm justify-start gap-3", className)}
     >
       {isLoading ? (
         <Icons.Spinner className="h-5 w-5 animate-spin" />

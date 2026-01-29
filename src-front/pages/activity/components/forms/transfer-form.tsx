@@ -199,9 +199,7 @@ export function TransferForm({
     (a) => a.value === initialFromAccountId || a.value === initialAccountId,
   );
   const initialCurrency =
-    defaultValues?.currency ??
-    normalizeCurrency(assetCurrency) ??
-    initialAccount?.currency;
+    defaultValues?.currency ?? normalizeCurrency(assetCurrency) ?? initialAccount?.currency;
 
   // Determine initial transfer mode from defaults
   const initialTransferMode: TransferMode =
@@ -349,7 +347,7 @@ export function TransferForm({
                   checked={isExternal}
                   onCheckedChange={handleExternalChange}
                 />
-                <Label htmlFor="isExternal" className="text-sm font-normal cursor-pointer">
+                <Label htmlFor="isExternal" className="cursor-pointer text-sm font-normal">
                   External transfer
                 </Label>
               </div>
@@ -365,13 +363,13 @@ export function TransferForm({
                   >
                     <div className="flex items-center space-x-1.5">
                       <RadioGroupItem value="in" id="direction-in" />
-                      <Label htmlFor="direction-in" className="text-sm font-normal cursor-pointer">
+                      <Label htmlFor="direction-in" className="cursor-pointer text-sm font-normal">
                         In
                       </Label>
                     </div>
                     <div className="flex items-center space-x-1.5">
                       <RadioGroupItem value="out" id="direction-out" />
-                      <Label htmlFor="direction-out" className="text-sm font-normal cursor-pointer">
+                      <Label htmlFor="direction-out" className="cursor-pointer text-sm font-normal">
                         Out
                       </Label>
                     </div>

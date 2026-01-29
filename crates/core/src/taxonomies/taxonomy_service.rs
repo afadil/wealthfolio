@@ -101,7 +101,6 @@ impl TaxonomyService {
             })
             .collect()
     }
-
 }
 
 #[async_trait]

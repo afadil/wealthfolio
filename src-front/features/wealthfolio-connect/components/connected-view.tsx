@@ -195,7 +195,9 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
                 <Icons.EyeOff className="text-muted-foreground h-4 w-4" />
               )}
             </TooltipTrigger>
-            <TooltipContent>{account.sync_enabled ? "Sync enabled" : "Sync disabled"}</TooltipContent>
+            <TooltipContent>
+              {account.sync_enabled ? "Sync enabled" : "Sync disabled"}
+            </TooltipContent>
           </Tooltip>
         </div>
       </div>
@@ -223,10 +225,7 @@ interface BrokerConnectionsCardProps {
   isLoading: boolean;
 }
 
-function BrokerConnectionsCard({
-  connections,
-  isLoading,
-}: BrokerConnectionsCardProps) {
+function BrokerConnectionsCard({ connections, isLoading }: BrokerConnectionsCardProps) {
   const openConnectionsPortal = () => {
     openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/connections`);
   };
@@ -282,7 +281,9 @@ function BrokerConnectionsCard({
                 connection.brokerage?.aws_s3_square_logo_url ??
                 connection.brokerage?.aws_s3_logo_url;
               const brokerageName =
-                connection.brokerage?.display_name ?? connection.brokerage?.name ?? "Unknown Broker";
+                connection.brokerage?.display_name ??
+                connection.brokerage?.name ??
+                "Unknown Broker";
               const isConnected = connection.status === "connected" && !connection.disabled;
 
               return (
@@ -300,7 +301,9 @@ function BrokerConnectionsCard({
                       {brokerageName.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{brokerageName}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                    {brokerageName}
+                  </span>
                   <Badge
                     className={`shrink-0 ${
                       isConnected
@@ -371,7 +374,9 @@ export function ConnectedView() {
       toast.loading("Syncing broker data...", { id: "broker-sync-start" });
     },
     onError: (error) => {
-      toast.error(`Failed to start sync: ${error instanceof Error ? error.message : "Unknown error"}`);
+      toast.error(
+        `Failed to start sync: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
     },
   });
 
@@ -557,10 +562,7 @@ export function ConnectedView() {
 
                   {/* Sync Action */}
                   <div className="mt-4">
-                    <Button
-                      onClick={() => syncToLocalMutation.mutate()}
-                      disabled={isSyncing}
-                    >
+                    <Button onClick={() => syncToLocalMutation.mutate()} disabled={isSyncing}>
                       {isSyncing ? (
                         <>
                           <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />

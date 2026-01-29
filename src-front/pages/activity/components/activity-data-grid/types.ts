@@ -17,9 +17,7 @@ export interface LocalTransaction extends ActivityDetails {
 /**
  * Type guard to check if an ActivityDetails is a LocalTransaction
  */
-export function isLocalTransaction(
-  activity: ActivityDetails,
-): activity is LocalTransaction {
+export function isLocalTransaction(activity: ActivityDetails): activity is LocalTransaction {
   return "isNew" in activity;
 }
 

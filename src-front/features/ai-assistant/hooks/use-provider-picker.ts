@@ -30,13 +30,15 @@ export function useProviderPicker(): UseProviderPickerResult {
   // Local providers (like Ollama) don't require API keys
   // API providers require hasApiKey to be true
   const activeProviders = useMemo(() => {
-    return settings?.providers.filter((p) => {
-      if (!p.enabled) return false;
-      // Local providers don't need API keys
-      if (p.type === "local") return true;
-      // API providers require an API key
-      return p.hasApiKey;
-    }) ?? [];
+    return (
+      settings?.providers.filter((p) => {
+        if (!p.enabled) return false;
+        // Local providers don't need API keys
+        if (p.type === "local") return true;
+        // API providers require an API key
+        return p.hasApiKey;
+      }) ?? []
+    );
   }, [settings?.providers]);
 
   // Determine current provider

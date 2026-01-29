@@ -10,7 +10,13 @@ import {
 import { Icons, type IconName } from "@wealthfolio/ui/components/ui/icons";
 import { cn } from "@/lib/utils";
 
-export type PrimaryActivityType = "BUY" | "SELL" | "DEPOSIT" | "WITHDRAWAL" | "DIVIDEND" | "TRANSFER";
+export type PrimaryActivityType =
+  | "BUY"
+  | "SELL"
+  | "DEPOSIT"
+  | "WITHDRAWAL"
+  | "DIVIDEND"
+  | "TRANSFER";
 export type SecondaryActivityType = "SPLIT" | "FEE" | "INTEREST" | "TAX";
 export type ActivityType = PrimaryActivityType | SecondaryActivityType;
 
@@ -73,7 +79,7 @@ function ActivityTypeButton({
       aria-pressed={isSelected}
       className={cn(
         "flex flex-col items-center justify-center gap-1.5 rounded-lg border-2 transition-all",
-        "hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+        "hover:bg-muted/50 focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none",
         "cursor-pointer",
         compact ? "min-h-[72px] min-w-[80px] p-3" : "min-h-[80px] p-4",
         isSelected && "border-foreground bg-primary/5",
@@ -88,7 +94,7 @@ function ActivityTypeButton({
       />
       <span
         className={cn(
-          "text-sm font-medium transition-colors whitespace-nowrap",
+          "text-sm font-medium whitespace-nowrap transition-colors",
           isSelected ? "text-primary" : "text-foreground",
         )}
       >
@@ -161,12 +167,8 @@ function CarouselView({
             ))}
           </CarouselContent>
 
-          {canScrollPrev && (
-            <CarouselPrevious className="left-0 h-7 w-7" />
-          )}
-          {canScrollNext && (
-            <CarouselNext className="right-0 h-7 w-7" />
-          )}
+          {canScrollPrev && <CarouselPrevious className="left-0 h-7 w-7" />}
+          {canScrollNext && <CarouselNext className="right-0 h-7 w-7" />}
         </Carousel>
       </div>
     </div>
@@ -184,50 +186,49 @@ function GridView({
 }) {
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent, index: number) => {
-    const total = types.length;
-    const cols = 5; // 5 columns in grid
-    let newIndex: number | null = null;
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent, index: number) => {
+      const total = types.length;
+      const cols = 5; // 5 columns in grid
+      let newIndex: number | null = null;
 
-    switch (e.key) {
-      case "ArrowRight":
-        e.preventDefault();
-        newIndex = (index + 1) % total;
-        break;
-      case "ArrowLeft":
-        e.preventDefault();
-        newIndex = (index - 1 + total) % total;
-        break;
-      case "ArrowDown":
-        e.preventDefault();
-        newIndex = (index + cols) % total;
-        break;
-      case "ArrowUp":
-        e.preventDefault();
-        newIndex = (index - cols + total) % total;
-        break;
-      case "Home":
-        e.preventDefault();
-        newIndex = 0;
-        break;
-      case "End":
-        e.preventDefault();
-        newIndex = total - 1;
-        break;
-    }
+      switch (e.key) {
+        case "ArrowRight":
+          e.preventDefault();
+          newIndex = (index + 1) % total;
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          newIndex = (index - 1 + total) % total;
+          break;
+        case "ArrowDown":
+          e.preventDefault();
+          newIndex = (index + cols) % total;
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          newIndex = (index - cols + total) % total;
+          break;
+        case "Home":
+          e.preventDefault();
+          newIndex = 0;
+          break;
+        case "End":
+          e.preventDefault();
+          newIndex = total - 1;
+          break;
+      }
 
-    if (newIndex !== null) {
-      buttonRefs.current[newIndex]?.focus();
-    }
-  }, [types.length]);
+      if (newIndex !== null) {
+        buttonRefs.current[newIndex]?.focus();
+      }
+    },
+    [types.length],
+  );
 
   return (
     <div className="p-1">
-      <div
-        role="group"
-        aria-label="All activity types"
-        className="grid grid-cols-5 gap-2"
-      >
+      <div role="group" aria-label="All activity types" className="grid grid-cols-5 gap-2">
         {types.map((type, index) => (
           <ActivityTypeButton
             key={type.value}
@@ -272,7 +273,7 @@ export function ActivityTypePicker({ value, onSelect, allowedTypes }: ActivityTy
         <button
           type="button"
           onClick={toggleViewMode}
-          className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors py-1"
+          className="text-muted-foreground hover:text-foreground flex items-center gap-1 py-1 transition-colors"
           aria-label={viewMode === "carousel" ? "Expand to show all types" : "Collapse"}
         >
           <Icons.ChevronDown

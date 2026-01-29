@@ -29,7 +29,9 @@ export const installAddonFile = async (
   enableAfterInstall?: boolean,
 ): Promise<AddonManifest> => {
   // Web doesn't support single-file addon installation
-  throw new Error(`installAddonFile not supported in web: ${fileName}, ${fileContent}, ${enableAfterInstall}`);
+  throw new Error(
+    `installAddonFile not supported in web: ${fileName}, ${fileContent}, ${enableAfterInstall}`,
+  );
 };
 
 export const listInstalledAddons = async (): Promise<InstalledAddon[]> => {

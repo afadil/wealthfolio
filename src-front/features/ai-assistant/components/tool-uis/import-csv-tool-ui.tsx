@@ -122,7 +122,10 @@ function normalizeActivityDraft(raw: BackendActivityDraft, index: number): Impor
     symbol: raw.symbol,
     exchangeMic: raw.exchange_mic ?? raw.exchangeMic,
     quantity: raw.quantity != null ? Number(raw.quantity) : undefined,
-    unitPrice: raw.unit_price ?? raw.unitPrice != null ? Number(raw.unit_price ?? raw.unitPrice) : undefined,
+    unitPrice:
+      (raw.unit_price ?? raw.unitPrice != null)
+        ? Number(raw.unit_price ?? raw.unitPrice)
+        : undefined,
     amount: raw.amount != null ? Number(raw.amount) : undefined,
     fee: raw.fee != null ? Number(raw.fee) : undefined,
     currency: raw.currency,
@@ -166,7 +169,10 @@ function normalizeMapping(raw: Record<string, unknown>): ImportCsvMappingData {
     accountId: (raw.account_id ?? raw.accountId) as string | undefined,
     name: raw.name as string | undefined,
     fieldMappings: (raw.field_mappings ?? raw.fieldMappings ?? {}) as Record<string, string>,
-    activityMappings: (raw.activity_mappings ?? raw.activityMappings ?? {}) as Record<string, string[]>,
+    activityMappings: (raw.activity_mappings ?? raw.activityMappings ?? {}) as Record<
+      string,
+      string[]
+    >,
     symbolMappings: (raw.symbol_mappings ?? raw.symbolMappings ?? {}) as Record<string, string>,
     accountMappings: (raw.account_mappings ?? raw.accountMappings ?? {}) as Record<string, string>,
     parseConfig: (raw.parse_config ?? raw.parseConfig) as ImportCsvMappingData["parseConfig"],
@@ -193,10 +199,15 @@ function normalizeResult(result: unknown): ImportCsvOutput | null {
   }
 
   const activitiesRaw = Array.isArray(candidate.activities) ? candidate.activities : [];
-  const activities = activitiesRaw.map((a: BackendActivityDraft, i: number) => normalizeActivityDraft(a, i));
+  const activities = activitiesRaw.map((a: BackendActivityDraft, i: number) =>
+    normalizeActivityDraft(a, i),
+  );
 
   // Handle applied_mapping (new format)
-  const mappingRaw = (candidate.applied_mapping ?? candidate.appliedMapping ?? {}) as Record<string, unknown>;
+  const mappingRaw = (candidate.applied_mapping ?? candidate.appliedMapping ?? {}) as Record<
+    string,
+    unknown
+  >;
   const appliedMapping = normalizeMapping(mappingRaw);
 
   const cleaningRaw = Array.isArray(candidate.cleaning_actions ?? candidate.cleaningActions)
@@ -213,7 +224,7 @@ function normalizeResult(result: unknown): ImportCsvOutput | null {
   const availableAccounts = (accountsRaw as Record<string, unknown>[]).map(normalizeAccount);
 
   const detectedHeaders = Array.isArray(candidate.detected_headers ?? candidate.detectedHeaders)
-    ? (candidate.detected_headers ?? candidate.detectedHeaders) as string[]
+    ? ((candidate.detected_headers ?? candidate.detectedHeaders) as string[])
     : undefined;
 
   return {
@@ -225,9 +236,13 @@ function normalizeResult(result: unknown): ImportCsvOutput | null {
     detectedHeaders,
     totalRows: (candidate.total_rows ?? candidate.totalRows) as number | undefined,
     truncated: candidate.truncated as boolean | undefined,
-    usedSavedProfile: (candidate.used_saved_profile ?? candidate.usedSavedProfile) as boolean | undefined,
+    usedSavedProfile: (candidate.used_saved_profile ?? candidate.usedSavedProfile) as
+      | boolean
+      | undefined,
     submitted: candidate.submitted as boolean | undefined,
-    createdActivityIds: (candidate.created_activity_ids ?? candidate.createdActivityIds) as string[] | undefined,
+    createdActivityIds: (candidate.created_activity_ids ?? candidate.createdActivityIds) as
+      | string[]
+      | undefined,
     submittedAt: (candidate.submitted_at ?? candidate.submittedAt) as string | undefined,
   };
 }
@@ -258,7 +273,10 @@ function toLocalTransaction(draft: ImportCsvActivityDraft, index: number): Impor
     comment: draft.comment,
     rowIndex: index,
     isValid: draft.validationStatus !== "error",
-    errors: draft.validationErrors?.filter((_, i) => i < (draft.validationStatus === "error" ? Infinity : 0)) ?? [],
+    errors:
+      draft.validationErrors?.filter(
+        (_, i) => i < (draft.validationStatus === "error" ? Infinity : 0),
+      ) ?? [],
     warnings: draft.validationStatus === "warning" ? (draft.validationErrors ?? []) : [],
   };
 }
@@ -300,19 +318,16 @@ function SuccessState({ activityCount }: SuccessStateProps) {
     <Card className="bg-muted/40 border-success/30">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
-          <Icons.CheckCircle className="h-5 w-5 text-success" />
+          <Icons.CheckCircle className="text-success h-5 w-5" />
           <CardTitle className="text-base">Import Complete</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-sm text-muted-foreground">
-          Successfully imported <span className="font-medium text-foreground">{activityCount}</span> activities.
+        <p className="text-muted-foreground text-sm">
+          Successfully imported <span className="text-foreground font-medium">{activityCount}</span>{" "}
+          activities.
         </p>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => window.open("/activities", "_blank")}
-        >
+        <Button variant="outline" size="sm" onClick={() => window.open("/activities", "_blank")}>
           <Icons.ExternalLink className="mr-2 h-4 w-4" />
           View Activities
         </Button>
@@ -334,7 +349,7 @@ function MappingQualityBadge({ mapping, usedSavedProfile }: MappingQualityBadgeP
   // Calculate quality from number of mapped fields (out of 6 core fields)
   const coreFields = ["date", "activityType", "symbol", "quantity", "unitPrice", "amount"];
   const mappedCount = coreFields.filter(
-    (f) => mapping.fieldMappings?.[f] && mapping.fieldMappings[f].length > 0
+    (f) => mapping.fieldMappings?.[f] && mapping.fieldMappings[f].length > 0,
   ).length;
   const quality = mappedCount / coreFields.length;
 
@@ -376,7 +391,11 @@ function CleaningActionsSummary({ actions }: CleaningActionsSummaryProps) {
   return (
     <Collapsible>
       <CollapsibleTrigger asChild>
-        <Button variant="ghost" size="sm" className="w-full justify-between px-2 text-muted-foreground hover:text-foreground">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground hover:text-foreground w-full justify-between px-2"
+        >
           <span className="flex items-center gap-2">
             <Icons.Sparkles className="h-4 w-4" />
             <span className="text-xs">
@@ -386,11 +405,11 @@ function CleaningActionsSummary({ actions }: CleaningActionsSummaryProps) {
           <Icons.ChevronDown className="h-4 w-4" />
         </Button>
       </CollapsibleTrigger>
-      <CollapsibleContent className="px-2 pt-2 space-y-2">
-        <ul className="space-y-1 text-xs text-muted-foreground">
+      <CollapsibleContent className="space-y-2 px-2 pt-2">
+        <ul className="text-muted-foreground space-y-1 text-xs">
           {actions.map((action, i) => (
             <li key={i} className="flex items-start gap-2">
-              <Icons.Check className="h-3 w-3 mt-0.5 text-success" />
+              <Icons.Check className="text-success mt-0.5 h-3 w-3" />
               <span>{action.description}</span>
             </li>
           ))}
@@ -420,7 +439,10 @@ function ValidationSummaryBadges({ validation }: ValidationSummaryProps) {
         </Badge>
       )}
       {validation.errorRows > 0 && (
-        <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30">
+        <Badge
+          variant="outline"
+          className="bg-destructive/10 text-destructive border-destructive/30"
+        >
           {validation.errorRows} errors
         </Badge>
       )}
@@ -456,7 +478,8 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
 
   const [transactions, setTransactions] = useState<ImportLocalTransaction[]>(initialTransactions);
   const [selectedAccountId, setSelectedAccountId] = useState<string | undefined>(
-    data.activities[0]?.accountId ?? (data.availableAccounts.length === 1 ? data.availableAccounts[0].id : undefined)
+    data.activities[0]?.accountId ??
+      (data.availableAccounts.length === 1 ? data.availableAccounts[0].id : undefined),
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -471,7 +494,7 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
   // Get fallback currency from selected account or first available
   const fallbackCurrency = useMemo(() => {
     if (selectedAccountId) {
-      const account = data.availableAccounts.find(a => a.id === selectedAccountId);
+      const account = data.availableAccounts.find((a) => a.id === selectedAccountId);
       if (account) return account.currency;
     }
     return data.availableAccounts[0]?.currency ?? "USD";
@@ -482,7 +505,7 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
     (rowIndex: number, _symbol: string, result?: SymbolSearchResult) => {
       if (!result) return;
 
-      setTransactions(prev => {
+      setTransactions((prev) => {
         const updated = [...prev];
         if (updated[rowIndex]) {
           const row = updated[rowIndex];
@@ -497,7 +520,7 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
         return updated;
       });
     },
-    [fallbackCurrency]
+    [fallbackCurrency],
   );
 
   // Request to create a custom asset - opens the dialog
@@ -511,7 +534,7 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
       const { rowIndex } = customAssetDialog;
       if (rowIndex < 0) return;
 
-      setTransactions(prev => {
+      setTransactions((prev) => {
         const updated = [...prev];
         if (updated[rowIndex]) {
           const row = updated[rowIndex];
@@ -528,7 +551,7 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
 
       setCustomAssetDialog({ open: false, rowIndex: -1, symbol: "" });
     },
-    [customAssetDialog, fallbackCurrency]
+    [customAssetDialog, fallbackCurrency],
   );
 
   // Symbol search handler
@@ -551,14 +574,12 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
     const { isValid, errors, warnings, rowIndex } = row;
     return (
       <div className="flex items-center gap-1.5">
-        <span className="text-muted-foreground text-xs w-5">{rowIndex + 1}</span>
-        {isValid && warnings.length === 0 && (
-          <Icons.CheckCircle className="h-4 w-4 text-success" />
-        )}
+        <span className="text-muted-foreground w-5 text-xs">{rowIndex + 1}</span>
+        {isValid && warnings.length === 0 && <Icons.CheckCircle className="text-success h-4 w-4" />}
         {!isValid && (
           <Tooltip>
             <TooltipTrigger>
-              <Icons.AlertCircle className="h-4 w-4 text-destructive" />
+              <Icons.AlertCircle className="text-destructive h-4 w-4" />
             </TooltipTrigger>
             <TooltipContent>{errors.join(", ")}</TooltipContent>
           </Tooltip>
@@ -566,7 +587,7 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
         {isValid && warnings.length > 0 && (
           <Tooltip>
             <TooltipTrigger>
-              <Icons.AlertTriangle className="h-4 w-4 text-warning" />
+              <Icons.AlertTriangle className="text-warning h-4 w-4" />
             </TooltipTrigger>
             <TooltipContent>{warnings.join(", ")}</TooltipContent>
           </Tooltip>
@@ -585,14 +606,14 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
     renderStatusCell,
   });
 
-  const validCount = useMemo(() => transactions.filter(t => t.isValid).length, [transactions]);
-  const errorCount = useMemo(() => transactions.filter(t => !t.isValid).length, [transactions]);
+  const validCount = useMemo(() => transactions.filter((t) => t.isValid).length, [transactions]);
+  const errorCount = useMemo(() => transactions.filter((t) => !t.isValid).length, [transactions]);
   const canSubmit = validCount > 0 && selectedAccountId;
 
   // Handle account change - update all transactions
   const handleAccountChange = useCallback((accountId: string) => {
     setSelectedAccountId(accountId);
-    setTransactions(prev => prev.map(t => ({ ...t, accountId })));
+    setTransactions((prev) => prev.map((t) => ({ ...t, accountId })));
   }, []);
 
   // Handle data changes from DataGrid
@@ -627,9 +648,9 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
 
     try {
       // Filter out error rows and prepare payloads
-      const validTransactions = transactions.filter(t => t.isValid);
+      const validTransactions = transactions.filter((t) => t.isValid);
 
-      const creates = validTransactions.map(t => ({
+      const creates = validTransactions.map((t) => ({
         id: t.tempId,
         accountId: selectedAccountId,
         activityType: t.activityType ?? "BUY",
@@ -652,7 +673,7 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
         deleteIds: [],
       });
 
-      const createdIds = result.created?.map(c => c.id) ?? [];
+      const createdIds = result.created?.map((c) => c.id) ?? [];
 
       // Update tool result in DB
       if (threadId && toolCallId) {
@@ -684,9 +705,12 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Icons.FileSpreadsheet className="h-5 w-5 text-primary" />
+            <Icons.FileSpreadsheet className="text-primary h-5 w-5" />
             <CardTitle className="text-base">CSV Import Preview</CardTitle>
-            <MappingQualityBadge mapping={data.appliedMapping} usedSavedProfile={data.usedSavedProfile} />
+            <MappingQualityBadge
+              mapping={data.appliedMapping}
+              usedSavedProfile={data.usedSavedProfile}
+            />
           </div>
           <ValidationSummaryBadges validation={data.validation} />
         </div>
@@ -697,7 +721,7 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
 
         {/* Account selector */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Target account:</span>
+          <span className="text-muted-foreground text-sm">Target account:</span>
           <Select value={selectedAccountId ?? ""} onValueChange={handleAccountChange}>
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Select account" />
@@ -714,20 +738,26 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
 
         {/* Truncation warning */}
         {data.truncated && (
-          <div className="flex items-center gap-2 rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-sm text-warning">
+          <div className="border-warning/50 bg-warning/10 text-warning flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
             <Icons.AlertTriangle className="h-4 w-4 shrink-0" />
-            <span>CSV was truncated. Showing first {transactions.length} of {data.totalRows} rows.</span>
+            <span>
+              CSV was truncated. Showing first {transactions.length} of {data.totalRows} rows.
+            </span>
           </div>
         )}
 
         {/* DataGrid */}
-        <div className="border rounded-md overflow-hidden">
-          <DataGrid {...dataGrid} height={Math.min(400, 50 + transactions.length * 36)} stretchColumns />
+        <div className="overflow-hidden rounded-md border">
+          <DataGrid
+            {...dataGrid}
+            height={Math.min(400, 50 + transactions.length * 36)}
+            stretchColumns
+          />
         </div>
 
         {/* Error message */}
         {submitError && (
-          <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          <div className="border-destructive/50 bg-destructive/10 text-destructive flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
             <Icons.AlertCircle className="h-4 w-4 shrink-0" />
             <span>{submitError}</span>
           </div>
@@ -735,15 +765,14 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
 
         {/* Action buttons */}
         <div className="flex items-center justify-between pt-2">
-          <div className="text-xs text-muted-foreground">
+          <div className="text-muted-foreground text-xs">
             {errorCount > 0 && (
-              <span className="text-destructive">{errorCount} row{errorCount > 1 ? "s" : ""} with errors will be skipped</span>
+              <span className="text-destructive">
+                {errorCount} row{errorCount > 1 ? "s" : ""} with errors will be skipped
+              </span>
             )}
           </div>
-          <Button
-            onClick={handleSubmit}
-            disabled={isSubmitting || !canSubmit}
-          >
+          <Button onClick={handleSubmit} disabled={isSubmitting || !canSubmit}>
             {isSubmitting ? (
               <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
             ) : (
@@ -765,7 +794,7 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
           defaultSymbol={customAssetDialog.symbol}
           defaultCurrency={
             customAssetDialog.rowIndex >= 0
-              ? transactions[customAssetDialog.rowIndex]?.currency ?? fallbackCurrency
+              ? (transactions[customAssetDialog.rowIndex]?.currency ?? fallbackCurrency)
               : fallbackCurrency
           }
         />
@@ -787,16 +816,17 @@ function AbstainState({ globalErrors }: AbstainStateProps) {
     <Card className="border-warning/30 bg-warning/5">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
-          <Icons.AlertTriangle className="h-5 w-5 text-warning" />
+          <Icons.AlertTriangle className="text-warning h-5 w-5" />
           <CardTitle className="text-base">Manual Mapping Required</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-sm text-muted-foreground">
-          The AI was unable to confidently map the CSV columns. Please use the manual import flow or provide more context about your CSV format.
+        <p className="text-muted-foreground text-sm">
+          The AI was unable to confidently map the CSV columns. Please use the manual import flow or
+          provide more context about your CSV format.
         </p>
         {globalErrors.length > 0 && (
-          <ul className="text-sm text-muted-foreground list-disc list-inside">
+          <ul className="text-muted-foreground list-inside list-disc text-sm">
             {globalErrors.map((err, i) => (
               <li key={i}>{err}</li>
             ))}
@@ -841,8 +871,10 @@ function ImportCsvToolUIContent({ result, status, toolCallId }: ImportCsvToolUIC
     return (
       <Card className="border-destructive/30 bg-destructive/5">
         <CardContent className="py-4">
-          <p className="text-sm font-medium text-destructive">Failed to parse CSV</p>
-          <p className="mt-1 text-xs text-muted-foreground">The request was interrupted or failed.</p>
+          <p className="text-destructive text-sm font-medium">Failed to parse CSV</p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            The request was interrupted or failed.
+          </p>
         </CardContent>
       </Card>
     );
@@ -852,14 +884,18 @@ function ImportCsvToolUIContent({ result, status, toolCallId }: ImportCsvToolUIC
     return (
       <Card className="border-destructive/30 bg-destructive/5">
         <CardContent className="py-4">
-          <p className="text-sm font-medium text-destructive">No import data available</p>
+          <p className="text-destructive text-sm font-medium">No import data available</p>
         </CardContent>
       </Card>
     );
   }
 
   // Show abstain state if there are global errors and no valid activities
-  if (parsed.validation.globalErrors && parsed.validation.globalErrors.length > 0 && parsed.activities.length === 0) {
+  if (
+    parsed.validation.globalErrors &&
+    parsed.validation.globalErrors.length > 0 &&
+    parsed.activities.length === 0
+  ) {
     return <AbstainState globalErrors={parsed.validation.globalErrors} />;
   }
 
@@ -867,8 +903,8 @@ function ImportCsvToolUIContent({ result, status, toolCallId }: ImportCsvToolUIC
     return (
       <Card className="border-warning/30 bg-warning/5">
         <CardContent className="py-4">
-          <p className="text-sm font-medium text-warning">No activities found in CSV</p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="text-warning text-sm font-medium">No activities found in CSV</p>
+          <p className="text-muted-foreground mt-1 text-xs">
             The CSV file was parsed but no valid activity rows were detected.
           </p>
         </CardContent>
@@ -879,7 +915,11 @@ function ImportCsvToolUIContent({ result, status, toolCallId }: ImportCsvToolUIC
   if (wasSubmitted) {
     return (
       <SuccessState
-        activityCount={parsed.createdActivityIds?.length ?? successState.createdActivityIds?.length ?? parsed.activities.length}
+        activityCount={
+          parsed.createdActivityIds?.length ??
+          successState.createdActivityIds?.length ??
+          parsed.activities.length
+        }
       />
     );
   }

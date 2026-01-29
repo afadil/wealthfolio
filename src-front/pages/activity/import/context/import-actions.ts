@@ -57,10 +57,7 @@ export function setDraftActivities(activities: DraftActivity[]): ImportAction {
 /**
  * Update a single draft activity by row index.
  */
-export function updateDraft(
-  rowIndex: number,
-  updates: Partial<DraftActivity>,
-): ImportAction {
+export function updateDraft(rowIndex: number, updates: Partial<DraftActivity>): ImportAction {
   return { type: "UPDATE_DRAFT", payload: { rowIndex, updates } };
 }
 

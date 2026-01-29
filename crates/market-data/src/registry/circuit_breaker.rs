@@ -188,7 +188,10 @@ impl CircuitBreaker {
             CircuitState::Closed => {
                 // Reset failure count on success
                 circuit.failure_count = 0;
-                debug!("Circuit breaker: success for '{}', failure count reset", provider);
+                debug!(
+                    "Circuit breaker: success for '{}', failure count reset",
+                    provider
+                );
             }
             CircuitState::HalfOpen => {
                 circuit.half_open_successes += 1;
@@ -291,7 +294,10 @@ impl CircuitBreaker {
         let mut circuits = self.lock_circuits();
 
         if let Some(circuit) = circuits.get_mut(provider.as_ref()) {
-            info!("Circuit breaker: manually resetting circuit for '{}'", provider);
+            info!(
+                "Circuit breaker: manually resetting circuit for '{}'",
+                provider
+            );
             circuit.state = CircuitState::Closed;
             circuit.failure_count = 0;
             circuit.half_open_successes = 0;

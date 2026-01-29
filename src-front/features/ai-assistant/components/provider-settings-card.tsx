@@ -11,11 +11,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@wealthfolio/ui/components/ui/collapsible";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@wealthfolio/ui/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import {
   Command,
   CommandEmpty,
@@ -25,12 +21,7 @@ import {
   CommandList,
 } from "@wealthfolio/ui/components/ui/command";
 import { cn } from "@/lib/utils";
-import type {
-  MergedProvider,
-  MergedModel,
-  FetchedModel,
-  ModelCapabilityOverrides,
-} from "../types";
+import type { MergedProvider, MergedModel, FetchedModel, ModelCapabilityOverrides } from "../types";
 import { ProviderIcon } from "./provider-icons";
 
 interface ProviderSettingsCardProps {
@@ -60,11 +51,23 @@ interface ProviderSettingsCardProps {
 const DATA_ACCESS_OPTIONS = [
   { toolId: "get_accounts", label: "Accounts", description: "Account names, types, and balances" },
   { toolId: "get_holdings", label: "Holdings", description: "Current positions and their values" },
-  { toolId: "search_activities", label: "Transactions", description: "Past transactions and activities" },
-  { toolId: "get_performance", label: "Performance", description: "Returns and performance metrics" },
+  {
+    toolId: "search_activities",
+    label: "Transactions",
+    description: "Past transactions and activities",
+  },
+  {
+    toolId: "get_performance",
+    label: "Performance",
+    description: "Returns and performance metrics",
+  },
   { toolId: "get_dividends", label: "Dividends", description: "Dividend income and history" },
   { toolId: "get_goals", label: "Goals", description: "Investment goals and progress" },
-  { toolId: "get_asset_allocation", label: "Allocation", description: "Portfolio allocation breakdown" },
+  {
+    toolId: "get_asset_allocation",
+    label: "Allocation",
+    description: "Portfolio allocation breakdown",
+  },
   { toolId: "get_valuation_history", label: "History", description: "Portfolio value over time" },
 ];
 
@@ -113,10 +116,10 @@ export function ProviderSettingsCard({
 
   // Check if provider supports custom base URL
   const supportsCustomUrl = provider.connectionFields?.some(
-    (field) => field.key === "baseUrl" || field.key === "customUrl"
+    (field) => field.key === "baseUrl" || field.key === "customUrl",
   );
   const customUrlField = provider.connectionFields?.find(
-    (field) => field.key === "baseUrl" || field.key === "customUrl"
+    (field) => field.key === "baseUrl" || field.key === "customUrl",
   );
 
   // Combine catalog models with fetched models and saved favorites
@@ -193,19 +196,12 @@ export function ProviderSettingsCard({
   // Auto-select recommended models on initial mount if no models are selected
   // This only runs once when the card first expands, not on subsequent updates
   useEffect(() => {
-    if (
-      isOpen &&
-      !hasAutoSelectedRef.current &&
-      onSetFavoriteModels &&
-      provider.enabled
-    ) {
+    if (isOpen && !hasAutoSelectedRef.current && onSetFavoriteModels && provider.enabled) {
       hasAutoSelectedRef.current = true; // Mark as run immediately to prevent re-runs
 
       // Only auto-select if truly empty
       if (!provider.favoriteModels || provider.favoriteModels.length === 0) {
-        const recommendedModelIds = provider.models
-          .filter((m) => m.isCatalog)
-          .map((m) => m.id);
+        const recommendedModelIds = provider.models.filter((m) => m.isCatalog).map((m) => m.id);
         if (recommendedModelIds.length > 0) {
           onSetFavoriteModels(recommendedModelIds);
         }
@@ -226,7 +222,7 @@ export function ProviderSettingsCard({
   const handleCapabilityChange = (
     modelId: string,
     capability: "tools" | "thinking" | "vision",
-    value: boolean
+    value: boolean,
   ) => {
     if (!onSetCapabilityOverride) return;
 
@@ -355,7 +351,13 @@ export function ProviderSettingsCard({
                       <Input
                         id={`apikey-${provider.id}`}
                         type={showApiKey ? "text" : "password"}
-                        value={hasLoadedKey ? apiKeyValue : (provider.hasApiKey ? "••••••••••••••••••••••••" : "")}
+                        value={
+                          hasLoadedKey
+                            ? apiKeyValue
+                            : provider.hasApiKey
+                              ? "••••••••••••••••••••••••"
+                              : ""
+                        }
                         onChange={(e) => setApiKeyValue(e.target.value)}
                         placeholder={provider.hasApiKey ? "" : "Enter API key"}
                         className="bg-background pr-9 font-mono text-sm"
@@ -365,7 +367,7 @@ export function ProviderSettingsCard({
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="absolute right-0 top-0 h-full w-9 hover:bg-transparent"
+                        className="absolute top-0 right-0 h-full w-9 hover:bg-transparent"
                         onClick={handleRevealApiKey}
                         disabled={isLoadingKey}
                         aria-label={showApiKey ? "Hide API key" : "Show API key"}
@@ -400,7 +402,9 @@ export function ProviderSettingsCard({
                             size="sm"
                             className="text-muted-foreground hover:text-foreground h-7 px-2 text-xs"
                             onClick={onRefreshModels}
-                            disabled={isFetchingModels || (!provider.hasApiKey && provider.type === "api")}
+                            disabled={
+                              isFetchingModels || (!provider.hasApiKey && provider.type === "api")
+                            }
                           >
                             {isFetchingModels ? (
                               <Icons.Spinner className="h-3 w-3 animate-spin" />
@@ -436,7 +440,8 @@ export function ProviderSettingsCard({
                                     .filter((m) => "isCatalog" in m && m.isCatalog)
                                     .map((model) => {
                                       const isEnabled = provider.favoriteModels?.includes(model.id);
-                                      const capabilities = "capabilities" in model ? model.capabilities : null;
+                                      const capabilities =
+                                        "capabilities" in model ? model.capabilities : null;
                                       return (
                                         <CommandItem
                                           key={model.id}
@@ -449,10 +454,20 @@ export function ProviderSettingsCard({
                                           <span className="truncate">{model.name ?? model.id}</span>
                                           <div className="flex items-center gap-1">
                                             {capabilities?.tools && (
-                                              <Badge variant="secondary" className="h-4 px-1 text-[9px]">T</Badge>
+                                              <Badge
+                                                variant="secondary"
+                                                className="h-4 px-1 text-[9px]"
+                                              >
+                                                T
+                                              </Badge>
                                             )}
                                             {capabilities?.vision && (
-                                              <Badge variant="secondary" className="h-4 px-1 text-[9px]">V</Badge>
+                                              <Badge
+                                                variant="secondary"
+                                                className="h-4 px-1 text-[9px]"
+                                              >
+                                                V
+                                              </Badge>
                                             )}
                                             {isEnabled && <Icons.Check className="h-4 w-4" />}
                                           </div>
@@ -461,12 +476,15 @@ export function ProviderSettingsCard({
                                     })}
                                 </CommandGroup>
                                 {/* Other available models */}
-                                {allModels.filter((m) => !("isCatalog" in m && m.isCatalog)).length > 0 && (
+                                {allModels.filter((m) => !("isCatalog" in m && m.isCatalog))
+                                  .length > 0 && (
                                   <CommandGroup heading="Other Available">
                                     {allModels
                                       .filter((m) => !("isCatalog" in m && m.isCatalog))
                                       .map((model) => {
-                                        const isEnabled = provider.favoriteModels?.includes(model.id);
+                                        const isEnabled = provider.favoriteModels?.includes(
+                                          model.id,
+                                        );
                                         return (
                                           <CommandItem
                                             key={model.id}
@@ -476,7 +494,9 @@ export function ProviderSettingsCard({
                                             }}
                                             className="flex items-center justify-between"
                                           >
-                                            <span className="truncate">{model.name ?? model.id}</span>
+                                            <span className="truncate">
+                                              {model.name ?? model.id}
+                                            </span>
                                             {isEnabled && <Icons.Check className="h-4 w-4" />}
                                           </CommandItem>
                                         );
@@ -512,17 +532,19 @@ export function ProviderSettingsCard({
                                 key={model.id}
                                 className={cn(
                                   "flex cursor-pointer items-center justify-between px-3 py-2 transition-colors",
-                                  isSelected ? "bg-accent" : "hover:bg-muted/50"
+                                  isSelected ? "bg-accent" : "hover:bg-muted/50",
                                 )}
-                                onClick={() => setSelectedModelForConfig(isSelected ? null : model.id)}
+                                onClick={() =>
+                                  setSelectedModelForConfig(isSelected ? null : model.id)
+                                }
                               >
-                                <div className="flex items-center gap-2 min-w-0">
+                                <div className="flex min-w-0 items-center gap-2">
                                   <span className="truncate text-sm">{model.name ?? model.id}</span>
                                   {isRecommended && (
                                     <Icons.Star className="text-warning h-3.5 w-3.5 shrink-0 fill-current" />
                                   )}
                                 </div>
-                                <div className="flex items-center gap-2 shrink-0">
+                                <div className="flex shrink-0 items-center gap-2">
                                   {/* Capability badges */}
                                   {capabilities?.tools && (
                                     <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
@@ -540,7 +562,10 @@ export function ProviderSettingsCard({
                                     </Badge>
                                   )}
                                   {needsConfig && (
-                                    <Badge variant="outline" className="border-warning/50 text-warning h-5 px-1.5 text-[10px]">
+                                    <Badge
+                                      variant="outline"
+                                      className="border-warning/50 text-warning h-5 px-1.5 text-[10px]"
+                                    >
                                       <Icons.AlertTriangle className="mr-1 h-3 w-3" />
                                       Config
                                     </Badge>
@@ -567,69 +592,70 @@ export function ProviderSettingsCard({
                     </div>
 
                     {/* Capability config for selected model */}
-                    {selectedModelForConfig && onSetCapabilityOverride && (() => {
-                      const model = enabledModels.find((m) => m.id === selectedModelForConfig);
-                      if (!model) return null;
-                      const isRecommended = "isCatalog" in model && model.isCatalog;
-                      const capabilities = isRecommended && "capabilities" in model
-                        ? model.capabilities
-                        : provider.modelCapabilityOverrides[model.id] || {};
+                    {selectedModelForConfig &&
+                      onSetCapabilityOverride &&
+                      (() => {
+                        const model = enabledModels.find((m) => m.id === selectedModelForConfig);
+                        if (!model) return null;
+                        const isRecommended = "isCatalog" in model && model.isCatalog;
+                        const capabilities =
+                          isRecommended && "capabilities" in model
+                            ? model.capabilities
+                            : provider.modelCapabilityOverrides[model.id] || {};
 
-                      return (
-                        <div className="bg-background rounded-md border p-3">
-                          <div className="flex items-center justify-between mb-3">
-                            <p className="text-sm font-medium">
-                              {model.name ?? model.id}
-                            </p>
+                        return (
+                          <div className="bg-background rounded-md border p-3">
+                            <div className="mb-3 flex items-center justify-between">
+                              <p className="text-sm font-medium">{model.name ?? model.id}</p>
+                              {isRecommended && (
+                                <Badge variant="secondary" className="text-xs">
+                                  Recommended
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap gap-4">
+                              <label className="flex items-center gap-2 text-sm">
+                                <Checkbox
+                                  checked={capabilities.tools ?? false}
+                                  onCheckedChange={(checked) =>
+                                    handleCapabilityChange(model.id, "tools", checked === true)
+                                  }
+                                  disabled={isRecommended}
+                                />
+                                Tools
+                              </label>
+                              <label className="flex items-center gap-2 text-sm">
+                                <Checkbox
+                                  checked={capabilities.vision ?? false}
+                                  onCheckedChange={(checked) =>
+                                    handleCapabilityChange(model.id, "vision", checked === true)
+                                  }
+                                  disabled={isRecommended}
+                                />
+                                Vision
+                              </label>
+                              <label className="flex items-center gap-2 text-sm">
+                                <Checkbox
+                                  checked={capabilities.thinking ?? false}
+                                  onCheckedChange={(checked) =>
+                                    handleCapabilityChange(model.id, "thinking", checked === true)
+                                  }
+                                  disabled={isRecommended}
+                                />
+                                Thinking
+                              </label>
+                            </div>
                             {isRecommended && (
-                              <Badge variant="secondary" className="text-xs">Recommended</Badge>
+                              <p className="text-muted-foreground mt-2 text-xs">
+                                Capabilities are preset for recommended models.
+                              </p>
                             )}
                           </div>
-                          <div className="flex flex-wrap gap-4">
-                            <label className="flex items-center gap-2 text-sm">
-                              <Checkbox
-                                checked={capabilities.tools ?? false}
-                                onCheckedChange={(checked) =>
-                                  handleCapabilityChange(model.id, "tools", checked === true)
-                                }
-                                disabled={isRecommended}
-                              />
-                              Tools
-                            </label>
-                            <label className="flex items-center gap-2 text-sm">
-                              <Checkbox
-                                checked={capabilities.vision ?? false}
-                                onCheckedChange={(checked) =>
-                                  handleCapabilityChange(model.id, "vision", checked === true)
-                                }
-                                disabled={isRecommended}
-                              />
-                              Vision
-                            </label>
-                            <label className="flex items-center gap-2 text-sm">
-                              <Checkbox
-                                checked={capabilities.thinking ?? false}
-                                onCheckedChange={(checked) =>
-                                  handleCapabilityChange(model.id, "thinking", checked === true)
-                                }
-                                disabled={isRecommended}
-                              />
-                              Thinking
-                            </label>
-                          </div>
-                          {isRecommended && (
-                            <p className="text-muted-foreground mt-2 text-xs">
-                              Capabilities are preset for recommended models.
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })()}
+                        );
+                      })()}
 
                     {/* Fetch error */}
-                    {fetchError && (
-                      <p className="text-destructive text-xs">{fetchError}</p>
-                    )}
+                    {fetchError && <p className="text-destructive text-xs">{fetchError}</p>}
                   </div>
                 </div>
               )}
@@ -696,7 +722,7 @@ export function ProviderSettingsCard({
                             "flex items-start gap-2.5 rounded-lg border p-3 text-left transition-all",
                             isEnabled
                               ? "border-primary/30 bg-primary/5"
-                              : "bg-muted/40 hover:bg-muted/60 border-transparent"
+                              : "bg-muted/40 hover:bg-muted/60 border-transparent",
                           )}
                         >
                           <div
@@ -704,7 +730,7 @@ export function ProviderSettingsCard({
                               "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-colors",
                               isEnabled
                                 ? "border-primary bg-primary text-primary-foreground"
-                                : "border-muted-foreground/30"
+                                : "border-muted-foreground/30",
                             )}
                           >
                             {isEnabled && <Icons.Check className="h-3 w-3" />}

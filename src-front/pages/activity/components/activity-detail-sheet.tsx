@@ -70,11 +70,7 @@ function DetailSection({ title, icon, children }: DetailSectionProps) {
   );
 }
 
-export function ActivityDetailSheet({
-  activity,
-  open,
-  onOpenChange,
-}: ActivityDetailSheetProps) {
+export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDetailSheetProps) {
   if (!activity) return null;
 
   const statusConfig = activity.status
@@ -116,11 +112,12 @@ export function ActivityDetailSheet({
 
         <div className="space-y-6 pb-8">
           {/* Header Summary */}
-          <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-xl border p-4">
+          <div className="from-primary/5 to-primary/10 rounded-xl border bg-gradient-to-br p-4">
             <div className="flex items-start justify-between">
               <div>
-                <div className="text-muted-foreground mb-1 text-xs uppercase tracking-wide">
-                  {ActivityTypeNames[activity.activityType as ActivityType] || activity.activityType}
+                <div className="text-muted-foreground mb-1 text-xs tracking-wide uppercase">
+                  {ActivityTypeNames[activity.activityType as ActivityType] ||
+                    activity.activityType}
                 </div>
                 {activity.assetSymbol && (
                   <div className="text-xl font-bold">{activity.assetSymbol}</div>
@@ -130,9 +127,7 @@ export function ActivityDetailSheet({
                 )}
               </div>
               <div className="flex flex-col items-end gap-2">
-                {statusConfig && (
-                  <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
-                )}
+                {statusConfig && <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>}
                 {activity.needsReview && (
                   <Badge variant="outline" className="border-amber-500 text-amber-600">
                     <Icons.AlertCircle className="mr-1 h-3 w-3" />
@@ -162,7 +157,8 @@ export function ActivityDetailSheet({
               label="Type"
               value={
                 <Badge variant="outline">
-                  {ActivityTypeNames[activity.activityType as ActivityType] || activity.activityType}
+                  {ActivityTypeNames[activity.activityType as ActivityType] ||
+                    activity.activityType}
                 </Badge>
               }
             />

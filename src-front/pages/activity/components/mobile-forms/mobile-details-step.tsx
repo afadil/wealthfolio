@@ -44,13 +44,7 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
 
   const isFeeActivity = activityType === "FEE";
   const isTaxActivity = activityType === "TAX";
-  const needsAssetSymbol = [
-    "BUY",
-    "SELL",
-    "DIVIDEND",
-    "INTEREST",
-    "SPLIT",
-  ].includes(activityType);
+  const needsAssetSymbol = ["BUY", "SELL", "DIVIDEND", "INTEREST", "SPLIT"].includes(activityType);
   const needsQuantity = ["BUY", "SELL"].includes(activityType);
   const needsUnitPrice = ["BUY", "SELL"].includes(activityType);
   const needsAmount = [
