@@ -368,7 +368,7 @@ impl PerformanceService {
             .map(|quote| {
                 (
                     quote.timestamp.date_naive(),
-                    quote.close.round_dp(DECIMAL_PRECISION),
+                    quote.adjclose.round_dp(DECIMAL_PRECISION),
                 )
             })
             .collect();
