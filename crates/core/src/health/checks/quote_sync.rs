@@ -133,21 +133,13 @@ impl QuoteSyncCheck {
             return issues;
         }
 
-        // Categorize by error count severity
-        // For assets that HAVE synced before (transient issues):
+        // Categorize by error count severity for assets that HAVE synced before:
         //   1-2 failures: might be transient, ignore
         //   3-5 failures: warning
         //   6+ failures: error (persistent issue)
-        // For assets that have NEVER synced (no data at all):
-        //   1+ failures: error (user needs to know they have no data)
+        // Note: Assets that have NEVER synced are handled by price_staleness check
         let warning_threshold = 3;
         let error_threshold = 6;
-
-        // Never-synced assets with any error are immediately errors
-        let never_synced_errors: Vec<_> = sync_errors
-            .iter()
-            .filter(|e| !e.has_synced_before && e.error_count >= 1)
-            .collect();
 
         let warning_errors: Vec<_> = sync_errors
             .iter()
@@ -166,58 +158,6 @@ impl QuoteSyncCheck {
         // Calculate market value impact
         let warning_mv: f64 = warning_errors.iter().map(|e| e.market_value).sum();
         let error_mv: f64 = persistent_errors.iter().map(|e| e.market_value).sum();
-        let never_synced_mv: f64 = never_synced_errors.iter().map(|e| e.market_value).sum();
-
-        // Emit error-level issue for assets that have NEVER synced (no data at all)
-        if !never_synced_errors.is_empty() {
-            let mv_pct = if ctx.total_portfolio_value > 0.0 {
-                never_synced_mv / ctx.total_portfolio_value
-            } else {
-                0.0
-            };
-
-            let severity = if mv_pct > ctx.config.mv_escalation_threshold {
-                Severity::Critical
-            } else {
-                Severity::Error
-            };
-
-            let count = never_synced_errors.len();
-            let title = if count == 1 {
-                format!("No market data for {}", never_synced_errors[0].symbol)
-            } else {
-                format!("No market data for {} assets", count)
-            };
-
-            let details = build_error_details(&never_synced_errors);
-            let asset_ids: Vec<String> = never_synced_errors
-                .iter()
-                .map(|e| e.asset_id.clone())
-                .collect();
-            let affected_items: Vec<AffectedItem> = never_synced_errors
-                .iter()
-                .map(|e| AffectedItem::asset_market_data(&e.asset_id, &e.symbol))
-                .collect();
-            let data_hash = compute_data_hash(&asset_ids, severity);
-
-            issues.push(
-                HealthIssue::builder()
-                    .id(format!("quote_sync:never_synced:{}", data_hash))
-                    .severity(severity)
-                    .category(HealthCategory::PriceStaleness)
-                    .title(title)
-                    .message(
-                        "Unable to fetch market data for these assets. Click on an asset to edit its market data settings and configure the correct provider symbol.",
-                    )
-                    .affected_count(count as u32)
-                    .affected_mv_pct(mv_pct)
-                    .affected_items(affected_items)
-                    .fix_action(FixAction::retry_sync(asset_ids))
-                    .details(details)
-                    .data_hash(data_hash)
-                    .build(),
-            );
-        }
 
         // Emit error-level issue for persistent sync failures
         if !persistent_errors.is_empty() {
@@ -460,24 +400,22 @@ mod tests {
     }
 
     #[test]
-    fn test_never_synced_immediate_error() {
+    fn test_never_synced_ignored() {
         let check = QuoteSyncCheck::new();
         let ctx = HealthContext::new(HealthConfig::default(), "USD", 100_000.0);
 
-        // 1 failure but never synced before - should be immediate error
+        // Never synced assets are now handled by price_staleness check, not here
         let sync_errors = vec![QuoteSyncErrorInfo {
             asset_id: "SEC:GOOGL:XTSE".to_string(),
             symbol: "GOOGL".to_string(),
             error_count: 1,
             last_error: Some("Symbol not found".to_string()),
-            market_value: 0.0, // no market value since no price data
+            market_value: 0.0,
             has_synced_before: false,
         }];
 
         let issues = check.analyze(&sync_errors, &ctx);
-        assert_eq!(issues.len(), 1);
-        assert_eq!(issues[0].severity, Severity::Error);
-        assert!(issues[0].title.contains("No market data"));
+        assert!(issues.is_empty(), "Never-synced assets should be ignored by quote_sync check");
     }
 
     #[test]

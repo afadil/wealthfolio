@@ -131,7 +131,7 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
 
           <PerformanceGrid isLoading={true} />
         </CardContent>
-        <CardFooter className="flex justify-end pb-0">
+        <CardFooter className="flex justify-end px-3 pb-0">
           <Skeleton className="h-3 w-48" />
         </CardFooter>
       </Card>
@@ -232,7 +232,7 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
           isHoldingsMode={isHoldingsMode}
         />
       </CardContent>
-      <CardFooter className="mt-auto flex flex-col items-start gap-1">
+      <CardFooter className="mt-auto flex flex-col items-start gap-1 px-3">
         {isHoldingsMode ? (
           <>
             <p className="text-muted-foreground m-0 p-0 text-xs">

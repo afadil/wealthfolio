@@ -50,6 +50,8 @@ export interface Account {
   currency: string;
   isDefault: boolean;
   isActive: boolean;
+  isArchived: boolean;
+  trackingMode: TrackingMode;
   createdAt: Date;
   updatedAt: Date;
   platformId?: string; // Optional - links to platform/broker
@@ -1370,59 +1372,6 @@ export interface MigrationResult {
  * Matches the backend TrackingMode enum.
  */
 export type TrackingMode = "TRANSACTIONS" | "HOLDINGS" | "NOT_SET";
-
-/**
- * Gets the tracking mode from an account's meta JSON field.
- * The tracking mode is stored at: meta.wealthfolio.trackingMode
- *
- * Returns "NOT_SET" if:
- * - meta is undefined or empty
- * - meta is invalid JSON
- * - wealthfolio.trackingMode field is missing or invalid
- */
-export function getTrackingMode(account: Account): TrackingMode {
-  if (!account.meta) {
-    return "NOT_SET";
-  }
-  try {
-    const parsed = JSON.parse(account.meta) as Record<string, unknown> | null;
-    const wealthfolio = parsed?.wealthfolio as Record<string, unknown> | undefined;
-    const mode = wealthfolio?.trackingMode;
-    if (mode === "TRANSACTIONS" || mode === "HOLDINGS" || mode === "NOT_SET") {
-      return mode;
-    }
-    return "NOT_SET";
-  } catch {
-    return "NOT_SET";
-  }
-}
-
-/**
- * Sets the tracking mode in an account's meta JSON, preserving other fields.
- * The tracking mode is stored at: meta.wealthfolio.trackingMode
- *
- * Returns a JSON string with the trackingMode field set under wealthfolio namespace.
- * If meta is undefined, empty, or invalid JSON, creates a new JSON object.
- */
-export function setTrackingMode(meta: string | undefined, mode: TrackingMode): string {
-  let existing: Record<string, unknown> = {};
-  if (meta) {
-    try {
-      const parsed: unknown = JSON.parse(meta);
-      if (typeof parsed === "object" && parsed !== null) {
-        existing = parsed as Record<string, unknown>;
-      }
-    } catch {
-      // Invalid JSON, start with empty object
-    }
-  }
-  // Ensure wealthfolio namespace exists
-  if (!existing.wealthfolio || typeof existing.wealthfolio !== "object") {
-    existing.wealthfolio = {};
-  }
-  (existing.wealthfolio as Record<string, unknown>).trackingMode = mode;
-  return JSON.stringify(existing);
-}
 
 // ============================================================================
 // AI Provider Types

@@ -35,7 +35,7 @@ function DateSegment({ className, ...props }: DateSegmentProps) {
     <DateSegmentRac
       className={composeRenderProps(className, (className) =>
         cn(
-          "text-foreground data-focused:bg-accent data-invalid:data-focused:bg-destructive data-focused:data-placeholder:text-foreground data-focused:text-foreground data-invalid:data-placeholder:text-destructive data-invalid:text-destructive data-placeholder:text-muted-foreground/70 data-[type=literal]:text-muted-foreground/70 inline rounded p-0.5 caret-transparent outline-hidden data-disabled:cursor-not-allowed data-disabled:opacity-50 data-invalid:data-focused:text-white data-invalid:data-focused:data-placeholder:text-white data-[type=literal]:px-0",
+          "text-foreground data-focused:bg-primary data-focused:text-primary-foreground data-focused:data-placeholder:text-primary-foreground data-invalid:data-focused:bg-destructive data-invalid:data-focused:text-destructive-foreground data-invalid:data-focused:data-placeholder:text-destructive-foreground data-invalid:data-placeholder:text-destructive data-invalid:text-destructive data-placeholder:text-muted-foreground/70 data-[type=literal]:text-muted-foreground/70 inline rounded p-0.5 caret-transparent outline-hidden data-disabled:cursor-not-allowed data-disabled:opacity-50 data-[type=literal]:px-0",
           className,
         ),
       )}
@@ -58,7 +58,7 @@ function DateInput({ className, unstyled = false, ...props }: Omit<DateInputProp
       className={composeRenderProps(className, (className) => cn(!unstyled && dateInputStyle, className))}
       {...props}
     >
-      {(segment) => <DateSegment segment={segment} className="focus-within:bg-accent px-2 py-1 ring-0" />}
+      {(segment) => <DateSegment segment={segment} className="px-2 py-1 ring-0" />}
     </DateInputRac>
   );
 }

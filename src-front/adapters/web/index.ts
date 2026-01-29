@@ -62,13 +62,7 @@ export const RUN_ENV: RunEnv = RunEnvs.WEB;
 // ============================================================================
 
 // Account Commands
-export {
-  getAccounts,
-  createAccount,
-  updateAccount,
-  deleteAccount,
-  switchTrackingMode,
-} from "../shared/accounts";
+export { getAccounts, createAccount, updateAccount, deleteAccount } from "../shared/accounts";
 
 // Activity Commands
 export {

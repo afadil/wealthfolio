@@ -132,12 +132,20 @@ export const getPortfolioAllocations = async (accountId: string): Promise<Portfo
 
 /**
  * Input for a single holding when saving manual holdings
+ *
+ * For existing holdings: provide `assetId` (preferred, avoids regenerating IDs)
+ * For new holdings: provide `symbol` + optional `exchangeMic`, backend generates the ID
  */
 export interface HoldingInput {
-  assetId: string;
+  /** For existing holdings, pass the known asset ID directly */
+  assetId?: string;
+  /** Symbol for new holdings (backend generates ID from this) */
+  symbol: string;
   quantity: string;
   currency: string;
   averageCost?: string;
+  /** Exchange MIC code for new holdings (e.g., "XNAS", "XTSE"). Required for symbols without Yahoo suffixes. */
+  exchangeMic?: string;
 }
 
 /**

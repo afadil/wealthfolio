@@ -1,5 +1,5 @@
 // Account Commands
-import type { Account, TrackingMode } from "@/lib/types";
+import type { Account } from "@/lib/types";
 import type { newAccountSchema } from "@/lib/schemas";
 import type z from "zod";
 
@@ -7,9 +7,9 @@ import { invoke, logger, isDesktop } from "./platform";
 
 type NewAccount = z.infer<typeof newAccountSchema>;
 
-export const getAccounts = async (): Promise<Account[]> => {
+export const getAccounts = async (includeArchived?: boolean): Promise<Account[]> => {
   try {
-    return await invoke<Account[]>("get_accounts");
+    return await invoke<Account[]>("get_accounts", { includeArchived: includeArchived ?? false });
   } catch (error) {
     logger.error("Error fetching accounts.");
     throw error;
@@ -46,23 +46,6 @@ export const deleteAccount = async (accountId: string): Promise<void> => {
     await invoke<void>("delete_account", { accountId });
   } catch (error) {
     logger.error("Error deleting account.");
-    throw error;
-  }
-};
-
-/**
- * Switches an account's tracking mode with proper handling of snapshot sources.
- * When switching from HOLDINGS to TRANSACTIONS, updates existing snapshots to CALCULATED
- * so they can be replaced during recalculation.
- */
-export const switchTrackingMode = async (
-  accountId: string,
-  newMode: TrackingMode,
-): Promise<void> => {
-  try {
-    await invoke<void>("switch_tracking_mode", { accountId, newMode });
-  } catch (error) {
-    logger.error("Error switching tracking mode.");
     throw error;
   }
 };

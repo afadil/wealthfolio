@@ -66,7 +66,7 @@ const CustomTooltip = ({
   }
 
   return (
-    <div className="bg-popover grid grid-cols-1 gap-1.5 rounded-md border p-2 shadow-md">
+    <div className="bg-popover pointer-events-none grid grid-cols-1 gap-1.5 rounded-md border p-2 shadow-md">
       <p className="text-muted-foreground text-xs">{formatDate(tvPayload.date)}</p>
 
       <div className="flex items-center justify-between space-x-2">
@@ -177,6 +177,8 @@ export function HistoryChart({
         </defs>
         <Tooltip
           position={isMobile ? { y: 60 } : { y: -20 }}
+          cursor={{ pointerEvents: "none" }}
+          wrapperStyle={{ pointerEvents: "none" }}
           content={(props) => (
             <CustomTooltip
               {...(props as unknown as TooltipBaseProps)}
@@ -197,6 +199,7 @@ export function HistoryChart({
           stroke="var(--success)"
           fillOpacity={1}
           fill="url(#colorUv)"
+          style={{ pointerEvents: "none" }}
         />
         <Area
           isAnimationActive={true}
@@ -209,6 +212,7 @@ export function HistoryChart({
           fill="transparent"
           strokeDasharray="5 5"
           strokeOpacity={isChartHovered ? 0.8 : 0}
+          style={{ pointerEvents: "none" }}
         />
         {/* Snapshot markers - diamond shape */}
         {showMarkers &&
@@ -217,13 +221,17 @@ export function HistoryChart({
               key={`marker-${point.date}`}
               x={point.date}
               y={point.value}
+              zIndex={1300}
               shape={(props: { cx?: number; cy?: number }) => {
                 const cx = props.cx ?? 0;
                 const cy = props.cy ?? 0;
                 const size = 8;
                 const hitAreaSize = 16;
                 return (
-                  <g style={{ cursor: "pointer" }} onClick={() => onMarkerClick?.(point.date)}>
+                  <g
+                    style={{ cursor: "pointer", pointerEvents: "all" }}
+                    onClick={() => onMarkerClick?.(point.date)}
+                  >
                     {/* Invisible larger hit area for easier clicking */}
                     <circle cx={cx} cy={cy} r={hitAreaSize} fill="transparent" />
                     {/* Diamond shape */}

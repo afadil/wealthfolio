@@ -48,7 +48,7 @@ interface ActivityTypePickerProps {
   value?: ActivityType;
   onSelect: (type: ActivityType) => void;
   /** Optional list of allowed activity types. If not provided, all types are shown. */
-  allowedTypes?: string[];
+  allowedTypes?: readonly string[];
 }
 
 type ViewMode = "carousel" | "grid";

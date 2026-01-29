@@ -300,10 +300,19 @@ pub fn calculate_sync_window(
                 .unwrap_or(today);
 
             // End at quote_min - 1 to avoid refetching existing data
-            let end = inputs
+            let initial_end = inputs
                 .quote_min
                 .map(|d| d - Duration::days(1))
                 .unwrap_or(today);
+
+            // Ensure minimum window size to avoid single-day fetch failures
+            // (e.g., weekends, holidays). Expand end forward if needed.
+            let window_size = (initial_end - start).num_days().max(0);
+            let end = if window_size < MIN_SYNC_LOOKBACK_DAYS {
+                start + Duration::days(MIN_SYNC_LOOKBACK_DAYS)
+            } else {
+                initial_end
+            };
 
             if start > end {
                 None
@@ -717,5 +726,246 @@ mod tests {
         state.mark_sync_failed("Rate limited".to_string());
         assert_eq!(state.error_count, 2);
         assert_eq!(state.last_error, Some("Rate limited".to_string()));
+    }
+
+    // =========================================================================
+    // calculate_sync_window Tests for NeedsBackfill
+    // =========================================================================
+
+    #[test]
+    fn test_backfill_window_tiny_gap_expands_to_minimum() {
+        // Bug fix: 1-day gap (e.g., weekend) should expand to MIN_SYNC_LOOKBACK_DAYS
+        let today = Utc::now().date_naive();
+
+        // Simulate: activity on Jan 7, quotes from Nov 17, required_start = Nov 16
+        // This creates a 1-day gap (Nov 16) which might be a weekend
+        let activity_min = today - Duration::days(22); // ~Jan 7 relative
+        let quote_min = today - Duration::days(73); // ~Nov 17 relative
+        let quote_max = today;
+
+        let inputs = create_inputs(
+            true,
+            None,
+            Some(activity_min),
+            Some(activity_min),
+            Some(quote_min),
+            Some(quote_max),
+        );
+
+        // Verify it's categorized as NeedsBackfill
+        let category = determine_sync_category(&inputs, 30, today);
+        assert_eq!(category, SyncCategory::NeedsBackfill);
+
+        // Calculate window
+        let window = calculate_sync_window(&category, &inputs, today);
+        assert!(window.is_some(), "Should return a valid window");
+
+        let (start, end) = window.unwrap();
+        let window_size = (end - start).num_days();
+
+        // Window should be at least MIN_SYNC_LOOKBACK_DAYS
+        assert!(
+            window_size >= MIN_SYNC_LOOKBACK_DAYS,
+            "Backfill window should be at least {} days, got {} days",
+            MIN_SYNC_LOOKBACK_DAYS,
+            window_size
+        );
+    }
+
+    #[test]
+    fn test_backfill_window_large_gap_unchanged() {
+        // Large gaps should not be affected by the minimum window expansion
+        let today = Utc::now().date_naive();
+
+        let activity_min = today - Duration::days(100);
+        let quote_min = today - Duration::days(30); // Large gap: ~70 days of backfill needed
+
+        let inputs = create_inputs(
+            true,
+            None,
+            Some(activity_min),
+            Some(activity_min),
+            Some(quote_min),
+            Some(today),
+        );
+
+        let category = determine_sync_category(&inputs, 30, today);
+        assert_eq!(category, SyncCategory::NeedsBackfill);
+
+        let window = calculate_sync_window(&category, &inputs, today);
+        assert!(window.is_some());
+
+        let (start, end) = window.unwrap();
+
+        // End should be quote_min - 1 (not expanded)
+        let expected_end = quote_min - Duration::days(1);
+        assert_eq!(
+            end, expected_end,
+            "Large backfill window should end at quote_min - 1"
+        );
+
+        // Start should be activity_min - buffer
+        let expected_start =
+            activity_min - Duration::days(QUOTE_HISTORY_BUFFER_DAYS + BACKFILL_SAFETY_MARGIN_DAYS);
+        assert_eq!(start, expected_start);
+    }
+
+    #[test]
+    fn test_backfill_window_exactly_minimum_size() {
+        // Window exactly at MIN_SYNC_LOOKBACK_DAYS should not expand
+        let today = Utc::now().date_naive();
+
+        // Create inputs where gap is exactly MIN_SYNC_LOOKBACK_DAYS
+        let buffer = QUOTE_HISTORY_BUFFER_DAYS + BACKFILL_SAFETY_MARGIN_DAYS;
+        let activity_min = today - Duration::days(50);
+        // quote_min such that (quote_min - 1) - (activity_min - buffer) = MIN_SYNC_LOOKBACK_DAYS
+        // quote_min - 1 = activity_min - buffer + MIN_SYNC_LOOKBACK_DAYS
+        // quote_min = activity_min - buffer + MIN_SYNC_LOOKBACK_DAYS + 1
+        let quote_min =
+            activity_min - Duration::days(buffer) + Duration::days(MIN_SYNC_LOOKBACK_DAYS + 1);
+
+        let inputs = create_inputs(
+            true,
+            None,
+            Some(activity_min),
+            Some(activity_min),
+            Some(quote_min),
+            Some(today),
+        );
+
+        let category = determine_sync_category(&inputs, 30, today);
+        // This might be Active if quote coverage is sufficient, check either way
+        if category == SyncCategory::NeedsBackfill {
+            let window = calculate_sync_window(&category, &inputs, today);
+            assert!(window.is_some());
+
+            let (start, end) = window.unwrap();
+            let window_size = (end - start).num_days();
+
+            // Should be exactly MIN_SYNC_LOOKBACK_DAYS (no expansion needed)
+            assert_eq!(window_size, MIN_SYNC_LOOKBACK_DAYS);
+        }
+    }
+
+    #[test]
+    fn test_backfill_window_zero_day_gap() {
+        // Edge case: start == initial_end (0-day window)
+        let today = Utc::now().date_naive();
+
+        // Create a scenario where required_start == quote_min - 1
+        let buffer = QUOTE_HISTORY_BUFFER_DAYS + BACKFILL_SAFETY_MARGIN_DAYS;
+        let activity_min = today - Duration::days(30);
+        let required_start = activity_min - Duration::days(buffer);
+        // quote_min = required_start + 1, so initial_end = quote_min - 1 = required_start
+        let quote_min = required_start + Duration::days(1);
+
+        let inputs = create_inputs(
+            true,
+            None,
+            Some(activity_min),
+            Some(activity_min),
+            Some(quote_min),
+            Some(today),
+        );
+
+        let category = determine_sync_category(&inputs, 30, today);
+        assert_eq!(
+            category,
+            SyncCategory::NeedsBackfill,
+            "Should be NeedsBackfill when required_start < quote_min"
+        );
+
+        let window = calculate_sync_window(&category, &inputs, today);
+        assert!(window.is_some(), "Should return valid window even for 0-day gap");
+
+        let (start, end) = window.unwrap();
+        let window_size = (end - start).num_days();
+
+        assert!(
+            window_size >= MIN_SYNC_LOOKBACK_DAYS,
+            "0-day gap should expand to at least {} days, got {}",
+            MIN_SYNC_LOOKBACK_DAYS,
+            window_size
+        );
+    }
+
+    #[test]
+    fn test_backfill_window_expansion_overlaps_existing_quotes() {
+        // When expanding a tiny window, end may overlap with existing quotes
+        // This is acceptable - quotes will be upserted
+        let today = Utc::now().date_naive();
+
+        let activity_min = today - Duration::days(22);
+        let quote_min = today - Duration::days(73);
+        let quote_max = today;
+
+        let inputs = create_inputs(
+            true,
+            None,
+            Some(activity_min),
+            Some(activity_min),
+            Some(quote_min),
+            Some(quote_max),
+        );
+
+        let category = determine_sync_category(&inputs, 30, today);
+        assert_eq!(category, SyncCategory::NeedsBackfill);
+
+        let window = calculate_sync_window(&category, &inputs, today);
+        let (start, end) = window.unwrap();
+
+        // Expanded end may be >= quote_min (overlapping existing quotes)
+        // This is fine - just verify the window is valid
+        assert!(start <= end, "Start should be <= end");
+        assert!(
+            (end - start).num_days() >= MIN_SYNC_LOOKBACK_DAYS,
+            "Window should be at least MIN_SYNC_LOOKBACK_DAYS"
+        );
+    }
+
+    #[test]
+    fn test_active_category_window_always_ends_at_today() {
+        // Active assets should always sync to today
+        let today = Utc::now().date_naive();
+
+        let inputs = create_inputs(
+            true,
+            None,
+            Some(today - Duration::days(30)),
+            Some(today - Duration::days(1)),
+            Some(today - Duration::days(100)),
+            Some(today - Duration::days(5)),
+        );
+
+        let category = determine_sync_category(&inputs, 30, today);
+        assert_eq!(category, SyncCategory::Active);
+
+        let window = calculate_sync_window(&category, &inputs, today);
+        let (_, end) = window.unwrap();
+
+        assert_eq!(end, today, "Active category should always end at today");
+    }
+
+    #[test]
+    fn test_new_category_window_always_ends_at_today() {
+        // New assets (no quotes) should sync to today
+        let today = Utc::now().date_naive();
+
+        let inputs = create_inputs(
+            true,
+            None,
+            Some(today - Duration::days(30)),
+            Some(today - Duration::days(1)),
+            None, // No quotes
+            None,
+        );
+
+        let category = determine_sync_category(&inputs, 30, today);
+        assert_eq!(category, SyncCategory::New);
+
+        let window = calculate_sync_window(&category, &inputs, today);
+        let (_, end) = window.unwrap();
+
+        assert_eq!(end, today, "New category should always end at today");
     }
 }

@@ -64,10 +64,11 @@ export const newAccountSchema = z.object({
   group: z.string().optional(),
   isDefault: z.boolean().optional(),
   isActive: z.boolean().optional(),
+  isArchived: z.boolean().optional().default(false),
   accountType: accountTypeSchema,
   currency: z.string({ required_error: "Please select a currency." }),
-  trackingMode: trackingModeSchema.optional().default("TRANSACTIONS"),
-  meta: z.string().optional(),
+  trackingMode: trackingModeSchema.optional().default("NOT_SET"),
+  meta: z.string().nullable().optional(),
 });
 
 export const newGoalSchema = z.object({

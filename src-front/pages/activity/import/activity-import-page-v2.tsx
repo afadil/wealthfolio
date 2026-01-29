@@ -9,7 +9,7 @@ import { logger, getAccounts } from "@/adapters";
 import { usePlatform } from "@/hooks/use-platform";
 import { useQuery } from "@tanstack/react-query";
 import { QueryKeys } from "@/lib/query-keys";
-import type { Account, TrackingMode } from "@/lib/types";
+import type { Account } from "@/lib/types";
 import { canImportCSV } from "@/lib/activity-restrictions";
 
 // Context
@@ -316,18 +316,17 @@ function ImportWizardContent() {
   // Fetch accounts to determine tracking mode based on selected account
   const { data: accounts } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
-    queryFn: getAccounts,
+    queryFn: () => getAccounts(),
   });
 
   // Determine if the selected account is in HOLDINGS mode
   const selectedAccount = useMemo(() => {
     if (!state.accountId || !accounts) return undefined;
-    return accounts.find((a) => a.id === state.accountId);
+    return accounts.find((a: Account) => a.id === state.accountId);
   }, [state.accountId, accounts]);
 
   const isHoldingsMode = useMemo(() => {
-    const trackingMode = getAccountTrackingMode(selectedAccount);
-    return trackingMode === "HOLDINGS";
+    return selectedAccount?.trackingMode === "HOLDINGS";
   }, [selectedAccount]);
 
   const isCsvImportAllowed = canImportCSV(selectedAccount);
@@ -518,19 +517,6 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, Error
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Export
 // ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Get the tracking mode for an account from its meta field
- */
-function getAccountTrackingMode(account: Account | undefined): TrackingMode {
-  if (!account?.meta) return "TRANSACTIONS";
-  try {
-    const meta = typeof account.meta === "string" ? JSON.parse(account.meta) : account.meta;
-    return meta?.wealthfolio?.trackingMode || "TRANSACTIONS";
-  } catch {
-    return "TRANSACTIONS";
-  }
-}
 
 export function ActivityImportPageV2() {
   const [searchParams] = useSearchParams();

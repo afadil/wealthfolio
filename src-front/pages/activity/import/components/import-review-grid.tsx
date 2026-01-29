@@ -521,7 +521,7 @@ export function ImportReviewGrid({
   }, [onSelectionChange]);
 
   // Get accounts for the account selector
-  const { accounts } = useAccounts(true);
+  const { accounts } = useAccounts({ filterActive: true, includeArchived: false });
 
   // Symbol search handler
   const handleSymbolSearch = useCallback(async (query: string): Promise<SymbolSearchResult[]> => {

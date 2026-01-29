@@ -20,6 +20,8 @@ const createMockAccount = (overrides: Partial<Account> = {}): Account => ({
   currency: "USD",
   isDefault: true,
   isActive: true,
+  isArchived: false,
+  trackingMode: "TRANSACTIONS",
   createdAt: new Date(),
   updatedAt: new Date(),
   ...overrides,

@@ -65,23 +65,16 @@ impl AccountRepositoryTrait for MockAccountRepository {
     fn list(
         &self,
         is_active_filter: Option<bool>,
+        is_archived_filter: Option<bool>,
         _account_ids: Option<&[String]>,
     ) -> Result<Vec<Account>> {
-        let accounts = match is_active_filter {
-            Some(true) => self
-                .accounts
-                .iter()
-                .filter(|a| a.is_active)
-                .cloned()
-                .collect(),
-            Some(false) => self
-                .accounts
-                .iter()
-                .filter(|a| !a.is_active)
-                .cloned()
-                .collect(),
-            None => self.accounts.clone(),
-        };
+        let accounts: Vec<Account> = self
+            .accounts
+            .iter()
+            .filter(|a| is_active_filter.is_none_or(|active| a.is_active == active))
+            .filter(|a| is_archived_filter.is_none_or(|archived| a.is_archived == archived))
+            .cloned()
+            .collect();
         Ok(accounts)
     }
 }
@@ -261,7 +254,7 @@ impl SnapshotRepositoryTrait for MockSnapshotRepository {
         unimplemented!()
     }
 
-    fn get_all_active_account_snapshots(
+    fn get_all_non_archived_account_snapshots(
         &self,
         _start_date: Option<NaiveDate>,
         _end_date: Option<NaiveDate>,
@@ -773,6 +766,8 @@ fn create_test_account(id: &str, account_type: &str, currency: &str) -> Account 
         meta: None,
         provider: None,
         provider_account_id: None,
+        is_archived: false,
+        tracking_mode: crate::accounts::TrackingMode::NotSet,
     }
 }
 
@@ -1637,4 +1632,181 @@ fn test_history_multiple_alt_assets() {
     // Day 3: 10K + 510K + 5.5K - 200K = 325.5K (property updated, gold forward-filled)
     assert_eq!(history[2].alternative_assets_value, dec!(515500)); // 510K + 5.5K
     assert_eq!(history[2].net_worth, dec!(325500));
+}
+
+// ============================================================================
+// Archive Behavior Tests
+// ============================================================================
+
+fn create_test_account_with_archive_state(
+    id: &str,
+    account_type: &str,
+    currency: &str,
+    is_active: bool,
+    is_archived: bool,
+) -> Account {
+    let now = Utc::now().naive_utc();
+    Account {
+        id: id.to_string(),
+        name: format!("Test Account {}", id),
+        account_type: account_type.to_string(),
+        group: None,
+        currency: currency.to_string(),
+        is_default: false,
+        is_active,
+        created_at: now,
+        updated_at: now,
+        platform_id: None,
+        account_number: None,
+        meta: None,
+        provider: None,
+        provider_account_id: None,
+        is_archived,
+        tracking_mode: crate::accounts::TrackingMode::NotSet,
+    }
+}
+
+#[tokio::test]
+async fn test_closed_account_in_net_worth_when_not_archived() {
+    // Account is closed (is_active=false) but NOT archived (is_archived=false)
+    // Should be included in net worth calculations
+    let account = create_test_account_with_archive_state("closed_acc", "SECURITIES", "USD", false, false);
+    let asset = create_test_asset("AAPL", AssetKind::Security, "USD");
+    let position = create_test_position("closed_acc", "AAPL", dec!(100), dec!(15000), "USD");
+    let snapshot = create_test_snapshot("closed_acc", vec![position], HashMap::new());
+    let quote = create_test_quote(
+        "AAPL",
+        dec!(200),
+        NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+        "USD",
+    );
+
+    let service = create_net_worth_service(vec![account], vec![asset], vec![snapshot], vec![quote]);
+
+    let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
+    let result = service.get_net_worth(date).await.unwrap();
+
+    // Closed but non-archived account should be included
+    // 100 shares * $200 = $20,000
+    assert_eq!(result.net_worth, dec!(20000));
+    assert_eq!(result.assets.total, dec!(20000));
+}
+
+#[tokio::test]
+async fn test_archived_account_excluded_from_net_worth() {
+    // Account is archived (is_archived=true)
+    // Should be excluded from net worth calculations
+    let account = create_test_account_with_archive_state("archived_acc", "SECURITIES", "USD", true, true);
+    let asset = create_test_asset("AAPL", AssetKind::Security, "USD");
+    let position = create_test_position("archived_acc", "AAPL", dec!(100), dec!(15000), "USD");
+    let snapshot = create_test_snapshot("archived_acc", vec![position], HashMap::new());
+    let quote = create_test_quote(
+        "AAPL",
+        dec!(200),
+        NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+        "USD",
+    );
+
+    let service = create_net_worth_service(vec![account], vec![asset], vec![snapshot], vec![quote]);
+
+    let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
+    let result = service.get_net_worth(date).await.unwrap();
+
+    // Archived account should be excluded - net worth should be zero
+    assert_eq!(result.net_worth, Decimal::ZERO);
+    assert_eq!(result.assets.total, Decimal::ZERO);
+}
+
+#[tokio::test]
+async fn test_net_worth_with_mixed_account_states() {
+    // Setup:
+    //   - Account A: is_active=true, is_archived=false (active) - $10,000
+    //   - Account B: is_active=false, is_archived=false (closed but not archived) - $5,000
+    //   - Account C: is_active=true, is_archived=true (active but archived) - $15,000
+    //   - Account D: is_active=false, is_archived=true (closed and archived) - $20,000
+    // Expected: Only A ($10K) and B ($5K) contribute = $15K total
+
+    let acc_a = create_test_account_with_archive_state("acc_a", "SECURITIES", "USD", true, false);
+    let acc_b = create_test_account_with_archive_state("acc_b", "SECURITIES", "USD", false, false);
+    let acc_c = create_test_account_with_archive_state("acc_c", "SECURITIES", "USD", true, true);
+    let acc_d = create_test_account_with_archive_state("acc_d", "SECURITIES", "USD", false, true);
+
+    let asset_a = create_test_asset("ASSET_A", AssetKind::Security, "USD");
+    let asset_b = create_test_asset("ASSET_B", AssetKind::Security, "USD");
+    let asset_c = create_test_asset("ASSET_C", AssetKind::Security, "USD");
+    let asset_d = create_test_asset("ASSET_D", AssetKind::Security, "USD");
+
+    let pos_a = create_test_position("acc_a", "ASSET_A", dec!(100), dec!(10000), "USD");
+    let pos_b = create_test_position("acc_b", "ASSET_B", dec!(50), dec!(5000), "USD");
+    let pos_c = create_test_position("acc_c", "ASSET_C", dec!(150), dec!(15000), "USD");
+    let pos_d = create_test_position("acc_d", "ASSET_D", dec!(200), dec!(20000), "USD");
+
+    let snap_a = create_test_snapshot("acc_a", vec![pos_a], HashMap::new());
+    let snap_b = create_test_snapshot("acc_b", vec![pos_b], HashMap::new());
+    let snap_c = create_test_snapshot("acc_c", vec![pos_c], HashMap::new());
+    let snap_d = create_test_snapshot("acc_d", vec![pos_d], HashMap::new());
+
+    let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
+    let quote_a = create_test_quote("ASSET_A", dec!(100), date, "USD"); // $100 * 100 = $10K
+    let quote_b = create_test_quote("ASSET_B", dec!(100), date, "USD"); // $100 * 50 = $5K
+    let quote_c = create_test_quote("ASSET_C", dec!(100), date, "USD"); // $100 * 150 = $15K (excluded)
+    let quote_d = create_test_quote("ASSET_D", dec!(100), date, "USD"); // $100 * 200 = $20K (excluded)
+
+    let service = create_net_worth_service(
+        vec![acc_a, acc_b, acc_c, acc_d],
+        vec![asset_a, asset_b, asset_c, asset_d],
+        vec![snap_a, snap_b, snap_c, snap_d],
+        vec![quote_a, quote_b, quote_c, quote_d],
+    );
+
+    let result = service.get_net_worth(date).await.unwrap();
+
+    // Only non-archived accounts (A and B) should be included
+    // A: $10K + B: $5K = $15K total
+    assert_eq!(result.net_worth, dec!(15000));
+    assert_eq!(result.assets.total, dec!(15000));
+}
+
+#[tokio::test]
+async fn test_all_accounts_archived_returns_zero_net_worth() {
+    // All accounts are archived - net worth should be zero
+    let acc1 = create_test_account_with_archive_state("archived1", "SECURITIES", "USD", true, true);
+    let acc2 = create_test_account_with_archive_state("archived2", "SECURITIES", "USD", false, true);
+
+    let asset1 = create_test_asset("ASSET_1", AssetKind::Security, "USD");
+    let asset2 = create_test_asset("ASSET_2", AssetKind::Security, "USD");
+
+    let pos1 = create_test_position("archived1", "ASSET_1", dec!(100), dec!(10000), "USD");
+    let pos2 = create_test_position("archived2", "ASSET_2", dec!(200), dec!(20000), "USD");
+
+    let snap1 = create_test_snapshot("archived1", vec![pos1], HashMap::new());
+    let snap2 = create_test_snapshot("archived2", vec![pos2], HashMap::new());
+
+    let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
+    let quote1 = create_test_quote("ASSET_1", dec!(150), date, "USD");
+    let quote2 = create_test_quote("ASSET_2", dec!(150), date, "USD");
+
+    let service = create_net_worth_service(
+        vec![acc1, acc2],
+        vec![asset1, asset2],
+        vec![snap1, snap2],
+        vec![quote1, quote2],
+    );
+
+    let result = service.get_net_worth(date).await.unwrap();
+
+    // All accounts are archived - should return zero
+    assert_eq!(result.net_worth, Decimal::ZERO);
+    assert_eq!(result.assets.total, Decimal::ZERO);
+}
+
+#[tokio::test]
+async fn test_newly_created_account_has_default_archive_values_net_worth() {
+    // Verify default values for newly created accounts
+    let account = Account::default();
+    assert!(!account.is_archived, "New accounts should not be archived by default");
+
+    let account = create_test_account("new_acc", "SECURITIES", "USD");
+    assert!(!account.is_archived, "Test helper should create non-archived accounts");
+    assert!(account.is_active, "Test helper should create active accounts");
 }

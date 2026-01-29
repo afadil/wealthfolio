@@ -340,6 +340,7 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
                       }}
                       variant="form"
                       filterActive={true}
+                      trackingModes={["TRANSACTIONS"]}
                     />
                   </FormControl>
                   <FormMessage />

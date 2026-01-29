@@ -3,7 +3,7 @@
 use log::debug;
 use std::sync::{Arc, RwLock};
 
-use super::accounts_model::{get_tracking_mode, Account, AccountUpdate, NewAccount};
+use super::accounts_model::{Account, AccountUpdate, NewAccount};
 use super::accounts_traits::{AccountRepositoryTrait, AccountServiceTrait};
 use crate::errors::Result;
 use crate::events::{CurrencyChange, DomainEvent, DomainEventSink};
@@ -98,14 +98,12 @@ impl AccountServiceTrait for AccountService {
         ));
 
         // Detect tracking mode changes
-        let old_mode = get_tracking_mode(&existing);
-        let new_mode = get_tracking_mode(&result);
-        if old_mode != new_mode {
+        if existing.tracking_mode != result.tracking_mode {
             let is_connected = result.provider_account_id.is_some();
             self.event_sink.emit(DomainEvent::tracking_mode_changed(
                 result.id.clone(),
-                old_mode,
-                new_mode,
+                existing.tracking_mode,
+                result.tracking_mode,
                 is_connected,
             ));
         }
@@ -118,28 +116,40 @@ impl AccountServiceTrait for AccountService {
         self.repository.get_by_id(account_id)
     }
 
-    /// Lists all accounts with optional filtering by active status and account IDs.
+    /// Lists all accounts with optional filtering by active status, archived status, and account IDs.
     fn list_accounts(
         &self,
         is_active_filter: Option<bool>,
+        is_archived_filter: Option<bool>,
         account_ids: Option<&[String]>,
     ) -> Result<Vec<Account>> {
-        self.repository.list(is_active_filter, account_ids)
+        self.repository
+            .list(is_active_filter, is_archived_filter, account_ids)
     }
 
     /// Lists all accounts.
     fn get_all_accounts(&self) -> Result<Vec<Account>> {
-        self.repository.list(None, None)
+        self.repository.list(None, None, None)
     }
 
     /// Lists only active accounts.
     fn get_active_accounts(&self) -> Result<Vec<Account>> {
-        self.list_accounts(Some(true), None)
+        self.list_accounts(Some(true), None, None)
     }
 
     /// Retrieves multiple accounts by their IDs.
     fn get_accounts_by_ids(&self, account_ids: &[String]) -> Result<Vec<Account>> {
-        self.list_accounts(None, Some(account_ids))
+        self.list_accounts(None, None, Some(account_ids))
+    }
+
+    /// Returns all non-archived accounts (for aggregates/history)
+    fn get_non_archived_accounts(&self) -> Result<Vec<Account>> {
+        self.repository.list(None, Some(false), None)
+    }
+
+    /// Returns active, non-archived accounts (for UI selectors)
+    fn get_active_non_archived_accounts(&self) -> Result<Vec<Account>> {
+        self.repository.list(Some(true), Some(false), None)
     }
 
     /// Deletes an account by its ID.

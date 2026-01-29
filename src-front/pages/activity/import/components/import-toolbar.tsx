@@ -42,7 +42,7 @@ export function ImportToolbar({
   onSetAccount,
   onClearSelection,
 }: ImportToolbarProps) {
-  const { accounts } = useAccounts(true);
+  const { accounts } = useAccounts({ filterActive: true, includeArchived: false });
   const [currencySearch, setCurrencySearch] = useState("");
 
   // Prevent mousedown from bubbling to document, which would clear DataGrid selection
@@ -253,7 +253,7 @@ export function ImportContextMenu({
   onSetCurrency,
   onSetAccount,
 }: ImportContextMenuProps) {
-  const { accounts } = useAccounts(true);
+  const { accounts } = useAccounts({ filterActive: true, includeArchived: false });
 
   if (!open || selectedCount === 0) return null;
 

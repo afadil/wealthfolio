@@ -258,13 +258,11 @@ async fn run_portfolio_job(
 
     event_bus.publish(ServerEvent::new(PORTFOLIO_UPDATE_START));
 
-    let active_accounts = match deps
-        .account_service
-        .list_accounts(Some(true), config.account_ids.as_deref())
-    {
+    // For TOTAL portfolio calculation, use non-archived accounts (ignores is_active)
+    let accounts_for_total = match deps.account_service.get_non_archived_accounts() {
         Ok(accounts) => accounts,
         Err(err) => {
-            let err_msg = format!("Failed to list active accounts: {}", err);
+            let err_msg = format!("Failed to list non-archived accounts: {}", err);
             tracing::error!("{}", err_msg);
             event_bus.publish(ServerEvent::with_payload(
                 PORTFOLIO_UPDATE_ERROR,
@@ -274,7 +272,16 @@ async fn run_portfolio_job(
         }
     };
 
-    let mut account_ids: Vec<String> = active_accounts.into_iter().map(|a| a.id).collect();
+    // Determine which accounts to calculate individual snapshots for:
+    // - If specific account_ids provided: process those accounts (even if archived)
+    // - Otherwise: process all non-archived accounts
+    let mut account_ids: Vec<String> = if let Some(ref target_ids) = config.account_ids {
+        // Process the specific requested accounts (even if archived, for their own snapshots)
+        target_ids.clone()
+    } else {
+        // No specific accounts requested - use non-archived accounts
+        accounts_for_total.iter().map(|a| a.id.clone()).collect()
+    };
 
     if !account_ids.is_empty() {
         let ids_slice = account_ids.as_slice();

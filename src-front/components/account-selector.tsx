@@ -8,7 +8,7 @@ import {
   CommandList,
 } from "@wealthfolio/ui/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
-import { Account } from "@/lib/types";
+import { Account, TrackingMode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Icons, type Icon } from "@wealthfolio/ui";
 import { forwardRef, useState } from "react";
@@ -39,6 +39,8 @@ interface AccountSelectorProps {
   includePortfolio?: boolean;
   className?: string;
   iconOnly?: boolean;
+  /** Filter accounts by tracking mode(s). If provided, only accounts with matching tracking mode are shown. */
+  trackingModes?: TrackingMode[];
 }
 
 // Extended Account type for UI that can have the PORTFOLIO type
@@ -56,6 +58,8 @@ function createPortfolioAccount(baseCurrency: string): UIAccount {
     currency: baseCurrency,
     isDefault: false,
     isActive: true,
+    isArchived: false,
+    trackingMode: "NOT_SET",
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -112,17 +116,24 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
       includePortfolio = false,
       className,
       iconOnly = false,
+      trackingModes,
     },
     ref,
   ) => {
     const [open, setOpen] = useState(false);
-    const { accounts, isLoading: isLoadingAccounts } = useAccounts(filterActive);
+    const { accounts, isLoading: isLoadingAccounts } = useAccounts({
+      filterActive,
+      includeArchived: false,
+    });
     const { data: settings, isLoading: isLoadingSettings } = useSettings();
 
     const isLoading = isLoadingAccounts || isLoadingSettings;
 
-    // Add portfolio account if requested
-    const displayAccounts = [...accounts];
+    // Filter by tracking mode if specified, then add portfolio account if requested
+    const filteredAccounts = trackingModes
+      ? accounts.filter((acc) => trackingModes.includes(acc.trackingMode))
+      : accounts;
+    const displayAccounts = [...filteredAccounts];
 
     if (includePortfolio) {
       const baseCurrency = settings?.baseCurrency ?? "USD"; // Default to USD if settings not loaded

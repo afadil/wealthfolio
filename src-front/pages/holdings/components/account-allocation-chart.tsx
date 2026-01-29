@@ -25,21 +25,21 @@ export function AccountAllocationChart({
 }: AccountAllocationChartProps) {
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const { data: accounts, isLoading: isLoadingAccounts } = useQuery<Account[], Error>({
+  const { data: accounts = [], isLoading: isLoadingAccounts } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
-    queryFn: getAccounts,
+    queryFn: () => getAccounts(),
   });
 
   const { data: performanceData, isLoading: isLoadingPerformance } =
     useAccountsSimplePerformance(accounts);
 
   const data = useMemo(() => {
-    if (!accounts || !performanceData) return [];
+    if (!accounts || accounts.length === 0 || !performanceData) return [];
 
     const groupedData = new Map<string, { value: number; currency: string }>();
 
     performanceData.forEach((perf) => {
-      const account = accounts.find((acc) => acc.id === perf.accountId);
+      const account = accounts.find((acc: Account) => acc.id === perf.accountId);
       if (!account) return;
 
       const valueAcct = Number(perf.totalValue) || 0;
@@ -87,11 +87,11 @@ export function AccountAllocationChart({
     value: number;
     currency: string;
   }) => {
-    if (onAccountSectionClick && accounts) {
+    if (onAccountSectionClick && accounts && accounts.length > 0) {
       const groupOrAccountName = sectionData.name;
       const accountIdsInGroup = accounts
-        .filter((acc) => (acc.group || acc.name) === groupOrAccountName)
-        .map((acc) => acc.id);
+        .filter((acc: Account) => (acc.group || acc.name) === groupOrAccountName)
+        .map((acc: Account) => acc.id);
 
       if (accountIdsInGroup.length > 0) {
         onAccountSectionClick(groupOrAccountName, accountIdsInGroup);

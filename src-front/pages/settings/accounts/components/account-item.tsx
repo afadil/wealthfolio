@@ -25,9 +25,10 @@ export interface AccountItemProps {
   platform?: Platform | null;
   onEdit: (account: Account) => void;
   onDelete: (account: Account) => void;
+  onArchive: (account: Account, archive: boolean) => void;
 }
 
-export function AccountItem({ account, platform, onEdit, onDelete }: AccountItemProps) {
+export function AccountItem({ account, platform, onEdit, onDelete, onArchive }: AccountItemProps) {
   // Check if account is synced from broker (has provider_account_id set)
   const isSynced = !!account.providerAccountId;
   const IconComponent = accountTypeIcons[account.accountType] ?? Icons.Wallet;
@@ -71,8 +72,14 @@ export function AccountItem({ account, platform, onEdit, onDelete }: AccountItem
       </div>
       <div className="flex items-center space-x-4">
         <TrackingModeBadge account={account} />
+        {account.isArchived && <Badge variant="outline">Archived</Badge>}
         {!account.isActive && <Badge variant="secondary">Disabled</Badge>}
-        <AccountOperations account={account} onEdit={onEdit} onDelete={onDelete} />
+        <AccountOperations
+          account={account}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onArchive={onArchive}
+        />
       </div>
     </div>
   );

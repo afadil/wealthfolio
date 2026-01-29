@@ -81,8 +81,9 @@ pub trait SnapshotRepositoryTrait: Send + Sync {
         end_date: Option<NaiveDate>,
     ) -> Result<Vec<AccountStateSnapshot>>;
 
-    /// Get all active account snapshots.
-    fn get_all_active_account_snapshots(
+    /// Get all non-archived account snapshots.
+    /// Uses is_archived=false filtering to include closed accounts in TOTAL aggregates.
+    fn get_all_non_archived_account_snapshots(
         &self,
         start_date: Option<NaiveDate>,
         end_date: Option<NaiveDate>,

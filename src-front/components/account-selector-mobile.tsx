@@ -51,6 +51,8 @@ function createPortfolioAccount(baseCurrency: string): UIAccount {
     currency: baseCurrency,
     group: undefined,
     isActive: true,
+    isArchived: false,
+    trackingMode: "NOT_SET",
     isDefault: false,
     balance: 0,
     createdAt: new Date(),
@@ -74,7 +76,10 @@ export const AccountSelectorMobile = forwardRef<HTMLButtonElement, AccountSelect
     const open = controlledOpen ?? internalOpen;
     const setOpen = onOpenChange ?? setInternalOpen;
 
-    const { accounts, isLoading: isLoadingAccounts } = useAccounts(true);
+    const { accounts, isLoading: isLoadingAccounts } = useAccounts({
+      filterActive: true,
+      includeArchived: false,
+    });
     const { data: settings, isLoading: isLoadingSettings } = useSettings();
 
     const isLoading = isLoadingAccounts || isLoadingSettings;

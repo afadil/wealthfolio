@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -42,6 +42,8 @@ interface EditableHolding {
   quantity: string;
   averageCost: string;
   currency: string;
+  /** Exchange MIC code (e.g., "XNAS", "XTSE") for new holdings from search */
+  exchangeMic?: string;
   isNew?: boolean;
 }
 
@@ -70,10 +72,15 @@ export const HoldingsEditMode = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showAddHolding, setShowAddHolding] = useState(false);
+  const [isAddHoldingPickerOpen, setIsAddHoldingPickerOpen] = useState(false);
+  const holdingSharesInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const pendingHoldingSharesFocusAssetIdRef = useRef<string | null>(null);
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showAddCurrency, setShowAddCurrency] = useState(false);
-  const [newCurrency, setNewCurrency] = useState("");
+  const [isAddCurrencyPickerOpen, setIsAddCurrencyPickerOpen] = useState(false);
+  const cashAmountInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const pendingCashAmountFocusCurrencyRef = useRef<string | null>(null);
 
   // When editing an existing snapshot, the date is locked
   const isEditingExistingSnapshot = !!existingSnapshotDate;
@@ -211,24 +218,61 @@ export const HoldingsEditMode = ({
         quantity: "",
         averageCost: "",
         currency: searchResult.currency ?? account.currency,
+        exchangeMic: searchResult.exchangeMic,
         isNew: true,
       };
+      pendingHoldingSharesFocusAssetIdRef.current = assetId;
       setEditableHoldings((prev) => [...prev, newHolding]);
+      setIsAddHoldingPickerOpen(false);
       setShowAddHolding(false);
     },
     [editableHoldings, account.currency],
   );
 
-  const handleAddCashBalance = useCallback(() => {
-    if (!newCurrency) return;
-    if (cashBalances.some((c) => c.currency === newCurrency)) {
-      toast.error("This currency already exists");
-      return;
-    }
-    setCashBalances((prev) => [...prev, { currency: newCurrency, amount: "" }]);
-    setNewCurrency("");
-    setShowAddCurrency(false);
-  }, [cashBalances, newCurrency]);
+  useLayoutEffect(() => {
+    const assetId = pendingHoldingSharesFocusAssetIdRef.current;
+    if (!assetId) return;
+    const input = holdingSharesInputRefs.current[assetId];
+    if (!input) return;
+    pendingHoldingSharesFocusAssetIdRef.current = null;
+    input.focus();
+    input.select();
+  }, [editableHoldings]);
+
+  const openAddHolding = useCallback(() => {
+    setShowAddHolding(true);
+    setIsAddHoldingPickerOpen(true);
+  }, []);
+
+  useLayoutEffect(() => {
+    const currency = pendingCashAmountFocusCurrencyRef.current;
+    if (!currency) return;
+    const input = cashAmountInputRefs.current[currency];
+    if (!input) return;
+    pendingCashAmountFocusCurrencyRef.current = null;
+    input.focus();
+    input.select();
+  }, [cashBalances]);
+
+  const handleSelectCashCurrency = useCallback(
+    (currency: string) => {
+      if (!currency) return;
+      if (cashBalances.some((c) => c.currency === currency)) {
+        toast.error("This currency already exists");
+        return;
+      }
+      setCashBalances((prev) => [...prev, { currency, amount: "" }]);
+      pendingCashAmountFocusCurrencyRef.current = currency;
+      setIsAddCurrencyPickerOpen(false);
+      setShowAddCurrency(false);
+    },
+    [cashBalances],
+  );
+
+  const openAddCurrency = useCallback(() => {
+    setShowAddCurrency(true);
+    setIsAddCurrencyPickerOpen(true);
+  }, []);
 
   const handleRemoveCashBalance = useCallback((currency: string) => {
     setCashBalances((prev) => prev.filter((c) => c.currency !== currency));
@@ -240,10 +284,14 @@ export const HoldingsEditMode = ({
       const holdingsInput: HoldingInput[] = editableHoldings
         .filter((h) => h.quantity !== "" && parseFloat(h.quantity) !== 0)
         .map((h) => ({
-          assetId: h.assetId,
+          // For existing holdings, pass the known assetId to avoid regenerating IDs
+          // For new holdings (isNew), backend generates ID from symbol + exchangeMic
+          assetId: h.isNew ? undefined : h.assetId,
+          symbol: h.symbol,
           quantity: h.quantity,
           currency: h.currency,
           averageCost: h.averageCost || undefined,
+          exchangeMic: h.isNew ? h.exchangeMic : undefined,
         }));
       const cashBalancesInput: Record<string, string> = {};
       for (const cash of cashBalances) {
@@ -391,6 +439,9 @@ export const HoldingsEditMode = ({
                         {/* Shares */}
                         <div className="col-span-2">
                           <Input
+                            ref={(el) => {
+                              holdingSharesInputRefs.current[holding.assetId] = el;
+                            }}
                             type="text"
                             inputMode="decimal"
                             value={holding.quantity}
@@ -454,12 +505,21 @@ export const HoldingsEditMode = ({
                         onSelectResult={handleAddHolding}
                         placeholder="Search for symbol..."
                         defaultCurrency={account.currency}
+                        open={isAddHoldingPickerOpen}
+                        onOpenChange={(open) => {
+                          setIsAddHoldingPickerOpen(open);
+                          if (!open) setShowAddHolding(false);
+                        }}
+                        autoFocusSearch={true}
                       />
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setShowAddHolding(false)}
+                      onClick={() => {
+                        setIsAddHoldingPickerOpen(false);
+                        setShowAddHolding(false);
+                      }}
                       className="h-8"
                     >
                       Cancel
@@ -474,7 +534,7 @@ export const HoldingsEditMode = ({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => setShowAddHolding(true)}
+                  onClick={openAddHolding}
                   className="border-muted-foreground/25 text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground h-10 w-full border border-dashed"
                 >
                   <Icons.PlusCircle className="mr-2 h-4 w-4" />
@@ -518,9 +578,7 @@ export const HoldingsEditMode = ({
                       {/* Currency */}
                       <div className="col-span-6">
                         <div className="flex items-center gap-2">
-                          <div className="bg-muted flex h-7 w-7 items-center justify-center rounded-full">
-                            <Icons.DollarSign className="h-3.5 w-3.5" />
-                          </div>
+                          <TickerAvatar symbol="$CASH" className="size-7" />
                           <span className="text-sm font-medium">{cash.currency}</span>
                         </div>
                       </div>
@@ -528,6 +586,9 @@ export const HoldingsEditMode = ({
                       {/* Amount */}
                       <div className="col-span-5">
                         <Input
+                          ref={(el) => {
+                            cashAmountInputRefs.current[cash.currency] = el;
+                          }}
                           type="text"
                           inputMode="decimal"
                           value={cash.amount}
@@ -558,26 +619,23 @@ export const HoldingsEditMode = ({
                   <div className="flex items-center gap-2 py-2">
                     <div className="w-[160px]">
                       <CurrencyInput
-                        value={newCurrency}
-                        onChange={setNewCurrency}
                         placeholder="Select currency"
+                        valueDisplay="code"
+                        autoFocusSearch={true}
+                        open={isAddCurrencyPickerOpen}
+                        onOpenChange={(open) => {
+                          setIsAddCurrencyPickerOpen(open);
+                          if (!open) setShowAddCurrency(false);
+                        }}
+                        onChange={handleSelectCashCurrency}
                       />
                     </div>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={handleAddCashBalance}
-                      disabled={!newCurrency}
-                      className="h-8"
-                    >
-                      Add
-                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => {
+                        setIsAddCurrencyPickerOpen(false);
                         setShowAddCurrency(false);
-                        setNewCurrency("");
                       }}
                       className="h-8"
                     >
@@ -593,7 +651,7 @@ export const HoldingsEditMode = ({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => setShowAddCurrency(true)}
+                  onClick={openAddCurrency}
                   className="border-muted-foreground/25 text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground h-10 w-full border border-dashed"
                 >
                   <Icons.PlusCircle className="mr-2 h-4 w-4" />

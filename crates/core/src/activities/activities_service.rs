@@ -406,9 +406,10 @@ impl ActivityService {
             }
 
             // Register FX pair for activity currency if different from account currency
+            // Creates FX:activity_currency:account_currency for converting foreign values to account currency
             if activity.currency != account.currency {
                 self.fx_service
-                    .register_currency_pair(account.currency.as_str(), activity.currency.as_str())
+                    .register_currency_pair(activity.currency.as_str(), account.currency.as_str())
                     .await?;
             }
 
@@ -417,7 +418,7 @@ impl ActivityService {
             // (e.g., asset is EUR but activity was recorded in account's USD)
             if asset.currency != account.currency && asset.currency != activity.currency {
                 self.fx_service
-                    .register_currency_pair(account.currency.as_str(), asset.currency.as_str())
+                    .register_currency_pair(asset.currency.as_str(), account.currency.as_str())
                     .await?;
             }
         } else {
@@ -428,7 +429,7 @@ impl ActivityService {
 
             if activity.currency != account.currency {
                 self.fx_service
-                    .register_currency_pair(account.currency.as_str(), activity.currency.as_str())
+                    .register_currency_pair(activity.currency.as_str(), account.currency.as_str())
                     .await?;
             }
         }
@@ -557,9 +558,10 @@ impl ActivityService {
             }
 
             // Register FX pair for activity currency if different from account currency
+            // Creates FX:activity_currency:account_currency for converting foreign values to account currency
             if activity.currency != account.currency {
                 self.fx_service
-                    .register_currency_pair(account.currency.as_str(), activity.currency.as_str())
+                    .register_currency_pair(activity.currency.as_str(), account.currency.as_str())
                     .await?;
             }
 
@@ -568,7 +570,7 @@ impl ActivityService {
             // (e.g., asset is EUR but activity was recorded in account's USD)
             if asset.currency != account.currency && asset.currency != activity.currency {
                 self.fx_service
-                    .register_currency_pair(account.currency.as_str(), asset.currency.as_str())
+                    .register_currency_pair(asset.currency.as_str(), account.currency.as_str())
                     .await?;
             }
         } else {
@@ -579,7 +581,7 @@ impl ActivityService {
 
             if activity.currency != account.currency {
                 self.fx_service
-                    .register_currency_pair(account.currency.as_str(), activity.currency.as_str())
+                    .register_currency_pair(activity.currency.as_str(), account.currency.as_str())
                     .await?;
             }
         }
@@ -1077,8 +1079,8 @@ impl ActivityServiceTrait for ActivityService {
                             match self
                                 .fx_service
                                 .register_currency_pair(
-                                    account.currency.as_str(),
-                                    activity.currency.as_str(), // Use currency from import data
+                                    activity.currency.as_str(), // Foreign currency (from import data)
+                                    account.currency.as_str(),  // Target currency (account currency)
                                 )
                                 .await
                             {

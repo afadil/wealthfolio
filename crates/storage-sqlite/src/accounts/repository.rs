@@ -54,6 +54,10 @@ impl AccountRepositoryTrait for AccountRepository {
     async fn update(&self, account_update: AccountUpdate) -> Result<Account> {
         account_update.validate()?;
 
+        // Capture which optional fields were explicitly set before conversion
+        let is_archived_provided = account_update.is_archived.is_some();
+        let tracking_mode_provided = account_update.tracking_mode.is_some();
+
         self.writer
             .exec(move |conn| {
                 let mut account_db: AccountDB = account_update.into();
@@ -64,9 +68,18 @@ impl AccountRepositoryTrait for AccountRepository {
                     .first::<AccountDB>(conn)
                     .map_err(StorageError::from)?;
 
+                // Preserve fields that shouldn't change
                 account_db.currency = existing.currency;
                 account_db.created_at = existing.created_at;
                 account_db.updated_at = chrono::Utc::now().naive_utc();
+
+                // Preserve is_archived and tracking_mode if not explicitly provided
+                if !is_archived_provided {
+                    account_db.is_archived = existing.is_archived;
+                }
+                if !tracking_mode_provided {
+                    account_db.tracking_mode = existing.tracking_mode;
+                }
 
                 diesel::update(accounts.find(&account_db.id))
                     .set(&account_db)
@@ -91,10 +104,11 @@ impl AccountRepositoryTrait for AccountRepository {
         Ok(account.into())
     }
 
-    /// Lists accounts in the database, optionally filtering by active status and account IDs
+    /// Lists accounts in the database, optionally filtering by active status, archived status, and account IDs
     fn list(
         &self,
         is_active_filter: Option<bool>,
+        is_archived_filter: Option<bool>,
         account_ids: Option<&[String]>,
     ) -> Result<Vec<Account>> {
         let mut conn = get_connection(&self.pool)?;
@@ -105,13 +119,17 @@ impl AccountRepositoryTrait for AccountRepository {
             query = query.filter(is_active.eq(active));
         }
 
+        if let Some(archived) = is_archived_filter {
+            query = query.filter(is_archived.eq(archived));
+        }
+
         if let Some(ids) = account_ids {
             query = query.filter(id.eq_any(ids));
         }
 
         let results = query
             .select(AccountDB::as_select())
-            .order((is_active.desc(), name.asc()))
+            .order((is_active.desc(), is_archived.asc(), name.asc()))
             .load::<AccountDB>(&mut conn)
             .map_err(StorageError::from)?;
 

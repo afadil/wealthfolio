@@ -1,87 +1,88 @@
 import type { Account } from "@/lib/types";
-import { getTrackingMode } from "@/lib/types";
 import { ActivityType, ACTIVITY_TYPES } from "@/lib/constants";
 
 /**
- * Activity types allowed for manual HOLDINGS tracking mode accounts.
- * These are cash-only activities that don't affect positions directly.
+ * Picker-friendly activity type that maps TRANSFER_IN/OUT to a single TRANSFER option.
+ * Used by ActivityTypePicker component.
  */
-const HOLDINGS_MODE_ACTIVITY_TYPES: ActivityType[] = [
+const PICKER_TRANSFER_TYPE = "TRANSFER";
+
+/**
+ * All activity types in picker-compatible format.
+ * Includes TRANSFER as UI alias for TRANSFER_IN/TRANSFER_OUT.
+ */
+const ALL_PICKER_TYPES: readonly string[] = [...ACTIVITY_TYPES, PICKER_TRANSFER_TYPE];
+
+/**
+ * Activity types allowed for manual HOLDINGS tracking mode accounts.
+ * These are income/cash activities that don't affect positions directly.
+ */
+const HOLDINGS_MODE_ALLOWED_TYPES: readonly string[] = [
   ActivityType.DEPOSIT,
   ActivityType.WITHDRAWAL,
   ActivityType.FEE,
   ActivityType.TAX,
   ActivityType.INTEREST,
+  ActivityType.DIVIDEND, // Income activity - doesn't change positions
 ];
 
 /**
  * Returns the list of activity types allowed for manual entry on the given account.
+ * Returns picker-compatible types (includes "TRANSFER" alias).
  *
- * - TRANSACTIONS mode: all activity types
- * - HOLDINGS mode (manual): only cash activities (DEPOSIT, WITHDRAWAL, FEE, TAX, INTEREST)
- * - HOLDINGS mode (connected): no manual entry allowed (empty array)
+ * - No account selected: all types
+ * - TRANSACTIONS mode: all types
+ * - HOLDINGS mode (manual): income/cash activities only
+ * - HOLDINGS mode (connected): none (sync-only)
  */
-export function getAllowedActivityTypes(account: Account | undefined): ActivityType[] {
+export function getAllowedActivityTypes(account: Account | undefined): readonly string[] {
   if (!account) {
-    // No account selected - return all types
-    return [...ACTIVITY_TYPES] as ActivityType[];
+    return ALL_PICKER_TYPES;
   }
 
-  const trackingMode = getTrackingMode(account);
+  const { trackingMode, providerAccountId } = account;
 
-  // TRANSACTIONS mode or NOT_SET (defaults to TRANSACTIONS) - all types allowed
-  if (trackingMode === "TRANSACTIONS" || trackingMode === "NOT_SET") {
-    return [...ACTIVITY_TYPES] as ActivityType[];
-  }
-
-  // HOLDINGS mode
   if (trackingMode === "HOLDINGS") {
-    // Connected account - no manual entry
-    if (account.providerAccountId) {
+    // Connected accounts are sync-only
+    if (providerAccountId) {
       return [];
     }
-    // Manual HOLDINGS - only cash activities
-    return HOLDINGS_MODE_ACTIVITY_TYPES;
+    return HOLDINGS_MODE_ALLOWED_TYPES;
   }
 
-  return [...ACTIVITY_TYPES] as ActivityType[];
+  // TRANSACTIONS or NOT_SET - all types allowed
+  return ALL_PICKER_TYPES;
+}
+
+/**
+ * Returns true if the account supports the given activity type.
+ */
+export function accountSupportsActivityType(account: Account, activityType: string): boolean {
+  return getAllowedActivityTypes(account).includes(activityType);
 }
 
 /**
  * Returns true if the account supports adding holdings directly.
- * This is only true for manual HOLDINGS tracking mode accounts.
+ * Only true for manual HOLDINGS tracking mode accounts.
  */
 export function canAddHoldings(account: Account | undefined): boolean {
   if (!account) {
     return false;
   }
-
-  const trackingMode = getTrackingMode(account);
-  return trackingMode === "HOLDINGS" && !account.providerAccountId;
+  return account.trackingMode === "HOLDINGS" && !account.providerAccountId;
 }
 
 /**
  * Returns true if CSV import is allowed for the given account.
- * CSV import is disabled for connected HOLDINGS accounts.
+ * Disabled for connected HOLDINGS accounts.
  */
 export function canImportCSV(account: Account | undefined): boolean {
   if (!account) {
     return true;
   }
-
-  const trackingMode = getTrackingMode(account);
-
-  // Connected HOLDINGS accounts don't support CSV import
-  if (trackingMode === "HOLDINGS" && account.providerAccountId) {
-    return false;
-  }
-
-  return true;
+  return !(account.trackingMode === "HOLDINGS" && account.providerAccountId);
 }
 
-/**
- * Describes the restriction level for an account's activity entry.
- */
 export type ActivityRestrictionLevel = "none" | "limited" | "blocked";
 
 /**
@@ -94,13 +95,8 @@ export function getActivityRestrictionLevel(
     return "none";
   }
 
-  const trackingMode = getTrackingMode(account);
-
-  if (trackingMode === "HOLDINGS") {
-    if (account.providerAccountId) {
-      return "blocked"; // Connected HOLDINGS - no manual entry
-    }
-    return "limited"; // Manual HOLDINGS - only cash activities
+  if (account.trackingMode === "HOLDINGS") {
+    return account.providerAccountId ? "blocked" : "limited";
   }
 
   return "none";

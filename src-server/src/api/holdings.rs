@@ -11,7 +11,7 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use wealthfolio_core::{
     accounts::AccountServiceTrait,
-    assets::{canonical_asset_id, AssetKind},
+    assets::security_id_from_symbol_with_mic,
     portfolio::{
         allocation::PortfolioAllocations,
         holdings::Holding,
@@ -474,10 +474,15 @@ async fn delete_snapshot_handler(
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HoldingInput {
-    pub asset_id: String,
+    /// For existing holdings, pass the known asset ID directly (preferred)
+    pub asset_id: Option<String>,
+    /// Symbol (e.g., "AAPL", "META.TO") - used when asset_id is not provided
+    pub symbol: String,
     pub quantity: String,
     pub currency: String,
     pub average_cost: Option<String>,
+    /// Exchange MIC code for new holdings (e.g., "XNAS", "XTSE"). Used when asset_id is not provided.
+    pub exchange_mic: Option<String>,
 }
 
 /// Request body for saving manual holdings
@@ -520,18 +525,28 @@ async fn save_manual_holdings_handler(
         let quantity = holding
             .quantity
             .parse::<Decimal>()
-            .map_err(|e| anyhow::anyhow!("Invalid quantity for {}: {}", holding.asset_id, e))?;
+            .map_err(|e| anyhow::anyhow!("Invalid quantity for {}: {}", holding.symbol, e))?;
 
         // Skip zero-quantity positions
         if quantity.is_zero() {
             continue;
         }
 
+        // Use provided asset_id for existing holdings, or generate for new holdings
+        let asset_id = match &holding.asset_id {
+            Some(id) => id.clone(),
+            None => security_id_from_symbol_with_mic(
+                &holding.symbol,
+                holding.exchange_mic.as_deref(),
+                &holding.currency,
+            ),
+        };
+
         // Ensure the asset exists in the database
         let asset = state
             .asset_service
             .get_or_create_minimal_asset(
-                &holding.asset_id,
+                &asset_id,
                 Some(holding.currency.clone()),
                 None,
                 None,
@@ -539,25 +554,27 @@ async fn save_manual_holdings_handler(
             .await?;
 
         // Register FX pair for holding currency if different from account currency
+        // Creates FX:holding_currency:account_currency for converting foreign values
         if holding.currency != account.currency {
             state
                 .fx_service
-                .register_currency_pair(&account.currency, &holding.currency)
+                .register_currency_pair(&holding.currency, &account.currency)
                 .await?;
         }
 
         // Register FX pair for asset currency if different
+        // Creates FX:asset_currency:account_currency for converting asset values
         if asset.currency != account.currency && asset.currency != holding.currency {
             state
                 .fx_service
-                .register_currency_pair(&account.currency, &asset.currency)
+                .register_currency_pair(&asset.currency, &account.currency)
                 .await?;
         }
 
         // Parse average cost if provided
         let average_cost = match &holding.average_cost {
             Some(cost_str) if !cost_str.is_empty() => cost_str.parse::<Decimal>().map_err(|e| {
-                anyhow::anyhow!("Invalid average cost for {}: {}", holding.asset_id, e)
+                anyhow::anyhow!("Invalid average cost for {}: {}", holding.symbol, e)
             })?,
             _ => Decimal::ZERO,
         };
@@ -590,10 +607,11 @@ async fn save_manual_holdings_handler(
             .map_err(|e| anyhow::anyhow!("Invalid cash amount for {}: {}", currency, e))?;
         if !amount.is_zero() {
             // Register FX pair for cash currency if different from account currency
+            // Creates FX:cash_currency:account_currency for converting foreign cash
             if currency != account.currency {
                 state
                     .fx_service
-                    .register_currency_pair(&account.currency, &currency)
+                    .register_currency_pair(&currency, &account.currency)
                     .await?;
             }
             parsed_cash_balances.insert(currency, amount);
@@ -601,10 +619,11 @@ async fn save_manual_holdings_handler(
     }
 
     // Register FX pair from account currency to base currency if different
+    // Creates FX:account_currency:base_currency for converting account values to base
     if account.currency != base_currency {
         state
             .fx_service
-            .register_currency_pair(&base_currency, &account.currency)
+            .register_currency_pair(&account.currency, &base_currency)
             .await?;
     }
 
@@ -741,10 +760,11 @@ async fn import_holdings_csv_handler(
     let base_currency = state.base_currency.read().unwrap().clone();
 
     // Register FX pair from account currency to base currency if different
+    // Creates FX:account_currency:base_currency for converting account values to base
     if account.currency != base_currency {
         state
             .fx_service
-            .register_currency_pair(&base_currency, &account.currency)
+            .register_currency_pair(&account.currency, &base_currency)
             .await?;
     }
 
@@ -851,13 +871,10 @@ async fn import_single_snapshot_impl(
             continue;
         }
 
-        // Create a canonical asset ID from the symbol
-        let asset_id = canonical_asset_id(
-            &AssetKind::Security,
-            &pos_input.symbol,
-            None, // No exchange MIC - will generate SEC:{symbol}:UNKNOWN
-            &pos_input.currency,
-        );
+        // Generate canonical asset ID from symbol (handles Yahoo suffixes like .TO, .L, etc.)
+        // e.g., "META.TO" → "SEC:META:XTSE", "AAPL" → "SEC:AAPL:UNKNOWN"
+        // CSV imports don't have explicit exchange_mic, so we rely on suffix extraction
+        let asset_id = security_id_from_symbol_with_mic(&pos_input.symbol, None, &pos_input.currency);
 
         // Ensure the asset exists in the database
         let asset = state
@@ -866,18 +883,20 @@ async fn import_single_snapshot_impl(
             .await?;
 
         // Register FX pair for position currency if different from account currency
+        // Creates FX:position_currency:account_currency for converting foreign values
         if pos_input.currency != account_currency {
             state
                 .fx_service
-                .register_currency_pair(account_currency, &pos_input.currency)
+                .register_currency_pair(&pos_input.currency, account_currency)
                 .await?;
         }
 
         // Register FX pair for asset currency if different
+        // Creates FX:asset_currency:account_currency for converting asset values
         if asset.currency != account_currency && asset.currency != pos_input.currency {
             state
                 .fx_service
-                .register_currency_pair(account_currency, &asset.currency)
+                .register_currency_pair(&asset.currency, account_currency)
                 .await?;
         }
 
@@ -917,10 +936,11 @@ async fn import_single_snapshot_impl(
             .map_err(|e| anyhow::anyhow!("Invalid cash amount for {}: {}", currency, e))?;
         if !amount.is_zero() {
             // Register FX pair for cash currency if different from account currency
+            // Creates FX:cash_currency:account_currency for converting foreign cash
             if currency != account_currency {
                 state
                     .fx_service
-                    .register_currency_pair(account_currency, currency)
+                    .register_currency_pair(currency, account_currency)
                     .await?;
             }
             parsed_cash_balances.insert(currency.clone(), amount);

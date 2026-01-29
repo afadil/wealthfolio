@@ -86,11 +86,10 @@ export function MappingStepUnified() {
   const { headers, parsedRows, mapping, accountId } = state;
 
   // Fetch accounts
-  const { data: accountsData } = useQuery<Account[], Error>({
+  const { data: accounts = [] } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
-    queryFn: getAccounts,
+    queryFn: () => getAccounts(),
   });
-  const accounts = accountsData ?? [];
 
   // Convert string[][] to CsvRowData[]
   const data: CsvRowData[] = useMemo(() => {

@@ -49,7 +49,6 @@ import {
   Account,
   AccountValuation,
   DateRange,
-  getTrackingMode,
   Holding,
   SnapshotInfo,
   TimePeriod,
@@ -128,7 +127,7 @@ const AccountPage = () => {
   // Check if this account is in HOLDINGS tracking mode
   const isHoldingsMode = useMemo(() => {
     if (!account) return false;
-    return getTrackingMode(account) === "HOLDINGS";
+    return account.trackingMode === "HOLDINGS";
   }, [account]);
 
   // Check if user can directly edit holdings (manual HOLDINGS-mode accounts only)
@@ -399,7 +398,7 @@ const AccountPage = () => {
           {/* Tracking mode avatar */}
           {account && (
             <div className="bg-primary/10 dark:bg-primary/20 flex size-9 shrink-0 items-center justify-center rounded-full">
-              {getTrackingMode(account) === "HOLDINGS" ? (
+              {account.trackingMode === "HOLDINGS" ? (
                 <Icons.Holdings className="text-primary h-5 w-5" />
               ) : (
                 <Icons.Activity className="text-primary h-5 w-5" />

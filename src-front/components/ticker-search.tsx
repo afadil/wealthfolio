@@ -14,6 +14,7 @@ import { SymbolSearchResult } from "@/lib/types";
 import { getExchangeDisplayName } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
+import { useComposedRefs } from "@wealthfolio/ui/hooks";
 import { Command as CommandPrimitive } from "cmdk";
 import { debounce } from "lodash";
 import { forwardRef, memo, useCallback, useMemo, useRef, useState } from "react";
@@ -25,6 +26,12 @@ interface SearchProps {
   value?: string;
   placeholder?: string;
   onSelectResult: (symbol: string, searchResult?: SymbolSearchResult) => void;
+  /** Controlled open state (optional). */
+  open?: boolean;
+  /** Controlled open change handler (optional). */
+  onOpenChange?: (open: boolean) => void;
+  /** When true, focuses the search input when the popover opens. */
+  autoFocusSearch?: boolean;
   className?: string;
   /** Default currency to use for custom assets (typically from account) */
   defaultCurrency?: string;
@@ -123,6 +130,37 @@ const SearchResults = memo(
 
 SearchResults.displayName = "SearchResults";
 
+function isElementVisible(element: HTMLElement) {
+  return !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+}
+
+function getFocusableElementsInDocument(doc: Document) {
+  const selector = [
+    "a[href]",
+    "button:not([disabled])",
+    "input:not([disabled]):not([type='hidden'])",
+    "select:not([disabled])",
+    "textarea:not([disabled])",
+    "[tabindex]:not([tabindex='-1'])",
+  ].join(",");
+
+  return Array.from(doc.querySelectorAll<HTMLElement>(selector)).filter((element) => {
+    if (element.getAttribute("aria-hidden") === "true") return false;
+    if (!isElementVisible(element)) return false;
+    return true;
+  });
+}
+
+function focusRelativeTo(anchor: HTMLElement, direction: "next" | "prev") {
+  const doc = anchor.ownerDocument;
+  const focusables = getFocusableElementsInDocument(doc);
+  const anchorIndex = focusables.indexOf(anchor);
+  if (anchorIndex < 0) return;
+
+  const offset = direction === "next" ? 1 : -1;
+  focusables[anchorIndex + offset]?.focus();
+}
+
 const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
   (
     {
@@ -131,12 +169,17 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       value,
       placeholder = "Select symbol...",
       onSelectResult,
+      open: openProp,
+      onOpenChange,
+      autoFocusSearch = false,
       className,
       defaultCurrency,
     },
     ref,
   ) => {
-    const [open, setOpen] = useState(false);
+    const isControlled = openProp !== undefined;
+    const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+    const open = isControlled ? openProp : uncontrolledOpen;
     const [customAssetDialogOpen, setCustomAssetDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState(defaultValue ?? value ?? "");
     const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -157,6 +200,9 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       return "";
     });
     const inputRef = useRef<HTMLInputElement>(null);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const closeFocusIntentRef = useRef<null | "next" | "prev">(null);
+    const composedTriggerRef = useComposedRefs(ref, triggerRef);
 
     // Create debounced search function
     const debouncedSearch = useMemo(
@@ -185,17 +231,26 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
         const displayText = ticker ? `${ticker.symbol} - ${ticker.longName}${exchangeSuffix}` : "";
         setSearchQuery(displayText);
         setSelected(displayText);
-        setOpen(false);
+        if (isControlled) {
+          onOpenChange?.(false);
+        } else {
+          setUncontrolledOpen(false);
+        }
         debouncedSearch.cancel(); // Cancel pending debounced calls
       },
-      [onSelectResult, debouncedSearch],
+      [onSelectResult, debouncedSearch, isControlled, onOpenChange],
     );
 
     // Handle "Create custom asset" click
     const handleCreateCustomAsset = useCallback(() => {
-      setOpen(false); // Close the popover
+      if (isControlled) {
+        onOpenChange?.(false);
+      } else {
+        setUncontrolledOpen(false);
+      }
+      debouncedSearch.cancel(); // Cancel pending debounced calls
       setCustomAssetDialogOpen(true); // Open the custom asset dialog
-    }, []);
+    }, [debouncedSearch, isControlled, onOpenChange]);
 
     // Handle custom asset created from dialog
     const handleCustomAssetCreated = useCallback(
@@ -227,25 +282,50 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
     // Handle popover open
     const handleOpenChange = useCallback(
       (newOpen: boolean) => {
-        setOpen(newOpen);
+        if (isControlled) {
+          onOpenChange?.(newOpen);
+        } else {
+          setUncontrolledOpen(newOpen);
+        }
         if (!newOpen) {
           debouncedSearch.cancel(); // Cancel pending searches when closing
         }
       },
-      [debouncedSearch],
+      [debouncedSearch, isControlled, onOpenChange],
     );
 
     // Handle focus events
-    const handleOpenAutoFocus = useCallback((e: Event) => {
-      e.preventDefault();
-      // Use requestAnimationFrame for smoother focus
-      requestAnimationFrame(() => {
+    const handleOpenAutoFocus = useCallback(
+      (e: Event) => {
+        if (!autoFocusSearch) return;
+        e.preventDefault();
         inputRef.current?.focus();
-      });
-    }, []);
+      },
+      [autoFocusSearch],
+    );
+
+    const handleInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key !== "Tab") return;
+      closeFocusIntentRef.current = e.shiftKey ? "prev" : "next";
+      e.preventDefault();
+      if (isControlled) {
+        onOpenChange?.(false);
+      } else {
+        setUncontrolledOpen(false);
+      }
+    }, [isControlled, onOpenChange]);
 
     const handleCloseAutoFocus = useCallback((e: Event) => {
+      const intent = closeFocusIntentRef.current;
+      closeFocusIntentRef.current = null;
+      if (!intent) return;
+
       e.preventDefault();
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+      requestAnimationFrame(() => {
+        focusRelativeTo(trigger, intent);
+      });
     }, []);
 
     return (
@@ -260,7 +340,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
                 open && "ring-ring ring-2",
                 className,
               )}
-              ref={ref}
+              ref={composedTriggerRef}
               aria-expanded={open}
               aria-haspopup="listbox"
             >
@@ -279,9 +359,11 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
             <Command shouldFilter={false} className="border-none">
               <CommandInput
                 ref={inputRef}
+                autoFocus={autoFocusSearch}
                 value={searchQuery}
                 onValueChange={handleSearchChange}
                 placeholder="Search for symbol"
+                onKeyDown={handleInputKeyDown}
               />
 
               <SearchResults

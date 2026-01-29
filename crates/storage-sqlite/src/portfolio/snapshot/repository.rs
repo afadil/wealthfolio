@@ -454,7 +454,7 @@ impl SnapshotRepository {
         self.get_snapshots_by_account(PORTFOLIO_TOTAL_ACCOUNT_ID, start_date_opt, end_date_opt)
     }
 
-    pub fn get_all_active_account_snapshots(
+    pub fn get_all_non_archived_account_snapshots(
         &self,
         start_date_opt: Option<NaiveDate>,
         end_date_opt: Option<NaiveDate>,
@@ -462,18 +462,19 @@ impl SnapshotRepository {
         use crate::schema::accounts::dsl as accounts_dsl;
         use crate::schema::holdings_snapshots::dsl::*;
         let mut conn = get_connection(&self.pool)?;
-        let active_account_ids: Vec<String> = accounts_dsl::accounts
-            .filter(accounts_dsl::is_active.eq(true))
+        // Use is_archived=false instead of is_active=true to include closed accounts in TOTAL
+        let non_archived_account_ids: Vec<String> = accounts_dsl::accounts
+            .filter(accounts_dsl::is_archived.eq(false))
             .select(accounts_dsl::id)
             .load::<String>(&mut conn)
             .map_err(StorageError::from)?;
-        if active_account_ids.is_empty() {
+        if non_archived_account_ids.is_empty() {
             return Ok(Vec::new());
         }
         let mut query = holdings_snapshots
             .into_boxed()
             .filter(account_id.ne("TOTAL"))
-            .filter(account_id.eq_any(active_account_ids));
+            .filter(account_id.eq_any(non_archived_account_ids));
         if let Some(start) = start_date_opt {
             query = query.filter(snapshot_date.ge(start.format("%Y-%m-%d").to_string()));
         }
@@ -847,12 +848,12 @@ impl SnapshotRepositoryTrait for SnapshotRepository {
         self.get_total_portfolio_snapshots(start_date, end_date)
     }
 
-    fn get_all_active_account_snapshots(
+    fn get_all_non_archived_account_snapshots(
         &self,
         start_date: Option<NaiveDate>,
         end_date: Option<NaiveDate>,
     ) -> Result<Vec<AccountStateSnapshot>> {
-        self.get_all_active_account_snapshots(start_date, end_date)
+        self.get_all_non_archived_account_snapshots(start_date, end_date)
     }
 
     fn get_earliest_snapshot_date(&self, account_id_param: &str) -> Result<Option<NaiveDate>> {

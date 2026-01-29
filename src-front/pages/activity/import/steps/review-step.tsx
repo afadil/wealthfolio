@@ -298,8 +298,8 @@ function validateDraft(draft: Partial<DraftActivity>): {
     if (!draft.symbol) {
       errors.symbol = ["Symbol is required for split activities"];
     }
-    if (draft.quantity === undefined) {
-      errors.quantity = ["Quantity (split ratio) is required for split activities"];
+    if (draft.amount === undefined) {
+      errors.amount = ["Amount (split ratio) is required for split activities"];
     }
   }
 

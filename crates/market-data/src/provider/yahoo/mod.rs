@@ -416,13 +416,6 @@ impl YahooProvider {
                 message: format!("Failed to read profile response: {}", e),
             })?;
 
-        // Log first 500 chars of response for debugging
-        debug!(
-            "[YAHOO QUOTE_SUMMARY RAW] symbol={}, response_preview={}",
-            symbol,
-            &response_text[..response_text.len().min(500)]
-        );
-
         let data: YahooQuoteSummaryResponse =
             serde_json::from_str(&response_text).map_err(|e| {
                 warn!(

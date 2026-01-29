@@ -1,6 +1,5 @@
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import type { Account } from "@/lib/types";
-import { getTrackingMode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export interface TrackingModeBadgeProps {
@@ -31,9 +30,7 @@ export function TrackingModeBadge({ account, syncEnabled, className }: TrackingM
     );
   }
 
-  const trackingMode = getTrackingMode(account);
-
-  switch (trackingMode) {
+  switch (account.trackingMode) {
     case "TRANSACTIONS":
       return (
         <Badge variant="secondary" className={cn("rounded-sm", className)}>

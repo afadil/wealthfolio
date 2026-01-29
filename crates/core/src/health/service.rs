@@ -301,9 +301,7 @@ impl HealthService {
         // Gather accounts without tracking mode set
         let unconfigured_accounts: Vec<UnconfiguredAccountInfo> = accounts
             .iter()
-            .filter(|acc| {
-                crate::accounts::get_tracking_mode(acc) == crate::accounts::TrackingMode::NotSet
-            })
+            .filter(|acc| acc.tracking_mode == crate::accounts::TrackingMode::NotSet)
             .map(|acc| UnconfiguredAccountInfo {
                 account_id: acc.id.clone(),
                 account_name: acc.name.clone(),
