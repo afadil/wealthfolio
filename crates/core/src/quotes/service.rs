@@ -1427,20 +1427,6 @@ fn fill_missing_quotes(
                 quote_for_today.timestamp =
                     Utc.from_utc_datetime(&current_date.and_hms_opt(12, 0, 0).unwrap());
                 all_filled_quotes.push(quote_for_today);
-            } else {
-                // Only log debug message if we're past the symbol's first appearance date
-                // This avoids noisy logs for assets added to portfolio later
-                let should_log = first_appearance
-                    .get(symbol)
-                    .map(|first_date| current_date >= *first_date)
-                    .unwrap_or(true); // Log if no first_appearance info provided
-
-                if should_log {
-                    debug!(
-                        "No quote available for symbol '{}' on or before date {}",
-                        symbol, current_date
-                    );
-                }
             }
         }
     }

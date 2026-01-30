@@ -41,7 +41,7 @@ const ActivityManagerPage = () => {
   // Parse URL parameters
   const typeParam = searchParams.get("type") as ActivityType | null;
   const accountParam = searchParams.get("account");
-  const symbolParam = searchParams.get("symbol");
+  const assetIdParam = searchParams.get("assetId");
   const redirectTo = searchParams.get("redirect-to");
 
   const { data: accounts = [] } = useQuery<Account[], Error>({
@@ -92,12 +92,12 @@ const ActivityManagerPage = () => {
       activity.accountId = accountParam;
     }
 
-    if (symbolParam) {
-      activity.assetId = symbolParam;
+    if (assetIdParam) {
+      activity.assetId = assetIdParam;
     }
 
     return activity;
-  }, [typeParam, accountParam, symbolParam]);
+  }, [typeParam, accountParam, assetIdParam]);
 
   const [selectedType, setSelectedType] = useState<PickerActivityType | undefined>(
     mapActivityTypeToPicker(typeParam),

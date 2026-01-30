@@ -16,7 +16,6 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
 import { PricingMode } from "@/lib/constants";
-import { UpdateAssetProfile } from "@/lib/types";
 import { ResponsiveSelect, type ResponsiveSelectOption } from "@wealthfolio/ui";
 import { SingleSelectTaxonomy } from "@/components/classification/single-select-taxonomy";
 import { MultiSelectTaxonomy } from "@/components/classification/multi-select-taxonomy";
@@ -207,9 +206,3 @@ export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProp
     </Form>
   );
 }
-
-export const buildAssetUpdatePayload = (values: AssetFormValues): UpdateAssetProfile => ({
-  symbol: values.symbol,
-  name: values.name || "",
-  notes: values.notes ?? "",
-});

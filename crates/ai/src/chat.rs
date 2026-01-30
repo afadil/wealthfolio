@@ -960,8 +960,6 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
                 Text { text },
             ))) => {
                 if !text.is_empty() {
-                    debug!("Text delta received: {} chars", text.len());
-
                     // Parse <think> tags and emit reasoning (models should not think if disabled via API)
                     let (text_out, reasoning_out) = think_parser.process(&text);
 
@@ -996,7 +994,6 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
             Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Reasoning(
                 Reasoning { reasoning, .. },
             ))) => {
-                debug!("Received reasoning from provider: {:?}", reasoning);
                 if !reasoning.is_empty() {
                     let reasoning_text = reasoning.join(" ");
                     content_parts.push(ChatMessagePart::Reasoning {
@@ -1128,14 +1125,8 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
             // send reasoning natively without streaming text deltas)
             Ok(MultiTurnStreamItem::FinalResponse(final_response)) => {
                 let response_text = final_response.response().to_string();
-                debug!(
-                    "FinalResponse received: accumulated_text_len={}, response_text_len={}",
-                    accumulated_text.len(),
-                    response_text.len()
-                );
                 // Use trim() to handle cases where only whitespace was accumulated
                 if accumulated_text.trim().is_empty() && !response_text.trim().is_empty() {
-                    debug!("Using FinalResponse text as accumulated_text was empty/whitespace");
                     accumulated_text = response_text.clone();
                     tx.send(AiStreamEvent::text_delta(
                         &thread_id,
@@ -1148,13 +1139,8 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
                 }
             }
 
-            // Other stream items - log for debugging
-            Ok(other) => {
-                debug!(
-                    "Unhandled stream item: {:?}",
-                    std::any::type_name_of_val(&other)
-                );
-            }
+            // Other stream items - ignore
+            Ok(_) => {}
 
             // Errors
             Err(error) => {

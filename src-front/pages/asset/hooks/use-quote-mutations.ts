@@ -4,11 +4,11 @@ import { QueryKeys } from "@/lib/query-keys";
 import { Quote } from "@/lib/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-export const useQuoteMutations = (symbol: string) => {
+export const useQuoteMutations = (assetId: string) => {
   const queryClient = useQueryClient();
 
   const handleSuccess = (message: string) => {
-    queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSET_DATA, symbol] });
+    queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSET_DATA, assetId] });
     toast({
       title: message,
       variant: "success",
@@ -25,10 +25,10 @@ export const useQuoteMutations = (symbol: string) => {
 
   const saveQuoteMutation = useMutation({
     mutationFn: async (quote: Quote) => {
-      await updateQuote(symbol, {
+      await updateQuote(assetId, {
         ...quote,
         dataSource: "MANUAL",
-        assetId: symbol,
+        assetId: assetId,
         createdAt: quote.createdAt || new Date().toISOString(),
       });
     },

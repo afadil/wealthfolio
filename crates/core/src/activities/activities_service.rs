@@ -475,7 +475,6 @@ impl ActivityService {
         };
 
         // Extract asset fields using helper methods (supports both nested `asset` and legacy flat fields)
-        let asset_id_input = activity.get_asset_id().map(|s| s.to_string());
         let symbol = activity.get_symbol().map(|s| s.to_string());
         let exchange_mic = activity.get_exchange_mic().map(|s| s.to_string());
         let asset_kind = activity.get_asset_kind().map(|s| s.to_string());
@@ -483,7 +482,7 @@ impl ActivityService {
         let pricing_mode = activity.get_pricing_mode().map(|s| s.to_string());
 
         // Build asset metadata from extracted fields
-        let asset_metadata = if asset_name.is_some() {
+        let asset_metadata = if asset_name.is_some() || exchange_mic.is_some() {
             Some(crate::assets::AssetMetadata {
                 name: asset_name.clone(),
                 kind: None,
@@ -493,9 +492,21 @@ impl ActivityService {
             None
         };
 
+        // For UPDATES: prioritize symbol over asset_id to ensure canonical ID generation.
+        // This prevents clients from accidentally sending raw symbols (e.g., "BTC") as asset_id,
+        // which would bypass canonical ID generation and cause asset kind inference failures.
+        // If symbol is provided, ignore asset_id and generate canonical ID from symbol.
+        let effective_asset_id = if symbol.as_ref().is_some_and(|s| !s.is_empty()) {
+            // Symbol is provided, ignore any asset_id and let resolve_asset_id generate canonical ID
+            None
+        } else {
+            // No symbol provided, fall back to asset.id (for edge cases)
+            activity.get_asset_id().map(|s| s.to_string())
+        };
+
         // Resolve asset_id using canonical_asset_id() if symbol is provided
         let resolved_asset_id = self.resolve_asset_id(
-            asset_id_input.as_deref(),
+            effective_asset_id.as_deref(),
             symbol.as_deref(),
             exchange_mic.as_deref(),
             asset_kind.as_deref(),

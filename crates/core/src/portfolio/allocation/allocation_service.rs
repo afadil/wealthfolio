@@ -261,6 +261,8 @@ impl AllocationServiceTrait for AllocationService {
         let mut sectors_alloc = TaxonomyAllocation::empty("industries_gics", "Sectors", "#da702c");
         let mut regions_alloc = TaxonomyAllocation::empty("regions", "Regions", "#8b7ec8");
         let mut risk_alloc = TaxonomyAllocation::empty("risk_category", "Risk Category", "#d14d41");
+        let mut security_types_alloc =
+            TaxonomyAllocation::empty("type_of_security", "Type of Security", "#3aa99f");
         let mut custom_allocs: Vec<TaxonomyAllocation> = Vec::new();
 
         for twc in taxonomies {
@@ -356,9 +358,18 @@ impl AllocationServiceTrait for AllocationService {
                     );
                 }
                 "type_of_security" => {
-                    // Skip type_of_security - we're using asset_classes instead
+                    security_types_alloc = self.aggregate_by_taxonomy(
+                        &holdings,
+                        &taxonomy.id,
+                        "Type of Security",
+                        &taxonomy.color,
+                        categories,
+                        &assignments_by_asset,
+                        total_value,
+                        false, // No rollup - single-select taxonomy
+                    );
                 }
-                "custom_groups" | _ if !taxonomy.is_system => {
+                _ if taxonomy.id == "custom_groups" || !taxonomy.is_system => {
                     // Custom taxonomies
                     let custom_alloc = self.aggregate_by_taxonomy(
                         &holdings,
@@ -384,6 +395,7 @@ impl AllocationServiceTrait for AllocationService {
             sectors: sectors_alloc,
             regions: regions_alloc,
             risk_category: risk_alloc,
+            security_types: security_types_alloc,
             custom_groups: custom_allocs,
             total_value: total_with_cash,
         })

@@ -775,6 +775,7 @@ export interface PerformanceMetrics {
 }
 
 export interface UpdateAssetProfile {
+  id: string; // Asset ID (e.g., "SEC:AAPL:XNAS")
   symbol: string;
   name?: string | null;
   notes: string;
@@ -1352,6 +1353,7 @@ export interface PortfolioAllocations {
   sectors: TaxonomyAllocation;
   regions: TaxonomyAllocation;
   riskCategory: TaxonomyAllocation;
+  securityTypes: TaxonomyAllocation;
   customGroups: TaxonomyAllocation[];
   totalValue: number;
 }

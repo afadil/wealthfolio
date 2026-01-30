@@ -58,8 +58,7 @@ export const getLatestQuotes = async (assetIds: string[]): Promise<Record<string
 
 export const updateAssetProfile = async (payload: UpdateAssetProfile): Promise<Asset> => {
   try {
-    // Internal transformation: add id from payload.symbol
-    return await invoke<Asset>("update_asset_profile", { id: payload.symbol, payload });
+    return await invoke<Asset>("update_asset_profile", { id: payload.id, payload });
   } catch (error) {
     logger.error("Error updating asset profile.");
     throw error;

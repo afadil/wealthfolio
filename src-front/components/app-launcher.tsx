@@ -182,13 +182,13 @@ export function AppLauncher() {
         params.set("redirect-to", path);
       }
 
-      // Check if on asset profile page: /holdings/:symbol (only for trade activities)
+      // Check if on asset profile page: /holdings/:assetId (only for trade activities)
       if (!activityType || ["BUY", "SELL"].includes(activityType)) {
         const assetRegex = /^\/holdings\/([^/]+)$/;
         const assetMatch = assetRegex.exec(path);
         if (assetMatch) {
-          const symbol = decodeURIComponent(assetMatch[1]);
-          params.set("symbol", symbol);
+          const assetId = decodeURIComponent(assetMatch[1]);
+          params.set("assetId", assetId);
           if (!params.has("redirect-to")) {
             params.set("redirect-to", path);
           }

@@ -5,15 +5,15 @@ import { DataSource } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 
 interface UseQuoteHistoryOptions {
-  symbol: string;
+  assetId: string;
   dataSource?: DataSource;
   enabled?: boolean;
 }
 
-export function useQuoteHistory({ symbol, enabled = true }: UseQuoteHistoryOptions) {
+export function useQuoteHistory({ assetId, enabled = true }: UseQuoteHistoryOptions) {
   return useQuery<Quote[], Error>({
-    queryKey: [QueryKeys.QUOTE_HISTORY, symbol],
-    queryFn: () => getQuoteHistory(symbol),
-    enabled: !!symbol && enabled,
+    queryKey: [QueryKeys.QUOTE_HISTORY, assetId],
+    queryFn: () => getQuoteHistory(assetId),
+    enabled: !!assetId && enabled,
   });
 }

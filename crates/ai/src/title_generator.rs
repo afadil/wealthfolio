@@ -245,17 +245,12 @@ impl<E: AiEnvironment + 'static> TitleGeneratorTrait for TitleGenerator<E> {
         provider_id: &str,
         chat_model_id: &str,
     ) -> String {
-        debug!("Generating title for message (len={})", user_message.len());
-
         // Try LLM generation, fall back to truncation on failure
         match self
             .generate_with_llm(user_message, provider_id, chat_model_id)
             .await
         {
-            Ok(title) => {
-                debug!("Generated title: {}", title);
-                title
-            }
+            Ok(title) => title,
             Err(e) => {
                 warn!("Title generation failed, using fallback: {}", e);
                 self.generate_fallback(user_message)
