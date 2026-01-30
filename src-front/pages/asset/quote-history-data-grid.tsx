@@ -49,8 +49,8 @@ export interface QuoteEntry {
 interface QuoteHistoryDataGridProps {
   /** Quote data from the backend */
   data: Quote[];
-  /** Symbol for the asset */
-  symbol: string;
+  /** Asset ID for the asset */
+  assetId: string;
   /** Currency for the asset */
   currency: string;
   /** Asset kind for decimal precision */
@@ -82,14 +82,14 @@ const toQuoteEntry = (quote: Quote, decimals?: number): QuoteEntry => ({
 });
 
 // Convert QuoteEntry back to Quote for saving
-const toQuote = (entry: QuoteEntry, symbol: string): Quote => {
+const toQuote = (entry: QuoteEntry, assetId: string): Quote => {
   const datePart = format(entry.date, "yyyy-MM-dd").replace(/-/g, "");
   return {
-    id: entry.id.startsWith("temp-") ? `${datePart}_${symbol.toUpperCase()}` : entry.id,
+    id: entry.id.startsWith("temp-") ? `${datePart}_${assetId.toUpperCase()}` : entry.id,
     createdAt: new Date().toISOString(),
     dataSource: "MANUAL",
     timestamp: entry.date.toISOString(),
-    assetId: symbol,
+    assetId: assetId,
     open: entry.open,
     high: entry.high,
     low: entry.low,
@@ -115,7 +115,7 @@ const createDraftEntry = (currency: string): QuoteEntry => ({
 
 export function QuoteHistoryDataGrid({
   data,
-  symbol,
+  assetId,
   currency,
   assetKind,
   isManualDataSource = false,
@@ -372,7 +372,7 @@ export function QuoteHistoryDataGrid({
     // Save dirty entries
     for (const entry of localEntries) {
       if (dirtyIds.has(entry.id)) {
-        const quote = toQuote(entry, symbol);
+        const quote = toQuote(entry, assetId);
         onSaveQuote(quote);
       }
     }
@@ -387,7 +387,7 @@ export function QuoteHistoryDataGrid({
     // Reset state
     setDirtyIds(new Set());
     setDeletedIds(new Set());
-  }, [localEntries, dirtyIds, deletedIds, symbol, onSaveQuote, onDeleteQuote]);
+  }, [localEntries, dirtyIds, deletedIds, assetId, onSaveQuote, onDeleteQuote]);
 
   // Cancel changes
   const handleCancel = useCallback(() => {

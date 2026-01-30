@@ -26,6 +26,7 @@ import { ClassesChart } from "./components/classes-chart";
 import { PortfolioComposition } from "./components/composition-chart";
 import { CountryChart } from "./components/country-chart";
 import { HoldingCurrencyChart } from "./components/currency-chart";
+import { CustomCategoriesChip } from "./components/custom-categories-chip";
 import { SectorsChart } from "./components/sectors-chart";
 import { SegmentedAllocationBar } from "./components/segmented-allocation-bar";
 
@@ -38,6 +39,7 @@ type SheetFilterType =
   | "account"
   | "composition"
   | "risk"
+  | "securityType"
   | "custom";
 
 export const HoldingsInsightsPage = () => {
@@ -151,6 +153,15 @@ export const HoldingsInsightsPage = () => {
           const riskCategory = h.instrument?.classifications?.riskCategory;
           if (riskCategory) {
             return riskCategory.id === sheetFilterId;
+          }
+          return sheetFilterName === "Unknown";
+        });
+        break;
+      case "securityType":
+        filteredHoldings = holdings.filter((h) => {
+          const assetType = h.instrument?.classifications?.assetType;
+          if (assetType) {
+            return assetType.id === sheetFilterId;
           }
           return sheetFilterName === "Unknown";
         });
@@ -296,7 +307,39 @@ export const HoldingsInsightsPage = () => {
           />
         </div>
 
-        {/* Second row: Composition and Sector */}
+        {/* Classification Strip: Type of Security and Custom Categories */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <SegmentedAllocationBar
+            title="Type of Security"
+            allocation={allocations?.securityTypes}
+            baseCurrency={baseCurrency}
+            isLoading={isLoading}
+            compact={true}
+            onSegmentClick={(categoryId, categoryName) =>
+              handleChartSectionClick(
+                "securityType",
+                categoryName,
+                `Type: ${categoryName}`,
+                categoryId,
+              )
+            }
+          />
+          <CustomCategoriesChip
+            customGroups={allocations?.customGroups}
+            baseCurrency={baseCurrency}
+            isLoading={isLoading}
+            onCategoryClick={(categoryId, categoryName, taxonomyName) =>
+              handleChartSectionClick(
+                "custom",
+                categoryName,
+                `${taxonomyName}: ${categoryName}`,
+                categoryId,
+              )
+            }
+          />
+        </div>
+
+        {/* Composition and Sector */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
           <div className="col-span-1 lg:col-span-3">
             <PortfolioComposition holdings={nonCashHoldings ?? []} isLoading={isLoading} />

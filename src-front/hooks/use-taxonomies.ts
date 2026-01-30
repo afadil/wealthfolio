@@ -232,6 +232,8 @@ export function useMigrateLegacyClassifications() {
       // Invalidate portfolio allocations and holdings to reflect classification changes
       queryClient.invalidateQueries({ queryKey: [QueryKeys.PORTFOLIO_ALLOCATIONS] });
       queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS] });
+      // Invalidate health status so health center updates
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.HEALTH_STATUS] });
     },
   });
 }

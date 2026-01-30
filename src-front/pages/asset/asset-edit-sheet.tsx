@@ -297,18 +297,24 @@ export function AssetEditSheet({
         assetKind,
       );
 
-      // Update profile with all fields including pricing mode
-      await updateAssetProfileMutation.mutateAsync({
-        symbol: asset.symbol,
-        name: values.name || "",
-        notes: values.notes ?? "",
-        kind: values.kind as AssetKind | undefined,
-        exchangeMic: values.exchangeMic || null,
-        pricingMode: values.pricingMode,
-        providerOverrides: serializedOverrides,
-      });
+      try {
+        // Update profile with all fields including pricing mode
+        await updateAssetProfileMutation.mutateAsync({
+          id: asset.id,
+          symbol: asset.symbol,
+          name: values.name || "",
+          notes: values.notes ?? "",
+          kind: values.kind as AssetKind | undefined,
+          exchangeMic: values.exchangeMic || null,
+          pricingMode: values.pricingMode,
+          providerOverrides: serializedOverrides,
+        });
 
-      onOpenChange(false);
+        onOpenChange(false);
+      } catch {
+        // Error toast is shown by mutation's onError callback
+        // Keep sheet open so user can retry
+      }
     },
     [asset, updateAssetProfileMutation, onOpenChange],
   );
@@ -386,7 +392,7 @@ export function AssetEditSheet({
                       <FormItem>
                         <FormLabel>Notes</FormLabel>
                         <FormControl>
-                          <Textarea rows={3} placeholder="Add any context or links" {...field} />
+                          <Textarea rows={10} placeholder="Add any context or links" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -410,6 +416,7 @@ export function AssetEditSheet({
                               sheetTitle="Asset Type"
                               sheetDescription="Select the type of asset"
                               disabled={isSystemManagedKind}
+                              triggerClassName="h-11"
                             />
                           </FormControl>
                           <FormMessage />

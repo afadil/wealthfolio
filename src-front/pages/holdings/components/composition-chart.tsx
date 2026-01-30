@@ -1,17 +1,17 @@
+import { usePersistentState } from "@/hooks/use-persistent-state";
+import { useSettingsContext } from "@/lib/settings-provider";
+import { Holding } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { AnimatedToggleGroup, formatAmount, formatPercent } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { EmptyPlaceholder } from "@wealthfolio/ui/components/ui/empty-placeholder";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
-import { usePersistentState } from "@/hooks/use-persistent-state";
-import { useSettingsContext } from "@/lib/settings-provider";
-import { Holding } from "@/lib/types";
-import { cn } from "@/lib/utils";
-import { AnimatedToggleGroup, formatAmount, formatPercent } from "@wealthfolio/ui";
-import { useMemo, type FC } from "react";
+import { useEffect, useMemo, useRef, type FC } from "react";
 import { Link } from "react-router-dom";
-import { Tooltip as ChartTooltip, ResponsiveContainer, Treemap } from "recharts";
+import { Tooltip as ChartTooltip, ResponsiveContainer, type TreemapNode, Treemap } from "recharts";
 
 type ReturnType = "daily" | "total";
 type DisplayMode = "symbol" | "name";
@@ -85,14 +85,14 @@ function truncateText(text: string, maxWidth: number, fontSize: number): string 
 }
 
 interface CustomizedContentProps {
-  depth?: number;
-  x?: number;
-  y?: number;
-  width?: number;
-  height?: number;
+  depth?: TreemapNode["depth"];
+  x?: TreemapNode["x"];
+  y?: TreemapNode["y"];
+  width?: TreemapNode["width"];
+  height?: TreemapNode["height"];
   id?: string; // Asset ID for navigation
   symbol?: string;
-  name?: string;
+  name?: TreemapNode["name"];
   gain?: number;
   maxGain?: number;
   minGain?: number;
@@ -138,6 +138,7 @@ const CustomizedContent: FC<CustomizedContentProps> = ({
         })}
         style={{
           fillOpacity: colorScale.opacity,
+          cursor: "pointer",
         }}
       />
       {depth === 1 ? (
@@ -262,10 +263,29 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
     "symbol",
   );
   const { settings } = useSettingsContext();
+  const lastLoggedMode = useRef<DisplayMode | null>(null);
 
   const toggleDisplayMode = () => {
-    setDisplayMode((prev) => (prev === "symbol" ? "name" : "symbol"));
+    const prev = displayMode;
+    const next = prev === "symbol" ? "name" : "symbol";
+    if (import.meta.env.DEV) {
+      console.warn("[Composition][debug] toggle displayMode", { prev, next });
+    }
+    setDisplayMode(next);
   };
+
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.warn("[Composition][debug] displayMode changed", { displayMode });
+    }
+  }, [displayMode]);
+
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.warn("[Composition][debug] returnType changed", { returnType });
+    }
+  }, [returnType]);
+
   const data = useMemo(() => {
     let maxGain = -Infinity;
     let minGain = Infinity;
@@ -385,7 +405,28 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
             data={data}
             dataKey="marketValueConverted"
             animationDuration={100}
-            content={<CustomizedContent displayMode={displayMode} />}
+            content={(props: TreemapNode) => {
+              if (import.meta.env.DEV && lastLoggedMode.current !== displayMode) {
+                const anyProps = props as unknown as {
+                  index?: number;
+                  symbol?: string;
+                  name?: string;
+                  depth?: number;
+                };
+                if (anyProps.depth === 1 && anyProps.index === 0) {
+                  lastLoggedMode.current = displayMode;
+                  console.warn("[Composition][debug] treemap content render (sample)", {
+                    displayMode,
+                    sample: {
+                      symbol: anyProps.symbol,
+                      name: anyProps.name,
+                    },
+                  });
+                }
+              }
+
+              return <CustomizedContent {...props} displayMode={displayMode} />;
+            }}
           >
             <ChartTooltip content={<CompositionTooltip settings={settings ?? undefined} />} />
           </Treemap>

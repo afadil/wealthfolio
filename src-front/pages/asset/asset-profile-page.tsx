@@ -79,8 +79,8 @@ interface AssetDetailData {
 type AssetTab = "overview" | "lots" | "history";
 
 export const AssetProfilePage = () => {
-  const { symbol: encodedSymbol = "" } = useParams<{ symbol: string }>();
-  const symbol = decodeURIComponent(encodedSymbol);
+  const { assetId: encodedAssetId = "" } = useParams<{ assetId: string }>();
+  const assetId = decodeURIComponent(encodedAssetId);
   const location = useLocation();
   const navigate = useNavigate();
   const queryParams = new URLSearchParams(location.search);
@@ -103,9 +103,9 @@ export const AssetProfilePage = () => {
     isLoading: isAssetProfileLoading,
     isError: isAssetProfileError,
   } = useQuery<Asset | null, Error>({
-    queryKey: [QueryKeys.ASSET_DATA, symbol],
-    queryFn: () => getAssetProfile(symbol),
-    enabled: !!symbol,
+    queryKey: [QueryKeys.ASSET_DATA, assetId],
+    queryFn: () => getAssetProfile(assetId),
+    enabled: !!assetId,
   });
 
   const {
@@ -113,9 +113,9 @@ export const AssetProfilePage = () => {
     isLoading: isHoldingLoading,
     isError: isHoldingError,
   } = useQuery<Holding | null, Error>({
-    queryKey: [QueryKeys.HOLDING, PORTFOLIO_ACCOUNT_ID, symbol],
-    queryFn: () => getHolding(PORTFOLIO_ACCOUNT_ID, symbol),
-    enabled: !!symbol,
+    queryKey: [QueryKeys.HOLDING, PORTFOLIO_ACCOUNT_ID, assetId],
+    queryFn: () => getHolding(PORTFOLIO_ACCOUNT_ID, assetId),
+    enabled: !!assetId,
   });
 
   const {
@@ -123,13 +123,13 @@ export const AssetProfilePage = () => {
     isLoading: isQuotesLoading,
     isError: isQuotesError,
   } = useQuoteHistory({
-    symbol,
-    enabled: !!symbol,
+    assetId,
+    enabled: !!assetId,
   });
 
   // Taxonomy data for category badges - use same approach as edit sheet
   const { data: assignments = [], isLoading: isAssignmentsLoading } =
-    useAssetTaxonomyAssignments(symbol);
+    useAssetTaxonomyAssignments(assetId);
   const { updatePricingModeMutation } = useAssetProfileMutations();
 
   // Fetch taxonomy details for taxonomies with assignments
@@ -264,7 +264,7 @@ export const AssetProfilePage = () => {
     return quoteHistory?.at(0) ?? null;
   }, [quoteHistory]);
 
-  const { saveQuoteMutation, deleteQuoteMutation } = useQuoteMutations(symbol);
+  const { saveQuoteMutation, deleteQuoteMutation } = useQuoteMutations(assetId);
   const syncMarketDataMutation = useSyncMarketDataMutation();
 
   // Determine if manual tracking based on asset's pricingMode
@@ -292,7 +292,7 @@ export const AssetProfilePage = () => {
 
     return {
       id: instrument?.id ?? asset?.id ?? "",
-      symbol: instrument?.symbol ?? asset?.symbol ?? symbol,
+      symbol: instrument?.symbol ?? asset?.symbol ?? assetId,
       name: instrument?.name ?? asset?.name ?? "-",
       isin: null,
       assetType: null,
@@ -313,7 +313,7 @@ export const AssetProfilePage = () => {
       totalGainPercent,
       calculatedAt,
     };
-  }, [holding, assetProfile, quote, symbol]);
+  }, [holding, assetProfile, quote, assetId]);
 
   const symbolHolding = useMemo((): AssetDetailData | null => {
     if (!holding) return null;
@@ -490,7 +490,7 @@ export const AssetProfilePage = () => {
       ) : (
         <QuoteHistoryDataGrid
           data={quoteHistory ?? []}
-          symbol={symbol}
+          assetId={assetId}
           currency={profile?.currency ?? "USD"}
           assetKind={assetProfile?.kind}
           isManualDataSource={isManualPricingMode}
@@ -499,7 +499,7 @@ export const AssetProfilePage = () => {
           onChangeDataSource={(isManual) => {
             if (profile) {
               updatePricingModeMutation.mutate({
-                assetId: symbol,
+                assetId: assetId,
                 pricingMode: isManual ? "MANUAL" : "MARKET",
               });
             }
@@ -516,7 +516,7 @@ export const AssetProfilePage = () => {
     quoteHistory,
     saveQuoteMutation,
     deleteQuoteMutation,
-    symbol,
+    assetId,
     isAltAsset,
     isLiability,
     isManualPricingMode,
@@ -548,13 +548,13 @@ export const AssetProfilePage = () => {
       </Page>
     ); // Show loading spinner
 
-  // Simplified view for quote-only symbols (like FX rates)
+  // Simplified view for quote-only assets (like FX rates)
   if (assetProfile?.kind === "FX_RATE") {
     return (
       <Page>
         <PageHeader
           heading="Quote History"
-          text={symbol}
+          text={assetId}
           onBack={handleBack}
           actions={
             <Button
@@ -573,7 +573,7 @@ export const AssetProfilePage = () => {
         <PageContent>
           <QuoteHistoryDataGrid
             data={quoteHistory ?? []}
-            symbol={symbol}
+            assetId={assetId}
             currency={profile?.currency ?? "USD"}
             assetKind={assetProfile?.kind}
             isManualDataSource={isManualPricingMode}
@@ -581,7 +581,7 @@ export const AssetProfilePage = () => {
             onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
             onChangeDataSource={(isManual) => {
               updatePricingModeMutation.mutate({
-                assetId: symbol,
+                assetId: assetId,
                 pricingMode: isManual ? "MANUAL" : "MARKET",
               });
             }}
@@ -596,13 +596,13 @@ export const AssetProfilePage = () => {
     return (
       <Page>
         <PageHeader
-          heading={symbol}
-          text={`Error loading data for ${symbol}`}
+          heading={assetId}
+          text={`Error loading data for ${assetId}`}
           onBack={handleBack}
         />
         <PageContent>
           <p>
-            Could not load necessary information for this symbol. Please check the symbol or try
+            Could not load necessary information for this asset. Please check the asset ID or try
             again later.
           </p>
           {isHoldingError && <p className="text-sm text-red-500">Holding fetch error.</p>}
@@ -640,8 +640,8 @@ export const AssetProfilePage = () => {
               open={actionPaletteOpen}
               onOpenChange={setActionPaletteOpen}
               title={(() => {
-                const parts = symbol.split(":");
-                return parts.length >= 2 ? parts[1] : symbol;
+                const parts = assetId.split(":");
+                return parts.length >= 2 ? parts[1] : assetId;
               })()}
               groups={
                 [
@@ -653,7 +653,7 @@ export const AssetProfilePage = () => {
                         label: "Buy",
                         onClick: () =>
                           navigate(
-                            `/activities/manage?symbol=${encodeURIComponent(symbol)}&type=BUY`,
+                            `/activities/manage?assetId=${encodeURIComponent(assetId)}&type=BUY`,
                           ),
                       },
                       {
@@ -661,7 +661,7 @@ export const AssetProfilePage = () => {
                         label: "Sell",
                         onClick: () =>
                           navigate(
-                            `/activities/manage?symbol=${encodeURIComponent(symbol)}&type=SELL`,
+                            `/activities/manage?assetId=${encodeURIComponent(assetId)}&type=SELL`,
                           ),
                       },
                       {
@@ -669,14 +669,14 @@ export const AssetProfilePage = () => {
                         label: "Dividend",
                         onClick: () =>
                           navigate(
-                            `/activities/manage?symbol=${encodeURIComponent(symbol)}&type=DIVIDEND`,
+                            `/activities/manage?assetId=${encodeURIComponent(assetId)}&type=DIVIDEND`,
                           ),
                       },
                       {
                         icon: Icons.Ellipsis,
                         label: "Other",
                         onClick: () =>
-                          navigate(`/activities/manage?symbol=${encodeURIComponent(symbol)}`),
+                          navigate(`/activities/manage?assetId=${encodeURIComponent(assetId)}`),
                       },
                     ],
                   },
@@ -709,17 +709,17 @@ export const AssetProfilePage = () => {
         <div className="flex items-center gap-2" data-tauri-drag-region="true">
           {(profile?.symbol ?? holding?.instrument?.symbol) && (
             <TickerAvatar
-              symbol={profile?.symbol ?? holding?.instrument?.symbol ?? symbol}
+              symbol={profile?.symbol ?? holding?.instrument?.symbol ?? assetId}
               className="size-9"
             />
           )}
           <div className="flex min-w-0 flex-col justify-center">
             <h1 className="truncate text-base leading-tight font-semibold md:text-lg">
-              {assetProfile?.name ?? holding?.instrument?.name ?? symbol ?? "-"}
+              {assetProfile?.name ?? holding?.instrument?.name ?? assetId ?? "-"}
             </h1>
             <p className="text-muted-foreground text-xs leading-tight md:text-sm">
               {(() => {
-                const fullSymbol = assetProfile?.symbol ?? holding?.instrument?.symbol ?? symbol;
+                const fullSymbol = assetProfile?.symbol ?? holding?.instrument?.symbol ?? assetId;
                 // Extract ticker from formats like "CRYPTO:GRT:USD" or "STOCK:AAPL:USD"
                 const parts = fullSymbol.split(":");
                 return parts.length >= 2 ? parts[1] : fullSymbol;
@@ -858,7 +858,7 @@ export const AssetProfilePage = () => {
               ) : (
                 <QuoteHistoryDataGrid
                   data={quoteHistory ?? []}
-                  symbol={symbol}
+                  assetId={assetId}
                   currency={profile?.currency ?? "USD"}
                   assetKind={assetProfile?.kind}
                   isManualDataSource={isManualPricingMode}
@@ -867,7 +867,7 @@ export const AssetProfilePage = () => {
                   onChangeDataSource={(isManual) => {
                     if (profile) {
                       updatePricingModeMutation.mutate({
-                        assetId: symbol,
+                        assetId: assetId,
                         pricingMode: isManual ? "MANUAL" : "MARKET",
                       });
                     }

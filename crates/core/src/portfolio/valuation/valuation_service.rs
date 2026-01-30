@@ -253,9 +253,12 @@ impl ValuationServiceTrait for ValuationService {
             )
             .await?;
 
+        // Build quotes_by_date and track which assets have ANY quotes at all
+        let mut assets_with_quotes: HashSet<String> = HashSet::new();
         let quotes_by_date = {
             let mut map = HashMap::new();
             for quote in quotes_vec {
+                assets_with_quotes.insert(quote.asset_id.clone());
                 map.entry(quote.timestamp.date_naive())
                     .or_insert_with(HashMap::new)
                     .insert(quote.asset_id.clone(), quote);
@@ -278,32 +281,40 @@ impl ValuationServiceTrait for ValuationService {
                     .cloned()
                     .unwrap_or_default();
 
-                let missing_quotes: Vec<_> = holdings_snapshot
+                // Check for assets missing quotes that SHOULD have quotes
+                // (i.e., they have quotes elsewhere, just not for this date - indicates a gap)
+                // Assets with NO quotes at all are skipped - they'll be valued at ZERO
+                // and the health check will detect them
+                let missing_quotes_with_gap: Vec<_> = holdings_snapshot
                     .positions
                     .iter()
                     .filter(|(_, position)| !position.quantity.is_zero())
                     .map(|(symbol, _)| symbol)
                     // Cash assets don't need quotes (valued at 1:1)
                     .filter(|symbol| !symbol.starts_with(CASH_PREFIX))
+                    // Only flag as missing if the asset HAS quotes (somewhere) but not for this date
+                    .filter(|symbol| assets_with_quotes.contains(*symbol))
                     .filter(|symbol| !quotes_for_current_date.contains_key(*symbol))
                     .cloned()
                     .collect();
 
-                if !missing_quotes.is_empty() {
+                if !missing_quotes_with_gap.is_empty() {
                     debug!(
-                        "Missing quotes {:?} on {} (account '{}'). Skipping day.",
-                        missing_quotes, current_date, account_id_clone
+                        "Quote gap for {:?} on {} (account '{}'). Skipping day.",
+                        missing_quotes_with_gap, current_date, account_id_clone
                     );
                     return None;
                 }
 
                 // Check if there are any non-cash positions that need quotes
-                let has_non_cash_positions = holdings_snapshot
+                // but only consider positions that HAVE quotes somewhere
+                let has_quotable_positions = holdings_snapshot
                     .positions
                     .keys()
-                    .any(|symbol| !symbol.starts_with(CASH_PREFIX));
+                    .filter(|symbol| !symbol.starts_with(CASH_PREFIX))
+                    .any(|symbol| assets_with_quotes.contains(symbol));
 
-                if quotes_for_current_date.is_empty() && has_non_cash_positions {
+                if quotes_for_current_date.is_empty() && has_quotable_positions {
                     debug!(
                         "No quotes for date {} (account '{}'). Skipping day.",
                         current_date, account_id_clone

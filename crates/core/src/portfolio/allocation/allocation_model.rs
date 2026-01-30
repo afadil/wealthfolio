@@ -57,6 +57,8 @@ pub struct PortfolioAllocations {
     pub regions: TaxonomyAllocation,
     /// Risk category allocation (Low, Medium, High, Unknown)
     pub risk_category: TaxonomyAllocation,
+    /// Security type allocation (Stock, ETF, Fund, Bond, etc.)
+    pub security_types: TaxonomyAllocation,
     /// Custom user-defined taxonomy allocations
     pub custom_groups: Vec<TaxonomyAllocation>,
     /// Total portfolio value in base currency
@@ -70,6 +72,11 @@ impl Default for PortfolioAllocations {
             sectors: TaxonomyAllocation::empty("industries_gics", "Sectors", "#da702c"),
             regions: TaxonomyAllocation::empty("regions", "Regions", "#8b7ec8"),
             risk_category: TaxonomyAllocation::empty("risk_category", "Risk Category", "#d14d41"),
+            security_types: TaxonomyAllocation::empty(
+                "type_of_security",
+                "Type of Security",
+                "#3aa99f",
+            ),
             custom_groups: Vec::new(),
             total_value: Decimal::ZERO,
         }

@@ -39,11 +39,7 @@ export function useRunHealthChecks() {
       queryClient.setQueryData([QueryKeys.HEALTH_STATUS], data);
     },
     onError: (error: Error) => {
-      toast({
-        title: "Health check failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error("Health check failed", { description: error.message });
     },
   });
 }
@@ -59,17 +55,10 @@ export function useDismissHealthIssue() {
       dismissHealthIssue(issueId, dataHash),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.HEALTH_STATUS] });
-      toast({
-        title: "Issue dismissed",
-        description: "The issue has been dismissed.",
-      });
+      toast.success("Issue dismissed");
     },
     onError: (error: Error) => {
-      toast({
-        title: "Failed to dismiss issue",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error("Failed to dismiss issue", { description: error.message });
     },
   });
 }
@@ -84,17 +73,10 @@ export function useRestoreHealthIssue() {
     mutationFn: restoreHealthIssue,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.HEALTH_STATUS] });
-      toast({
-        title: "Issue restored",
-        description: "The issue has been restored.",
-      });
+      toast.success("Issue restored");
     },
     onError: (error: Error) => {
-      toast({
-        title: "Failed to restore issue",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error("Failed to restore issue", { description: error.message });
     },
   });
 }
@@ -110,17 +92,10 @@ export function useExecuteHealthFix() {
     onSuccess: () => {
       // Refresh health status after fix
       queryClient.invalidateQueries({ queryKey: [QueryKeys.HEALTH_STATUS] });
-      toast({
-        title: "Fix applied",
-        description: "The fix action has been executed. Refreshing health status...",
-      });
+      toast.success("Fix applied", { description: "Refreshing health status..." });
     },
     onError: (error: Error) => {
-      toast({
-        title: "Fix failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error("Fix failed", { description: error.message });
     },
   });
 }
@@ -149,17 +124,10 @@ export function useUpdateHealthConfig() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.HEALTH_CONFIG] });
       queryClient.invalidateQueries({ queryKey: [QueryKeys.HEALTH_STATUS] });
-      toast({
-        title: "Configuration updated",
-        description: "Health check configuration has been updated.",
-      });
+      toast.success("Configuration updated");
     },
     onError: (error: Error) => {
-      toast({
-        title: "Failed to update configuration",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error("Failed to update configuration", { description: error.message });
     },
   });
 }
