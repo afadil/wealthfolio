@@ -1,0 +1,270 @@
+import { useSettingsContext } from "@/lib/settings-provider";
+import { cn } from "@/lib/utils";
+import { Icons } from "@wealthfolio/ui";
+import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
+import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+
+export interface OnboardingAppearanceHandle {
+  submitForm: () => void;
+}
+
+interface OnboardingAppearanceProps {
+  onNext: () => void;
+  onValidityChange: (isValid: boolean) => void;
+}
+
+const fonts = [
+  {
+    value: "font-mono",
+    label: "Mono",
+    description: "Technical & precise",
+  },
+  {
+    value: "font-sans",
+    label: "Sans",
+    description: "Clean & modern",
+  },
+  {
+    value: "font-serif",
+    label: "Serif",
+    description: "Classic & elegant",
+  },
+];
+
+export const OnboardingAppearance = forwardRef<
+  OnboardingAppearanceHandle,
+  OnboardingAppearanceProps
+>(({ onNext, onValidityChange }, ref) => {
+  const { settings, updateSettings } = useSettingsContext();
+  const [theme, setTheme] = useState<string>(settings?.theme ?? "system");
+  const [font, setFont] = useState<string>(settings?.font ?? "font-mono");
+
+  useEffect(() => {
+    // Always valid since we have defaults
+    onValidityChange(true);
+  }, [onValidityChange]);
+
+  useImperativeHandle(ref, () => ({
+    submitForm() {
+      updateSettings({ theme, font })
+        .then(() => onNext())
+        .catch((error) => console.error("Failed to save appearance settings:", error));
+    },
+  }));
+
+  // Apply theme/font preview when user selects them
+  const handleThemeChange = (newTheme: string) => {
+    setTheme(newTheme);
+    updateSettings({ theme: newTheme }).catch(console.error);
+  };
+
+  const handleFontChange = (newFont: string) => {
+    setFont(newFont);
+    updateSettings({ font: newFont }).catch(console.error);
+  };
+
+  return (
+    <div className="w-full max-w-2xl space-y-8">
+      <div className="text-center">
+        <p className="text-muted-foreground">Customize your experience</p>
+      </div>
+
+      <Card className="border-none bg-transparent">
+        <CardContent className="space-y-10 p-0 sm:p-6">
+          {/* Theme Selection */}
+          <div>
+            <div className="mb-5 flex items-center gap-3">
+              <div className="bg-muted rounded-lg p-2">
+                <Icons.Palette className="text-muted-foreground h-5 w-5" />
+              </div>
+              <span className="text-xl font-semibold">Theme</span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 sm:gap-4">
+              {/* Light Theme */}
+              <button
+                type="button"
+                onClick={() => handleThemeChange("light")}
+                className={cn(
+                  "group relative overflow-hidden rounded-xl border-2 transition-all duration-200",
+                  theme === "light"
+                    ? "border-primary ring-primary/20 ring-2"
+                    : "border-border hover:border-primary/50",
+                )}
+              >
+                <div className="overflow-hidden rounded-t-lg">
+                  <img
+                    src="/theme-light.webp"
+                    srcSet="/theme-light.webp 1x, /theme-light@2x.webp 2x"
+                    alt="Light theme preview"
+                    className="h-auto w-full object-cover"
+                  />
+                </div>
+                <div
+                  className={cn(
+                    "flex items-center justify-center gap-2 py-2.5 sm:py-3",
+                    theme === "light" ? "bg-primary/10" : "bg-muted/50",
+                  )}
+                >
+                  <Icons.Sun
+                    className={cn(
+                      "h-4 w-4",
+                      theme === "light" ? "text-primary" : "text-muted-foreground",
+                    )}
+                  />
+                  <span className="text-sm font-medium">Light</span>
+                </div>
+                {theme === "light" && (
+                  <div className="bg-primary absolute top-2 right-2 rounded-full p-0.5">
+                    <Icons.Check className="h-3 w-3 text-white" />
+                  </div>
+                )}
+              </button>
+
+              {/* Dark Theme */}
+              <button
+                type="button"
+                onClick={() => handleThemeChange("dark")}
+                className={cn(
+                  "group relative overflow-hidden rounded-xl border-2 transition-all duration-200",
+                  theme === "dark"
+                    ? "border-primary ring-primary/20 ring-2"
+                    : "border-border hover:border-primary/50",
+                )}
+              >
+                <div className="overflow-hidden rounded-t-lg">
+                  <img
+                    src="/theme-dark.webp"
+                    srcSet="/theme-dark.webp 1x, /theme-dark@2x.webp 2x"
+                    alt="Dark theme preview"
+                    className="h-auto w-full object-cover"
+                  />
+                </div>
+                <div
+                  className={cn(
+                    "flex items-center justify-center gap-2 py-2.5 sm:py-3",
+                    theme === "dark" ? "bg-primary/10" : "bg-muted/50",
+                  )}
+                >
+                  <Icons.Moon
+                    className={cn(
+                      "h-4 w-4",
+                      theme === "dark" ? "text-primary" : "text-muted-foreground",
+                    )}
+                  />
+                  <span className="text-sm font-medium">Dark</span>
+                </div>
+                {theme === "dark" && (
+                  <div className="bg-primary absolute top-2 right-2 rounded-full p-0.5">
+                    <Icons.Check className="h-3 w-3 text-white" />
+                  </div>
+                )}
+              </button>
+
+              {/* System Theme */}
+              <button
+                type="button"
+                onClick={() => handleThemeChange("system")}
+                className={cn(
+                  "group relative overflow-hidden rounded-xl border-2 transition-all duration-200",
+                  theme === "system"
+                    ? "border-primary ring-primary/20 ring-2"
+                    : "border-border hover:border-primary/50",
+                )}
+              >
+                <div className="overflow-hidden rounded-t-lg">
+                  <img
+                    src="/theme-system.webp"
+                    srcSet="/theme-system.webp 1x, /theme-system@2x.webp 2x"
+                    alt="System theme preview"
+                    className="h-auto w-full object-cover"
+                  />
+                </div>
+                <div
+                  className={cn(
+                    "flex items-center justify-center gap-2 py-2.5 sm:py-3",
+                    theme === "system" ? "bg-primary/10" : "bg-muted/50",
+                  )}
+                >
+                  <Icons.Monitor
+                    className={cn(
+                      "h-4 w-4",
+                      theme === "system" ? "text-primary" : "text-muted-foreground",
+                    )}
+                  />
+                  <span className="text-sm font-medium">System</span>
+                </div>
+                {theme === "system" && (
+                  <div className="bg-primary absolute top-2 right-2 rounded-full p-0.5">
+                    <Icons.Check className="h-3 w-3 text-white" />
+                  </div>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Font Selection */}
+          <div>
+            <div className="mb-5 flex items-center gap-3">
+              <div className="bg-muted rounded-lg p-2">
+                <Icons.Type className="text-muted-foreground h-5 w-5" />
+              </div>
+              <span className="text-xl font-semibold">Font</span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 sm:gap-4">
+              {fonts.map((f) => (
+                <button
+                  key={f.value}
+                  type="button"
+                  onClick={() => handleFontChange(f.value)}
+                  className={cn(
+                    "group relative flex flex-col overflow-hidden rounded-xl border-2 transition-all duration-200",
+                    font === f.value
+                      ? "border-primary ring-primary/20 ring-2"
+                      : "border-border hover:border-primary/50",
+                    f.value,
+                  )}
+                >
+                  {/* Font preview area */}
+                  <div className="bg-muted/30 flex flex-1 flex-col items-center justify-center px-3 py-5 text-center sm:px-4 sm:py-6">
+                    <div className="w-full space-y-3">
+                      {/* Font name as hero */}
+                      <div className="text-2xl font-medium tracking-tight sm:text-3xl">
+                        {f.label}
+                      </div>
+                      {/* Sample text paragraph */}
+                      <div className="text-muted-foreground text-[11px] leading-relaxed sm:text-xs">
+                        Track investments with clarity.
+                      </div>
+                      {/* Secondary: numbers sample */}
+                      <div className="text-muted-foreground/60 text-[10px] whitespace-nowrap sm:text-xs">
+                        12345 · $1,234
+                      </div>
+                    </div>
+                  </div>
+                  {/* Label area */}
+                  <div
+                    className={cn(
+                      "px-4 py-2.5 text-center sm:py-3",
+                      font === f.value ? "bg-primary/10" : "bg-muted/50",
+                    )}
+                  >
+                    <div className="text-muted-foreground text-xs">{f.description}</div>
+                  </div>
+                  {font === f.value && (
+                    <div className="bg-primary absolute top-2 right-2 rounded-full p-0.5">
+                      <Icons.Check className="h-3 w-3 text-white" />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+});
+
+OnboardingAppearance.displayName = "OnboardingAppearance";

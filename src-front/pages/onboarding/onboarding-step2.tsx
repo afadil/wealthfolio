@@ -20,7 +20,6 @@ const onboardingSettingsSchema = z.object({
   baseCurrency: z
     .string({ required_error: "Please select a base currency." })
     .min(1, "Please select a base currency."),
-  theme: z.enum(["light", "dark", "system"], { required_error: "Please select a theme." }),
 });
 
 function detectDefaultCurrency(): string | undefined {
@@ -105,7 +104,6 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
       if (!initialValuesSet) {
         form.reset({
           baseCurrency: settings?.baseCurrency ?? detectDefaultCurrency() ?? "",
-          theme: (settings?.theme as OnboardingSettingsValues["theme"]) ?? undefined,
         });
         setInitialValuesSet(true);
       }
@@ -115,7 +113,6 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
       try {
         await updateSettings({
           baseCurrency: data.baseCurrency,
-          theme: data.theme,
         });
         onNext();
       } catch (error) {
@@ -169,92 +166,6 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                             >
                               <Icons.Search className="size-5" />
                               Other
-                            </button>
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="theme"
-                    render={({ field }) => (
-                      <FormItem>
-                        <div className="mb-4 flex items-center gap-3">
-                          <div className="bg-muted rounded-lg p-2">
-                            <Icons.Palette className="text-muted-foreground h-5 w-5" />
-                          </div>
-                          <FormLabel className="text-xl font-semibold">Theme</FormLabel>
-                        </div>
-                        <FormControl>
-                          <div className="grid grid-cols-3 gap-4">
-                            <button
-                              type="button"
-                              onClick={() => field.onChange("dark")}
-                              className={`rounded-lg border-2 p-4 transition-all ${
-                                field.value === "dark"
-                                  ? "border-primary bg-primary/10"
-                                  : "border-border hover:border-primary/50 hover:bg-accent"
-                              }`}
-                            >
-                              <div className="flex flex-col items-center gap-3">
-                                <div
-                                  className={`rounded-full p-3 ${
-                                    field.value === "dark"
-                                      ? "bg-primary text-primary-foreground"
-                                      : "bg-muted"
-                                  }`}
-                                >
-                                  <Icons.Moon className="h-6 w-6" />
-                                </div>
-                                <span className="font-semibold">Dark</span>
-                              </div>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => field.onChange("light")}
-                              className={`rounded-lg border-2 p-4 transition-all ${
-                                field.value === "light"
-                                  ? "border-primary bg-primary/10"
-                                  : "border-border hover:border-primary/50 hover:bg-accent"
-                              }`}
-                            >
-                              <div className="flex flex-col items-center gap-3">
-                                <div
-                                  className={`rounded-full p-3 ${
-                                    field.value === "light"
-                                      ? "bg-primary text-primary-foreground"
-                                      : "bg-muted"
-                                  }`}
-                                >
-                                  <Icons.Sun className="h-6 w-6" />
-                                </div>
-                                <span className="font-semibold">Light</span>
-                              </div>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => field.onChange("system")}
-                              className={`rounded-lg border-2 p-4 transition-all ${
-                                field.value === "system"
-                                  ? "border-primary bg-primary/10"
-                                  : "border-border hover:border-primary/50 hover:bg-accent"
-                              }`}
-                            >
-                              <div className="flex flex-col items-center gap-3">
-                                <div
-                                  className={`rounded-full p-3 ${
-                                    field.value === "system"
-                                      ? "bg-primary text-primary-foreground"
-                                      : "bg-muted"
-                                  }`}
-                                >
-                                  <Icons.Monitor className="h-6 w-6" />
-                                </div>
-                                <span className="font-semibold">System</span>
-                              </div>
                             </button>
                           </div>
                         </FormControl>

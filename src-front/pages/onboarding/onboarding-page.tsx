@@ -6,11 +6,12 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { AnimatePresence, motion } from "motion/react";
 import { useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
+import { OnboardingAppearance, OnboardingAppearanceHandle } from "./onboarding-appearance";
 import { OnboardingConnect } from "./onboarding-connect";
 import { OnboardingStep1 } from "./onboarding-step1";
 import { OnboardingStep2, OnboardingStep2Handle } from "./onboarding-step2";
 
-const MAX_STEPS = 3;
+const MAX_STEPS = 4;
 
 const OnboardingPage = () => {
   const { data: settings, isLoading: isSettingsLoading } = useSettings();
@@ -18,6 +19,7 @@ const OnboardingPage = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isStepValid, setIsStepValid] = useState(true);
   const settingsStepRef = useRef<OnboardingStep2Handle>(null);
+  const appearanceStepRef = useRef<OnboardingAppearanceHandle>(null);
 
   if (isSettingsLoading) return null;
   if (settings?.onboardingCompleted) {
@@ -35,6 +37,8 @@ const OnboardingPage = () => {
   const handleContinue = () => {
     if (currentStep === 2 && settingsStepRef.current) {
       settingsStepRef.current.submitForm();
+    } else if (currentStep === 3 && appearanceStepRef.current) {
+      appearanceStepRef.current.submitForm();
     } else {
       handleNext();
     }
@@ -89,7 +93,14 @@ const OnboardingPage = () => {
                 onValidityChange={setIsStepValid}
               />
             )}
-            {currentStep === 3 && <OnboardingConnect />}
+            {currentStep === 3 && (
+              <OnboardingAppearance
+                ref={appearanceStepRef}
+                onNext={handleNext}
+                onValidityChange={setIsStepValid}
+              />
+            )}
+            {currentStep === 4 && <OnboardingConnect />}
           </motion.div>
         </AnimatePresence>
       </main>
@@ -97,7 +108,7 @@ const OnboardingPage = () => {
       {/* Fixed Footer */}
       <footer className="flex-none pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto max-w-4xl px-4 pt-6 pb-8 sm:px-6 sm:pb-18">
-          {currentStep === 3 ? (
+          {currentStep === 4 ? (
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="order-2 sm:order-1">
                 <Button variant="ghost" onClick={handleBack} size="sm">
