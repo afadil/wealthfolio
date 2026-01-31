@@ -169,12 +169,7 @@ function StatusSummary({
   const totalIssues = Object.values(counts).reduce((a, b) => (a ?? 0) + (b ?? 0), 0);
 
   if (totalIssues === 0) {
-    return (
-      <div className="bg-success/10 border-success/20 flex items-center gap-2 rounded-lg border px-3 py-2">
-        <Icons.CheckCircle className="text-success h-4 w-4" />
-        <span className="text-success text-sm font-medium">All systems healthy</span>
-      </div>
-    );
+    return null;
   }
 
   const severities: HealthSeverity[] = ["CRITICAL", "ERROR", "WARNING", "INFO"];
@@ -220,12 +215,14 @@ function StatusSummary({
 
 function HealthyState() {
   return (
-    <div className="flex flex-col items-center justify-center py-16">
-      <div className="bg-success/10 mb-4 flex h-12 w-12 items-center justify-center rounded-full">
-        <Icons.CheckCircle className="text-success h-6 w-6" />
+    <div className="flex flex-col items-center justify-center py-20">
+      <div className="bg-success/10 mb-6 flex h-16 w-16 items-center justify-center rounded-full">
+        <Icons.CheckCircle className="text-success h-8 w-8" />
       </div>
-      <h2 className="mb-1 text-base font-medium">All Clear</h2>
-      <p className="text-muted-foreground text-sm">No issues detected</p>
+      <h2 className="mb-2 text-lg font-semibold">Your Data Looks Great</h2>
+      <p className="text-muted-foreground max-w-sm text-center text-sm">
+        No issues found. Your portfolio data is consistent and up to date.
+      </p>
     </div>
   );
 }
