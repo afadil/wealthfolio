@@ -25,7 +25,7 @@ import {
   isIncomeActivity,
   isSplitActivity,
 } from "@/lib/activity-utils";
-import { ActivityType } from "@/lib/constants";
+import { ActivityType, isCashAssetId } from "@/lib/constants";
 import { ActivityDetails } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 import {
@@ -129,7 +129,7 @@ export const ActivityTable = ({
         cell: ({ row }) => {
           const symbol = String(row.getValue("assetSymbol"));
           const assetId = row.original.assetId;
-          const isCash = assetId.startsWith("CASH:");
+          const isCash = isCashAssetId(assetId);
           const displaySymbol = isCash ? "Cash" : symbol;
           const avatarSymbol = isCash ? "$CASH" : symbol;
 

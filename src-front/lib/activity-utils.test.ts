@@ -37,8 +37,11 @@ describe("Activity Utilities", () => {
     it("should identify cash transfers correctly", () => {
       expect(isCashTransfer(ActivityType.TRANSFER_IN, "$CASH-USD")).toBe(true);
       expect(isCashTransfer(ActivityType.TRANSFER_OUT, "$CASH-EUR")).toBe(true);
+      expect(isCashTransfer(ActivityType.TRANSFER_IN, "CASH:USD")).toBe(true);
 
       expect(isCashTransfer(ActivityType.TRANSFER_IN, "AAPL")).toBe(false);
+      expect(isCashTransfer(ActivityType.TRANSFER_IN, "CASH:XTSE")).toBe(false);
+      expect(isCashTransfer(ActivityType.TRANSFER_IN, "CASH.TO")).toBe(false);
       expect(isCashTransfer(ActivityType.DEPOSIT, "$CASH-USD")).toBe(false);
     });
   });

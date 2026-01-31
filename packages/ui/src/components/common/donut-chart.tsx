@@ -7,6 +7,35 @@ import { useBalancePrivacy } from "../../hooks/use-balance-privacy";
 import { formatPercent } from "../../lib/utils";
 import { AmountDisplay } from "../financial/amount-display";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "../ui/chart";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
+
+/**
+ * Formats a number in compact form (e.g., 437.8K, 1.2M)
+ */
+function formatCompactNumber(value: number, currency: string): string {
+  const absValue = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+
+  // Get currency symbol
+  const formatter = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+  const symbol = formatter.format(0).replace(/[0-9]/g, "").trim();
+
+  if (absValue >= 1_000_000_000) {
+    return `${sign}${symbol}${(absValue / 1_000_000_000).toFixed(1)}B`;
+  }
+  if (absValue >= 1_000_000) {
+    return `${sign}${symbol}${(absValue / 1_000_000).toFixed(1)}M`;
+  }
+  if (absValue >= 1_000) {
+    return `${sign}${symbol}${(absValue / 1_000).toFixed(1)}K`;
+  }
+  return `${sign}${symbol}${absValue.toFixed(0)}`;
+}
 
 const COLORS = [
   "var(--chart-1)",
@@ -32,15 +61,23 @@ const ChartCenterLabel: React.FC<ChartCenterLabelProps> = ({ activeData, totalVa
   }
 
   const percent = totalValue > 0 ? activeData.value / totalValue : 0;
+  const compactValue = isBalanceHidden ? "••••" : formatCompactNumber(activeData.value, activeData.currency);
 
   return (
-    <div className="pointer-events-none absolute top-[108px] left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
-      <p className="text-muted-foreground text-xs font-medium">{activeData.name}</p>
-      <p className="text-foreground text-xs font-bold">
-        <AmountDisplay value={activeData.value} currency={activeData.currency} isHidden={isBalanceHidden} />
-      </p>
-      <p className="text-muted-foreground text-xs">({formatPercent(percent)})</p>
-    </div>
+    <TooltipProvider>
+      <div className="pointer-events-auto absolute top-[108px] left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
+        <p className="text-muted-foreground text-xs font-medium">{activeData.name}</p>
+        <Tooltip delayDuration={100}>
+          <TooltipTrigger asChild>
+            <p className="text-foreground cursor-default text-xs font-bold">{compactValue}</p>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-center">
+            <AmountDisplay value={activeData.value} currency={activeData.currency} isHidden={isBalanceHidden} />
+          </TooltipContent>
+        </Tooltip>
+        <p className="text-muted-foreground text-xs">({formatPercent(percent)})</p>
+      </div>
+    </TooltipProvider>
   );
 };
 

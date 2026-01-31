@@ -322,9 +322,15 @@ export function createCurrencyResolver(
     // Support both old format ($CASH-CAD) and new format (CASH:CAD)
     let cashCurrency: string | undefined;
     if (assetKey.startsWith("$CASH-")) {
-      cashCurrency = assetKey.replace("$CASH-", "");
+      const currency = assetKey.slice("$CASH-".length);
+      if (/^[A-Z]{3}$/.test(currency)) {
+        cashCurrency = currency;
+      }
     } else if (assetKey.startsWith("CASH:")) {
-      cashCurrency = assetKey.replace("CASH:", "");
+      const currency = assetKey.slice("CASH:".length);
+      if (/^[A-Z]{3}$/.test(currency)) {
+        cashCurrency = currency;
+      }
     }
     const assetCurrency = cashCurrency ?? assetCurrencyLookup.get(assetKey);
 

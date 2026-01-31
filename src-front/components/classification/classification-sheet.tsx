@@ -26,7 +26,7 @@ interface ClassificationSheetProps {
  * Can be used from Assets page, Holdings page, and Asset Profile page.
  *
  * Layout:
- * - Single-select taxonomies at top (type_of_security, risk_category)
+ * - Single-select taxonomies at top (instrument_type, risk_category)
  * - Multi-select taxonomies below (asset_classes, industries, regions, custom)
  */
 export function ClassificationSheet({

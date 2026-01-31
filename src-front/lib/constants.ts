@@ -142,7 +142,7 @@ export function parseAssetId(assetId: string): ParsedAssetId | null {
   // Determine kind based on the ID format
   let kind: ParsedAssetId["kind"];
 
-  if (primary === "CASH") {
+  if (primary === "CASH" && /^[A-Z]{3}$/.test(qualifier)) {
     kind = "cash";
   } else if (["PROP", "VEH", "COLL", "PREC", "LIAB", "ALT"].includes(primary)) {
     kind = "alternative";
@@ -197,10 +197,14 @@ export function isLiabilityAssetId(assetId: string): boolean {
 }
 
 /**
- * Returns true if the asset ID belongs to a cash position (CASH: prefix).
+ * Returns true if the asset ID belongs to a cash position (CASH:{currency}).
  */
 export function isCashAssetId(assetId: string): boolean {
-  return assetId.startsWith(CASH_ASSET_ID_PREFIX);
+  if (!assetId.startsWith(CASH_ASSET_ID_PREFIX)) {
+    return false;
+  }
+  const currency = assetId.slice(CASH_ASSET_ID_PREFIX.length);
+  return /^[A-Z]{3}$/.test(currency);
 }
 
 // DataSource: Where quote data comes from (used on Quote objects)

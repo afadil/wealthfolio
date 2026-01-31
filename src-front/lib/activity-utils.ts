@@ -42,9 +42,22 @@ export const isCashTransfer = (activityType: string, assetSymbol: string): boole
   // - New format: CASH:{currency} (e.g., CASH:USD)
   // - Display value: "CASH" (set by applyCashDefaults)
   const upperSymbol = assetSymbol.toUpperCase();
-  return (
-    upperSymbol === "CASH" || upperSymbol.startsWith("$CASH") || upperSymbol.startsWith("CASH:")
-  );
+
+  if (upperSymbol === "CASH") {
+    return true;
+  }
+
+  if (upperSymbol.startsWith("$CASH-")) {
+    const currency = upperSymbol.slice("$CASH-".length);
+    return /^[A-Z]{3}$/.test(currency);
+  }
+
+  if (upperSymbol.startsWith("CASH:")) {
+    const currency = upperSymbol.slice("CASH:".length);
+    return /^[A-Z]{3}$/.test(currency);
+  }
+
+  return false;
 };
 
 // Helper to check if activity is a trade type

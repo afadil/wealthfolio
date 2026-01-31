@@ -18,6 +18,23 @@ function stripExchangeSuffix(symbol: string): string {
   return symbol.replace(suffixPattern, "");
 }
 
+/**
+ * Normalize crypto pair symbols (e.g., "BTC-CAD" -> "BTC").
+ * Canonical crypto IDs use base symbol + quote currency.
+ */
+function stripCryptoQuoteSuffix(symbol: string, currencyHint?: string): string {
+  const trimmed = symbol.trim();
+  const match = trimmed.match(/^(.*)-([A-Za-z]{3,5})$/);
+  if (!match) return trimmed;
+  const base = match[1]?.trim();
+  const quote = match[2]?.trim().toUpperCase();
+  const hint = currencyHint?.trim().toUpperCase();
+  if (hint && quote && quote !== hint) {
+    return trimmed;
+  }
+  return base || trimmed;
+}
+
 interface SymbolSearchProps<TFieldValues extends FieldValues = FieldValues> {
   /** Field name for the symbol value */
   name: FieldPath<TFieldValues>;
@@ -58,9 +75,15 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
       setValue(pricingModeName, PricingMode.MANUAL as any);
     }
 
-    // Strip exchange suffix when we have exchangeMic (e.g., "VFV.TO" -> "VFV")
-    // Backend generates canonical ID as SEC:{symbol}:{mic}, so we need the base symbol
-    const baseSymbol = searchResult?.exchangeMic ? stripExchangeSuffix(symbol) : symbol;
+    // Normalize symbol for canonical ID generation:
+    // - Securities: strip Yahoo suffix when exchangeMic exists (e.g., "VFV.TO" -> "VFV")
+    // - Crypto: strip quote suffix (e.g., "BTC-CAD" -> "BTC")
+    // Backend generates canonical IDs (SEC:{symbol}:{mic}, CRYPTO:{symbol}:{currency})
+    const withoutExchangeSuffix = searchResult?.exchangeMic ? stripExchangeSuffix(symbol) : symbol;
+    const baseSymbol =
+      searchResult?.assetKind?.toUpperCase() === "CRYPTO"
+        ? stripCryptoQuoteSuffix(withoutExchangeSuffix, searchResult?.currency)
+        : withoutExchangeSuffix;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     setValue(name, baseSymbol as any, {

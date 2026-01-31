@@ -12,6 +12,10 @@ export interface LocalTransaction extends ActivityDetails {
   pendingAssetKind?: string;
   /** Whether this transfer is external (from/to outside tracked accounts). Stored in metadata.flow.is_external */
   isExternal?: boolean;
+  /** Original asset symbol from server - used to detect symbol changes for updates */
+  _originalAssetSymbol?: string;
+  /** Original asset ID from server - sent for updates when symbol hasn't changed */
+  _originalAssetId?: string;
 }
 
 /**
@@ -31,7 +35,14 @@ export function toLocalTransaction(activity: ActivityDetails): LocalTransaction 
   // Extract isExternal from metadata.flow.is_external
   const flowMeta = activity.metadata?.flow as Record<string, unknown> | undefined;
   const isExternal = flowMeta?.is_external === true;
-  return { ...activity, isNew: false, isExternal };
+  return {
+    ...activity,
+    isNew: false,
+    isExternal,
+    // Capture original values for change detection during updates
+    _originalAssetSymbol: activity.assetSymbol,
+    _originalAssetId: activity.assetId,
+  };
 }
 
 /**
@@ -116,7 +127,7 @@ interface ActivityBasePayload {
   currency?: string;
   fee?: string;
   fxRate?: string | null;
-  comment?: string;
+  notes?: string | null;
   /** JSON blob for metadata (e.g., flow.is_external for transfers) */
   metadata?: string;
 }

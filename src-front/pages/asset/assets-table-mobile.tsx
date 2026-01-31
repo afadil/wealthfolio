@@ -24,7 +24,7 @@ import {
 } from "@wealthfolio/ui/components/ui/sheet";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
-import { Quote } from "@/lib/types";
+import { ASSET_KIND_DISPLAY_NAMES, AssetKind, Quote } from "@/lib/types";
 import { cn, formatAmount, formatDate } from "@/lib/utils";
 import { ScrollArea, Separator } from "@wealthfolio/ui";
 import { ParsedAsset } from "./asset-utils";
@@ -411,7 +411,9 @@ export function AssetsTableMobile({
                           >
                             {isSelected && <Icons.Check className="text-secondary h-3 w-3" />}
                           </div>
-                          <span className="font-medium uppercase">{kind}</span>
+                          <span className="font-medium">
+                            {ASSET_KIND_DISPLAY_NAMES[kind as AssetKind] ?? kind}
+                          </span>
                         </div>
                         <Badge variant="secondary" className="ml-auto">
                           {count}

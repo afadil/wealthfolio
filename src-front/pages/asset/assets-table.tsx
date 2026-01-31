@@ -26,6 +26,7 @@ import {
 } from "@wealthfolio/ui/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 
+import { ASSET_KIND_DISPLAY_NAMES, AssetKind } from "@/lib/types";
 import { Quote } from "@/lib/types";
 import { formatAmount, formatDate } from "@/lib/utils";
 import { ParsedAsset } from "./asset-utils";
@@ -156,6 +157,17 @@ export function AssetsTable({
         enableHiding: false,
       },
       {
+        accessorKey: "kind",
+        header: () => null,
+        cell: () => null,
+        enableHiding: false,
+        filterFn: (row, id, value) => {
+          const filterValue = value as string[];
+          const cellValue = row.getValue(id);
+          return filterValue.includes(cellValue as string);
+        },
+      },
+      {
         accessorKey: "isStale",
         header: () => null,
         cell: () => null,
@@ -280,8 +292,22 @@ export function AssetsTable({
     }));
   }, [assets]);
 
+  // Build filter options from assets (kind)
+  const kindOptions = useMemo(() => {
+    const kinds = new Set(assets.map((asset) => asset.kind).filter(Boolean));
+    return Array.from(kinds).map((kind) => ({
+      label: ASSET_KIND_DISPLAY_NAMES[kind as AssetKind] ?? kind,
+      value: kind,
+    }));
+  }, [assets]);
+
   const filters: DataTableFacetedFilterProps<ParsedAsset, unknown>[] = useMemo(
     () => [
+      {
+        id: "kind",
+        title: "Kind",
+        options: kindOptions,
+      },
       {
         id: "pricingMode",
         title: "Mode",
@@ -293,7 +319,7 @@ export function AssetsTable({
         options: PRICE_STALE_OPTIONS,
       },
     ],
-    [pricingModeOptions],
+    [kindOptions, pricingModeOptions],
   );
 
   // Add computed field for stale status to enable filtering
@@ -371,6 +397,7 @@ export function AssetsTable({
         isStale: false,
         assetSubClass: false,
         pricingMode: false,
+        kind: false,
       }}
       defaultSorting={[{ id: "symbol", desc: false }]}
       storageKey="securities-table-v2"

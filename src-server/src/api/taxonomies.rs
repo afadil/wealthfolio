@@ -495,8 +495,14 @@ async fn migrate_legacy_classifications(
 
         if processed {
             result.assets_processed += 1;
+        }
 
-            // Cleanup legacy metadata after successful migration
+        // Always cleanup legacy metadata after attempting migration.
+        // This ensures migration is a one-shot action - even if no mappings were found,
+        // we remove the legacy data to stop prompting the user.
+        let has_legacy_data =
+            legacy.get("sectors").is_some() || legacy.get("countries").is_some();
+        if has_legacy_data {
             if let Err(e) = state.asset_service.cleanup_legacy_metadata(&asset.id).await {
                 warn!(
                     "Failed to cleanup legacy metadata for asset '{}': {}",

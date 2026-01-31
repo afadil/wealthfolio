@@ -9,7 +9,12 @@ import { AccountSelector } from "@/components/account-selector";
 import { ActionPalette, type ActionPaletteGroup } from "@/components/action-palette";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useHoldings } from "@/hooks/use-holdings";
-import { useAlternativeHoldings, useDeleteAlternativeAsset } from "@/hooks/use-alternative-assets";
+import {
+  useAlternativeHoldings,
+  useDeleteAlternativeAsset,
+  useLinkLiability,
+  useUnlinkLiability,
+} from "@/hooks/use-alternative-assets";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import {
   PORTFOLIO_ACCOUNT_ID,
@@ -28,6 +33,8 @@ import {
   AssetDetailsSheet,
   UpdateValuationModal,
   type AssetDetailsSheetAsset,
+  type LinkableAsset,
+  type LinkedLiability,
 } from "@/features/alternative-assets";
 import { updateAlternativeAssetMetadata } from "@/adapters";
 import { ClassificationSheet } from "@/components/classification/classification-sheet";
@@ -75,6 +82,16 @@ export const HoldingsPage = () => {
 
   // Delete mutation
   const { mutate: deleteAsset, isPending: isDeleting } = useDeleteAlternativeAsset();
+
+  // Linking mutations
+  const linkLiabilityMutation = useLinkLiability();
+  const unlinkLiabilityMutation = useUnlinkLiability();
+
+  // State for chained liability creation (when creating property with mortgage checkbox)
+  const [pendingLiabilityLink, setPendingLiabilityLink] = useState<string | null>(null);
+  const [pendingLiabilityType, setPendingLiabilityType] = useState<string | undefined>(undefined);
+  const [pendingOriginationDate, setPendingOriginationDate] = useState<Date | undefined>(undefined);
+  const [pendingMortgageName, setPendingMortgageName] = useState<string | undefined>(undefined);
 
   // Classification sheet state
   const [classifyAsset, setClassifyAsset] = useState<{
@@ -164,6 +181,96 @@ export const HoldingsPage = () => {
     if (!alternativeHoldings) return [];
     return alternativeHoldings.filter((h) => h.kind === "liability");
   }, [alternativeHoldings]);
+
+  // Linkable assets for liability creation/editing (properties and vehicles)
+  const linkableAssets: LinkableAsset[] = useMemo(() => {
+    return assetsHoldings
+      .filter((h) => h.kind === "property" || h.kind === "vehicle")
+      .map((h) => ({ id: h.id, name: h.name }));
+  }, [assetsHoldings]);
+
+  // Get linked liabilities for a property (mortgages that have linked_asset_id matching the property)
+  const getLinkedLiabilities = useCallback(
+    (propertyId: string): LinkedLiability[] => {
+      return liabilitiesHoldings
+        .filter((h) => {
+          const linkedAssetId = (h.metadata as Record<string, unknown>)?.linked_asset_id;
+          return linkedAssetId === propertyId;
+        })
+        .map((h) => ({
+          id: h.id,
+          name: h.name,
+          balance: h.marketValue,
+        }));
+    },
+    [liabilitiesHoldings],
+  );
+
+  // Get available (unlinked) mortgages for linking to a property
+  const getAvailableMortgages = useCallback(
+    (excludePropertyId?: string): LinkedLiability[] => {
+      return liabilitiesHoldings
+        .filter((h) => {
+          const metadata = h.metadata as Record<string, unknown>;
+          const liabilityType = metadata?.liability_type;
+          const linkedAssetId = metadata?.linked_asset_id;
+          // Only mortgages that are not linked to any asset (or linked to this property for re-linking)
+          return (
+            liabilityType === "mortgage" && (!linkedAssetId || linkedAssetId === excludePropertyId)
+          );
+        })
+        .map((h) => ({
+          id: h.id,
+          name: h.name,
+          balance: h.marketValue,
+        }));
+    },
+    [liabilitiesHoldings],
+  );
+
+  // Get the name of the asset linked to a liability
+  const getLinkedAssetName = useCallback(
+    (liabilityMetadata?: Record<string, unknown>): string | undefined => {
+      const linkedAssetId = liabilityMetadata?.linked_asset_id as string | undefined;
+      if (!linkedAssetId) return undefined;
+      const linkedAsset = assetsHoldings.find((h) => h.id === linkedAssetId);
+      return linkedAsset?.name;
+    },
+    [assetsHoldings],
+  );
+
+  // Handler for chained liability creation (called when property is created with mortgage checkbox)
+  const handleOpenLiabilityQuickAdd = useCallback(
+    (propertyId: string, purchaseDate?: Date, propertyName?: string) => {
+      setPendingLiabilityLink(propertyId);
+      setPendingLiabilityType("mortgage");
+      setPendingOriginationDate(purchaseDate);
+      setPendingMortgageName(propertyName ? `${propertyName} Mortgage` : undefined);
+      setModalDefaultKind(AlternativeAssetKind.LIABILITY);
+      setIsAlternativeAssetModalOpen(true);
+    },
+    [],
+  );
+
+  // Handler for linking a mortgage to a property
+  const handleLinkMortgage = useCallback(
+    async (mortgageId: string) => {
+      if (!editAsset) return;
+      await linkLiabilityMutation.mutateAsync({
+        liabilityId: mortgageId,
+        targetAssetId: editAsset.id,
+      });
+    },
+    [editAsset, linkLiabilityMutation],
+  );
+
+  // Handler for unlinking a mortgage from a property
+  const handleUnlinkMortgage = useCallback(
+    async (mortgageId: string) => {
+      await unlinkLiabilityMutation.mutateAsync(mortgageId);
+    },
+    [unlinkLiabilityMutation],
+  );
 
   // Process investment holdings
   const { nonCashHoldings, filteredHoldings } = useMemo(() => {
@@ -481,9 +588,21 @@ export const HoldingsPage = () => {
         open={isAlternativeAssetModalOpen}
         onOpenChange={(open) => {
           setIsAlternativeAssetModalOpen(open);
-          if (!open) setModalDefaultKind(undefined);
+          if (!open) {
+            setModalDefaultKind(undefined);
+            setPendingLiabilityLink(null);
+            setPendingLiabilityType(undefined);
+            setPendingOriginationDate(undefined);
+            setPendingMortgageName(undefined);
+          }
         }}
         defaultKind={getDefaultKindForModal()}
+        linkableAssets={linkableAssets}
+        linkedAssetId={pendingLiabilityLink ?? undefined}
+        defaultLiabilityType={pendingLiabilityType}
+        defaultOriginationDate={pendingOriginationDate}
+        defaultName={pendingMortgageName}
+        onOpenLiabilityQuickAdd={handleOpenLiabilityQuickAdd}
       />
 
       {/* Asset Details Sheet (Edit) */}
@@ -493,6 +612,12 @@ export const HoldingsPage = () => {
         asset={editAsset}
         onSave={handleSaveAssetDetails}
         isSaving={isSavingDetails}
+        linkableAssets={linkableAssets}
+        linkedAssetName={getLinkedAssetName(editAsset?.metadata)}
+        linkedLiabilities={editAsset ? getLinkedLiabilities(editAsset.id) : []}
+        availableMortgages={editAsset ? getAvailableMortgages(editAsset.id) : []}
+        onLinkMortgage={handleLinkMortgage}
+        onUnlinkMortgage={handleUnlinkMortgage}
       />
 
       {/* Update Valuation Modal */}

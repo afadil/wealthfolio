@@ -262,7 +262,7 @@ impl AllocationServiceTrait for AllocationService {
         let mut regions_alloc = TaxonomyAllocation::empty("regions", "Regions", "#8b7ec8");
         let mut risk_alloc = TaxonomyAllocation::empty("risk_category", "Risk Category", "#d14d41");
         let mut security_types_alloc =
-            TaxonomyAllocation::empty("type_of_security", "Type of Security", "#3aa99f");
+            TaxonomyAllocation::empty("instrument_type", "Instrument Type", "#4385be");
         let mut custom_allocs: Vec<TaxonomyAllocation> = Vec::new();
 
         for twc in taxonomies {
@@ -357,16 +357,16 @@ impl AllocationServiceTrait for AllocationService {
                         false, // No rollup for risk
                     );
                 }
-                "type_of_security" => {
+                "instrument_type" => {
                     security_types_alloc = self.aggregate_by_taxonomy(
                         &holdings,
                         &taxonomy.id,
-                        "Type of Security",
+                        "Instrument Type",
                         &taxonomy.color,
                         categories,
                         &assignments_by_asset,
                         total_value,
-                        false, // No rollup - single-select taxonomy
+                        true, // Roll up to top-level instrument types
                     );
                 }
                 _ if taxonomy.id == "custom_groups" || !taxonomy.is_system => {

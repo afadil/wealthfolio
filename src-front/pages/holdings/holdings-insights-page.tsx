@@ -18,19 +18,17 @@ import { useHoldings } from "@/hooks/use-holdings";
 import { usePortfolioAllocations } from "@/hooks/use-portfolio-allocations";
 import { PORTFOLIO_ACCOUNT_ID, isAlternativeAssetId } from "@/lib/constants";
 import { useSettingsContext } from "@/lib/settings-provider";
-import { Account, Holding, HoldingType, Instrument } from "@/lib/types";
+import type { Account, Holding, HoldingType, Instrument } from "@/lib/types";
 import { useNavigate } from "react-router-dom";
-import { AccountAllocationChart } from "./components/account-allocation-chart";
 import { CashHoldingsWidget } from "./components/cash-holdings-widget";
-import { ClassesChart } from "./components/classes-chart";
 import { PortfolioComposition } from "./components/composition-chart";
-import { CountryChart } from "./components/country-chart";
 import { HoldingCurrencyChart } from "./components/currency-chart";
-import { CustomCategoriesChip } from "./components/custom-categories-chip";
 import { SectorsChart } from "./components/sectors-chart";
 import { SegmentedAllocationBar } from "./components/segmented-allocation-bar";
+import { CompactAllocationStrip } from "./components/compact-allocation-strip";
+import { DrillableDonutChart } from "./components/drillable-donut-chart";
+import { DrillableAccountChart } from "./components/drillable-account-chart";
 
-// Define a type for the filter criteria
 type SheetFilterType =
   | "class"
   | "sector"
@@ -80,7 +78,6 @@ export const HoldingsInsightsPage = () => {
     title?: string,
     categoryId?: string,
     compositionId?: Instrument["id"],
-    _accountIdsForFilter?: string[],
   ) => {
     setSheetFilterType(type);
     setSheetFilterName(name);
@@ -104,11 +101,10 @@ export const HoldingsInsightsPage = () => {
     switch (sheetFilterType) {
       case "class":
         filteredHoldings = holdings.filter((h) => {
-          const isCash = h.holdingType === HoldingType.CASH;
+          const isCash = h.holdingType === ("cash" as HoldingType);
           if (isCash) {
             return sheetFilterName === "Cash";
           }
-          // Use taxonomy assetClasses classification - filter by top-level category ID
           const assetClasses = h.instrument?.classifications?.assetClasses;
           if (assetClasses && assetClasses.length > 0) {
             return assetClasses.some((c) => c.topLevelCategory.id === sheetFilterId);
@@ -118,7 +114,6 @@ export const HoldingsInsightsPage = () => {
         break;
       case "sector":
         filteredHoldings = holdings.filter((h) => {
-          // Filter by top-level category ID to match rolled-up allocation view
           const taxonomySectors = h.instrument?.classifications?.sectors;
           if (taxonomySectors && taxonomySectors.length > 0) {
             return taxonomySectors.some((s) => s.topLevelCategory.id === sheetFilterId);
@@ -128,7 +123,6 @@ export const HoldingsInsightsPage = () => {
         break;
       case "country":
         filteredHoldings = holdings.filter((h) => {
-          // Filter by top-level category ID
           const taxonomyRegions = h.instrument?.classifications?.regions;
           if (taxonomyRegions && taxonomyRegions.length > 0) {
             return taxonomyRegions.some((r) => r.topLevelCategory.id === sheetFilterId);
@@ -168,7 +162,6 @@ export const HoldingsInsightsPage = () => {
         break;
       case "custom":
         filteredHoldings = holdings.filter((h) => {
-          // Filter by top-level category ID
           const customGroups = h.instrument?.classifications?.customGroups;
           if (customGroups && customGroups.length > 0) {
             return customGroups.some((c) => c.topLevelCategory.id === sheetFilterId);
@@ -192,12 +185,10 @@ export const HoldingsInsightsPage = () => {
   };
 
   const { cashHoldings, nonCashHoldings } = useMemo(() => {
-    const cash =
-      holdings?.filter((holding) => holding.holdingType?.toLowerCase() === HoldingType.CASH) ?? [];
-    // Filter out alternative assets (PROP-, VEH-, COLL-, PREC-, LIAB-, ALT-) - insights is investment-focused
+    const cash = holdings?.filter((holding) => holding.holdingType?.toLowerCase() === "cash") ?? [];
     const nonCash =
       holdings?.filter((holding) => {
-        if (holding.holdingType?.toLowerCase() === HoldingType.CASH) return false;
+        if (holding.holdingType?.toLowerCase() === "cash") return false;
         const symbol = holding.instrument?.symbol ?? holding.id;
         if (isAlternativeAssetId(symbol)) return false;
         return true;
@@ -206,14 +197,13 @@ export const HoldingsInsightsPage = () => {
     return { cashHoldings: cash, nonCashHoldings: nonCash };
   }, [holdings]);
 
-  // For insights tab, check if there are no holdings at all (including cash)
   const hasNoHoldingsAtAll = !isLoading && (!holdings || holdings.length === 0);
 
-  // Check if we have any custom taxonomy allocations to display
-  const hasCustomAllocations =
-    allocations?.customGroups && allocations.customGroups.some((g) => g.categories.length > 0);
   const hasRiskAllocations =
     allocations?.riskCategory && allocations.riskCategory.categories.length > 0;
+
+  const hasCustomGroups =
+    allocations?.customGroups?.some((taxonomy) => taxonomy.categories.length > 0) ?? false;
 
   const renderEmptyState = () => (
     <div className="flex items-center justify-center py-16">
@@ -243,29 +233,10 @@ export const HoldingsInsightsPage = () => {
 
     return (
       <div className="space-y-4">
-        {/* First row: Cash Balance and Risk Profile */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <CashHoldingsWidget cashHoldings={cashHoldings ?? []} isLoading={isLoading} />
-          {hasRiskAllocations && (
-            <SegmentedAllocationBar
-              title="Risk Profile"
-              allocation={allocations?.riskCategory}
-              baseCurrency={baseCurrency}
-              isLoading={isLoading}
-              compact={true}
-              onSegmentClick={(categoryId, categoryName) =>
-                handleChartSectionClick(
-                  "risk",
-                  categoryName,
-                  `Risk Category: ${categoryName}`,
-                  categoryId,
-                )
-              }
-            />
-          )}
-        </div>
+        {/* Row 1: Cash Balance (full width) */}
+        <CashHoldingsWidget cashHoldings={cashHoldings ?? []} isLoading={isLoading} />
 
-        {/* Second row: Summary widgets */}
+        {/* Row 2: 4 semi-donut charts */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <HoldingCurrencyChart
             holdings={[...cashHoldings, ...nonCashHoldings]}
@@ -276,13 +247,16 @@ export const HoldingsInsightsPage = () => {
             }
           />
 
-          <AccountAllocationChart isLoading={isLoading} />
+          <DrillableAccountChart isLoading={isLoading} />
 
-          <ClassesChart
+          <DrillableDonutChart
+            title="Asset Classes"
             allocation={allocations?.assetClasses}
+            holdings={nonCashHoldings}
+            taxonomyType="assetClasses"
             baseCurrency={baseCurrency}
             isLoading={isLoading}
-            onClassSectionClick={(categoryId, categoryName) =>
+            onCategoryClick={(categoryId, categoryName) =>
               handleChartSectionClick(
                 "class",
                 categoryName,
@@ -292,11 +266,14 @@ export const HoldingsInsightsPage = () => {
             }
           />
 
-          <CountryChart
+          <DrillableDonutChart
+            title="Regions"
             allocation={allocations?.regions}
+            holdings={nonCashHoldings}
+            taxonomyType="regions"
             baseCurrency={baseCurrency}
             isLoading={isLoading}
-            onCountrySectionClick={(categoryId, categoryName) =>
+            onCategoryClick={(categoryId, categoryName) =>
               handleChartSectionClick(
                 "country",
                 categoryName,
@@ -307,46 +284,47 @@ export const HoldingsInsightsPage = () => {
           />
         </div>
 
-        {/* Classification Strip: Type of Security and Custom Categories */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <SegmentedAllocationBar
-            title="Type of Security"
-            allocation={allocations?.securityTypes}
-            baseCurrency={baseCurrency}
-            isLoading={isLoading}
-            compact={true}
-            onSegmentClick={(categoryId, categoryName) =>
-              handleChartSectionClick(
-                "securityType",
-                categoryName,
-                `Type: ${categoryName}`,
-                categoryId,
-              )
-            }
-          />
-          <CustomCategoriesChip
-            customGroups={allocations?.customGroups}
-            baseCurrency={baseCurrency}
-            isLoading={isLoading}
-            onCategoryClick={(categoryId, categoryName, taxonomyName) =>
-              handleChartSectionClick(
-                "custom",
-                categoryName,
-                `${taxonomyName}: ${categoryName}`,
-                categoryId,
-              )
-            }
-          />
-        </div>
-
-        {/* Composition and Sector */}
+        {/* Row 3: Composition (col-span-3) + Right column (Security Type, Risk Profile, Sectors) */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
           <div className="col-span-1 lg:col-span-3">
             <PortfolioComposition holdings={nonCashHoldings ?? []} isLoading={isLoading} />
           </div>
 
-          {/* Sectors Chart */}
-          <div className="col-span-1">
+          <div className="col-span-1 space-y-4">
+            <CompactAllocationStrip
+              title="Security Types"
+              allocation={allocations?.securityTypes}
+              baseCurrency={baseCurrency}
+              isLoading={isLoading}
+              variant="security-types"
+              onSegmentClick={(categoryId, categoryName) =>
+                handleChartSectionClick(
+                  "securityType",
+                  categoryName,
+                  `Type: ${categoryName}`,
+                  categoryId,
+                )
+              }
+            />
+
+            {hasRiskAllocations && (
+              <CompactAllocationStrip
+                title="Risk Composition"
+                allocation={allocations?.riskCategory}
+                baseCurrency={baseCurrency}
+                isLoading={isLoading}
+                variant="risk-composition"
+                onSegmentClick={(categoryId, categoryName) =>
+                  handleChartSectionClick(
+                    "risk",
+                    categoryName,
+                    `Risk Category: ${categoryName}`,
+                    categoryId,
+                  )
+                }
+              />
+            )}
+
             <SectorsChart
               allocation={allocations?.sectors}
               baseCurrency={baseCurrency}
@@ -363,29 +341,32 @@ export const HoldingsInsightsPage = () => {
           </div>
         </div>
 
-        {/* Fourth row: Custom Taxonomies */}
-        {hasCustomAllocations && (
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {allocations?.customGroups?.map(
-              (taxonomy) =>
-                taxonomy.categories.length > 0 && (
-                  <SegmentedAllocationBar
-                    key={taxonomy.taxonomyId}
-                    title={taxonomy.taxonomyName}
-                    allocation={taxonomy}
-                    baseCurrency={baseCurrency}
-                    isLoading={isLoading}
-                    onSegmentClick={(categoryId, categoryName) =>
-                      handleChartSectionClick(
-                        "custom",
-                        categoryName,
-                        `${taxonomy.taxonomyName}: ${categoryName}`,
-                        categoryId,
-                      )
-                    }
-                  />
-                ),
-            )}
+        {/* Row 4: Custom Groups (under composition, col-span-3) */}
+        {hasCustomGroups && (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+            <div className="col-span-1 space-y-4 lg:col-span-3">
+              {allocations?.customGroups?.map(
+                (taxonomy) =>
+                  taxonomy.categories.length > 0 && (
+                    <SegmentedAllocationBar
+                      key={taxonomy.taxonomyId}
+                      title={taxonomy.taxonomyName}
+                      allocation={taxonomy}
+                      baseCurrency={baseCurrency}
+                      isLoading={isLoading}
+                      compact={true}
+                      onSegmentClick={(categoryId, categoryName) =>
+                        handleChartSectionClick(
+                          "custom",
+                          categoryName,
+                          `${taxonomy.taxonomyName}: ${categoryName}`,
+                          categoryId,
+                        )
+                      }
+                    />
+                  ),
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -435,7 +416,7 @@ export const HoldingsInsightsPage = () => {
                   let displayName = "N/A";
                   let symbol = "-";
                   let assetId: string | null = null;
-                  if (holding.holdingType === HoldingType.CASH) {
+                  if (holding.holdingType === ("cash" as HoldingType)) {
                     displayName = holding.localCurrency
                       ? `Cash (${holding.localCurrency})`
                       : "Cash";

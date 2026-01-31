@@ -546,6 +546,7 @@ describe("Form Schemas Validation", () => {
           transferMode: "securities",
           assetId: "AAPL",
           quantity: 5,
+          unitPrice: 100,
           comment: "External securities transfer in",
         };
 
