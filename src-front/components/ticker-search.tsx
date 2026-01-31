@@ -47,6 +47,17 @@ interface SearchResultsProps {
   onCreateCustomAsset: () => void;
 }
 
+function getSearchResultKey(result: SymbolSearchResult) {
+  if (result.existingAssetId) return result.existingAssetId;
+  const parts = [
+    result.symbol,
+    result.exchangeMic ?? result.exchange,
+    result.currency,
+    result.index,
+  ].filter(Boolean);
+  return parts.join("|");
+}
+
 // Memoize search results component
 const SearchResults = memo(
   ({
@@ -59,6 +70,7 @@ const SearchResults = memo(
   }: SearchResultsProps) => {
     const hasResults = results && results.length > 0;
     const showNoResults = !isLoading && !hasResults && query.length > 1;
+    const selectedKey = selectedResult ? getSearchResultKey(selectedResult) : null;
 
     return (
       <CommandList>
@@ -85,11 +97,13 @@ const SearchResults = memo(
             // Use exchangeName if available (from backend), otherwise map exchange code to friendly name
             const exchangeDisplay = ticker.exchangeName || getExchangeDisplayName(ticker.exchange);
             const displayName = ticker.longName || ticker.shortName || ticker.symbol;
+            const itemKey = getSearchResultKey(ticker);
+            const isSelected = selectedKey === itemKey;
             return (
               <CommandItem
-                key={ticker.symbol}
+                key={itemKey}
                 onSelect={() => onSelect(ticker)}
-                value={ticker.symbol}
+                value={itemKey}
                 className="flex items-center justify-between py-2"
               >
                 <div className="flex flex-col">
@@ -98,7 +112,7 @@ const SearchResults = memo(
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-muted-foreground text-xs">{exchangeDisplay}</span>
-                  {selectedResult?.symbol === ticker.symbol && <Icons.Check className="size-4" />}
+                  {isSelected && <Icons.Check className="size-4" />}
                 </div>
               </CommandItem>
             );

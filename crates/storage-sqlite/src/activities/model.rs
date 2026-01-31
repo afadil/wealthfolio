@@ -73,14 +73,20 @@ pub struct ActivityDB {
     pub settlement_date: Option<String>,
 
     // Quantities - NOW ALL NULLABLE
+    // treat_none_as_null: When None, Diesel sets column to NULL instead of skipping
+    #[diesel(treat_none_as_null = true)]
     pub quantity: Option<String>,
+    #[diesel(treat_none_as_null = true)]
     pub unit_price: Option<String>,
+    #[diesel(treat_none_as_null = true)]
     pub amount: Option<String>,
+    #[diesel(treat_none_as_null = true)]
     pub fee: Option<String>,
     pub currency: String,
     pub fx_rate: Option<String>,
 
     // Metadata
+    #[diesel(treat_none_as_null = true)]
     pub notes: Option<String>,
     pub metadata: Option<String>,
 

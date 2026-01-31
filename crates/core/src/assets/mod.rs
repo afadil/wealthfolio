@@ -30,6 +30,7 @@ pub use asset_id::{
     canonical_asset_id,
     // Yahoo symbol parsing helpers
     parse_symbol_with_exchange_suffix,
+    parse_crypto_pair_symbol,
     security_id_from_symbol,
     security_id_from_symbol_with_mic,
     // Alternative Asset ID Generation
