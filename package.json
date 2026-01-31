@@ -41,7 +41,9 @@
   "dependencies": {
     "@assistant-ui/react": "^0.11.53",
     "@assistant-ui/react-markdown": "^0.11.9",
+    "@fontsource-variable/inter": "^5.2.8",
     "@fontsource/ibm-plex-mono": "^5.2.7",
+    "@fontsource/merriweather": "^5.2.11",
     "@hookform/resolvers": "^5.2.2",
     "@internationalized/date": "^3.10.0",
     "@number-flow/react": "^0.5.10",
