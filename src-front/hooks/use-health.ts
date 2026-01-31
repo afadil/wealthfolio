@@ -88,11 +88,19 @@ export function useExecuteHealthFix() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (action: FixAction) => executeHealthFix(action),
-    onSuccess: () => {
-      // Refresh health status after fix
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.HEALTH_STATUS] });
-      toast.success("Fix applied", { description: "Refreshing health status..." });
+    mutationFn: async (action: FixAction) => {
+      // Execute the fix
+      await executeHealthFix(action);
+      // Run health checks to get fresh status
+      return runHealthChecks();
+    },
+    onSuccess: (data) => {
+      // Update health status with fresh data from health checks
+      queryClient.setQueryData([QueryKeys.HEALTH_STATUS], data);
+      // Invalidate holdings so related pages refresh
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.PORTFOLIO_ALLOCATIONS] });
+      toast.success("Fix applied successfully");
     },
     onError: (error: Error) => {
       toast.error("Fix failed", { description: error.message });
