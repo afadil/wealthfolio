@@ -156,13 +156,10 @@ pub fn start_broker_sync_scheduler(state: Arc<AppState>) {
     tokio::spawn(async move {
         info!("Broker sync scheduler started (4-hour interval)");
 
-        // Initial delay
+        // Initial delay before first sync
         tokio::time::sleep(Duration::from_secs(INITIAL_DELAY_SECS)).await;
 
-        // Run initial sync
-        run_scheduled_sync(&state).await;
-
-        // Set up periodic sync
+        // Set up periodic sync - first tick is immediate, subsequent ticks are 4h apart
         let mut sync_interval = interval(Duration::from_secs(SYNC_INTERVAL_SECS));
 
         loop {
