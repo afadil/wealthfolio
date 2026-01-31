@@ -117,6 +117,15 @@ export const COMMANDS: CommandMap = {
   remove_asset_taxonomy_assignment: { method: "DELETE", path: "/taxonomies/assignments" },
   get_migration_status: { method: "GET", path: "/taxonomies/migration/status" },
   migrate_legacy_classifications: { method: "POST", path: "/taxonomies/migration/run" },
+  // Health Center
+  get_health_status: { method: "GET", path: "/health/status" },
+  run_health_checks: { method: "POST", path: "/health/check" },
+  dismiss_health_issue: { method: "POST", path: "/health/dismiss" },
+  restore_health_issue: { method: "POST", path: "/health/restore" },
+  get_dismissed_health_issues: { method: "GET", path: "/health/dismissed" },
+  execute_health_fix: { method: "POST", path: "/health/fix" },
+  get_health_config: { method: "GET", path: "/health/config" },
+  update_health_config: { method: "PUT", path: "/health/config" },
   // Addons
   list_installed_addons: { method: "GET", path: "/addons/installed" },
   install_addon_zip: { method: "POST", path: "/addons/install-zip" },
@@ -699,6 +708,32 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       break;
     case "migrate_legacy_classifications":
       break;
+    // Health Center commands
+    case "get_health_status":
+    case "run_health_checks":
+    case "get_dismissed_health_issues":
+    case "get_health_config":
+      break;
+    case "dismiss_health_issue": {
+      const { issueId, dataHash } = payload as { issueId: string; dataHash: string };
+      body = JSON.stringify({ issueId, dataHash });
+      break;
+    }
+    case "restore_health_issue": {
+      const { issueId } = payload as { issueId: string };
+      body = JSON.stringify({ issueId });
+      break;
+    }
+    case "execute_health_fix": {
+      const { action } = payload as { action: Record<string, unknown> };
+      body = JSON.stringify(action);
+      break;
+    }
+    case "update_health_config": {
+      const { config } = payload as { config: Record<string, unknown> };
+      body = JSON.stringify(config);
+      break;
+    }
     // Addons
     case "install_addon_zip": {
       const { zipData, enableAfterInstall } = payload as {

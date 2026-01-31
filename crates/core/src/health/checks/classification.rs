@@ -60,10 +60,21 @@ pub fn gather_legacy_migration_status(
     asset_service: &dyn AssetServiceTrait,
     taxonomy_service: &dyn TaxonomyServiceTrait,
 ) -> Option<LegacyMigrationInfo> {
+    use log::info;
+
     // Get all assets
     let assets = match asset_service.get_assets() {
-        Ok(assets) => assets,
-        Err(_) => return None,
+        Ok(assets) => {
+            info!(
+                "gather_legacy_migration_status: loaded {} assets",
+                assets.len()
+            );
+            assets
+        }
+        Err(e) => {
+            info!("gather_legacy_migration_status: failed to load assets: {}", e);
+            return None;
+        }
     };
 
     // Get GICS and Regions taxonomy info
@@ -74,8 +85,24 @@ pub fn gather_legacy_migration_status(
 
     let regions_taxonomy = taxonomy_service.get_taxonomy("regions").ok().flatten();
 
+    info!(
+        "gather_legacy_migration_status: gics_taxonomy exists={}, regions_taxonomy exists={}",
+        gics_taxonomy.is_some(),
+        regions_taxonomy.is_some()
+    );
+
+    // Log first asset with metadata for debugging
+    if let Some(asset) = assets.iter().find(|a| a.metadata.is_some()) {
+        info!(
+            "Sample asset metadata for {}: {:?}",
+            asset.symbol,
+            asset.metadata
+        );
+    }
+
     let mut assets_needing_migration = Vec::new();
     let mut assets_already_migrated = 0;
+    let mut assets_with_legacy_data = 0;
 
     for asset in &assets {
         // Check if asset has legacy sector/country data in metadata.legacy
@@ -94,6 +121,8 @@ pub fn gather_legacy_migration_status(
         if !has_legacy_sectors && !has_legacy_countries {
             continue;
         }
+
+        assets_with_legacy_data += 1;
 
         // Check if asset has taxonomy assignments for GICS or regions
         let assignments = taxonomy_service
@@ -121,6 +150,13 @@ pub fn gather_legacy_migration_status(
             assets_already_migrated += 1;
         }
     }
+
+    info!(
+        "gather_legacy_migration_status: found {} assets with legacy data, {} needing migration, {} already migrated",
+        assets_with_legacy_data,
+        assets_needing_migration.len(),
+        assets_already_migrated
+    );
 
     Some(LegacyMigrationInfo {
         assets_needing_migration,
