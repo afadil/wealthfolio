@@ -1,7 +1,7 @@
 //! Auto-classification of assets based on provider profile data.
 //!
 //! Maps Yahoo/provider data to taxonomy categories:
-//! - quote_type (EQUITY, ETF, MUTUALFUND) → type_of_security taxonomy
+//! - quote_type (EQUITY, ETF, MUTUALFUND) → instrument_type taxonomy
 //! - quote_type → asset_classes taxonomy (EQUITY, DEBT, CASH, etc.)
 //! - sector (Technology, Healthcare) → industries_gics taxonomy
 //! - country (United States, Canada) → regions taxonomy
@@ -10,44 +10,54 @@ use crate::taxonomies::{NewAssetTaxonomyAssignment, TaxonomyServiceTrait};
 use log::{debug, warn};
 use std::sync::Arc;
 
-/// Maps Yahoo quote_type to type_of_security taxonomy category ID
+/// Maps Yahoo quote_type to instrument_type taxonomy category ID
 /// Yahoo quoteType values: EQUITY, ETF, MUTUALFUND, INDEX, CRYPTOCURRENCY, OPTION, BOND, FUTURES, CURRENCY
 /// Also handles: ECNQUOTE (Canadian ETFs), NONE (delisted)
-fn map_quote_type_to_security_type(quote_type: &str) -> Option<&'static str> {
+///
+/// Instrument type hierarchy:
+/// - EQUITY_SECURITY: STOCK_COMMON, STOCK_PREFERRED, DEPOSITARY_RECEIPT, EQUITY_WARRANT_RIGHT, PARTNERSHIP_UNIT
+/// - DEBT_SECURITY: BOND_GOVERNMENT, BOND_CORPORATE, BOND_MUNICIPAL, BOND_CONVERTIBLE, MONEY_MARKET_DEBT
+/// - FUND: FUND_MUTUAL, FUND_CLOSED_END, FUND_PRIVATE, FUND_FOF
+/// - ETP: ETF, ETN, ETC
+/// - DERIVATIVE: OPTION, FUTURE, OTC_DERIVATIVE, CFD
+/// - CASH_FX: CASH, DEPOSIT, FX_POSITION
+/// - DIGITAL_ASSET: CRYPTO_NATIVE, STABLECOIN, TOKENIZED_SECURITY
+fn map_quote_type_to_instrument_type(quote_type: &str) -> Option<&'static str> {
     match quote_type.to_uppercase().as_str() {
-        "EQUITY" => Some("STOCK"),
+        "EQUITY" => Some("STOCK_COMMON"),
         "ETF" => Some("ETF"),
-        "MUTUALFUND" | "MUTUAL FUND" => Some("FUND"),
+        "MUTUALFUND" | "MUTUAL FUND" => Some("FUND_MUTUAL"),
         "INDEX" => Some("ETF"), // Index funds are typically ETFs
-        "CRYPTOCURRENCY" | "CRYPTO" => Some("CRYPTO"),
+        "CRYPTOCURRENCY" | "CRYPTO" => Some("CRYPTO_NATIVE"),
         "OPTION" => Some("OPTION"),
-        "BOND" | "MONEYMARKET" => Some("BOND"),
-        "FUTURE" | "FUTURES" => Some("OPTION"), // Futures mapped to Options category
+        "BOND" => Some("BOND_CORPORATE"), // Default to corporate, can be refined manually
+        "MONEYMARKET" => Some("MONEY_MARKET_DEBT"),
+        "FUTURE" | "FUTURES" => Some("FUTURE"),
         // ECNQUOTE: Used by Yahoo for some Canadian/international ETFs and securities
         // Since we can't determine if it's a stock or ETF, skip classification
         // Users can manually classify these
         "ECNQUOTE" => None,
         // NONE: Delisted symbols - skip classification
         "NONE" => None,
-        // CURRENCY/FOREX not mapped to security type (it's an FX rate, not a security)
+        // CURRENCY/FOREX not mapped to instrument type (it's an FX rate, not a security)
         _ => None,
     }
 }
 
 /// Maps Yahoo quote_type to asset_classes taxonomy category ID
-/// Asset classes: CASH, EQUITY, DEBT, REAL_ESTATE, COMMODITY
+/// Asset classes: CASH, EQUITY, FIXED_INCOME, REAL_ESTATE, COMMODITIES, ALTERNATIVES, DIGITAL_ASSETS
 fn map_quote_type_to_asset_class(quote_type: &str) -> Option<&'static str> {
     match quote_type.to_uppercase().as_str() {
         // Equity class: stocks, ETFs, mutual funds, options
         "EQUITY" | "ETF" | "MUTUALFUND" | "MUTUAL FUND" | "INDEX" | "OPTION" => Some("EQUITY"),
-        // Debt class: bonds, money market
-        "BOND" | "MONEYMARKET" => Some("DEBT"),
+        // Fixed Income class: bonds, money market
+        "BOND" | "MONEYMARKET" => Some("FIXED_INCOME"),
         // Cash class
         "CURRENCY" | "FOREX" | "FX" | "CASH" => Some("CASH"),
-        // Cryptocurrency - classify as EQUITY (alternative investment)
-        "CRYPTOCURRENCY" | "CRYPTO" => Some("EQUITY"),
-        // Commodity class
-        "COMMODITY" | "FUTURE" | "FUTURES" => Some("COMMODITY"),
+        // Cryptocurrency - classify as Digital Assets
+        "CRYPTOCURRENCY" | "CRYPTO" => Some("DIGITAL_ASSETS"),
+        // Commodities class
+        "COMMODITY" | "FUTURE" | "FUTURES" => Some("COMMODITIES"),
         // ECNQUOTE: Unknown type (Canadian/international securities) - skip
         // NONE: Delisted - skip
         "ECNQUOTE" | "NONE" => None,
@@ -311,7 +321,7 @@ impl AutoClassificationService {
     }
 
     /// Auto-classify an asset based on provider profile data.
-    /// Creates taxonomy assignments for type_of_security, industries_gics, and regions.
+    /// Creates taxonomy assignments for instrument_type, asset_classes, industries_gics, and regions.
     pub async fn classify_asset(
         &self,
         asset_id: &str,
@@ -319,23 +329,23 @@ impl AutoClassificationService {
     ) -> Result<ClassificationResult, String> {
         let mut result = ClassificationResult::default();
 
-        // 1. Classify type of security
+        // 1. Classify instrument type
         if let Some(quote_type) = &input.quote_type {
-            if let Some(category_id) = map_quote_type_to_security_type(quote_type) {
+            if let Some(category_id) = map_quote_type_to_instrument_type(quote_type) {
                 match self
-                    .assign_to_taxonomy(asset_id, "type_of_security", category_id, 10000)
+                    .assign_to_taxonomy(asset_id, "instrument_type", category_id, 10000)
                     .await
                 {
                     Ok(_) => {
                         debug!(
-                            "Auto-classified {} as {} in type_of_security",
+                            "Auto-classified {} as {} in instrument_type",
                             asset_id, category_id
                         );
                         result.security_type = Some(category_id.to_string());
                     }
                     Err(e) => {
                         warn!(
-                            "Failed to auto-classify {} type_of_security: {}",
+                            "Failed to auto-classify {} instrument_type: {}",
                             asset_id, e
                         );
                     }
@@ -453,15 +463,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_map_quote_type() {
-        assert_eq!(map_quote_type_to_security_type("EQUITY"), Some("STOCK"));
-        assert_eq!(map_quote_type_to_security_type("ETF"), Some("ETF"));
-        assert_eq!(map_quote_type_to_security_type("MUTUALFUND"), Some("FUND"));
+    fn test_map_quote_type_to_instrument_type() {
+        assert_eq!(map_quote_type_to_instrument_type("EQUITY"), Some("STOCK_COMMON"));
+        assert_eq!(map_quote_type_to_instrument_type("ETF"), Some("ETF"));
+        assert_eq!(map_quote_type_to_instrument_type("MUTUALFUND"), Some("FUND_MUTUAL"));
         assert_eq!(
-            map_quote_type_to_security_type("CRYPTOCURRENCY"),
-            Some("CRYPTO")
+            map_quote_type_to_instrument_type("CRYPTOCURRENCY"),
+            Some("CRYPTO_NATIVE")
         );
-        assert_eq!(map_quote_type_to_security_type("unknown"), None);
+        assert_eq!(map_quote_type_to_instrument_type("BOND"), Some("BOND_CORPORATE"));
+        assert_eq!(map_quote_type_to_instrument_type("MONEYMARKET"), Some("MONEY_MARKET_DEBT"));
+        assert_eq!(map_quote_type_to_instrument_type("FUTURE"), Some("FUTURE"));
+        assert_eq!(map_quote_type_to_instrument_type("FUTURES"), Some("FUTURE"));
+        assert_eq!(map_quote_type_to_instrument_type("OPTION"), Some("OPTION"));
+        assert_eq!(map_quote_type_to_instrument_type("unknown"), None);
     }
 
     #[test]
@@ -472,16 +487,16 @@ mod tests {
         assert_eq!(map_quote_type_to_asset_class("MUTUALFUND"), Some("EQUITY"));
         assert_eq!(
             map_quote_type_to_asset_class("CRYPTOCURRENCY"),
-            Some("EQUITY")
+            Some("DIGITAL_ASSETS")
         );
-        // Debt class
-        assert_eq!(map_quote_type_to_asset_class("BOND"), Some("DEBT"));
+        // Fixed Income class
+        assert_eq!(map_quote_type_to_asset_class("BOND"), Some("FIXED_INCOME"));
         // Cash class
         assert_eq!(map_quote_type_to_asset_class("CURRENCY"), Some("CASH"));
-        // Commodity class
+        // Commodities class
         assert_eq!(
             map_quote_type_to_asset_class("COMMODITY"),
-            Some("COMMODITY")
+            Some("COMMODITIES")
         );
         // Unknown
         assert_eq!(map_quote_type_to_asset_class("unknown"), None);

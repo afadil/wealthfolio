@@ -99,7 +99,7 @@ export function HoldingCurrencyChart({
           {/* Title */}
           <div className="flex items-center justify-between">
             <h3 className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
-              Currency Allocation
+              Currency
             </h3>
           </div>
 

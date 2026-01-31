@@ -228,6 +228,30 @@ describe("activity-utils", () => {
       expect(resolver(tx)).toBe("EUR");
     });
 
+    it("should extract currency from CASH:{currency} asset id", () => {
+      const resolver = createCurrencyResolver(assetCurrencyLookup, "USD");
+      const tx = createMockTransaction({
+        currency: "",
+        assetId: "CASH:USD",
+        assetSymbol: "CASH:USD",
+        accountCurrency: "",
+      });
+
+      expect(resolver(tx)).toBe("USD");
+    });
+
+    it("should not treat CASH:XTSE as a cash currency", () => {
+      const resolver = createCurrencyResolver(assetCurrencyLookup, "USD");
+      const tx = createMockTransaction({
+        currency: "",
+        assetId: "CASH:XTSE",
+        assetSymbol: "CASH:XTSE",
+        accountCurrency: "CAD",
+      });
+
+      expect(resolver(tx, { includeFallback: true })).toBe("CAD");
+    });
+
     it("should use account currency as fallback", () => {
       const resolver = createCurrencyResolver(assetCurrencyLookup, "JPY");
       const tx = createMockTransaction({

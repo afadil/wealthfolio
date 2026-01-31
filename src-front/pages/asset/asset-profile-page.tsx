@@ -135,7 +135,7 @@ export const AssetProfilePage = () => {
   // Fetch taxonomy details for taxonomies with assignments
   // We need the categories to get name and color
   const { data: typeOfSecurityTaxonomy } = useTaxonomy(
-    assignments.find((a) => a.taxonomyId === "type_of_security")?.taxonomyId ?? null,
+    assignments.find((a) => a.taxonomyId === "instrument_type")?.taxonomyId ?? null,
   );
   const { data: riskCategoryTaxonomy } = useTaxonomy(
     assignments.find((a) => a.taxonomyId === "risk_category")?.taxonomyId ?? null,
@@ -179,7 +179,7 @@ export const AssetProfilePage = () => {
     }
 
     // Type of Security badge (second)
-    const typeAssignment = assignments.find((a) => a.taxonomyId === "type_of_security");
+    const typeAssignment = assignments.find((a) => a.taxonomyId === "instrument_type");
     if (typeAssignment && typeOfSecurityTaxonomy?.categories) {
       const category = typeOfSecurityTaxonomy.categories.find(
         (c) => c.id === typeAssignment.categoryId,

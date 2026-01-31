@@ -34,14 +34,14 @@ export function SectorsChart({
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
-            Sector Allocation
+            Sectors
           </CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="relative w-full">
+      <CardContent className="relative w-full pt-0">
         <TooltipProvider>
           {isLoading ? (
             <div className="space-y-2">
@@ -61,7 +61,7 @@ export function SectorsChart({
               />
             </div>
           ) : (
-            <div className="space-y-4 pt-2">
+            <div className="space-y-4">
               {sectors.map((sector) => {
                 const percent = total > 0 ? sector.value / total : 0;
                 return (
@@ -87,7 +87,7 @@ export function SectorsChart({
                             className="absolute top-0 left-0 h-full rounded"
                             style={{
                               width: `${percent * 100}%`,
-                              backgroundColor: sector.color || "var(--chart-2)",
+                              backgroundColor: `var(--chart-${(sectors.indexOf(sector) % 9) + 1})`,
                             }}
                           />
                           {/* Conditional Text Block */}

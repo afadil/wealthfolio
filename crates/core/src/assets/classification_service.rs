@@ -9,7 +9,7 @@ use std::sync::Arc;
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AssetClassifications {
-    /// Primary type (from type_of_security taxonomy) - single value
+    /// Primary type (from instrument_type taxonomy) - single value
     pub asset_type: Option<Category>,
     /// Risk level (from risk_category taxonomy) - single value
     pub risk_category: Option<Category>,
@@ -93,7 +93,7 @@ impl AssetClassificationService {
                     };
 
                     match assignment.taxonomy_id.as_str() {
-                        "type_of_security" => classifications.asset_type = Some(cat),
+                        "instrument_type" => classifications.asset_type = Some(cat),
                         "risk_category" => classifications.risk_category = Some(cat),
                         "asset_classes" => classifications.asset_classes.push(cat_with_weight),
                         "industries_gics" => classifications.sectors.push(cat_with_weight),
@@ -168,7 +168,7 @@ impl AssetClassificationService {
                 };
 
                 match assignment.taxonomy_id.as_str() {
-                    "type_of_security" => classifications.asset_type = Some(category),
+                    "instrument_type" => classifications.asset_type = Some(category),
                     "risk_category" => classifications.risk_category = Some(category),
                     "asset_classes" => classifications.asset_classes.push(cat_with_weight),
                     "industries_gics" => classifications.sectors.push(cat_with_weight),

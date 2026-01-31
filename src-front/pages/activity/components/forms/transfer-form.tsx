@@ -61,6 +61,13 @@ export const transferFormSchema = z
       .positive({ message: "Quantity must be greater than 0." })
       .optional()
       .nullable(),
+    unitPrice: z.coerce
+      .number({
+        invalid_type_error: "Cost basis must be a number.",
+      })
+      .positive({ message: "Cost basis must be greater than 0." })
+      .optional()
+      .nullable(),
     comment: z.string().optional().nullable(),
     // Advanced options
     currency: z.string().optional(),
@@ -161,6 +168,20 @@ export const transferFormSchema = z
       message: "Please enter a quantity.",
       path: ["quantity"],
     },
+  )
+  .refine(
+    (data) => {
+      // Cost basis required only for external transfer in with securities
+      // Backend calculates cost basis for transfer out from existing holdings
+      if (data.transferMode === "securities" && data.isExternal && data.direction === "in") {
+        return data.unitPrice != null && data.unitPrice > 0;
+      }
+      return true;
+    },
+    {
+      message: "Please enter a cost basis.",
+      path: ["unitPrice"],
+    },
   );
 
 export type TransferFormValues = z.infer<typeof transferFormSchema>;
@@ -223,6 +244,7 @@ export function TransferForm({
       amount: undefined,
       assetId: null,
       quantity: null,
+      unitPrice: null,
       comment: null,
       currency: initialCurrency,
       subtype: null,
@@ -258,6 +280,7 @@ export function TransferForm({
     if (mode === "cash") {
       setValue("assetId", null);
       setValue("quantity", null);
+      setValue("unitPrice", null);
     } else {
       setValue("amount", null);
     }
@@ -424,6 +447,10 @@ export function TransferForm({
                 <input type="hidden" {...form.register("assetMetadata.name")} />
                 <input type="hidden" {...form.register("assetMetadata.kind")} />
                 <QuantityInput name="quantity" label="Quantity" />
+                {/* Cost basis only needed for external transfer in - backend calculates for transfer out */}
+                {isExternal && direction === "in" && (
+                  <AmountInput name="unitPrice" label="Cost Basis" maxDecimalPlaces={4} />
+                )}
               </>
             )}
 

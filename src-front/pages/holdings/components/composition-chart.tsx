@@ -47,7 +47,7 @@ function getColorScale(gain: number, maxGain: number, minGain: number): ColorSca
   // Handle edge cases
   if (isNaN(gain) || isNaN(maxGain) || isNaN(minGain)) {
     return {
-      opacity: 0.4,
+      opacity: 0.5,
       className: isGain ? "fill-success" : "fill-destructive",
     };
   }
@@ -60,8 +60,8 @@ function getColorScale(gain: number, maxGain: number, minGain: number): ColorSca
     relativePosition = minGain === 0 ? 0 : Math.min(1, gain / minGain);
   }
 
-  // Ensure opacity is between 0.4 and 1.0
-  const opacity = Math.max(0.4, Math.min(1, 0.4 + Math.abs(relativePosition) * 0.6));
+  // Semi-transparent range: 0.4 to 0.85 (more muted, matches v2)
+  const opacity = Math.max(0.4, Math.min(0.85, 0.4 + Math.abs(relativePosition) * 0.45));
 
   return {
     opacity,

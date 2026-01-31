@@ -73,9 +73,9 @@ impl Default for PortfolioAllocations {
             regions: TaxonomyAllocation::empty("regions", "Regions", "#8b7ec8"),
             risk_category: TaxonomyAllocation::empty("risk_category", "Risk Category", "#d14d41"),
             security_types: TaxonomyAllocation::empty(
-                "type_of_security",
-                "Type of Security",
-                "#3aa99f",
+                "instrument_type",
+                "Instrument Type",
+                "#4385be",
             ),
             custom_groups: Vec::new(),
             total_value: Decimal::ZERO,
