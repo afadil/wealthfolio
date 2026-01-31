@@ -81,6 +81,24 @@ pub const LIABILITY_PREFIX: &str = "LIAB";
 /// Prefix for Other (catch-all) assets
 pub const OTHER_PREFIX: &str = "ALT";
 
+/// Parse crypto pair symbols like "BTC-USD" or "BTC-USDT" into (base, quote).
+/// Returns None if the symbol doesn't match the expected pair pattern.
+pub fn parse_crypto_pair_symbol(symbol: &str) -> Option<(String, String)> {
+    let trimmed = symbol.trim();
+    let (base, quote) = trimmed.rsplit_once('-')?;
+    let base = base.trim();
+    let quote = quote.trim();
+    if base.is_empty() || quote.is_empty() {
+        return None;
+    }
+    let quote_upper = quote.to_uppercase();
+    let quote_len = quote_upper.len();
+    if !(3..=5).contains(&quote_len) || !quote_upper.chars().all(|c| c.is_ascii_alphabetic()) {
+        return None;
+    }
+    Some((base.to_string(), quote_upper))
+}
+
 /// Checks if an asset ID represents a cash asset.
 /// Format: `CASH:{currency}` (e.g., `CASH:USD`)
 pub fn is_cash_asset_id(asset_id: &str) -> bool {
@@ -254,7 +272,8 @@ pub fn canonical_asset_id(
     exchange_mic: Option<&str>,
     currency: &str,
 ) -> String {
-    let sym = symbol.trim().to_uppercase();
+    let raw_sym = symbol.trim();
+    let sym = raw_sym.to_uppercase();
     let ccy = currency.trim().to_uppercase();
 
     match kind {
@@ -267,7 +286,12 @@ pub fn canonical_asset_id(
 
         AssetKind::Crypto => {
             // BTC:USD - include quote currency
-            format!("{}:{}:{}", CRYPTO_PREFIX, sym, ccy)
+            // If a provider returns a pair symbol like "BTC-USD", normalize to base "BTC"
+            // and use the quote currency from the symbol (asset currency).
+            let (base_sym, quote_ccy) = parse_crypto_pair_symbol(raw_sym)
+                .map(|(base, quote)| (base.to_uppercase(), quote))
+                .unwrap_or((sym, ccy));
+            format!("{}:{}:{}", CRYPTO_PREFIX, base_sym, quote_ccy)
         }
 
         AssetKind::Security => {
@@ -1110,6 +1134,22 @@ mod tests {
         assert_eq!(
             canonical_asset_id(&AssetKind::Crypto, "eth", None, "cad"),
             "CRYPTO:ETH:CAD"
+        );
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Crypto, "BTC-CAD", None, "CAD"),
+            "CRYPTO:BTC:CAD"
+        );
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Crypto, "BTC-USD", None, "CAD"),
+            "CRYPTO:BTC:USD"
+        );
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Crypto, "BTC-USDT", None, "USD"),
+            "CRYPTO:BTC:USDT"
+        );
+        assert_eq!(
+            canonical_asset_id(&AssetKind::Crypto, "X-AI-USD", None, "USD"),
+            "CRYPTO:X-AI:USD"
         );
     }
 

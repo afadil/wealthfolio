@@ -12,7 +12,7 @@ use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
 use crate::activities::csv_parser::{self, ParseConfig, ParsedCsvResult};
 use crate::activities::{ActivityRepositoryTrait, ActivityServiceTrait};
-use crate::assets::{canonical_asset_id, AssetKind, AssetServiceTrait};
+use crate::assets::{canonical_asset_id, parse_crypto_pair_symbol, AssetKind, AssetServiceTrait};
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::fx::currency::{get_normalization_rule, normalize_amount};
 use crate::fx::FxServiceTrait;
@@ -219,6 +219,26 @@ impl ActivityService {
         // 1. If asset_id is explicitly provided, use it (backward compatibility for updates)
         if let Some(id) = asset_id {
             if !id.is_empty() {
+                // Normalize legacy crypto IDs where the base symbol includes the quote currency,
+                // e.g. "CRYPTO:BTC-CAD:CAD" -> "CRYPTO:BTC:CAD".
+                if id.starts_with("CRYPTO:") {
+                    if let Some(parsed) = crate::assets::parse_canonical_asset_id(id) {
+                        if parsed.kind == Some(crate::assets::AssetKind::Crypto) {
+                            if let Some((base, quote)) =
+                                crate::assets::parse_crypto_pair_symbol(&parsed.symbol)
+                            {
+                                if !base.trim().is_empty() {
+                                    return Ok(Some(crate::assets::canonical_asset_id(
+                                        &crate::assets::AssetKind::Crypto,
+                                        &base,
+                                        None,
+                                        &quote,
+                                    )));
+                                }
+                            }
+                        }
+                    }
+                }
                 return Ok(Some(id.to_string()));
             }
         }
@@ -289,13 +309,17 @@ impl ActivityService {
             return AssetKind::Crypto;
         }
 
-        // 4. If symbol contains "-USD", "-CAD", etc., likely crypto
-        if upper_symbol.contains("-USD")
-            || upper_symbol.contains("-CAD")
-            || upper_symbol.contains("-EUR")
-            || upper_symbol.contains("-GBP")
-        {
-            return AssetKind::Crypto;
+        // 4. If symbol looks like a crypto pair (e.g., BTC-USD, BTC-USDT), likely crypto
+        if let Some((_base, quote)) = upper_symbol.rsplit_once('-') {
+            let quote = quote.trim();
+            let crypto_quotes = [
+                "USD", "CAD", "EUR", "GBP", "JPY", "CHF", "AUD", "NZD", "HKD", "SGD", "CNY",
+                "SEK", "NOK", "DKK", "PLN", "CZK", "HUF", "TRY", "MXN", "BRL", "KRW", "INR",
+                "ZAR", "BTC", "ETH", "USDT", "USDC", "DAI", "BUSD", "USDP", "TUSD", "FDUSD",
+            ];
+            if crypto_quotes.contains(&quote) {
+                return AssetKind::Crypto;
+            }
         }
 
         // 5. Default to Security (most common case)
@@ -330,6 +354,21 @@ impl ActivityService {
             None
         };
 
+        let inferred_kind = symbol
+            .as_deref()
+            .map(|s| self.infer_asset_kind(s, exchange_mic.as_deref(), asset_kind.as_deref()));
+
+        // Use asset currency for crypto pairs (e.g., BTC-USD -> USD) instead of activity currency.
+        let asset_currency = if inferred_kind == Some(AssetKind::Crypto) {
+            symbol
+                .as_deref()
+                .and_then(parse_crypto_pair_symbol)
+                .map(|(_, quote)| quote)
+                .unwrap_or_else(|| currency.clone())
+        } else {
+            currency.clone()
+        };
+
         // For NEW activities: prioritize symbol over asset_id to ensure canonical ID generation.
         // This prevents clients from accidentally sending raw symbols (e.g., "AAPL") as asset_id.
         // If symbol is provided, ignore asset_id and generate canonical ID.
@@ -348,7 +387,7 @@ impl ActivityService {
             exchange_mic.as_deref(),
             asset_kind.as_deref(),
             &activity.activity_type,
-            &currency,
+            &asset_currency,
         )?;
 
         // Update activity's asset with resolved asset_id
@@ -367,15 +406,15 @@ impl ActivityService {
         // Process asset if asset_id is resolved
         if let Some(ref asset_id) = resolved_asset_id {
             // Pass pricing_mode to asset creation so custom/manual assets get the right mode
-            let asset = self
-                .asset_service
-                .get_or_create_minimal_asset(
-                    asset_id,
-                    Some(currency.clone()),
-                    asset_metadata,
-                    pricing_mode.clone(),
-                )
-                .await?;
+                let asset = self
+                    .asset_service
+                    .get_or_create_minimal_asset(
+                        asset_id,
+                        Some(asset_currency.clone()),
+                        asset_metadata,
+                        pricing_mode.clone(),
+                    )
+                    .await?;
 
             // Update asset pricing mode if specified (for existing assets that need mode change)
             if let Some(ref mode) = pricing_mode {
@@ -492,6 +531,21 @@ impl ActivityService {
             None
         };
 
+        let inferred_kind = symbol
+            .as_deref()
+            .map(|s| self.infer_asset_kind(s, exchange_mic.as_deref(), asset_kind.as_deref()));
+
+        // Use asset currency for crypto pairs (e.g., BTC-USD -> USD) instead of activity currency.
+        let asset_currency = if inferred_kind == Some(AssetKind::Crypto) {
+            symbol
+                .as_deref()
+                .and_then(parse_crypto_pair_symbol)
+                .map(|(_, quote)| quote)
+                .unwrap_or_else(|| currency.clone())
+        } else {
+            currency.clone()
+        };
+
         // For UPDATES: prioritize symbol over asset_id to ensure canonical ID generation.
         // This prevents clients from accidentally sending raw symbols (e.g., "BTC") as asset_id,
         // which would bypass canonical ID generation and cause asset kind inference failures.
@@ -511,7 +565,7 @@ impl ActivityService {
             exchange_mic.as_deref(),
             asset_kind.as_deref(),
             &activity.activity_type,
-            &currency,
+            &asset_currency,
         )?;
 
         // Update activity's asset with resolved asset_id
@@ -534,7 +588,7 @@ impl ActivityService {
                 .asset_service
                 .get_or_create_minimal_asset(
                     asset_id,
-                    Some(currency.clone()),
+                    Some(asset_currency.clone()),
                     asset_metadata,
                     pricing_mode.clone(),
                 )
@@ -832,6 +886,42 @@ impl ActivityServiceTrait for ActivityService {
                         action: "create".to_string(),
                         message: err.to_string(),
                     });
+                }
+            }
+        }
+
+        // Batch resolve symbols for updates that don't have exchange_mic (same as creates)
+        let update_symbols_to_resolve: HashSet<String> = request
+            .updates
+            .iter()
+            .filter_map(|a| {
+                let symbol = a.get_symbol();
+                let has_mic = a.get_exchange_mic().is_some();
+                let is_cash = symbol.map(|s| s.starts_with("$CASH-")).unwrap_or(false);
+                if symbol.is_some() && !has_mic && !is_cash {
+                    symbol.map(|s| s.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let update_symbol_mic_cache = if !update_symbols_to_resolve.is_empty() {
+            self.resolve_symbols_batch(update_symbols_to_resolve, "USD").await
+        } else {
+            HashMap::new()
+        };
+
+        // Update updates with resolved exchange_mic
+        for activity in &mut request.updates {
+            if let Some(symbol) = activity.get_symbol() {
+                let has_mic = activity.get_exchange_mic().is_some();
+                if !has_mic {
+                    if let Some(mic) = update_symbol_mic_cache.get(symbol).cloned().flatten() {
+                        if let Some(ref mut asset) = activity.asset {
+                            asset.exchange_mic = Some(mic);
+                        }
+                    }
                 }
             }
         }

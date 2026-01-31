@@ -423,10 +423,13 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
                     .map(|s| s.to_string());
 
                 // Calculate unrealized gain if we have purchase price
+                // Note: unrealized_gain_pct is returned as decimal (e.g., 0.0652 for 6.52%)
+                // because the frontend formatPercent uses Intl.NumberFormat style:"percent"
+                // which multiplies by 100 automatically
                 let (unrealized_gain, unrealized_gain_pct) = if let Some(pp) = purchase_price {
                     let gain = quote.close - pp;
                     let pct = if pp != Decimal::ZERO {
-                        Some((gain / pp) * Decimal::from(100))
+                        Some(gain / pp)
                     } else {
                         None
                     };

@@ -941,9 +941,7 @@ export function SelectCell<TData>({
     >
       {isEditing ? (
         <Select value={selectValue} onValueChange={onValueChange} open={isEditing} onOpenChange={onOpenChange}>
-          <SelectTrigger
-            className="size-full h-auto items-start border-none p-0 shadow-none focus-visible:ring-0 dark:bg-transparent [&_svg]:hidden"
-          >
+          <SelectTrigger className="size-full h-auto items-start border-none p-0 shadow-none focus-visible:ring-0 dark:bg-transparent [&_svg]:hidden">
             {displayLabel ? (
               <Badge variant="secondary" className="px-1.5 text-xs whitespace-pre-wrap">
                 <SelectValue />
@@ -2420,6 +2418,31 @@ export function SymbolCell<TData>({
   readOnly,
   cellState,
 }: DataGridCellProps<TData>) {
+  const stripYahooExchangeSuffix = React.useCallback((symbol: string) => {
+    // Common exchange suffixes from Yahoo Finance (e.g., "VFV.TO" -> "VFV").
+    // Share class suffixes like "BRK.B" are preserved (not in the allowlist).
+    const suffixPattern =
+      /\.(TO|L|PA|DE|SW|AS|MI|MC|BR|HK|T|SI|AX|NZ|TA|JO|SA|SN|MX|VI|ST|OL|CO|HE|IC|PR|WA|AT|LI|LS|IR|KQ|KS|TW|TWO|V|CN|F|BE|DU|HA|HM|MU|SG)$/i;
+    return symbol.replace(suffixPattern, "");
+  }, []);
+
+  const normalizeCryptoPairSymbol = React.useCallback(
+    (symbol: string, currencyHint?: string) => {
+      // Provider may return a pair symbol like "BTC-USD". Canonical crypto IDs use the base symbol.
+      const trimmed = symbol.trim();
+      const match = trimmed.match(/^(.*)-([A-Za-z]{3,5})$/);
+      if (!match) return trimmed;
+      const base = match[1]?.trim();
+      const quote = match[2]?.trim().toUpperCase();
+      const hint = currencyHint?.trim().toUpperCase();
+      if (hint && quote && quote !== hint) {
+        return trimmed;
+      }
+      return base || trimmed;
+    },
+    [],
+  );
+
   const initialValue = cell.getValue() as string;
   const [value, setValue] = React.useState(initialValue ?? "");
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -2453,9 +2476,9 @@ export function SymbolCell<TData>({
     setIsError(false);
 
     try {
+      // Results are already sorted by backend (existing assets first, then by score)
       const results = await onSearch(query);
-      const sorted = [...results].sort((a, b) => b.score - a.score);
-      setOptions(sorted);
+      setOptions(results);
     } catch {
       setIsError(true);
       setOptions([]);
@@ -2474,7 +2497,13 @@ export function SymbolCell<TData>({
 
   const handleSelect = React.useCallback(
     (symbol: string, result?: SymbolSearchResult) => {
-      const normalized = symbol.trim().toUpperCase();
+      const trimmed = symbol.trim();
+      const withoutExchangeSuffix = result?.exchangeMic ? stripYahooExchangeSuffix(trimmed) : trimmed;
+      const withoutCryptoQuote =
+        result?.assetKind?.toUpperCase() === "CRYPTO"
+          ? normalizeCryptoPairSymbol(withoutExchangeSuffix, result?.currency)
+          : withoutExchangeSuffix;
+      const normalized = withoutCryptoQuote.trim().toUpperCase();
       setValue(normalized);
       tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: normalized });
       onSelectCallback?.(rowIndex, normalized, result);
@@ -2482,7 +2511,7 @@ export function SymbolCell<TData>({
       setOptions([]);
       tableMeta?.onCellEditingStop?.();
     },
-    [tableMeta, rowIndex, columnId, onSelectCallback],
+    [tableMeta, rowIndex, columnId, onSelectCallback, stripYahooExchangeSuffix, normalizeCryptoPairSymbol],
   );
 
   const handleCustomSymbol = React.useCallback(() => {
@@ -2565,6 +2594,14 @@ export function SymbolCell<TData>({
   const displayName = (option: SymbolSearchResult) => {
     return option.longName || option.shortName || option.symbol;
   };
+  const getOptionKey = (option: SymbolSearchResult) => {
+    const parts = [
+      option.symbol,
+      option.exchangeMic ?? option.exchange,
+      option.currency,
+    ].filter(Boolean);
+    return parts.join("|");
+  };
 
   const trimmedQuery = searchQuery.trim();
 
@@ -2613,8 +2650,8 @@ export function SymbolCell<TData>({
                   <CommandGroup>
                     {options.map((option) => (
                       <CommandItem
-                        key={option.symbol}
-                        value={option.symbol}
+                        key={getOptionKey(option)}
+                        value={getOptionKey(option)}
                         onSelect={() => handleSelect(option.symbol, option)}
                         className="flex items-center justify-between"
                       >
@@ -2692,8 +2729,7 @@ export function CurrencyCell<TData>({
     }
     const query = searchQuery.toLowerCase();
     return worldCurrencies.filter(
-      (currency) =>
-        currency.value.toLowerCase().includes(query) || currency.label.toLowerCase().includes(query),
+      (currency) => currency.value.toLowerCase().includes(query) || currency.label.toLowerCase().includes(query),
     );
   }, [searchQuery]);
 
