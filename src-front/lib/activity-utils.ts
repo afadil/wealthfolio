@@ -34,9 +34,16 @@ export const isIncomeActivity = (activityType: string): boolean => {
  * @returns True if the activity is a cash transfer
  */
 export const isCashTransfer = (activityType: string, assetSymbol: string): boolean => {
+  if (activityType !== ActivityType.TRANSFER_IN && activityType !== ActivityType.TRANSFER_OUT) {
+    return false;
+  }
+  // Recognize cash transfers by symbol:
+  // - Legacy format: $CASH-{currency} (e.g., $CASH-USD)
+  // - New format: CASH:{currency} (e.g., CASH:USD)
+  // - Display value: "CASH" (set by applyCashDefaults)
+  const upperSymbol = assetSymbol.toUpperCase();
   return (
-    (activityType === ActivityType.TRANSFER_IN || activityType === ActivityType.TRANSFER_OUT) &&
-    assetSymbol.startsWith("$CASH")
+    upperSymbol === "CASH" || upperSymbol.startsWith("$CASH") || upperSymbol.startsWith("CASH:")
   );
 };
 

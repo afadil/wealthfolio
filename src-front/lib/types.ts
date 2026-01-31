@@ -22,6 +22,7 @@ export {
   ALTERNATIVE_ASSET_DEFAULT_GROUPS,
   ALTERNATIVE_ASSET_KIND_DISPLAY_NAMES,
   AssetKind,
+  ASSET_KIND_DISPLAY_NAMES,
   DataSource,
   defaultGroupForAccountType,
   ExportDataType,

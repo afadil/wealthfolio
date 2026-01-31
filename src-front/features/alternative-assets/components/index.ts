@@ -1,4 +1,7 @@
-export { AlternativeAssetQuickAddModal } from "./alternative-asset-quick-add-modal";
+export {
+  AlternativeAssetQuickAddModal,
+  type LinkableAsset,
+} from "./alternative-asset-quick-add-modal";
 export {
   ASSET_KIND_OPTIONS,
   LIABILITY_TYPES,
@@ -16,7 +19,11 @@ export {
   type UpdateValuationFormValues,
 } from "./update-valuation-schema";
 
-export { AssetDetailsSheet, type AssetDetailsSheetAsset } from "./asset-details-sheet";
+export {
+  AssetDetailsSheet,
+  type AssetDetailsSheetAsset,
+  type LinkedLiability,
+} from "./asset-details-sheet";
 export {
   COLLECTIBLE_TYPES,
   PROPERTY_TYPES,

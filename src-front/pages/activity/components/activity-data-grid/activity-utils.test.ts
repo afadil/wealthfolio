@@ -2,6 +2,7 @@ import { ActivityType } from "@/lib/constants";
 import type { Account } from "@/lib/types";
 import { describe, expect, it } from "vitest";
 import {
+  applyTransactionUpdate,
   buildSavePayload,
   createCurrencyResolver,
   createDraftTransaction,
@@ -405,6 +406,28 @@ describe("activity-utils", () => {
 
       expect(result.updates[0].quantity).toBeUndefined();
       expect(result.updates[0].unitPrice).toBeUndefined();
+    });
+  });
+
+  describe("applyTransactionUpdate", () => {
+    it("should clear amount when value is null", () => {
+      const accountLookup = new Map<string, { id: string; name: string; currency: string }>([
+        ["account-1", { id: "account-1", name: "Test Account", currency: "USD" }],
+      ]);
+      const assetCurrencyLookup = new Map<string, string>();
+      const tx = createMockTransaction({ amount: 1000 });
+
+      const updated = applyTransactionUpdate({
+        transaction: tx,
+        field: "amount",
+        value: null,
+        accountLookup,
+        assetCurrencyLookup,
+        fallbackCurrency: "USD",
+        resolveTransactionCurrency: () => "USD",
+      });
+
+      expect(updated.amount).toBeNull();
     });
   });
 

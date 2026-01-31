@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -44,11 +44,8 @@ import {
   WEIGHT_UNITS,
   LIABILITY_TYPES,
 } from "./asset-details-sheet-schema";
-import {
-  AlternativeAssetKind,
-  ALTERNATIVE_ASSET_KIND_DISPLAY_NAMES,
-  type Holding,
-} from "@/lib/types";
+import { type LinkableAsset } from "./alternative-asset-quick-add-modal";
+import { AlternativeAssetKind, ALTERNATIVE_ASSET_KIND_DISPLAY_NAMES } from "@/lib/types";
 
 /**
  * Asset data required by the sheet.
@@ -60,6 +57,13 @@ export interface AssetDetailsSheetAsset {
   kind: AlternativeAssetKind;
   currency: string;
   metadata?: Record<string, unknown>;
+}
+
+/** Represents a liability that can be linked from a property */
+export interface LinkedLiability {
+  id: string;
+  name: string;
+  balance?: string;
 }
 
 interface AssetDetailsSheetProps {
@@ -74,9 +78,15 @@ interface AssetDetailsSheetProps {
   /** Optional: For displaying linked asset name for liabilities */
   linkedAssetName?: string;
   /** Optional: For liabilities, list of assets that can be linked */
-  linkableAssets?: Holding[];
+  linkableAssets?: LinkableAsset[];
   /** Optional: For properties, list of liabilities linked to this asset */
-  linkedLiabilities?: { id: string; name: string; balance?: string }[];
+  linkedLiabilities?: LinkedLiability[];
+  /** Optional: For properties, list of unlinked mortgages that can be linked */
+  availableMortgages?: LinkedLiability[];
+  /** Optional: Callback to link a mortgage to this property */
+  onLinkMortgage?: (mortgageId: string) => Promise<void>;
+  /** Optional: Callback to unlink a mortgage from this property */
+  onUnlinkMortgage?: (mortgageId: string) => Promise<void>;
   /** Whether the save operation is in progress */
   isSaving?: boolean;
 }
@@ -93,6 +103,9 @@ export function AssetDetailsSheet({
   linkedAssetName,
   linkableAssets = [],
   linkedLiabilities = [],
+  availableMortgages = [],
+  onLinkMortgage,
+  onUnlinkMortgage,
   isSaving = false,
 }: AssetDetailsSheetProps) {
   // Use a fallback kind for the form when asset is null (form state won't be used anyway)
@@ -116,9 +129,9 @@ export function AssetDetailsSheet({
   const linkableAssetOptions: ResponsiveSelectOption[] = useMemo(() => {
     return [
       { value: "__none__", label: "None (standalone liability)" },
-      ...linkableAssets.map((holding) => ({
-        value: holding.id,
-        label: holding.instrument?.name ?? holding.id,
+      ...linkableAssets.map((asset) => ({
+        value: asset.id,
+        label: asset.name,
       })),
     ];
   }, [linkableAssets]);
@@ -174,58 +187,62 @@ export function AssetDetailsSheet({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 pb-8">
-            {/* Common Fields Section */}
-            <div className="space-y-4">
-              <SectionHeader
-                title="Purchase Information"
-                description="Optional purchase details for gain/loss tracking"
-              />
+            {/* Purchase Information - only for assets, not liabilities */}
+            {asset.kind !== AlternativeAssetKind.LIABILITY && (
+              <>
+                <div className="space-y-4">
+                  <SectionHeader
+                    title="Purchase Information"
+                    description="Optional purchase details for gain/loss tracking"
+                  />
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="purchasePrice"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        {asset.kind === AlternativeAssetKind.PHYSICAL_PRECIOUS
-                          ? "Purchase Price (per unit)"
-                          : "Purchase Price"}
-                      </FormLabel>
-                      <FormControl>
-                        <MoneyInput
-                          value={field.value ?? ""}
-                          onChange={(e) =>
-                            field.onChange(e.target.value ? parseFloat(e.target.value) : null)
-                          }
-                          placeholder="0.00"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="purchasePrice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            {asset.kind === AlternativeAssetKind.PHYSICAL_PRECIOUS
+                              ? "Purchase Price (per unit)"
+                              : "Purchase Price"}
+                          </FormLabel>
+                          <FormControl>
+                            <MoneyInput
+                              value={field.value ?? ""}
+                              onChange={(e) =>
+                                field.onChange(e.target.value ? parseFloat(e.target.value) : null)
+                              }
+                              placeholder="0.00"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                <FormField
-                  control={form.control}
-                  name="purchaseDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Purchase Date</FormLabel>
-                      <FormControl>
-                        <DatePickerInput
-                          value={field.value ?? undefined}
-                          onChange={(date) => field.onChange(date ?? null)}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
+                    <FormField
+                      control={form.control}
+                      name="purchaseDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Purchase Date</FormLabel>
+                          <FormControl>
+                            <DatePickerInput
+                              value={field.value ?? undefined}
+                              onChange={(date) => field.onChange(date ?? null)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
 
-            <Separator />
+                <Separator />
+              </>
+            )}
 
             {/* Type-specific Fields */}
             <div className="space-y-4">
@@ -262,26 +279,13 @@ export function AssetDetailsSheet({
             </div>
 
             {/* Linked Liabilities Display (for properties) */}
-            {asset.kind === AlternativeAssetKind.PROPERTY && linkedLiabilities.length > 0 && (
-              <>
-                <Separator />
-                <div className="space-y-3">
-                  <SectionHeader
-                    title="Linked Liabilities"
-                    description="Debts associated with this property"
-                  />
-                  <div className="bg-muted/30 space-y-2 rounded-lg border p-3">
-                    {linkedLiabilities.map((liability) => (
-                      <div key={liability.id} className="flex items-center justify-between text-sm">
-                        <span className="font-medium">{liability.name}</span>
-                        {liability.balance && (
-                          <span className="text-muted-foreground">-{liability.balance}</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
+            {asset.kind === AlternativeAssetKind.PROPERTY && (
+              <PropertyMortgageSection
+                linkedLiabilities={linkedLiabilities}
+                availableMortgages={availableMortgages}
+                onLinkMortgage={onLinkMortgage}
+                onUnlinkMortgage={onUnlinkMortgage}
+              />
             )}
 
             <Separator />
@@ -678,36 +682,37 @@ function LiabilityFields({
       />
 
       {/* Linked Asset Display/Selector */}
-      {linkableAssetOptions.length > 1 ? (
-        <FormField
-          control={form.control}
-          name="linkedAssetId"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Linked Asset</FormLabel>
+      <FormField
+        control={form.control}
+        name="linkedAssetId"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Linked Asset</FormLabel>
+            {linkableAssetOptions.length > 1 ? (
               <FormControl>
                 <ResponsiveSelect
                   value={field.value ?? "__none__"}
                   onValueChange={(val) => field.onChange(val === "__none__" ? null : val)}
                   options={linkableAssetOptions}
-                  placeholder="Select asset to link"
+                  placeholder="Select asset to link (optional)"
                   sheetTitle="Link to Asset"
                   sheetDescription="Link this liability to a property or vehicle for grouped display"
                 />
               </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      ) : linkedAssetName ? (
-        <div className="space-y-2">
-          <FormLabel>Linked Asset</FormLabel>
-          <div className="bg-muted/30 flex items-center gap-2 rounded-lg border p-3">
-            <Icons.Link className="text-muted-foreground h-4 w-4" />
-            <span className="text-sm font-medium">{linkedAssetName}</span>
-          </div>
-        </div>
-      ) : null}
+            ) : linkedAssetName ? (
+              <div className="bg-muted/30 flex items-center gap-2 rounded-lg border p-3">
+                <Icons.Link className="text-muted-foreground h-4 w-4" />
+                <span className="text-sm font-medium">{linkedAssetName}</span>
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-sm">
+                No assets available to link. Create a property or vehicle first.
+              </p>
+            )}
+            <FormMessage />
+          </FormItem>
+        )}
+      />
     </div>
   );
 }
@@ -731,5 +736,160 @@ function OtherFields({ form }: { form: ReturnType<typeof useForm<AssetDetailsFor
         </FormItem>
       )}
     />
+  );
+}
+
+/**
+ * Section for managing mortgage links on a property.
+ * Shows linked mortgages with unlink option and allows linking available mortgages.
+ */
+function PropertyMortgageSection({
+  linkedLiabilities,
+  availableMortgages,
+  onLinkMortgage,
+  onUnlinkMortgage,
+}: {
+  linkedLiabilities: LinkedLiability[];
+  availableMortgages: LinkedLiability[];
+  onLinkMortgage?: (mortgageId: string) => Promise<void>;
+  onUnlinkMortgage?: (mortgageId: string) => Promise<void>;
+}) {
+  const [isLinking, setIsLinking] = useState(false);
+  const [unlinkingId, setUnlinkingId] = useState<string | null>(null);
+  const [showLinkSelect, setShowLinkSelect] = useState(false);
+  const [selectedMortgageId, setSelectedMortgageId] = useState<string>("");
+
+  const handleLink = async () => {
+    if (!selectedMortgageId || !onLinkMortgage) return;
+    setIsLinking(true);
+    try {
+      await onLinkMortgage(selectedMortgageId);
+      setSelectedMortgageId("");
+      setShowLinkSelect(false);
+    } finally {
+      setIsLinking(false);
+    }
+  };
+
+  const handleUnlink = async (mortgageId: string) => {
+    if (!onUnlinkMortgage) return;
+    setUnlinkingId(mortgageId);
+    try {
+      await onUnlinkMortgage(mortgageId);
+    } finally {
+      setUnlinkingId(null);
+    }
+  };
+
+  // Don't show anything if there are no linked liabilities and no available mortgages
+  if (linkedLiabilities.length === 0 && availableMortgages.length === 0) {
+    return null;
+  }
+
+  return (
+    <>
+      <Separator />
+      <div className="space-y-4">
+        <SectionHeader
+          title="Linked Mortgage"
+          description="Mortgage or loan associated with this property"
+        />
+
+        {/* Display linked liabilities with unlink option */}
+        {linkedLiabilities.length > 0 && (
+          <div className="bg-muted/30 space-y-2 rounded-lg border p-3">
+            {linkedLiabilities.map((liability) => (
+              <div key={liability.id} className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <Icons.Link className="text-muted-foreground h-4 w-4" />
+                  <span className="font-medium">{liability.name}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {liability.balance && (
+                    <span className="text-muted-foreground">-{liability.balance}</span>
+                  )}
+                  {onUnlinkMortgage && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleUnlink(liability.id)}
+                      disabled={unlinkingId === liability.id}
+                      className="h-7 px-2"
+                    >
+                      {unlinkingId === liability.id ? (
+                        <Icons.Spinner className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Icons.X className="h-3 w-3" />
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Link existing mortgage section */}
+        {availableMortgages.length > 0 && onLinkMortgage && (
+          <div className="space-y-3">
+            {!showLinkSelect ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowLinkSelect(true)}
+                className="w-full"
+              >
+                <Icons.Link className="mr-2 h-4 w-4" />
+                Link existing mortgage
+              </Button>
+            ) : (
+              <div className="space-y-2">
+                <ResponsiveSelect
+                  value={selectedMortgageId}
+                  onValueChange={setSelectedMortgageId}
+                  options={availableMortgages.map((m) => ({
+                    value: m.id,
+                    label: m.name + (m.balance ? ` (${m.balance})` : ""),
+                  }))}
+                  placeholder="Select a mortgage to link"
+                  sheetTitle="Link Mortgage"
+                  sheetDescription="Select a mortgage to link to this property"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowLinkSelect(false);
+                      setSelectedMortgageId("");
+                    }}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleLink}
+                    disabled={!selectedMortgageId || isLinking}
+                    className="flex-1"
+                  >
+                    {isLinking ? (
+                      <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Icons.Check className="mr-2 h-4 w-4" />
+                    )}
+                    Link
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </>
   );
 }
