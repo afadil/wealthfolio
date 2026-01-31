@@ -21,8 +21,13 @@ import {
   AlternativeAssetKind,
   type CreateAlternativeAssetRequest,
   type AlternativeAssetKindApi,
-  type Holding,
 } from "@/lib/types";
+
+/** Simple type for assets that can be linked to liabilities */
+export interface LinkableAsset {
+  id: string;
+  name: string;
+}
 
 // Asset type configuration using theme colors
 const ASSET_TYPES = [
@@ -110,10 +115,21 @@ interface AlternativeAssetQuickAddModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultKind?: AlternativeAssetKind;
-  linkableAssets?: Holding[];
+  linkableAssets?: LinkableAsset[];
   linkedAssetId?: string;
+  /** Default liability type (e.g., "mortgage" when chained from property) */
+  defaultLiabilityType?: string;
+  /** Default origination date for liability (e.g., from property purchase date) */
+  defaultOriginationDate?: Date;
+  /** Default name for liability (e.g., "Beach House Mortgage") */
+  defaultName?: string;
   onAssetCreated?: (response: { assetId: string }) => void;
-  onOpenLiabilityQuickAdd?: (linkedAssetId: string) => void;
+  /** Callback to open liability creation modal (chained from property with mortgage checkbox) */
+  onOpenLiabilityQuickAdd?: (
+    linkedAssetId: string,
+    purchaseDate?: Date,
+    propertyName?: string,
+  ) => void;
 }
 
 export function AlternativeAssetQuickAddModal({
@@ -122,6 +138,9 @@ export function AlternativeAssetQuickAddModal({
   defaultKind,
   linkableAssets = [],
   linkedAssetId: initialLinkedAssetId,
+  defaultLiabilityType,
+  defaultOriginationDate,
+  defaultName,
   onAssetCreated,
   onOpenLiabilityQuickAdd,
 }: AlternativeAssetQuickAddModalProps) {
@@ -130,6 +149,8 @@ export function AlternativeAssetQuickAddModal({
 
   const [step, setStep] = useState<1 | 2>(1);
   const [hasMortgageChecked, setHasMortgageChecked] = useState(false);
+  const [savedPurchaseDate, setSavedPurchaseDate] = useState<Date | undefined>(undefined);
+  const [savedPropertyName, setSavedPropertyName] = useState<string | undefined>(undefined);
   const [formData, setFormData] = useState<FormData>({
     kind: defaultKind || AlternativeAssetKind.PROPERTY,
     name: "",
@@ -143,11 +164,17 @@ export function AlternativeAssetQuickAddModal({
     onCreateSuccess: (response) => {
       onAssetCreated?.(response);
 
+      // If mortgage checkbox was checked, chain to liability creation
+      // Don't close the modal - the callback will reopen it for liability
       if (hasMortgageChecked && onOpenLiabilityQuickAdd) {
-        onOpenLiabilityQuickAdd(response.assetId);
+        onOpenChange(false);
+        // Use setTimeout to ensure modal closes before reopening
+        setTimeout(() => {
+          onOpenLiabilityQuickAdd(response.assetId, savedPurchaseDate, savedPropertyName);
+        }, 100);
+      } else {
+        onOpenChange(false);
       }
-
-      onOpenChange(false);
     },
   });
 
@@ -157,16 +184,27 @@ export function AlternativeAssetQuickAddModal({
       // Skip step 1 if a defaultKind is provided
       setStep(defaultKind ? 2 : 1);
       setHasMortgageChecked(false);
+      setSavedPurchaseDate(undefined);
+      setSavedPropertyName(undefined);
       setFormData({
         kind: defaultKind || AlternativeAssetKind.PROPERTY,
-        name: "",
+        name: defaultName || "",
         currency: baseCurrency,
         currentValue: "",
-        valueDate: new Date(),
+        valueDate: defaultOriginationDate || new Date(),
         linkedAssetId: initialLinkedAssetId,
+        liabilityType: defaultLiabilityType,
       });
     }
-  }, [open, defaultKind, initialLinkedAssetId, baseCurrency]);
+  }, [
+    open,
+    defaultKind,
+    initialLinkedAssetId,
+    defaultLiabilityType,
+    defaultOriginationDate,
+    defaultName,
+    baseCurrency,
+  ]);
 
   const selectedAssetType = useMemo(
     () => ASSET_TYPES.find((t) => t.kind === formData.kind),
@@ -215,19 +253,18 @@ export function AlternativeAssetQuickAddModal({
     };
 
     setHasMortgageChecked(formData.hasMortgage ?? false);
+    setSavedPurchaseDate(formData.purchaseDate);
+    setSavedPropertyName(formData.name);
 
     await createMutation.mutateAsync(request);
   };
 
-  // Build linkable assets options for liability form
+  // Build linkable assets options for liability form (only actual assets, no "none" option)
   const linkableAssetOptions = useMemo(() => {
-    return [
-      { value: "", label: "None (standalone liability)" },
-      ...linkableAssets.map((asset) => ({
-        value: asset.id,
-        label: asset.instrument?.name ?? asset.id,
-      })),
-    ];
+    return linkableAssets.map((asset) => ({
+      value: asset.id,
+      label: asset.name,
+    }));
   }, [linkableAssets]);
 
   const getValueLabel = () => {
@@ -498,27 +535,29 @@ export function AlternativeAssetQuickAddModal({
                       }
                     />
                     <label htmlFor="hasMortgage" className="text-foreground cursor-pointer text-sm">
-                      I have a mortgage/loan on this property
+                      Create and link a mortgage
                     </label>
                   </div>
                 )}
 
-                {/* Link to asset for liability */}
-                {formData.kind === AlternativeAssetKind.LIABILITY && linkableAssets.length > 0 && (
-                  <div className="space-y-2">
-                    <Label className="text-foreground text-sm font-medium">
-                      Link to Asset (optional)
-                    </Label>
-                    <ResponsiveSelect
-                      value={formData.linkedAssetId || ""}
-                      onValueChange={(v) => updateFormData("linkedAssetId", v === "" ? "" : v)}
-                      options={linkableAssetOptions}
-                      placeholder="None (standalone liability)"
-                      sheetTitle="Link to Asset"
-                      sheetDescription="Link this liability to a property or vehicle for grouped display"
-                    />
-                  </div>
-                )}
+                {/* Link to asset for liability - show if there are linkable assets and no pre-set link */}
+                {formData.kind === AlternativeAssetKind.LIABILITY &&
+                  linkableAssets.length > 0 &&
+                  !initialLinkedAssetId && (
+                    <div className="space-y-2">
+                      <Label className="text-foreground text-sm font-medium">
+                        Link to Asset (optional)
+                      </Label>
+                      <ResponsiveSelect
+                        value={formData.linkedAssetId}
+                        onValueChange={(v) => updateFormData("linkedAssetId", v)}
+                        options={linkableAssetOptions}
+                        placeholder="Select asset to link (optional)"
+                        sheetTitle="Link to Asset"
+                        sheetDescription="Link this liability to a property or vehicle for grouped display"
+                      />
+                    </div>
+                  )}
               </motion.div>
             )}
           </AnimatePresence>

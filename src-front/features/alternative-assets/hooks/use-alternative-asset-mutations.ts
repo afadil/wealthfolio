@@ -31,6 +31,7 @@ export function useAlternativeAssetMutations(options: UseAlternativeAssetMutatio
     queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS] });
     queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNTS] });
     queryClient.invalidateQueries({ queryKey: [QueryKeys.NET_WORTH] });
+    queryClient.invalidateQueries({ queryKey: [QueryKeys.ALTERNATIVE_HOLDINGS] });
   };
 
   const createMutation = useMutation({

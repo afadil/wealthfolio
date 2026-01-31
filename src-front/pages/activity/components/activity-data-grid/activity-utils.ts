@@ -1,4 +1,4 @@
-import { isCashActivity, isIncomeActivity } from "@/lib/activity-utils";
+import { isCashActivity, isCashTransfer, isIncomeActivity } from "@/lib/activity-utils";
 import { ActivityType } from "@/lib/constants";
 import type { Account } from "@/lib/types";
 import { parseDecimalInput, parseLocalDateTime } from "@/lib/utils";
@@ -19,7 +19,7 @@ const NUMERIC_FIELDS = new Set(["quantity", "unitPrice", "amount", "fee", "fxRat
 
 /**
  * Converts a number to a string for API payloads, preserving full precision.
- * Returns undefined for null/undefined/NaN values.
+ * Returns undefined for null/undefined/NaN values (so they are omitted from JSON).
  */
 function toDecimalString(value: unknown): string | undefined {
   if (value == null) return undefined;
@@ -28,9 +28,11 @@ function toDecimalString(value: unknown): string | undefined {
     return value.toString();
   }
   if (typeof value === "string") {
-    const parsed = Number.parseFloat(value);
+    const trimmed = value.trim();
+    if (trimmed === "") return undefined;
+    const parsed = Number.parseFloat(trimmed);
     if (!Number.isFinite(parsed)) return undefined;
-    return value; // Keep original string to preserve precision
+    return trimmed; // Keep original string to preserve precision
   }
   return undefined;
 }
@@ -208,34 +210,35 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
       updated = { ...updated, date: value };
     }
   } else if (field === "quantity") {
-    // Preserve original value if null/undefined (user cleared the field)
     // Use high precision (18) to support crypto quantities like 0.000000099
-    if (value != null) {
-      updated = { ...updated, quantity: parseDecimalInput(value as string | number, 18) };
-      updated = applySplitDefaults(updated);
-    }
+    // Empty string or null defaults to 0 (ActivityDetails type requires number)
+    const parsed =
+      value != null && value !== "" ? parseDecimalInput(value as string | number, 18) : 0;
+    updated = { ...updated, quantity: parsed };
+    updated = applySplitDefaults(updated);
   } else if (field === "unitPrice") {
-    // Preserve original value if null/undefined (user cleared the field)
     // Use high precision (18) to support crypto prices
-    if (value != null) {
-      const newUnitPrice = parseDecimalInput(value as string | number, 18);
-      updated = { ...updated, unitPrice: newUnitPrice };
-      if (isCashActivity(updated.activityType) || isIncomeActivity(updated.activityType)) {
-        updated = { ...updated, amount: newUnitPrice };
-      }
-      updated = applySplitDefaults(updated);
+    // Empty string or null defaults to 0 (ActivityDetails type requires number)
+    const newUnitPrice =
+      value != null && value !== "" ? parseDecimalInput(value as string | number, 18) : 0;
+    updated = { ...updated, unitPrice: newUnitPrice };
+    if (isCashActivity(updated.activityType) || isIncomeActivity(updated.activityType)) {
+      updated = { ...updated, amount: newUnitPrice };
     }
+    updated = applySplitDefaults(updated);
   } else if (field === "amount") {
-    // Preserve original value if null/undefined (user cleared the field)
     // Use high precision (18) to support crypto amounts
-    if (value != null) {
+    // Empty string or null clears the value so the backend can persist NULL (via treat_none_as_null)
+    if (value == null || value === "") {
+      updated = { ...updated, amount: null as unknown as number };
+    } else {
       updated = { ...updated, amount: parseDecimalInput(value as string | number, 18) };
     }
   } else if (field === "fee") {
-    // Preserve original value if null/undefined (user cleared the field)
-    if (value != null) {
-      updated = { ...updated, fee: parseDecimalInput(value as string | number, 12) };
-    }
+    // Empty string or null defaults to 0 (ActivityDetails type requires number)
+    const parsed =
+      value != null && value !== "" ? parseDecimalInput(value as string | number, 12) : 0;
+    updated = { ...updated, fee: parsed };
   } else if (field === "assetSymbol") {
     const upper = (typeof value === "string" ? value : "").trim().toUpperCase();
     // Only update assetSymbol, NOT assetId
@@ -382,7 +385,6 @@ export function buildSavePayload(
     const currencyForPayload =
       resolvedCurrency ?? (isCashActivity(transaction.activityType) ? currencyFallback : undefined);
 
-    const isCash = isCashActivity(transaction.activityType);
     const isNew = transaction.isNew === true;
 
     // Build metadata JSON if needed (e.g., for isExternal flag on transfers)
@@ -390,6 +392,13 @@ export function buildSavePayload(
     const isTransfer =
       transaction.activityType === ActivityType.TRANSFER_IN ||
       transaction.activityType === ActivityType.TRANSFER_OUT;
+
+    // Determine if this is a "pure cash" activity that doesn't need asset info
+    // Transfers are special: they can be cash OR securities, so check the symbol
+    const assetSymbol = (transaction.assetSymbol || "").trim();
+    const isCash = isTransfer
+      ? isCashTransfer(transaction.activityType, assetSymbol) || !assetSymbol
+      : isCashActivity(transaction.activityType);
     if (isTransfer && transaction.isExternal != null) {
       // Merge with existing metadata if present
       const existingMeta = typeof transaction.metadata === "object" ? transaction.metadata : {};
@@ -422,14 +431,14 @@ export function buildSavePayload(
       currency: currencyForPayload,
       fee: toDecimalString(transaction.fee),
       fxRate: transaction.fxRate != null ? toDecimalString(transaction.fxRate) : null,
-      comment: transaction.comment ?? undefined,
+      notes: transaction.comment?.trim() || undefined,
       metadata: metadataJson,
     };
 
-    // Remove quantity/unitPrice for split activities
+    // Clear quantity/unitPrice for split activities (they use splitRatio in amount instead)
     if (basePayload.activityType === ActivityType.SPLIT) {
-      delete basePayload.quantity;
-      delete basePayload.unitPrice;
+      basePayload.quantity = undefined;
+      basePayload.unitPrice = undefined;
     }
 
     if (isNew) {
@@ -454,15 +463,27 @@ export function buildSavePayload(
 
       creates.push(createPayload);
     } else {
-      // Build UPDATE payload - can include asset.id for backward compatibility
+      // Build UPDATE payload
       const updatePayload: ActivityUpdatePayload = { ...basePayload };
 
       if (!isCash) {
-        // For EXISTING activities: send asset.id for backward compatibility
-        const existingAssetId = resolveAssetIdForTransaction(transaction, fallbackCurrency);
-        if (existingAssetId) {
+        const currentSymbol = (transaction.assetSymbol || "").trim().toUpperCase();
+        const originalSymbol = (transaction._originalAssetSymbol || "").trim().toUpperCase();
+        const symbolChanged = currentSymbol !== originalSymbol;
+
+        if (symbolChanged && currentSymbol) {
+          // Symbol changed: send symbol + exchangeMic for backend to generate new canonical ID
           updatePayload.asset = {
-            id: existingAssetId,
+            symbol: currentSymbol,
+            exchangeMic: transaction.exchangeMic,
+            kind: transaction.pendingAssetKind,
+            name: transaction.pendingAssetName,
+            pricingMode: transaction.assetPricingMode,
+          };
+        } else if (transaction._originalAssetId) {
+          // Symbol unchanged: send existing asset ID with pricingMode to allow mode updates
+          updatePayload.asset = {
+            id: transaction._originalAssetId,
             pricingMode: transaction.assetPricingMode,
           };
         }
