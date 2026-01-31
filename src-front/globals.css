@@ -3,14 +3,18 @@
 @import "tw-shimmer";
 @plugin "@tailwindcss/typography";
 @source "../packages/ui/src";
-@import "@fontsource/ibm-plex-mono";
-@import "@fontsource/ibm-plex-mono/200.css";
-@import "@fontsource/ibm-plex-mono/300.css";
+/* Fonts - using variable fonts where available for best performance */
+/* Inter (sans) - variable font: single file for all weights */
+@import "@fontsource-variable/inter";
+/* Merriweather (serif) - selective weights for body/heading use */
+@import "@fontsource/merriweather/400.css";
+@import "@fontsource/merriweather/400-italic.css";
+@import "@fontsource/merriweather/700.css";
+/* IBM Plex Mono (mono) - selective weights */
 @import "@fontsource/ibm-plex-mono/400.css";
 @import "@fontsource/ibm-plex-mono/500.css";
 @import "@fontsource/ibm-plex-mono/600.css";
 @import "@fontsource/ibm-plex-mono/700.css";
-@import "@fontsource/ibm-plex-mono/400-italic.css";
 
 /* Enable class-based dark mode across the subtree (Tailwind v4 pattern) */
 @custom-variant dark (&:where(.dark, .dark *));
@@ -39,6 +43,11 @@
 }
 
 @theme {
+  /* Font families */
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Merriweather", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
   /* Disable default colors to prevent their use; feel free to re-enable as needed. */
   --color-amber-*: initial;
   --color-lime-*: initial;
@@ -489,6 +498,7 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans);
   }
 
   button:not(:disabled),
@@ -757,7 +767,8 @@ html.app-lockdown .allow-select {
   user-select: text;
 }
 
-* Prevent zoom on double tap */ * {
+/* Prevent zoom on double tap */
+* {
   touch-action: manipulation;
 }
 
